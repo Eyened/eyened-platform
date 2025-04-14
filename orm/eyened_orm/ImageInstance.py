@@ -305,7 +305,7 @@ class DeviceModel(Base):
         self.ManufacturerModelName = ManufacturerModelName
 
     def __repr__(self):
-        return f"{self.DeviceID} - {self.Manufacturer} {self.ManufacturerModelName}"
+        return f"{self.DeviceModelID} - {self.Manufacturer} {self.ManufacturerModelName}"
 
 
     @classmethod

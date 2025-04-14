@@ -39,7 +39,7 @@ class DBManager:
         """Context manager for session management."""
         if cls._SessionLocal is None:
             raise RuntimeError(
-                "DatabaseSession is not initialized. Call DatabaseSession.init(config) first."
+                "DBManager is not initialized. Call DBManager.init(config) first."
             )
 
         session = cls._SessionLocal()
@@ -63,6 +63,6 @@ class DBManager:
         """Returns the engine instance."""
         if cls._engine is None:
             raise RuntimeError(
-                "DatabaseSession is not initialized. Call DatabaseSession.init(config) first."
+                "DBManager is not initialized. Call DBManager.init(config) first."
             )
         return cls._engine

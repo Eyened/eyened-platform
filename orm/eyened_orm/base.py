@@ -58,10 +58,6 @@ class Base(DeclarativeBase):
     def filter_columns(cls):
         return [c for c in cls.get_columns() if not c.foreign_keys]
 
-    @property
-    def column_names(cls):
-        return [c.name for c in cls.get_columns()]
-
     @classmethod
     def init_class(cls, session=None, config=None):
         cls.session = session

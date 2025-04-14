@@ -128,7 +128,7 @@ class Annotation(Base):
         a.Creator = creator
         a.AnnotationType = annotationType
         a.Feature = feature
-        a.Created = datetime.now()
+        a.DateInserted = datetime.now()
         return a
 
 
