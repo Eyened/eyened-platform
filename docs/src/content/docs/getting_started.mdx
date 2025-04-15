@@ -3,3 +3,43 @@ title: Deploying Eyened platform
 description: Deploy the Eyened platform in a network
 ---
 
+## Getting started with the Eyened Platform
+
+The Eyened Platform consists of three main containers:
+
+- **Eyened database** The core of the platform, holds image and annotation metadata organized in a hierarchical structure Patient -> Study -> Series -> ImageInstance. It can be generated and accessed via the `eyened_orm`.
+
+- **Eyened API** A fastapi API providing an interface to the database.
+
+- **Eyened viewer client** A browser application for image visualization and annotation.
+
+```
+http {
+
+    sendfile on;
+    gzip on;
+    gzip_types image/jpeg image/png text/plain;
+    gzip_vary on;
+    gunzip on;
+    access_log off;
+    
+    server {
+        listen 80;
+
+        # File server
+        location /files/ {
+            internal;
+            alias /local/path/to/images/;
+        }
+
+        # Reverse Proxy for viewer server
+        location / {
+            proxy_pass http://localhost:8000/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+```

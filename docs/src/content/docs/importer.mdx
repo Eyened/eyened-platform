@@ -3,3 +3,123 @@ title: Importing data
 description: Import data into the eyened platform
 ---
 
+{/* Claude query: Document the usage of the importer in importer.py. Clearly document the data structure used by the importer. Then document the options received by the importer. Finally, include a section with the Patient, Study, Series and ImageInstance fields. Look at the respective files and document only the non-relationship fields.*/}
+
+The `Importer` class in the eyened platform provides a structured way to import ophthalmic images into the database.
+
+:::note
+For a hands-on introduction to using the importer, make sure to check our example notebook.
+:::
+
+## Data Structure
+
+The importer expects data to be structured as a list of dictionary objects with the following hierarchical format:
+
+```python
+[
+    {
+        "patient_identifier": str,  # Optional patient identifier in the system
+        "props": {},                # Optional key-value properties for patient
+        "studies": [
+            {
+                "study_date": datetime.date,  # Optional study date
+                "props": {},                  # Optional key-value properties for study
+                "series": [
+                    {
+                        "series_id": str,     # Optional series identifier
+                        "props": {},          # Optional key-value properties for series
+                        "images": [
+                            {
+                                # Image-specific properties
+                                "path": str,   # Path to image file
+                                "props": {},   # Additional properties
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]
+```
+
+The importer creates a hierarchy of objects in the database: Project → Patient → Study → Series → ImageInstance.
+
+## Importer Options
+
+When initializing the `Importer` class, you can provide the following options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `session` | SQLAlchemy session | Required | Database session to use for the import |
+| `project_name` | str | Required | Name of the project to import data into |
+| `create_patients` | bool | False | If True, create patients when they don't exist |
+| `create_studies` | bool | False | If True, create studies when they don't exist |
+| `create_series` | bool | True | If True, create series when they don't exist |
+| `run_ai_models` | bool | True | If True, run AI models on the images after import |
+| `generate_thumbnails` | bool | True | If True, generate thumbnails for the images after import |
+| `copy_files` | bool | False | If True, copy image files to the images_basepath directory |
+| `env` | str | "test" | Environment to use for configuration (e.g., "test", "production") |
+
+## Entity Fields
+
+The following optional fields may be provided in the `props` dictionary of the Patient, Study, Series or Image.
+
+### Patient
+
+The `Patient` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `BirthDate` | date | Patient's date of birth |
+| `Sex` | SexEnum | Patient's sex (M=1, F=2) |
+| `PatientIdentifier` | str | Unique identifier for the patient (within a project) |
+
+### Study
+
+The `Study` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `StudyRound` | int | Project round of this study |
+| `StudyDescription` | str | Description of the study |
+| `StudyInstanceUid` | str | Unique identifier for the study (DICOM) |
+| `StudyDate` | date | Date when the study was performed |
+
+### Series
+
+The `Series` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `SeriesID` | int | Primary key identifier for the series |
+| `SeriesNumber` | int | Series number |
+| `SeriesInstanceUid` | str | Unique identifier for the series (DICOM) |
+
+### ImageInstance
+
+The `ImageInstance` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Modality` | Modality | Type of image (ColorFundus, OCT, etc.) |
+| `SOPInstanceUid` | str | Unique identifier for SOP instance (DICOM) |
+| `SOPClassUid` | str | Identifies the service-object pair class (DICOM) |
+| `PhotometricInterpretation` | str | Specifies the intended interpretation of pixel data (RGB, MONOCHROME, etc.) |
+| `SamplesPerPixel` | int | Number of color components in each pixel |
+| `NrOfFrames` | int | Number of frames in a multi-frame image |
+| `SliceThickness` | float | Nominal slice thickness, in millimeters |
+| `Rows_y` | int | Number of rows (height) in the image |
+| `Columns_x` | int | Number of columns (width) in the image |
+| `Laterality` | Laterality | Side of body examined (L=1, R=2) |
+| `DICOMModality` | ModalityType | Type of equipment that acquired the data (OP, OPT, SC) |
+| `AnatomicRegion` | int | Body part examined |
+| `ETDRSField` | ETDRSField | Early Treatment Diabetic Retinopathy Study field position |
+| `Angiography` | int | Indicates angiography type |
+| `AcquisitionDateTime` | datetime | Date and time the acquisition of data started |
+| `PupilDilated` | bool | Indicates if pupil was dilated during image acquisition |
+| `HorizontalFieldOfView` | float | Horizontal dimension of field of view in millimeters |
+| `ResolutionAxial` | float | Axial resolution in millimeters |
+| `ResolutionHorizontal` | float | Horizontal resolution in millimeters |
+| `ResolutionVertical` | float | Vertical resolution in millimeters |
+
