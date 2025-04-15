@@ -10,6 +10,24 @@ export default defineConfig({
 		starlight({
 			title: 'Eyened Platform',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/eyened/eyened-platform' }],
+			sidebar: [
+				{ slug: 'getting_started' },
+                { slug: 'importer' },
+				{
+				label: 'Eyened ORM',
+					// Autogenerate a group of links for the 'constellations' directory.
+					autogenerate: { directory: 'orm' },
+				},
+				{
+				label: 'Eyened API',
+					// Autogenerate a group of links for the 'constellations' directory.
+					autogenerate: { directory: 'api' },
+				},
+				{label: 'Eyened Viewer',
+					// Autogenerate a group of links for the 'constellations' directory.
+					autogenerate: { directory: 'client' },
+				},
+			],
 			// sidebar: [
 			// 	{
 			// 		label: 'Guides',

@@ -1,0 +1,81 @@
+---
+title: Getting started with Eyened ORM
+description: Learn how to work with database objects in Python code or Jupyter notebooks
+sidebar:
+  order: 1
+---
+
+{/* Claude query: Update the documentation in getting_started.mdx using the sample in import.ipynb. Keep the setup section the same but update the Connecting section and add a section briefly showing how to import and use the database objects.  */}
+
+## Setup
+
+```
+git clone git@github.com:Eyened/eyened-orm.git eyened-orm
+cd eyened-orm
+pip install -e .
+```
+
+## Connecting to the database
+
+To connect the ORM to a database from Python code, use the `DBManager` class with a configuration:
+
+```python
+from eyened_orm import DBManager
+from eyened_orm.utils import get_config
+
+# Load configuration for a specific environment (e.g., "test", "prod")
+config = get_config("test")
+
+# Initialize the DBManager with the configuration
+DBManager.init(config)
+
+# Get a session to interact with the database
+session = DBManager.get_session()
+```
+
+Alternatively, you can provide database credentials directly:
+
+```python
+from eyened_orm import get_session_local, init_orm
+
+database = {
+    'user': 'USERNAME',
+    'password': 'PASSWORD',
+    'host': 'DBHOST',
+    'database': 'DBNAME',
+    'port': 'PORT',
+}
+
+SessionLocal = get_session_local({'database': database})
+session = SessionLocal()
+init_orm(session)
+```
+
+## Working with database objects
+
+Once connected, you can import and use database objects from the ORM:
+
+```python
+# Import database model classes
+from eyened_orm import Project, Patient, Study, Series, Image
+
+# Find a project by name
+project = Project.by_name(session, 'My Project Name')
+
+# Access related objects
+for patient in project.patients:
+    print(f"Patient ID: {patient.patient_id}, Identifier: {patient.patient_identifier}")
+    
+    for study in patient.studies:
+        print(f"  Study date: {study.study_date}")
+        
+        for series in study.series:
+            print(f"    Series ID: {series.series_id}")
+            
+            for image in series.images:
+                print(f"      Image path: {image.path}")
+
+# Query objects directly
+patients = session.query(Patient).filter(Patient.patient_identifier.like("Patient_%")).all()
+```
+For more information on using the ORM, see the [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/).

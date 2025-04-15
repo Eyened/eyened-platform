@@ -1,0 +1,75 @@
+---
+title: Command line utilities
+description: Learn how to use the command line utilities available in the ORM
+sidebar:
+  order: 2
+---
+
+{/* Claude query: In cli.mdx, document the command line utilities in cli.py. Include a section for each utility and explain what they do. ie. that full will create a full copy of the production database for development reasons and update thumbnails will update all thumbnails in the database. Do not include the specific options for each command as these might change, but do indicate that they can be checked with --help */}
+
+# Eyened ORM CLI
+
+The Eyened ORM provides several command line utilities to help with development, testing, and maintenance. These commands are available through the `eorm` CLI tool.
+
+
+:::info
+All commands support the `--help` option to display available command-specific options.
+
+```bash
+eorm [COMMAND] --help
+```
+:::
+
+
+## Available Commands
+
+
+### update-thumbnails
+
+Updates thumbnails for all images in the database. This is useful when the thumbnail generation logic has changed or when thumbnails are missing.
+
+```bash
+eorm update-thumbnails [OPTIONS]
+```
+
+### run-models
+
+Runs inference models on the database. This command processes images with the configured AI models.
+
+```bash
+eorm run-models [OPTIONS]
+```
+
+### validate-forms
+
+Validates form annotations and schemas in the database. This helps ensure that all form data is correctly structured and follows the defined schemas.
+
+```bash
+eorm validate-forms [OPTIONS]
+```
+
+### update-hashes
+
+Updates FileChecksum and DataHash for all ImageInstances in the database where they are NULL. This maintains data integrity by ensuring all images have proper hash values.
+
+```bash
+eorm update-hashes [OPTIONS]
+```
+
+
+
+### test
+
+Creates a test database for ORM testing, developing new features, or running alembic migrations. This command creates a database with the schema but only a subset of the data from the production database.
+
+```bash
+eorm test
+```
+
+### full
+
+Creates a complete test database with all data from the production database. This is useful when you need a full copy of the database for development or testing purposes.
+
+```bash
+eorm full
+```
