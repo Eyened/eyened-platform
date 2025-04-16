@@ -102,58 +102,71 @@ class ImageInstance(Base):
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
     Scan: Mapped[Scan] = relationship(back_populates="ImageInstances")
 
+        # Image modality
     Modality: Mapped[Optional[Modality]]
 
-    SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
-    SOPClassUid: Mapped[Optional[str]] = mapped_column(String(64))
+    # DICOM metadata
+    SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)  # Unique identifier for SOP instance (image)
+    SOPClassUid: Mapped[Optional[str]] = mapped_column(String(64))  # Identifies the service-object pair class
+    PhotometricInterpretation: Mapped[Optional[str]] = mapped_column(String(64))  # Specifies the intended interpretation of pixel data (RGB, MONOCHROME, etc.)
+    SamplesPerPixel: Mapped[Optional[int]]  # Number of color components in each pixel
+    NrOfFrames: Mapped[Optional[int]]  # Number of frames in a multi-frame image
+    SliceThickness: Mapped[Optional[float]]  # Nominal slice thickness, in millimeters
+    Rows_y: Mapped[Optional[int]]  # Number of rows (height) in the image
+    Columns_x: Mapped[Optional[int]]  # Number of columns (width) in the image
+    Laterality: Mapped[Optional[Laterality]]  # Side of body examined (left or right)
+    DICOMModality: Mapped[Optional[ModalityType]]  # Type of equipment that acquired the data (OP = Ophthalmic Photography)
+    AnatomicRegion: Mapped[Optional[int]]  # Body part examined
+    ETDRSField: Mapped[Optional[ETDRSField]]  # Early Treatment Diabetic Retinopathy Study field position (not standard DICOM)
+    Angiography: Mapped[Optional[int]]  # Indicates angiography type (not standard DICOM)
+    AcquisitionDateTime: Mapped[Optional[datetime]]  # Date and time the acquisition of data started
+    PupilDilated: Mapped[Optional[bool]]  # Indicates if pupil was dilated during image acquisition (ophthalmic-specific)
+    HorizontalFieldOfView: Mapped[Optional[float]]  # Horizontal dimension of field of view in millimeters
+    ResolutionAxial: Mapped[Optional[float]]  # Axial resolution in millimeters (not standard DICOM)
+    ResolutionHorizontal: Mapped[Optional[float]]  # Horizontal resolution in millimeters (not standard DICOM)
+    ResolutionVertical: Mapped[Optional[float]]  # Vertical resolution in millimeters (not standard DICOM)
 
-    # MONOCHROME OR RGB (perhaps make enum?)
-    PhotometricInterpretation: Mapped[Optional[str]] = mapped_column(String(64))
-    
-    SamplesPerPixel: Mapped[Optional[int]]
-    
-    # TODO: rename
-    Rows_y: Mapped[Optional[int]]
-    Columns_x: Mapped[Optional[int]]
-    NrOfFrames: Mapped[Optional[int]]
-
-    # TODO: there is something wrong here, using 4 resolution values for 3 dimensions    
-    SliceThickness: Mapped[Optional[float]]
-    ResolutionAxial: Mapped[Optional[float]]
-    ResolutionHorizontal: Mapped[Optional[float]]
-    ResolutionVertical: Mapped[Optional[float]]
-
-    Laterality: Mapped[Optional[Laterality]]
-    DICOMModality: Mapped[Optional[ModalityType]]
-
-    
-    # https://www.researchgate.net/figure/ETDRS-fields-definition-Courtesy-of-ETDRS-Research-Group-6_fig1_4072011
-    # TODO: AnatomicRegion is the same as ETDRS Field ?
-    AnatomicRegion: Mapped[Optional[int]]    
-    ETDRSField: Mapped[Optional[ETDRSField]]
-    
-    
-    Angiography: Mapped[Optional[int]]
-    AcquisitionDateTime: Mapped[Optional[datetime]]
-    PupilDilated: Mapped[Optional[bool]]
-    HorizontalFieldOfView: Mapped[Optional[float]]
-
-    # filename
+    # Relative filepath to the image file
     DatasetIdentifier: Mapped[str] = mapped_column(String(256), index=True)
+
+    # Relative filepath to the thumbnail file
     ThumbnailIdentifier: Mapped[Optional[str]] = mapped_column(String(256))
     ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(256))
-    
-    OldPath: Mapped[Optional[str]] = mapped_column(String(256))
-    # used for topcon images
-    FDAIdentifier: Mapped[Optional[int]]
 
-    # This default is not picked up by Alembic
+    # Original IDs of the image in the source database
+    OldPath: Mapped[Optional[str]] = mapped_column(String(256))
+    FDAIdentifier: Mapped[Optional[int]]
+    
+    # Considered removed from the database
     Inactive: Mapped[bool] = mapped_column(server_default="0")
 
     # Fundus-specific columns
-    # TODO: merge?
+    # CFROI contains the fundus bounds, eg.
+    # {
+        # "lines": {},
+        # "max_x": 2048,
+        # "max_y": 1536,
+        # "min_x": 0,
+        # "min_y": 0,
+        # "center": [1021.7938260323712, 751.6328910976617],
+        # "radius": 688.1397816206166,
+    # }
+    # Can be read by CFIBounds from rtnls_fundusprep
+    # from rtnls_fundusprep.cfi_bounds import CFIBounds
+    # bounds = copy.deepcopy(image_instance.CFROI)
+    # bounds["hw"] = (image_instance.Rows_y, image_instance.Columns_x)
+    # cfroi = CFIBounds(**bounds)
     CFROI: Mapped[Optional[Dict[str, Any]]]
+    # CFKeypoints holds fundus keypoint data
+    # {
+    # "fovea_xy": [525.3117339804495, 781.470218347899],
+    # "disc_edge_xy": [1038.7284831576292, 778.7821723259435],
+    # "prep_fovea_xy": [142.60000610351562, 534.2000122070312],
+    # "prep_disc_edge_xy": [524.5999755859375, 532.2000122070312]
+    # }
+    # keys prefixed with prep are keypoint locations in the preprocessed image
     CFKeypoints: Mapped[Optional[Dict[str, Any]]]
+    # Model assessment of fundus quality
     CFQuality: Mapped[Optional[float]]
 
     # File checksum and data hash
@@ -166,11 +179,12 @@ class ImageInstance(Base):
     # and detect duplicates even when the metadata might be different
     DataHash: Mapped[Optional[bytes]] = mapped_column(LargeBinary(32))
 
-    # datetimes
+     # Datetimes - automatically filled
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]] = mapped_column(
         server_default=func.now(), onupdate=func.now()
     )
+    # DatePreprocessed is the date and time the image was last preprocessed
     DatePreprocessed: Mapped[Optional[datetime]]
 
 
@@ -201,13 +215,13 @@ class ImageInstance(Base):
 
     @property
     def path(self):
-        if "images_basepath" not in self.config:
+        if self.config.get("images_basepath") is None:
             raise RuntimeError("images_basepath not set in config")
         return os.path.join(self.config["images_basepath"], self.DatasetIdentifier)
 
     @property
     def url(self):
-        if "image_server_url" not in self.config:
+        if self.config.get("image_server_url") is None:
             raise RuntimeError("image_server_url not set in config")
         return f"{self.config['image_server_url']}/{self.DatasetIdentifier}"
 

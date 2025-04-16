@@ -57,18 +57,7 @@ class Study(Base):
 
     patient_date_to_id_map = None
 
-    @classmethod
-    def _make_patient_date_to_id_map(cls, session: Session):
-        results = (
-            session.execute(
-                select(
-                    Patient.PatientIdentifier, Study.StudyDate, Study.StudyID
-                ).join_from(Study, Study.Patient)
-            )
-            .scalars()
-            .all()
-        )
-        Study.patient_date_to_id_map = {(r[0], r[1]): r[2] for r in results}
+
 
     @classmethod
     def by_id(cls, session: Session, id: int):
@@ -84,19 +73,14 @@ class Study(Base):
         )
 
     @classmethod
-    def from_patient_and_date(
-        cls, session: Session, patient_identifier, study_date, preload=True
+    def by_patient_and_date(
+        cls, session: Session, patient_id, study_date
     ):
-        if preload:
-            if Study.patient_date_to_id_map is None:
-                Study._make_patient_date_to_id_map(session)
-
-            study_id = Study.patient_date_to_id_map.get(
-                (patient_identifier, study_date), None
-            )
-            return Study.by_id(session, study_id)
-        else:
-            raise NotImplementedError()
+        return session.scalar(
+            select(Study)
+            .where(Study.PatientID == patient_id)
+            .where(Study.StudyDate == study_date)
+        )
 
     @property
     def age_years(self):
