@@ -2,7 +2,7 @@
 
 # Load environment variables
 set -a
-source ./server/.env
+source .env
 set +a
 
 # Start the server
