@@ -131,6 +131,25 @@ class Annotation(Base):
         a.DateInserted = datetime.now()
         return a
 
+import gzip
+
+import numpy as np
+from PIL import Image
+
+
+def load_png(filepath) -> np.ndarray:
+    return np.array(Image.open(filepath))
+
+
+def load_binary(filepath, shape) -> np.ndarray:
+    _, ext = os.path.splitext(filepath)
+    if ext.lower() in ['.gz']:
+        with gzip.open(filepath, 'rb') as f:
+            raw = np.frombuffer(f.read(), dtype=np.uint8)
+    else:
+        with open(filepath, 'rb') as f:
+            raw = np.frombuffer(f.read(), dtype=np.uint8)
+    return raw.reshape(shape, order='C')
 
 class AnnotationData(Base):
     """
@@ -167,18 +186,25 @@ class AnnotationData(Base):
     )
 
     @classmethod
+    def default_path(cls, annotation: Annotation, scan_nr: int, ext: str) -> str:
+        """Default path for the annotation data."""
+        return f"{annotation.Patient.PatientIdentifier}/{annotation.AnnotationID}_{scan_nr}.{ext}"
+
+
+
+    @classmethod
     def create(
         cls,
         annotation: Annotation,
-        path: str,
+        file_extension: str = "png",
         scan_nr: int = 0,
-        media_type: str = "image/png",
     ) -> AnnotationData:
         annotation_data = cls()
         annotation_data.Annotation = annotation
         annotation_data.ScanNr = scan_nr
-        annotation_data.DatasetIdentifier = path
-        annotation_data.MediaType = media_type
+        annotation_data.DatasetIdentifier = cls.default_path(
+            annotation, scan_nr, file_extension)
+        annotation_data.MediaType = "image/png" if file_extension.lower() == "png" else "application/octet-stream"
         return annotation_data
 
     @property
@@ -199,6 +225,75 @@ class AnnotationData(Base):
     @classmethod
     def get_columns(cls):
         return cls.__table__.columns
+    
+    def load_data(self) -> Any:
+        """Load the annotation data from the file."""       
+        if self.MediaType == 'image/png':
+            return load_png(self.path)
+        elif self.MediaType == 'application/octet-stream':
+            instance = self.Annotation.ImageInstance
+            return load_binary(self.path, (instance.Rows_y, instance.Columns_x))
+        else:
+            raise ValueError(f'Unsupported media type {self.media_type}')
+
+
+    @property
+    def mask(self, mask_type: str = "segmentation") -> np.ndarray:
+        """
+        Returns a mask based on the specified type ('segmentation' or 'questionable').
+
+        Args:
+            mask_type (str): The type of mask to return. Options are 'segmentation' or 'questionable'.
+
+        Returns:
+            np.ndarray: A 2D boolean mask.
+
+        Raises:
+            ValueError: If the annotation type is unsupported or the mask type is invalid.
+        """
+        data = self.load_data()
+        if self.Annotation.AnnotationType.Interpretation == 'R/G mask':
+            assert len(data.shape) == 3, "Expected color image"
+            data2D = data[:, :, 0]
+        elif self.Annotation.AnnotationType.Interpretation == 'Binary mask':
+            assert len(data.shape) == 2, "Expected grayscale image"
+            data2D = data
+        else:
+            raise ValueError(f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}")
+
+        if mask_type == "segmentation":
+            return data2D > 0
+        elif mask_type == "questionable":
+            return data2D > 0  # Placeholder for different logic if needed
+        else:
+            raise ValueError(f"Unsupported mask type: {mask_type}")
+
+    @property
+    def segmentation_mask(self):
+        data = self.load_data()
+        if self.Annotation.AnnotationType.Interpretation == 'R/G mask':
+            assert len(data.shape) == 3, "Expected color image"
+            data2D = data[:, :, 0] 
+        elif self.Annotation.AnnotationType.Interpretation == 'Binary mask':
+            assert len(data.shape) == 2, "Expected grayscale image"
+            data2D = data
+        else:
+            raise ValueError(f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}") 
+        return data2D > 0
+
+    @property
+    def questionable_mask(self, data):
+        data = self.load_data()
+        if self.Annotation.AnnotationType.Interpretation == 'R/G mask':
+            assert len(data.shape) == 3, "Expected color image"
+            data2D = data[:, :, 0] 
+        elif self.Annotation.AnnotationType.Interpretation == 'Binary mask':
+            assert len(data.shape) == 2, "Expected grayscale image"
+            data2D = data
+        else:
+            raise ValueError(f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}") 
+        return data2D > 0
+    
 
 
 def move_file_to_trash(annotation_data: AnnotationData) -> None:

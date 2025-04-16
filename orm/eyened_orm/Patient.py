@@ -58,7 +58,8 @@ class Patient(Base):
         Returns the study for this patient with the given study date.
         """
         return next(
-            study for study in self.Studies if study.StudyDate == study_date
+            (study for study in self.Studies if study.StudyDate == study_date),
+            None
         )
 
     def __repr__(self):

@@ -82,14 +82,15 @@ class Project(Base):
 
         return df
 
-    def get_patient_by_identifier(self, patient_identifier: string, session: Session) -> Optional[Patient]:
+    def get_patient_by_identifier(self, session: Session, patient_identifier: string) -> Optional[Patient]:
         """
         Returns a patient with the specified ID that belongs to this project.
         """
+        from eyened_orm import Patient
         return session.scalar(
             select(Patient).where(
-                (Patient.PatientIdentifier == patient_identifier) &
-                (Patient.ProjectID == self.ProjectID)
+                Patient.PatientIdentifier == patient_identifier,
+                Patient.ProjectID == self.ProjectID
             )
         )
 

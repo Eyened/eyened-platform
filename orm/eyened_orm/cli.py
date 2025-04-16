@@ -27,8 +27,8 @@ def eorm():
 @eorm.command()
 def test():
     """Create a test database for ORM testing, developing new features or running alembic migrations."""
-    source_db = get_config("eyened")["database"]
-    test_db = get_config("test")["database"]
+    source_db = get_config("prod")["database"]
+    test_db = get_config("dev")["database"]
 
     source_db_string = (
         f"{source_db['host']}:{source_db['port']}/{source_db['database']}"
@@ -53,7 +53,7 @@ def test():
 def full():
     """Create a test database for ORM testing, developing new features or running alembic migrations."""
     source_db = get_config("eyened")["database"]
-    test_db = get_config("test")["database"]
+    test_db = get_config("dev")["database"]
 
     source_db_string = (
         f"{source_db['host']}:{source_db['port']}/{source_db['database']}"
@@ -104,7 +104,7 @@ def run_models(env):
 
 
 @eorm.command()
-@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'test', 'prod', 'eyened')")
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
 @click.option("--print-errors", is_flag=True, default=False, help="Print validation errors")
 def validate_forms(env, print_errors):
     """Validate form annotations and schemas in the database.
@@ -124,7 +124,7 @@ def validate_forms(env, print_errors):
 
 
 @eorm.command()
-@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'test', 'prod', 'eyened')")
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
 @click.option("--print-errors", is_flag=True, default=False, help="Print errors for failed hash calculations")
 def update_hashes(env, print_errors):
     """Update FileChecksum and DataHash for all ImageInstances in the database where they are NULL.
