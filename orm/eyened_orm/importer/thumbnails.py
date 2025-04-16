@@ -73,8 +73,11 @@ def get_thumbnail(im: ImageInstance):
     return np_im
 
 
-def generate_hash(db_id, secret_key):
-    # Use HMAC-SHA256 for cryptographic security
+def generate_thumbnail_name(db_id, secret_key):
+    # default to the db_id if no secret key is provided
+    if secret_key is None:
+        return str(db_id)
+    # otherwise generate a hash of the db_id and the secret key for obfuscation
     hash_bytes = hmac.new(
         secret_key.encode(), str(db_id).encode(), hashlib.sha256
     ).hexdigest()
@@ -106,7 +109,7 @@ def save_thumbnails(
     else:
         raise ValueError("Thumbnail must be 2D or 3D")
 
-    thumbnail_identifier = f"{str(im.Patient.Project.ProjectID)}/{generate_hash(im.ImageInstanceID, secret)[:24]}"
+    thumbnail_identifier = f"{str(im.Patient.Project.ProjectID)}/{generate_thumbnail_name(im.ImageInstanceID, secret)[:24]}"
 
     for size in sizes:
         thumb = pil_im.copy()
