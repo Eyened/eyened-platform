@@ -1,4 +1,4 @@
-// src/hooks.server.js
+// src/hooks.server.ts
 import { host } from '$lib/config';
 
 /** @type {import('@sveltejs/kit').HandleFetch} */
