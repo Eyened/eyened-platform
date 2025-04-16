@@ -1,0 +1,45 @@
+---
+title: Eyened ORM configuration
+description: Learn how to use the command line utilities available in the ORM
+sidebar:
+  order: 4
+---
+
+{/* 
+Claude query: In configuration.mdx, write documentation for the configuration options in config.sample.py. First show the structure of the database configuration and then make a single table with the rest of the options with columns Option, Required and Description
+*/}
+
+## Configuration File
+
+The Eyened ORM uses a configuration file to manage database connections, file paths, and other settings. A sample configuration file is provided at `eyened_orm/config.sample.py`. Copy this file to `config.py` in your project and modify the settings according to your environment.
+
+## Database Configuration
+
+The database section contains the connection details for your MySQL database:
+
+```python
+"database": {
+    "user": "USERNAME",
+    "password": "PASSWORD",
+    "host": "DB_HOST",
+    "database": "DB_NAME",
+    "port": "PORT",
+    "raise_on_warnings": True,
+}
+```
+
+## Configuration Options
+
+The following table describes all available configuration options:
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| annotations_path | Yes | Path to the folder containing annotations used by the platform for reading and writing annotations |
+| thumbnails_path | Yes | Folder containing the thumbnail structure used by the ORM to read thumbnails and by the importer to write thumbnails on insertion |
+| images_basepath | Yes | The folder containing local image data. All local images linked in the eyened database should be stored in this folder (or descendants). File references in the database will be relative to this folder. This folder should be served if used with the eyened-viewer |
+| default_date | No | Default date for new studies. When the importer needs to create new studies and it does not receive a study date, it will use this default date. Defaults to 1970-01-01 |
+| importer_copy_path | No | Folder for the importer to copy images to when ran with copy_files=True. Only required when running the importer with the copy_files=True option. It should be a descendant of images_basepath |
+| cfi_cache_path | No | Path of a cache for fundus images. Used by the importer to write a preprocessed version of the images. The cache is only written if this path is set |
+| secret_key | No | Secret key used to generate hashes deterministically for anonymisation and obfuscation of file names. If not set, the db_id will be used as the filename |
+| image_server_url | No | URL of the image server endpoint. Used by the ORM to generate URLs to images as `<image_server_url>/<dataset_identifier>` |
+| trash_path | No | Folder to move deleted annotations / form_annotations to when deleted from the ORM. If not set, the annotations will not be moved to a trash folder |

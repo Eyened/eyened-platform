@@ -68,9 +68,16 @@ class Importer:
         self.config = get_config(env)
         self.copy_queue = []
 
-        self.default_path_relative = Path(
-            self.config["importer_default_path"]
-        ).relative_to(self.config["images_basepath"])
+        assert self.config['images_basepath'] is not None, "images_basepath must be set when using the importer"
+
+        if self.copy_files:
+            assert self.config['importer_copy_path'] is not None, "importer_copy_path must be set when copy_files is True"
+
+            self.default_path_relative = Path(
+                self.config["importer_default_path"]
+            ).relative_to(self.config["images_basepath"])
+        else:
+            self.default_path_relative = None
 
     def init_objects(self, data: List[Dict]):
         """
@@ -276,7 +283,7 @@ class Importer:
             except ValueError:
                 raise ValueError(
                     f"File path {fpath} is not within the images_basepath directory "
-                    f"({basepath}). Set copy_files=True to copy external files."
+                    f"({basepath}). Verify that the images_basepath is set correctly."
                 )
 
     def copy_images(self):

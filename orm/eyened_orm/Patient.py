@@ -48,10 +48,16 @@ class Patient(Base):
     )
 
     @classmethod
-    def by_identifier(cls, session, identifier: str | int) -> Patient:
-        return session.scalar(
-            select(Patient).where(Patient.PatientIdentifier == identifier)
+    def by_project_and_identifier(
+        cls, session, project_id: int, patient_identifier: str | int | None
+    ) -> Patient:
+        patient = session.scalar(
+            select(Patient).where(
+                Patient.ProjectID == project_id, 
+                Patient.PatientIdentifier == patient_identifier
+            )
         )
+        return patient
 
     def get_study_by_date(self, study_date: date) -> Study:
         """

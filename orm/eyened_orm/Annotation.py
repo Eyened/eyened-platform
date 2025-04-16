@@ -318,6 +318,8 @@ def move_file_to_trash(annotation_data: AnnotationData) -> None:
 @event.listens_for(Session, "before_flush")
 def receive_before_flush(session, flush_context, instances):
     """Track AnnotationData objects being deleted before they're removed from the session."""
+    if Base.config.get("trash_path") is None: # only run if trash_path is set
+        return
     session.deleted_annotation_data_info = [
         {
             'path': obj.path,
@@ -332,6 +334,7 @@ def receive_before_flush(session, flush_context, instances):
 @event.listens_for(Session, "after_commit")
 def receive_after_commit(session):
     """Process tracked deleted annotation data after the transaction is committed."""
+    
     if not hasattr(session, 'deleted_annotation_data_info'):
         return
     for info in session.deleted_annotation_data_info:
