@@ -1,0 +1,38 @@
+FROM php:8.2-apache
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    software-properties-common \
+    default-mysql-client \
+    curl \
+    git \
+    python3 \
+    python3-pip && \
+    docker-php-ext-install mysqli pdo_mysql && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Use the composer image to install PHP package: smartdump
+COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+RUN composer global require benmorel/smartdump
+
+# Copy application files
+COPY ./ /app/
+COPY ./docker/run_alembic.sh /app/run_alembic.sh
+COPY ./docker/config.dev.py /app/eyened_orm/config.dev.py
+COPY ./docker/config.prod.py /app/eyened_orm/config.prod.py
+RUN chmod +x /app/run_alembic.sh
+
+WORKDIR /app
+
+# Install Python dependencies 
+RUN python3 -m pip config set global.break-system-packages true && \
+    pip install --upgrade pip && \
+    pip install . alembic cryptography python-dotenv 
+
+RUN pip install mysql-connector-python
+WORKDIR /app/alembic_
+
+# Use exec form for ENTRYPOINT
+ENTRYPOINT ["/app/run_alembic.sh"]
