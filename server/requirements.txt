@@ -7,3 +7,4 @@ pyodbc==4.0.35
 numpy==1.23.5
 pandas==1.5.3
 pyjwt==2.10.1
+cryptography==44.0.2

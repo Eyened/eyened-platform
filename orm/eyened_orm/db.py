@@ -5,38 +5,32 @@ from sqlalchemy.orm import sessionmaker
 
 from .base import Base
 
+def create_connection_string_mysql(user, password, host, port, database=None, **kwargs):
+    if database is None:
+        return f"mysql+pymysql://{user}:{password}@{host}:{port}"
+    else:
+        return f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
 
 class DBManager:
     _engine = None
     _SessionLocal = None
 
     @classmethod
-    def init(cls, config: str | dict, create_all=False):
+    def init(cls, config: str | dict):
         """Initialize the database session factory with the given config."""
         
         if type(config) == str:
             from eyened_orm.utils.config import get_config
             config = get_config(config)
         
+        conn_string = create_connection_string_mysql(**config["database"])
         if cls._engine is None:
-            db = config["database"]
-
-            if "conn_string" in db:
-                conn_string = db["conn_string"]
-            else:
-                conn_string = (
-                    f"mysql+pymysql://{db['user']}:{db['password']}"
-                    f"@{db['host']}:{db['port']}/{db['database']}"
-                )
-
             cls._engine = create_engine(conn_string, pool_pre_ping=True)
             cls._SessionLocal = sessionmaker(
                 autocommit=False, autoflush=False, bind=cls._engine
             )
 
-            if create_all:
-                Base.metadata.create_all(cls._engine)
-            Base.config = config
+        Base.config = config
 
     @classmethod
     @contextmanager

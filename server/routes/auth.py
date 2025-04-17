@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from eyened_orm import Creator
 
-from .config import settings
-from .db import get_db
+from ..config import settings
+from ..db import get_db
 from .login_manager import LoginManager
 from .utils import password_hash
 

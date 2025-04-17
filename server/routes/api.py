@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .auth import manager
-from .db import get_db
+from ..db import get_db
 
 router = APIRouter()
 

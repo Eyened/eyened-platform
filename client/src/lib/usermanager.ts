@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import { authTokenDuration, host } from '$lib/config';
+import { apiUrl, authTokenDuration } from '$lib/config';
 
 export interface TokenData {
     id: number;
@@ -98,7 +98,7 @@ export class UserManager {
     }
 
     public async logout() {
-        await fetch(`${host}/api/auth/logout`, {
+        await fetch(`${apiUrl}/auth/logout`, {
             method: 'POST'
         });
 
@@ -108,7 +108,7 @@ export class UserManager {
 
 
     public async signup(username: string, password: string) {
-        const resp = await fetch(`${host}/api/auth/register`, {
+        const resp = await fetch(`${apiUrl}/auth/register`, {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
@@ -138,7 +138,7 @@ export class UserManager {
     }
 
     public async refresh() {
-        const resp = await fetch(`${host}/api/auth/refresh`, {
+        const resp = await fetch(`${apiUrl}/auth/refresh`, {
             method: 'POST'
         });
         this.setTokenData(await resp.json())

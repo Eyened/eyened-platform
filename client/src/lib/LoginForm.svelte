@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { host } from '$lib/config';
-	import type { TokenData } from './usermanager';
+	import { apiUrl } from '$lib/config'
+	import type { TokenData } from './usermanager'
 
 	interface LoginFormProps {
 		onLogin: (tokenData: TokenData) => void;
@@ -15,7 +15,7 @@
 		if (!username || !password) {
 			return alert('Please enter both username and password');
 		}
-		const resp = await fetch(`${host}/api/auth/login-password`, {
+		const resp = await fetch(`${apiUrl}/auth/login-password`, {
 			method: 'POST',
 			headers: {
 				Accept: 'application/json',

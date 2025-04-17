@@ -13,7 +13,7 @@ from eyened_orm import (
 )
 
 from .auth import manager
-from .db import get_db
+from ..db import get_db
 
 router = APIRouter()
 

@@ -7,14 +7,15 @@ from eyened_orm import (Annotation, AnnotationData, AnnotationType, Creator,
                         Series, SourceInfo, Study)
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel
-from routes.query_utils import (apply_filters, decode_params,
-                                sqlalchemy_operators)
+
 from sqlalchemy import distinct, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from .auth import manager
-from .db import get_db
+from ..db import get_db
 from .utils import collect_rows
+from .query_utils import (apply_filters, decode_params,
+                                sqlalchemy_operators)
 
 router = APIRouter()
 
