@@ -1,0 +1,9 @@
+fastapi==0.115.8
+fastapi-cli==0.0.7
+uvicorn==0.34.0
+pydantic-settings==2.7.1
+mysql-connector-python==8.0.31
+pyodbc==4.0.35
+numpy==1.23.5
+pandas==1.5.3
+pyjwt==2.10.1
