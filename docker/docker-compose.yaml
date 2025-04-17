@@ -1,0 +1,57 @@
+version: "3.1"
+
+services:
+
+  database:
+    image: mysql:8.0.27
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
+    volumes:
+      - ${DATABASE_PATH}:/var/lib/mysql 
+    ports:
+      - "${DATABASE_PORT}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DATABASE_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-server:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile.server
+      args:
+        - PUBLIC_API_URL=http://${HOSTNAME}:${PORT}/api
+        - PUBLIC_AUTH_TOKEN_DURATION=${PUBLIC_AUTH_TOKEN_DURATION}
+        - PUBLIC_FILESERVER_URL=http://${HOSTNAME}:${PORT}/api/instances/images
+        - PUBLIC_THUMBNAIL_SERVER_URL=http://${HOSTNAME}:${PORT}/api/instances/thumbnails
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - SQLITE_DB_PATH=${STORAGE_BASEPATH}/database.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ANNOTATIONS_DIR=${STORAGE_BASEPATH}/annotations
+      - DB_HOST=database
+      - DB_PASSWORD=${DATABASE_ROOT_PASSWORD}
+      - DB_USER=root
+      - DB_PORT=3306
+      - DB_NAME=eyened_database
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    restart: always
+    volumes:
+      - ${STORAGE_BASEPATH}:/storage
+    ports:
+      - ${PORT}:8000
+  
+  fileserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.fileserver
+    volumes:
+      - ${IMAGES_BASEPATH}:/images
+
+
+  
+

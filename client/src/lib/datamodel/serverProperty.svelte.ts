@@ -1,4 +1,4 @@
-import { host } from '$lib/config';
+import { apiUrl } from '$lib/config';
 import { writable, type Readable, type Subscriber, type Unsubscriber, type Writable } from 'svelte/store';
 
 export interface ServerPropertyOptions<T> {
@@ -59,7 +59,7 @@ export class WriteOnlyServerProperty<T> implements Readable<T | undefined> {
 
 
     private async save(data: T) {
-        const url = `${host}/api/${this.endpoint}`
+        const url = `${apiUrl}/${this.endpoint}`
         if (this.mediaType == 'application/json') {
             return putJson(url, data);
         } else if (this.mediaType == 'image/png') {
@@ -84,7 +84,7 @@ export class ServerProperty<T> extends WriteOnlyServerProperty<T> {
             return this.val;
         }
 
-        const url = `${host}/api/${this.endpoint}`;
+        const url = `${apiUrl}/${this.endpoint}`;
 
         const fetchFunctions: { [key: string]: () => Promise<any> } = {
             'application/json': () => this.fetchData(url, 'json'),

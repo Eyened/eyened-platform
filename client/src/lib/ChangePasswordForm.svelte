@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
-	import { host } from '$lib/config';
-	import type { GlobalContext } from './data-loading/globalContext.svelte';
-	import { data } from '$lib/datamodel/model';
+	import { apiUrl } from '$lib/config'
+	import { data } from '$lib/datamodel/model'
+	import { getContext } from 'svelte'
+	import type { GlobalContext } from './data-loading/globalContext.svelte'
 
 	const { creators } = data;
 
@@ -16,7 +16,7 @@
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		const resp = await fetch(`${host}/api/auth/change-password`, {
+		const resp = await fetch(`${apiUrl}/auth/change-password`, {
 			method: 'POST',
 			headers: {
 				Accept: 'application/json',

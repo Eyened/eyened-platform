@@ -1,7 +1,7 @@
-import { writable, type Readable, derived, type Invalidator, type Subscriber, type Unsubscriber, get } from 'svelte/store';
-import { host } from '$lib/config';
-import { constructors, importItem } from './model';
+import { apiUrl } from '$lib/config';
+import { derived, get, writable, type Invalidator, type Readable, type Subscriber, type Unsubscriber } from 'svelte/store';
 import type { ItemConstructor } from './itemContructor';
+import { constructors, importItem } from './model';
 
 export interface Item {
     id: number | string;
@@ -150,7 +150,7 @@ export class MutableItemCollection<T extends Item> extends ItemCollection<T> {
         const itemConstructor = constructors[this.endpoint] as ItemConstructor<T>;
         const apiParams = itemConstructor.toParams(item);
 
-        const resp = await fetch(`${host}/api/${this.endpoint}/new`, {
+        const resp = await fetch(`${apiUrl}/${this.endpoint}/new`, {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
@@ -164,7 +164,7 @@ export class MutableItemCollection<T extends Item> extends ItemCollection<T> {
 
     async delete(item: T, fromServer = true): Promise<void> {
         if (fromServer) {
-            const url = `${host}/api/${this.endpoint}/${item.id}`;
+            const url = `${apiUrl}/${this.endpoint}/${item.id}`;
             const resp = await fetch(url, { method: 'DELETE' });
             if (resp.status != 204) {
                 throw new Error('Failed to delete');

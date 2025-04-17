@@ -1,4 +1,4 @@
-import { host } from '$lib/config';
+import { apiUrl } from '$lib/config';
 import { importData } from './model';
 import type { Task } from './task';
 
@@ -22,7 +22,7 @@ function fetchData(endpoint: string, params: Record<string, string | number | Ar
 }
 
 async function fetchSearchParams(endpoint: string, searchParams: URLSearchParams): Promise<any> {
-    const url = new URL(`${host}/api/${endpoint}`);
+    const url = new URL(`${apiUrl}/${endpoint}`);
     url.search = searchParams.toString();
     const response = await fetch(url.toString());
     return response.json();
@@ -57,7 +57,7 @@ export async function loadBase() {
 }
 
 export async function loadSubtasks(task: Task) {
-    const url = new URL(`${host}/api/tasks/${task.id}/subtasks`);
+    const url = new URL(`${apiUrl}/tasks/${task.id}/subtasks`);
     const response = await fetch(url);
     const data = await response.json();
     importData(data);
