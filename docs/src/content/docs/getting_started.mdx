@@ -1,45 +1,38 @@
 ---
-title: Deploying Eyened platform
+title: Getting Started
 description: Deploy the Eyened platform in a network
 ---
 
-## Getting started with the Eyened Platform
 
-The Eyened Platform consists of three main containers:
+The Eyened platform is a modern web platform for visualization and annotation of ophthalmic images with features like:
 
-- **Eyened database** The core of the platform, holds image and annotation metadata organized in a hierarchical structure Patient -> Study -> Series -> ImageInstance. It can be generated and accessed via the `eyened_orm`.
+- Loading of various image formats including DICOM.
+- Convenient system for browsing loaded studies and images.
+- Task system for managing grading tasks.
+- Drawing tools for 2D image segmentation of enface images and OCT B-scans
+- Images and annotations are rendered in the browser, making it very responsive and easy to set up.
+- Image enhancements such as CLAHE can be applied on the fly.
+- Integrated tools for registration of enface images.
+- Automated ETDRS grid placement via AI-based bounds detection and landmark detection (fovea, optic disc) upon insertion of CFI images.
+- Python-based import script for loading images and associated metadata.
+- Authentication system can secure the viewer, images, thumbnails and annotations.
+- For advanced use cases, our ORM allows data scientists to more easily work with the database.
 
-- **Eyened API** A fastapi API providing an interface to the database.
+## Quick Setup
 
-- **Eyened viewer client** A browser application for image visualization and annotation.
+The easiest way to get started with the eyened platform is by configuring and running our docker-compose on a server accessible within your network (admin privileges are necessary). Our containers will create a setup like the following:
 
-```
-http {
+![Alt text](../../assets/eyened_platform.png)
 
-    sendfile on;
-    gzip on;
-    gzip_types image/jpeg image/png text/plain;
-    gzip_vary on;
-    gunzip on;
-    access_log off;
-    
-    server {
-        listen 80;
+With this setup you will be able to:
 
-        # File server
-        location /files/ {
-            internal;
-            alias /local/path/to/images/;
-        }
+- Run the client / viewer, initially on an empty database.
+- Run our import script to import local images and associated metadata into the system. Access to the images through the Eyened platform will be protected by authentication.
+- A sqlite database will be created for the app's data in the local filesystem.
+- Annotations and image thumbnails will be stored in local folders by the Eyened server.
 
-        # Reverse Proxy for viewer server
-        location / {
-            proxy_pass http://localhost:8000/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-    }
-}
-```
+:::caution
+Make sure to set up regular back ups for both the sqlite database and the annotation folders.
+:::
+
+
