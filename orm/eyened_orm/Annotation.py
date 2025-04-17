@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import enum
+import gzip
 import json
 import os
 import shutil
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, List, Optional
 
+import numpy as np
+from PIL import Image
 from sqlalchemy import (ForeignKey, LargeBinary, String, UniqueConstraint,
                         event, func, select)
 from sqlalchemy.dialects.mysql import LONGBLOB
@@ -131,12 +134,6 @@ class Annotation(Base):
         a.DateInserted = datetime.now()
         return a
 
-import gzip
-
-import numpy as np
-from PIL import Image
-
-
 def load_png(filepath) -> np.ndarray:
     return np.array(Image.open(filepath))
 
@@ -186,13 +183,6 @@ class AnnotationData(Base):
     )
 
     @classmethod
-    def default_path(cls, annotation: Annotation, scan_nr: int, ext: str) -> str:
-        """Default path for the annotation data."""
-        return f"{annotation.Patient.PatientIdentifier}/{annotation.AnnotationID}_{scan_nr}.{ext}"
-
-
-
-    @classmethod
     def create(
         cls,
         annotation: Annotation,
@@ -202,10 +192,14 @@ class AnnotationData(Base):
         annotation_data = cls()
         annotation_data.Annotation = annotation
         annotation_data.ScanNr = scan_nr
-        annotation_data.DatasetIdentifier = cls.default_path(
-            annotation, scan_nr, file_extension)
+        annotation_data.DatasetIdentifier = annotation_data.default_path(file_extension)
+            
         annotation_data.MediaType = "image/png" if file_extension.lower() == "png" else "application/octet-stream"
         return annotation_data
+
+    def default_path(self, ext: str) -> str:
+        a = self.Annotation
+        return f"{a.Patient.PatientIdentifier}/{a.AnnotationID}_{self.ScanNr}.{ext}"
 
     @property
     def path(self) -> str:

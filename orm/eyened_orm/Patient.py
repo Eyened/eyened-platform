@@ -5,12 +5,16 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import ForeignKey, String, func, select
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
+from .ImageInstance import ImageInstance
+from .Project import Project
+from .Series import Series
+from .Study import Study
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, Study, Project
+    from eyened_orm import Annotation, FormAnnotation
 
 
 class SexEnum(int, enum.Enum):
@@ -51,13 +55,27 @@ class Patient(Base):
     def by_project_and_identifier(
         cls, session, project_id: int, patient_identifier: str | int | None
     ) -> Patient:
-        patient = session.scalar(
+        """
+        Returns a patient with the given project ID and identifier.
+        If no patient is found, raises an exception.
+        """
+        return session.scalar(
             select(Patient).where(
-                Patient.ProjectID == project_id, 
+                Patient.ProjectID == project_id,
                 Patient.PatientIdentifier == patient_identifier
             )
-        )
-        return patient
+        ).one()
+
+    @classmethod
+    def by_identifier(cls, session, patient_identifier: str | int | None) -> List[Patient]:
+        """
+        Returns a list of patients with the given identifier 
+        """
+        return session.scalars(
+            select(Patient).where(
+                Patient.PatientIdentifier == patient_identifier
+            )
+        ).all()
 
     def get_study_by_date(self, study_date: date) -> Study:
         """
@@ -67,6 +85,21 @@ class Patient(Base):
             (study for study in self.Studies if study.StudyDate == study_date),
             None
         )
+
+    def get_images(self, where=None, include_inactive=False) -> List[ImageInstance]:
+        session = Session.object_session(self)
+        q = (
+            select(ImageInstance)
+            .join_from(ImageInstance, Series)
+            .join_from(Series, Study)
+            .join_from(Study, Patient)
+            .where(Patient.PatientID == self.PatientID)
+        )
+        if not include_inactive:
+            q = q.where(~ImageInstance.Inactive)
+        if where is not None:
+            q = q.where(where)
+        return session.scalars(q)
 
     def __repr__(self):
         return f"Patient({self.PatientID}, {self.PatientIdentifier}, {self.BirthDate}, {self.Sex})"

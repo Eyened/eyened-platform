@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+	<meta name="viewport" content="width=device-width" />
+	%sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+	<div style="display: contents">%sveltekit.body%</div>
+</body>
+
+<!-- workaround to let webpack scripts work properly -->
+<!-- https://github.com/cornerstonejs/cornerstoneWADOImageLoader/issues/441#:~:text=%3Cscript%20type%3D%22text/javascript%22%20src%3D%22%22%3E%3C/script%3E -->
+<script type="text/javascript" src=""></script>
+
+</html>

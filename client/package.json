@@ -1,0 +1,44 @@
+{
+    "name": "client",
+    "private": true,
+    "version": "0.0.1",
+    "type": "module",
+    "scripts": {
+        "dev": "vite --port 16002 --host 0.0.0.0 dev",
+        "build": "vite build",
+        "preview": "vite preview",
+        "prepare": "svelte-kit sync || echo ''",
+        "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+        "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+    },
+    "devDependencies": {
+        "@iconify/json": "^2.2.142",
+        "@sveltejs/adapter-auto": "^4.0.0",
+        "@sveltejs/adapter-static": "^3.0.8",
+        "@sveltejs/kit": "^2.16.0",
+        "@sveltejs/vite-plugin-svelte": "^5.0.0",
+        "svelte": "^5.0.0",
+        "svelte-check": "^4.0.0",
+        "typescript": "^5.0.0",
+        "unplugin-icons": "^22.1.0",
+        "vite": "^6.2.5",
+        "vite-plugin-glsl": "^1.4.0",
+        "eslint": "^8.28.0",
+        "eslint-config-prettier": "^8.5.0",
+        "prettier": "^3.1.0",
+        "prettier-plugin-svelte": "^3.2.6",
+        "tslib": "^2.4.1"
+    },
+    "dependencies": {
+        "@cornerstonejs/dicom-image-loader": "^3.7.8",
+        "@types/json-schema": "^7.0.15",
+        "ajv": "^8.17.1",
+        "cornerstone-core": "^2.6.1",
+        "cornerstone-wado-image-loader": "^4.13.2",
+        "dicom-parser": "^1.8.21",
+        "eslint-plugin-svelte": "^2.45.1",
+        "jpeg-lossless-decoder-js": "^2.0.4",
+        "mathjs": "^12.0.0",
+        "vite-plugin-glsl": "^1.1.2"
+    }
+}
