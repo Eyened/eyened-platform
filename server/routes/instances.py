@@ -38,164 +38,163 @@ class InstanceResponse(BaseModel):
     count: int
     entities: DataResponse
 
-
-# Create aliases for Creator table
-AnnotationCreator = aliased(Creator)
-FormAnnotationCreator = aliased(Creator)
-
-# alias the annotation tables to filter out inactive annotations
-ActiveAnnotation = aliased(
-    Annotation,
-    select(Annotation).filter(
-        ~Annotation.Inactive).subquery(name="active_annot"),
-    name="active_annot",
+base_query = (
+    select(ImageInstance, Series, Study, Patient)
+    .select_from(ImageInstance)
+    .filter(~ImageInstance.Inactive)    
+    .join(Series)
+    .join(Study)
+    .join(Patient)
+    .join(Project)
+    .outerjoin(SourceInfo)
+    .outerjoin(Scan)
+    .outerjoin(DeviceInstance)
+    .outerjoin(DeviceModel)
 )
-ActiveFormAnnotation = aliased(
-    FormAnnotation,
+
+annotation_query = (
+    select(Annotation, AnnotationData)
+    .select_from(AnnotationData)
+    .join(Annotation)
+    .filter(~Annotation.Inactive)
+    .join(Feature)
+    .join(AnnotationType)
+    .join(Creator)
+)
+form_query = (
     select(FormAnnotation)
     .filter(~FormAnnotation.Inactive)
-    .subquery(name="active_form_annot"),
-    name="active_form_annot",
-)
-base_query = (
-    select(ImageInstance,
-           Series,
-           Study,
-           Patient,
-           AnnotationData,
-           ActiveAnnotation,
-           ActiveFormAnnotation)
-    .select_from(ImageInstance)
-    .filter(ImageInstance.Inactive == False)    
-    .join(Series, ImageInstance.SeriesID == Series.SeriesID)
-    .join(Study, Series.StudyID == Study.StudyID)
-    .join(Patient, Study.PatientID == Patient.PatientID)
-    .join(Project, Patient.ProjectID == Project.ProjectID)
-    .join(DeviceInstance, ImageInstance.DeviceInstanceID == DeviceInstance.DeviceInstanceID, isouter=True)
-    .join(DeviceModel, DeviceInstance.DeviceModelID == DeviceModel.DeviceModelID, isouter=True)
-    .join(SourceInfo, ImageInstance.SourceInfoID == SourceInfo.SourceInfoID, isouter=True)
-    .join(Scan, ImageInstance.ScanID == Scan.ScanID, isouter=True)
-
-    # join on ImageInstanceID
-    .join(ActiveAnnotation, ActiveAnnotation.ImageInstanceID == ImageInstance.ImageInstanceID, isouter=True)
-    .join(AnnotationData, AnnotationData.AnnotationID == ActiveAnnotation.AnnotationID, isouter=True)
-    .join(Feature, ActiveAnnotation.FeatureID == Feature.FeatureID, isouter=True)
-    .join(AnnotationType, ActiveAnnotation.AnnotationTypeID == AnnotationType.AnnotationTypeID, isouter=True)
-    .join(AnnotationCreator, ActiveAnnotation.CreatorID == AnnotationCreator.CreatorID, isouter=True)
-
-    # join on PatientID
-    .join(ActiveFormAnnotation, ActiveFormAnnotation.PatientID == Patient.PatientID, isouter=True)
-    .join(FormSchema, ActiveFormAnnotation.FormSchemaID == FormSchema.FormSchemaID, isouter=True)
-    .join(FormAnnotationCreator, ActiveFormAnnotation.CreatorID == FormAnnotationCreator.CreatorID, isouter=True)
+    .join(Patient)    
+    .join(FormSchema)
+    .join(Creator)
 )
 
-all_tables = [
+base_tables = [
     ImageInstance,
     Series,
     Study,
     Patient,
     Project,
     DeviceInstance,
+    
     DeviceModel,
     SourceInfo,
-    Scan,
-
-    AnnotationData,
-    ActiveAnnotation,
+    Scan
+]
+annotation_tables = [
+    Annotation,
     Feature,
     AnnotationType,
-    AnnotationCreator,
-
-    ActiveFormAnnotation,
+    Creator,
+    AnnotationData
+]
+form_tables = [
+    FormAnnotation,
     FormSchema,
-    FormAnnotationCreator
+    Creator
 ]
 
-all_mappings = defaultdict(set)
+def get_mappings(tables):
+    all_mappings = {}
 
-for table in all_tables:
-    for column in table.__table__.columns:
-        if column.name == 'Password':
-            continue
-        if column.name == 'Modality' and table.__name__ == 'Feature':
-            continue
-        if column.name == 'ImageInstanceID' and table.__name__ != 'ImageInstance':
-            continue
-        if column.name == 'SeriesID' and table.__name__ != 'Series':
-            continue
-        if column.name == 'StudyID' and table.__name__ != 'Study':
-            continue
-        if column.name == 'PatientID' and table.__name__ != 'Patient':
-            continue
-        col = getattr(table, column.key)
+    for table in tables:
+        # Use the original table name, not the alias
+        original_table_name = table.__table__.name
 
-        all_mappings[column.name].add(col)
+        for column in table.__table__.columns:
+            if column.name == 'Password':
+                continue
+            col = getattr(table, column.key)
 
+            # Use the original table name in the mapping
+            all_mappings[f'{original_table_name}.{column.name}'] = col
+            if column.name not in all_mappings:
+                # First encounter only
+                all_mappings[column.name] = col
+    return all_mappings
 
-def apply_filters(query, params):
+base_mappings = get_mappings(base_tables)
+annotation_mappings = get_mappings(annotation_tables)
+form_mappings = get_mappings(form_tables)
 
+def apply_filters(query, mappings, params):
+    applied = False
     for field, (operator, value) in params.items():
-        if field not in all_mappings:
+        if field not in mappings:
             continue
+        applied = True
+        column = mappings[field]
+        query = query.where(sqlalchemy_operators[operator](column, value))
+    return query, applied
 
-        columns = all_mappings[field]
-        op_func = sqlalchemy_operators[operator]
-        filter = or_(
-            op_func(column, value)
-            for column in columns
-        )
-        query = query.where(filter)
-
-    return query
-
-
-def collect_entities(main):
-    instances = set()
-    series_set = set()
-    studies = set()
-    patients = set()
-    annotations_set = set()
-    annotation_datas = set()
-    form_annotations = set()
-
-    for instance, series, study, patient, annotation_data, annotation, form_annotation in main:
-        instances.add(instance)
-        series_set.add(series)
-        studies.add(study)
-        patients.add(patient)
-        annotations_set.add(annotation)
-        annotation_datas.add(annotation_data)
-        form_annotations.add(form_annotation)
-
-    return instances, series_set, studies, patients, annotations_set, annotation_datas, form_annotations
-
-
-def run_base_query(session, params, offset, limit):
+def run_queries(session, params, offset, limit, base_query, annotation_query, form_query):
     params_decoded = decode_params(params)
-    filtered_query = apply_filters(base_query, params_decoded)
 
-    # Create a count query using the filtered query
-    count_query = filtered_query.with_only_columns(
-        func.count(distinct(ImageInstance.ImageInstanceID))
-    )
-    images_count = session.execute(count_query).scalar()
+    # Apply filters to each query and track whether filters were applied
+    base_query, base_applied = apply_filters(base_query, base_mappings, params_decoded)
+    annotation_query, annot_applied = apply_filters(annotation_query, annotation_mappings, params_decoded)
+    form_query, form_applied = apply_filters(form_query, form_mappings, params_decoded)
 
-    subquery = select(
-        filtered_query
-        .with_only_columns(distinct(ImageInstance.ImageInstanceID))
-        # Order to ensure deterministic pagination
-        .order_by(ImageInstance.ImageInstanceID)
-        .limit(limit)
-        .offset(offset)
-        .subquery()
-    )
+    instances = []
+    annotations = []
+    form_annotations = []
+    
+    if base_applied: 
+        # CASE 1: Base filters are applied → get images directly
+        instances = session.execute(
+            base_query.order_by(ImageInstance.ImageInstanceID).limit(limit).offset(offset)
+        ).all()
+        
+        if instances:
+            
+            # filter form annotations by image instance IDs
+            image_ids = {instance.ImageInstanceID for instance, *_ in instances}
+            annotation_query = annotation_query.where(Annotation.ImageInstanceID.in_(image_ids))
+            annotations = session.execute(annotation_query).all()
+            
+            if annot_applied:
+                # filter only instances that have annotations 
+                # the same logic is not applied to form annotations because those are filtered by patient IDs
+                # Not sure if this makes sense. 
+                # TODO: find a cleaner way to query / filter instances and annotations?
+                annotated_instances = {annotation.ImageInstanceID for annotation, _ in annotations}                        
+                instances = [row for row in instances if row[0].ImageInstanceID in annotated_instances]
+                        
+            # filter form annotations by patient IDs    
+            patient_ids = {instance.Patient.PatientID for instance, *_ in instances}
+            form_query = form_query.where(FormAnnotation.PatientID.in_(patient_ids))
+            form_annotations = session.scalars(form_query).all()
+            
+           
+    
+    else:
+        # CASE 2: No base filters applied
+        instance_ids = set()
 
-    query = base_query.where(ImageInstance.ImageInstanceID.in_(
-        subquery
-    ))
+        if annot_applied: 
+            # only retrieve annotations if filters are applied 
+            annotations = session.execute(annotation_query).all()
+            instance_ids.update(annotation.ImageInstanceID for annotation, _ in annotations)
 
-    return images_count, session.execute(query).all()
+        if form_applied:
+            # only retrieve form annotations if filters are applied
+            form_annotations = session.scalars(form_query).all()
+            instance_ids.update(form.ImageInstanceID for form in form_annotations)
 
+        instance_ids.delete(None)
+
+        if instance_ids:
+            # filter base query by image instance IDs obtained from annotations and/or form annotations
+            base_query = base_query.where(ImageInstance.ImageInstanceID.in_(instance_ids))
+            instances = session.execute(
+                base_query.order_by(ImageInstance.ImageInstanceID).limit(limit).offset(offset)
+            ).all()
+        else:
+            # No filters applied or no matching instances
+            pass
+
+
+    return instances, annotations, form_annotations
 
 @router.get("/instances", response_model=InstanceResponse)
 async def get_instances(
@@ -210,24 +209,31 @@ async def get_instances(
 
     multiparams = request.query_params.multi_items()
     print(multiparams)
-    # r = session.execute(select(ImageInstance).where(ImageInstance.ImageInstanceID == 193024)).all()
-    # print('??', r)
     
-    images_count, main = run_base_query(session, multiparams, offset, limit)
+    i, a, form_annotations = run_queries(session, multiparams, offset, limit, base_query, annotation_query, form_query)
+    
+    instances = set()
+    series_set = set()
+    studies = set()
+    patients = set()
+    annotations = set()
+    annotation_datas = set()    
 
-    (instances,
-     series,
-     studies,
-     patients,
-     annotations,
-     annotation_datas,
-     form_annotations) = collect_entities(main)
+    for instance, series, study, patient in i: 
+        instances.add(instance)
+        series_set.add(series)
+        studies.add(study)
+        patients.add(patient)
+    for annotation, annotation_data in a:
+        annotations.add(annotation)
+        annotation_datas.add(annotation_data)
+
 
     return {
         "entities": {
             k: collect_rows(v) for k, v in {
                 "instances": instances,
-                "series": series,
+                "series": series_set,
                 "studies": studies,
                 "patients": patients,
                 "annotations": annotations,
@@ -235,7 +241,7 @@ async def get_instances(
                 "formAnnotations": form_annotations
             }.items()
         },
-        "count": images_count,
+        "count": len(instances),
     }
 
 
