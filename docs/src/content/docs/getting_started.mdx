@@ -35,4 +35,22 @@ With this setup you will be able to:
 Make sure to set up regular back ups for both the sqlite database and the annotation folders.
 :::
 
+## Environment Variables
+
+The following environment variables are available to configure our docker containers:
+
+| Variable | Description |
+| --- | --- |
+| HOSTNAME | Hostname the app will be served on |
+| PORT | Port the app will be served on |
+| JWT_SECRET_KEY | Secret key used to encode/decode access tokens and for password hashing. Change to something random when setting up the system |
+| PUBLIC_AUTH_TOKEN_DURATION | Duration of user access tokens in seconds (default: 3 days) |
+| ADMIN_USERNAME | Username for the default admin user |
+| ADMIN_PASSWORD | Password for the default admin user |
+| IMAGES_BASEPATH | Local folder to serve images from (may be read-only) |
+| STORAGE_BASEPATH | Local path to store annotations, thumbnails and other generated files |
+| DATABASE_PATH | Path to the database files |
+| DATABASE_PORT | Port to access the database from outside (optional) |
+| DATABASE_ROOT_PASSWORD | Root password for external database access (optional) |
+
 
