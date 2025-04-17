@@ -14,7 +14,8 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, Series, SubTaskImageLink
+    from eyened_orm import (Annotation, Creator, FormAnnotation, Series,
+                            SubTaskImageLink)
 
 
 class Laterality(enum.Enum):
@@ -25,7 +26,7 @@ class Laterality(enum.Enum):
 class ModalityType(enum.Enum):
     # thus far only encountered OP, OPT, SC
     # should perhaps be extended (https://dicom.nema.org/medical/Dicom/2024d/output/chtml/part16/chapter_D.html)
-    # Ophthalmic Photography    
+    # Ophthalmic Photography
     OP = 1
     # Ophthalmic Photography Tomography (used for OCT)
     OPT = 2
@@ -35,7 +36,7 @@ class ModalityType(enum.Enum):
 
 class Modality(enum.Enum):
     # custom selection of commonly used ophthalmic modalities
-    
+
     AdaptiveOptics = 1
     ColorFundus = 2
     ColorFundusStereo = 3
@@ -78,15 +79,16 @@ class ImageInstance(Base):
     )
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
 
-    
     SeriesID: Mapped[int] = mapped_column(
         ForeignKey("Series.SeriesID", ondelete="CASCADE")
     )
     Series: Mapped[Series] = relationship(back_populates="ImageInstances")
 
     # TODO: not needed anymore?
-    SourceInfoID: Mapped[int] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"))
-    SourceInfo: Mapped[SourceInfo] = relationship(back_populates="ImageInstances")
+    SourceInfoID: Mapped[int] = mapped_column(
+        ForeignKey("SourceInfo.SourceInfoID"))
+    SourceInfo: Mapped[SourceInfo] = relationship(
+        back_populates="ImageInstances")
 
     DeviceInstanceID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("DeviceInstance.DeviceInstanceID")
@@ -97,34 +99,52 @@ class ImageInstance(Base):
 
     # TODO: redundant with Modality enum
     ModalityID: Mapped[int] = mapped_column(ForeignKey("Modality.ModalityID"))
-    _Modality: Mapped[ModalityTable] = relationship(back_populates="ImageInstances")
+    _Modality: Mapped[ModalityTable] = relationship(
+        back_populates="ImageInstances")
 
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
     Scan: Mapped[Scan] = relationship(back_populates="ImageInstances")
 
-        # Image modality
+    # Image modality
     Modality: Mapped[Optional[Modality]]
 
     # DICOM metadata
-    SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)  # Unique identifier for SOP instance (image)
-    SOPClassUid: Mapped[Optional[str]] = mapped_column(String(64))  # Identifies the service-object pair class
-    PhotometricInterpretation: Mapped[Optional[str]] = mapped_column(String(64))  # Specifies the intended interpretation of pixel data (RGB, MONOCHROME, etc.)
-    SamplesPerPixel: Mapped[Optional[int]]  # Number of color components in each pixel
-    NrOfFrames: Mapped[Optional[int]]  # Number of frames in a multi-frame image
-    SliceThickness: Mapped[Optional[float]]  # Nominal slice thickness, in millimeters
+    SOPInstanceUid: Mapped[Optional[str]] = mapped_column(
+        String(64), unique=True)  # Unique identifier for SOP instance (image)
+    SOPClassUid: Mapped[Optional[str]] = mapped_column(
+        String(64))  # Identifies the service-object pair class
+    # Specifies the intended interpretation of pixel data (RGB, MONOCHROME, etc.)
+    PhotometricInterpretation: Mapped[Optional[str]] = mapped_column(
+        String(64))
+    # Number of color components in each pixel
+    SamplesPerPixel: Mapped[Optional[int]]
+    # Number of frames in a multi-frame image
+    NrOfFrames: Mapped[Optional[int]]
+    # Nominal slice thickness, in millimeters
+    SliceThickness: Mapped[Optional[float]]
     Rows_y: Mapped[Optional[int]]  # Number of rows (height) in the image
     Columns_x: Mapped[Optional[int]]  # Number of columns (width) in the image
-    Laterality: Mapped[Optional[Laterality]]  # Side of body examined (left or right)
-    DICOMModality: Mapped[Optional[ModalityType]]  # Type of equipment that acquired the data (OP = Ophthalmic Photography)
+    # Side of body examined (left or right)
+    Laterality: Mapped[Optional[Laterality]]
+    # Type of equipment that acquired the data (OP = Ophthalmic Photography)
+    DICOMModality: Mapped[Optional[ModalityType]]
     AnatomicRegion: Mapped[Optional[int]]  # Body part examined
-    ETDRSField: Mapped[Optional[ETDRSField]]  # Early Treatment Diabetic Retinopathy Study field position (not standard DICOM)
-    Angiography: Mapped[Optional[int]]  # Indicates angiography type (not standard DICOM)
-    AcquisitionDateTime: Mapped[Optional[datetime]]  # Date and time the acquisition of data started
-    PupilDilated: Mapped[Optional[bool]]  # Indicates if pupil was dilated during image acquisition (ophthalmic-specific)
-    HorizontalFieldOfView: Mapped[Optional[float]]  # Horizontal dimension of field of view in millimeters
-    ResolutionAxial: Mapped[Optional[float]]  # Axial resolution in millimeters (not standard DICOM)
-    ResolutionHorizontal: Mapped[Optional[float]]  # Horizontal resolution in millimeters (not standard DICOM)
-    ResolutionVertical: Mapped[Optional[float]]  # Vertical resolution in millimeters (not standard DICOM)
+    # Early Treatment Diabetic Retinopathy Study field position (not standard DICOM)
+    ETDRSField: Mapped[Optional[ETDRSField]]
+    # Indicates angiography type (not standard DICOM)
+    Angiography: Mapped[Optional[int]]
+    # Date and time the acquisition of data started
+    AcquisitionDateTime: Mapped[Optional[datetime]]
+    # Indicates if pupil was dilated during image acquisition (ophthalmic-specific)
+    PupilDilated: Mapped[Optional[bool]]
+    # Horizontal dimension of field of view in millimeters
+    HorizontalFieldOfView: Mapped[Optional[float]]
+    # Axial resolution in millimeters (not standard DICOM)
+    ResolutionAxial: Mapped[Optional[float]]
+    # Horizontal resolution in millimeters (not standard DICOM)
+    ResolutionHorizontal: Mapped[Optional[float]]
+    # Vertical resolution in millimeters (not standard DICOM)
+    ResolutionVertical: Mapped[Optional[float]]
 
     # Relative filepath to the image file
     DatasetIdentifier: Mapped[str] = mapped_column(String(256), index=True)
@@ -136,20 +156,20 @@ class ImageInstance(Base):
     # Original IDs of the image in the source database
     OldPath: Mapped[Optional[str]] = mapped_column(String(256))
     FDAIdentifier: Mapped[Optional[int]]
-    
+
     # Considered removed from the database
     Inactive: Mapped[bool] = mapped_column(server_default="0")
 
     # Fundus-specific columns
     # CFROI contains the fundus bounds, eg.
     # {
-        # "lines": {},
-        # "max_x": 2048,
-        # "max_y": 1536,
-        # "min_x": 0,
-        # "min_y": 0,
-        # "center": [1021.7938260323712, 751.6328910976617],
-        # "radius": 688.1397816206166,
+    # "lines": {},
+    # "max_x": 2048,
+    # "max_y": 1536,
+    # "min_x": 0,
+    # "min_y": 0,
+    # "center": [1021.7938260323712, 751.6328910976617],
+    # "radius": 688.1397816206166,
     # }
     # Can be read by CFIBounds from rtnls_fundusprep
     # from rtnls_fundusprep.cfi_bounds import CFIBounds
@@ -179,14 +199,13 @@ class ImageInstance(Base):
     # and detect duplicates even when the metadata might be different
     DataHash: Mapped[Optional[bytes]] = mapped_column(LargeBinary(32))
 
-     # Datetimes - automatically filled
+    # Datetimes - automatically filled
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]] = mapped_column(
         server_default=func.now(), onupdate=func.now()
     )
     # DatePreprocessed is the date and time the image was last preprocessed
     DatePreprocessed: Mapped[Optional[datetime]]
-
 
     # relationships:
     Annotations: Mapped[List[Annotation]] = relationship(
@@ -226,15 +245,16 @@ class ImageInstance(Base):
         return f"{self.config['image_server_url']}/{self.DatasetIdentifier}"
 
     @property
-    def raw_data(self):
+    def pixel_array(self):
         """Return the raw data for this image as a numpy array"""
         if self.DatasetIdentifier.endswith(".dcm"):
-            ds = pydicom.read_file(self.path)
+            ds = pydicom.dcmread(self.path)
             return ds.pixel_array
         elif self.DatasetIdentifier.endswith(".binary"):
             with open(self.path, "rb") as f:
                 raw = np.frombuffer(f.read(), dtype=np.uint8)
-                data = raw.reshape((-1, self.Rows_y, self.Columns_x), order="C")
+                data = raw.reshape(
+                    (-1, self.Rows_y, self.Columns_x), order="C")
             return data
         else:
             return np.array(Image.open(self.path))
@@ -249,7 +269,7 @@ class ImageInstance(Base):
             raise FileNotFoundError(f"File {self.path} does not exist")
 
         # Get the raw data as numpy array
-        data = self.raw_data
+        data = self.pixel_array
 
         # Ensure the array is contiguous in memory for consistent byte representation
         contiguous_data = np.ascontiguousarray(data)
@@ -272,13 +292,12 @@ class ImageInstance(Base):
                 md5_hash.update(chunk)
         return md5_hash.digest()
 
-
     @classmethod
     def where(cls, clause):
         """
         return a query with some useful joins
         usage example: 
-        
+
             q = ImageInstance.where(DeviceModel.ManufacturerModelName == 'HRA')
             session.scalar(q.limit(1))
         """
@@ -287,12 +306,21 @@ class ImageInstance(Base):
         return (
             select(ImageInstance)
             .where(~ImageInstance.Inactive)
-            .join(Series).join(Study).join(Patient).join(Project)            
-            .outerjoin(Scan)            
+            .join(Series).join(Study).join(Patient).join(Project)
+            .outerjoin(Scan)
             .outerjoin(DeviceInstance)
-            .outerjoin(DeviceModel)                        
+            .outerjoin(DeviceModel)
             .where(clause)
         )
+
+    def get_annotations_for_creator(self, creator: Creator) -> List[Annotation]:
+        """
+        Get all annotations for this image instance for a specific creator
+        :param creator_id: ID of the creator
+        :return: list of annotations
+        """
+        return [a for a in self.Annotations
+                if a.CreatorID == creator.CreatorID]
 
     def __repr__(self):
         return f"ID: {self.ImageInstanceID} @ {self.SourceInfo.SourcePath} {self.DatasetIdentifier}"
@@ -304,12 +332,13 @@ class DeviceModel(Base):
         CompositeUniqueConstraint("Manufacturer", "ManufacturerModelName"),
     )
     DeviceModelID: Mapped[int] = mapped_column(primary_key=True)
-    
-    Manufacturer: Mapped[Optional[str]] = mapped_column(String(45), nullable=False)
+
+    Manufacturer: Mapped[Optional[str]] = mapped_column(
+        String(45), nullable=False)
     ManufacturerModelName: Mapped[Optional[str]] = mapped_column(
         String(45), nullable=False
     )
-    
+
     DeviceInstances: Mapped[List["DeviceInstance"]] = relationship(
         back_populates="DeviceModel"
     )
@@ -321,10 +350,9 @@ class DeviceModel(Base):
     def __repr__(self):
         return f"{self.DeviceModelID} - {self.Manufacturer} {self.ManufacturerModelName}"
 
-
     @classmethod
-    def by_manufacturer(cls, Manufacturer: str, ManufacturerModelName: str, session:Session
-    ) -> DeviceModel:
+    def by_manufacturer(cls, Manufacturer: str, ManufacturerModelName: str, session: Session
+                        ) -> DeviceModel:
         return session.scalar(
             select(cls)
             .where(
@@ -334,22 +362,25 @@ class DeviceModel(Base):
         )
 
 
-
 class DeviceInstance(Base):
     __tablename__ = "DeviceInstance"
-    __table_args__ = (CompositeUniqueConstraint("DeviceModelID", "Description"),)
+    __table_args__ = (CompositeUniqueConstraint(
+        "DeviceModelID", "Description"),)
 
-    DeviceInstanceID: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    DeviceInstanceID: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True)
     DeviceModelID: Mapped[int] = mapped_column(
         ForeignKey("DeviceModel.DeviceModelID"), nullable=False
     )
     SerialNumber: Mapped[str] = mapped_column(Text, nullable=True)
-    Description: Mapped[Optional[str]] = mapped_column(String(256), nullable=False)
+    Description: Mapped[Optional[str]] = mapped_column(
+        String(256), nullable=False)
 
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         back_populates="DeviceInstance"
     )
-    DeviceModel: Mapped["DeviceModel"] = relationship(back_populates="DeviceInstances")
+    DeviceModel: Mapped["DeviceModel"] = relationship(
+        back_populates="DeviceInstances")
 
     def __init__(
         self, DeviceModelID: int, SerialNumber: str, Description: Optional[str] = None
@@ -379,7 +410,6 @@ class SourceInfo(Base):
         return session.scalar(select(cls).where(cls.SourceName == name))
 
 
-
 class ModalityTable(Base):
     __tablename__ = "Modality"
     ModalityID: Mapped[int] = mapped_column(primary_key=True)
@@ -391,11 +421,10 @@ class ModalityTable(Base):
     )
 
     @classmethod
-    def by_tag(cls, ModalityTag: str, session:Session) -> Optional[ModalityTable]:
+    def by_tag(cls, ModalityTag: str, session: Session) -> Optional[ModalityTable]:
         return session.scalar(
             select(cls).where(cls.ModalityTag == ModalityTag)
         )
-        
 
 
 class Scan(Base):
@@ -403,10 +432,11 @@ class Scan(Base):
     ScanID: Mapped[int] = mapped_column(primary_key=True)
     ScanMode: Mapped[str] = mapped_column(String(40), unique=True)
 
-    ImageInstances: Mapped[List[ImageInstance]] = relationship(back_populates="Scan")
+    ImageInstances: Mapped[List[ImageInstance]
+                           ] = relationship(back_populates="Scan")
 
     @classmethod
-    def by_mode(cls, ScanMode: str, session:Session) -> Scan:
+    def by_mode(cls, ScanMode: str, session: Session) -> Scan:
         return session.scalar(
             select(cls).where(cls.ScanMode == ScanMode)
         )
