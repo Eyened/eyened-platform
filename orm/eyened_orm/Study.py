@@ -8,11 +8,11 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
 from .ImageInstance import ImageInstance
-from .Patient import Patient
+
 from .Series import Series
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation
+    from eyened_orm import Annotation, FormAnnotation, Patient
 
 
 class Study(Base):
@@ -89,15 +89,18 @@ class Study(Base):
         return (self.StudyDate - self.Patient.BirthDate).days / 365.25
     
 
-    def get_images(self, where=None) -> List[ImageInstance]:
+    def get_images(self, where=None, include_inactive=False) -> List[ImageInstance]:
+        from eyened_orm import Series, Study, Patient
         session = Session.object_session(self)
         q = (
             select(ImageInstance)
-            .where(~ImageInstance.Inactive)
             .join_from(ImageInstance, Series)
             .join_from(Series, Study)
+            .join_from(Study, Patient)    
             .where(Study.StudyID == self.StudyID)
         )
+        if not include_inactive:
+            q = q.where(~ImageInstance.Inactive)
         if where is not None:
             q = q.where(where)
         return session.scalars(q)
