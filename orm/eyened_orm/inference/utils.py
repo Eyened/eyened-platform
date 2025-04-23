@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import GPUtil
 import torch
 import torch.nn.functional as F
 from sqlalchemy import update
@@ -88,3 +89,17 @@ def clear_unsuccessfull(session, df, commit=True):
     session.execute(update(ImageInstance), updates)
     if commit:
         session.commit()
+
+
+
+def auto_device():
+    # Attempt to select a free GPU
+    try:
+        deviceID = GPUtil.getFirstAvailable(order="memory")[
+            0
+        ]  # Get the GPU with the most free memory
+        device = f"cuda:{deviceID}"
+    except RuntimeError:
+        device = "cpu"
+    device = torch.device(device if torch.cuda.is_available() else "cpu")
+    return device

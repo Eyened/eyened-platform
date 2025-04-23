@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from .routes import annotations, api, auth, form_annotations, instances, tasks
+from .routes import annotations, api, auth, form_annotations, import_api, instances, tasks
 from .config import settings
 from .db import get_db
 from .utils.database_init import create_database, init_annotation_types, init_admin
@@ -16,6 +16,7 @@ app_api.include_router(api.router)
 app_api.include_router(annotations.router)
 app_api.include_router(form_annotations.router)
 app_api.include_router(tasks.router)
+app_api.include_router(import_api.router)
 
 
 @asynccontextmanager

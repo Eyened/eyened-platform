@@ -4,6 +4,7 @@ services:
 
   database:
     image: mysql:8.0.27
+    user: $USER
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
     volumes:
@@ -17,6 +18,7 @@ services:
       retries: 5
 
   api-server:
+    user: $USER
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.server
@@ -29,9 +31,12 @@ services:
       database:
         condition: service_healthy
     environment:
-      - SQLITE_DB_PATH=${STORAGE_BASEPATH}/database.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - IMAGES_BASEPATH=${IMAGES_BASEPATH}
+      - THUMBNAILS_PATH=${STORAGE_BASEPATH}/thumbnails
       - ANNOTATIONS_DIR=${STORAGE_BASEPATH}/annotations
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - DB_HOST=database
       - DB_PASSWORD=${DATABASE_ROOT_PASSWORD}
       - DB_USER=root
@@ -52,6 +57,32 @@ services:
     volumes:
       - ${IMAGES_BASEPATH}:/images
 
+  redis:
+    user: $USER
+    image: redis:7-alpine
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
-  
+  worker:
+    user: $USER
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile.worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    volumes:
+      - ${IMAGES_BASEPATH}:/images
+      - ${STORAGE_BASEPATH}:/storage
+    restart: always
 

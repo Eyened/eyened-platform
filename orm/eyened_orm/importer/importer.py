@@ -30,7 +30,7 @@ class Importer:
         run_ai_models: bool = True,
         generate_thumbnails: bool = True,
         copy_files: bool = False,
-        env="test",
+        config: str | dict = "test",
     ):
         """
         Initialize the Importer with database session and data to import.
@@ -53,8 +53,8 @@ class Importer:
             If True, generate thumbnails for the images after import
         copy_files : bool, default=False
             If True, copy image files to the images_basepath directory
-        env : str, default="test"
-            Environment to use for configuration (e.g., "test", "production").
+        config : str, default="test"
+            config object (see config.sample.py) or environment to load for configuration (e.g., "test", "production").
         """
         self.session = session
         self.project_name = project_name
@@ -65,7 +65,12 @@ class Importer:
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
         self.copy_files = copy_files
-        self.config = get_config(env)
+        if isinstance(config, str):
+            self.config = get_config(config)
+        elif isinstance(config, dict):
+            self.config = config
+        else:
+            raise ValueError(f"Invalid config type: {type(config)}")
         self.copy_queue = []
 
         assert self.config['images_basepath'] is not None, "images_basepath must be set when using the importer"
@@ -78,6 +83,7 @@ class Importer:
             ).relative_to(self.config["images_basepath"])
         else:
             self.default_path_relative = None
+        self.images_basepath_container = self.config.get("images_basepath_container", None)
 
     def init_objects(self, data: List[Dict]):
         """
@@ -194,8 +200,19 @@ class Importer:
         return series
 
     def find_or_create_study(self, patient, study_item):
-        study_date = study_item.get("study_date", self.config["default_date"])
+        study_date = study_item.get("study_date", self.config.get("study_date", datetime.date(1970,1,1)))
         props = study_item.get("props", {})
+
+        # Convert string date to datetime.date if necessary
+        if isinstance(study_date, str):
+            try:
+                # Assuming format is 'yyyy-mm-dd'
+                year, month, day = map(int, study_date.split('-'))
+                study_date = datetime.date(year, month, day)
+            except ValueError:
+                raise ValueError(
+                    f"Invalid study date format: '{study_date}'. Expected format: 'yyyy-mm-dd' for patient '{patient.PatientIdentifier}'"
+                )
 
         if not isinstance(study_date, datetime.date):
             raise ValueError(
@@ -265,8 +282,11 @@ class Importer:
             raise NotImplementedError()
 
         fpath = Path(path_or_url)
-        assert fpath.exists(), f"File does not exist: {fpath}"
-        assert fpath.is_absolute(), f"Path must be absolute: {fpath}"
+
+        local_path = Path(self.images_basepath_container) / fpath.relative_to(basepath) if self.images_basepath_container else fpath
+        
+        assert local_path.exists(), f"File does not exist: {local_path}"
+        assert local_path.is_absolute(), f"Path must be absolute: {local_path}"
 
         if self.copy_files:
             # Generate a unique filename for the copied file
@@ -274,7 +294,7 @@ class Importer:
             extension = fpath.suffix  # Preserve the original extension
             target = str(self.default_path_relative /
                          f"{unique_id}{extension}")
-            self.copy_queue.append((fpath, target))
+            self.copy_queue.append((local_path, target))
             return target
         else:
             # Verify path is within the images_basepath
@@ -438,61 +458,85 @@ class Importer:
                 for name, items in entities.items()
             }
 
+            # General statistics in dataframe-ready format
+            general_stats = []
+            for name, items in entities.items():
+                total = len(items)
+                new = len(new_entities[name])
+                existing = total - new
+                
+                # Calculate percentages
+                new_percentage = (new / total * 100) if total > 0 else 0
+                existing_percentage = (existing / total * 100) if total > 0 else 0
+                
+                general_stats.append({
+                    'Entity': name.capitalize(),
+                    'Total': total,
+                    'New': new,
+                    'Existing': existing,
+                    'New_Percentage': new_percentage,
+                    'Existing_Percentage': existing_percentage
+                })
+            
+            # Column population statistics for new entities
+            column_stats = {}
+            for name, items in new_entities.items():
+                if items:
+                    column_stats[name] = self._get_populated_fields_stats(
+                        class_map[name], items)
+
+            # Complete summary
             summary = {
-                "project": self.project_name,
-                **{
-                    name: {
-                        "total": len(items),
-                        "new": len(new_entities[name]),
-                        "existing": len(items) - len(new_entities[name])
-                    }
-                    for name, items in entities.items()
-                }
+                "project_name": self.project_name,
+                "general_stats": general_stats,
+                "column_stats": column_stats
             }
 
-            print(f"\nImport Summary for Project: {summary['project']}")
+            # Print summary as before
+            print(f"\nImport Summary for Project: {self.project_name}")
             print('----------------  Object Statistics  ----------------')
 
-            df_stats = pd.DataFrame({
-                'Entity': [name.capitalize() for name in entities.keys()],
-                'Total': [len(entity_attr) for entity_attr in entities.values()],
-                'New': [len(new_entities[name]) for name in entities.keys()],
-                'Existing': [
-                    len(entity_attr) - len(new_entities[name])
-                    for name, entity_attr in entities.items()
-                ]
-            })
+            # Create and display dataframe directly from general_stats
+            df_stats = pd.DataFrame(general_stats)
+            # Format percentages for display
+            df_stats['New_Percentage'] = df_stats['New_Percentage'].apply(lambda x: f"{x:.1f}%")
+            df_stats['Existing_Percentage'] = df_stats['Existing_Percentage'].apply(lambda x: f"{x:.1f}%")
             print(df_stats.to_string(index=False))
 
             print('\n-----------  Column Population Statistics  -----------')
             print('- only for new entities')
             print('- values set to NULL are not considered populated')
 
-            for name, items in new_entities.items():
-                if items:
+            for name, stats in column_stats.items():
+                if stats:
                     print(f"\nPopulated {name.capitalize()} Columns:")
-                    self._display_populated_fields_summary(
-                        class_map[name], items)
+                    df_columns = pd.DataFrame(stats)
+                    # Format percentage for display
+                    df_columns['Percentage'] = df_columns['Percentage'].apply(lambda x: f"{x:.1f}%")
+                    print(df_columns.to_string(index=False))
 
             # Rollback the nested transaction to avoid creating any objects
             # This happens automatically when exiting the with block
         return summary
 
-    def _display_populated_fields_summary(self, model_class, instances):
+    def _get_populated_fields_stats(self, model_class, instances):
         """
-        Display a summary of populated fields for a list of model instances.
-
+        Return a dictionary of populated fields statistics for a list of model instances.
+        
         Parameters:
         -----------
         model_class : SQLAlchemy model class
             The model class (Patient, Study, Series, ImageInstance) to analyze
         instances : List[model_class]
             List of model instances to analyze
+            
+        Returns:
+        --------
+        List[Dict]
+            List of dictionaries with column stats, each with keys 'Column', 'Populated', 'Percentage'
         """
-
         if not instances:
-            print("No instances to analyze")
-            return
+            return []
 
         # Get all relevant columns from the model class
         from sqlalchemy import inspect as sa_inspect
@@ -523,11 +567,7 @@ class Importer:
             column_stats.append({
                 'Column': column,
                 'Populated': populated_count,
-                'Percentage': f"{percentage:.1f}%"
+                'Percentage': percentage  # Return raw number for easy dataframe creation
             })
 
-        if column_stats:
-            df_columns = pd.DataFrame(column_stats)
-            print(df_columns.to_string(index=False))
-        else:
-            print("No populated columns found")
+        return column_stats

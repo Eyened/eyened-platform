@@ -13,26 +13,26 @@ For a hands-on introduction to using the importer, make sure to check our exampl
 
 ## Data Structure
 
-The importer expects data to be structured as a list of dictionary objects with the following hierarchical format:
+The importer expects an input structured as nested lists of dictionaries with the following format:
 
 ```python
 [
-    {
+    { # patient object
         "patient_identifier": str,  # Optional patient identifier in the system
         "props": {},                # Optional key-value properties for patient
         "studies": [
-            {
+            { # study object
                 "study_date": datetime.date,  # Optional study date
                 "props": {},                  # Optional key-value properties for study
                 "series": [
-                    {
+                    { # series object
                         "series_id": str,     # Optional series identifier
                         "props": {},          # Optional key-value properties for series
                         "images": [
-                            {
+                            { # image object
                                 # Image-specific properties
                                 "path": str,   # Path to image file
-                                "props": {},   # Additional properties
+                                "props": {},   # Additional properties / image metadatada
                             }
                         ]
                     }
@@ -43,7 +43,19 @@ The importer expects data to be structured as a list of dictionary objects with 
 ]
 ```
 
-The importer creates a hierarchy of objects in the database: Project → Patient → Study → Series → ImageInstance.
+This structure especifies a hierarchy of Project → Patient → Study → Series → ImageInstance that will be translated to database objects:
+
+- Project is the name of the dataset or research study. It may match an existing project in the database, in which case it will be expanded.
+- Patient represents a unique data subject within a project. `patient_identifier` should be unique within the project. It may match an existing patient identifier within the project, in which case the new images will be assigned to this patient.
+- Study represents a *visit* of the patient to the clinic during which the corresponding set of images was acquired. It is identified by a `study_date` that is unique for the patient. It may match an existing `study_date` for this patient, in which case the new images will be added.
+- Series represents a grouping of images within the study. May be used to group images from the same capture device. It is identified by a numeric ID `series_id` which may also match an existing database id. 
+- ImageInstance represents an image and associated metadata. No ID is used as the importer will always create new image objects.
+
+:::note
+The Modality metadata field is currently required by the viewer.
+:::
+
+By default, the importer will try to find objects in the database with existing identifiers (Patient -> `patient_identifier`; Study -> `study_date`; Series -> `series_id`) following the hierarchy. If the identifiers match existing database objects, the new images will be assigned to those objects. If a provided identifier does not match database objects, the importer will produce an error. However, the importer can be configured to create new objets using the `create_patients`, `create_studies` and `create_series` flags. When these flags are set, the importer will try to create the corresponding objects if they do not exist. If the identifiers are not provided, the importer will create new objects with generic IDs.
 
 ## Importer Options
 

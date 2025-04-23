@@ -10,9 +10,12 @@ from sqlalchemy import select
 from tqdm import tqdm
 
 from eyened_orm import ImageInstance, Modality
+from .utils import auto_device
 
 
-def run_basic_models(fpaths, ids, device: torch.device):
+def run_basic_models(fpaths, ids, device: torch.device = None):
+    if device is None:
+        device = auto_device()
     ensemble_fovea = HeatmapRegressionEnsemble.from_release("fovea_july24.pt").to(
         device
     )
@@ -82,7 +85,9 @@ def run_basic_models(fpaths, ids, device: torch.device):
     )
 
 
-def run_quality_model(fpaths, ids, device: torch.device):
+def run_quality_model(fpaths, ids, device: torch.device = None):
+    if device is None:
+        device = auto_device()
     ensemble_quality = ClassificationEnsemble.from_release("quality.pt").to(device)
     dataloader = ensemble_quality._make_inference_dataloader(
         fpaths,
@@ -118,8 +123,11 @@ def run_quality_model(fpaths, ids, device: torch.device):
     )
 
 
-def run_inference_for_images(session, images, device, cfi_cache_path=None):
+def run_inference_for_images(session, images, device: torch.device = None, cfi_cache_path=None):
     from rtnls_fundusprep.preprocessor import parallel_preprocess
+    if device is None:
+        device = auto_device()
+    
 
     ids = [im.ImageInstanceID for im in images]
     paths = [im.path for im in images]
@@ -179,10 +187,10 @@ def run_inference_for_images(session, images, device, cfi_cache_path=None):
     clear_unsuccessfull(session, df_unsucessfull)
 
 
-def run_inference(session, config, device: torch.device):
-    # Run preprocessing
-    cfi_cache_path = Path(config.get("cfi_cache_path", None))
-
+def run_inference(session, device: torch.device = None, cfi_cache_path=None):
+    if device is None:
+        device = auto_device()
+        
     # We run preprocessing + inference on all ColorFundus images with DatePreprocessed==None
     images = (
         session.execute(
