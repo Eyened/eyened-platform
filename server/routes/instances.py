@@ -19,6 +19,25 @@ from .query_utils import (apply_filters, decode_params,
 
 router = APIRouter()
 
+AnnotationCreator = aliased(Creator, name='annotation_creator')
+FormCreator = aliased(Creator, name='form_creator')
+
+ActiveAnnotation = aliased(
+        Annotation,
+        select(Annotation)
+        .filter(~Annotation.Inactive)
+        .subquery(name="active_annot"),
+        name="active_annot",
+    )
+ActiveFormAnnotation = aliased(
+        FormAnnotation,
+        select(FormAnnotation)
+        .filter(~FormAnnotation.Inactive)
+        .subquery(name="active_form_annot"),
+        name="active_form_annot",
+    )
+
+
 
 # Pydantic models for response schemas
 class DataResponse(BaseModel):
@@ -52,24 +71,22 @@ base_query = (
     .outerjoin(DeviceInstance)
     .outerjoin(DeviceModel)
 )
-
 annotation_query = (
-    select(Annotation, AnnotationData)
+    select(ActiveAnnotation, AnnotationData)
     .select_from(AnnotationData)
-    .join(Annotation)
-    .filter(~Annotation.Inactive)
+    .join(ActiveAnnotation)
     .join(Feature)
     .join(AnnotationType)
-    .join(Creator)
-)
-form_query = (
-    select(FormAnnotation)
-    .filter(~FormAnnotation.Inactive)
-    .join(Patient)    
-    .join(FormSchema)
-    .join(Creator)
+    .join(AnnotationCreator)
 )
 
+form_query = (
+    select(ActiveFormAnnotation)
+    .join(Patient)
+    .join(FormSchema)
+    .join(FormCreator)
+    .join(Study, Patient.PatientID == Study.PatientID)    
+)
 base_tables = [
     ImageInstance,
     Series,
@@ -83,16 +100,15 @@ base_tables = [
     Scan
 ]
 annotation_tables = [
-    Annotation,
+    ActiveAnnotation,
     Feature,
     AnnotationType,
-    Creator,
-    AnnotationData
+    AnnotationCreator
 ]
 form_tables = [
-    FormAnnotation,
+    ActiveFormAnnotation,
     FormSchema,
-    Creator
+    FormCreator
 ]
 
 def get_mappings(tables):
@@ -119,81 +135,52 @@ annotation_mappings = get_mappings(annotation_tables)
 form_mappings = get_mappings(form_tables)
 
 def apply_filters(query, mappings, params):
-    applied = False
     for field, (operator, value) in params.items():
         if field not in mappings:
             continue
-        applied = True
         column = mappings[field]
+        print('where', column, operator, value)
         query = query.where(sqlalchemy_operators[operator](column, value))
-    return query, applied
+    return query
 
-def run_queries(session, params, offset, limit, base_query, annotation_query, form_query):
+def run_queries(session, params, offset, limit, base_query, annotation_query, form_query):   
     params_decoded = decode_params(params)
-
-    # Apply filters to each query and track whether filters were applied
-    base_query, base_applied = apply_filters(base_query, base_mappings, params_decoded)
-    annotation_query, annot_applied = apply_filters(annotation_query, annotation_mappings, params_decoded)
-    form_query, form_applied = apply_filters(form_query, form_mappings, params_decoded)
-
-    instances = []
-    annotations = []
-    form_annotations = []
     
-    if base_applied: 
-        # CASE 1: Base filters are applied → get images directly
-        instances = session.execute(
-            base_query.order_by(ImageInstance.ImageInstanceID).limit(limit).offset(offset)
-        ).all()
+    query = apply_filters(base_query, base_mappings, params_decoded)
+    
+    if any(field in annotation_mappings for field in params_decoded):
+        query = (
+            query
+                 .join(ActiveAnnotation, ImageInstance.ImageInstanceID == ActiveAnnotation.ImageInstanceID)
+                 .join(Feature, ActiveAnnotation.FeatureID == Feature.FeatureID)
+                 .join(AnnotationType, ActiveAnnotation.AnnotationTypeID == AnnotationType.AnnotationTypeID)
+                 .join(AnnotationCreator, ActiveAnnotation.CreatorID == AnnotationCreator.CreatorID)
+        )
+        print('joining annotations')
+        query = apply_filters(query, annotation_mappings, params_decoded)
+    if any(field in form_mappings for field in params_decoded):
+        query = (
+            query
+                 .join(ActiveFormAnnotation, ActiveFormAnnotation.PatientID == Patient.PatientID)                 
+                 .join(FormSchema, ActiveFormAnnotation.FormSchemaID == FormSchema.FormSchemaID)
+                 .join(FormCreator, ActiveFormAnnotation.CreatorID == FormCreator.CreatorID)
+        )
+        print('joining forms')
+        query = apply_filters(query, form_mappings, params_decoded)
         
-        if instances:
-            
-            # filter form annotations by image instance IDs
-            image_ids = {instance.ImageInstanceID for instance, *_ in instances}
-            annotation_query = annotation_query.where(Annotation.ImageInstanceID.in_(image_ids))
-            annotations = session.execute(annotation_query).all()
-            
-            if annot_applied:
-                # filter only instances that have annotations 
-                # the same logic is not applied to form annotations because those are filtered by patient IDs
-                # Not sure if this makes sense. 
-                # TODO: find a cleaner way to query / filter instances and annotations?
-                annotated_instances = {annotation.ImageInstanceID for annotation, _ in annotations}                        
-                instances = [row for row in instances if row[0].ImageInstanceID in annotated_instances]
-                        
-            # filter form annotations by patient IDs    
-            patient_ids = {instance.Patient.PatientID for instance, *_ in instances}
-            form_query = form_query.where(FormAnnotation.PatientID.in_(patient_ids))
-            form_annotations = session.scalars(form_query).all()
-            
-           
     
-    else:
-        # CASE 2: No base filters applied
-        instance_ids = set()
-
-        if annot_applied: 
-            # only retrieve annotations if filters are applied 
-            annotations = session.execute(annotation_query).all()
-            instance_ids.update(annotation.ImageInstanceID for annotation, _ in annotations)
-
-        if form_applied:
-            # only retrieve form annotations if filters are applied
-            form_annotations = session.scalars(form_query).all()
-            instance_ids.update(form.ImageInstanceID for form in form_annotations)
-
-        instance_ids.delete(None)
-
-        if instance_ids:
-            # filter base query by image instance IDs obtained from annotations and/or form annotations
-            base_query = base_query.where(ImageInstance.ImageInstanceID.in_(instance_ids))
-            instances = session.execute(
-                base_query.order_by(ImageInstance.ImageInstanceID).limit(limit).offset(offset)
-            ).all()
-        else:
-            # No filters applied or no matching instances
-            pass
-
+    instance_query = query.distinct(ImageInstance.ImageInstanceID).order_by(Study.StudyDate).limit(limit).offset(offset)
+    instances = session.execute(instance_query).all()
+    image_ids = {instance.ImageInstanceID for instance, *_ in instances}
+    
+        
+    annotation_query = annotation_query.where(ActiveAnnotation.ImageInstanceID.in_(image_ids))
+    annotations = session.execute(annotation_query).all()
+    
+    patient_ids = {patient.PatientID for _, _, _, patient in instances}        
+    form_query = form_query.where(ActiveFormAnnotation.PatientID.in_(patient_ids))
+    form_annotations = session.scalars(form_query).all()
+    
 
     return instances, annotations, form_annotations
 
