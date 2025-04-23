@@ -17,6 +17,10 @@ class Settings(BaseSettings):
         default=2592000,  # 30 days in seconds
     )
 
+    # Default username and password for the admin user
+    admin_username: str = Field(default=None, env="ADMIN_USERNAME")
+    admin_password: str = Field(default=None, env="ADMIN_PASSWORD")
+
     # Database Settings
     db_engine_string: Optional[str] = Field(default=None, env="DB_ENGINE_STRING")
     db_user: Optional[str] = Field(default=None, env="DB_USER")
@@ -28,8 +32,12 @@ class Settings(BaseSettings):
     # Path Settings
     
     # for some reason, this is not working ???
-    # annotations_path: str = Field(default="/", env="ANNOTATIONS_DIR")
-    annotations_path: str = Field(os.environ.get('ANNOTATIONS_DIR', '/'))
+    images_basepath: str = Field(default="/", env="IMAGES_BASEPATH")
+    thumbnails_path: str = Field(default="/", env="THUMBNAILS_PATH")
+    annotations_path: str = Field(default="/", env="ANNOTATIONS_DIR")
+    importer_copy_path: str = Field(default="/", env="IMPORTER_COPY_PATH")
+    cfi_cache_path: str = Field(default="/", env="CFI_CACHE_PATH")
+    
 
     @property
     def database(self) -> Dict[str, Optional[str]]:
@@ -39,6 +47,20 @@ class Settings(BaseSettings):
             "host": self.db_host,
             "database": self.db_name,
             "port": self.db_port,
+        }
+    
+    def make_orm_config(self) -> Dict[str, Optional[str]]:
+        return {
+            "database": self.database,
+            "annotations_path": self.annotations_path,
+            "thumbnails_path": self.thumbnails_path,
+            "images_basepath": self.images_basepath,
+            "default_date": None,
+            "importer_copy_path": self.importer_copy_path,
+            "cfi_cache_path": self.cfi_cache_path,
+            "secret_key": None,
+            "image_server_url": None,
+            "trash_path": None,
         }
 
     class Config:

@@ -8,3 +8,5 @@ numpy==1.23.5
 pandas==1.5.3
 pyjwt==2.10.1
 cryptography==44.0.2
+huey==2.5.3
+redis==5.*

@@ -2,9 +2,8 @@
 
 # Load environment variables
 set -a
-source .env
+source dev.env
 set +a
 
 # Start the server
-cd server
-uvicorn main:app --reload --host 0.0.0.0 --port $SERVER_PORT --log-level debug
+python -m uvicorn server.main:app --host 0.0.0.0 --port $DEV_SERVER_PORT --log-level debug

@@ -126,14 +126,14 @@ def save_thumbnails(
     return thumbnail_identifier
 
 
-def update_thumbnails_for_images(session, images, config, N=1000):
+def update_thumbnails_for_images(session, images, thumbnails_path, secret_key, N=1000):
     for i, image in enumerate(tqdm(images)):
         if image.path.endswith(".json"):
             image.ThumbnailPath = None
         else:
             try:
                 thumbnail_identifier = save_thumbnails(
-                    image, Path(config["thumbnails_path"]), secret=config["secret_key"]
+                    image, Path(thumbnails_path), secret=secret_key
                 )
             except Exception:
                 thumbnail_identifier = ""
@@ -144,7 +144,7 @@ def update_thumbnails_for_images(session, images, config, N=1000):
     session.commit()
 
 
-def update_thumbnails(session, config, update_failed=False):
+def update_thumbnails(session, thumbnails_path, secret_key, update_failed=False):
     where = (ImageInstance.ThumbnailPath == None)
     if update_failed:
         where = (where | (ImageInstance.ThumbnailPath == ""))
@@ -159,4 +159,4 @@ def update_thumbnails(session, config, update_failed=False):
     )
     print(f"Found {len(images)} images without thumbnails")
 
-    update_thumbnails_for_images(session, images, config)
+    update_thumbnails_for_images(session, images, thumbnails_path, secret_key)
