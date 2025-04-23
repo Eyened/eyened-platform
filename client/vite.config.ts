@@ -10,14 +10,15 @@ export default () => {
 
     let allowedHost = '';
     try {
-        if (env.VITE_PROXY_URL) {
-            const url = new URL(env.VITE_PROXY_URL);
+        if (env.VITE_HOSTNAME) {
+            const url = new URL('http://' + env.VITE_HOSTNAME);
             allowedHost = url.hostname;
         }
     } catch (error) {
-        console.warn('Failed to parse VITE_PROXY_URL:', error);
+        console.warn('Failed to parse VITE_HOSTNAME:', error);
     }
-
+    console.log('Allowed host:', allowedHost);
+    console.log('Port:', env.VITE_PORT);
     return {
         plugins: [
             sveltekit(),
@@ -29,13 +30,13 @@ export default () => {
         server: {
             proxy: {
                 '/auth': {
-                    target: env.VITE_PROXY_URL,
+                    target: env.VITE_HOSTNAME + ':' + env.VITE_PORT,
                     changeOrigin: true,
                     secure: false,
                     ws: true,
                 },
                 '/api': {
-                    target: env.VITE_PROXY_URL,
+                    target: env.VITE_HOSTNAME + ':' + env.VITE_PORT,
                     changeOrigin: true,
                     secure: false,
                     ws: true,

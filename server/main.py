@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from .routes import annotations, api, auth, form_annotations, instances, tasks
-from .config import settings
-from .db import get_db
-from .utils.database_init import create_database, init_annotation_types, init_admin
+from server.routes import annotations, api, auth, form_annotations, instances, tasks
+from server.config import settings
+from server.db import get_db
+from server.utils.database_init import create_database, init_annotation_types, init_admin
 
 app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)

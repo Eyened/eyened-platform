@@ -15,10 +15,20 @@ def create_database():
     # create generic engine for database creation
     temp_engine = create_engine(create_connection_string_mysql(**{**config["database"], 'database': None}))
     
-    # Create database if it doesn't exist
     dbname = config["database"]["database"]
-    with temp_engine.connect() as conn:
-        conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {dbname}"))
+    
+    # First check if database exists
+    try:
+        with temp_engine.connect() as conn:
+            result = conn.execute(text(f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{dbname}'"))
+            if not result.fetchone():
+                # Database doesn't exist, try to create it
+                try:
+                    conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {dbname}"))
+                except Exception as e:
+                    raise RuntimeError(f"Database {dbname} does not exist and could not be created. Error: {str(e)}")
+    except Exception as e:
+        raise RuntimeError(f"Could not check if database {dbname} exists. Error: {str(e)}")
 
     # Now create tables using normal engine
     engine = DBManager.get_engine()
