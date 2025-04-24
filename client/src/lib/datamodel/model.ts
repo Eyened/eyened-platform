@@ -4,7 +4,7 @@ import { AnnotationConstructor, type Annotation } from "./annotation";
 import { AnnotationDataConstructor, type AnnotationData } from "./annotationData";
 import { AnnotationTypeConstructor, type AnnotationType } from "./annotationType";
 import { CreatorConstructor, type Creator } from "./creator";
-import { DeviceConstructor, type Device, DeviceModelConstructor, type DeviceModel } from "./device";
+import { DeviceConstructor, DeviceModelConstructor, type Device, type DeviceModel } from "./device";
 import { FeatureConstructor, type Feature } from "./feature";
 import { FormAnnotationConstructor, type FormAnnotation } from "./formAnnotation";
 import { FormSchemaConstructor, type FormSchema } from "./formSchema";
@@ -97,9 +97,18 @@ export function annotationDatas(annotation: Annotation) {
 export function instanceAnnotations(instance: Instance) {
     return data.annotations.filter(a => a.instance === instance);
 }
-
-export function importData(itemCollections: { [key: string]: any[] }) {
+export function clearData() {
+    data['instances'].clear();
+    data['series'].clear();
+    data['studies'].clear();
+    data['patients'].clear();
+    data['annotationDatas'].clear();
+    data['annotations'].clear();
+    data['formAnnotations'].clear();
     
+}
+export function importData(itemCollections: { [key: string]: any[] }) {
+
     const newData: { [key: string]: Map<string | number, any> } = {};
     const allNewItems = [];
     // First pass: create all new objects with only the id

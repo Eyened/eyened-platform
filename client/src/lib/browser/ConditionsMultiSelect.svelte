@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { browser } from "$app/environment";
     import { page } from "$app/state";
-    import { toggleParam } from "./searchUtils";
+    import { derived } from "svelte/store";
+    import { toggleParam } from "./browserContext.svelte";
 
     interface Props {
         variable: string; // api variable name (e.g. 'FeatureName')
@@ -20,16 +20,11 @@
         return [];
     });
 
-    let selectedValues: string[] = $state([]);
-    if (browser) {
-        selectedValues = page.url.searchParams.getAll(variable);
-    }
+    const selectedValues = $derived(page.url.searchParams.getAll(variable));
 
+    // if present, remove, otherwise add
     function toggle(value: string) {
-        if (browser) {
-            toggleParam(page.url.searchParams, variable, value);
-            selectedValues = page.url.searchParams.getAll(variable);
-        }
+        toggleParam(variable, value);
     }
 </script>
 

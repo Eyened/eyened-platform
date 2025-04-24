@@ -95,6 +95,10 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
     protected readonly items: Map<number | string, T> = new Map();
     protected readonly store = writable(0);
 
+    clear() {
+        this.items.clear();
+        this.store.update(n => n + 1);
+    }
 
     get(id: number | string): T | undefined {
         return this.items.get(id);

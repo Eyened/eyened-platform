@@ -1,71 +1,80 @@
 <script lang="ts">
-    import type { Condition } from "$lib/types";
-    import Icon from "$lib/gui/Icon.svelte";
-    import { toggleParam } from "./searchUtils";
     import { page } from "$app/state";
-    import { browser } from "$app/environment";
+    import { PanelIcon } from "$lib/viewer-window/icons/icons";
+    import Trash from "$lib/viewer-window/icons/Trash.svelte";
+    import { removeParam } from "./browserContext.svelte";
+    
+    
+    class Condition {
+        constructor(
+            public readonly variable: string,
+            public readonly operator: string,
+            public readonly value: string,
+        ) {}
 
-    const params = browser ? page.url.searchParams : new URLSearchParams();
-
-    const conditions: Condition[] = [];
-    for (const [key, value] of params) {
-        if (key == "limit" || key == "page") continue;
-        if (Array.isArray(value)) {
-            for (const v of value) {
-                conditions.push({ variable: key, operator: "=", value: v });
+        get key() {
+            if (this.operator == "=") {
+                return this.variable;
             }
-        } else {
-            conditions.push({ variable: key, operator: "=", value });
+            return `${this.variable}~~${this.operator}`;
         }
     }
 
+    function getCondition(key: string, value: string): Condition {
+        const parts = key.split("~~");
+        let operator = "=";
+        if (parts.length == 2) {
+            operator = parts[1];
+        } else if (parts.length > 2) {
+            throw new Error(`Invalid condition: ${key}`);
+        }
+        return new Condition(parts[0], operator, value);
+    }
+
     function remove(condition: Condition) {
-        toggleParam(params, condition.variable, condition.value);
-        location.href = page.url.toString();
+        removeParam(condition.variable, condition.value);
     }
 </script>
 
-<div id="main">
-    <table>
-        <tbody>
-            {#each conditions as condition (condition)}
-                <tr>
-                    <td>{condition.variable}</td>
-                    <td>{condition.operator}</td>
-                    <td>{condition.value}</td>
-                    <td
-                        ><Icon
-                            icon="delete"
-                            type="tool"
-                            onclick={() => remove(condition)}
-                        /></td
-                    >
-                </tr>
+{#snippet variable(variable: string, value: string)}
+    {@const condition = getCondition(variable, value)}
+    <div class="condition">
+        <span>
+            {condition.variable}
+            {condition.operator}
+            {condition.value}
+        </span>
+        <PanelIcon onclick={() => remove(condition)}>
+            <Trash />
+        </PanelIcon>
+    </div>
+{/snippet}
+
+<div class="filter-conditions">
+    {#each page.url.searchParams.entries() as [key, value]}
+        {#if Array.isArray(value)}
+            {#each value as v}
+                {@render variable(key, v)}
             {/each}
-        </tbody>
-    </table>
+        {:else}
+            {@render variable(key, value)}
+        {/if}
+    {/each}
 </div>
 
 <style>
-    div#main {
-        max-height: 5em;
-        overflow: auto;
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: 2px;
-        padding: 0.2em;
-    }
-    table {
-        border-collapse: collapse;
-        width: 100%;
-    }
-    td {
-        padding: 0.2em;
-    }
-    tr:nth-child(odd) {
-        background-color: rgba(255, 255, 255, 0.1);
+    .filter-conditions {
+        display: flex;
+        flex-direction: column;
+        flex-wrap: wrap;
     }
 
-    tr:nth-child(even) {
-        background-color: rgba(255, 255, 255, 0.2);
+    .condition {
+        display: flex;
+        align-items: center;
+    }
+    .condition:hover {
+        background-color: rgba(0, 0, 0, 0.1);
+        color: black;
     }
 </style>

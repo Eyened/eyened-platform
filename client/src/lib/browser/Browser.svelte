@@ -1,23 +1,18 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
-    import { getContext, onMount, setContext } from "svelte";
-    import { type GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { loadSearchParams } from "$lib/datamodel/api";
     import Selection from "$lib/browser/Selection.svelte";
+    import { type GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import Toggle from "$lib/Toggle.svelte";
+    import UserMenu from "$lib/UserMenu.svelte";
     import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte";
+    import { getContext, onMount, setContext } from "svelte";
     import Spinner from "../utils/Spinner.svelte";
     import BrowserContent from "./BrowserContent.svelte";
-    import FilterConditions from "./FilterConditions.svelte";
-    import QuickFilter from "./FilterImages.svelte";
-    import FilterShorcuts from "./FilterShorcuts.svelte";
-    import UserMenu from "$lib/UserMenu.svelte";
     import { BrowserContext } from "./browserContext.svelte";
-    import { page } from "$app/state";
-    import { data } from "$lib/datamodel/model";
-    import { browser } from "$app/environment";
+    import FilterConditions from "./FilterConditions.svelte";
+    import FilterImages from "./FilterImages.svelte";
+    import FilterShorcuts from "./FilterShorcuts.svelte";
 
-    let loading = $state(false);
+    
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const creator = globalContext.creator;
@@ -26,61 +21,25 @@
         .map((name) => name[0])
         .join("");
 
-    const { instances } = data;
-    const browserContext = new BrowserContext(instances, []);
+    const browserContext = new BrowserContext([]);
     setContext("browserContext", browserContext);
 
-    async function loadDataFromServer() {
-        if (!browser) {
-            return;
-        }
-        const params = page.url.searchParams;
-        if (!params.has("limit")) {
-            params.set("limit", "200");
-        }
-        if (!params.has("page")) {
-            params.set("page", "0");
-        }
-        goto("?" + params.toString());
-
-        const validVariables = [
-            "PatientIdentifier",
-            "StudyDate",
-            "StudyDate~~>=",
-            "StudyDate~~=<",
-            "ProjectName",
-            "FeatureName",
-            "CreatorName",
-            "Modality",
-            "ManufacturerModelName",
-        ];
-        let isValid = false;
-        for (const key of validVariables) {
-            if (params.has(key)) {
-                isValid = true;
-                break;
-            }
-        }
-        if (!isValid) {
-            console.warn("search params are not valid", params.toString());
-            return;
-        }
-
-        loading = true;
-        await loadSearchParams(params);
-        loading = false;
-    }
-
-    onMount(loadDataFromServer);
+    onMount(() => {
+        browserContext.loadDataFromServer();
+    });
 
     let renderMode = $state(true);
 
     function showUserMenu() {
         globalContext.popupComponent = { component: UserMenu };
     }
+
+    function search() {
+        browserContext.loadDataFromServer();
+    }
 </script>
 
-{#if loading}
+{#if browserContext.loading}
     <div class="loader">
         <div>
             <Spinner />
@@ -92,10 +51,11 @@
         <div id="browser-header">
             <div id="browser-header-left">
                 <FilterShorcuts />
-                <QuickFilter />
             </div>
             <div id="browser-header-right">
+                <FilterImages />
                 <FilterConditions />
+                <button onclick={search}>Search</button>
             </div>
             <div id="user">
                 <MainIcon
