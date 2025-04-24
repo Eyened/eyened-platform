@@ -1,29 +1,64 @@
 <script lang="ts">
-    import { searchParams } from "$lib/stores/searchParams";
-    import type { Condition } from "$lib/types";
+    import { page } from "$app/state";
+    import { PanelIcon } from "$lib/viewer-window/icons/icons";
+    import Trash from "$lib/viewer-window/icons/Trash.svelte";
+    import { removeParam } from "./browserContext.svelte";
+    
+    
+    class Condition {
+        constructor(
+            public readonly variable: string,
+            public readonly operator: string,
+            public readonly value: string,
+        ) {}
 
-    function getCondition(variable: string): Condition {
-        const params = new URLSearchParams(window.location.search);
-        const value = params.get(variable) ?? '';
-        return {
-            variable: variable,
-            operator: "=",
-            value,
-        };
+        get key() {
+            if (this.operator == "=") {
+                return this.variable;
+            }
+            return `${this.variable}~~${this.operator}`;
+        }
+    }
+
+    function getCondition(key: string, value: string): Condition {
+        const parts = key.split("~~");
+        let operator = "=";
+        if (parts.length == 2) {
+            operator = parts[1];
+        } else if (parts.length > 2) {
+            throw new Error(`Invalid condition: ${key}`);
+        }
+        return new Condition(parts[0], operator, value);
     }
 
     function remove(condition: Condition) {
-        searchParams.removeParam(condition.variable);
+        removeParam(condition.variable, condition.value);
     }
 </script>
 
+{#snippet variable(variable: string, value: string)}
+    {@const condition = getCondition(variable, value)}
+    <div class="condition">
+        <span>
+            {condition.variable}
+            {condition.operator}
+            {condition.value}
+        </span>
+        <PanelIcon onclick={() => remove(condition)}>
+            <Trash />
+        </PanelIcon>
+    </div>
+{/snippet}
+
 <div class="filter-conditions">
-    {#each Object.entries($searchParams) as [variable, value]}
-        {@const condition = getCondition(variable)}
-        <div class="condition">
-            <span>{condition.variable} {condition.operator} {condition.value}</span>
-            <button on:click={() => remove(condition)}>×</button>
-        </div>
+    {#each page.url.searchParams.entries() as [key, value]}
+        {#if Array.isArray(value)}
+            {#each value as v}
+                {@render variable(key, v)}
+            {/each}
+        {:else}
+            {@render variable(key, value)}
+        {/if}
     {/each}
 </div>
 
@@ -36,19 +71,10 @@
 
     .condition {
         display: flex;
-        align-items: left;        
-        border-radius: 4px;
+        align-items: center;
     }
-
-    button {
-        background: none;
-        border: none;
-        color: var(--color-text);
-        cursor: pointer;
-        padding: 0 0.25rem;
-    }
-
-    button:hover {
-        color: var(--color-error);
+    .condition:hover {
+        background-color: rgba(0, 0, 0, 0.1);
+        color: black;
     }
 </style>

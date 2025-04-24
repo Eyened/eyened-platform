@@ -1,7 +1,7 @@
-import { loadEnv } from 'vite';
-import glsl from 'vite-plugin-glsl';
 import { sveltekit } from '@sveltejs/kit/vite';
 import Icons from 'unplugin-icons/vite';
+import { loadEnv } from 'vite';
+import glsl from 'vite-plugin-glsl';
 
 /** @type {import('vite').UserConfig} */
 export default () => {
@@ -17,8 +17,7 @@ export default () => {
     } catch (error) {
         console.warn('Failed to parse VITE_HOSTNAME:', error);
     }
-    console.log('Allowed host:', allowedHost);
-    console.log('Port:', env.VITE_PORT);
+
     return {
         plugins: [
             sveltekit(),
