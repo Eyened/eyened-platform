@@ -54,16 +54,10 @@ services:
     volumes:
       - ${IMAGES_BASEPATH}:/images
       - ${STORAGE_BASEPATH}:/storage
-    # ports:
-    #   - ${PORT}:8000
-  
-  
 
   redis:
     user: "${USERID:-1000}:${GROUPID:-1000}"
     image: redis:7-alpine
-    # ports:
-    #   - 6379:6379
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
@@ -100,4 +94,15 @@ services:
       - ${STORAGE_BASEPATH}/thumbnails:/thumbnails
     ports:
       - ${PORT}:80
+
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
 
