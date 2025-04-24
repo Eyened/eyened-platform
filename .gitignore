@@ -1,1 +1,5 @@
-.env
+docker/.env
+dev.env
+*.zip
+*.pyc
+notebooks/hrfav/**/*
