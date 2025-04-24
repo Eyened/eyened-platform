@@ -1,24 +1,50 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 import traceback
+import datetime
 import importlib.util
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from eyened_orm.importer.importer import Importer
 from ..db import get_db
 from ..config import settings
+from ..utils.huey import task_run_inference, task_update_thumbnails
 
 router = APIRouter()
 security = HTTPBasic()
 
 
 # Pydantic models for request and response schemas
+class ImageImportData(BaseModel):
+    """
+    Model for a single image import data
+    """
+    project_name: str = Field(..., description="Required project name")
+    patient_identifier: Optional[str] = Field(None, description="Patient identifier in the system")
+    patient_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new patient")
+    study_date: Optional[Union[datetime.date, str]] = Field(None, description="Study date (can be a date object or ISO format string)")
+    study_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new study")
+    series_id: Optional[str] = Field(None, description="Optional series identifier")
+    series_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new series")
+    image: str = Field(..., description="Path to the image file (required)")
+    image_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new image")
+
+class ImportOptions(BaseModel):
+    """
+    Options for the import process
+    """
+    create_patients: bool = Field(False, description="If True, create patients when they don't exist")
+    create_studies: bool = Field(False, description="If True, create studies when they don't exist")
+    create_series: bool = Field(True, description="If True, create series when they don't exist")
+    create_project: bool = Field(False, description="If True, create project when it doesn't exist")
+    include_stack_trace: bool = Field(False, description="If True, include stack trace in the error response")
+
 class ImportRequest(BaseModel):
-    data: List[Dict[str, Any]]
-    options: Dict[str, Any]
+    data: ImageImportData
+    options: ImportOptions
 
 class ImportResponse(BaseModel):
     success: bool
@@ -26,7 +52,12 @@ class ImportResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     stack_trace: Optional[str] = None
-    background_processing: Optional[bool] = None
+
+class TaskResponse(BaseModel):
+    success: bool
+    message: str
+    task_id: Optional[str] = None
+    error: Optional[str] = None
 
 def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
     """
@@ -50,72 +81,40 @@ def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
     
     return credentials
 
-def make_importer(session, project_name, options: Dict[str, Any]):
+def make_importer(session, options: ImportOptions):
     # Create importer with options
     return Importer(
         session=session,
-        project_name=project_name,
-        create_patients=options.get("create_patients", False),
-        create_studies=options.get("create_studies", False),
-        create_series=options.get("create_series", True),
-        run_ai_models=options.get("run_ai_models", True),
-        generate_thumbnails=options.get("generate_thumbnails", True),
-        copy_files=options.get("copy_files", False),
+        create_patients=options.create_patients,
+        create_studies=options.create_studies,
+        create_series=options.create_series,
+        create_project=options.create_project,
+        run_ai_models=False,  # We handle this separately via background tasks
+        generate_thumbnails=False,  # We handle this separately via background tasks
+        copy_files=False,
         config=settings.make_orm_config()
     )
 
-@router.post("/import/exec", response_model=ImportResponse)
-async def import_exec(
+@router.post("/import/image", response_model=ImportResponse)
+async def import_single_image(
     request: ImportRequest,
     session: Session = Depends(get_db),
     credentials: HTTPBasicCredentials = Depends(verify_credentials)
 ):
-    """
-    Execute the import process with the provided data and options.
-    """
+    
+    # Create importer with options
+    importer = make_importer(session, request.options)
+
+    # Process the date field if it's a string
+    image_data = request.data.model_dump()
+    image_data['study_date'] = datetime.date.fromisoformat(image_data['study_date'])
+        
+    # Execute the import
     try:
-        # Extract options with defaults
-        options = request.options or {}
-        project_name = options.get("project_name")
-        
-        if not project_name:
-            return ImportResponse(
-                success=False,
-                message="Import failed",
-                error="project_name is required in options"
-            )
-        
-        
-        # Modify options for immediate import
-        import_options = options.copy()
-        # Disable AI models and thumbnail generation during import
-        # These will be handled by Huey tasks
-        import_options["run_ai_models"] = False
-        import_options["generate_thumbnails"] = False
-        
-        # Create importer with modified options
-        importer = make_importer(session, project_name, import_options)
-        
-        # Execute the import
-        importer.exec(request.data)
-        
-        # If Huey is available, schedule background processing
-        from ..utils.huey import task_run_inference, task_update_thumbnails
-            
-        # Schedule background processing tasks
-        config = settings.make_orm_config()
-        task_update_thumbnails(config, print_errors=True)
-        task_run_inference(config)
-        
-        return ImportResponse(
-            success=True,
-            message="Import completed successfully" + 
-                    (" (background processing scheduled)"),
-            data={"project_name": project_name}
-        )
+        images = importer.import_one(image_data)
         
     except Exception as e:
-        include_stack_trace = options.get("include_stack_trace", False)
+        include_stack_trace = request.options.include_stack_trace
         error_message = str(e)
         stack_trace = traceback.format_exc() if include_stack_trace else None
         
@@ -125,48 +124,51 @@ async def import_exec(
             error=error_message,
             stack_trace=stack_trace
         )
+        
+    return ImportResponse(
+        success=True,
+        message="Import completed successfully",
+        data={"project_name": image_data["project_name"], "image_count": len(images)},
+    )
 
-@router.post("/import/summary", response_model=ImportResponse)
-async def import_summary(
-    request: ImportRequest,
-    session: Session = Depends(get_db),
+@router.post("/import/run_inference", response_model=TaskResponse)
+async def run_inference(
     credentials: HTTPBasicCredentials = Depends(verify_credentials)
 ):
-    """
-    Generate a summary of what would be imported with the provided data and options.
-    """
     try:
-        # Extract options with defaults
-        options = request.options or {}
-        project_name = options.get("project_name")
+        config = settings.make_orm_config()
+        task = task_run_inference(config)
         
-        if not project_name:
-            return ImportResponse(
-                success=False,
-                message="Summary generation failed",
-                error="project_name is required in options"
-            )
-        
-        # Create importer with options
-        importer = make_importer(session, project_name, options)
-        
-        # Generate the summary
-        summary = importer.summary(request.data)
-        
-        return ImportResponse(
+        return TaskResponse(
             success=True,
-            message="Summary generated successfully",
-            data=summary
+            message="Inference task queued successfully",
+            task_id=task.id
+        )
+    except Exception as e:
+        return TaskResponse(
+            success=False,
+            message="Failed to queue inference task",
+            error=str(e)
+        )
+
+@router.post("/import/update_thumbnails", response_model=TaskResponse)
+async def update_thumbnails(
+    credentials: HTTPBasicCredentials = Depends(verify_credentials)
+):
+    try:
+        config = settings.make_orm_config()
+        task = task_update_thumbnails(config)
+        
+        return TaskResponse(
+            success=True,
+            message="Thumbnail update task queued successfully",
+            task_id=task.id
+        )
+    except Exception as e:
+        return TaskResponse(
+            success=False,
+            message="Failed to queue thumbnail update task",
+            error=str(e)
         )
         
-    except Exception as e:
-        include_stack_trace = options.get("include_stack_trace", False)
-        error_message = str(e)
-        stack_trace = traceback.format_exc() if include_stack_trace else None
-        
-        return ImportResponse(
-            success=False,
-            message="Summary generation failed",
-            error=error_message,
-            stack_trace=stack_trace
-        ) 
+    

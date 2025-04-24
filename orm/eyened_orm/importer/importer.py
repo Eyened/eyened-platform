@@ -3,7 +3,7 @@ import secrets
 import shutil
 import warnings
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from sqlalchemy import inspect
@@ -23,10 +23,10 @@ class Importer:
     def __init__(
         self,
         session,
-        project_name: str,
         create_patients: bool = False,
         create_studies: bool = False,
         create_series: bool = True,
+        create_project: bool = False,
         run_ai_models: bool = True,
         generate_thumbnails: bool = True,
         copy_files: bool = False,
@@ -39,14 +39,14 @@ class Importer:
         -----------
         session : SQLAlchemy session
             Database session to use for the import
-        project_name : str
-            Name of the project to import data into
-        create_studies : bool, default=False
-            If True, create studies when they don't exist
         create_patients : bool, default=False
             If True, create patients when they don't exist
+        create_studies : bool, default=False
+            If True, create studies when they don't exist
         create_series : bool, default=False
             If True, create series when they don't exist
+        create_project : bool, default=False
+            If True, create project when it doesn't exist
         run_ai_models : bool, default=True
             If True, run AI models on the images after import
         generate_thumbnails : bool, default=True
@@ -57,11 +57,11 @@ class Importer:
             config object (see config.sample.py) or environment to load for configuration (e.g., "test", "production").
         """
         self.session = session
-        self.project_name = project_name
 
         self.create_patients = create_patients
         self.create_studies = create_studies
         self.create_series = create_series
+        self.create_project = create_project
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
         self.copy_files = copy_files
@@ -84,6 +84,20 @@ class Importer:
         else:
             self.default_path_relative = None
         self.images_basepath_local = self.config.get("images_basepath_local", None)
+        
+        # Initialize empty collections
+        self._clear_collections()
+
+    def _clear_collections(self):
+        """
+        Clear all collection attributes to reset state.
+        """
+        self.projects = []
+        self.patients = []
+        self.studies = []
+        self.series = []
+        self.images = []
+        self.copy_queue = []
 
     def init_objects(self, data: List[Dict]):
         """
@@ -91,6 +105,7 @@ class Importer:
 
         Creates the hierarchy from project down to series objects based on the data
         structure and configuration:
+        - Project is created if self.create_project is True
         - Patients are created if self.create_patients is True
         - Studies are created if self.create_studies is True
         - Series are created if self.create_series is True
@@ -106,8 +121,9 @@ class Importer:
             List of patient dictionaries with the following structure:
             [
                 {
-                    "patient_identifier": str,  # Optional patient identifier in the system
-                    "props": {},                # Optional key-value properties for patient
+                    "project_name": str,            # Required project name
+                    "patient_identifier": str,      # Optional patient identifier in the system
+                    "props": {},                    # Optional key-value properties for patient
                     "studies": [
                         {
                             "study_date": datetime.date,  # Optional study date
@@ -126,23 +142,24 @@ class Importer:
 
         Returns:
         --------
-        Project
-            The project object (either found or created)
+        List[Project]
+            The project objects (either found or created)
         """
-        self.project = None
-        self.patients = []
-        self.studies = []
-        self.series = []
-        self.images = []
+        # Clear collections before starting
+        self._clear_collections()
+        
+        # Check that all patient items have a project_name
+        for i, patient_item in enumerate(data):
+            if "project_name" not in patient_item or not patient_item["project_name"]:
+                raise ValueError(f"project_name is required for patient at index {i}")
 
-        # Find or create project
-        project = Project.by_name(self.session, self.project_name)
-        if project is None:
-            project = Project(ProjectName=self.project_name, External=True)
-        self.project = project
-
+        # Process each patient
         for patient_item in data:
-            patient = self.find_or_create_patient(patient_item)
+            # Find or create the project for this patient
+            project = self.find_or_create_project(patient_item["project_name"])
+            self.projects.append(project)
+            
+            patient = self.find_or_create_patient(patient_item, project)
             self.patients.append(patient)
 
             for study_item in patient_item.get("studies", []):
@@ -156,6 +173,60 @@ class Importer:
                     for image_item in series_item.get("images", []):
                         image = self.find_or_create_image(series, image_item)
                         self.images.append(image)
+                        
+        return self.projects
+
+    def find_or_create_project(self, project_name: str) -> Project:
+        # Check if we've already processed this project
+        for project in self.projects:
+            if project.ProjectName == project_name:
+                return project
+                
+        # Try to find the project in the database
+        project = Project.by_name(self.session, project_name)
+        
+        # Create the project if it doesn't exist and we're allowed to
+        if project is None:
+            if not self.create_project:
+                raise RuntimeError(
+                    f"Project with name '{project_name}' not found and create_project=False"
+                )
+            project = Project(ProjectName=project_name, External=True)
+            
+        # Add to our list of projects
+        
+        return project
+    
+    def find_or_create_patient(self, patient_item, project):
+        patient_identifier = patient_item.get("patient_identifier")
+        patient_props = patient_item.get("props", {})
+
+        # Try to find existing patient
+        patient = project.get_patient_by_identifier(
+            self.session, patient_identifier)
+
+        if patient is None:
+            if not self.create_patients:
+                raise RuntimeError(
+                    f"Patient with identifier '{patient_identifier}' not found and create_patients=False"
+                )
+
+            # Create new patient
+            patient = Patient(**patient_props)
+            patient.Project = project
+            patient.PatientIdentifier = (
+                patient_identifier
+                if patient_identifier is not None
+                # default patient identifier is random
+                else secrets.token_hex(8)
+            )
+        elif patient_props:
+            warnings.warn(
+                f"Props provided for existing patient '{patient_identifier}' will be ignored. "
+                f"The importer does not update existing patients."
+            )
+
+        return patient
 
     def find_or_create_image(self, series, image_data):
         props = image_data.get("props", {})
@@ -238,36 +309,7 @@ class Importer:
 
         return study
 
-    def find_or_create_patient(self, patient_item):
-        patient_identifier = patient_item.get("patient_identifier")
-        patient_props = patient_item.get("props", {})
-
-        # Try to find existing patient
-        patient = self.project.get_patient_by_identifier(
-            self.session, patient_identifier)
-
-        if patient is None:
-            if not self.create_patients:
-                raise RuntimeError(
-                    f"Patient with identifier '{patient_identifier}' not found and create_patients=False"
-                )
-
-            # Create new patient
-            patient = Patient(**patient_props)
-            patient.Project = self.project
-            patient.PatientIdentifier = (
-                patient_identifier
-                if patient_identifier is not None
-                # default patient identifier is random
-                else secrets.token_hex(8)
-            )
-        elif patient_props:
-            warnings.warn(
-                f"Props provided for existing patient '{patient_identifier}' will be ignored. "
-                f"The importer does not update existing patients."
-            )
-
-        return patient
+    
 
     def get_image_path(self, image_data):
         """
@@ -354,7 +396,7 @@ class Importer:
                 self.config,
             )
 
-    def exec(self, data: List[Dict]):
+    def _import(self, data: List[Dict]):
         """
         Execute the entire import process with the provided data.
 
@@ -364,16 +406,17 @@ class Importer:
             List of patient dictionaries with the following structure:
             [
                 {
-                    "patient_id": str,  # Patient identifier in the system
-                    "props": {},        # Optional key-value properties for patient
+                    "project_name": str,           # Required project name
+                    "patient_identifier": str,     # Optional patient identifier in the system
+                    "props": {},                   # Optional key-value properties for patient
                     "studies": [
                         {
                             "study_date": str,
-                            "props": {},  # Optional key-value properties for study
+                            "props": {},           # Optional key-value properties for study
                             "series": [
                                 {
                                     "series_id": str,
-                                    "props": {},  # Optional key-value properties for series
+                                    "props": {},   # Optional key-value properties for series
                                     "images": [
                                         {
                                             "image": str,  # Path to image
@@ -389,60 +432,28 @@ class Importer:
 
         Returns:
         --------
-        Project
-            The project object associated with the import
+        List[ImageInstance]
+            The image instances created during the import
         """
 
-        # Create a deep copy of the data to avoid modifying the user's original data
-        # data = copy.deepcopy(data)
+        self.init_objects(data)
+        # Add all created / updated objects to the session
+        for item in [*self.projects, *self.patients, *self.studies, *self.series, *self.images]:
+            self.session.add(item)
 
-        # Initialize progress tracking
-        steps = ['Creating hierarchy',
-                 'Database commit', 'Post-processing']
-        if self.copy_files:
-            steps.insert(1, 'Copying files')
+        try:
+            self.session.commit()
+        except Exception as e:
+            self.session.rollback()
+            raise RuntimeError(
+                "Failed to commit the transaction. Nothing will be written to the database and no files have been created or changed"
+            ) from e
 
-        # Create a progress bar for overall process
-        with tqdm(total=len(steps), desc="Import Progress") as pbar:
-            # Create the hierarchy of objects
-            pbar.set_description(
-                "Creating patients, studies, series, instances")
-            self.init_objects(data)
-            pbar.update(1)
-
-            # Copy files if needed (before committing to ensure all files are copied)
-            if self.copy_files:
-                pbar.set_description("Copying image files")
-                self.copy_images()
-                pbar.update(1)
-
-            # Commit to database
-            pbar.set_description("Committing to database")
-            self.session.add(self.project)
-
-            # Add all created / updated objects to the session
-            for item in [*self.patients, *self.studies, *self.series, *self.images]:
-                self.session.add(item)
-
-            try:
-                self.session.commit()
-                pbar.write("Successfully committed to database")
-                pbar.update(1)
-            except Exception as e:
-                pbar.write("Failed to commit to database")
-                self.session.rollback()
-                # TODO: roll back copied files
-                raise RuntimeError(
-                    "Failed to commit the transaction. Nothing will be written to the database and no files have been created or changed"
-                ) from e
-
-            # Process the imported data (run AI models, generate thumbnails)
-            pbar.set_description("Running post-processing")
-            self.post_insert()
-            pbar.update(1)
-
-    def summary(self, data: List[Dict]) -> Dict:
-
+        self.post_insert()
+        # Save created images to return before clearing collections
+        return list(self.images)
+    
+    def _summary(self, data: List[Dict]) -> Dict:
         with self.session.begin_nested():
             self.init_objects(data)
             
@@ -485,15 +496,18 @@ class Importer:
                     column_stats[name] = self._get_populated_fields_stats(
                         class_map[name], items)
 
+            # Save project names before rolling back
+            project_names = [project.ProjectName for project in self.projects]
+            
             # Complete summary
             summary = {
-                "project_name": self.project_name,
+                "projects": project_names,
                 "general_stats": general_stats,
                 "column_stats": column_stats
             }
 
             # Print summary as before
-            print(f"\nImport Summary for Project: {self.project_name}")
+            print(f"\nImport Summary for Projects: {', '.join(summary['projects'])}")
             print('----------------  Object Statistics  ----------------')
 
             # Create and display dataframe directly from general_stats
@@ -517,7 +531,89 @@ class Importer:
 
             # Rollback the nested transaction to avoid creating any objects
             # This happens automatically when exiting the with block
+        
         return summary
+
+    def import_many(self, data: List[Dict], summary: bool = False) -> Union[List[ImageInstance], Dict]:
+        """
+        Import data or generate a summary of what would be imported.
+        
+        Parameters:
+        -----------
+        data : List[Dict]
+            List of patient dictionaries with the structure documented in _import
+        summary : bool, default=False
+            If True, only generate a summary of what would be imported without actually
+            importing the data. If False, perform the actual import.
+            
+        Returns:
+        --------
+        Union[List[ImageInstance], Dict]
+            If summary=False: The image instances created during the import
+            If summary=True: A dictionary containing import statistics
+        """
+        try:
+            if summary:
+                return self._summary(data)
+            else:
+                return self._import(data)
+        finally:
+            # Always clear collections at the end to ensure stateless behavior
+            self._clear_collections()
+
+    def import_one(self, image_data: Dict, summary: bool = False) -> Union[List[ImageInstance], Dict]:
+        """
+        Import a single image using a simplified flat dictionary structure.
+        
+        Parameters:
+        -----------
+        image_data : Dict
+            Dictionary containing all the necessary information for importing a single image:
+            {
+                "project_name": str,              # Required project name
+                "patient_identifier": str,        # Optional patient identifier
+                "patient_props": dict,            # Optional patient properties
+                "study_date": datetime.date,      # Optional study date
+                "study_props": dict,              # Optional study properties
+                "series_id": str,                 # Optional series identifier
+                "series_props": dict,             # Optional series properties
+                "image": str,                     # Path to the image file (required)
+                "image_props": dict               # Optional image properties
+            }
+        summary : bool, default=False
+            If True, only generate a summary of what would be imported without actually
+            importing the data. If False, perform the actual import.
+            
+        Returns:
+        --------
+        Union[List[ImageInstance], Dict]
+            If summary=False: The image instances created during the import
+            If summary=True: A dictionary containing import statistics
+        """
+        if "project_name" not in image_data:
+            raise ValueError("project_name is required in the image_data dictionary")
+            
+        # Transform the flat dictionary into the nested structure expected by import
+        structured_data = [{
+            "project_name": image_data.get("project_name"),
+            "patient_identifier": image_data.get("patient_identifier"),
+            "props": image_data.get("patient_props", {}),
+            "studies": [{
+                "study_date": image_data.get("study_date"),
+                "props": image_data.get("study_props", {}),
+                "series": [{
+                    "series_id": image_data.get("series_id"),
+                    "props": image_data.get("series_props", {}),
+                    "images": [{
+                        "image": image_data.get("image"),
+                        "props": image_data.get("image_props", {})
+                    }]
+                }]
+            }]
+        }]
+        
+        # Call the appropriate method based on the summary flag
+        return self.import_many(structured_data, summary=summary)
 
     def _get_populated_fields_stats(self, model_class, instances):
         """
