@@ -4,7 +4,7 @@ services:
 
   database:
     image: mysql:8.0.27
-    user: $USER
+    # user: "${USERID:-1000}:${GROUPID:-1000}"
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
     volumes:
@@ -13,12 +13,12 @@ services:
       - "${DATABASE_PORT}:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DATABASE_ROOT_PASSWORD}"]
-      interval: 10s
+      interval: 2s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   api-server:
-    user: $USER
+    user: "${USERID:-1000}:${GROUPID:-1000}"
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.server
@@ -27,14 +27,20 @@ services:
         - PUBLIC_AUTH_TOKEN_DURATION=${PUBLIC_AUTH_TOKEN_DURATION}
         - PUBLIC_FILESERVER_URL=http://${HOSTNAME}:${PORT}/api/instances/images
         - PUBLIC_THUMBNAIL_SERVER_URL=http://${HOSTNAME}:${PORT}/api/instances/thumbnails
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
     depends_on:
       database:
         condition: service_healthy
     environment:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - IMAGES_BASEPATH=${IMAGES_BASEPATH}
+      - IMAGES_BASEPATH_LOCAL=/images
       - THUMBNAILS_PATH=${STORAGE_BASEPATH}/thumbnails
-      - ANNOTATIONS_DIR=${STORAGE_BASEPATH}/annotations
+      - ANNOTATIONS_PATH=${STORAGE_BASEPATH}/annotations
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DB_HOST=database
@@ -46,22 +52,18 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     restart: always
     volumes:
-      - ${STORAGE_BASEPATH}:/storage
-    ports:
-      - ${PORT}:8000
-  
-  fileserver:
-    build:
-      context: .
-      dockerfile: Dockerfile.fileserver
-    volumes:
       - ${IMAGES_BASEPATH}:/images
+      - ${STORAGE_BASEPATH}:/storage
+    # ports:
+    #   - ${PORT}:8000
+  
+  
 
   redis:
-    user: $USER
+    user: "${USERID:-1000}:${GROUPID:-1000}"
     image: redis:7-alpine
-    ports:
-      - 6379:6379
+    # ports:
+    #   - 6379:6379
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
@@ -69,7 +71,7 @@ services:
       retries: 10
 
   worker:
-    user: $USER
+    user: "${USERID:-1000}:${GROUPID:-1000}"
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.worker
@@ -85,4 +87,17 @@ services:
       - ${IMAGES_BASEPATH}:/images
       - ${STORAGE_BASEPATH}:/storage
     restart: always
+
+  fileserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.fileserver
+    depends_on:
+      api-server:
+        condition: service_healthy
+    volumes:
+      - ${IMAGES_BASEPATH}:/images
+      - ${STORAGE_BASEPATH}/thumbnails:/thumbnails
+    ports:
+      - ${PORT}:80
 

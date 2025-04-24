@@ -61,10 +61,7 @@ def make_importer(session, project_name, options: Dict[str, Any]):
         run_ai_models=options.get("run_ai_models", True),
         generate_thumbnails=options.get("generate_thumbnails", True),
         copy_files=options.get("copy_files", False),
-        config={
-            "images_basepath":settings.images_basepath,
-            "images_basepath_container": '/images',
-        }
+        config=settings.make_orm_config()
     )
 
 @router.post("/import/exec", response_model=ImportResponse)
@@ -107,7 +104,7 @@ async def import_exec(
             
         # Schedule background processing tasks
         config = settings.make_orm_config()
-        task_update_thumbnails(config)
+        task_update_thumbnails(config, print_errors=True)
         task_run_inference(config)
         
         return ImportResponse(

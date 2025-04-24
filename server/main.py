@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from .routes import annotations, api, auth, form_annotations, import_api, instances, tasks
 from .config import settings
 from .db import get_db
-from .utils.database_init import create_database, init_annotation_types, init_admin
+from .utils.database_init import create_database, init_annotation_types, init_admin, init_other_objects
 
 app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
@@ -28,6 +28,8 @@ async def lifespan(app: FastAPI):
         create_database()
         # initialize admin user
         init_admin(session)
+        # initialize other objects
+        init_other_objects(session)
         # initialize annotation types
         init_annotation_types(session)
     except Exception as e:
@@ -42,6 +44,9 @@ app = FastAPI(lifespan=lifespan)
 
 app.mount("/api", app_api)
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if settings.viewer_env == "production":
 

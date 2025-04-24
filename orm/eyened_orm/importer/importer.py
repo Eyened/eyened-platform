@@ -83,7 +83,7 @@ class Importer:
             ).relative_to(self.config["images_basepath"])
         else:
             self.default_path_relative = None
-        self.images_basepath_container = self.config.get("images_basepath_container", None)
+        self.images_basepath_local = self.config.get("images_basepath_local", None)
 
     def init_objects(self, data: List[Dict]):
         """
@@ -283,7 +283,7 @@ class Importer:
 
         fpath = Path(path_or_url)
 
-        local_path = Path(self.images_basepath_container) / fpath.relative_to(basepath) if self.images_basepath_container else fpath
+        local_path = Path(self.images_basepath_local) / fpath.relative_to(basepath) if self.images_basepath_local else fpath
         
         assert local_path.exists(), f"File does not exist: {local_path}"
         assert local_path.is_absolute(), f"Path must be absolute: {local_path}"
