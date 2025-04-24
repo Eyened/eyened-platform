@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from server.routes import annotations, api, auth, form_annotations, instances, tasks
+from server.routes import annotations, api, auth, features, form_annotations, instances, tasks
 from server.config import settings
 from server.db import get_db
 from server.utils.database_init import create_database, init_annotation_types, init_admin
@@ -16,7 +16,7 @@ app_api.include_router(api.router)
 app_api.include_router(annotations.router)
 app_api.include_router(form_annotations.router)
 app_api.include_router(tasks.router)
-
+app_api.include_router(features.router)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
