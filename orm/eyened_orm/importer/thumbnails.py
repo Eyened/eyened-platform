@@ -131,14 +131,14 @@ def update_thumbnails_for_images(session, images, thumbnails_path, secret_key, N
         if image.path.endswith(".json"):
             image.ThumbnailPath = None
         else:
-            # try:
-            thumbnail_identifier = save_thumbnails(
-                image, Path(thumbnails_path), secret=secret_key
-            )
-            # except Exception as e:
-            #     if print_errors:
-            #         print(f"Error generating thumbnail for image {image.ImageInstanceID}: {e}")
-            #     thumbnail_identifier = ""
+            try:
+                thumbnail_identifier = save_thumbnails(
+                    image, Path(thumbnails_path), secret=secret_key
+                )
+            except Exception as e:
+                if print_errors:
+                    print(f"Error generating thumbnail for image {image.ImageInstanceID}: {e}")
+                thumbnail_identifier = ""
             image.ThumbnailPath = thumbnail_identifier
 
         if (i + 1) % N == 0:
