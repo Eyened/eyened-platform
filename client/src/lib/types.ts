@@ -16,11 +16,7 @@ export type FilterFieldSpec =
     | number[]
     | string[];
 
-export interface Condition {
-    variable: string;
-    operator: string;
-    value: string;
-}
+
 
 export type DialogueType = undefined | string | {
     query: string | Component,
