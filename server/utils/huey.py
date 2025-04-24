@@ -38,15 +38,14 @@ def task_run_inference(config):
     DBManager.init(config)
     session = DBManager.get_session()
     
-    with session() as s:
-        run_inference(s, device=None, cfi_cache_path=None)
-    
+    run_inference(session, device=None, cfi_cache_path=None)
+    session.close()
     logger.info("Inference task completed successfully")
     return True
 
 @huey.task()
 @huey.lock_task('update-thumbnails-lock') 
-def task_update_thumbnails(config):
+def task_update_thumbnails(config, print_errors=False):
     """
     Update thumbnails for images in a background task.
     
@@ -56,10 +55,11 @@ def task_update_thumbnails(config):
     from eyened_orm.importer.thumbnails import update_thumbnails
     from eyened_orm.db import DBManager
     logger.info(f"Starting thumbnail update task")
-    session = DBManager.get_session(config)
+
+    DBManager.init(config)
+    session = DBManager.get_session()
     
-    with session() as s:
-        update_thumbnails(s, thumbnails_path='/storage/thumbnails', secret_key= config["secret_key"])
-    
+    update_thumbnails(session, thumbnails_path='/storage/thumbnails', secret_key= config["secret_key"], print_errors=True)
+    session.close()
     logger.info("Thumbnail update task completed successfully")
     return True

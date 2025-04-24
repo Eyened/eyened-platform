@@ -262,5 +262,5 @@ async def get_thumb(
     thumbnail_identifier: str,
 ):
     response = Response()
-    response.headers["X-Accel-Redirect"] = "/files/" + thumbnail_identifier
+    response.headers["X-Accel-Redirect"] = "/thumbnails/" + thumbnail_identifier
     return response
