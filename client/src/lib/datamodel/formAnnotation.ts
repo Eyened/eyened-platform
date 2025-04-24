@@ -35,5 +35,5 @@ export const FormAnnotationConstructor = new ItemConstructor<FormAnnotation>(
         created: DateMapping('DateInserted'),
         modified: DateMapping('DateModified'),
         reference: FKMapping('FormAnnotationReferenceID', 'formAnnotations'),
-        value: ServerPropertyMapping('FormData', params => `formAnnotations/${params.FormAnnotationID}/value`, params => 'application/json', true)
+        value: ServerPropertyMapping('FormData', params => `formAnnotations/${params.FormAnnotationID}/value`, params => 'application/json', false)
     });
