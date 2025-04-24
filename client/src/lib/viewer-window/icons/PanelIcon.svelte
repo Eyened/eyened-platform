@@ -8,6 +8,8 @@
 		isText?: boolean;
 		children?: Snippet;
 		onclick?: () => void;
+		color?: string;
+		backgroundColor?: string;
 	}
 
 	let {
@@ -16,7 +18,9 @@
 		tooltip = undefined,
 		isText = false,
 		children,
-		onclick = () => {}
+		onclick = () => {},
+		color,
+		backgroundColor
 	}: Props = $props();
 
 	let tooltipElem: HTMLElement = $state();
@@ -46,7 +50,7 @@
 <div class="tooltip" bind:this={tooltipElem}>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<span class="icon" class:isText class:active class:disabled onclick={click}>
+	<span class="icon" class:isText class:active class:disabled onclick={click} style:color={color} style:background-color={backgroundColor}>
 		{@render children?.()}
 	</span>
 	{#if tooltip}
