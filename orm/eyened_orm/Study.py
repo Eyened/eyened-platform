@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import ForeignKey, String, func, select, sa
+from sqlalchemy import ForeignKey, String, func, select, Index
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
@@ -27,7 +27,7 @@ class Study(Base):
         # one study per patient per date
         CompositeUniqueConstraint("PatientID", "StudyDate"),
         # Add index on StudyDate for faster ordering and filtering
-        sa.Index('StudyDate_idx', 'StudyDate'),
+        Index('StudyDate_idx', 'StudyDate'),
     )
 
     StudyID: Mapped[int] = mapped_column(primary_key=True)
