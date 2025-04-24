@@ -1,7 +1,7 @@
-import { loadEnv } from 'vite';
-import glsl from 'vite-plugin-glsl';
 import { sveltekit } from '@sveltejs/kit/vite';
 import Icons from 'unplugin-icons/vite';
+import { loadEnv } from 'vite';
+import glsl from 'vite-plugin-glsl';
 
 /** @type {import('vite').UserConfig} */
 export default () => {
@@ -10,12 +10,12 @@ export default () => {
 
     let allowedHost = '';
     try {
-        if (env.VITE_PROXY_URL) {
-            const url = new URL(env.VITE_PROXY_URL);
+        if (env.VITE_HOSTNAME) {
+            const url = new URL('http://' + env.VITE_HOSTNAME);
             allowedHost = url.hostname;
         }
     } catch (error) {
-        console.warn('Failed to parse VITE_PROXY_URL:', error);
+        console.warn('Failed to parse VITE_HOSTNAME:', error);
     }
 
     return {
@@ -29,13 +29,13 @@ export default () => {
         server: {
             proxy: {
                 '/auth': {
-                    target: env.VITE_PROXY_URL,
+                    target: env.VITE_HOSTNAME + ':' + env.VITE_PORT,
                     changeOrigin: true,
                     secure: false,
                     ws: true,
                 },
                 '/api': {
-                    target: env.VITE_PROXY_URL,
+                    target: env.VITE_HOSTNAME + ':' + env.VITE_PORT,
                     changeOrigin: true,
                     secure: false,
                     ws: true,

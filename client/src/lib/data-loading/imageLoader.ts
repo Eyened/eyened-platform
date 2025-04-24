@@ -5,30 +5,20 @@ import { Image3D } from '$lib/webgl/image3D';
 import type { Dimensions } from '$lib/webgl/types';
 import type { WebGL } from '$lib/webgl/webgl';
 import { splitTail } from '../utils';
-import { browser } from '$app/environment';
 
-let cornerstone: typeof import('cornerstone-core') | undefined;
-let cornerstoneWADOImageLoader: typeof import('cornerstone-wado-image-loader') | undefined;
-let dicomParser: typeof import('dicom-parser') | undefined;
+import * as cornerstone from 'cornerstone-core';
+import * as cornerstoneWADOImageLoader from 'cornerstone-wado-image-loader';
+import * as dicomParser from 'dicom-parser';
 
-if (browser) {
-    // Dynamically import the modules only in the browser environment
-    (async () => {
-        cornerstone = await import('cornerstone-core');
-        cornerstoneWADOImageLoader = await import('cornerstone-wado-image-loader');
-        dicomParser = await import('dicom-parser');
-
-        // Configure cornerstone WADO image loader after loading
-        cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
-        cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
-        cornerstoneWADOImageLoader.configure({
-            beforeSend: (xhr: XMLHttpRequest) => {
-                xhr.setRequestHeader('Accept', 'application/dicom');
-            },
-            useWebWorkers: true,
-        });
-    })();
-}
+// Configure cornerstone WADO image loader
+cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+cornerstoneWADOImageLoader.external.dicomParser = dicomParser
+cornerstoneWADOImageLoader.configure({
+    beforeSend: (xhr: XMLHttpRequest) => {
+        xhr.setRequestHeader('Accept', 'application/dicom');
+    },
+    useWebWorkers: true
+});
 
 export type LoadedImages = [Image2D] | [Image3D] | [Image2D, Image3D]
 
