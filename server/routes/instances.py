@@ -65,8 +65,8 @@ class DataResponse(BaseModel):
 
 
 class InstanceResponse(BaseModel):
-    count: int
     entities: DataResponse
+    next_cursor: Optional[str] = None
 
 
 base_query = (
@@ -125,6 +125,13 @@ def get_mappings(tables):
         for column in table.__table__.columns:
             if column.name == "Password":
                 continue
+            # Skip foreign keys
+            if column.foreign_keys:
+                continue
+            # Modality is defined on ImageInstance and Feature, but we want to use the value from ImageInstance
+            if column.name == "Modality" and original_table_name == "Feature":
+                continue
+            
             col = getattr(table, column.key)
 
             # Use the original table name in the mapping
@@ -136,7 +143,7 @@ def get_mappings(tables):
 
 
 base_mappings = get_mappings(base_tables)
-annotation_mappings = get_mappings(annotation_tables)
+annotation_mappings = get_mappings(annotation_tables)   
 form_mappings = get_mappings(form_tables)
 
 
@@ -151,11 +158,14 @@ def apply_filters(query, mappings, params):
 
 
 def run_queries(
-    session, params, offset, limit, base_query, annotation_query, form_query
+    session, params, cursor, limit, base_query, annotation_query, form_query
 ):
     params_decoded = decode_params(params)
+    if cursor:
+        query = query.filter(Study.StudyDate <= cursor)
 
     query = apply_filters(base_query, base_mappings, params_decoded)
+
 
     if any(field in annotation_mappings for field in params_decoded):
         query = (
@@ -173,7 +183,6 @@ def run_queries(
                 ActiveAnnotation.CreatorID == AnnotationCreator.CreatorID,
             )
         )
-        print("joining annotations")
         query = apply_filters(query, annotation_mappings, params_decoded)
     if any(field in form_mappings for field in params_decoded):
         query = (
@@ -186,16 +195,28 @@ def run_queries(
             )
             .join(FormCreator, ActiveFormAnnotation.CreatorID == FormCreator.CreatorID)
         )
-        print("joining forms")
         query = apply_filters(query, form_mappings, params_decoded)
 
     instance_query = (
         query.distinct(ImageInstance.ImageInstanceID)
         .order_by(Study.StudyDate)
-        .limit(limit)
-        .offset(offset)
+        .limit(limit + 1)
     )
     instances = session.execute(instance_query).all()
+    if len(instances) > limit:
+        _, _, last_study, _ = instances[-1]
+        next_cursor = last_study.StudyDate
+        # run again, but with cursor for max date instead of limit
+        instance_query = (
+            query.filter(Study.StudyDate <= next_cursor)
+            .distinct(ImageInstance.ImageInstanceID)
+            .order_by(Study.StudyDate)
+        )
+        instances = session.execute(instance_query).all()
+
+    else:
+        next_cursor = None
+
     image_ids = {instance.ImageInstanceID for instance, *_ in instances}
 
     annotation_query = annotation_query.where(
@@ -207,7 +228,7 @@ def run_queries(
     form_query = form_query.where(ActiveFormAnnotation.PatientID.in_(patient_ids))
     form_annotations = session.scalars(form_query).all()
 
-    return instances, annotations, form_annotations
+    return next_cursor, instances, annotations, form_annotations
 
 
 @router.get("/instances", response_model=InstanceResponse)
@@ -216,16 +237,15 @@ async def get_instances(
     session: Session = Depends(get_db),
     user_id: int = Depends(manager),
 ):
-
+    
+    cursor = request.query_params.get("cursor")
     limit = int(request.query_params.get("limit", 200))
-    page = int(request.query_params.get("page", 0))
-    offset = limit * page
-
+    
     multiparams = request.query_params.multi_items()
-    print(multiparams)
+    
 
-    i, a, form_annotations = run_queries(
-        session, multiparams, offset, limit, base_query, annotation_query, form_query
+    next_cursor, i, a, form_annotations = run_queries(
+        session, multiparams, cursor, limit, base_query, annotation_query, form_query
     )
 
     instances = set()
@@ -243,8 +263,8 @@ async def get_instances(
     for annotation, annotation_data in a:
         annotations.add(annotation)
         annotation_datas.add(annotation_data)
-
-    return {
+    
+    response = {
         "entities": {
             k: collect_rows(v)
             for k, v in {
@@ -256,9 +276,11 @@ async def get_instances(
                 "annotationDatas": annotation_datas,
                 "formAnnotations": form_annotations,
             }.items()
-        },
-        "count": len(instances),
+        }
     }
+    if next_cursor:
+        response["next_cursor"] = next_cursor.isoformat()
+    return response
 
 
 @router.get("/instances/images/{dataset_identifier:path}")

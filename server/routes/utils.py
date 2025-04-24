@@ -13,8 +13,7 @@ class ordered_partial(functools.partial):
     def __call__(*args, **keywords):
         # This is the old way (before 3.8) of using only positional arguments
         if not args:
-            raise TypeError(
-                "descriptor '__call__' of partial needs an argument")
+            raise TypeError("descriptor '__call__' of partial needs an argument")
         self, *args = args
         # allow overwriting the declared keywords
         keywords = {**self.keywords, **keywords}
@@ -23,19 +22,19 @@ class ordered_partial(functools.partial):
 
 def password_hash(password: str):
     return pbkdf2_hmac(
-        "sha256", password.encode(
-        ), os.environ["JWT_SECRET_KEY"].encode(), 10000
+        "sha256", password.encode(), os.environ["JWT_SECRET_KEY"].encode(), 10000
     )
 
 
 def collect_rows(rows):
     def to_dict(row):
-        return {k: v for k, v in row.to_dict().items() if k != "ValueBlob"}
-    
+        return {
+            k: v for k, v in row.to_dict().items() if k not in ("ValueBlob", "FormData")
+        }
+
     return [
-        to_dict(row) 
-        for row in rows 
+        to_dict(row)
+        for row in rows
         # the tuples (None, None) are returned by the tags linking tables
         if (row is not None) and (row != (None, None))
     ]
-
