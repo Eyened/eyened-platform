@@ -1,4 +1,5 @@
 docker/.env
+.env
 dev.env
 *.zip
 *.pyc

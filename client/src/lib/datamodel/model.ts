@@ -62,7 +62,7 @@ export class DataModel {
     creators = new ItemCollection<Creator>();
     devices = new ItemCollection<Device>();
     deviceModels = new ItemCollection<DeviceModel>();
-    features = new ItemCollection<Feature>();
+    features = new MutableItemCollection<Feature>('features');
     formAnnotations = new MutableItemCollection<FormAnnotation>('formAnnotations');
     formSchemas = new ItemCollection<FormSchema>();
 
