@@ -2,12 +2,8 @@ from eyened_orm import DBManager
 
 from .config import settings
 
-config = {
-    "database": settings.database,
-    "annotations_path": settings.annotations_path
-}
 
-DBManager.init(config)
+DBManager.init(settings)
 
 
 def get_db():

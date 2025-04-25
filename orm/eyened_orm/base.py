@@ -2,6 +2,7 @@ import datetime
 import enum
 from typing import Any, Dict, List, Type, TypeVar, Tuple
 
+from eyened_orm.utils.config import EyenedORMConfig
 from sqlalchemy import Index, MetaData, UniqueConstraint, select
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.types import JSON
@@ -23,7 +24,7 @@ T = TypeVar("T", bound="Base")
 class Base(DeclarativeBase):
     metadata = metadata  # Attach the metadata with the naming convention
     type_annotation_map = {Dict[str, Any]: JSON}
-    config = None
+    config: EyenedORMConfig = None
 
     @classmethod
     def fetch_all(cls: Type[T], session) -> List[T]:

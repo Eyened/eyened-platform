@@ -234,16 +234,16 @@ class ImageInstance(Base):
 
     @property
     def path(self):
-        basepath = self.config.get("images_basepath_local", self.config.get("images_basepath"))
+        basepath = self.config.images_basepath_local or self.config.images_basepath
         if basepath is None:
             raise RuntimeError("images_basepath not set in config")
         return os.path.join(basepath, self.DatasetIdentifier)
 
     @property
     def url(self):
-        if self.config.get("image_server_url") is None:
+        if self.config.image_server_url is None:
             raise RuntimeError("image_server_url not set in config")
-        return f"{self.config['image_server_url']}/{self.DatasetIdentifier}"
+        return f"{self.config.image_server_url}/{self.DatasetIdentifier}"
 
     @property
     def pixel_array(self):

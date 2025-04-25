@@ -1,1 +1,3 @@
-config.*.py
+config.*.env
+!config.sample.env
+

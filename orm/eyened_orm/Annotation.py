@@ -205,13 +205,13 @@ class AnnotationData(Base):
     def path(self) -> str:
         if not self.config:
             raise ValueError("Configuration not initialized")
-        return f"{self.config['annotations_path']}/{self.DatasetIdentifier}"
+        return f"{self.config.annotations_path}/{self.DatasetIdentifier}"
 
     @property
     def trash_path(self) -> str:
         if not self.config:
             raise ValueError("Configuration not initialized")
-        return f"{self.config['trash_path']}/{self.DatasetIdentifier}"
+        return f"{self.config.trash_path}/{self.DatasetIdentifier}"
 
     def __repr__(self):
         return f"AnnotationData({self.AnnotationID}, {self.ScanNr}, {self.DatasetIdentifier}, {self.MediaType})"
@@ -318,7 +318,7 @@ def move_file_to_trash(annotation_data: AnnotationData) -> None:
 @event.listens_for(Session, "before_flush")
 def receive_before_flush(session, flush_context, instances):
     """Track AnnotationData objects being deleted before they're removed from the session."""
-    if Base.config.get("trash_path") is None: # only run if trash_path is set
+    if Base.config.trash_path is None: # only run if trash_path is set
         return
     session.deleted_annotation_data_info = [
         {
