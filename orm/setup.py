@@ -28,7 +28,9 @@ setup(
         "tqdm==4.*",
         "alembic==1.13.2",        
         "PyMySQL==1.0.2",
-        "pydicom==3.*"
+        "pydicom==3.*",
+        "GPUtil==1.*",
+        "requests==2.*"
     ],
     python_requires=">=3.8",
 )

@@ -1,0 +1,27 @@
+FROM pytorch/pytorch:2.6.0-cuda11.8-cudnn9-runtime
+
+
+SHELL ["/bin/bash", "-c"]
+
+# Install system dependencies for OpenCV -> required by albumentations -> opencv
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY server/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install the ORM
+COPY orm /libraries/eyened_orm/
+WORKDIR /libraries/eyened_orm
+RUN pip install --no-cache-dir -e .
+
+# Setup the application
+COPY server /app/server
+WORKDIR /app
+
+RUN pip install --no-cache-dir retinalysis-fundusprep retinalysis-inference
+
+CMD python -m huey.bin.huey_consumer server.utils.huey.huey -w ${HUEY_WORKERS:-2} -k process

@@ -27,10 +27,9 @@ export function parseDate(dateString: string): Date | undefined {
 }
 
 export function getThumbUrl(Instance: Instance) {
-    if (!Instance.thumbnailIdentifier) return;
+    if (!Instance.thumbnailPath) return;
 
-    let image_url = [thumbnailHost, Instance.thumbnailIdentifier].join('/');
-    if (image_url.endsWith('.binary')) image_url += '.png';
+    let image_url = [thumbnailHost, Instance.thumbnailPath].join('/') + '_144.jpg';
 
     return encodeURI(image_url);
 }

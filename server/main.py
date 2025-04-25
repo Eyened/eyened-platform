@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from server.routes import annotations, api, auth, features, form_annotations, instances, tasks
+from server.routes import annotations, api, auth, features, form_annotations, instances, tasks, import_api
 from server.config import settings
 from server.db import get_db
-from server.utils.database_init import create_database, init_annotation_types, init_admin
+from server.utils.database_init import create_database, init_annotation_types, init_admin, init_other_objects
 
 app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
@@ -17,6 +17,8 @@ app_api.include_router(annotations.router)
 app_api.include_router(form_annotations.router)
 app_api.include_router(tasks.router)
 app_api.include_router(features.router)
+app_api.include_router(import_api.router)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,6 +29,8 @@ async def lifespan(app: FastAPI):
         create_database()
         # initialize admin user
         init_admin(session)
+        # initialize other objects
+        init_other_objects(session)
         # initialize annotation types
         init_annotation_types(session)
     except Exception as e:
@@ -41,6 +45,9 @@ app = FastAPI(lifespan=lifespan)
 
 app.mount("/api", app_api)
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if settings.viewer_env == "production":
 

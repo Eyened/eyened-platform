@@ -2,16 +2,10 @@
 
 # Load environment variables
 set -a
-source .env
+source dev.env
 set +a
 
 # Start the client
 cd client
+npm exec vite -- --port $DEV_FRONTEND_SERVER_PORT --host 0.0.0.0 dev
 
-# Create .env file for Vite
-cat > .env << EOL
-VITE_PORT=$PORT
-VITE_HOSTNAME=$HOSTNAME
-EOL
-
-npm run dev
