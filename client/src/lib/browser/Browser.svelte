@@ -7,12 +7,10 @@
     import { getContext, onMount, setContext } from "svelte";
     import Spinner from "../utils/Spinner.svelte";
     import BrowserContent from "./BrowserContent.svelte";
-    import { BrowserContext } from "./browserContext.svelte";
+    import { BrowserContext, setParam } from "./browserContext.svelte";
     import FilterConditions from "./FilterConditions.svelte";
     import FilterImages from "./FilterImages.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
-
-    
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const creator = globalContext.creator;
@@ -37,6 +35,11 @@
     function search() {
         browserContext.loadDataFromServer();
     }
+
+    async function loadMore(event) {
+        await setParam("StudyDate~~>=", browserContext.next_cursor);
+        browserContext.loadDataFromServer();
+    }
 </script>
 
 {#if browserContext.loading}
@@ -55,7 +58,7 @@
             <div id="browser-header-right">
                 <FilterImages />
                 <FilterConditions />
-                <button onclick={search}>Search</button>
+                <button onclick={search} disabled={browserContext.no_params_set}>Search</button>
             </div>
             <div id="user">
                 <MainIcon
@@ -69,13 +72,22 @@
                 </MainIcon>
             </div>
         </div>
-        <div>
+        <div class="display-toggle">
             Display:
             <Toggle
                 bind:control={renderMode}
                 textOn="studies"
                 textOff="instances"
             />
+            {#if browserContext.next_cursor}
+                <div>
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <span class="link" onclick={loadMore}
+                        >Large result set, click to load more</span
+                    >
+                </div>
+            {/if}
         </div>
     </div>
 
@@ -160,5 +172,16 @@
     }
     span.icon:hover {
         background-color: rgba(178, 229, 253, 0.5);
+    }
+    div.display-toggle {
+        display: flex;        
+        padding: 1em;
+        flex-direction: column;
+    }
+    span.link {
+        cursor: pointer;
+    }
+    span.link:hover {
+        text-decoration: underline;
     }
 </style>
