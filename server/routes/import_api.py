@@ -136,8 +136,7 @@ async def run_inference(
     credentials: HTTPBasicCredentials = Depends(verify_credentials)
 ):
     try:
-        config = settings.make_orm_config()
-        task = task_run_inference(config)
+        task = task_run_inference()
         
         return TaskResponse(
             success=True,
@@ -156,8 +155,7 @@ async def update_thumbnails(
     credentials: HTTPBasicCredentials = Depends(verify_credentials)
 ):
     try:
-        config = settings.make_orm_config()
-        task = task_update_thumbnails(config)
+        task = task_update_thumbnails()
         
         return TaskResponse(
             success=True,
