@@ -92,7 +92,7 @@ def make_importer(session, options: ImportOptions):
         run_ai_models=False,  # We handle this separately via background tasks
         generate_thumbnails=False,  # We handle this separately via background tasks
         copy_files=False,
-        config=settings.make_orm_config()
+        config=settings.model_dump()
     )
 
 @router.post("/import/image", response_model=ImportResponse)
