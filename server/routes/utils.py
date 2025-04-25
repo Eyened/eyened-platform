@@ -24,7 +24,7 @@ class ordered_partial(functools.partial):
 def password_hash(password: str):
     return pbkdf2_hmac(
         "sha256", password.encode(
-        ), os.environ["JWT_SECRET_KEY"].encode(), 10000
+        ), os.environ["SECRET_KEY"].encode(), 10000
     )
 
 

@@ -17,7 +17,7 @@ router = APIRouter()
 
 # Initialize LoginManager
 manager = LoginManager(
-    secret=settings.jwt_secret_key,
+    secret=settings.secret_key,
     token_url="/auth/token",
     use_cookie=True,
     use_header=False,

@@ -29,7 +29,9 @@ Our development setup will run hot-reloading development servers for the api and
     ```
     conda create --name viewer python=3.11
     git clone https://github.com/Eyened/eyened-platform.git eyened_platform
-    cd eyened_platform/server
+    cd eyened_platform/orm
+    pip install -e .
+    cd ../server
     pip install -r requirements.txt
     cd ../client
     npm install

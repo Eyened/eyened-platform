@@ -133,7 +133,7 @@ class FormAnnotation(Base):
     @property
     def trash_path(self) -> str:
         """Return the path to the trash file for this FormAnnotation."""
-        return f"{self.config['trash_path']}/FormAnnotations/{self.FormAnnotationID}.json"
+        return f"{self.config.trash_path}/FormAnnotations/{self.FormAnnotationID}.json"
 
     def get_flat_data(self):
         metadata = {

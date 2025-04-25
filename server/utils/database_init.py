@@ -2,20 +2,22 @@ from eyened_orm import AnnotationType
 
 import os
 import warnings
-from eyened_orm.db import create_connection_string_mysql
+from eyened_orm.db import create_connection_string
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, text
 from eyened_orm import Creator, SourceInfo, ModalityTable
 from eyened_orm.base import Base
 
-from ..db import config, DBManager
+from ..db import settings, DBManager
 from ..routes.utils import password_hash
 
 def create_database():
     # create generic engine for database creation
-    temp_engine = create_engine(create_connection_string_mysql(**{**config["database"], 'database': None}))
-    
-    dbname = config["database"]["database"]
+    db_config = settings.database.model_copy()
+    dbname = db_config.database
+
+    db_config.database = None
+    temp_engine = create_engine(create_connection_string(db_config))
     
     # First check if database exists
     try:
