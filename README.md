@@ -1,39 +1,61 @@
 # eyened-platform
 
-## Overview
+A modern web platform for visualization and annotation of ophthalmic images with features like:
 
-## Features
+- Loading of various image formats including DICOM.
+- Convenient system for browsing loaded studies and images.
+- Task system for managing grading tasks.
+- Drawing tools for 2D image segmentation of enface images and OCT B-scans
+- Images and annotations are rendered in the browser, making it very responsive and easy to set up.
+- Image enhancements such as CLAHE can be applied on the fly.
+- Integrated tools for registration of enface images.
+- Automated ETDRS grid placement via AI-based bounds detection and landmark detection (fovea, optic disc) upon insertion of - CFI images.
+- Python-based import script for loading images and associated metadata.
+- Authentication system can secure the viewer, images, thumbnails and annotations.
+- For advanced use cases, our ORM allows data scientists to more easily work with the database.
 
-## Installation 
 
-### Prerequisites
-- Docker and Docker Compose
-- MySQL database
-- Nginx (for file serving)
+See our [Documentation](https://eyened.github.io/eyened-platform/).
 
-### Database Setup
-1. Set up a MySQL database
-2. Initialize the database schema:
-    - Use eyened_orm
-3. Configure the database:
-   - Add an entry to the `Creator` table to enable login
-   - For segmentation features: add desired features to the `Feature` table
-   - For form annotations: add entries to the `FormSchema` table
+## Development setup
 
-### File Server Setup
-1. Configure an Nginx server as a file server
+Our development setup will run hot-reloading development servers for the api and frontend. To avoid exposing image files, it also requires a reverse proxy nginx server set up. A [docker-compose] is provided for this server.
 
-### Deployment
-Run the following commands to build and start the containers:
-```bash
-docker-compose build
-docker-compose up -d
-```
+### Setup
 
-## Development
+0. [Install npm and node](https://nodejs.org/en/download) if necessary.
 
-Run the following scripts to start development servers:
-```bash
-./start_client_dev.sh
-./start_server_dev.sh
-```
+1. Create an environment, clone the repo, and install Python and Node dependencies:
+    ```
+    conda create --name viewer python=3.11
+    git clone https://github.com/Eyened/eyened-platform.git eyened_platform
+    cd eyened_platform/orm
+    pip install -e .
+    cd ../server
+    pip install -r requirements.txt
+    cd ../client
+    npm install
+    ```
+
+
+2. Copy `sample.dev.env` into `dev.env` and configure the variables documented in it.
+
+3. Build and run the development nginx:
+    ```
+    cd ../docker/development_nginx
+    docker-compose build
+    docker-compose up -d
+    ```
+
+### Regular usage
+
+- Keep the development nginx docker running
+- When working on eyened platform run:
+    ```
+    ./start_client_dev.sh
+    ```
+    and:
+    ```
+    ./start_server_dev.sh
+    ```
+    on separate terminals.

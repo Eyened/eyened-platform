@@ -36,7 +36,7 @@ services:
       database:
         condition: service_healthy
     environment:
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY}
       - IMAGES_BASEPATH=${IMAGES_BASEPATH}
       - IMAGES_BASEPATH_LOCAL=/images
       - THUMBNAILS_PATH=${STORAGE_BASEPATH}/thumbnails
