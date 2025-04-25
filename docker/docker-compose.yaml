@@ -69,9 +69,21 @@ services:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.worker
-    environment:
+    environment: # the workers need the ORM config to connect to the database and store data
+      - SECRET_KEY=${SECRET_KEY}
+      - IMAGES_BASEPATH=${IMAGES_BASEPATH}
+      - IMAGES_BASEPATH_LOCAL=/images
+      - THUMBNAILS_PATH=${STORAGE_BASEPATH}/thumbnails
+      - ANNOTATIONS_PATH=${STORAGE_BASEPATH}/annotations
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_HOST=database
+      - DB_PASSWORD=${DATABASE_ROOT_PASSWORD}
+      - DB_USER=root
+      - DB_PORT=3306
+      - DB_NAME=eyened_database
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     depends_on:
       redis:
         condition: service_healthy

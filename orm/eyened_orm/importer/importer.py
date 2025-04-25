@@ -15,7 +15,7 @@ from eyened_orm import (
     Series,
     Study,
 )
-from eyened_orm.utils.config import get_config
+from eyened_orm.utils.config import EyenedORMConfig, get_config
 from tqdm import tqdm
 
 
@@ -30,7 +30,7 @@ class Importer:
         run_ai_models: bool = True,
         generate_thumbnails: bool = True,
         copy_files: bool = False,
-        config: str | dict = "test",
+        config: str | EyenedORMConfig = "test",
     ):
         """
         Initialize the Importer with database session and data to import.
@@ -67,23 +67,23 @@ class Importer:
         self.copy_files = copy_files
         if isinstance(config, str):
             self.config = get_config(config)
-        elif isinstance(config, dict):
+        elif isinstance(config, EyenedORMConfig):
             self.config = config
         else:
             raise ValueError(f"Invalid config type: {type(config)}")
         self.copy_queue = []
 
-        assert self.config['images_basepath'] is not None, "images_basepath must be set when using the importer"
+        assert self.config.images_basepath is not None, "images_basepath must be set when using the importer"
 
         if self.copy_files:
-            assert self.config['importer_copy_path'] is not None, "importer_copy_path must be set when copy_files is True"
+            assert self.config.importer_copy_path is not None, "importer_copy_path must be set when copy_files is True"
 
             self.default_path_relative = Path(
-                self.config["importer_default_path"]
-            ).relative_to(self.config["images_basepath"])
+                self.config.importer_copy_path
+            ).relative_to(self.config.images_basepath)
         else:
             self.default_path_relative = None
-        self.images_basepath_local = self.config.get("images_basepath_local", None)
+        self.images_basepath_local = self.config.images_basepath_local
         
         # Initialize empty collections
         self._clear_collections()
@@ -271,39 +271,39 @@ class Importer:
         return series
 
     def find_or_create_study(self, patient, study_item):
-        study_date = study_item.get("study_date", self.config.get("study_date", datetime.date(1970,1,1)))
+        default_study_date = self.config.default_study_date or datetime.date(1970,1,1)
         props = study_item.get("props", {})
 
         # Convert string date to datetime.date if necessary
-        if isinstance(study_date, str):
+        if isinstance(default_study_date, str):
             try:
                 # Assuming format is 'yyyy-mm-dd'
-                year, month, day = map(int, study_date.split('-'))
-                study_date = datetime.date(year, month, day)
+                year, month, day = map(int, default_study_date.split('-'))
+                default_study_date = datetime.date(year, month, day)
             except ValueError:
                 raise ValueError(
-                    f"Invalid study date format: '{study_date}'. Expected format: 'yyyy-mm-dd' for patient '{patient.PatientIdentifier}'"
+                    f"Invalid study date format: '{default_study_date}'. Expected format: 'yyyy-mm-dd' for patient '{patient.PatientIdentifier}'"
                 )
 
-        if not isinstance(study_date, datetime.date):
+        if not isinstance(default_study_date, datetime.date):
             raise ValueError(
                 f"Study date must be a datetime.date object for patient '{patient.PatientIdentifier}'"
             )
 
-        study = patient.get_study_by_date(study_date)
+        study = patient.get_study_by_date(default_study_date)
 
         if study is None:
             if not self.create_studies:
                 raise RuntimeError(
-                    f"Study with date '{study_date}' for patient '{patient.PatientIdentifier}' not found and create_studies=False"
+                    f"Study with date '{default_study_date}' for patient '{patient.PatientIdentifier}' not found and create_studies=False"
                 )
 
             # Create new study
-            study = Study(StudyDate=study_date, **props)
+            study = Study(StudyDate=default_study_date, **props)
             study.Patient = patient
         elif props:
             warnings.warn(
-                f"Props provided for existing study (date: '{study_date}', patient: '{patient.PatientIdentifier}') "
+                f"Props provided for existing study (date: '{default_study_date}', patient: '{patient.PatientIdentifier}') "
                 f"will be ignored. The importer does not update existing studies."
             )
 
@@ -317,7 +317,7 @@ class Importer:
         If copy_files is True, it generates a unique filename for the copied file.
         The generated filenames are stored in the copy_queue for later copying.
         """
-        basepath = Path(self.config["images_basepath"])
+        basepath = Path(self.config.images_basepath)
 
         path_or_url = image_data.get("image")
         if path_or_url.startswith("http"):

@@ -49,7 +49,7 @@ class EyenedORMConfig(BaseSettings):
         description="The local path to images_basepath to be used to resolve image paths in the ORM. This is different from images_basepath in that images_basepath is the path on the server (outside of the container) and images_basepath_local is the path inside the container (to a mounted volume)."
     )
     default_study_date: Optional[date] = Field(
-        None,
+        date(1970, 1, 1),
         description="Default date for new studies. "
                     "When the importer needs to create new studies and it does not receive a study date, "
                     "it will use this default date. Defaults to 1970-01-01"
