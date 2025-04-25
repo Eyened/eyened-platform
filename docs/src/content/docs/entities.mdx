@@ -1,0 +1,65 @@
+---
+title: Data Model Entity Fields
+description: Detailed documentation of entity fields in the eyened platform data model
+---
+
+# Entity Fields 📊
+
+The following fields may be provided in the `props` dictionary of the Patient, Study, Series or Image when importing data into the eyened platform.
+
+## Patient
+
+The `Patient` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `BirthDate` | date | Patient's date of birth |
+| `Sex` | SexEnum | Patient's sex (M=1, F=2) |
+| `PatientIdentifier` | str | Unique identifier for the patient (within a project) |
+
+## Study
+
+The `Study` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `StudyRound` | int | Project round of this study |
+| `StudyDescription` | str | Description of the study |
+| `StudyInstanceUid` | str | Unique identifier for the study (DICOM) |
+| `StudyDate` | date | Date when the study was performed |
+
+## Series
+
+The `Series` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `SeriesNumber` | int | Series number |
+| `SeriesInstanceUid` | str | Unique identifier for the series (DICOM) |
+
+## ImageInstance
+
+The `ImageInstance` model contains the following non-relationship fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Modality` | Modality | Type of image (ColorFundus, OCT, etc.) |
+| `SOPInstanceUid` | str | Unique identifier for SOP instance (DICOM) |
+| `SOPClassUid` | str | Identifies the service-object pair class (DICOM) |
+| `PhotometricInterpretation` | str | Specifies the intended interpretation of pixel data (RGB, MONOCHROME, etc.) |
+| `SamplesPerPixel` | int | Number of color components in each pixel |
+| `NrOfFrames` | int | Number of frames in a multi-frame image |
+| `SliceThickness` | float | Nominal slice thickness, in millimeters |
+| `Rows_y` | int | Number of rows (height) in the image |
+| `Columns_x` | int | Number of columns (width) in the image |
+| `Laterality` | Laterality | Side of body examined (L=1, R=2) |
+| `DICOMModality` | ModalityType | Type of equipment that acquired the data (OP, OPT, SC) |
+| `AnatomicRegion` | int | Body part examined |
+| `ETDRSField` | ETDRSField | Early Treatment Diabetic Retinopathy Study field position |
+| `Angiography` | int | Indicates angiography type |
+| `AcquisitionDateTime` | datetime | Date and time the acquisition of data started |
+| `PupilDilated` | bool | Indicates if pupil was dilated during image acquisition |
+| `HorizontalFieldOfView` | float | Horizontal dimension of field of view in millimeters |
+| `ResolutionAxial` | float | Axial resolution in millimeters |
+| `ResolutionHorizontal` | float | Horizontal resolution in millimeters |
+| `ResolutionVertical` | float | Vertical resolution in millimeters | 

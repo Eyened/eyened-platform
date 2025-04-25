@@ -5,7 +5,7 @@ import warnings
 from eyened_orm.db import create_connection_string_mysql
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, text
-from eyened_orm.Creator import Creator
+from eyened_orm import Creator, SourceInfo, ModalityTable
 from eyened_orm.base import Base
 
 from ..db import config, DBManager
@@ -70,6 +70,21 @@ def init_admin(session: Session) -> None:
     new_admin.Description = "Default admin user created during initialization"
     
     session.add(new_admin)
+    session.commit()
+
+
+def init_other_objects(session):
+    # add SourceInfo 37 and Modality 14 if they don't exist
+    source_info = session.get(SourceInfo, 37)
+    if source_info is None:
+        source_info = SourceInfo(SourceInfoID=37, SourceName="Default", SourcePath="", ThumbnailPath="")
+        session.add(source_info)
+
+    modality = session.get(ModalityTable, 14)
+    if modality is None:
+        modality = ModalityTable(ModalityID=14, ModalityTag="Default")
+        session.add(modality)
+
     session.commit()
 
 
