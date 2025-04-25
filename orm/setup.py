@@ -30,7 +30,8 @@ setup(
         "PyMySQL==1.0.2",
         "pydicom==3.*",
         "GPUtil==1.*",
-        "requests==2.*"
+        "requests==2.*",
+        "pydantic-settings==2.7.1"
     ],
     python_requires=">=3.8",
 )

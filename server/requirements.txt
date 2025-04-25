@@ -1,7 +1,6 @@
 fastapi==0.115.8
 fastapi-cli==0.0.7
 uvicorn==0.34.0
-pydantic-settings==2.7.1
 mysql-connector-python==8.0.31
 pyodbc==4.0.35
 numpy==1.23.5
@@ -10,3 +9,4 @@ pyjwt==2.10.1
 cryptography==44.0.2
 huey==2.5.3
 redis==5.*
+pydantic-settings==2.7.1

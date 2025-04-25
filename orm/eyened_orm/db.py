@@ -1,29 +1,30 @@
 from contextlib import contextmanager
 
+from eyened_orm.utils.config import EyenedORMConfig, DatabaseSettings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .base import Base
 
-def create_connection_string_mysql(user, password, host, port, database=None, **kwargs):
-    if database is None:
-        return f"mysql+pymysql://{user}:{password}@{host}:{port}"
-    else:
-        return f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
+def create_connection_string(config: DatabaseSettings):
+    dbstring = f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}"
+    if config.database is not None:
+        dbstring += f"/{config.database}"
+    return dbstring
 
 class DBManager:
     _engine = None
     _SessionLocal = None
 
     @classmethod
-    def init(cls, config: str | dict):
+    def init(cls, config: str | EyenedORMConfig):
         """Initialize the database session factory with the given config."""
         
-        if type(config) == str:
+        if isinstance(config, str):
             from eyened_orm.utils.config import get_config
             config = get_config(config)
-        
-        conn_string = create_connection_string_mysql(**config["database"])
+
+        conn_string = create_connection_string(config.database)
         if cls._engine is None:
             cls._engine = create_engine(conn_string, pool_pre_ping=True)
             cls._SessionLocal = sessionmaker(
