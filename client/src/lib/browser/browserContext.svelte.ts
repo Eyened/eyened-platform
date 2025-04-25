@@ -12,7 +12,8 @@ export class BrowserContext {
     popup: ComponentDef | null = $state(null);
     loading: boolean = $state(false);
     next_cursor: string | null = $state(null);
-
+    no_params_set: boolean = $derived(page.url.searchParams.size === 0);
+    
     constructor(selection: number[]) {
         this.selection = selection;
     }
@@ -29,10 +30,15 @@ export class BrowserContext {
         if (!browser) {
             return;
         }
+        if (this.no_params_set) {
+            console.log("no params set");
+            return;
+        }
+
         this.loading = true;
         // removes existing entities from the model
         clearData();
-        
+
         const next_cursor = await loadSearchParams(page.url.searchParams);
         this.next_cursor = next_cursor;
         this.loading = false;

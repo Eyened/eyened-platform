@@ -58,7 +58,7 @@
             <div id="browser-header-right">
                 <FilterImages />
                 <FilterConditions />
-                <button onclick={search}>Search</button>
+                <button onclick={search} disabled={browserContext.no_params_set}>Search</button>
             </div>
             <div id="user">
                 <MainIcon
