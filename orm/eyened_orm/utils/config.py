@@ -24,7 +24,7 @@ class EyenedORMConfig(BaseSettings):
 
     """Global configuration for Eyened platform"""
     # Database configuration
-    database: DatabaseSettings = DatabaseSettings()
+    database: DatabaseSettings | None = None
     
     # Basic configuration
     annotations_path: str = Field(
@@ -95,8 +95,8 @@ def get_config(env="dev") -> EyenedORMConfig:
     Returns:
         EyenedConfig: Configuration object
     """
-    env_file = f"config.{env}.env"
-    dir_path = Path(__file__).parent.parent
+    env_file = f"{env}.env"
+    dir_path = Path(__file__).parent.parent.parent.parent
     env_path = dir_path / env_file
     
     if not env_path.exists():
@@ -104,5 +104,9 @@ def get_config(env="dev") -> EyenedORMConfig:
             f"Environment file {env_file} does not exist at {env_path}. Did you forget to create it?"
         )
     
-    return EyenedORMConfig(_env_file=env_path, _env_file_encoding='utf-8')
+    db_settings = DatabaseSettings(_env_file=env_path, _env_file_encoding='utf-8')
+    config = EyenedORMConfig(_env_file=env_path, _env_file_encoding='utf-8')
+    config.database = db_settings
+    
+    return config
     
