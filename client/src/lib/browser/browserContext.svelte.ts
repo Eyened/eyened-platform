@@ -11,6 +11,9 @@ export class BrowserContext {
     selection: number[] = $state([]);
     popup: ComponentDef | null = $state(null);
     loading: boolean = $state(false);
+    next_cursor: string | null = $state(null);
+    no_params_set: boolean = $derived(page.url.searchParams.size === 0);
+    
     constructor(selection: number[]) {
         this.selection = selection;
     }
@@ -27,11 +30,17 @@ export class BrowserContext {
         if (!browser) {
             return;
         }
+        if (this.no_params_set) {
+            console.log("no params set");
+            return;
+        }
+
         this.loading = true;
         // removes existing entities from the model
         clearData();
-        
-        await loadSearchParams(page.url.searchParams);
+
+        const next_cursor = await loadSearchParams(page.url.searchParams);
+        this.next_cursor = next_cursor;
         this.loading = false;
     }
 }
@@ -63,4 +72,11 @@ export async function removeParam(variable: string, value: string) {
         values.forEach(v => params.append(variable, v));
         await goto(`?${params.toString()}`);
     }
+}
+export async function setParam(variable: string, value: string) {
+    if (!browser) return;
+
+    const params = page.url.searchParams;
+    params.set(variable, value);
+    await goto(`?${params.toString()}`);
 }

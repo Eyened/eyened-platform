@@ -164,7 +164,6 @@ export class ViewerWindowContext {
     }
 
     getImages(instanceID: number): Promise<LoadedImages> {
-        console.log('getImages', instanceID);
         const instance = data.instances.get(instanceID);
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);
