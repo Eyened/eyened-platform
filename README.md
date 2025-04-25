@@ -23,7 +23,7 @@ Our development setup will run hot-reloading development servers for the api and
 
 ### Setup
 
-0. [Install npm and node](https://nodejs.org/en/download), required for the frontend.
+0. [Install npm and node](https://nodejs.org/en/download) if necessary.
 
 1. Create an environment, clone the repo, and install Python and Node dependencies:
     ```
@@ -37,6 +37,13 @@ Our development setup will run hot-reloading development servers for the api and
 
 
 2. Copy `sample.dev.env` into `dev.env` and configure the variables documented in it.
+
+3. Build and run the development nginx:
+    ```
+    cd ../docker/development_nginx
+    docker-compose build
+    docker-compose up -d
+    ```
 
 ### Regular usage
 
