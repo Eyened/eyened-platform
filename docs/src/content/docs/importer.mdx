@@ -3,15 +3,85 @@ title: Importing data
 description: Import data into the eyened platform
 ---
 
-{/* Claude query: Document the usage of the importer in importer.py. Clearly document the data structure used by the importer. Then document the options received by the importer. Finally, include a section with the Patient, Study, Series and ImageInstance fields. Look at the respective files and document only the non-relationship fields.*/}
+The eyened platform provides multiple ways to import ophthalmic images into the database. Choose the method that best fits your needs and technical expertise.
 
-The `Importer` class in the eyened platform provides a structured way to import ophthalmic images into the database.
+## Importing via API (basic) 🔌
+
+This method is the simplest way to import individual images using the REST API. It's ideal for smaller imports or when building integrations with other systems.
+
+The import process follows a hierarchical structure where images are organized within projects, patients, studies, and series. When importing an image, you can specify identifiers for each level of this hierarchy. The API will either use existing database entities or create new ones based on the configuration options you provide.
 
 :::note
-For a hands-on introduction to using the importer, make sure to check our example notebook.
+For a complete example of using the import API with real images, check out our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb).
 :::
 
-## Data Structure
+:::note
+For detailed information about entity fields available for each level (Patient, Study, Series, Image), see the [Entity Fields documentation](entities).
+:::
+
+### Single Image Import
+
+The API provides an endpoint for importing individual images:
+
+```
+POST /api/import/image
+```
+
+This endpoint accepts a JSON payload with the following structure:
+
+```python
+{
+  "data": {
+    "project_name": "Project Name",    # Required: name of the project
+    "patient_identifier": "Patient_1",  # Patient identifier
+    "patient_props": {},                # Optional key-value properties for patient
+    "study_date": "2023-05-15",        # Date of the study
+    "study_props": {},                  # Optional key-value properties for study
+    "series_id": "series123",           # Optional series identifier
+    "series_props": {},                 # Optional key-value properties for series
+    "image": "/path/to/image.jpg",     # Absolute path to image
+    "image_props": {                    # Optional image properties
+      "Laterality": "R",               # Optional: eye laterality (R/L)
+      "Modality": "ColorFundus",       # Required: image modality
+      # Any other image properties from entities.mdx
+    }
+  },
+  "options": {
+    "create_patients": true,           # Create patient if not exists
+    "create_studies": true,            # Create study if not exists
+    "create_series": true,             # Create series if not exists
+    "create_project": true,            # Create project if not exists
+    "include_stack_trace": true        # Include stack trace in error responses
+  }
+}
+```
+
+The `props` dictionaries at each level can include any of the fields documented in the [Entity Fields documentation](entities.mdx). These properties are used to populate the corresponding database objects.
+
+### Generating Thumbnails
+
+After importing images, you can trigger thumbnail generation with:
+
+```python
+response = requests.post(
+    f"{API_BASE_URL}/import/update_thumbnails",
+    headers=headers
+)
+```
+
+## Importing via ORM (advanced) 📊
+
+The `Importer` class in the eyened platform provides a structured way to import ophthalmic images directly using the Python ORM. This approach is more powerful and flexible, allowing batch imports of multiple patients, studies, and images in a single operation.
+
+:::note
+For a hands-on introduction to using the ORM importer, make sure to check our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_python.ipynb).
+:::
+
+:::note
+For detailed information about entity fields that can be included in the `props` dictionaries, see the [Entity Fields documentation](entities).
+:::
+
+### Data Structure
 
 The importer expects an input structured as nested lists of dictionaries with the following format:
 
@@ -43,7 +113,7 @@ The importer expects an input structured as nested lists of dictionaries with th
 ]
 ```
 
-This structure especifies a hierarchy of Project → Patient → Study → Series → ImageInstance that will be translated to database objects:
+This structure specifies a hierarchy of Project → Patient → Study → Series → ImageInstance that will be translated to database objects:
 
 - Project is the name of the dataset or research study. It may match an existing project in the database, in which case it will be expanded.
 - Patient represents a unique data subject within a project. `patient_identifier` should be unique within the project. It may match an existing patient identifier within the project, in which case the new images will be assigned to this patient.
@@ -55,9 +125,9 @@ This structure especifies a hierarchy of Project → Patient → Study → Serie
 The Modality metadata field is currently required by the viewer.
 :::
 
-By default, the importer will try to find objects in the database with existing identifiers (Patient -> `patient_identifier`; Study -> `study_date`; Series -> `series_id`) following the hierarchy. If the identifiers match existing database objects, the new images will be assigned to those objects. If a provided identifier does not match database objects, the importer will produce an error. However, the importer can be configured to create new objets using the `create_patients`, `create_studies` and `create_series` flags. When these flags are set, the importer will try to create the corresponding objects if they do not exist. If the identifiers are not provided, the importer will create new objects with generic IDs.
+By default, the importer will try to find objects in the database with existing identifiers (Patient -> `patient_identifier`; Study -> `study_date`; Series -> `series_id`) following the hierarchy. If the identifiers match existing database objects, the new images will be assigned to those objects. If a provided identifier does not match database objects, the importer will produce an error. However, the importer can be configured to create new objects using the `create_patients`, `create_studies` and `create_series` flags. When these flags are set, the importer will try to create the corresponding objects if they do not exist. If the identifiers are not provided, the importer will create new objects with generic IDs.
 
-## Importer Options
+### Importer Options
 
 When initializing the `Importer` class, you can provide the following options:
 
@@ -72,65 +142,4 @@ When initializing the `Importer` class, you can provide the following options:
 | `generate_thumbnails` | bool | True | If True, generate thumbnails for the images after import |
 | `copy_files` | bool | False | If True, copy image files to the images_basepath directory |
 | `env` | str | "test" | Environment to use for configuration (e.g., "test", "production") |
-
-## Entity Fields
-
-The following optional fields may be provided in the `props` dictionary of the Patient, Study, Series or Image.
-
-### Patient
-
-The `Patient` model contains the following non-relationship fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `BirthDate` | date | Patient's date of birth |
-| `Sex` | SexEnum | Patient's sex (M=1, F=2) |
-| `PatientIdentifier` | str | Unique identifier for the patient (within a project) |
-
-### Study
-
-The `Study` model contains the following non-relationship fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `StudyRound` | int | Project round of this study |
-| `StudyDescription` | str | Description of the study |
-| `StudyInstanceUid` | str | Unique identifier for the study (DICOM) |
-| `StudyDate` | date | Date when the study was performed |
-
-### Series
-
-The `Series` model contains the following non-relationship fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `SeriesNumber` | int | Series number |
-| `SeriesInstanceUid` | str | Unique identifier for the series (DICOM) |
-
-### ImageInstance
-
-The `ImageInstance` model contains the following non-relationship fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `Modality` | Modality | Type of image (ColorFundus, OCT, etc.) |
-| `SOPInstanceUid` | str | Unique identifier for SOP instance (DICOM) |
-| `SOPClassUid` | str | Identifies the service-object pair class (DICOM) |
-| `PhotometricInterpretation` | str | Specifies the intended interpretation of pixel data (RGB, MONOCHROME, etc.) |
-| `SamplesPerPixel` | int | Number of color components in each pixel |
-| `NrOfFrames` | int | Number of frames in a multi-frame image |
-| `SliceThickness` | float | Nominal slice thickness, in millimeters |
-| `Rows_y` | int | Number of rows (height) in the image |
-| `Columns_x` | int | Number of columns (width) in the image |
-| `Laterality` | Laterality | Side of body examined (L=1, R=2) |
-| `DICOMModality` | ModalityType | Type of equipment that acquired the data (OP, OPT, SC) |
-| `AnatomicRegion` | int | Body part examined |
-| `ETDRSField` | ETDRSField | Early Treatment Diabetic Retinopathy Study field position |
-| `Angiography` | int | Indicates angiography type |
-| `AcquisitionDateTime` | datetime | Date and time the acquisition of data started |
-| `PupilDilated` | bool | Indicates if pupil was dilated during image acquisition |
-| `HorizontalFieldOfView` | float | Horizontal dimension of field of view in millimeters |
-| `ResolutionAxial` | float | Axial resolution in millimeters |
-| `ResolutionHorizontal` | float | Horizontal resolution in millimeters |
-| `ResolutionVertical` | float | Vertical resolution in millimeters |
 

@@ -32,25 +32,51 @@ With this setup you will be able to:
 - Annotations and image thumbnails will be stored in local folders by the Eyened server.
 
 :::caution
-Make sure to set up regular back ups for both the sqlite database and the annotation folders.
+Make sure to set up regular back ups for both the sqlite database and storage folders.
 :::
 
-## Environment Variables
+### Setup
 
-The following environment variables are available to configure our docker containers:
+1. Clone our repository:
 
-| Variable | Description |
-| --- | --- |
-| HOSTNAME | Hostname the app will be served on |
-| PORT | Port the app will be served on |
-| JWT_SECRET_KEY | Secret key used to encode/decode access tokens and for password hashing. Change to something random when setting up the system |
-| PUBLIC_AUTH_TOKEN_DURATION | Duration of user access tokens in seconds (default: 3 days) |
-| ADMIN_USERNAME | Username for the default admin user |
-| ADMIN_PASSWORD | Password for the default admin user |
-| IMAGES_BASEPATH | Local folder to serve images from (may be read-only) |
-| STORAGE_BASEPATH | Local path to store annotations, thumbnails and other generated files |
-| DATABASE_PATH | Path to the database files |
-| DATABASE_PORT | Port to access the database from outside (optional) |
-| DATABASE_ROOT_PASSWORD | Root password for external database access (optional) |
+    ```
+    git clone https://github.com/Eyened/eyened-platform.git eyened_platform
+    ```
+
+2. A docker-compose project can be found in `eyened_platform/docker`:
+    
+
+    Create a copy of `sample.env` and configure the variables used by docker-compose to set up the containers by editing `.env` with your favorite text editor:
+
+    ```
+    cd eyened_platform/docker
+    cp sample.env .env
+    ```
+
+    The following environment variables are available:
+
+    | Variable | Description |
+    | --- | --- |
+    | HOSTNAME | Hostname the app will be served on |
+    | PORT | Port the app will be served on |
+    | JWT_SECRET_KEY | Secret key used to encode/decode access tokens and for password hashing. Change to something random when setting up the system |
+    | PUBLIC_AUTH_TOKEN_DURATION | Duration of user access tokens in seconds (default: 3 days) |
+    | ADMIN_USERNAME | Username for the default admin user |
+    | ADMIN_PASSWORD | Password for the default admin user |
+    | IMAGES_BASEPATH | Local folder to serve images from (may be read-only) |
+    | STORAGE_BASEPATH | Local path to store annotations, thumbnails and other generated files |
+    | DATABASE_PATH | Path to the database files |
+    | DATABASE_PORT | Port to access the database from outside (optional) |
+    | DATABASE_ROOT_PASSWORD | Root password for external database access (optional) |
 
 
+3. Build and run the containers:
+
+    ```
+    docker-compose build
+    USERID=$(id -u) GROUPID=$(id -g) docker-compose -f docker-compose.yaml up -d
+    ```
+
+4. Now the viewer should be available at `http://<HOSTNAME>:<PORT>` from within the network. Make sure to verify this.
+
+5. To import data, follow the [Importer guide](importer).
