@@ -19,11 +19,11 @@
 	const instanceIds = viewerWindowContext.instanceIds;
 	const initialInstanceIds = $instanceIds;
 
-	const browserContext = new BrowserContext(instances, initialInstanceIds);
+	const browserContext = new BrowserContext(initialInstanceIds);
 
 	setContext('browserContext', browserContext);
 
-	const patientIds = initialInstanceIds.map((i) => data.instances.get(i)!.patient.identifier);
+	const patientIds = initialInstanceIds.map((i) => instances.get(i)!.patient.identifier);
 	const loading = loadParams({ PatientIdentifier: patientIds });
 
 	const taskContext = getContext<TaskContext>('taskContext');

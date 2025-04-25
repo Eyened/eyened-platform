@@ -29,8 +29,10 @@ async function fetchSearchParams(endpoint: string, searchParams: URLSearchParams
 }
 
 export async function loadSearchParams(searchParams: URLSearchParams) {
-    const { count, entities } = await fetchSearchParams('instances', searchParams);
+    const resp = await fetchSearchParams('instances', searchParams);
+    const { next_cursor, entities } = resp;    
     importData(entities);
+    return next_cursor;
 }
 
 export async function loadParams(params: Record<string, string | number | Array<string | number>>) {
