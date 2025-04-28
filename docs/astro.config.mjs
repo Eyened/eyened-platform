@@ -13,6 +13,7 @@ export default defineConfig({
 			sidebar: [
 				{ slug: 'getting_started' },
                 { slug: 'importer' },
+				{ slug: 'entities' },
 				{
 				label: 'Eyened ORM',
 					// Autogenerate a group of links for the 'constellations' directory.

@@ -2,6 +2,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from eyened_orm.utils.config import DatabaseSettings
 import mysql.connector
 
 
@@ -24,9 +25,9 @@ partial_tables = set(
 )
 
 
-def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=None):
+def dump_database(db_config: DatabaseSettings, dump_file, no_data=False, no_create=False, tables=None):
     source_db_string = (
-        f"{db_config['host']}:{db_config['port']}/{db_config['database']}"
+        f"{db_config.host}:{db_config.port}/{db_config.database}"
     )
 
     if tables is None:
@@ -38,13 +39,13 @@ def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=N
         "--no-data" if no_data else "",
         "--no-create-info" if no_create else "",
         "-h",
-        db_config["host"],
+        db_config.host,
         "-P",
-        db_config["port"],
+        db_config.port,
         "-u",
-        db_config["user"],
-        "-p" + db_config["password"],  # password without space
-        db_config["database"],
+        db_config.user,
+        "-p" + db_config.password,  # password without space
+        db_config.database,
         *tables,
     ]
     command = [tk for tk in command if tk != ""]
@@ -63,20 +64,20 @@ def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=N
         return False
 
 
-def drop_create_db(test_db):
+def drop_create_db(test_db: DatabaseSettings):
     sql_commands = f"""
-DROP DATABASE IF EXISTS `{test_db["database"]}`;
-CREATE DATABASE `{test_db["database"]}`;
+DROP DATABASE IF EXISTS `{test_db.database}`;
+CREATE DATABASE `{test_db.database}`;
 """
     command = [
         "mysql",
         "-h",
-        test_db["host"],
+        test_db.host,
         "-P",
-        test_db["port"],
+        test_db.port,
         "-u",
-        test_db["user"],
-        "-p" + test_db["password"],
+        test_db.user,
+        "-p" + test_db.password,
     ]
 
     print("Dropping and creating the database..")
@@ -93,19 +94,19 @@ CREATE DATABASE `{test_db["database"]}`;
         return False
 
 
-def load_db(db_config, dump_file, force=False):
+def load_db(db_config: DatabaseSettings, dump_file, force=False):
     # now load the dump file
     command = [
         "mysql",
         "-h",
-        db_config["host"],
+        db_config.host,
         "-P",
-        db_config["port"],
+        db_config.port,
         "-u",
-        db_config["user"],
-        "-p" + db_config["password"],
+        db_config.user,
+        "-p" + db_config.password,
         "--force" if force else "",
-        db_config["database"],
+        db_config.database,
     ]
 
     command = [tk for tk in command if tk != ""]
@@ -125,15 +126,15 @@ def load_db(db_config, dump_file, force=False):
         return False
 
 
-def get_table_names(db_config):
+def get_table_names(db_config: DatabaseSettings):
     import mysql.connector
     # Connect to the MySQL database
     connection = mysql.connector.connect(
-        host=db_config["host"],
-        port=db_config["port"],
-        user=db_config["user"],
-        password=db_config["password"],
-        database=db_config["database"],
+        host=db_config.host,
+        port=db_config.port,
+        user=db_config.user,
+        password=db_config.password,
+        database=db_config.database,
     )
 
     try:
@@ -153,23 +154,23 @@ def get_table_names(db_config):
         connection.close()
 
 
-def run_smartdump(db_config, dump_file):
+def run_smartdump(db_config: DatabaseSettings, dump_file):
     smartdump_path = (
         Path.home() / ".config/composer/vendor/benmorel/smartdump/bin/smartdump"
     )
 
     # dump the partial tables using smartdump
-    database = db_config["database"]
+    database = db_config.database
     command = [
         str(smartdump_path),
         "--host",
-        db_config["host"],
+        db_config.host,
         "--user",
-        db_config["user"],
+        db_config.user,
         "--port",
-        db_config["port"],
+        db_config.port,
         "--password",
-        db_config["password"],
+        db_config.password,
         "--no-create-table",
         f'"{database}.Annotation:WHERE PatientID=217250"',
         f'"{database}.FormAnnotation:WHERE PatientID=217250"',
@@ -193,7 +194,7 @@ def run_smartdump(db_config, dump_file):
         print(result.stderr)
 
 
-def populate(source_db, test_db):
+def populate(source_db: DatabaseSettings, test_db: DatabaseSettings):
     all_tables = get_table_names(source_db)
     full_tables = list(set(all_tables) - partial_tables)
 

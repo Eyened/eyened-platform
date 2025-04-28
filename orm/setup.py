@@ -31,7 +31,8 @@ setup(
         "pydicom==3.*",
         "GPUtil==1.*",
         "requests==2.*",
-        "pydantic-settings==2.7.1"
+        "pydantic-settings==2.7.1",
+        "retinalysis-fundusprep==0.4.0"
     ],
     python_requires=">=3.8",
 )

@@ -27,13 +27,13 @@ def eorm():
 @eorm.command()
 def test():
     """Create a test database for ORM testing, developing new features or running alembic migrations."""
-    source_db = get_config("prod")["database"]
-    test_db = get_config("dev")["database"]
+    source_db = get_config("prod").database
+    test_db = get_config("dev").database
 
     source_db_string = (
-        f"{source_db['host']}:{source_db['port']}/{source_db['database']}"
+        f"{source_db.host}:{source_db.port}/{source_db.database}"
     )
-    test_db_string = f"{test_db['host']}:{test_db['port']}/{test_db['database']}"
+    test_db_string = f"{test_db.host}:{test_db.port}/{test_db.database}"
 
     print(f"Creating test database {test_db_string} from {source_db_string}..")
 
@@ -52,13 +52,13 @@ def test():
 @eorm.command()
 def full():
     """Create a test database for ORM testing, developing new features or running alembic migrations."""
-    source_db = get_config("eyened")["database"]
-    test_db = get_config("dev")["database"]
+    source_db = get_config("eyened").database
+    test_db = get_config("dev").database
 
     source_db_string = (
-        f"{source_db['host']}:{source_db['port']}/{source_db['database']}"
+        f"{source_db.host}:{source_db.port}/{source_db.database}"
     )
-    test_db_string = f"{test_db['host']}:{test_db['port']}/{test_db['database']}"
+    test_db_string = f"{test_db.host}:{test_db.port}/{test_db.database}"
 
     print(f"Creating test database {test_db_string} from {source_db_string}..")
 
@@ -85,7 +85,7 @@ def update_thumbnails(env, sample):
     DBManager.init(config)
     session = DBManager.get_session()
 
-    update_thumbnails_fn(session, config)
+    update_thumbnails_fn(session, config.thumbnails_path, config.secret_key)
 
 
 @eorm.command()
