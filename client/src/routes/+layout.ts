@@ -1,11 +1,9 @@
-import { start } from "$lib/main";
+import { _globalContext, start } from "$lib/main";
 
 export const prerender = false;
 export const ssr = false;
 
 /** @type {import('./$types').PageLoad} */
 export async function load({ fetch, params, url }) {
-    const globalContext = await start(url);
-
-    return { globalContext };
+    _globalContext.set(await start(url));
 }

@@ -22,7 +22,7 @@
 
 	import { LabelNumbersSegmentation, LayerBitsSegmentation } from '$lib/webgl/layerSegmentation';
 	import type { SegmentationContext } from '../panelSegmentation/segmentationContext.svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { globalContext } from '$lib/main';
 
 	interface Props {
 		annotation: Annotation;
@@ -33,8 +33,7 @@
 	const { annotationType, feature } = annotation;
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 	const viewerContext = getContext<ViewerContext>('viewerContext');
-	const globalContext = getContext<GlobalContext>('globalContext');
-	const { creator } = globalContext;
+	const { creator } = $globalContext;
 	const { image, registration } = viewerContext;
 	const { segmentationController } = image;
 

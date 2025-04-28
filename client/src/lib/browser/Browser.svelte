@@ -1,19 +1,17 @@
 <script lang="ts">
     import Selection from "$lib/browser/Selection.svelte";
-    import { type GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import Toggle from "$lib/Toggle.svelte";
     import UserMenu from "$lib/UserMenu.svelte";
     import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte";
-    import { getContext, onMount, setContext } from "svelte";
+    import { onMount, setContext } from "svelte";
     import Spinner from "../utils/Spinner.svelte";
     import BrowserContent from "./BrowserContent.svelte";
     import { BrowserContext, setParam } from "./browserContext.svelte";
     import FilterConditions from "./FilterConditions.svelte";
     import FilterImages from "./FilterImages.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
-
-    const globalContext = getContext<GlobalContext>("globalContext");
-    const creator = globalContext.creator;
+    import { globalContext } from "$lib/main";
+    const { creator } = $globalContext;
     const initials = creator.name
         .split(" ")
         .map((name) => name[0])
@@ -29,7 +27,7 @@
     let renderMode = $state(true);
 
     function showUserMenu() {
-        globalContext.popupComponent = { component: UserMenu };
+        $globalContext.popupComponent = { component: UserMenu };
     }
 
     function search() {
@@ -37,7 +35,7 @@
     }
 
     async function loadMore(event) {
-        await setParam("StudyDate~~>=", browserContext.next_cursor);
+        await setParam("StudyDate~~>=", browserContext.next_cursor!);
         browserContext.loadDataFromServer();
     }
 </script>
