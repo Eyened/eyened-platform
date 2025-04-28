@@ -26,14 +26,14 @@
 	import type { Writable } from 'svelte/store';
 	import { SegmentationContext } from './segmentationContext.svelte';
 	import ThresholdSlider from './ThresholdSlider.svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { globalContext } from '$lib/main';
 
 	interface Props {
 		annotation: Annotation;
 	}
 	let { annotation }: Props = $props();
 	const { annotationDatas, feature, annotationType } = annotation;
-	const globalContext = getContext<GlobalContext>('globalContext');
+	const { creator } = $globalContext;
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 
@@ -45,7 +45,7 @@
 	// const segmentationItem = new SegmentationItem(image, annotation, segmentation);
 	const segmentation = segmentationItem.segmentation;
 
-	const isEditable = globalContext?.canEdit(annotation);
+	const isEditable = $globalContext.canEdit(annotation);
 	const isVessels = feature.name == 'Vessels';
 
 	let active = $derived(segmentationContext.activeSegmentation == segmentation);
@@ -100,7 +100,6 @@
 			throw new Error('Annotation type not found');
 		}
 
-		const creator = globalContext.creator;
 		const item = { ...annotation, annotationType, creator };
 		const newAnnotation = await data.annotations.create(item);
 		const newSegmentationItem = segmentationController.getSegmentationItem(newAnnotation);
@@ -112,7 +111,7 @@
 	}
 
 	function createMasked() {
-		createMaskedAnnotation(dialogue, annotation, globalContext.creator, viewerContext.index);
+		createMaskedAnnotation(dialogue, annotation, creator, viewerContext.index);
 	}
 
 	async function importFromOther() {

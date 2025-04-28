@@ -5,14 +5,16 @@
 	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
 	import { openNewWindow } from '$lib/newWindow';
 	import { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import { getContext, onDestroy } from 'svelte';
-	import { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { getContext } from 'svelte';
+	import { globalContext } from '$lib/main';
 	import Duplicate from '../icons/Duplicate.svelte';
 	import type { TaskContext } from '$lib/types';
 
-	const globalContext = getContext<GlobalContext>('globalContext');
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const taskContext = getContext<TaskContext>('taskContext');
+
+	
+	const { creator } = $globalContext;
 
 	interface Props {
 		form: FormAnnotation;
@@ -21,11 +23,12 @@
 	let { form }: Props = $props();
 	const { formAnnotations } = data;
 
-	const dt = new Date().getTime() - form.created;
+	const dt = new Date().getTime() - (form.created?.getTime() ?? 0);
 	const daysSinceCreation = dt / (1000 * 60 * 60 * 24);
-	const canEdit = globalContext.canEdit(form);
+	const canEditForm = $globalContext.canEdit(form);
 
 	let removing: number | undefined = $state();
+	let timeout: ReturnType<typeof setTimeout> | undefined = $state();
 	let progress = $state(0);
 	let maxTime = 3000; // 3 seconds
 
@@ -42,7 +45,7 @@
 	}
 	function duplicate() {
 		const item: any = { ...form };
-		item.creator = globalContext.creator;
+		item.creator = creator;
 		if (taskContext) {
 			item.subTask = taskContext.subTask;
 		} else {
@@ -57,7 +60,7 @@
 		if (window) {
 			window.close();
 		}
-		const props = { form, viewerContext, canEdit };
+		const props = { form, viewerContext, canEdit: canEditForm } as const;
 
 		window = openNewWindow(FormItemContent, props, `${form.formSchema.name} ${form.id}`);
 	}
@@ -72,6 +75,8 @@
 			minute: '2-digit'
 		});
 	}
+
+	const date = form.created?.toISOString() ?? '';
 </script>
 
 <div id="main">
@@ -87,13 +92,13 @@
 			<PanelIcon onclick={duplicate} tooltip="Copy">
 				<Duplicate />
 			</PanelIcon>
-			<PanelIcon onclick={deleteAnnotation} tooltip="Delete" disabled={!canEdit}>
+			<PanelIcon onclick={deleteAnnotation} tooltip="Delete" disabled={!canEditForm}>
 				<Trash />
 			</PanelIcon>
 		</span>
 	</div>
 	<div class="header">
-		<span>{formatDateTime(form.created)}</span>
+		<span>{formatDateTime(date)}</span>
 	</div>
 	{#if removing}
 		<div>

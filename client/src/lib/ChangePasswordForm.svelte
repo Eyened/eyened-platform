@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { apiUrl } from '$lib/config'
 	import { data } from '$lib/datamodel/model'
-	import { getContext } from 'svelte'
-	import type { GlobalContext } from './data-loading/globalContext.svelte'
+	import { globalContext } from '$lib/main'
 
 	const { creators } = data;
 
@@ -11,7 +10,7 @@
 	let newPassword2 = $state('');
 	let passwordsMatch = $derived(newPassword1 == newPassword2);
 
-	const { userManager } = getContext<GlobalContext>('globalContext');
+	const { userManager } = $globalContext;
 	const creator = creators.get(userManager.CreatorID!);
 
 	async function handleSubmit(e: Event) {

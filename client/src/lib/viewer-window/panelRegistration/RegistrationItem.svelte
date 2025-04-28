@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext, onDestroy } from 'svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { globalContext } from '$lib/main';
 	import { PanelIcon, Trash } from '../icons/icons';
 	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
 	import { data } from '$lib/datamodel/model';
@@ -13,12 +13,11 @@
 		activator: { activeID: number | undefined; toggle: (formAnnotation: FormAnnotation) => void };
 	}
 	let { formAnnotation, active: panelActive, activator }: Props = $props();
-	const globalContext = getContext<GlobalContext>('globalContext');
-	const canEdit = globalContext.canEdit(formAnnotation);
+	const canEditForm = $globalContext.canEdit(formAnnotation);
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const instance = viewerContext.image.instance;
-
+    console.log(formAnnotation.value);
 	const item = formAnnotation.value.value;
 	const pointSet = item[instance.id] || [];
 
@@ -53,7 +52,7 @@
 			{formAnnotation.creator.name}
 		</span>
 		<span class="annotationID">[{formAnnotation.id}]</span>
-		{#if canEdit}
+		{#if canEditForm}
 			<PanelIcon onclick={remove} tooltip="Remove">
 				<Trash />
 			</PanelIcon>
