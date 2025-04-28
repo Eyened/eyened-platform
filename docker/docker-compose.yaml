@@ -37,10 +37,7 @@ services:
         condition: service_healthy
     environment:
       - SECRET_KEY=${SECRET_KEY}
-      - IMAGES_BASEPATH=${IMAGES_BASEPATH}
-      - IMAGES_BASEPATH_LOCAL=/images
-      - THUMBNAILS_PATH=${STORAGE_BASEPATH}/thumbnails
-      - ANNOTATIONS_PATH=${STORAGE_BASEPATH}/annotations
+      - IMAGES_BASEPATH_HOST=${IMAGES_BASEPATH}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DB_HOST=database
@@ -50,6 +47,7 @@ services:
       - DB_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - RUNNING_IN_DOCKER=true
     restart: always
     volumes:
       - ${IMAGES_BASEPATH}:/images
@@ -71,10 +69,7 @@ services:
       dockerfile: ./docker/Dockerfile.worker
     environment: # the workers need the ORM config to connect to the database and store data
       - SECRET_KEY=${SECRET_KEY}
-      - IMAGES_BASEPATH=${IMAGES_BASEPATH}
-      - IMAGES_BASEPATH_LOCAL=/images
-      - THUMBNAILS_PATH=${STORAGE_BASEPATH}/thumbnails
-      - ANNOTATIONS_PATH=${STORAGE_BASEPATH}/annotations
+      - IMAGES_BASEPATH_HOST=${IMAGES_BASEPATH}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DB_HOST=database
@@ -84,6 +79,7 @@ services:
       - DB_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - RUNNING_IN_DOCKER=true
     depends_on:
       redis:
         condition: service_healthy

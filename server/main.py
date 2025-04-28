@@ -8,6 +8,7 @@ from server.routes import annotations, api, auth, features, form_annotations, in
 from server.config import settings
 from server.db import get_db
 from server.utils.database_init import create_database, init_annotation_types, init_admin, init_other_objects
+from .config import settings
 
 app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
@@ -22,6 +23,9 @@ app_api.include_router(import_api.router)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("Starting up with settings:")
+    print(settings)
+
     # before startup
     try:
         session = next(get_db())

@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import numpy as np
@@ -233,11 +234,34 @@ class ImageInstance(Base):
         return self.Patient.PatientIdentifier
 
     @property
-    def path(self):
-        basepath = self.config.images_basepath_local or self.config.images_basepath
-        if basepath is None:
-            raise RuntimeError("images_basepath not set in config")
-        return os.path.join(basepath, self.DatasetIdentifier)
+    def path(self) -> Path:
+        '''
+        The local path to the image on the server. 
+        When running in Docker, this path is within the container (ie. /images/...)
+        and may not exist on the host machine.
+        '''
+        return Path(self.config.images_basepath) / self.DatasetIdentifier
+    
+    @property
+    def host_path(self) -> Path:
+        '''
+        The path to the image on the host machine.
+        If images_basepath_host is not set in config, raise an error.
+        '''
+        if self.config.images_basepath_host is None:
+            raise RuntimeError("images_basepath_host not set in config")
+        return Path(self.config.images_basepath_host) / self.DatasetIdentifier
+    
+    @property
+    def thumbnail_path(self) -> Path:
+        '''
+        The path to the thumbnail on the server.
+        When running in Docker, this path is within the container (ie. /thumbnails/...)
+        and may not exist on the host machine.
+        '''
+        if self.ThumbnailIdentifier is None:
+            raise RuntimeError("ThumbnailIdentifier not set in config")
+        return Path(self.config.thumbnails_path) / self.ThumbnailIdentifier
 
     @property
     def url(self):

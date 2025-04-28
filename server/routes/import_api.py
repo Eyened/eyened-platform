@@ -88,11 +88,10 @@ def make_importer(session, options: ImportOptions):
         create_patients=options.create_patients,
         create_studies=options.create_studies,
         create_series=options.create_series,
-        create_project=options.create_project,
+        create_projects=options.create_project,
+        generate_thumbnails=True,
         run_ai_models=False,  # We handle this separately via background tasks
-        generate_thumbnails=False,  # We handle this separately via background tasks
-        copy_files=False,
-        config=settings.model_dump()
+        config=settings
     )
 
 @router.post("/import/image", response_model=ImportResponse)
