@@ -88,11 +88,10 @@ def make_importer(session, options: ImportOptions):
         create_patients=options.create_patients,
         create_studies=options.create_studies,
         create_series=options.create_series,
-        create_project=options.create_project,
+        create_projects=options.create_project,
+        generate_thumbnails=True,
         run_ai_models=False,  # We handle this separately via background tasks
-        generate_thumbnails=False,  # We handle this separately via background tasks
-        copy_files=False,
-        config=settings.make_orm_config()
+        config=settings
     )
 
 @router.post("/import/image", response_model=ImportResponse)
@@ -136,8 +135,7 @@ async def run_inference(
     credentials: HTTPBasicCredentials = Depends(verify_credentials)
 ):
     try:
-        config = settings.make_orm_config()
-        task = task_run_inference(config)
+        task = task_run_inference()
         
         return TaskResponse(
             success=True,
@@ -156,8 +154,7 @@ async def update_thumbnails(
     credentials: HTTPBasicCredentials = Depends(verify_credentials)
 ):
     try:
-        config = settings.make_orm_config()
-        task = task_update_thumbnails(config)
+        task = task_update_thumbnails()
         
         return TaskResponse(
             success=True,

@@ -51,6 +51,9 @@ def get_thumbnail_binary(im: ImageInstance):
     data = open_dot_binary(im)
     im = data.mean(axis=1)
     size = np.max(im.shape)
+    im = im - np.min(im)   # Shift minimum to 0
+    im = im / np.max(im)   # Normalize maximum to 1
+    im = (im * 255).astype(np.uint8)  # Scale to [0, 255] and convert to uint8
     return cv2.resize(im, (size, size), interpolation=cv2.INTER_LINEAR)
 
 
@@ -68,7 +71,7 @@ def get_thumbnail(im: ImageInstance):
 
     if im.Modality == Modality.ColorFundus and im.CFROI:
         if "success" not in im.CFROI or im.CFROI["success"]:
-            np_im = preprocess(np_im, im.CFROI)
+            np_im = cfi_crop_to_bounds(np_im, im.CFROI)
 
     return np_im
 
@@ -84,7 +87,7 @@ def generate_thumbnail_name(db_id, secret_key):
     return hash_bytes
 
 
-def preprocess(image: np.ndarray, bounds: dict):
+def cfi_crop_to_bounds(image: np.ndarray, bounds: dict):
     from rtnls_fundusprep.cfi_bounds import CFIBounds
 
     bounds = CFIBounds(**bounds, image=image)
@@ -126,9 +129,9 @@ def save_thumbnails(
     return thumbnail_identifier
 
 
-def update_thumbnails_for_images(session, images, thumbnails_path, secret_key, N=1000, print_errors=False):
+def update_thumbnails_for_images(session, images: list[ImageInstance], thumbnails_path: Path, secret_key: str, N=1000, print_errors=False):
     for i, image in enumerate(tqdm(images)):
-        if image.path.endswith(".json"):
+        if image.path.suffix == '.json':
             image.ThumbnailPath = None
         else:
             try:
@@ -136,8 +139,7 @@ def update_thumbnails_for_images(session, images, thumbnails_path, secret_key, N
                     image, Path(thumbnails_path), secret=secret_key
                 )
             except Exception as e:
-                if print_errors:
-                    print(f"Error generating thumbnail for image {image.ImageInstanceID}: {e}")
+                print(f"Error generating thumbnail for image {image.ImageInstanceID}: {e}")
                 thumbnail_identifier = ""
             image.ThumbnailPath = thumbnail_identifier
 

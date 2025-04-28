@@ -1,11 +1,7 @@
+
 from huey import RedisHuey
 import os
 import logging
-
-
-
-
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +20,7 @@ huey = RedisHuey(
 
 @huey.task()
 @huey.lock_task('inference-lock')
-def task_run_inference(config):
+def task_run_inference():
     """
     Run inference on images in a background task.
     
@@ -32,9 +28,12 @@ def task_run_inference(config):
         config: Configuration dictionary
         device: Device to run inference on (None for auto-selection)
     """
+    from eyened_orm.utils.config import EyenedORMConfig
     from eyened_orm.inference.inference import run_inference
     from eyened_orm.db import DBManager
     logger.info(f"Starting inference task")
+
+    config = EyenedORMConfig()
     DBManager.init(config)
     session = DBManager.get_session()
     
@@ -45,21 +44,28 @@ def task_run_inference(config):
 
 @huey.task()
 @huey.lock_task('update-thumbnails-lock') 
-def task_update_thumbnails(config, print_errors=False):
+def task_update_thumbnails(print_errors=False):
     """
     Update thumbnails for images in a background task.
     
     Args:
         config: Configuration dictionary
     """
+    from eyened_orm.utils.config import EyenedORMConfig
     from eyened_orm.importer.thumbnails import update_thumbnails
     from eyened_orm.db import DBManager
     logger.info(f"Starting thumbnail update task")
 
+    config = EyenedORMConfig()
     DBManager.init(config)
     session = DBManager.get_session()
     
-    update_thumbnails(session, thumbnails_path='/storage/thumbnails', secret_key= config["secret_key"], print_errors=True)
+    update_thumbnails(
+        session, 
+        thumbnails_path='/storage/thumbnails', 
+        secret_key= config.secret_key,
+        print_errors=True
+    )
     session.close()
     logger.info("Thumbnail update task completed successfully")
     return True

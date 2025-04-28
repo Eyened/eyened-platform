@@ -15,6 +15,8 @@ SHELL ["/bin/bash", "-c"]
 # Install dependencies
 # nodejs, mssql-tools18, msodbcsql18
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
     curl \
     gnupg \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -27,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY server/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --verbose -r requirements.txt
 
 # Install the ORM
 COPY orm /libraries/eyened_orm/
