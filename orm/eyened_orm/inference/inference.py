@@ -16,10 +16,10 @@ from .utils import auto_device
 def run_basic_models(fpaths, ids, device: torch.device = None):
     if device is None:
         device = auto_device()
-    ensemble_fovea = HeatmapRegressionEnsemble.from_release("fovea_july24.pt").to(
+    ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface('Eyened/vascx:fovea/fovea_july24.pt').to(
         device
     )
-    ensemble_discedge = KeypointsEnsemble.from_release("disc_edge.pt").to(device)
+    ensemble_discedge = KeypointsEnsemble.from_huggingface('Eyened/vascx:discedge/discedge.pt').to(device)
 
     dataloader = ensemble_fovea._make_inference_dataloader(
         fpaths,
@@ -88,7 +88,7 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
 def run_quality_model(fpaths, ids, device: torch.device = None):
     if device is None:
         device = auto_device()
-    ensemble_quality = ClassificationEnsemble.from_release("quality.pt").to(device)
+    ensemble_quality = ClassificationEnsemble.from_release('Eyened/vascx:quality/quality.pt').to(device)
     dataloader = ensemble_quality._make_inference_dataloader(
         fpaths,
         ids=ids,
@@ -152,8 +152,8 @@ def run_inference_for_images(session, images, device: torch.device = None, cfi_c
     ].index.tolist()  # only run on successfully preprocessed images
     fpaths = [
         (
-            "/mnt/ssd2/cfi_cache/rgb/" + str(id) + ".png",
-            "/mnt/ssd2/cfi_cache/ce/" + str(id) + ".png",
+            cfi_cache_path / "rgb" / f"{id}.png",
+            cfi_cache_path / "ce" / f"{id}.png",
         )
         for id in ids
     ]

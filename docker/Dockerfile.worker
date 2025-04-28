@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY server/requirements.txt .
+
+RUN /bin/bash
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install the ORM

@@ -5,6 +5,7 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from eyened_orm.importer.thumbnails import update_thumbnails_for_images
 import pandas as pd
 from sqlalchemy import inspect
 
@@ -26,10 +27,9 @@ class Importer:
         create_patients: bool = False,
         create_studies: bool = False,
         create_series: bool = True,
-        create_project: bool = False,
-        run_ai_models: bool = True,
+        create_projects: bool = False,
+        run_ai_models: bool = False,
         generate_thumbnails: bool = True,
-        copy_files: bool = False,
         config: str | EyenedORMConfig = "test",
     ):
         """
@@ -45,14 +45,12 @@ class Importer:
             If True, create studies when they don't exist
         create_series : bool, default=False
             If True, create series when they don't exist
-        create_project : bool, default=False
+        create_projects : bool, default=False
             If True, create project when it doesn't exist
-        run_ai_models : bool, default=True
+        run_ai_models : bool, default=False
             If True, run AI models on the images after import
         generate_thumbnails : bool, default=True
             If True, generate thumbnails for the images after import
-        copy_files : bool, default=False
-            If True, copy image files to the images_basepath directory
         config : str, default="test"
             config object (see config.sample.py) or environment to load for configuration (e.g., "test", "production").
         """
@@ -61,29 +59,19 @@ class Importer:
         self.create_patients = create_patients
         self.create_studies = create_studies
         self.create_series = create_series
-        self.create_project = create_project
+        self.create_projects = create_projects
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
-        self.copy_files = copy_files
+
         if isinstance(config, str):
             self.config = get_config(config)
         elif isinstance(config, EyenedORMConfig):
             self.config = config
         else:
             raise ValueError(f"Invalid config type: {type(config)}")
-        self.copy_queue = []
 
         assert self.config.images_basepath is not None, "images_basepath must be set when using the importer"
 
-        if self.copy_files:
-            assert self.config.importer_copy_path is not None, "importer_copy_path must be set when copy_files is True"
-
-            self.default_path_relative = Path(
-                self.config.importer_copy_path
-            ).relative_to(self.config.images_basepath)
-        else:
-            self.default_path_relative = None
-        self.images_basepath_local = self.config.images_basepath_local
         
         # Initialize empty collections
         self._clear_collections()
@@ -97,7 +85,6 @@ class Importer:
         self.studies = []
         self.series = []
         self.images = []
-        self.copy_queue = []
 
     def init_objects(self, data: List[Dict]):
         """
@@ -105,7 +92,7 @@ class Importer:
 
         Creates the hierarchy from project down to series objects based on the data
         structure and configuration:
-        - Project is created if self.create_project is True
+        - Projects are created if self.create_projects is True
         - Patients are created if self.create_patients is True
         - Studies are created if self.create_studies is True
         - Series are created if self.create_series is True
@@ -156,7 +143,7 @@ class Importer:
         # Process each patient
         for patient_item in data:
             # Find or create the project for this patient
-            project = self.find_or_create_project(patient_item["project_name"])
+            project = self.find_or_create_projects(patient_item["project_name"])
             self.projects.append(project)
             
             patient = self.find_or_create_patient(patient_item, project)
@@ -176,7 +163,7 @@ class Importer:
                         
         return self.projects
 
-    def find_or_create_project(self, project_name: str) -> Project:
+    def find_or_create_projects(self, project_name: str) -> Project:
         # Check if we've already processed this project
         for project in self.projects:
             if project.ProjectName == project_name:
@@ -187,9 +174,9 @@ class Importer:
         
         # Create the project if it doesn't exist and we're allowed to
         if project is None:
-            if not self.create_project:
+            if not self.create_projects:
                 raise RuntimeError(
-                    f"Project with name '{project_name}' not found and create_project=False"
+                    f"Project with name '{project_name}' not found and create_projects=False"
                 )
             project = Project(ProjectName=project_name, External=True)
             
@@ -313,9 +300,9 @@ class Importer:
 
     def get_image_path(self, image_data):
         """
-        Checks if the image path is absolute and within the images_basepath directory.
-        If copy_files is True, it generates a unique filename for the copied file.
-        The generated filenames are stored in the copy_queue for later copying.
+        Checks if the image path:
+         - is absolute and within the images_basepath directory
+         - is relative and exists within the images_basepath directory
         """
         basepath = Path(self.config.images_basepath)
 
@@ -325,56 +312,14 @@ class Importer:
 
         fpath = Path(path_or_url)
 
-        local_path = Path(self.images_basepath_local) / fpath.relative_to(basepath) if self.images_basepath_local else fpath
-        
-        assert local_path.exists(), f"File does not exist: {local_path}"
-        assert local_path.is_absolute(), f"Path must be absolute: {local_path}"
-
-        if self.copy_files:
-            # Generate a unique filename for the copied file
-            unique_id = secrets.token_hex(16)
-            extension = fpath.suffix  # Preserve the original extension
-            target = str(self.default_path_relative /
-                         f"{unique_id}{extension}")
-            self.copy_queue.append((local_path, target))
-            return target
+        if fpath.is_absolute():
+            assert fpath.is_relative_to(basepath), f"File path {fpath} is absolute is not within the images_basepath directory {basepath}"
         else:
-            # Verify path is within the images_basepath
-            try:
-                return str(fpath.relative_to(basepath))
-            except ValueError:
-                raise ValueError(
-                    f"File path {fpath} is not within the images_basepath directory "
-                    f"({basepath}). Verify that the images_basepath is set correctly."
-                )
+            # relative path provided, make it absolute and check
+            fpath = Path(basepath) / fpath
+            assert fpath.exists(), f"File does not exist: {fpath}"
 
-    def copy_images(self):
-        """
-        Copies image files from their original locations to the images_basepath directory.
-
-        This should be called after init_objects()
-        """
-        if not self.copy_files:
-            return
-
-        failed_copies = []
-        for source_path, dest_path in tqdm(self.copy_queue, desc="Copying files", unit="file"):
-            try:
-                # Ensure the destination directory exists
-                dest_dir = Path(dest_path).parent
-                dest_dir.mkdir(parents=True, exist_ok=True)
-
-                shutil.copy2(source_path, dest_path)
-            except Exception as e:
-                failed_copies.append((source_path, dest_path))
-
-        # Clear the copy queue
-        self.copy_queue = []
-
-        if failed_copies:
-            warnings.warn(f"Failed to copy {len(failed_copies)} files:")
-            for source_path, dest_path in failed_copies:
-                warnings.warn(f"  - {source_path} -> {dest_path}")
+        return str(fpath.relative_to(basepath))
 
     def post_insert(self):
         """
@@ -382,19 +327,15 @@ class Importer:
         The state for this is kept in the database so there is no need to pass any images here
         This way it is easier to maintain at the expense of being slightly less efficient
         """
+        
+        if self.generate_thumbnails:
+            update_thumbnails_for_images(self.session, self.images, self.config.thumbnails_path, self.config.secret_key)
+
         if self.run_ai_models:
             # Run AI models on the images
             from eyened_orm.inference.inference import run_inference
 
-            run_inference(self.session, self.config, device=None)
-        if self.generate_thumbnails:
-            # Generate thumbnails for the images
-            from eyened_orm.importer.thumbnails import update_thumbnails
-
-            update_thumbnails(
-                self.session,
-                self.config,
-            )
+            run_inference(self.session, device=None, cfi_cache_path=self.config.cfi_cache_path)
 
     def _import(self, data: List[Dict]):
         """

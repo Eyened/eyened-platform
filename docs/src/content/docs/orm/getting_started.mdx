@@ -7,17 +7,24 @@ sidebar:
 
 {/* Claude query: Update the documentation in getting_started.mdx using the sample in import.ipynb. Keep the setup section the same but update the Connecting section and add a section briefly showing how to import and use the database objects.  */}
 
+The ORM allows to interact with the Eyened database for operations such as:
+- Updating fields not updateable in the viewer
+- Importing and exporting data
+- Bulk updates to metadata or corrections
+
 ## Setup
 
+To install the ORM locally as a Python package:
+
 ```
-git clone git@github.com:Eyened/eyened-orm.git eyened-orm
-cd eyened-orm
+git clone https://github.com/Eyened/eyened-platform.git eyened_platform
+cd eyened_platform/orm
 pip install -e .
 ```
 
 ## Connecting to the database
 
-To connect the ORM to a database from Python code, use the `DBManager` class with a configuration:
+The easiest way to connect the ORM to a database from Python code, use the `DBManager` class with a configuration:
 
 ```python
 from eyened_orm import DBManager
@@ -33,22 +40,30 @@ DBManager.init(config)
 session = DBManager.get_session()
 ```
 
+:::caution
+See [ORM Configuration](/eyened-platform/orm/configuration) for information on how to create configuration files for the ORM.
+:::
+
 Alternatively, you can provide database credentials directly:
 
 ```python
 from eyened_orm import get_session_local, init_orm
+from eyened_orm.utils.config import EyenedORMConfig,DatabaseSettings
 
-database = {
-    'user': 'USERNAME',
-    'password': 'PASSWORD',
-    'host': 'DBHOST',
-    'database': 'DBNAME',
-    'port': 'PORT',
-}
+config = EyenedORMConfig(
+    database=DatabaseSettings(
+        DB_HOST="<HOSTNAME>",
+        DB_PORT="<PORT>",
+        DB_USER="<USER>",
+        DB_PASSWORD="<PASSWORD>",
+        DB_NAME="<DATABASE>"
+    ),
+    images_basepath="/PATH/TO/IMAGES",
+    annotations_path="/PATH/TO/ANNOTATIONS",
+    ...
+)
 
-SessionLocal = get_session_local({'database': database})
-session = SessionLocal()
-init_orm(session)
+DBManager.init(config)
 ```
 
 ## Working with database objects

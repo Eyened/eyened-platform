@@ -85,7 +85,7 @@ def update_thumbnails(env, sample):
     DBManager.init(config)
     session = DBManager.get_session()
 
-    update_thumbnails_fn(session, config)
+    update_thumbnails_fn(session, config.thumbnails_path, config.secret_key)
 
 
 @eorm.command()
