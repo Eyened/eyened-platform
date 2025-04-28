@@ -20,7 +20,7 @@
 	import { data } from '$lib/datamodel/model';
 	import ImportSegmentation from '../icons/ImportSegmentation.svelte';
 
-	import { LabelNumbersSegmentation, LayerBitsSegmentation } from '$lib/webgl/layerSegmentation';
+	import { MulticlassSegmentation, MultilabelSegmentation } from '$lib/webgl/layerSegmentation';
 	import type { SegmentationContext } from '../panelSegmentation/segmentationContext.svelte';
 	import { globalContext } from '$lib/main';
 
@@ -40,8 +40,8 @@
 	// Note: segmentation is never removed (may cause memory issues in some scenarios)
 	const segmentationItem = segmentationController.getSegmentationItem(annotation);
 	const segmentation = segmentationItem.segmentation as
-		| LabelNumbersSegmentation
-		| LayerBitsSegmentation;
+		| MulticlassSegmentation
+		| MultilabelSegmentation;
 	const shaders = image.webgl.shaders;
 	const layerSegmentationOverlay = new LayerSegmentationOverlay(
 		registration,
@@ -89,18 +89,18 @@
 		dialogue.set(undefined);
 	}
 
-	function duplicateNumbers() {
-		duplicateAnnotation('Label numbers'); //, segmentation.exportLabelNumbers($position.index));
+	function duplicateMulticlass() {
+		duplicateAnnotation('Label numbers'); 
 	}
 
-	function duplicateBits() {
-		duplicateAnnotation('Layer bits'); //, segmentation.exportLayerBits($position.index));
+	function duplicateMultilabel() {
+		duplicateAnnotation('Layer bits'); 
 	}
 
 	async function importFromOther() {
 		const hide = () => dialogue.set(undefined);
 		const reject = hide;
-		const resolve = (other: LabelNumbersSegmentation | LayerBitsSegmentation) => {
+		const resolve = (other: MulticlassSegmentation | MultilabelSegmentation) => {
 			const scanNr = viewerContext.index;
 			segmentation.importOther(scanNr, other);
 			segmentationItem.checkpoint(scanNr);
@@ -110,7 +110,7 @@
 		const availableSegmentations = segmentationController.allSegmentations.filter(
 			(s) =>
 				s != segmentation &&
-				(s instanceof LabelNumbersSegmentation || s instanceof LayerBitsSegmentation)
+				(s instanceof MulticlassSegmentation || s instanceof MultilabelSegmentation)
 		);
 		const d = {
 			query: ImportSegmentationSelector,
@@ -178,10 +178,10 @@
 			</div>
 		{/if}
 		<div class="row">
-			<PanelIcon onclick={duplicateNumbers} tooltip="Duplicate numbers">
+			<PanelIcon onclick={duplicateMulticlass} tooltip="Duplicate numbers">
 				<Duplicate />
 			</PanelIcon>
-			<PanelIcon onclick={duplicateBits} tooltip="Duplicate bits">
+			<PanelIcon onclick={duplicateMultilabel} tooltip="Duplicate bits">
 				<Duplicate />
 			</PanelIcon>
 

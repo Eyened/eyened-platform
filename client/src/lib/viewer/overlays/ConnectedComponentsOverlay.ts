@@ -1,5 +1,5 @@
 import type { TextureShaderProgram } from "$lib/webgl/FragmentShaderProgram";
-import type { BinarySegmentation } from "$lib/webgl/binarySegmentation.svelte";
+import type { BinarySegmentation } from "$lib/webgl/binarySegmentation";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { ViewerContext } from "../viewerContext.svelte";

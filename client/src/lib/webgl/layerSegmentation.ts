@@ -1,25 +1,103 @@
 import type { Annotation } from "$lib/datamodel/annotation";
+import type { AnnotationData } from "$lib/datamodel/annotationData";
 import { featureLabels } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
 import type { Segmentation } from "./SegmentationController";
 import type { AbstractImage } from "./abstractImage";
 import { LayerBoundaries } from "./layerBoundaries";
-import { CanvasToUint16Array, CanvasToUint8Array, LabelNumbersData, LayerBitData, Uint16ArrayToCanvas, Uint8ArrayToCanvasGray as Uint8ArrayToCanvasGray } from "./segmentationData";
+import { CanvasToUint16Array, CanvasToUint8Array, MulticlassData, MultilabelData, Uint16ArrayToCanvas, Uint8ArrayToCanvasGray as Uint8ArrayToCanvasGray } from "./segmentationData";
 
-export class LabelNumbersSegmentation implements Segmentation {
-
-    public data: LabelNumbersData;
+abstract class BaseSegmentation implements Segmentation {
     public readonly dataInterpretation: { [layerName: string]: number };
+    abstract questionable_bit: number;
+
+    constructor(
+        public readonly id: string,
+        public readonly image: AbstractImage,
+        public readonly annotation: Annotation,
+    ) {
+        this.dataInterpretation = featureLabels[annotation.feature.name];
+    }
+
+    abstract get data(): MulticlassData | MultilabelData;
+    abstract dispose(): void;
+    abstract draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void;
+    abstract clear(scanNr: number): void;
+    abstract export(scanNr: number, ctx: CanvasRenderingContext2D): void;
+    abstract import(scanNr: number, canvas: HTMLCanvasElement): void;
+    abstract importBscanFromArrayBuffer(scanNr: number, data: ArrayBuffer): void;
+    abstract importVolumeFromArrayBuffer(data: ArrayBuffer): void;
+    abstract importOther(scanNr: number, other: Segmentation): void;
+
+    protected getNeighbors(i: number): number[] {
+        // returns the indices of the neighbors of pixel i
+        const { width, height } = this.image;
+        const neighbors = [];
+        const x = i % width;
+        const y = Math.floor(i / width);
+        if (x > 0) {
+            neighbors.push(i - 1);
+        }
+        if (x < width - 1) {
+            neighbors.push(i + 1);
+        }
+        if (y > 0) {
+            neighbors.push(i - width);
+        }
+        if (y < height - 1) {
+            neighbors.push(i + width);
+        }
+        return neighbors;
+    }
+
+    protected drawQuestionable(data: Uint8Array | Uint16Array, i: number, isPaint: boolean): void {
+        if (isPaint) { // add questionable bit
+            data[i] |= this.questionable_bit;
+        } else { // remove questionable bit
+            data[i] &= ~this.questionable_bit;
+        }
+    }
+
+    protected getDrawingContext(drawing: HTMLCanvasElement): { ctx: CanvasRenderingContext2D, drawingData: ImageData, drawingArray: Uint8ClampedArray } {
+        const { width, height } = this.image;
+        const ctx = drawing.getContext('2d')!;
+        const drawingData = ctx.getImageData(0, 0, width, height);
+        const drawingArray = drawingData.data;
+        return { ctx, drawingData, drawingArray };
+    }
+
+    initialize(annotationData: AnnotationData, dataRaw: any): void {
+        function getBuffer(): ArrayBuffer {
+            if (dataRaw instanceof ArrayBuffer) {
+                return dataRaw;
+            } else if (dataRaw instanceof Uint8Array || dataRaw instanceof Uint16Array) {
+                return dataRaw.buffer as ArrayBuffer;
+            } else {
+                throw new Error('Unsupported data type');
+            }
+        }
+        const buffer = getBuffer();
+
+        const annotationType = this.annotation.annotationType.name;
+        if (annotationType === 'Segmentation OCT Volume') {
+            this.importVolumeFromArrayBuffer(buffer);
+        } else if (annotationType === 'Segmentation OCT B-scan') {
+            this.importBscanFromArrayBuffer(annotationData.scanNr, buffer);
+        } else {
+            throw new Error('Unsupported data type');
+        }
+    }
+}
+
+export class MulticlassSegmentation extends BaseSegmentation {
+    public data: MulticlassData;
     public questionable_bit: number = 1 << 7;
 
     private _layerBoundaries: LayerBoundaries;
     private layerBoundariesValid: boolean = false;
 
-    constructor(public readonly id: string,
-        public readonly image: AbstractImage,
-        public readonly annotation: Annotation,
-    ) {
-        this.data = new LabelNumbersData(image);
-        this.dataInterpretation = featureLabels[annotation.feature.name];
+    constructor(id: string, image: AbstractImage, annotation: Annotation) {
+        super(id, image, annotation);
+        this.data = new MulticlassData(image);
         this._layerBoundaries = new LayerBoundaries(image, this.data.texture);
     }
 
@@ -49,50 +127,17 @@ export class LabelNumbersSegmentation implements Segmentation {
         return 0;
     }
 
-    private getNeighbors(i: number): number[] {
-        // returns the indices of the neighbors of pixel i
-        const { width, height } = this.image;
-        const neighbors = [];
-        const x = i % width;
-        const y = Math.floor(i / width);
-        if (x > 0) {
-            neighbors.push(i - 1);
-        }
-        if (x < width - 1) {
-            neighbors.push(i + 1);
-        }
-        if (y > 0) {
-            neighbors.push(i - width);
-        }
-        if (y < height - 1) {
-            neighbors.push(i + width);
-        }
-        return neighbors;
-    }
-
-
     draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void {
-
         const current = this.data.getBscan(scanNr);
         // need to make a copy, because it's modified in the loop        
         const data = new Uint8Array(current);
 
-        const { width, height } = this.image;
-        const ctx = drawing.getContext('2d')!;
-        const drawingData = ctx.getImageData(0, 0, width, height);
-        const drawingArray = drawingData.data;
+        const { drawingArray } = this.getDrawingContext(drawing);
         const number = this.getLabelNumber(settings.selectedLabelNames);
         const isPaint = settings.mode == 'paint';
         const isQuestionable = settings.questionable;
         const isErodeDilate = settings.erodeDilate;
 
-        const drawQuestionable = (i: number) => {
-            if (isPaint) { // add questionable bit
-                data[i] |= this.questionable_bit;
-            } else { // remove questionable bit
-                data[i] &= ~this.questionable_bit;
-            }
-        }
         const drawErodeDilate = (i: number) => {
             if (isPaint) { // update to selected label
                 if (isErodeDilate) {
@@ -119,11 +164,12 @@ export class LabelNumbersSegmentation implements Segmentation {
                 }
             }
         }
-        for (let i = 0; i < width * height; i++) {
+
+        for (let i = 0; i < this.image.width * this.image.height; i++) {
             // if the pixel is painted
             if (drawingArray[i * 4] > 0) {
                 if (isQuestionable) {
-                    drawQuestionable(i);
+                    this.drawQuestionable(data, i, isPaint);
                 } else {
                     drawErodeDilate(i);
                 }
@@ -160,11 +206,10 @@ export class LabelNumbersSegmentation implements Segmentation {
     }
 
     importOther(scanNr: number, other: Segmentation): void {
-        if (other instanceof LabelNumbersSegmentation) {
+        if (other instanceof MulticlassSegmentation) {
             // TODO: what if the other segmentation has different labels (dataInterpretation)?
             this.updateBscan(scanNr, other.data.getBscan(scanNr));
-        } else if (other instanceof LayerBitsSegmentation) {
-
+        } else if (other instanceof MultilabelSegmentation) {
             const other_data = other.data.getBscan(scanNr);
             const data = new Uint8Array(this.image.width * this.image.height);
             for (let i = 0; i < data.length; i++) {
@@ -186,18 +231,13 @@ export class LabelNumbersSegmentation implements Segmentation {
     }
 }
 
-export class LayerBitsSegmentation implements Segmentation {
-
-    public data: LayerBitData;
-    public readonly dataInterpretation: { [layerName: string]: number };
+export class MultilabelSegmentation extends BaseSegmentation {
+    public data: MultilabelData;
     public questionable_bit: number = 1 << 15;
 
-    constructor(public readonly id: string,
-        public readonly image: AbstractImage,
-        public readonly annotation: Annotation
-    ) {
-        this.data = new LayerBitData(image);
-        this.dataInterpretation = featureLabels[annotation.feature.name];
+    constructor(id: string, image: AbstractImage, annotation: Annotation) {
+        super(id, image, annotation);
+        this.data = new MultilabelData(image);
     }
 
     dispose(): void {
@@ -217,26 +257,17 @@ export class LayerBitsSegmentation implements Segmentation {
 
     draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void {
         const bitmask = this.getBitmask(settings.selectedLabelNames);
-
         const data = this.data.getBscan(scanNr);
-        const { width, height } = this.image;
-        const ctx = drawing.getContext('2d')!;
-        const drawingData = ctx.getImageData(0, 0, width, height);
-        const drawingArray = drawingData.data;
+        const { drawingArray } = this.getDrawingContext(drawing);
 
         const isPaint = settings.mode == 'paint';
         const isQuestionable = settings.questionable;
-        // TODO: implement questionable
         // TODO: implement erosion and dilation
 
-        for (let i = 0; i < width * height; i++) {
+        for (let i = 0; i < this.image.width * this.image.height; i++) {
             if (drawingArray[i * 4] > 0) {
                 if (isQuestionable) {
-                    if (isPaint) { // add questionable bit
-                        data[i] |= this.questionable_bit;
-                    } else { // remove questionable bit
-                        data[i] &= ~this.questionable_bit;
-                    }
+                    this.drawQuestionable(data, i, isPaint);
                 } else {
                     // drawing adds the bitmask, leaving other bits unchanged
                     if (isPaint) {
@@ -274,11 +305,10 @@ export class LayerBitsSegmentation implements Segmentation {
     }
 
     importOther(scanNr: number, other: Segmentation): void {
-        if (other instanceof LayerBitsSegmentation) {
+        if (other instanceof MultilabelSegmentation) {
             // TODO: what if the other segmentation has different labels (dataInterpretation)?
             this.data.setBscan(scanNr, other.data.getBscan(scanNr));
-        } else if (other instanceof LabelNumbersSegmentation) {
-
+        } else if (other instanceof MulticlassSegmentation) {
             const other_data = other.data.getBscan(scanNr);
             const data = new Uint16Array(this.image.width * this.image.height);
             for (let i = 0; i < data.length; i++) {
@@ -295,6 +325,4 @@ export class LayerBitsSegmentation implements Segmentation {
             throw new Error("Unsupported segmentation type");
         }
     }
-
-
 }

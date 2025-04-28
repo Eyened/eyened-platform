@@ -1,4 +1,6 @@
+import { getImage } from "$lib/data-loading/imageLoader";
 import type { Annotation } from "$lib/datamodel/annotation";
+import type { AnnotationData } from "$lib/datamodel/annotationData";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
 import type { Branch } from "$lib/types";
 import type { Segmentation } from "./SegmentationController";
@@ -9,7 +11,7 @@ import { SvelteMap } from "svelte/reactivity";
 
 export class BinarySegmentation implements Segmentation {
 
-    // mask (bitmask) for this segmentation
+    // bitmask for this segmentation (1 << layerIndex)
     public readonly layerBit: number;
 
     // maps scanNr to the number of pixels in the segmentation
@@ -21,24 +23,43 @@ export class BinarySegmentation implements Segmentation {
     private connectedComponents: WebGLTexture | undefined;
     private connectedComponentsValid: false | number = false;
 
-
+    /**
+     * 
+     * @param id: unique identifier (implemented as string of annotation.id)
+     * @param image: the image that is being annotated
+     * @param annotation: Annotation with interpretation 'Binary mask' or 'R/G mask'
+     * @param data: SharedDataRG (R = segmentation mask, G = questionable mask)
+     * @param layerIndex: index of the layer in the SharedDataRG
+     */
     constructor(
         readonly id: string,
         readonly image: AbstractImage,
         readonly annotation: Annotation,
         readonly data: SharedDataRG,
         readonly layerIndex: number
-    ) {
+    ) {        
         this.layerBit = 1 << layerIndex;
     }
 
+    initialize(annotationData: AnnotationData, dataRaw: any): void {
+        if (dataRaw instanceof HTMLCanvasElement) {
+            this.import(annotationData.scanNr, dataRaw);
+        } else {
+            console.warn('Unsupported data type', dataRaw);
+            throw new Error('Unsupported data type');
+        }
+    }
+
     /**
-     * Draw or erase using the image in the canvas
-     * The red channel is used for drawing, the green channel for erasing
+     * Modify the segmentation using the image in the canvas
      * 
-     * @param scanNr 
-     * @param drawing 
-     * @param settings { questionable: boolean, erodeDilate: boolean }
+     * use settings.mode = 'paint' or 'erase' to draw or erase
+     * use settings.questionable = true to draw to the questionable mask (G in R/G mask)
+     * use settings.erodeDilate = true to erode/dilate instead of erase/draw
+     * 
+     * @param scanNr: B-scan number
+     * @param drawing: HTMLCanvasElement (checking red channel: 0 = background, >0 = drawing / erasing)
+     * @param settings: { mode: 'paint' | 'erase', questionable: boolean, erodeDilate: boolean }
      */
     draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void {
         const { webgl: { shaders } } = this.image;
@@ -210,10 +231,12 @@ export class BinarySegmentation implements Segmentation {
     }
 
     computeConnectedComponents(scanNr: number) {
+        // data is a Uint8Array with 2 bytes per pixel (R and G)
         const data = this.data.getBscan(scanNr);
         const { width, height } = this.image;
         const binaryArray = new Uint8Array(width * height);
         for (let i = 0; i < binaryArray.length; i++) {
+            // note 2 * i to skip the green channel (only R is used)
             binaryArray[i] = data[2 * i] & this.layerBit;
         }
         const label = BlobExtraction(binaryArray, this.image.width, this.image.height);
@@ -231,6 +254,7 @@ export class BinarySegmentation implements Segmentation {
     countPixels(scanNr: number): number {
         const data = this.data.getBscan(scanNr);
         let count = 0;
+        // note: i += 2 to skip the green channel (only R is used)
         for (let i = 0; i < data.length; i += 2) {
             if (data[i] & this.layerBit) {
                 count++;
@@ -252,5 +276,19 @@ export class MaskedSegmentation extends BinarySegmentation {
         public readonly branch: Branch
     ) {
         super(id, image, annotation, data, layerIndex);
+    }
+
+    initialize(annotationData: AnnotationData, dataRaw: any): void {
+        try {
+            const { branches } = dataRaw;
+            for (const branch of branches as Branch[]) {
+                if (branch == this.branch) {
+                    getImage(branch.drawing).then(canvas => this.import(annotationData.scanNr, canvas));
+                }
+            }
+        } catch (error) {
+            console.warn('Unsupported data type', dataRaw);
+            throw new Error('Unsupported data type');
+        }
     }
 }
