@@ -263,7 +263,7 @@ class TextureData2DArray implements SegmentationData {
     }
 }
 
-export class LabelNumbersData extends TextureData3D<Uint8Array> {
+export class MulticlassData extends TextureData3D<Uint8Array> {
     constructor(image: AbstractImage) {
         const gl = image.webgl.gl;
         const data = new Uint8Array(image.width * image.height * image.depth);
@@ -271,7 +271,7 @@ export class LabelNumbersData extends TextureData3D<Uint8Array> {
     }
 }
 
-export class LayerBitData extends TextureData3D<Uint16Array> {
+export class MultilabelData extends TextureData3D<Uint16Array> {
     constructor(image: AbstractImage) {
         const gl = image.webgl.gl;
         const data = new Uint16Array(image.width * image.height * image.depth);

@@ -21,7 +21,7 @@
 	import { createMaskedAnnotation, deleteAnnotation } from './segmentationUtils';
 	import { data } from '$lib/datamodel/model';
 	import type { Segmentation } from '$lib/webgl/SegmentationController';
-	import { BinarySegmentation } from '$lib/webgl/binarySegmentation.svelte';
+	import { BinarySegmentation } from '$lib/webgl/binarySegmentation';
 	import { ProbabilitySegmentation } from '$lib/webgl/probabilitySegmentation.svelte';
 	import type { Writable } from 'svelte/store';
 	import { SegmentationContext } from './segmentationContext.svelte';

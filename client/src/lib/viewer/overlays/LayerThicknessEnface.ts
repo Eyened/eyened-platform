@@ -1,6 +1,6 @@
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
-import type { LabelNumbersSegmentation } from "$lib/webgl/layerSegmentation";
+import type { MulticlassSegmentation } from "$lib/webgl/layerSegmentation";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
@@ -8,7 +8,7 @@ import type { ViewerContext } from "../viewerContext.svelte";
 export class LayerThicknessEnfaceOverlay implements Overlay {
 
     constructor(readonly image: AbstractImage,
-        readonly segmentation: LabelNumbersSegmentation,
+        readonly segmentation: MulticlassSegmentation,
         public layer: number,
         public scaling: number
     ) { }

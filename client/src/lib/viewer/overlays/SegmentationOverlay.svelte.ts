@@ -2,7 +2,7 @@ import type { Color } from "$lib/utils";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import type { TextureShaderProgram } from "$lib/webgl/FragmentShaderProgram";
 import type { Segmentation, SegmentationController } from "$lib/webgl/SegmentationController";
-import { MaskedSegmentation } from "$lib/webgl/binarySegmentation.svelte";
+import { MaskedSegmentation } from "$lib/webgl/binarySegmentation";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay } from "../viewer-utils";

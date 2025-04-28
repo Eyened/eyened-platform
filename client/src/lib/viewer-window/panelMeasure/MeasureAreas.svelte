@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import SegmentationArea from './SegmentationArea.svelte';
 	import type { Annotation } from '$lib/datamodel/annotation';
 	import type { MeasureTool } from '$lib/viewer/tools/Measure.svelte';
-	import { BinarySegmentation } from '$lib/webgl/binarySegmentation.svelte';
+	import { BinarySegmentation } from '$lib/webgl/binarySegmentation';
 	import { ProbabilitySegmentation } from '$lib/webgl/probabilitySegmentation.svelte';
 	import type { Creator } from '$lib/datamodel/creator';
 	import CreatorAreas from './CreatorAreas.svelte';
