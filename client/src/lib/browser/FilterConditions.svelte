@@ -32,7 +32,7 @@
     }
 
     function remove(condition: Condition) {
-        removeParam(condition.variable, condition.value);
+        removeParam(condition.key, condition.value);
     }
 </script>
 
