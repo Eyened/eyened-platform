@@ -1,9 +1,19 @@
-import StudyBlockForms from "../extensions/StudyBlockForms.svelte";
 
-export const studyBlockExtensions = [
-    {
-        component: StudyBlockForms
+const config = {
+    browser: {
+        patient: {
+            additional_data_sources: []
+        },
+        study: {
+            list_forms: [],
+            additional_data_sources: []
+        }
+    },
+    viewer: {
+        panel_info: {
+            additional_data_sources: []
+        }
     }
-]
-export const browserExtensions = []
-export const imageInfoExtensions = []
+};
+
+export default config; 

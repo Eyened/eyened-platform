@@ -22,6 +22,8 @@
         showSegmentationInfo = false,
     }: Props = $props();
 
+    let size = $derived(browserContext.thumbnailSize + "em");
+    
     const segmentations = instance.annotations.filter((a) =>
         a.annotationType.name.includes("Segmentation"),
     );
@@ -32,7 +34,7 @@
         },
         {} as { [name: string]: number },
     );
-
+    
     const image_url = getThumbUrl(instance)!;
 
     const selected = $derived(browserContext.selection.includes(instance.id));
@@ -74,7 +76,12 @@
     </div>
     <div class="tile" onclick={toggleSelect}>
         {#if image_url}
-            <div class="img" style="background-image: url('{image_url}');">
+            <div
+                class="img"
+                style:width={size}
+                style:height={size}
+                style:background-image="url('{image_url}')"
+            >
                 {#if instance.dicomModality == "OPT"}
                     <div class="oct-info">
                         [{instance.anatomicRegion}] ({instance.nrOfFrames} x {instance.columns})
@@ -123,11 +130,6 @@
         justify-content: center;
     }
 
-    div.img {
-        flex-direction: column;
-        align-items: center;
-        flex-flow: column-reverse;
-    }
     div.oct-info {
         font-size: x-small;
         color: rgba(255, 255, 255, 0.7);
@@ -139,10 +141,10 @@
         background-color: black;
         margin: 1px;
         cursor: pointer;
+        flex-direction: column;
+        align-items: center;
+        flex-flow: column-reverse;
 
-        width: 6em;
-        min-width: 6em;
-        height: 6em;
         background-size: contain;
         background-repeat: no-repeat;
         background-position: center;
@@ -154,7 +156,7 @@
         border: 0.2em solid transparent;
     }
     div.main.selected {
-        border: 0.2em solid #93d59d;
+        border: 0.2em solid #72de80;
     }
     div.main.showPatientInfo {
         outline: 1px solid #d0d0d0;

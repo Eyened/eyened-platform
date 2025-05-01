@@ -47,6 +47,8 @@
         </div>
     </div>
 {/if}
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div id="container">
     <div id="main">
         <div id="browser-header">
@@ -56,7 +58,12 @@
             <div id="browser-header-right">
                 <FilterImages />
                 <FilterConditions />
-                <button onclick={search} disabled={browserContext.no_params_set}>Search</button>
+                <button
+                    onclick={search}
+                    disabled={browserContext.no_params_set}
+                >
+                    Search
+                </button>
             </div>
             <div id="user">
                 <MainIcon
@@ -70,20 +77,30 @@
                 </MainIcon>
             </div>
         </div>
-        <div class="display-toggle">
-            Display:
-            <Toggle
-                bind:control={renderMode}
-                textOn="studies"
-                textOff="instances"
-            />
+        <div id="browser-header-bottom">
+            <div>
+                Display:
+                <Toggle
+                    bind:control={renderMode}
+                    textOn="studies"
+                    textOff="instances"
+                />
+            </div>
+            <div>
+                Thumbnail size:
+                <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    step="0.1"
+                    bind:value={browserContext.thumbnailSize}
+                />
+            </div>
             {#if browserContext.next_cursor}
                 <div>
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span class="link" onclick={loadMore}
-                        >Large result set, click to load more</span
-                    >
+                    <span class="link" onclick={loadMore}>
+                        Large result set, click to load more
+                    </span>
                 </div>
             {/if}
         </div>
@@ -121,6 +138,14 @@
     div#browser-header {
         flex: 1;
     }
+    div#browser-header-bottom {
+        display: flex;
+    }
+    div#browser-header-bottom > div {
+        display: flex;
+        padding-left: 2em;
+        align-items: center;
+    }
 
     div#container {
         height: 100vh;
@@ -138,10 +163,9 @@
     }
     div#main {
         flex: 1;
-        background-color: #d7d7d7;
         font-size: 0.8em;
-        border-bottom: 3px solid #f1f1f1;
-    }
+        border-bottom: 2px solid #e3e3e3;
+    }    
     div#browser-header-left,
     div#browser-header-right {
         flex: 1;
@@ -171,11 +195,7 @@
     span.icon:hover {
         background-color: rgba(178, 229, 253, 0.5);
     }
-    div.display-toggle {
-        display: flex;        
-        padding: 1em;
-        flex-direction: column;
-    }
+
     span.link {
         cursor: pointer;
     }

@@ -10,6 +10,10 @@
 		onclick?: () => void;
 		color?: string;
 		backgroundColor?: string;
+		theme?: 'light' | 'dark';
+		size?: number;
+		width?: number;
+		height?: number;
 	}
 
 	let {
@@ -20,11 +24,21 @@
 		children,
 		onclick = () => {},
 		color,
-		backgroundColor
+		backgroundColor,
+		theme = 'dark',
+		size,
+		width = 1.5,
+		height = 1.5
 	}: Props = $props();
 
-	let tooltipElem: HTMLElement = $state();
-	let tooltiptextElem: HTMLElement = $state();
+	// If size is provided, override width and height
+	if (size !== undefined) {
+		width = size;
+		height = size;
+	}
+
+	let tooltipElem: HTMLElement | undefined = $state();
+	let tooltiptextElem: HTMLElement | undefined = $state();
 
 	onMount(() => {
 		if (!tooltiptextElem || !tooltipElem) return;
@@ -47,10 +61,20 @@
 	}
 </script>
 
-<div class="tooltip" bind:this={tooltipElem}>
+<div class="tooltip {theme}" bind:this={tooltipElem}>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<span class="icon" class:isText class:active class:disabled onclick={click} style:color={color} style:background-color={backgroundColor}>
+	<span 
+		class="icon" 
+		class:isText 
+		class:active 
+		class:disabled 
+		onclick={click} 
+		style:color={color} 
+		style:background-color={backgroundColor}
+		style:width="{width}em"
+		style:height="{height}em"
+	>
 		{@render children?.()}
 	</span>
 	{#if tooltip}
@@ -58,51 +82,78 @@
 	{/if}
 </div>
 
-<style>
+<style lang="scss">
+	.light {
+		--icon-color: rgba(0, 0, 0, 0.6);
+		--icon-hover-color: rgba(0, 0, 0, 0.8);
+		--icon-active-color: rgba(0, 0, 0, 1);
+		--icon-disabled-color: rgba(0, 0, 0, 0.1);
+		--icon-hover-bg: rgba(0, 0, 0, 0.1);
+		--icon-active-bg: rgba(0, 0, 0, 0.2);
+		--tooltip-bg: #333;
+		--tooltip-color: #fff;
+	}
+
+	.dark {
+		--icon-color: rgba(255, 255, 255, 0.6);
+		--icon-hover-color: rgba(255, 255, 255, 0.8);
+		--icon-active-color: rgba(255, 255, 255, 1);
+		--icon-disabled-color: rgba(255, 255, 255, 0.1);
+		--icon-hover-bg: rgba(255, 255, 255, 0.1);
+		--icon-active-bg: rgba(255, 255, 255, 0.2);
+		--tooltip-bg: #555;
+		--tooltip-color: #fff;
+	}
+
 	span.icon {
 		display: flex;
 		align-items: center;
 		cursor: pointer;
-		width: 1.5em;
-		height: 1.5em;
-		color: rgba(255, 255, 255, 0.6);
+		color: var(--icon-color);
 		margin: 0.2em;
 		padding: 0.2em;
 		border-radius: 50%;
 		transition: all 0.3s ease;
 	}
+
 	span.icon.isText {
-		width: auto;
+		width: auto !important;
+		height: auto !important;
 	}
+
 	span.icon:hover {
 		border-radius: 2px;
-		color: rgba(255, 255, 255, 0.8);
-		background-color: rgba(100, 255, 255, 0.3);
+		color: var(--icon-hover-color);
+		background-color: var(--icon-hover-bg);
 	}
+
 	span.icon.active {
 		border-radius: 2px;
-		color: rgba(255, 255, 255, 1);
-		background-color: rgba(255, 255, 255, 0.4);
+		color: var(--icon-active-color);
+		background-color: var(--icon-active-bg);
 	}
+
 	span.icon.disabled {
 		cursor: not-allowed;
 		border-radius: 2px;
-		color: rgba(255, 255, 255, 0.1);
-		background-color: rgba(255, 255, 255, 0);
+		color: var(--icon-disabled-color);
+		background-color: transparent;
 	}
 
 	.tooltip {
 		position: relative;
 		display: inline-block;
 	}
+
 	.tooltiptext {
 		pointer-events: none;
 	}
+
 	.tooltip .tooltiptext {
-		background-color: #555;
+		background-color: var(--tooltip-bg);
 		opacity: 0;
 		visibility: hidden;
-		color: #fff;
+		color: var(--tooltip-color);
 		text-align: center;
 		border-radius: 2px;
 		padding: 0.2em 1em;
