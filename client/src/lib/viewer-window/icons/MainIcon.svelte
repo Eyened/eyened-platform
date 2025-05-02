@@ -6,7 +6,7 @@
 		onclick?: MouseEventHandler<HTMLSpanElement>;
 		active?: boolean;
 		tooltip?: string;
-		style?: 'dark' | 'light';
+		theme?: 'dark' | 'light';
 		icon?: Snippet;
 	}
 
@@ -14,7 +14,7 @@
 		onclick = undefined,
 		active = false,
 		tooltip = undefined,
-		style = 'dark',
+		theme = 'dark',
 		icon = undefined
 	}: Props = $props();
 </script>
@@ -22,7 +22,7 @@
 <div class="tooltip" class:link={onclick !== undefined}>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<span class="icon" class:active {onclick} class:dark={style == 'dark'}>
+	<span class="icon" class:active {onclick} class:dark={theme == 'dark'}>
 		{@render icon?.()}
 	</span>
 	{#if tooltip}
@@ -40,11 +40,17 @@
 		cursor: pointer;
 	}
 	div.tooltip.link > span.icon:hover {
-		color: white;
+		color: var(--icon-hover-color);
 	}
 	span.icon.dark {
 		background-color: transparent;
 		color: rgb(175, 175, 175);
+		--icon-hover-color: white;
+	}
+	span.icon:not(.dark) {
+		background-color: transparent;
+		color: rgb(75, 75, 75);
+		--icon-hover-color: rgb(0, 0, 0);
 	}
 	span.icon.active {
 		background-color: inherit;

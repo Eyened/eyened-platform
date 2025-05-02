@@ -32,7 +32,7 @@
     }
 
     function remove(condition: Condition) {
-        removeParam(condition.variable, condition.value);
+        removeParam(condition.key, condition.value);
     }
 </script>
 
@@ -44,7 +44,7 @@
             {condition.operator}
             {condition.value}
         </span>
-        <PanelIcon onclick={() => remove(condition)}>
+        <PanelIcon onclick={() => remove(condition)} theme="light">
             <Trash />
         </PanelIcon>
     </div>

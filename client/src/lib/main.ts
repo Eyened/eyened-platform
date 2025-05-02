@@ -4,7 +4,18 @@ import { redirect } from "@sveltejs/kit";
 import { GlobalContext } from "./data-loading/globalContext.svelte";
 import { data } from "./datamodel/model";
 import { FilterList } from "./datamodel/itemList";
-import { readable } from "svelte/store";
+import { derived, readable, writable, type Readable } from "svelte/store";
+
+export const _globalContext = writable<GlobalContext | null>(null);
+export const globalContext: Readable<GlobalContext> = derived(
+    _globalContext,
+    ($globalContext) => {
+        if ($globalContext == null) {
+            throw new Error('Global context is not set');
+        }
+        return $globalContext;
+    }
+);
 
 export async function start(url: URL) {
     const userManager = new UserManager();

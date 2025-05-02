@@ -117,8 +117,8 @@ def get_config(env="dev") -> EyenedORMConfig:
     Returns:
         EyenedConfig: Configuration object
     """
-    env_file = f"config.{env}.env"
-    dir_path = Path(__file__).parent.parent
+    env_file = f"{env}.env"
+    dir_path = Path(__file__).parent.parent.parent.parent
     env_path = dir_path / env_file
     
     if not env_path.exists():

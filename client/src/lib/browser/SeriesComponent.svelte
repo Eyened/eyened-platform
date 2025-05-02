@@ -44,5 +44,6 @@
 		flex: 1;
 		flex-direction: row;
 		flex-wrap: wrap;
+		gap: 0.3em;
 	}
 </style>

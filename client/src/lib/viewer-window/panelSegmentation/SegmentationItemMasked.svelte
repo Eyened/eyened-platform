@@ -9,7 +9,7 @@
 	import { data } from '$lib/datamodel/model';
 	import { addBranch, deleteAnnotation } from './segmentationUtils';
 	import type { SegmentationContext } from './segmentationContext.svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { globalContext } from '$lib/main';
 
 	interface Props {
 		maskID: number;
@@ -23,7 +23,6 @@
 		annotation: { feature }
 	} = annotationData;
 
-	const globalContext = getContext<GlobalContext>('globalContext');
 	const { image } = getContext<ViewerContext>('viewerContext');
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 
@@ -35,7 +34,7 @@
 		}
 	}
 	// TODO: find a cleaner solution?
-	const isEditable = globalContext?.canEdit(annotation);
+	const isEditable = $globalContext.canEdit(annotation);
 
 	let branches = $derived(annotationData.value.value.branches);
 	const maskAnnotation = data.annotations.find((a) => a.id === maskID);

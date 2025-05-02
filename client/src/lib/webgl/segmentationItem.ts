@@ -6,10 +6,8 @@ import type { AnnotationData } from "$lib/datamodel/annotationData";
 import type { AbstractImage } from "./abstractImage";
 import { data } from "$lib/datamodel/model";
 import { getImage } from "$lib/data-loading/imageLoader";
-import { MaskedSegmentation } from "./binarySegmentation.svelte";
-import type { Branch } from "$lib/types";
-import { LabelNumbersSegmentation, LayerBitsSegmentation } from "./layerSegmentation";
-import { ProbabilitySegmentation } from "./probabilitySegmentation.svelte";
+import { MaskedSegmentation } from "./binarySegmentation";
+import { MulticlassSegmentation, MultilabelSegmentation } from "./layerSegmentation";
 
 export class SegmentationItem {
 
@@ -49,53 +47,7 @@ export class SegmentationItem {
     private initialize(annotationData: AnnotationData, dataRaw: any) {
         const { scanNr } = annotationData;
 
-        // TODO: separate this logic and implement in each Segmentation subclass
-        if (this.segmentation instanceof ProbabilitySegmentation) {
-            this.segmentation.threshold = annotationData.parameters.value?.valuefloat || 0.5;
-        }
-        // TODO: separate this logic and implement in each Segmentation subclass
-
-        if (dataRaw instanceof HTMLCanvasElement) {
-            this.segmentation.import(scanNr, dataRaw);
-        } else if (this.segmentation instanceof MaskedSegmentation) {
-            const { branches } = dataRaw;
-            for (const branch of branches as Branch[]) {
-                if (branch == this.segmentation.branch) {
-                    getImage(branch.drawing).then(canvas => this.segmentation.import(scanNr, canvas));
-                }
-            }
-        } else if (this.segmentation instanceof LabelNumbersSegmentation || this.segmentation instanceof LayerBitsSegmentation) {
-            if (dataRaw instanceof ArrayBuffer) {
-
-                if (this.annotation.annotationType.name == 'Segmentation OCT Volume') {
-                    this.segmentation.importVolumeFromArrayBuffer(dataRaw);
-                } else if (this.annotation.annotationType.name == 'Segmentation OCT B-scan') {
-                    this.segmentation.importBscanFromArrayBuffer(annotationData.scanNr, dataRaw);
-                } else {
-                    console.log(this.segmentation, dataRaw);
-                    console.warn('Unsupported data type', dataRaw);
-                    throw new Error('Unsupported data type');
-                }
-            } else if (dataRaw instanceof Uint8Array || dataRaw instanceof Uint16Array) {
-                if (this.annotation.annotationType.name == 'Segmentation OCT Volume') {
-                    this.segmentation.importVolumeFromArrayBuffer(dataRaw.buffer);
-                } else if (this.annotation.annotationType.name == 'Segmentation OCT B-scan') {
-                    this.segmentation.importBscanFromArrayBuffer(annotationData.scanNr, dataRaw.buffer);
-                } else {
-                    console.log(this.segmentation, dataRaw);
-                    console.warn('Unsupported data type', dataRaw);
-                    throw new Error('Unsupported data type');
-                }
-            } else {
-                console.log(this.segmentation, dataRaw);
-                console.warn('Unsupported data type', dataRaw);
-                throw new Error('Unsupported data type');
-            }
-        } else {
-            console.log(this.segmentation, dataRaw);
-            console.warn('Unsupported data type', dataRaw);
-            throw new Error('Unsupported data type');
-        }
+        this.segmentation.initialize(annotationData, dataRaw);
 
 
         // make a checkpoint of current state
@@ -164,7 +116,7 @@ async function getAnnotationData(segmentation: Segmentation, scanNr: number) {
     const { annotation } = segmentation;
     let annotationData = annotation.annotationDatas.find(d => d.scanNr == scanNr);
     let mediaType = 'image/png';
-    if (segmentation instanceof LabelNumbersSegmentation || segmentation instanceof LayerBitsSegmentation) {
+    if (segmentation instanceof MulticlassSegmentation || segmentation instanceof MultilabelSegmentation) {
         mediaType = 'application/octet-stream';
     } else if (segmentation instanceof MaskedSegmentation) {
         mediaType = 'application/json';
@@ -207,9 +159,9 @@ export async function updateServer(segmentation: Segmentation, scanNr: number): 
             break;
 
         case 'application/octet-stream':
-            if (segmentation instanceof LabelNumbersSegmentation) {
+            if (segmentation instanceof MulticlassSegmentation) {
                 serverValue = segmentation.data.getBscan(scanNr);
-            } else if (segmentation instanceof LayerBitsSegmentation) {
+            } else if (segmentation instanceof MultilabelSegmentation) {
                 serverValue = segmentation.data.getBscan(scanNr);
             } else {
                 console.error('Unsupported combination segmentation / media type', annotationData.mediaType);

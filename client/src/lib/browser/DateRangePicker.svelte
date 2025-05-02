@@ -18,33 +18,48 @@
 -->
 
 <script lang="ts">
-    import { browser } from "$app/environment";
-    import { page } from "$app/state";
+    import { removeParam, setParam } from "./browserContext.svelte";
+    import { getParam } from "./browserContext.svelte";
+    let date: string = $state(getParam("StudyDate") ?? "");
+    let startDate: string = $state(getParam("StudyDate~~>=") ?? "");
+    let endDate: string = $state(getParam("StudyDate~~<=") ?? "");
 
-    let date: string = $state();
-    let startDate: string = $state();
-    let endDate: string = $state();
-
-    $effect(() => {
-        if (!browser) {
-            return;
+    function setDates() {
+        if (date) {
+            setParam("StudyDate", date);
+        } else {
+            removeParam("StudyDate", date);
         }
-        if (date || startDate || endDate) {
-            const params = page.url.searchParams;
-
-            params.delete("StudyDate");
-            params.delete("StudyDate~~>=");
-            params.delete("StudyDate~~<=");
-
-            if (date) params.append("StudyDate", date);
-            if (startDate) params.append("StudyDate~~>=", startDate);
-            if (endDate) params.append("StudyDate~~<=", endDate);
+        if (startDate) {
+            setParam("StudyDate~~>=", startDate);
+        } else {
+            removeParam("StudyDate~~>=", startDate);
         }
-    });
+        if (endDate) {
+            setParam("StudyDate~~<=", endDate);
+        } else {
+            removeParam("StudyDate~~<=", endDate);
+        }
+    }
 </script>
 
-<div>Date: <input type="date" bind:value={date} /></div>
 <div>
-    From: <input type="date" bind:value={startDate} />
-    To: <input type="date" bind:value={endDate} />
+    Date: <input
+        type="date"
+        bind:value={date}
+        oninput={setDates}
+    />
+</div>
+<div>
+    From: <input
+        type="date"
+        bind:value={startDate}
+        oninput={setDates}
+    />
+    To:
+    <input
+        type="date"
+        bind:value={endDate}
+        oninput={setDates}
+    />
 </div>

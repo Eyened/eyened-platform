@@ -7,11 +7,16 @@ import type { RenderTexture } from "./renderTexture";
 import type { Instance } from "$lib/datamodel/instance";
 import type { RenderMode } from "$lib/viewer/viewer-utils";
 
+// Define metadata interface
+interface ImageMetadata {
+    [key: string]: unknown;
+}
+
 export class Image2D extends AbstractImage {
     is3D = false;
     is2D = true;
     contrastEnhanced?: RenderTexture;
-    sharpened?: RenderTexture
+    sharpened?: RenderTexture;
     CLAHE?: RenderTexture;
     standardizedMuSigma?: RenderTexture;
     standardizedHistogram?: RenderTexture;
@@ -19,13 +24,14 @@ export class Image2D extends AbstractImage {
     isGrayscale: boolean;
     private _pixels: Uint8Array | undefined;
 
-    private constructor(instance: Instance,
+    private constructor(
+        instance: Instance,
         webgl: WebGL,
         image_id: string,
         public readonly canvas: HTMLCanvasElement,
         public readonly texture: WebGLTexture,
         dimensions: Dimensions,
-        meta: any
+        meta: ImageMetadata
     ) {
         super(instance, webgl, image_id, dimensions, meta, texture);
         this.isGrayscale = isImageGrayscale(canvas);
@@ -86,7 +92,7 @@ export class Image2D extends AbstractImage {
     }
 
     selectTexture(renderMode: RenderMode) {
-        const textureMap: Record<string, WebGLTexture | undefined> = {
+        const textureMap = {
             "Contrast enhanced": this.contrastEnhanced?.texture,
             "Color balanced": this.standardizedMuSigma?.texture,
             "CLAHE": this.CLAHE?.texture || this.texture,
@@ -98,7 +104,6 @@ export class Image2D extends AbstractImage {
         return textureMap[renderMode] || this.texture;
     }
 }
-
 
 function initTexture(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement): WebGLTexture {
 
@@ -122,7 +127,7 @@ function initTexture(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement): Web
         gl.UNSIGNED_BYTE,
         canvas
     );
-    return texture
+    return texture;
 }
 
 function isImageGrayscale(canvas: HTMLCanvasElement): boolean {
@@ -136,7 +141,6 @@ function isImageGrayscale(canvas: HTMLCanvasElement): boolean {
         const g = data[i + 1];
         const b = data[i + 2];
 
-        // Check if the pixel is grayscale
         if (r !== g || g !== b) {
             return false;
         }
@@ -145,10 +149,7 @@ function isImageGrayscale(canvas: HTMLCanvasElement): boolean {
     return true;
 }
 
-
-
 function getCanvas(pixelData: Uint8Array, width: number, height: number): HTMLCanvasElement {
-    // Create a new canvas
     const nChannels = pixelData.length / (width * height);
     const canvas = document.createElement('canvas');
     canvas.width = width;

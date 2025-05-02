@@ -6,6 +6,7 @@ import type { Annotation } from "$lib/datamodel/annotation";
 import type { Segmentation } from "./SegmentationController";
 import { ProbabilityData, Uint8ArrayToCanvasGray } from "./segmentationData";
 import { SvelteMap } from "svelte/reactivity";
+import type { AnnotationData } from "$lib/datamodel/annotationData";
 
 export class ProbabilitySegmentation implements Segmentation {
 
@@ -26,6 +27,16 @@ export class ProbabilitySegmentation implements Segmentation {
 
         this.drawEnhanceShader = image.webgl.shaders.drawEnhance;
         this.drawHardShader = image.webgl.shaders.drawHard;
+    }
+
+    initialize(annotationData: AnnotationData, dataRaw: any): void {
+        this.threshold = annotationData.parameters.value?.valuefloat || 0.5;
+        if (dataRaw instanceof HTMLCanvasElement) {
+            this.import(annotationData.scanNr, dataRaw);
+        } else {
+            console.warn('Unsupported data type', dataRaw);
+            throw new Error('Unsupported data type');
+        }
     }
 
     dispose(): void {
