@@ -4,3 +4,6 @@ dev.env
 *.zip
 *.pyc
 notebooks/hrfav/**/*
+node_modules/**/*
+extensions.ts
+client/src/lib/extensions.ts

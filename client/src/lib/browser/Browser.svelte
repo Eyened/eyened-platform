@@ -66,15 +66,15 @@
                 </button>
             </div>
             <div id="user">
+                {#snippet icon()}
+                    <span class="icon">{initials}</span>
+                {/snippet}
                 <MainIcon
                     onclick={showUserMenu}
                     tooltip={creator.name}
-                    style="light"
-                >
-                    {#snippet icon()}
-                        <span class="icon">{initials}</span>
-                    {/snippet}
-                </MainIcon>
+                    theme="light"
+                    {icon}
+                />
             </div>
         </div>
         <div id="browser-header-bottom">
@@ -119,12 +119,12 @@
     .loader {
         height: 100vh;
         width: 100vw;
-        position: fixed; /* Stay in place */
-        z-index: 1; /* Sit on top */
+        position: fixed;
+        z-index: 1;
         left: 0;
         top: 0;
-        background-color: rgba(255, 255, 255, 0.7); /* Black w/opacity */
-        backdrop-filter: blur(5px); /* Filter effect */
+        background-color: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(5px);
     }
     .loader > div {
         position: absolute;
@@ -163,9 +163,10 @@
     }
     div#main {
         flex: 1;
-        font-size: 0.8em;
-        border-bottom: 2px solid #e3e3e3;
-    }    
+        background-color: var(--browser-background);
+        color: var(--browser-color);
+        border-bottom: 2px solid var(--browser-border);
+    }
     div#browser-header-left,
     div#browser-header-right {
         flex: 1;
@@ -188,12 +189,12 @@
         width: 2em;
         height: 2em;
         margin: auto;
-        border: 1px solid rgba(255, 255, 255, 0.5);
+        border: 1px solid var(--browser-color);
         border-radius: 50%;
         font-weight: bold;
     }
     span.icon:hover {
-        background-color: rgba(178, 229, 253, 0.5);
+        background-color: var(--icon-hover);
     }
 
     span.link {
