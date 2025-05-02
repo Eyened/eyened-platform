@@ -20,7 +20,7 @@ class InstanceReport:
 
     def load_image(self):
         if self.path.endswith(".dcm"):
-            ds = pydicom.read_file(self.path)
+            ds = pydicom.dcmread(self.path)
             return ds.pixel_array
         else:
             return np.array(Image.open(self.path))
