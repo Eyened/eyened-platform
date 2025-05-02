@@ -19,15 +19,15 @@ export default defineConfig({
 					// Autogenerate a group of links for the 'constellations' directory.
 					autogenerate: { directory: 'orm' },
 				},
-				{
-				label: 'Eyened API',
-					// Autogenerate a group of links for the 'constellations' directory.
-					autogenerate: { directory: 'api' },
-				},
-				{label: 'Eyened Viewer',
-					// Autogenerate a group of links for the 'constellations' directory.
-					autogenerate: { directory: 'client' },
-				},
+				// {
+				// label: 'Eyened API',
+				// 	// Autogenerate a group of links for the 'constellations' directory.
+				// 	autogenerate: { directory: 'api' },
+				// },
+				// {label: 'Eyened Viewer',
+				// 	// Autogenerate a group of links for the 'constellations' directory.
+				// 	autogenerate: { directory: 'client' },
+				// },
 			],
 			// sidebar: [
 			// 	{
