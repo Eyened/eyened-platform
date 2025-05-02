@@ -24,4 +24,10 @@
         display: flex;
         flex-direction: column;
     }
+    :root {
+        --browser-background: #f4f4f8;
+        --browser-color: #000010;
+        --browser-border: #e3e3e3;
+        --icon-hover: rgba(239, 250, 255, 0.5);
+    }
 </style>

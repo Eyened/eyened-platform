@@ -44,7 +44,7 @@
             {condition.operator}
             {condition.value}
         </span>
-        <PanelIcon onclick={() => remove(condition)}>
+        <PanelIcon onclick={() => remove(condition)} theme="light">
             <Trash />
         </PanelIcon>
     </div>

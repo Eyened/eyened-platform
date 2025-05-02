@@ -185,11 +185,14 @@
                         />
                         <div class="icon">
                             {#if canEdit}
-                                <MainIcon onclick={() => removeArrayValue(i)}>
-                                    {#snippet icon()}
-                                        <Trash size="1.5em" />
-                                    {/snippet}
-                                </MainIcon>
+                                {#snippet icon()}
+                                    <Trash size="1.5em" />
+                                {/snippet}
+                                <MainIcon
+                                    onclick={() => removeArrayValue(i)}
+                                    theme="light"
+                                    {icon}
+                                />
                             {/if}
                         </div>
                     </li>
