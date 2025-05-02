@@ -1,0 +1,51 @@
+---
+title: ORM utilities
+description: Learn how to use the command line utilities available in the ORM
+sidebar:
+  order: 5
+---
+
+## Thumbnail management
+
+The ORM uses the `ThumbnailPath` column of `ImageInstance` to store thumbnail path and state:
+
+- *NULL* means that the image contains no thumbnail and the thumbnail generation code must be ran on this image. 
+- An empty string indicates that the thumbnail generator ran and failed for this image.
+- Any other value will be interpreted as a relative path to the image thumbnail within the `THUMBNAILS_PATH` directory.
+
+This section explains how to update thumbnails in the database, potentially after the thumbnail generation code has been updated.
+
+:::note
+These steps below assume that the ORM is locally installed and configured as explained in [Getting Started](eyened_platform/getting_started).
+:::
+
+### Generating thumbnails
+
+The ORM contains a simple `update_thumbnails` script that will create thumbnails:
+
+```
+eorm update-thumbnails --env prod
+```
+
+This example uses an environment called `prod` to determine what database to connect to and where to write thumbnails. This environment must be provided in a .env file as explained in [eyened_platform/configuration].
+
+By default, `eorm update-thumbnails` runs only for images with `ThumbnailPath == NULL`. To run also on images with failed thumbnails (useful after the thumbnail generation code has been updated) use:
+
+```
+eorm update-thumbnails --failed --env prod
+```
+
+### Updating thumbnail generation code
+
+To updated the thumbnail generation code to support new image types or generally change the way thumbnails are generated:
+
+
+
+1. Update the [thumbnail generation code](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/thumbnails.py).
+2. The ORM includes a [notebook](https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/test_thumbnail_generator.ipynb) to easily query a sample of images and visualize their generated thumbnails.
+3. For any images that need to be updated in the database, set `ThumbnailPath` to *NULL*.
+4. Run the thumbnail update script:
+
+    ```
+    eorm update-thumbnails --failed --env prod
+    ```
