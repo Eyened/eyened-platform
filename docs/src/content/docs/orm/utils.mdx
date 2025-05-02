@@ -11,7 +11,7 @@ The ORM uses the `ThumbnailPath` column of `ImageInstance` to store thumbnail pa
 
 - *NULL* means that the image contains no thumbnail and the thumbnail generation code must be ran on this image. 
 - An empty string indicates that the thumbnail generator ran and failed for this image.
-- Any other value will be interpreted as a relative path to the image thumbnail within the `THUMBNAILS_PATH` directory.
+- Any other value will be interpreted as a relative path to the image thumbnail within the `THUMBNAILS_PATH` directory. In practice, the thumbnail generator will generate multiple thumbnail sizes and a suffix must be appended to correctly locate a thumbnail file. For example, the thumbnail of 144px (side) will be stored at `<THUMBNAILS_PATH>_144.jpg`.
 
 This section explains how to update thumbnails in the database, potentially after the thumbnail generation code has been updated.
 
@@ -21,15 +21,15 @@ These steps below assume that the ORM is locally installed and configured as exp
 
 ### Generating thumbnails
 
-The ORM contains a simple `update_thumbnails` script that will create thumbnails:
+The ORM contains a simple `update_thumbnails` script that will update thumbnails in the database:
 
 ```
 eorm update-thumbnails --env prod
 ```
 
-This example uses an environment called `prod` to determine what database to connect to and where to write thumbnails. This environment must be provided in a .env file as explained in [/eyened-platform/orm/configuration].
+This example uses an environment called `prod` to determine what database to connect to and where to write thumbnails. This environment must be provided in a .env file as explained in [ORM Configuration](/eyened-platform/orm/configuration).
 
-By default, `eorm update-thumbnails` runs only for images with `ThumbnailPath == NULL`. To run also on images with failed thumbnails (useful after the thumbnail generation code has been updated) use:
+By default, `eorm update-thumbnails` will run for images with `ThumbnailPath == NULL`. To run also on images with failed thumbnails (useful after the thumbnail generation code has been updated) use:
 
 ```
 eorm update-thumbnails --failed --env prod
