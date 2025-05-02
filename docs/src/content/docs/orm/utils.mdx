@@ -41,8 +41,7 @@ To updated the thumbnail generation code to support new image types or generally
 
 
 
-1. Update the [thumbnail generation code](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/thumbnails.py).
-2. The ORM includes a [notebook](https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/test_thumbnail_generator.ipynb) to easily query a sample of images and visualize their generated thumbnails.
+1. Update the [thumbnail generation code](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/thumbnails.py). The ORM includes a [notebook](https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/test_thumbnail_generator.ipynb) to easily visualize the output of these methods on a sample images from the database.
 3. For any images that need to be updated in the database, set `ThumbnailPath` to *NULL*.
 4. Run the thumbnail update script:
 
