@@ -13,7 +13,7 @@ from eyened_orm import ImageInstance, Modality
 
 
 def get_thumbnail_dicom(im: ImageInstance):
-    ds = pydicom.read_file(im.path)
+    ds = pydicom.dcmread(im.path)
     ds.decompress()
 
     if ds.pixel_array is None:
