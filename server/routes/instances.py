@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy import distinct, func, or_, select
 from sqlalchemy.orm import Session, aliased, defer
 
-from .auth import manager
+from .auth import CurrentUser, get_current_user
 from ..db import get_db
 from .utils import collect_rows
 from .query_utils import apply_filters, decode_params, sqlalchemy_operators
@@ -35,11 +35,30 @@ router = APIRouter()
 AnnotationCreator = aliased(Creator, name="annotation_creator")
 FormCreator = aliased(Creator, name="form_creator")
 
+
+segmentation_annotation_types = select(AnnotationType.AnnotationTypeID).where(
+    AnnotationType.AnnotationTypeName.in_(
+        [
+            "Segmentation 2D",
+            "Segmentation 2D masked",
+            "Segmentation OCT B-scan",
+            "Segmentation OCT Enface",
+            "Segmentation OCT Volume",
+        ]
+    )
+)
+
+# TODO: this can be removed once other annotation types are removed (using annotation table only for segmentations)
 ActiveAnnotation = aliased(
     Annotation,
-    select(Annotation).filter(~Annotation.Inactive).subquery(name="active_annot"),
+    select(Annotation)
+    .filter(~Annotation.Inactive)
+    .filter(Annotation.AnnotationTypeID.in_(segmentation_annotation_types))
+    .subquery(name="active_annot"),
     name="active_annot",
 )
+
+
 ActiveFormAnnotation = aliased(
     FormAnnotation,
     select(FormAnnotation)
@@ -131,7 +150,7 @@ def get_mappings(tables):
             # Modality is defined on ImageInstance and Feature, but we want to use the value from ImageInstance
             if column.name == "Modality" and original_table_name == "Feature":
                 continue
-            
+
             col = getattr(table, column.key)
 
             # Use the original table name in the mapping
@@ -143,17 +162,17 @@ def get_mappings(tables):
 
 
 base_mappings = get_mappings(base_tables)
-annotation_mappings = get_mappings(annotation_tables)   
+annotation_mappings = get_mappings(annotation_tables)
 form_mappings = get_mappings(form_tables)
 
 
 def apply_filters(query, mappings, params):
-    for field, (operator, value) in params.items():
+    for (field, operator), value in params.items():
         if field not in mappings:
             continue
         column = mappings[field]
-        print("where", column, operator, value)
         query = query.where(sqlalchemy_operators[operator](column, value))
+        print("where", field, operator, value)
     return query
 
 
@@ -166,8 +185,7 @@ def run_queries(
 
     query = apply_filters(base_query, base_mappings, params_decoded)
 
-
-    if any(field in annotation_mappings for field in params_decoded):
+    if any(field in annotation_mappings for field, operator in params_decoded):
         query = (
             query.join(
                 ActiveAnnotation,
@@ -184,7 +202,7 @@ def run_queries(
             )
         )
         query = apply_filters(query, annotation_mappings, params_decoded)
-    if any(field in form_mappings for field in params_decoded):
+    if any(field in form_mappings for field, operator in params_decoded):
         query = (
             query.join(
                 ActiveFormAnnotation,
@@ -235,14 +253,13 @@ def run_queries(
 async def get_instances(
     request: Request,
     session: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
-    
+
     cursor = request.query_params.get("cursor")
     limit = int(request.query_params.get("limit", 200))
-    
+
     multiparams = request.query_params.multi_items()
-    
 
     next_cursor, i, a, form_annotations = run_queries(
         session, multiparams, cursor, limit, base_query, annotation_query, form_query
@@ -263,7 +280,7 @@ async def get_instances(
     for annotation, annotation_data in a:
         annotations.add(annotation)
         annotation_datas.add(annotation_data)
-    
+
     response = {
         "entities": {
             k: collect_rows(v)
@@ -286,6 +303,7 @@ async def get_instances(
 @router.get("/instances/images/{dataset_identifier:path}")
 async def get_file(
     dataset_identifier: str,
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     # Set X-Accel-Redirect header to tell NGINX to serve the file
     response = Response()
@@ -296,6 +314,7 @@ async def get_file(
 @router.get("/instances/thumbnails/{thumbnail_identifier:path}")
 async def get_thumb(
     thumbnail_identifier: str,
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     response = Response()
     response.headers["X-Accel-Redirect"] = "/thumbnails/" + thumbnail_identifier

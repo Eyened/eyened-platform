@@ -23,7 +23,7 @@
 	let show = $derived(overlay.visible.has(formAnnotation));
 	let active = $derived(tool.annotation?.id == formAnnotation.id);
 
-	const canEditForm = $globalContext.canEdit(formAnnotation);
+	const canEditForm = globalContext.canEdit(formAnnotation);
 
 	function toggleVisisble() {
 		if (overlay.visible.has(formAnnotation)) {

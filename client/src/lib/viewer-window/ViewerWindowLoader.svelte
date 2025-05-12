@@ -30,7 +30,7 @@ Used to create the viewerwindow context.
 		}
 	}
 
-	const { creator } = $globalContext;
+	const { creator } = globalContext;
 
 	const { promise, resolve } = new Deferred<ViewerWindowContext>();
 

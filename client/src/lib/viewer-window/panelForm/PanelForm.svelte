@@ -9,7 +9,7 @@
 	import { globalContext } from '$lib/main';
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
-	const { creator, annotationsFilter, formShortcut } = $globalContext;
+	const { creator, annotationsFilter, formShortcut } = globalContext;
 	const { formSchemas, formAnnotations } = data;
 
 	const {

@@ -1,7 +1,7 @@
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
 
-export type TextureDataFormat = 'RG32UI' | 'RG16UI' | 'R16UI' | 'R8' | 'R8UI' | 'RGBA' | 'RGBA_FLOAT' | 'R32UI';
+export type TextureDataFormat = 'RG32UI' | 'RG16UI' | 'R16UI' | 'R8' | 'R8UI' | 'RGBA' | 'RGBA_FLOAT' | 'R32UI' | 'RG8';
 
 export class RenderTexture {
 
@@ -22,6 +22,10 @@ export class RenderTexture {
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         if (format === 'R8') {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, width, height, 0, gl.RED, gl.UNSIGNED_BYTE, source);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        } else if (format === 'RG8'){
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, width, height, 0, gl.RG, gl.UNSIGNED_BYTE, source);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         } else if (format === 'R8UI') {
@@ -72,6 +76,10 @@ export class RenderTexture {
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         if (this.format === 'R8UI') {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, width, height, 0, gl.RED, gl.UNSIGNED_BYTE, data)
+        } else if (this.format === 'RG8') {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, width, height, 0, gl.RG, gl.UNSIGNED_BYTE, data)
+        } else if (this.format === 'R8') {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, width, height, 0, gl.RED, gl.UNSIGNED_BYTE, data)
         } else if (this.format === 'RGBA') {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
         } else {

@@ -13,7 +13,7 @@
 		activator: { activeID: number | undefined; toggle: (formAnnotation: FormAnnotation) => void };
 	}
 	let { formAnnotation, active: panelActive, activator }: Props = $props();
-	const canEditForm = $globalContext.canEdit(formAnnotation);
+	const canEditForm = globalContext.canEdit(formAnnotation);
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const instance = viewerContext.image.instance;

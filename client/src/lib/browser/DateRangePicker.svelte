@@ -14,15 +14,15 @@
 
   Behavior:
     - When any of the date inputs change, the URL search parameters are updated.
-    - The search parameters 'StudyDate', 'StudyDate~~>=', and 'StudyDate~~<=' are used to represent the selected dates.
+    - The search parameters 'StudyDate', 'StudyDate~~gte', and 'StudyDate~~lte' are used to represent the selected dates.
 -->
 
 <script lang="ts">
     import { removeParam, setParam } from "./browserContext.svelte";
     import { getParam } from "./browserContext.svelte";
     let date: string = $state(getParam("StudyDate") ?? "");
-    let startDate: string = $state(getParam("StudyDate~~>=") ?? "");
-    let endDate: string = $state(getParam("StudyDate~~<=") ?? "");
+    let startDate: string = $state(getParam("StudyDate~~gte") ?? "");
+    let endDate: string = $state(getParam("StudyDate~~lte") ?? "");
 
     function setDates() {
         if (date) {
@@ -31,14 +31,14 @@
             removeParam("StudyDate", date);
         }
         if (startDate) {
-            setParam("StudyDate~~>=", startDate);
+            setParam("StudyDate~~gte", startDate);
         } else {
-            removeParam("StudyDate~~>=", startDate);
+            removeParam("StudyDate~~gte", startDate);
         }
         if (endDate) {
-            setParam("StudyDate~~<=", endDate);
+            setParam("StudyDate~~lte", endDate);
         } else {
-            removeParam("StudyDate~~<=", endDate);
+            removeParam("StudyDate~~lte", endDate);
         }
     }
 </script>

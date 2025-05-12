@@ -71,6 +71,9 @@ abstract class BaseSegmentation implements Segmentation {
                 return dataRaw;
             } else if (dataRaw instanceof Uint8Array || dataRaw instanceof Uint16Array) {
                 return dataRaw.buffer as ArrayBuffer;
+            } else if (dataRaw instanceof HTMLCanvasElement) {
+                const array = CanvasToUint8Array(dataRaw);
+                return array.buffer as ArrayBuffer;
             } else {
                 throw new Error('Unsupported data type');
             }
@@ -103,7 +106,9 @@ export class MulticlassSegmentation extends BaseSegmentation {
 
     get layerBoundaries(): LayerBoundaries {
         if (!this.layerBoundariesValid) {
+            console.log('calculateBoundaries')
             this._layerBoundaries.calculateBoundaries();
+            this.layerBoundariesValid = true;
         }
         return this._layerBoundaries;
     }

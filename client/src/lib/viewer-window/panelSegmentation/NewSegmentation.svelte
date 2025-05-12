@@ -11,7 +11,7 @@
 	import { SegmentationContext } from './segmentationContext.svelte';
 	import { globalContext } from '$lib/main';
 
-	const { creator } = $globalContext;
+	const { creator } = globalContext;
 	const { image } = getContext<ViewerContext>('viewerContext');
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 	const { annotationTypes, features } = data;

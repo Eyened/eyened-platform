@@ -13,7 +13,7 @@
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
 
-    const { creator } = $globalContext;
+    const { creator } = globalContext;
 
     interface Props {
         form: FormAnnotation;
@@ -25,7 +25,7 @@
 
     const dt = new Date().getTime() - (form.created?.getTime() ?? 0);
     const daysSinceCreation = dt / (1000 * 60 * 60 * 24);
-    const canEditForm = $globalContext.canEdit(form);
+    const canEditForm = globalContext.canEdit(form);
 
     let removing: number | undefined = $state();
     let timeout: ReturnType<typeof setTimeout> | undefined = $state();

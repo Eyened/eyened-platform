@@ -2,10 +2,12 @@ import { getImage } from "$lib/data-loading/imageLoader";
 import type { Annotation } from "$lib/datamodel/annotation";
 import type { AnnotationData } from "$lib/datamodel/annotationData";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
+import { f } from "$lib/registration/affine";
 import type { Branch } from "$lib/types";
 import type { Segmentation } from "./SegmentationController";
 import type { AbstractImage } from "./abstractImage";
 import type { ProbabilitySegmentation } from "./probabilitySegmentation.svelte";
+import { RenderTexture, type TextureDataFormat } from "./renderTexture";
 import type { SharedDataRG } from "./segmentationData";
 import { SvelteMap } from "svelte/reactivity";
 
@@ -37,17 +39,54 @@ export class BinarySegmentation implements Segmentation {
         readonly annotation: Annotation,
         readonly data: SharedDataRG,
         readonly layerIndex: number
-    ) {        
+    ) {
         this.layerBit = 1 << layerIndex;
     }
 
     initialize(annotationData: AnnotationData, dataRaw: any): void {
         if (dataRaw instanceof HTMLCanvasElement) {
             this.import(annotationData.scanNr, dataRaw);
+        } else if (dataRaw instanceof ArrayBuffer) {
+            this.initializeArrayBuffer(annotationData, dataRaw);
         } else {
             console.warn('Unsupported data type', dataRaw);
             throw new Error('Unsupported data type');
         }
+    }
+
+    private getFormatAndBytes(): { format: TextureDataFormat; nBytes: number } {
+        const { interpretation } = this.annotation.annotationType;
+
+        if (interpretation === 'R/G mask') {
+            return { format: 'RG8', nBytes: 2 };
+        } else if (interpretation === 'Binary mask') {
+            return { format: 'R8', nBytes: 1 };
+        }
+
+        throw new Error(`Unsupported annotation interpretation: ${interpretation}`);
+    }
+
+    initializeArrayBuffer(annotationData: AnnotationData, dataRaw: ArrayBuffer): void {
+        const { annotationType } = this.annotation;
+        const { format, nBytes } = this.getFormatAndBytes();
+        const { width, height, depth } = this.image;
+        const size = width * height * nBytes;
+        const renderTexture = new RenderTexture(this.image.webgl, width, height, format, null);
+
+        if (annotationType.name === 'Segmentation OCT Volume') {
+            for (let i = 0; i < depth; i++) {
+                const data = new Uint8Array(dataRaw.slice(i * size, (i + 1) * size));
+                renderTexture.setDataArray(data);
+                this.import(i, renderTexture.texture, 0.0);
+            }
+        } else if (annotationType.name === 'Segmentation OCT B-scan') {
+            const data = new Uint8Array(dataRaw);
+            renderTexture.setDataArray(data);
+            this.import(annotationData.scanNr, renderTexture.texture, 0.0);
+        } else {
+            throw new Error(`Unsupported annotation type: ${annotationType.name}`);
+        }
+        renderTexture.dispose();
     }
 
     /**
@@ -102,9 +141,15 @@ export class BinarySegmentation implements Segmentation {
      * @param scanNr 
      * @param canvas R/G mask
      */
-    import(scanNr: number, canvas: HTMLCanvasElement): void {
+    import(scanNr: number, canvas: HTMLCanvasElement | WebGLTexture, u_threshold: number = 0.5): void {
         const { webgl: { shaders } } = this.image;
 
+        let u_drawing: WebGLTexture;
+        if (canvas instanceof HTMLCanvasElement) {
+            u_drawing = this.image.getTextureForCanvas(canvas);
+        } else {
+            u_drawing = canvas;
+        }
         // Annotations with binary data are stored as single channel (black/white) images.
         // However the canvas is always 4 channels, so the green channel will also be set.
         // This should not be interpreted as the 'questionable' mask        
@@ -112,9 +157,10 @@ export class BinarySegmentation implements Segmentation {
 
         const uniforms = {
             u_current: this.data.getTexture(scanNr),
-            u_drawing: this.image.getTextureForCanvas(canvas),
+            u_drawing,
             u_bitmask: this.layerBit,
-            u_has_questionable_mask
+            u_has_questionable_mask,
+            u_threshold
         };
         this.data.passShader(scanNr, shaders.import, uniforms);
         this._after_update(scanNr);

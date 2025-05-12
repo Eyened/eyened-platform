@@ -29,7 +29,7 @@
             {#snippet icon()}
                 <Close size="2em" />
             {/snippet}
-            <MainIcon onclick={close} {icon} />
+            <MainIcon onclick={close} {icon} theme="light" />
         </div>
         <div class="popup-body">
             <componentDef.component {...componentDef.props} />
@@ -64,7 +64,7 @@
     .popup-header {
         display: flex;
         flex: 0;
-        background-color: #f5f5f5;
+        background-color: var(--browser-background);
         border-bottom: 1px solid #ddd;
         border-radius: 2px 2px 0 0;
     }

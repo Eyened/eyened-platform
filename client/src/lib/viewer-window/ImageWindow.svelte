@@ -16,7 +16,7 @@
 	let { instance, webgl }: Props = $props();
 
 	const imageLoader = new ImageLoader(webgl);
-	const { creator } = $globalContext;
+	const { creator } = globalContext;
 	const registration = new Registration();
 	const viewerWindowContext = new ViewerWindowContext(webgl, registration, creator, [instance.id]);
 	setContext('viewerWindowContext', viewerWindowContext);

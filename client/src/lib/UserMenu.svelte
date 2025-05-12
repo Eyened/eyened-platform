@@ -2,10 +2,10 @@
 	import { globalContext } from './main';
 	import ChangePasswordForm from './ChangePasswordForm.svelte';
 
-	const { userManager, creator } = $globalContext;
+	const { userManager, creator } = globalContext;
 	function logout() {
-		userManager.logout();
-		$globalContext.popupComponent = null;
+		globalContext.popupComponent = null;
+        userManager.logout();		
 	}
 </script>
 

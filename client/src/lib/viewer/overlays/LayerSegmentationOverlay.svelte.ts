@@ -31,6 +31,7 @@ export class LayerSegmentationOverlay implements Overlay {
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        // console.log('repaint layers')
 		const {
 			hideCreators,
 			hideFeatures,
@@ -59,6 +60,7 @@ export class LayerSegmentationOverlay implements Overlay {
 			u_alpha: this.alpha,
 			u_highlight: voxel,
 			u_questionable_bit: this.segmentation.questionable_bit,
+			u_image_size: [viewerContext.image.width, viewerContext.image.height, viewerContext.image.depth]
 		};
 
 		if (this.segmentation instanceof MultilabelSegmentation) {

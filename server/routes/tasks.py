@@ -12,39 +12,41 @@ from eyened_orm import (
     TaskState,
 )
 
-from .auth import manager
 from ..db import get_db
+from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
+
 
 class SubTaskImageLinkCreate(BaseModel):
     SubTaskID: int
     ImageInstanceID: int
 
+
 class TaskDefinitionCreate(BaseModel):
     TaskDefinitionName: str
+
 
 class TaskCreate(BaseModel):
     TaskName: str
     TaskDefinitionID: int
 
+
 class TaskStateUpdate(BaseModel):
     state: str
+
 
 class TaskResponse(BaseModel):
     TaskID: int
     TaskName: str
     size: int
 
-@router.get("/tasks/{taskid}/subtasks")
-async def get_subtasks(
-    taskid: int, db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
-):
+
+@router.get("/tasks")
+async def get_tasks(current_user: CurrentUser = Depends(get_current_user)):
     result = (db.query(SubTask).join(Task).filter(Task.TaskID == taskid)).all()
     links = (
-        db.query(SubTaskImageLink).join(
-            SubTask).filter(SubTask.TaskID == taskid)
+        db.query(SubTaskImageLink).join(SubTask).filter(SubTask.TaskID == taskid)
     ).all()
 
     return {
@@ -58,7 +60,7 @@ async def update_task_state_id(
     SubTaskID: int,
     state_id: int = Body(...),
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     subtask = db.get(SubTask, SubTaskID)
     if not subtask:
@@ -73,7 +75,7 @@ async def update_task_state_id(
 async def create_subtask_image_link(
     link_data: SubTaskImageLinkCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     link = SubTaskImageLink(
         SubTaskID=link_data.SubTaskID, ImageInstanceID=link_data.ImageInstanceID
@@ -85,13 +87,13 @@ async def create_subtask_image_link(
 
 @router.delete("/subTaskImageLinks/{link_id}")
 async def delete_subtask_image_link(
-    link_id: int, db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    link_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     link = db.get(SubTaskImageLink, link_id)
     if not link:
-        raise HTTPException(
-            status_code=404, detail="SubTaskImageLink not found")
+        raise HTTPException(status_code=404, detail="SubTaskImageLink not found")
 
     db.delete(link)
     db.commit()
@@ -102,7 +104,7 @@ async def delete_subtask_image_link(
 async def create_task_definition(
     task_def: TaskDefinitionCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     taskdefinition = TaskDefinition(TaskDefinitionName=task_def.TaskDefinitionName)
     db.add(taskdefinition)
@@ -114,7 +116,7 @@ async def create_task_definition(
 async def create_task(
     task_data: TaskCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     taskdef = db.get(TaskDefinition, task_data.TaskDefinitionID)
     if not taskdef:
@@ -130,7 +132,7 @@ async def create_task(
 async def get_task(
     taskid: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     task = db.get(Task, taskid)
     if not task:
@@ -143,9 +145,9 @@ async def get_task(
 
 @router.delete("/tasks/{taskid}")
 async def delete_task(
-    taskid: int, 
-    db: Session = Depends(get_db), 
-    user_id: int = Depends(manager)
+    taskid: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     task = db.get(Task, taskid)
     if not task:
@@ -156,12 +158,29 @@ async def delete_task(
     return Response(status_code=204)
 
 
+@router.get("/tasks/{taskid}/subtasks")
+async def get_subtasks(
+    taskid: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    result = (db.query(SubTask).join(Task).filter(Task.TaskID == taskid)).all()
+    links = (
+        db.query(SubTaskImageLink).join(SubTask).filter(SubTask.TaskID == taskid)
+    ).all()
+
+    return {
+        "subTasks": [r.to_dict() for r in result],
+        "subTaskImageLinks": [r.to_dict() for r in links],
+    }
+
+
 @router.get("/tasks/{taskid}/subtasks/{index}")
 async def get_subtask_from_task(
     taskid: int,
     index: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     task = db.get(Task, taskid)
     if not task:
@@ -171,8 +190,7 @@ async def get_subtask_from_task(
         subtask = task.SubTasks[index]
         return subtask.to_dict(with_images=True)
     except IndexError:
-        raise HTTPException(
-            status_code=404, detail="SubTask index out of range")
+        raise HTTPException(status_code=404, detail="SubTask index out of range")
 
 
 @router.put("/subtasks/{subtaskid}/state")
@@ -180,7 +198,7 @@ async def update_subtask_state(
     subtaskid: int,
     state_data: TaskStateUpdate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     subtask = db.get(SubTask, subtaskid)
     if not subtask:

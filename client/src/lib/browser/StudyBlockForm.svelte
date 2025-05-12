@@ -16,9 +16,10 @@
         study: Study;
         create_new: boolean;
     }
-    let { title, split_laterality, study, schema_name, create_new }: Props = $props();
+    let { title, split_laterality, study, schema_name, create_new }: Props =
+        $props();
 
-    const { creator } = $globalContext;
+    const { creator } = globalContext;
     const taskContext = getContext<TaskContext | undefined>("taskContext");
 
     const { formAnnotations, formSchemas } = data;
@@ -77,7 +78,11 @@
     {/if}
 
     {#each forms as form}
-        <div><FormItem {form} theme="light" /></div>
+        <div>
+            <div class="form-item">
+                <FormItem {form} theme="light" />
+            </div>
+        </div>
     {/each}
 {/snippet}
 
@@ -102,22 +107,25 @@
         display: flex;
     }
     h4 {
-        padding:0;
-        margin:0;
+        padding: 0;
+        margin: 0;
         margin-top: 0.5em;
         margin-bottom: 0.5em;
     }
-    div#main {        
+    div#main {
         flex-direction: column;
         padding-left: 0.5em;
-        padding-right: 0.5em;       
+        padding-right: 0.5em;
     }
     div#eyes {
         flex-direction: row;
     }
     div#eyes > div {
-        
         flex-direction: column;
         flex: 1;
+    }
+    div.form-item {
+        flex-direction: column;
+        width: 20em;
     }
 </style>

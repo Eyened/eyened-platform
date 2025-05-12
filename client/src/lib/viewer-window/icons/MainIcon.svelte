@@ -38,6 +38,7 @@
 	}
 	div.tooltip.link > span.icon {
 		cursor: pointer;
+        color: var(--icon-color);
 	}
 	div.tooltip.link > span.icon:hover {
 		color: var(--icon-hover-color);
@@ -46,11 +47,13 @@
 		background-color: transparent;
 		color: rgb(175, 175, 175);
 		--icon-hover-color: white;
+        --icon-color: rgb(175, 175, 175);
 	}
 	span.icon:not(.dark) {
 		background-color: transparent;
 		color: rgb(75, 75, 75);
 		--icon-hover-color: rgb(0, 0, 0);
+        --icon-color: rgb(75, 75, 75);
 	}
 	span.icon.active {
 		background-color: inherit;

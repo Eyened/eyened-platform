@@ -3,7 +3,6 @@ import { Matrix } from "$lib/matrix";
 import { LinePhotoLocator } from "$lib/registration/photoLocators";
 import { getPrivateEyeRegistrationHeidelberg } from "$lib/registration/privateEyeRegistrationHeidelberg";
 import { AbstractImage } from "./abstractImage";
-import { PixelShaderProgram } from "./FragmentShaderProgram";
 import { Image2D } from "./image2D";
 import { RenderTexture } from "./renderTexture";
 import type { Dimensions } from "./types";

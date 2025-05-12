@@ -61,6 +61,6 @@
         border-top-left-radius: 2px;
         border-top-right-radius: 2px;
         padding: 0.3em;
-        background-color: #f0f0f0;
+        background-color: var(--browser-background);
     }
 </style>

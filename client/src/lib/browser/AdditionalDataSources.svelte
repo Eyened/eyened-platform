@@ -39,7 +39,7 @@
                 {#await loadAdditionalData(source)}
                     <div>Loading...</div>
                 {:then data}
-                    <ExternalData {data} name={source.name} />
+                    <ExternalData {data} name={source.name} collapse={source.collapse}/>
                 {:catch error}
                     <div>Error: {error}</div>
                 {/await}
