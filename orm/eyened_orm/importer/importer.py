@@ -1,11 +1,9 @@
 import datetime
-import secrets
-import shutil
+import secrets    
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
-from eyened_orm.importer.thumbnails import update_thumbnails_for_images
 import pandas as pd
 from sqlalchemy import inspect
 
@@ -16,8 +14,8 @@ from eyened_orm import (
     Series,
     Study,
 )
+from eyened_orm.importer.thumbnails import update_thumbnails
 from eyened_orm.utils.config import EyenedORMConfig, get_config
-from tqdm import tqdm
 
 
 class Importer:
@@ -329,7 +327,7 @@ class Importer:
         """
         
         if self.generate_thumbnails:
-            update_thumbnails_for_images(self.session, self.images, self.config.thumbnails_path, self.config.secret_key)
+            self.update_thumbnails()
 
         if self.run_ai_models:
             # Run AI models on the images
@@ -608,3 +606,7 @@ class Importer:
             })
 
         return column_stats
+
+    def update_thumbnails(self):
+        """Update thumbnails for all images in the importer."""
+        update_thumbnails(self.session, self.images)

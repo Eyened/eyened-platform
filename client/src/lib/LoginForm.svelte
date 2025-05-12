@@ -1,114 +1,104 @@
 <script lang="ts">
-	import { apiUrl } from '$lib/config'
-	import type { TokenData } from './usermanager'
+    import { globalContext } from "./main";
 
-	interface LoginFormProps {
-		onLogin: (tokenData: TokenData) => void;
-	}
-	const { onLogin }: LoginFormProps = $props();
-
-	let username = $state('');
-	let password = $state('');
-
-	async function handleLogin(e: Event) {
-		e.preventDefault();
-		if (!username || !password) {
-			return alert('Please enter both username and password');
-		}
-		const resp = await fetch(`${apiUrl}/auth/login-password`, {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({ username, password })
-		});
-
-		if (resp.ok) {
-			const response = await resp.json();
-			console.log('Login successful', response);
-			onLogin(response);
-		} else {
-			if (resp.status == 401) {
-				alert('Bad username and/or password');
-			} else {
-				alert('Unknown error');
-			}
-		}
-	}
+    let username = $state("");
+    let password = $state("");
+    let error = $state<string | null>(null);
+    let rememberMe = $state(true);
+    async function handleLogin(e: Event) {
+        e.preventDefault();
+        if (!username || !password) {
+            error = "Please enter both username and password";
+            return;
+        }
+        try {
+            await globalContext.userManager.login(username, password, rememberMe);
+            error = null;
+        } catch (err) {
+            error =
+                err instanceof Error ? err.message : "Unknown error occurred";
+        }
+    }
 </script>
 
-<div class="container">
-	<form onsubmit={handleLogin}>
-		<div>
-			<label for="username">Username:</label>
-			<input type="text" id="username" placeholder="Enter your username" bind:value={username} />
-		</div>
-		<div>
-			<label for="password">Password:</label>
-			<input
-				type="password"
-				id="password"
-				placeholder="Enter your password"
-				bind:value={password}
-			/>
-		</div>
-		<div>
-			<button type="submit">Login</button>
-		</div>
-	</form>
+<div id="main">
+    <div class="container">
+        <form onsubmit={handleLogin}>
+            <label for="username">Username:</label>
+            <input
+                type="text"
+                id="username"
+                placeholder="Enter your username"
+                bind:value={username}
+            />
+            <label for="password">Password:</label>
+            <input
+                type="password"
+                id="password"
+                placeholder="Enter your password"
+                bind:value={password}
+            />
+            <label for="rememberMe">Remember me:</label>
+            <input
+                type="checkbox"
+                id="rememberMe"
+                bind:checked={rememberMe}
+            />
+            {#if error}
+                <div class="error" style="grid-column: 1 / 3;">{error}</div>
+            {/if}
+            <div style="grid-column: 1 / 3;">
+                <button type="submit">Login</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <style>
-	.container {
-		margin: 0;
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		-ms-transform: translate(-50%, -50%);
-		transform: translate(-50%, -50%);
-
-		padding: 3em;
-		background-color: #e8e8e8;
-		border-radius: 10px;
-	}
-	form {
-		display: flex;
-		flex-direction: column;
-	}
-	form > div {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 10px;
-	}
-
-	div {
-		margin-bottom: 1em;
-	}
-
-	label {
-		flex: 1;
-		margin-right: 0.5em;
-	}
-
-	input {
-		flex: 2;
-		padding: 8px;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-	}
-
-	button {
-		padding: 10px;
-		border: none;
-		border-radius: 4px;
-		background-color: #007bff;
-		color: white;
-		cursor: pointer;
-	}
-
-	button:hover {
-		background-color: #0056b3;
-	}
+    div {
+        display: flex;
+    }
+    #main {
+        flex-direction: column;
+        align-items: center;
+        margin-top: 100px;
+    }
+    div.container {
+        flex: 0;
+        align-items: center;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 3em;
+        box-shadow: 0 0 2em 0 rgba(0, 0, 0, 0.05);
+    }
+    .error {
+        color: red;
+        margin: 10px 0;
+    }
+    form {
+        flex: 0;
+        display: grid;
+        grid-template-columns: 0fr 1fr;
+        gap: 0.5em;
+    }
+    label {
+        display: flex;
+        align-items: center;
+    }
+    input {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    button {
+        padding: 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    button:hover {
+        background-color: #0056b3;
+    }
 </style>

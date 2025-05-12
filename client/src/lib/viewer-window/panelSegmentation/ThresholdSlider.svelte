@@ -1,20 +1,17 @@
 <script lang="ts">
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 	import type { ProbabilitySegmentation } from '$lib/webgl/probabilitySegmentation.svelte';
-	import { getContext } from 'svelte';
+	import { globalContext } from '$lib/main';
 
 	interface Props {
 		segmentation: ProbabilitySegmentation;
 	}
 	let { segmentation }: Props = $props();
 
-	const globalContext = getContext<GlobalContext>('globalContext');
-
 	const annotation = segmentation.annotation;
-	const canEdit = globalContext?.canEdit(annotation);
+	const canEditForm = globalContext.canEdit(annotation);
 
 	function onUpdateThreshold() {
-		if (canEdit) {
+		if (canEditForm) {
 			const th = segmentation.threshold;
 
 			// updates the threshold value in the annotation data on server

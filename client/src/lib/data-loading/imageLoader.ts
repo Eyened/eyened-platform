@@ -28,13 +28,16 @@ export class ImageLoader {
 
     async load(instance: Instance): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
-
-        if (instance.datasetIdentifier.endsWith('.png') || instance.datasetIdentifier.endsWith('.jpg') || instance.datasetIdentifier.endsWith('.jpeg')) {
+        console.log('loading', instance);
+        // Convert to lowercase for case-insensitive comparison
+        const extension = instance.datasetIdentifier.toLowerCase().split('.').pop();
+        const supportedFormats = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+        
+        if (extension && supportedFormats.includes(extension)) {
             return [await this.loadImage2D(instance, img_id)];
 
         } else if (instance.datasetIdentifier.endsWith('.binary')) {
             const url = `${fsHost}/${instance.datasetIdentifier}`;
-            // const url = `${fsHost}/instance/${instance.sourceID}/${instance.datasetIdentifier}`;
             const meta = await this.loadMeta(url);
             const image = await this.loadBinary3D(instance, url, meta, img_id);
             return this.returnImage3D(image);
@@ -46,7 +49,6 @@ export class ImageLoader {
             const [pre, base_url] = instance.datasetIdentifier.split(']');
             const [folder, source_id] = splitTail(base_url, '/');
             const meta_url = `${fsHost}/${folder}/metadata.json`;
-            // const meta_url = `${fsHost}/instance/${instance.sourceID}/${folder}/metadata.json`;
             const response = await fetch(meta_url);
             const meta = await response.json();
             return this.loadPngSeries(instance, meta, img_id, pre, base_url, source_id);
@@ -74,7 +76,7 @@ export class ImageLoader {
                 height_mm: image.dimensions_mm.height,
                 depth_mm: image.dimensions_mm.depth
             };
-
+            console.log('dimensions', dimensions);
             const img3d = new Image3D(instance, this.webgl, img_id, getArrayFromImages(js_images), dimensions!, meta)
             return this.returnImage3D(img3d);
         }
@@ -101,7 +103,7 @@ export class ImageLoader {
             width_mm: instance.resolutionHorizontal ? instance.resolutionHorizontal * canvas.width : -1,
             height_mm: instance.resolutionVertical ? instance.resolutionVertical * canvas.height : -1,
             depth_mm: -1
-        };
+        };        
         const meta = undefined;
         return Image2D.fromCanvas(instance, this.webgl, img_id, canvas, dimensions, meta);
     }
@@ -116,7 +118,7 @@ export class ImageLoader {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
         const pixelData = new Uint8Array(buffer);
-
+        
         const dimensions = {
             width: meta.oct_shape[2],
             height: meta.oct_shape[1],
@@ -126,6 +128,10 @@ export class ImageLoader {
             height_mm: meta.resolution[1] * meta.oct_shape[1] / 1000,
             depth_mm: meta.resolution[0] * meta.oct_shape[0] / 1000
         };
+        if (instance.scan.mode == 'Circle-Scan') {
+            // this is not correct in the meta file
+            dimensions.width_mm = instance.resolutionHorizontal * dimensions.width;
+        }
         return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, meta);
     }
 

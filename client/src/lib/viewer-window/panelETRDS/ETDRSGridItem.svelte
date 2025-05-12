@@ -1,7 +1,6 @@
 <script lang="ts">
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 	import type { ETDRSCoordinates, Position2D } from '$lib/types';
-	import { getContext } from 'svelte';
+	import { globalContext } from '$lib/main';
 	import ShowHideToggle from '../icons/ShowHideToggle.svelte';
 	import { Edit, PanelIcon, Trash } from '../icons/icons';
 	import type { ETDRSGridOverlay } from '$lib/viewer/overlays/ETDRSGridOverlay.svelte';
@@ -10,7 +9,7 @@
 	import type { ServerProperty } from '$lib/datamodel/serverProperty.svelte';
 	import { data } from '$lib/datamodel/model';
 
-	const globalContext = getContext<GlobalContext>('globalContext');
+	
 
 	interface Props {
 		overlay: ETDRSGridOverlay;
@@ -24,7 +23,7 @@
 	let show = $derived(overlay.visible.has(formAnnotation));
 	let active = $derived(tool.annotation?.id == formAnnotation.id);
 
-	const canEdit = globalContext.canEdit(formAnnotation);
+	const canEditForm = globalContext.canEdit(formAnnotation);
 
 	function toggleVisisble() {
 		if (overlay.visible.has(formAnnotation)) {
@@ -66,12 +65,12 @@
 		<PanelIcon active={show} onclick={toggleVisisble} tooltip="show/hide">
 			<ShowHideToggle {show} />
 		</PanelIcon>
-		{#if canEdit}
+		{#if canEditForm}
 			<PanelIcon {active} onclick={edit} tooltip="edit">
 				<Edit />
 			</PanelIcon>
 		{/if}
-		{#if canEdit}
+		{#if canEditForm}
 			<div class="spacer"></div>
 			<PanelIcon onclick={remove} tooltip="delete">
 				<Trash />

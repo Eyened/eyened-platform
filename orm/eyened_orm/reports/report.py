@@ -101,14 +101,20 @@ class Report:
             for feature_name, img in self.feature_images.items()
         }
 
+    def export_html(self, filename, image, name):
+        html = self.generate_html_report(image, name)
+        with open(filename, 'w') as f:
+            f.write(html)
+
+    def export_json(self, filename):
+        with open(filename, 'w') as f:
+            json.dump(self.summaries, f, cls=NumpyEncoder)
+
     def export(self, folder, image, name, export_html=True, export_json=True):
         if export_html:
-            html = self.generate_html_report(image, name)
-            with open(f'{folder}/report.html', 'w') as f:
-                f.write(html)
+            self.export_html(f'{folder}/report.html', image, name)
         if export_json:
-            with open(f'{folder}/report.json', 'w') as f:
-                json.dump(self.summaries, f, cls=NumpyEncoder)
+            self.export_json(f'{folder}/report.json')
 
     def generate_html_table(self):
         measurements = 'area', 'count'

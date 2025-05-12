@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from eyened_orm import FormAnnotation
 
-from .auth import manager
 from ..db import get_db
+from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ router = APIRouter()
 async def create_form_annotation(
     form_data: dict,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user)
 ):
     annotation = FormAnnotation()
     keys = [
@@ -35,11 +35,11 @@ async def create_form_annotation(
 
 
 
-@router.delete("/formAnnotations/{form_annotation_id}")
+@router.delete("/formAnnotations/{form_annotation_id}", status_code=204)
 async def delete_form_annotation(
     form_annotation_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user)
 ):
     annotation = db.get(FormAnnotation, form_annotation_id)
     if annotation is None:
@@ -50,12 +50,12 @@ async def delete_form_annotation(
     return Response(status_code=204)
 
 
-@router.put("/formAnnotations/{form_annotation_id}/value")
+@router.put("/formAnnotations/{form_annotation_id}/value", status_code=204)
 async def update_form_annotation_value(
     form_annotation_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user)
 ):
     annotation = db.get(FormAnnotation, form_annotation_id)
     if annotation is None:
@@ -71,10 +71,26 @@ async def update_form_annotation_value(
 async def get_form_annotation_value(
     form_annotation_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user)
 ):
     annotation = db.get(FormAnnotation, form_annotation_id)
     if annotation is None:
         raise HTTPException(status_code=404, detail="FormAnnotation not found")
 
     return annotation.FormData
+
+
+@router.get("/form-annotations")
+async def get_form_annotations(
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    # Your existing code here, but use current_user.id instead of user_id
+    pass
+
+@router.put("/form-annotations/{annotation_id}")
+async def update_form_annotation(
+    annotation_id: int,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    # Your existing code here, but use current_user.id instead of user_id
+    pass

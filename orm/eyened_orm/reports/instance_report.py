@@ -4,8 +4,8 @@ import numpy as np
 import pydicom
 from PIL import Image
 
-from .ImageInstance import ImageInstance
-from .report import Report
+from eyened_orm.ImageInstance import ImageInstance
+from eyened_orm.reports import Report
 
 
 # Read relevant database fields from ImageInstance to create the report

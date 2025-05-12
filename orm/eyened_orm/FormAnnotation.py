@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pandas import DataFrame, json_normalize
@@ -46,11 +47,9 @@ class FormAnnotation(Base):
     FormSchemaID: Mapped[int] = mapped_column(
         ForeignKey("FormSchema.FormSchemaID"), index=True
     )
-    FormSchema: Mapped["FormSchema"] = relationship(
-        back_populates="FormAnnotations")
+    FormSchema: Mapped["FormSchema"] = relationship(back_populates="FormAnnotations")
 
-    PatientID: Mapped[int] = mapped_column(
-        ForeignKey("Patient.PatientID"), index=True)
+    PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"), index=True)
     Patient: Mapped[Optional["Patient"]] = relationship(
         back_populates="FormAnnotations"
     )
@@ -58,8 +57,7 @@ class FormAnnotation(Base):
     StudyID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("Study.StudyID"), nullable=True, index=True
     )
-    Study: Mapped[Optional["Study"]] = relationship(
-        back_populates="FormAnnotations")
+    Study: Mapped[Optional["Study"]] = relationship(back_populates="FormAnnotations")
 
     ImageInstanceID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"),
@@ -70,8 +68,7 @@ class FormAnnotation(Base):
         back_populates="FormAnnotations"
     )
 
-    CreatorID: Mapped[int] = mapped_column(
-        ForeignKey("Creator.CreatorID"), index=True)
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"), index=True)
     Creator: Mapped["Creator"] = relationship(back_populates="FormAnnotations")
 
     SubTaskID: Mapped[Optional[int]] = mapped_column(
@@ -102,9 +99,9 @@ class FormAnnotation(Base):
     def by_schema_and_creator(
         session: Session, schema_name: str, creator_name: str = None
     ) -> List["FormAnnotation"]:
-        '''
+        """
         Get all FormAnnotations for a given schema and optionally filter by creator.
-        '''
+        """
         schema = FormSchema.by_name(session, schema_name)
 
         if schema is None:
@@ -126,22 +123,28 @@ class FormAnnotation(Base):
         cls, schema_name: str, creator_name: str = None
     ) -> DataFrame:
         form_annotations = cls.by_schema_and_creator(schema_name, creator_name)
-        data = [form_annotation.get_flat_data()
-                for form_annotation in form_annotations]
+        data = [form_annotation.flat_data for form_annotation in form_annotations]
         return json_normalize(data)
 
     @property
-    def trash_path(self) -> str:
+    def trash_path(self) -> Path:
         """Return the path to the trash file for this FormAnnotation."""
-        return f"{self.config.trash_path}/FormAnnotations/{self.FormAnnotationID}.json"
+        return (
+            self.config.trash_path / "FormAnnotations" / f"{self.FormAnnotationID}.json"
+        )
 
-    def get_flat_data(self):
+    @property
+    def flat_data(self):
         metadata = {
             "Creator": self.Creator.CreatorName,
             "Created": self.DateInserted,
             "PatientIdentifier": self.Patient.PatientIdentifier,
             "ImageInstance": self.ImageInstanceID,
-            "Laterality": str(self.ImageInstance.Laterality.name),
+            "Laterality": (
+                str(self.ImageInstance.Laterality.name)
+                if self.ImageInstance and self.ImageInstance.Laterality
+                else None
+            ),
         }
         return metadata | flatten_json(self.FormData)
 
@@ -150,23 +153,25 @@ class FormAnnotation(Base):
 def move_to_trash(mapper, connection, target: FormAnnotation):
     """Move a serialized version of the FormAnnotation to the trash."""
     try:
-        import os
-        os.makedirs(os.path.dirname(target.trash_path), exist_ok=True)
-        with open(target.trash_path, "w") as trash_file:
+        trash_path = target.trash_path
+        trash_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(trash_path, "w") as trash_file:
             json.dump(target.to_dict(), trash_file, indent=4, default=str)
-        print(
-            f"FormAnnotation {target.FormAnnotationID} moved to trash: {target.trash_path}")
+        print(f"FormAnnotation {target.FormAnnotationID} moved to trash: {trash_path}")
     except Exception as e:
-        print(
-            f"Failed to move FormAnnotation {target.FormAnnotationID} to trash: {e}")
+        print(f"Failed to move FormAnnotation {target.FormAnnotationID} to trash: {e}")
 
 
-def flatten_json(data: dict | list | str | int | float | bool, parent_key: str = "") -> dict:
+def flatten_json(
+    data: dict | list | str | int | float | bool, parent_key: str = ""
+) -> dict:
     if isinstance(data, dict):
         return {
             k: v
             for key, value in data.items()
-            for k, v in flatten_json(value, f"{parent_key}.{key}" if parent_key else key).items()
+            for k, v in flatten_json(
+                value, f"{parent_key}.{key}" if parent_key else key
+            ).items()
         }
     elif isinstance(data, list):
         return {

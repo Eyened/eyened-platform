@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
 	import type { DialogueType } from '$lib/types';
 	import type { Writable } from 'svelte/store';
@@ -10,8 +9,9 @@
 	import { createAnnotation } from '$lib/datamodel/annotation';
 	import { featureSetColorFundus, featureSetOCT } from '$lib/viewer-config';
 	import { SegmentationContext } from './segmentationContext.svelte';
+	import { globalContext } from '$lib/main';
 
-	const { creator } = getContext<GlobalContext>('globalContext');
+	const { creator } = globalContext;
 	const { image } = getContext<ViewerContext>('viewerContext');
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 	const { annotationTypes, features } = data;

@@ -3,7 +3,6 @@ title: Getting Started
 description: Deploy the Eyened platform in a network
 ---
 
-
 The Eyened platform is a modern web platform for visualization and annotation of ophthalmic images with features like:
 
 - Loading of various image formats including DICOM.
@@ -28,55 +27,112 @@ With this setup you will be able to:
 
 - Run the client / viewer, initially on an empty database.
 - Run our import script to import local images and associated metadata into the system. Access to the images through the Eyened platform will be protected by authentication.
-- A sqlite database will be created for the app's data in the local filesystem.
+- A MySQL database will be created for the app's data in the local filesystem.
 - Annotations and image thumbnails will be stored in local folders by the Eyened server.
+- Redis is used for task queue management and caching.
+- Adminer is included for database management (accessible on port 8080).
 
 :::caution
-Make sure to set up regular back ups for both the sqlite database and storage folders.
+Make sure to set up regular back ups for both the MySQL database and storage folders.
 :::
 
 ### Setup
 
+You can set up the Eyened platform in two ways:
+
+#### Option 1: Automated Setup (Recommended)
+
+We provide a setup script that automates the installation process:
+
 1. Clone our repository:
 
-    ```
+    ```bash
     git clone https://github.com/Eyened/eyened-platform.git eyened_platform
     ```
 
-2. A docker-compose project can be found in `eyened_platform/docker`:
-    
+2. Run the setup script:
 
-    Create a copy of `sample.env` and configure the variables used by docker-compose to set up the containers by editing `.env` with your favorite text editor:
-
-    ```
+    ```bash
     cd eyened_platform/docker
-    cp sample.env .env
+    chmod +x setup.sh
+    ./setup.sh
     ```
 
-    The following environment variables are available:
+The script will:
+- Check for required dependencies (Docker and Docker Compose)
+- Prompt you for configuration settings or use defaults
+- Create and configure the `.env` file
+- Create necessary directories for images, storage, and database
+- Build and start the containers
+- Save your credentials to a secure file
+- Display the URLs for accessing the platform
 
-    | Variable | Description |
-    | --- | --- |
-    | HOSTNAME | Hostname the app will be served on |
-    | PORT | Port the app will be served on |
-    | SECRET_KEY | Secret key used to encode/decode access tokens and for password hashing. Change to something random when setting up the system |
-    | PUBLIC_AUTH_TOKEN_DURATION | Duration of user access tokens in seconds (default: 3 days) |
-    | ADMIN_USERNAME | Username for the default admin user |
-    | ADMIN_PASSWORD | Password for the default admin user |
-    | IMAGES_BASEPATH | Local folder to serve images from (may be read-only) |
-    | STORAGE_BASEPATH | Local path to store annotations, thumbnails and other generated files |
-    | DATABASE_PATH | Path to the database files |
-    | DATABASE_PORT | Port to access the database from outside (optional) |
-    | DATABASE_ROOT_PASSWORD | Root password for external database access (optional) |
+:::note
+The setup script will create a `.platform_credentials` file containing your login information. Please keep this file secure and delete it after you've noted the credentials.
+:::
 
+#### Option 2: Manual Setup
 
-3. Build and run the containers:
+If you prefer to set up manually:
 
+1. Clone our repository:
+
+    ```bash
+    git clone https://github.com/Eyened/eyened-platform.git eyened_platform
     ```
-    docker-compose build
-    USERID=$(id -u) GROUPID=$(id -g) docker-compose -f docker-compose.yaml up -d
+
+2. Navigate to the docker directory:
+
+    ```bash
+    cd eyened_platform/docker
     ```
 
-4. Now the viewer should be available at `http://<HOSTNAME>:<PORT>` from within the network. Make sure to verify this.
+3. Create a `.env` file with the following variables:
 
-5. To import data, follow the [Importer guide](/eyened-platform/importer).
+    | Variable | Description | Default |
+    | --- | --- | --- |
+    | PORT | Port the app will be served on | 80 |
+    | ADMIN_USERNAME | Username for the default admin user | admin |
+    | ADMIN_PASSWORD | Password for the default admin user | (randomly generated) |
+    | IMAGES_BASEPATH | Local folder to serve images from (may be read-only) | $HOME/eyened-platform/images |
+    | STORAGE_BASEPATH | Local path to store annotations, thumbnails and other generated files | $HOME/eyened-platform/storage |
+    | DATABASE_PATH | Path to the database files | $HOME/eyened-platform/database |
+    | DATABASE_PORT | Port to access the database from outside | 3306 |
+    | DATABASE_ROOT_PASSWORD | Root password for external database access | (randomly generated) |
+
+4. Create the necessary directories:
+
+    ```bash
+    mkdir -p $HOME/eyened-platform/{images,storage,database}
+    ```
+
+5. Start the platform:
+
+    ```bash
+    USERID=$(id -u) GROUPID=$(id -g) docker-compose up -d
+    ```
+
+### Accessing the Platform
+
+Once the platform is running:
+
+1. The viewer will be available at `http://<HOSTNAME>:<PORT>` from within your network
+2. Adminer (database management) will be available at `http://<HOSTNAME>:8080`
+
+To manage the platform:
+
+- To view logs: `docker-compose logs -f`
+- To stop the platform: `docker-compose down`
+- To start the platform: `USERID=$(id -u) GROUPID=$(id -g) docker-compose up -d`
+
+:::note
+To access Adminer, use the following credentials:
+- System: MySQL
+- Server: database
+- Username: root
+- Password: (your DATABASE_ROOT_PASSWORD)
+:::
+
+### Next Steps
+
+To import data into the platform, follow the [Importer guide](/eyened-platform/importer).

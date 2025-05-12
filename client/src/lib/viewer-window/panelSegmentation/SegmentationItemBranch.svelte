@@ -11,7 +11,7 @@
 	import type { Annotation } from '$lib/datamodel/annotation';
 	import { SegmentationOverlay } from '$lib/viewer/overlays/SegmentationOverlay.svelte';
 	import { SegmentationContext } from './segmentationContext.svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { globalContext } from '$lib/main';
 
 	interface Props {
 		branch: Branch;
@@ -21,15 +21,13 @@
 
 	let { branch, annotationData, maskAnnotation }: Props = $props();
 	const { annotation } = annotationData;
-	const globalContext = getContext<GlobalContext>('globalContext');
+	const isEditable = globalContext.canEdit(annotation);
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 	const segmentationOverlay = getContext<SegmentationOverlay>('segmentationOverlay');
 	const segmentationController = viewerContext.image.segmentationController;
 
 	// TODO: find a cleaner solution?
-	const isEditable = globalContext?.canEdit(annotation);
-
 	const segmentationItem = segmentationController.getMaskedSegmentation(
 		annotation,
 		maskAnnotation,

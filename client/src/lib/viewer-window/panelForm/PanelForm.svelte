@@ -1,16 +1,15 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import type { GlobalContext } from '../../data-loading/globalContext.svelte';
 	import type { TaskContext } from '$lib/types';
 	import { data } from '$lib/datamodel/model';
 	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
 	import type { FormSchema } from '$lib/datamodel/formSchema';
 	import FormItem from './FormItem.svelte';
+	import { globalContext } from '$lib/main';
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
-	const globalContext = getContext<GlobalContext>('globalContext');
-	const { creator } = globalContext;
+	const { creator, annotationsFilter, formShortcut } = globalContext;
 	const { formSchemas, formAnnotations } = data;
 
 	const {
@@ -52,7 +51,7 @@
 
 	const forms = formAnnotations
 		.filter((annotation) => filters.every((filter) => filter(annotation)))
-        .filter(globalContext.annotationsFilter) 
+        .filter(annotationsFilter) 
 		.sort((a, b) => a.id - b.id);
 
 	async function addForm() {
@@ -71,7 +70,7 @@
 	}
 
 	let formShortcutSchema = $derived(
-		formSchemas.find((schema) => schema.name === globalContext.formShortcut)
+		formSchemas.find((schema) => schema.name === formShortcut)
 	);
 	async function addShortcut() {
 		const item: any = {
@@ -105,7 +104,7 @@
 
 		{#if formShortcutSchema}
 			<div>
-				<button onclick={addShortcut}> Create {globalContext.formShortcut} </button>
+				<button onclick={addShortcut}> Create {formShortcut} </button>
 			</div>
 		{/if}
 	</div>

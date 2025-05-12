@@ -1,8 +1,9 @@
 import type { Annotation } from "$lib/datamodel/annotation";
+import type { AnnotationData } from "$lib/datamodel/annotationData";
 import type { Branch } from "$lib/types";
 import type { AbstractImage } from "./abstractImage";
-import { BinarySegmentation, MaskedSegmentation } from "./binarySegmentation.svelte";
-import { LabelNumbersSegmentation, LayerBitsSegmentation } from "./layerSegmentation";
+import { BinarySegmentation, MaskedSegmentation } from "./binarySegmentation";
+import { MulticlassSegmentation, MultilabelSegmentation } from "./layerSegmentation";
 import { ProbabilitySegmentation } from "./probabilitySegmentation.svelte";
 import { SharedDataRG } from "./segmentationData";
 import { SegmentationItem } from "./segmentationItem";
@@ -16,7 +17,8 @@ export interface Segmentation {
     export(scanNr: number, ctx: CanvasRenderingContext2D): void;
     import(scanNr: number, canvas: HTMLCanvasElement): void;
     importOther(scanNr: number, other: Segmentation): void;
-    dispose(): void;
+    dispose(): void;    
+    initialize(annotationData:AnnotationData, dataRaw:any): void;
 }
 
 
@@ -60,10 +62,10 @@ export class SegmentationController {
             segmentation = this.createBinarySegmentation(id, annotation);
         } else if (type == 'Probability') {
             segmentation = new ProbabilitySegmentation(id, this.image, annotation);
-        } else if (type == 'Label numbers') {
-            segmentation = new LabelNumbersSegmentation(id, this.image, annotation);
-        } else if (type == 'Layer bits') {
-            segmentation = new LayerBitsSegmentation(id, this.image, annotation);
+        } else if (type == 'Multiclass') {
+            segmentation = new MulticlassSegmentation(id, this.image, annotation);
+        } else if (type == 'Multilabel') {
+            segmentation = new MultilabelSegmentation(id, this.image, annotation);
         } else if (type == 'Masked') {
             // should be created instead via getMaskedSegmentation
             throw new Error('Should not be called for masked segmentations');
@@ -215,9 +217,9 @@ function getAnnotationType(annotation: Annotation) {
     } else if (interpretation == 'Probability') {
         return 'Probability';
     } else if (interpretation == 'Label numbers') {
-        return 'Label numbers';
+        return 'Multiclass';
     } else if (interpretation == 'Layer bits') {
-        return 'Layer bits';
+        return 'Multilabel';
     }
     throw new Error('Unknown annotation type');
 }
