@@ -4,6 +4,7 @@ import enum
 import gzip
 import json
 import os
+from pathlib import Path
 import shutil
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, List, Optional
@@ -134,17 +135,17 @@ class Annotation(Base):
         a.DateInserted = datetime.now()
         return a
 
-def load_png(filepath) -> np.ndarray:
-    return np.array(Image.open(filepath))
+def load_png(filepath: Path) -> np.ndarray:
+    return np.array(Image.open(str(filepath)))
 
 
-def load_binary(filepath, shape) -> np.ndarray:
-    _, ext = os.path.splitext(filepath)
-    if ext.lower() in ['.gz']:
-        with gzip.open(filepath, 'rb') as f:
+def load_binary(filepath: Path, shape) -> np.ndarray:
+    ext = filepath.suffix.lower()
+    if ext == '.gz':
+        with gzip.open(str(filepath), 'rb') as f:
             raw = np.frombuffer(f.read(), dtype=np.uint8)
     else:
-        with open(filepath, 'rb') as f:
+        with open(str(filepath), 'rb') as f:
             raw = np.frombuffer(f.read(), dtype=np.uint8)
     return raw.reshape(shape, order='C')
 
@@ -202,24 +203,20 @@ class AnnotationData(Base):
         return f"{a.Patient.PatientIdentifier}/{a.AnnotationID}_{self.ScanNr}.{ext}"
 
     @property
-    def path(self) -> str:
+    def path(self) -> Path:
         if not self.config:
             raise ValueError("Configuration not initialized")
-        return f"{self.config.annotations_path}/{self.DatasetIdentifier}"
+        return self.config.annotations_path / self.DatasetIdentifier
 
     @property
-    def trash_path(self) -> str:
+    def trash_path(self) -> Path:
         if not self.config:
             raise ValueError("Configuration not initialized")
-        return f"{self.config.trash_path}/{self.DatasetIdentifier}"
+        return self.config.trash_path / self.DatasetIdentifier
 
     def __repr__(self):
         return f"AnnotationData({self.AnnotationID}, {self.ScanNr}, {self.DatasetIdentifier}, {self.MediaType})"
 
-    @classmethod
-    def get_columns(cls):
-        return cls.__table__.columns
-    
     def load_data(self) -> Any:
         """Load the annotation data from the file."""       
         if self.MediaType == 'image/png':
@@ -228,11 +225,9 @@ class AnnotationData(Base):
             instance = self.Annotation.ImageInstance
             return load_binary(self.path, (instance.Rows_y, instance.Columns_x))
         else:
-            raise ValueError(f'Unsupported media type {self.media_type}')
+            raise ValueError(f'Unsupported media type {self.MediaType}')
 
-
-    @property
-    def mask(self, mask_type: str = "segmentation") -> np.ndarray:
+    def get_mask(self, mask_type: str = "segmentation") -> np.ndarray:
         """
         Returns a mask based on the specified type ('segmentation' or 'questionable').
 
@@ -248,66 +243,48 @@ class AnnotationData(Base):
         data = self.load_data()
         if self.Annotation.AnnotationType.Interpretation == 'R/G mask':
             assert len(data.shape) == 3, "Expected color image"
-            data2D = data[:, :, 0]
+            if mask_type == "segmentation":
+                return data[:, :, 0] > 0 # red channel
+            elif mask_type == "questionable":
+                return data[:, :, 1] > 0 # green channel
+            else:
+                raise ValueError(f"Unsupported mask type: {mask_type}")            
+            
         elif self.Annotation.AnnotationType.Interpretation == 'Binary mask':
             assert len(data.shape) == 2, "Expected grayscale image"
-            data2D = data
+            return data > 0
         else:
             raise ValueError(f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}")
 
-        if mask_type == "segmentation":
-            return data2D > 0
-        elif mask_type == "questionable":
-            return data2D > 0  # Placeholder for different logic if needed
-        else:
-            raise ValueError(f"Unsupported mask type: {mask_type}")
+    @property
+    def segmentation_mask(self) -> np.ndarray:
+        return self.get_mask("segmentation")
 
     @property
-    def segmentation_mask(self):
-        data = self.load_data()
-        if self.Annotation.AnnotationType.Interpretation == 'R/G mask':
-            assert len(data.shape) == 3, "Expected color image"
-            data2D = data[:, :, 0] 
-        elif self.Annotation.AnnotationType.Interpretation == 'Binary mask':
-            assert len(data.shape) == 2, "Expected grayscale image"
-            data2D = data
-        else:
-            raise ValueError(f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}") 
-        return data2D > 0
-
-    @property
-    def questionable_mask(self, data):
-        data = self.load_data()
-        if self.Annotation.AnnotationType.Interpretation == 'R/G mask':
-            assert len(data.shape) == 3, "Expected color image"
-            data2D = data[:, :, 0] 
-        elif self.Annotation.AnnotationType.Interpretation == 'Binary mask':
-            assert len(data.shape) == 2, "Expected grayscale image"
-            data2D = data
-        else:
-            raise ValueError(f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}") 
-        return data2D > 0
-    
+    def questionable_mask(self) -> np.ndarray:
+        return self.get_mask("questionable")
 
 
 def move_file_to_trash(annotation_data: AnnotationData) -> None:
     """Moves a file to trash folder and stores metadata alongside it."""
     source_path = annotation_data.path
-    if not os.path.exists(source_path):
+    if not source_path.exists():
         print(f"File {source_path} does not exist, skipping trash move")
         return
 
     trash_path = annotation_data.trash_path
 
     try:
-        shutil.move(source_path, trash_path)
+        shutil.move(str(source_path), str(trash_path))
         print(f"File moved to trash: {trash_path}")
 
         with open(f"{trash_path}.metadata.json", 'w') as f:
             json.dump({
                 "annotation": annotation_data.Annotation.to_dict(),
                 "annotation_data": annotation_data.to_dict(),
-                "deleted_at": datetime.now().isoformat()
+                "deleted_at": datetime.now().isoformat(),
+                "source_path": str(source_path),
+                "trash_path": str(trash_path)
             }, f)
 
     except Exception as e:
@@ -322,8 +299,8 @@ def receive_before_flush(session, flush_context, instances):
         return
     session.deleted_annotation_data_info = [
         {
-            'path': obj.path,
-            'trash_path': obj.trash_path,
+            'path': str(obj.path),
+            'trash_path': str(obj.trash_path),
             'annotation': obj.Annotation.to_dict(),
             'annotation_data': obj.to_dict()
         } 
@@ -339,15 +316,15 @@ def receive_after_commit(session):
         return
     for info in session.deleted_annotation_data_info:
         try:
-            source_path = info['path']
-            trash_path = info['trash_path']
+            source_path = Path(info['path'])
+            trash_path = Path(info['trash_path'])
 
-            if os.path.exists(source_path):
+            if source_path.exists():
                 # Create trash directory if it doesn't exist
-                os.makedirs(os.path.dirname(trash_path), exist_ok=True)
+                trash_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # Move the file to trash
-                shutil.move(source_path, trash_path)
+                shutil.move(str(source_path), str(trash_path))
                 print(f"File moved to trash: {trash_path}")
 
                 # Store metadata
@@ -355,7 +332,9 @@ def receive_after_commit(session):
                     json.dump({
                         "annotation": info['annotation'],
                         "annotation_data": info['annotation_data'],
-                        "deleted_at": datetime.now().isoformat()
+                        "deleted_at": datetime.now().isoformat(),
+                        "source_path": str(source_path),
+                        "trash_path": str(trash_path)
                     }, f)
             else:
                 print(

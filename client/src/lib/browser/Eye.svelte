@@ -33,7 +33,9 @@
 <div class="outer">
     <h3>
         {eye}
-        <button class="link" onclick={open}> Open all {eye} images</button>
+        {#if $bySeries.size > 0}
+            <button class="link" onclick={open}> Open all {eye} images</button>
+        {/if}
     </h3>
     <div class="series-container">
         {#each [...$bySeries].sort((a, b) => a.id - b.id) as series (series.id)}

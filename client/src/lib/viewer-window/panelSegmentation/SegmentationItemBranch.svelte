@@ -21,7 +21,7 @@
 
 	let { branch, annotationData, maskAnnotation }: Props = $props();
 	const { annotation } = annotationData;
-	const isEditable = $globalContext.canEdit(annotation);
+	const isEditable = globalContext.canEdit(annotation);
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 	const segmentationOverlay = getContext<SegmentationOverlay>('segmentationOverlay');

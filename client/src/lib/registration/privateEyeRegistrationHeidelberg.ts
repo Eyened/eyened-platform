@@ -7,7 +7,7 @@ function getSourceID(instance: Instance) {
 }
 export function getPrivateEyeRegistrationHeidelberg(image: AbstractImage): PhotoLocator[] {
     const { instance, meta } = image;
-    if (!meta || !meta.images || !meta.images.images || !meta.images.images.length) return [];
+    if (!meta?.images?.images?.length) return [];
     const source_id = getSourceID(instance);
     if (!source_id.startsWith('OCT')) return [];
 

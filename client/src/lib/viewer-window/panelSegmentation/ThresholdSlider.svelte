@@ -8,7 +8,7 @@
 	let { segmentation }: Props = $props();
 
 	const annotation = segmentation.annotation;
-	const canEditForm = $globalContext.canEdit(annotation);
+	const canEditForm = globalContext.canEdit(annotation);
 
 	function onUpdateThreshold() {
 		if (canEditForm) {

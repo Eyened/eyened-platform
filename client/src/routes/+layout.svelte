@@ -4,12 +4,12 @@
     let { children } = $props();
 
     function close() {
-        $globalContext.popupComponent = null;
+        globalContext.popupComponent = null;
     }
 </script>
 
-{#if $globalContext.popupComponent}
-    <Popup componentDef={$globalContext.popupComponent} {close} />
+{#if globalContext.popupComponent}
+    <Popup componentDef={globalContext.popupComponent} {close} />
 {/if}
 
 {@render children()}
@@ -28,6 +28,6 @@
         --browser-background: #f4f4f8;
         --browser-color: #000010;
         --browser-border: #e3e3e3;
-        --icon-hover: rgba(239, 250, 255, 0.5);
+        --icon-hover: rgba(110, 164, 189, 0.43);
     }
 </style>

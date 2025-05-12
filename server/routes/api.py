@@ -1,14 +1,24 @@
 from typing import Dict, List
 
-from eyened_orm import (AnnotationType, Creator, DeviceInstance, DeviceModel,
-                        Feature, FormSchema, Project, Scan, Task,
-                        TaskDefinition, TaskState)
+from eyened_orm import (
+    AnnotationType,
+    Creator,
+    DeviceInstance,
+    DeviceModel,
+    Feature,
+    FormSchema,
+    Project,
+    Scan,
+    Task,
+    TaskDefinition,
+    TaskState,
+)
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .auth import manager
 from ..db import get_db
+from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
 
@@ -33,8 +43,7 @@ class DataResponse(BaseModel):
 
 @router.get("/data", response_model=DataResponse)
 async def get_data(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)
 ):
     tables = {
         "features": Feature,

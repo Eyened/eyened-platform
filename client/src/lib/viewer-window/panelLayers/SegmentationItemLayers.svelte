@@ -33,7 +33,7 @@
 	const { annotationType, feature } = annotation;
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 	const viewerContext = getContext<ViewerContext>('viewerContext');
-	const { creator } = $globalContext;
+	const { creator } = globalContext;
 	const { image, registration } = viewerContext;
 	const { segmentationController } = image;
 

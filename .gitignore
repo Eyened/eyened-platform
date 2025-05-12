@@ -1,6 +1,5 @@
 docker/.env
-.env
-dev.env
+*.env
 *.zip
 *.pyc
 notebooks/hrfav/**/*

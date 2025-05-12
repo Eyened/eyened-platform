@@ -27,13 +27,17 @@
 	import { SegmentationContext } from './segmentationContext.svelte';
 	import ThresholdSlider from './ThresholdSlider.svelte';
 	import { globalContext } from '$lib/main';
+    // import { onDestroy } from 'svelte';
+    // onDestroy(() => {
+    //     console.log('destroy');
+    // });
 
 	interface Props {
 		annotation: Annotation;
 	}
 	let { annotation }: Props = $props();
 	const { annotationDatas, feature, annotationType } = annotation;
-	const { creator } = $globalContext;
+	const { creator } = globalContext;
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 
@@ -45,7 +49,7 @@
 	// const segmentationItem = new SegmentationItem(image, annotation, segmentation);
 	const segmentation = segmentationItem.segmentation;
 
-	const isEditable = $globalContext.canEdit(annotation);
+	const isEditable = globalContext.canEdit(annotation);
 	const isVessels = feature.name == 'Vessels';
 
 	let active = $derived(segmentationContext.activeSegmentation == segmentation);

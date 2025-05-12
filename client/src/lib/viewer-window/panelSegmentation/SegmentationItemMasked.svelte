@@ -34,7 +34,7 @@
 		}
 	}
 	// TODO: find a cleaner solution?
-	const isEditable = $globalContext.canEdit(annotation);
+	const isEditable = globalContext.canEdit(annotation);
 
 	let branches = $derived(annotationData.value.value.branches);
 	const maskAnnotation = data.annotations.find((a) => a.id === maskID);

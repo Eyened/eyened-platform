@@ -70,7 +70,7 @@ export class SegmentationOverlay implements Overlay {
 
 
 	paintBinarySegmentations(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-
+		// console.log('paintBinarySegmentations')
 		const { image: { segmentationController }, index } = viewerContext;
 		const {
 			hideCreators,

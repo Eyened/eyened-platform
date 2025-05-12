@@ -12,13 +12,13 @@
 	import type { Creator } from '$lib/datamodel/creator';
 	import { globalContext } from '$lib/main';
 
-	const viewerContext = getContext<ViewerContext>('viewerContext');
+    const viewerContext = getContext<ViewerContext>('viewerContext');
 
 	const {
 		image: { segmentationAnnotations, segmentationController }
 	} = viewerContext;
 
-	const { creator } = $globalContext;
+	const { creator } = globalContext;
 	const segmentationContext = new SegmentationContext();
 	setContext('segmentationContext', segmentationContext);
 	const overlay = new SegmentationOverlay(
@@ -33,7 +33,7 @@
 	onDestroy(viewerContext.addOverlay(overlay));
 
 	// filtered contains only annotations to be shown (based on config settings)
-	const filtered = segmentationAnnotations.filter($globalContext.annotationsFilter);
+	const filtered = segmentationAnnotations.filter(globalContext.annotationsFilter);
 	const creatorSegmentations = filtered.groupBy((a) => a.creator);
 
 	// hide all on load

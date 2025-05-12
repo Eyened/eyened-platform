@@ -7,22 +7,28 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .auth import manager
-from ..config import settings
+from .auth import CurrentUser, get_current_user
 from ..db import get_db
 
 router = APIRouter()
 
+
 @router.post("/annotations/new", response_model=Dict)
 async def create_annotation(
-        properties: dict,
-        db: Session = Depends(get_db),
-        user_id: int = Depends(manager)
+    properties: dict,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     annotation = Annotation()
     keys = [
-        'PatientID', 'StudyID', 'SeriesID', 'ImageInstanceID', 'AnnotationReferenceID',
-        'CreatorID', 'FeatureID', 'AnnotationTypeID'
+        "PatientID",
+        "StudyID",
+        "SeriesID",
+        "ImageInstanceID",
+        "AnnotationReferenceID",
+        "CreatorID",
+        "FeatureID",
+        "AnnotationTypeID",
     ]
     for key, value in properties.items():
         if key in keys:
@@ -35,34 +41,35 @@ async def create_annotation(
 
 @router.post("/annotationDatas/new", response_model=Dict)
 async def create_annotationdata(
-        properties: dict,
-        db: Session = Depends(get_db),
-        user_id: int = Depends(manager)
+    properties: dict,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     try:
-        annotation = Annotation.by_id(db, properties['AnnotationID'])
-        scan_nr = properties['ScanNr']
+        annotation = Annotation.by_id(db, properties["AnnotationID"])
+        scan_nr = properties["ScanNr"]
 
         # TODO: implement better way of finding file type
-        media_type = properties['MediaType']
-        if media_type == 'image/png':
-            file_extension = 'png'
-        elif media_type == 'application/octet-stream':
-            file_extension = 'bin'
-        annotationData = AnnotationData.create(
-            annotation, file_extension, scan_nr)
+        media_type = properties["MediaType"]
+        if media_type == "image/png":
+            file_extension = "png"
+        elif media_type == "application/octet-stream":
+            file_extension = "bin"
+        annotationData = AnnotationData.create(annotation, file_extension, scan_nr)
         db.add(annotationData)
         db.commit()
         return annotationData.to_dict()
     except Exception as e:
         raise HTTPException(
-            status_code=400, detail=f"Error creating annotation data: {e}")
+            status_code=400, detail=f"Error creating annotation data: {e}"
+        )
 
 
-@router.delete("/annotations/{annotation_id}")
+@router.delete("/annotations/{annotation_id}", status_code=204)
 async def delete_annotation(
-    annotation_id: int, db: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    annotation_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     annot = db.query(Annotation).get(annotation_id)
     if annot is None:
@@ -74,25 +81,24 @@ async def delete_annotation(
     return Response(status_code=204)
 
 
-def get_annotation_data(annotation_data_id: str, db: Session):
+def get_annotation_data(annotation_data_id: str, db: Session) -> AnnotationData:
     annotation_id, scan_nr = map(int, annotation_data_id.split("_"))
     return (
         db.query(AnnotationData)
         .filter_by(AnnotationID=annotation_id, ScanNr=scan_nr)
-        .first()
+        .one()
     )
 
 
-@router.delete("/annotationDatas/{annotation_data_id}")
+@router.delete("/annotationDatas/{annotation_data_id}", status_code=204)
 async def delete_annotation_data(
-        annotation_data_id: str,
-        db: Session = Depends(get_db),
-        user_id: int = Depends(manager)
+    annotation_data_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     annotation_data = get_annotation_data(annotation_data_id, db)
     if annotation_data is None:
-        raise HTTPException(
-            status_code=404, detail="Annotation data not found")
+        raise HTTPException(status_code=404, detail="Annotation data not found")
 
     db.delete(annotation_data)
     db.commit()
@@ -103,29 +109,28 @@ async def delete_annotation_data(
 async def get_annotation_data_value(
     annotation_data_id: str,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
+    print(f"get_annotation_data_value: {annotation_data_id}")
     annotation_data = get_annotation_data(annotation_data_id, db)
+    print(f"annotation_data: {annotation_data}")
+
     if annotation_data is None:
-        raise HTTPException(
-            status_code=404, detail="Annotation data not found")
+        raise HTTPException(status_code=404, detail="Annotation data not found")
 
-    file_path = os.path.join(
-        settings.annotations_path, annotation_data.DatasetIdentifier
-    )
-
+    filename = annotation_data.path
+    print(f"filename: {filename}")
     headers = {}
     # Manually set headers for zipped files
-    if file_path.endswith('.gz'):
+    if filename.suffix == ".gz":
         headers = {
-            'Content-Type': 'application/octet-stream',
-            'Content-Encoding': 'gzip'
+            "Content-Type": "application/octet-stream",
+            "Content-Encoding": "gzip",
         }
-    if not os.path.exists(file_path):
-        raise HTTPException(
-            status_code=404, detail="Annotation data file not found")
+    if not filename.exists():
+        raise HTTPException(status_code=404, detail="Annotation data file not found")
 
-    return FileResponse(file_path, headers=headers)
+    return FileResponse(str(filename), headers=headers)
 
 
 @router.put("/annotationDatas/{annotation_data_id}/value")
@@ -133,18 +138,15 @@ async def update_annotation_data_value(
     annotation_data_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     annotation_data = get_annotation_data(annotation_data_id, db)
     if annotation_data is None:
-        raise HTTPException(
-            status_code=404, detail="Annotation data not found")
+        raise HTTPException(status_code=404, detail="Annotation data not found")
 
     # store to disk
-    filename = os.path.join(
-        settings.annotations_path, annotation_data.DatasetIdentifier
-    )
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    filename = annotation_data.path
+    os.makedirs(filename.parent, exist_ok=True)
 
     data = await request.body()
     with open(filename, "wb") as f:
@@ -157,21 +159,23 @@ class AnnotationDataParameters(BaseModel):
     valueint: Optional[int] = None
 
 
-@router.get("/annotationDatas/{annotation_data_id}/parameters", response_model=AnnotationDataParameters)
+@router.get(
+    "/annotationDatas/{annotation_data_id}/parameters",
+    response_model=AnnotationDataParameters,
+)
 async def get_annotation_data_parameters(
     annotation_data_id: str,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     annotation_data = get_annotation_data(annotation_data_id, db)
 
     if annotation_data is None:
-        raise HTTPException(
-            status_code=404, detail="Annotation data not found")
+        raise HTTPException(status_code=404, detail="Annotation data not found")
 
     return {
-        'valuefloat': annotation_data.ValueFloat,
-        'valueint': annotation_data.ValueInt
+        "valuefloat": annotation_data.ValueFloat,
+        "valueint": annotation_data.ValueInt,
     }
 
 
@@ -180,18 +184,14 @@ async def update_annotation_data_parameters(
     annotation_data_id: str,
     request: AnnotationDataParameters,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     annotation_data = get_annotation_data(annotation_data_id, db)
 
     if annotation_data is None:
-        raise HTTPException(
-            status_code=404, detail="Annotation data not found")
+        raise HTTPException(status_code=404, detail="Annotation data not found")
 
-    property_mapping = {
-        'valuefloat': 'ValueFloat',
-        'valueint': 'ValueInt'
-    }
+    property_mapping = {"valuefloat": "ValueFloat", "valueint": "ValueInt"}
 
     for key, value in request.model_dump().items():
         property = property_mapping[key]

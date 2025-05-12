@@ -5,17 +5,23 @@
     interface Props {
         data: DataSource;
         name: string;
+        collapse?: boolean;
     }
-    let { data, name }: Props = $props();
-    
-    function open(tag: string, rows: DataRow[]) {        
-        openNewWindow(DataTable, {data:rows}, tag);
+    let { data, name, collapse = $bindable(false) }: Props = $props();
+
+    function open(tag: string, rows: DataRow[]) {
+        openNewWindow(DataTable, { data: rows }, tag);
     }
 </script>
 
 <div>
-    <h4>{name}</h4>
-    <ul>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <h4 onclick={() => (collapse = !collapse)}>
+        {#if collapse}►{:else}▼{/if}
+        {name}
+    </h4>
+    <ul class:collapse>
         {#each Object.entries(data) as [tag, rows]}
             <li>
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -27,7 +33,8 @@
 </div>
 
 <style>
-    h4, ul {
+    h4,
+    ul {
         padding: 0;
         margin: 0;
     }
@@ -35,15 +42,22 @@
         margin-bottom: 0.2em;
         margin-top: 0.2em;
         padding-left: 0.5em;
+        cursor: pointer;
     }
+    h4:hover {
+        background-color: var(--browser-background);
+    }
+
     ul {
         list-style-type: none;
         margin-left: 1em;
     }
+    ul.collapse {
+        display: none;
+    }
     span {
         cursor: pointer;
         font-family: monospace;
-
     }
     span:hover {
         text-decoration: underline;

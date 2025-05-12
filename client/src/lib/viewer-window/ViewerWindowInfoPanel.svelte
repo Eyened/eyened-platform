@@ -30,7 +30,7 @@ Some UI components on the top right of the viewer window.
 		.join('');
 
 	function showUserMenu() {
-		$globalContext.popupComponent = { component: UserMenu };
+		globalContext.popupComponent = { component: UserMenu };
 	}
 	function browse() {
 		viewerWindowContext.browserOverlay = true;

@@ -11,7 +11,7 @@
     import FilterImages from "./FilterImages.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
     import { globalContext } from "$lib/main";
-    const { creator } = $globalContext;
+    const { creator } = globalContext;
     const initials = creator.name
         .split(" ")
         .map((name) => name[0])
@@ -27,7 +27,7 @@
     let renderMode = $state(true);
 
     function showUserMenu() {
-        $globalContext.popupComponent = { component: UserMenu };
+        globalContext.popupComponent = { component: UserMenu };
     }
 
     function search() {
@@ -37,6 +37,10 @@
     async function loadMore(event) {
         await setParam("StudyDate~~>=", browserContext.next_cursor!);
         browserContext.loadDataFromServer();
+    }
+
+    function showFilterImages() {
+        globalContext.popupComponent = { component: FilterImages };
     }
 </script>
 
@@ -56,7 +60,8 @@
                 <FilterShorcuts />
             </div>
             <div id="browser-header-right">
-                <FilterImages />
+                <button onclick={showFilterImages}>Advanced search</button>
+
                 <FilterConditions />
                 <button
                     onclick={search}

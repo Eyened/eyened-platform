@@ -10,3 +10,5 @@ cryptography==44.0.2
 huey==2.5.3
 redis==5.*
 pydantic-settings==2.7.1
+passlib==1.7.4
+argon2_cffi==23.1.0

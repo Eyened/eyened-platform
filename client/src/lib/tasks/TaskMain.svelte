@@ -7,8 +7,8 @@
 	const taskContext: TaskContext = $props();
 	setContext('taskContext', taskContext);
 
-	const { updateConfig } = $globalContext;
-	updateConfig(taskContext.taskConfig);
+	
+	globalContext.updateConfig(taskContext.taskConfig);
 
 	const instanceIDs = taskContext.subTask.instanceIds;
 </script>

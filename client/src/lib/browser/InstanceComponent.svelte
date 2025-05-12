@@ -8,7 +8,7 @@
     import { globalContext } from "$lib/main";
 
     const browserContext = getContext<BrowserContext>("browserContext");
-    const { creator } = $globalContext;
+    const { creator } = globalContext;
 
     interface Props {
         instance: Instance;
