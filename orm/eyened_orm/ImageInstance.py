@@ -5,12 +5,14 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing_extensions import deprecated
 
 import numpy as np
 import pydicom
 from PIL import Image
 from sqlalchemy import ForeignKey, LargeBinary, String, Text, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from functools import cached_property
 
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
 
@@ -151,7 +153,10 @@ class ImageInstance(Base):
     DatasetIdentifier: Mapped[str] = mapped_column(String(256), index=True)
 
     # Relative filepath to the thumbnail file
+    # deprecated, use ThumbnailPath instead
     ThumbnailIdentifier: Mapped[Optional[str]] = mapped_column(String(256))
+    
+    # identifier for the thumbnail (project_id/thumbnail_name), needs suffix for different sizes
     ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(256))
 
     # Original IDs of the image in the source database
@@ -235,33 +240,10 @@ class ImageInstance(Base):
 
     @property
     def path(self) -> Path:
-        '''
-        The local path to the image on the server. 
-        When running in Docker, this path is within the container (ie. /images/...)
-        and may not exist on the host machine.
-        '''
         return Path(self.config.images_basepath) / self.DatasetIdentifier
     
-    @property
-    def host_path(self) -> Path:
-        '''
-        The path to the image on the host machine.
-        If images_basepath_host is not set in config, raise an error.
-        '''
-        if self.config.images_basepath_host is None:
-            raise RuntimeError("images_basepath_host not set in config")
-        return Path(self.config.images_basepath_host) / self.DatasetIdentifier
-    
-    @property
-    def thumbnail_path(self) -> Path:
-        '''
-        The path to the thumbnail on the server.
-        When running in Docker, this path is within the container (ie. /thumbnails/...)
-        and may not exist on the host machine.
-        '''
-        if self.ThumbnailIdentifier is None:
-            raise RuntimeError("ThumbnailIdentifier not set in config")
-        return Path(self.config.thumbnails_path) / self.ThumbnailIdentifier
+    def get_thumbnail_path(self, size: int) -> Path:
+        return Path(self.config.thumbnails_path) / f"{self.ThumbnailPath}_{size}.jpg"
 
     @property
     def url(self):
@@ -281,16 +263,38 @@ class ImageInstance(Base):
                 data = raw.reshape(
                     (-1, self.Rows_y, self.Columns_x), order="C")
             return data
+        elif self.DatasetIdentifier.startswith("[png_series_"):
+            prefix, filename = self.DatasetIdentifier.split(']', 1)
+            n_files = int(prefix[len("[png_series_"):])
+            base_path = Path(self.config.images_basepath) / filename   
+            return np.array([
+                np.array(Image.open(base_path.parent / f"{base_path.stem}_{i}.png")) 
+                for i in range(n_files)
+            ]).squeeze()            
         else:
             return np.array(Image.open(self.path))
+
+    @property
+    def bounds(self):
+        pixel_array = self.pixel_array
+        shape = pixel_array.shape
+        if len(shape) == 3 and shape[2] > 4:
+            raise ValueError("Can only handle 2D images")
+        if self.CFROI is not None:
+            # use bounds from database
+            from rtnls_fundusprep.cfi_bounds import CFIBounds
+            return CFIBounds(**self.CFROI, image=pixel_array)
+                
+        from rtnls_fundusprep.mask_extraction import get_cfi_bounds       
+        bounds = get_cfi_bounds(pixel_array)
+        self.CFROI = bounds.to_dict_all()
+        return bounds
 
     def calc_data_hash(self):
         """Return the hash of the image data"""
         import hashlib
 
-        import numpy as np
-
-        if not os.path.exists(self.path):
+        if not self.path.exists():
             raise FileNotFoundError(f"File {self.path} does not exist")
 
         # Get the raw data as numpy array
@@ -307,7 +311,7 @@ class ImageInstance(Base):
         """Return the checksum of the file"""
         import hashlib
 
-        if not os.path.exists(self.path):
+        if not self.path.exists():
             raise FileNotFoundError(f"File {self.path} does not exist")
 
         md5_hash = hashlib.md5()
@@ -318,7 +322,7 @@ class ImageInstance(Base):
         return md5_hash.digest()
 
     @classmethod
-    def where(cls, clause):
+    def where(cls, clause, include_inactive=False):
         """
         return a query with some useful joins
         usage example: 
@@ -327,10 +331,11 @@ class ImageInstance(Base):
             session.scalar(q.limit(1))
         """
         from eyened_orm import Patient, Project, Series, Study
-
+        statement = select(ImageInstance)
+        if not include_inactive:
+            statement = statement.where(~ImageInstance.Inactive)
         return (
-            select(ImageInstance)
-            .where(~ImageInstance.Inactive)
+            statement
             .join(Series).join(Study).join(Patient).join(Project)
             .outerjoin(Scan)
             .outerjoin(DeviceInstance)

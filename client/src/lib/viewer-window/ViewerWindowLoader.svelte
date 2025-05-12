@@ -4,11 +4,11 @@ Used to create the viewerwindow context.
 
 -->
 <script lang="ts">
-	import { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { globalContext } from '$lib/main';
 	import { Registration } from '$lib/registration/registration';
 	import { Deferred } from '$lib/utils';
 	import { WebGL } from '$lib/webgl/webgl';
-	import { getContext, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import BrowserOverlay from './BrowserOverlay.svelte';
 	import ViewerWindow from './ViewerWindow.svelte';
 	import { ViewerWindowContext } from './viewerWindowContext.svelte';
@@ -30,7 +30,7 @@ Used to create the viewerwindow context.
 		}
 	}
 
-	const { creator } = getContext<GlobalContext>('globalContext');
+	const { creator } = globalContext;
 
 	const { promise, resolve } = new Deferred<ViewerWindowContext>();
 

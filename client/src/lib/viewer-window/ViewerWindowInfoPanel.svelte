@@ -9,10 +9,9 @@ Some UI components on the top right of the viewer window.
 	import MultiImageViewer from './MultiImageViewer.svelte';
 	import { data } from '$lib/datamodel/model';
 	import { Image2D } from '$lib/webgl/image2D';
-	import { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 	import UserMenu from '$lib/UserMenu.svelte';
+	import { globalContext } from '$lib/main';
 
-	const globalContext = getContext<GlobalContext>('globalContext');
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
 	const { creator } = viewerWindowContext;
 	const { instances } = data;

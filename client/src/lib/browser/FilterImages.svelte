@@ -3,12 +3,6 @@
     import ConditionsMultiSelect from "./ConditionsMultiSelect.svelte";
     import DateRangePicker from "./DateRangePicker.svelte";
     import FilterBlock from "./FilterBlock.svelte";
-    import { getContext } from "svelte";
-    import { BrowserContext } from "./browserContext.svelte";
-
-    let show = $state(false);
-
-    const browserContext = getContext<BrowserContext>("browserContext");
 
     type FilterItem = {
         variable: string;
@@ -66,42 +60,22 @@
             title: "Camera",
         },
     ];
-
-    
 </script>
 
-<button onclick={() => (show = true)}>Advanced search</button>
-{#if show}
-    <div class="content">
-        <div>
-            <button onclick={() => (show = false)}>Close</button>
-        </div>
-        <div>
-            {#each filterBlocks as { variable, name, values, title }}
-                <FilterBlock {title}>
-                    <ConditionsMultiSelect {variable} {values} {name} />
-                </FilterBlock>
-            {/each}
-        </div>
-
-        <FilterBlock title="Study Date">
-            <DateRangePicker />
-        </FilterBlock>
+<div class="content">
+    <div>
+        {#each filterBlocks as { variable, name, values, title }}
+            <FilterBlock {title}>
+                <ConditionsMultiSelect {variable} {values} {name} />
+            </FilterBlock>
+        {/each}
     </div>
-{/if}
+
+    <FilterBlock title="Study Date">
+        <DateRangePicker />
+    </FilterBlock>
+</div>
 
 <style>
-    .content {
-        position: fixed;
-        z-index: 1;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        right: 0;
-        background-color: rgba(255, 255, 255, 0.99);
-        backdrop-filter: blur(5px);
-        transition: 0.5s;
-        padding: 1em;
-        overflow: auto;
-    }
+
 </style>

@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, text
 from eyened_orm import Creator, SourceInfo, ModalityTable
 from eyened_orm.base import Base
-
+from ..utils.crypto import hash_password, password_hash
 from ..db import settings, DBManager
-from ..routes.utils import password_hash
+
 
 def create_database():
     # create generic engine for database creation
@@ -18,44 +18,55 @@ def create_database():
 
     db_config.database = None
     temp_engine = create_engine(create_connection_string(db_config))
-    
+
     # First check if database exists
     try:
         with temp_engine.connect() as conn:
-            result = conn.execute(text(f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{dbname}'"))
+            result = conn.execute(
+                text(
+                    f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{dbname}'"
+                )
+            )
             if not result.fetchone():
                 # Database doesn't exist, try to create it
                 try:
                     conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {dbname}"))
                 except Exception as e:
-                    raise RuntimeError(f"Database {dbname} does not exist and could not be created. Error: {str(e)}")
+                    raise RuntimeError(
+                        f"Database {dbname} does not exist and could not be created. Error: {str(e)}"
+                    )
     except Exception as e:
-        raise RuntimeError(f"Could not check if database {dbname} exists. Error: {str(e)}")
+        raise RuntimeError(
+            f"Could not check if database {dbname} exists. Error: {str(e)}"
+        )
 
     # Now create tables using normal engine
     engine = DBManager.get_engine()
     Base.metadata.create_all(engine)
 
+
 def init_admin(session: Session) -> None:
     """
     Initialize an admin user if ADMIN_USERNAME environment variable is set.
-    
+
     Args:
         session: SQLAlchemy session to use for database operations
     """
     admin_username = os.environ.get("ADMIN_USERNAME")
     admin_password = os.environ.get("ADMIN_PASSWORD")
-    
+
     if admin_username is None or admin_password is None:
         raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be set")
 
     if admin_username == "admin" and admin_password == "admin":
-        raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be changed from default values")
-    
+        raise ValueError(
+            "ADMIN_USERNAME and ADMIN_PASSWORD must be changed from default values"
+        )
+
     # Check if admin already exists
-    existing_admin = session.query(Creator).filter(
-        Creator.CreatorName == admin_username
-    ).first()
+    existing_admin = (
+        session.query(Creator).filter(Creator.CreatorName == admin_username).first()
+    )
 
     print(f"Admin user: {admin_username}")
     print(f"Admin password: {admin_password}")
@@ -63,23 +74,37 @@ def init_admin(session: Session) -> None:
         warnings.warn("Admin user already exists, skipping creation")
         return
 
-    
     # Create new admin user
     new_admin = Creator()
     new_admin.CreatorName = admin_username
-    new_admin.Password = password_hash(admin_password)
     new_admin.IsHuman = True
     new_admin.Description = "Default admin user created during initialization"
-    
-    session.add(new_admin)
-    session.commit()
+
+    try:
+        # Try with Argon2 hash
+        new_admin.Password = hash_password(admin_password).encode('utf-8')
+        session.add(new_admin)
+        session.commit()
+    except Exception as e:
+        session.rollback()  # Rollback the failed transaction
+        warnings.warn(f"Error with Argon2 hash, using legacy method: {str(e)}")
+        try:
+            # Try with legacy hash
+            new_admin.Password = password_hash(admin_password, settings.secret_key)
+            session.add(new_admin)
+            session.commit()
+        except Exception as e2:
+            session.rollback()  # Rollback the failed transaction
+            raise RuntimeError(f"Failed to create admin user: {str(e2)}")
 
 
 def init_other_objects(session):
     # add SourceInfo 37 and Modality 14 if they don't exist
     source_info = session.get(SourceInfo, 37)
     if source_info is None:
-        source_info = SourceInfo(SourceInfoID=37, SourceName="Default", SourcePath="", ThumbnailPath="")
+        source_info = SourceInfo(
+            SourceInfoID=37, SourceName="Default", SourcePath="", ThumbnailPath=""
+        )
         session.add(source_info)
 
     modality = session.get(ModalityTable, 14)
@@ -92,38 +117,33 @@ def init_other_objects(session):
 
 def init_annotation_types(session):
     types = (
-        'Segmentation 2D',
-        'Segmentation OCT B-scan',
-        'Segmentation OCT Enface',
-        'Segmentation OCT Volume'
+        "Segmentation 2D",
+        "Segmentation OCT B-scan",
+        "Segmentation OCT Enface",
+        "Segmentation OCT Volume",
     )
     interpretations = (
-        'Binary mask',
-        'Probability',
-        'R/G mask',
-        'Label numbers',
-        'Layer bits'
+        "Binary mask",
+        "Probability",
+        "R/G mask",
+        "Label numbers",
+        "Layer bits",
     )
-    additional_types = [
-        ('Segmentation 2D masked', 'R/G mask')
-    ]
+    additional_types = [("Segmentation 2D masked", "R/G mask")]
 
     index = {
         (a.AnnotationTypeName, a.Interpretation): a
         for a in AnnotationType.fetch_all(session)
     }
     expected = [
-        (name, interpretation)
-        for name in types
-        for interpretation in interpretations
+        (name, interpretation) for name in types for interpretation in interpretations
     ] + additional_types
-    
+
     for name, interpretation in expected:
         if (name, interpretation) not in index:
             annotation_type = AnnotationType(
-                AnnotationTypeName=name,
-                Interpretation=interpretation
+                AnnotationTypeName=name, Interpretation=interpretation
             )
-            print('Adding annotation type:', name, interpretation)
+            print("Adding annotation type:", name, interpretation)
             session.add(annotation_type)
     session.commit()

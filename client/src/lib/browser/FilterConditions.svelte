@@ -3,8 +3,24 @@
     import { PanelIcon } from "$lib/viewer-window/icons/icons";
     import Trash from "$lib/viewer-window/icons/Trash.svelte";
     import { removeParam } from "./browserContext.svelte";
-    
-    
+
+    const operatorMap = {
+        eq: "=",
+        ne: "!=",
+        gt: ">",
+        lt: "<",
+        gte: "≥",
+        lte: "≤",
+        in: "in",
+        not_in: "not in",
+        like: "like",
+        ilike: "ilike",
+        startswith: "startswith",
+        endswith: "endswith",
+        is_null: "is null",
+        is_not_null: "is not null",
+    };
+
     class Condition {
         constructor(
             public readonly variable: string,
@@ -13,16 +29,20 @@
         ) {}
 
         get key() {
-            if (this.operator == "=") {
+            if (this.operator == "eq") {
                 return this.variable;
             }
             return `${this.variable}~~${this.operator}`;
+        }
+
+        get displayValue() {
+            return `${this.variable} ${operatorMap[this.operator as keyof typeof operatorMap]} ${this.value}`;
         }
     }
 
     function getCondition(key: string, value: string): Condition {
         const parts = key.split("~~");
-        let operator = "=";
+        let operator = "eq";
         if (parts.length == 2) {
             operator = parts[1];
         } else if (parts.length > 2) {
@@ -32,7 +52,7 @@
     }
 
     function remove(condition: Condition) {
-        removeParam(condition.variable, condition.value);
+        removeParam(condition.key, condition.value);
     }
 </script>
 
@@ -40,11 +60,9 @@
     {@const condition = getCondition(variable, value)}
     <div class="condition">
         <span>
-            {condition.variable}
-            {condition.operator}
-            {condition.value}
+            {condition.displayValue}
         </span>
-        <PanelIcon onclick={() => remove(condition)}>
+        <PanelIcon onclick={() => remove(condition)} theme="light">
             <Trash />
         </PanelIcon>
     </div>
@@ -72,9 +90,10 @@
     .condition {
         display: flex;
         align-items: center;
+        border-radius: 2px;
     }
     .condition:hover {
-        background-color: rgba(0, 0, 0, 0.1);
+        background-color: var(--icon-hover);
         color: black;
     }
 </style>

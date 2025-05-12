@@ -1,7 +1,8 @@
 import type { Registration } from "$lib/registration/registration";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
-import { LayerBitsSegmentation, type LabelNumbersSegmentation } from "$lib/webgl/layerSegmentation";
+import { MultilabelSegmentation } from "$lib/webgl/layerSegmentation";
+import type { MulticlassSegmentation } from "$lib/webgl/layerSegmentation";
 import type { Shaders } from "$lib/webgl/shaders";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay } from "../viewer-utils";
@@ -14,7 +15,7 @@ export class LayerSegmentationOverlay implements Overlay {
 
 	constructor(
 		private readonly registration: Registration,
-		private readonly segmentation: LabelNumbersSegmentation | LayerBitsSegmentation,
+		private readonly segmentation: MulticlassSegmentation | MultilabelSegmentation,
 		public readonly segmentationContext: SegmentationContext,
 		private shaders: Shaders
 
@@ -30,6 +31,7 @@ export class LayerSegmentationOverlay implements Overlay {
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        // console.log('repaint layers')
 		const {
 			hideCreators,
 			hideFeatures,
@@ -58,13 +60,14 @@ export class LayerSegmentationOverlay implements Overlay {
 			u_alpha: this.alpha,
 			u_highlight: voxel,
 			u_questionable_bit: this.segmentation.questionable_bit,
+			u_image_size: [viewerContext.image.width, viewerContext.image.height, viewerContext.image.depth]
 		};
 
-		if (this.segmentation instanceof LayerBitsSegmentation) {
+		if (this.segmentation instanceof MultilabelSegmentation) {
 			this.shaders.renderLayerBits.pass(renderTarget, uniforms);
 		} else {
-			if (this.segmentation.boundaries) {
-				uniforms.u_boundaries = this.segmentation.boundaries.texture;
+			if (this.segmentation.layerBoundaries) {
+				uniforms.u_boundaries = this.segmentation.layerBoundaries.texture;
 			}
 			this.shaders.renderLabelNumbers.pass(renderTarget, uniforms);
 		}

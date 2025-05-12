@@ -7,11 +7,11 @@ uniform usampler2D u_current;
 
 uniform uint u_bitmask;
 uniform bool u_has_questionable_mask;
-
+uniform float u_threshold;
 layout(location = 0) out uvec2 color_out;
 
 uint setColor(float pixColor, uint colorOut, uint bitmask) {
-    return (pixColor > 0.5) ? (colorOut | bitmask) : (colorOut & ~bitmask);
+    return (pixColor > u_threshold) ? (colorOut | bitmask) : (colorOut & ~bitmask);
 }
 
 void main() {

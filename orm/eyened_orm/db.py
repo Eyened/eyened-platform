@@ -17,10 +17,9 @@ class DBManager:
     _SessionLocal = None
 
     @classmethod
-    def init(cls, config: str | EyenedORMConfig):
+    def init(cls, config: None | str | EyenedORMConfig):
         """Initialize the database session factory with the given config."""
-        
-        if isinstance(config, str):
+        if config is None or isinstance(config, str):
             from eyened_orm.utils.config import get_config
             config = get_config(config)
 

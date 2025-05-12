@@ -18,6 +18,7 @@ export type MainPanelType = {
 }
 
 export class ViewerWindowContext {
+    
     // show/hide the browser overlay
     browserOverlay: boolean = $state(false);
 
@@ -70,6 +71,10 @@ export class ViewerWindowContext {
         this.setInstanceIDs(instanceIDs);
     }
 
+    closeBrowserOverlay() {
+        this.browserOverlay = false;
+    }
+    
     addViewer(viewer: ViewerContext) {
         this.viewers.add(viewer);
         return () => this.viewers.delete(viewer);

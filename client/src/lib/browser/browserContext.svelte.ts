@@ -1,7 +1,6 @@
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import type { ComponentDef } from "$lib/data-loading/globalContext.svelte";
 import { loadSearchParams } from "$lib/datamodel/api";
 import type { Instance } from "$lib/datamodel/instance";
 import { clearData } from "$lib/datamodel/model";
@@ -9,11 +8,11 @@ import { clearData } from "$lib/datamodel/model";
 export class BrowserContext {
 
     selection: number[] = $state([]);
-    popup: ComponentDef | null = $state(null);
     loading: boolean = $state(false);
     next_cursor: string | null = $state(null);
     no_params_set: boolean = $derived(page.url.searchParams.size === 0);
-    
+    thumbnailSize: number = $state(6);
+
     constructor(selection: number[]) {
         this.selection = selection;
     }
@@ -26,6 +25,13 @@ export class BrowserContext {
         }
     }
 
+    openTab(instances: number[]) {
+
+        const suffix_string = `?instances=${instances}`;
+        const url = `${window.location.origin}/view${suffix_string}`;
+        window.open(url, '_blank')?.focus();
+    }
+
     async loadDataFromServer() {
         if (!browser) {
             return;
@@ -36,8 +42,10 @@ export class BrowserContext {
         }
 
         this.loading = true;
+        this.selection = [];
         // removes existing entities from the model
         clearData();
+
 
         const next_cursor = await loadSearchParams(page.url.searchParams);
         this.next_cursor = next_cursor;
@@ -79,4 +87,11 @@ export async function setParam(variable: string, value: string) {
     const params = page.url.searchParams;
     params.set(variable, value);
     await goto(`?${params.toString()}`);
+}
+
+export function getParam(variable: string) {
+    if (!browser) return;
+
+    const params = page.url.searchParams;
+    return params.get(variable);
 }

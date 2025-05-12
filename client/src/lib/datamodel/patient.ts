@@ -1,7 +1,10 @@
 import { ItemConstructor } from "./itemContructor";
-import type { Item } from "./itemList";
+import type { FilterList, Item } from "./itemList";
 import { DateMapping, FKMapping } from "./mapping";
 import type { Project } from "./project";
+import type { Study } from "./study";
+import type { DataModel } from './model';
+import { DerivedProperty } from "./itemContructor";
 
 export interface Patient extends Item {
     id: number,
@@ -9,7 +12,8 @@ export interface Patient extends Item {
     project: Project,
     birthDate?: Date,
     sex?: 'M' | 'F',
-    isHuman: boolean
+    isHuman: boolean,
+    studies: FilterList<Study>
 }
 
 export const PatientConstructor = new ItemConstructor<Patient>(
@@ -18,5 +22,6 @@ export const PatientConstructor = new ItemConstructor<Patient>(
     project: FKMapping('ProjectID', 'projects'),
     birthDate: DateMapping('BirthDate'),
     sex: 'Sex',
-    isHuman: 'isHuman'
+    isHuman: 'isHuman',
+    studies: new DerivedProperty((self: Patient, data: DataModel) => data.studies.filter(study => study.patient == self)),
 });

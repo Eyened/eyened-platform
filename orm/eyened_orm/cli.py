@@ -79,13 +79,13 @@ def update_thumbnails(env, failed):
     """Update thumbnails for all images in the database."""
 
     from eyened_orm import DBManager
-    from eyened_orm.importer.thumbnails import update_thumbnails as update_thumbnails_fn
+    from eyened_orm.importer.thumbnails import update_thumbnails, get_missing_thumbnail_images
 
     config = get_config(env)
-    DBManager.init(config)
+    DBManager.init(env)
     session = DBManager.get_session()
-
-    update_thumbnails_fn(session, config.thumbnails_path, config.secret_key, update_failed=failed)
+    images = get_missing_thumbnail_images(session, failed)
+    update_thumbnails(session, images)
 
 
 @eorm.command()

@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { globalContext } from '$lib/main';
 	import { ImageLoader } from '$lib/data-loading/imageLoader';
 	import type { Instance } from '$lib/datamodel/instance';
 	import type { WebGL } from '$lib/webgl/webgl';
-	import { getContext, setContext } from 'svelte';
+	import { setContext } from 'svelte';
 	import BaseViewer from './BaseViewer.svelte';
 	import { ViewerWindowContext } from './viewerWindowContext.svelte';
 	import { Registration } from '$lib/registration/registration';
@@ -16,9 +16,8 @@
 	let { instance, webgl }: Props = $props();
 
 	const imageLoader = new ImageLoader(webgl);
-	const globalContext = getContext<GlobalContext>('globalContext');
-	const registration = new Registration();
 	const { creator } = globalContext;
+	const registration = new Registration();
 	const viewerWindowContext = new ViewerWindowContext(webgl, registration, creator, [instance.id]);
 	setContext('viewerWindowContext', viewerWindowContext);
 

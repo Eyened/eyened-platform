@@ -1,4 +1,3 @@
-import type { Creator } from '$lib/datamodel/creator';
 import type { AbstractImage } from '$lib/webgl/abstractImage';
 import type { Shaders } from '$lib/webgl/shaders';
 import type { MeasureTool } from './tools/Measure.svelte.js';
@@ -81,7 +80,9 @@ export class ViewerContext {
                 this.windowLevel = { min: 30, max: 225 };
             }
             // aspect ratio for OCT
-            this.stretch = 8 * image.resolution.y / image.resolution.x;
+            if (image.resolution.z) {
+                this.stretch = 8 * image.resolution.y / image.resolution.x;
+            }
         }
         this.transform = this.getInitTransform();
         this.imageTransform = image.transform;

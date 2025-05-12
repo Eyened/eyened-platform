@@ -33,8 +33,8 @@
 	}
 	.series {
 		flex-direction: column;
-		background-color: #f5f5f5;
-		border: 1px solid #d0d0d0;
+		background-color: var(--browser-background);
+		border: 1px solid var(--browser-border);
 		border-radius: 2px;
 		flex: 0 1 auto;
 		margin: 0.1em;
@@ -44,5 +44,6 @@
 		flex: 1;
 		flex-direction: row;
 		flex-wrap: wrap;
+		gap: 0.3em;
 	}
 </style>

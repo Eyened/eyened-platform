@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from .auth import manager
+from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
 
@@ -19,7 +19,7 @@ class FeatureCreate(BaseModel):
 async def create_feature(
     params: FeatureCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     new_feature = Feature()
     new_feature.FeatureName = params.FeatureName
@@ -32,7 +32,7 @@ async def create_feature(
 async def delete_feature(
     feature_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(manager),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     feature = db.query(Feature).filter(Feature.FeatureID == feature_id).first()
     if not feature:
@@ -40,3 +40,11 @@ async def delete_feature(
     db.delete(feature)
     db.commit()
     return Response(status_code=204)
+
+
+@router.get("/features")
+async def get_features(
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    # Your existing code here, but use current_user.id instead of user_id
+    pass

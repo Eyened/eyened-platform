@@ -1,10 +1,10 @@
 import { getInstanceByDataSetIdentifier } from "$lib/datamodel/instance";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { LinePhotoLocator, type PhotoLocator } from "./photoLocators";
+import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 
 export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
     const { instance, meta } = image;
-    if (!instance || !meta || !meta.registration || !meta.registration.top_left || !meta.registration.bottom_right || !meta.oct_shape) {
+    if (!instance || !meta?.registration?.top_left || !meta?.registration?.bottom_right || !meta?.oct_shape) {
         return [];
     }
     const enfaceInstance = getInstanceByDataSetIdentifier(instance.datasetIdentifier.replace('.binary', '.png'));
@@ -14,6 +14,16 @@ export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
     const enfaceID = `${enfaceInstance.id}`;
     const octID = `${instance.id}`;
     const { top_left, bottom_right } = meta.registration;
+
+    if (instance.scan.mode == 'Circle-Scan') {
+        // this is extracted wrongly from the fds files
+        const [cx, cy] = top_left;
+        const radius = bottom_right[0];
+        const photoLocations = [
+            new CirclePhotoLocator(enfaceID, octID, { x: cx, y: cy }, radius, Math.PI, 0, instance.columns)
+        ]
+        return photoLocations;
+    }
 
     const { oct_shape } = meta;
     const [n_scans, h, w] = oct_shape;
