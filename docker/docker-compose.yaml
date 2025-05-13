@@ -35,8 +35,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DB_HOST=database
-      - DB_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DB_USER=root
+      - DB_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
+      - DB_USER=${DATABASE_USER}
+      - DB_PASSWORD=${DATABASE_PASSWORD}
       - DB_PORT=3306
       - DB_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
@@ -64,8 +65,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DB_HOST=database
-      - DB_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DB_USER=root
+      - DB_USER=${DATABASE_USER}
+      - DB_PASSWORD=${DATABASE_PASSWORD}
       - DB_PORT=3306
       - DB_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}

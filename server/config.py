@@ -12,7 +12,6 @@ class Settings(EyenedORMConfig):
     
     # Server-specific configuration with non-redundant fields
     model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
-    viewer_env: str = "production"
 
     # Default username and password for the admin user
     admin_username: str

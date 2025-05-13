@@ -74,21 +74,6 @@ get_input() {
     eval "$var_name='$input'"
 }
 
-# Function to cleanup on exit
-cleanup() {
-    local exit_code=$?
-    if [ $exit_code -ne 0 ]; then
-        print_error "Setup failed with exit code $exit_code"
-        # Cleanup any temporary files if needed
-        [ -f "$ENV_FILE" ] && rm -f "$ENV_FILE"
-        [ -f "$CREDS_FILE" ] && rm -f "$CREDS_FILE"
-    fi
-    exit $exit_code
-}
-
-# Set up trap for cleanup
-trap cleanup EXIT
-
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
     print_error "Please do not run this script as root"
@@ -127,15 +112,18 @@ echo
 echo "Setting up database configuration. This is used to connect to the database outside of the platform."
 get_input "Enter the database port" "3306" DATABASE_PORT validate_port
 
-# if the DATABASE_PATH exists and is not empty, ask for the password, otherwise generate a random one
+# Check if database exists and handle credentials accordingly
 if [ -s "$DATABASE_PATH" ]; then
-    echo "Database path exists and is not empty. Please enter the database root password."
-    get_input "Enter the database root password" "" DATABASE_ROOT_PASSWORD validate_path
+    echo "Database path exists and is not empty. Please enter the database credentials."
 else
-    DEFAULT_DB_PASSWORD=$(openssl rand -base64 16)  
-    echo "Database path does not exist or is empty. Create a database root password."
-    get_input "Enter the database root password (or press Enter for a random one)" "$DEFAULT_DB_PASSWORD" DATABASE_ROOT_PASSWORD validate_path
+    echo "Database path does not exist or is empty. Creating new database."
+    DEFAULT_ROOT_PASSWORD=$(openssl rand -base64 16)
+    get_input "Enter the database root password (or press Enter for a random one)" "$DEFAULT_ROOT_PASSWORD" DATABASE_ROOT_PASSWORD validate_path    
 fi
+get_input "Enter the database username" "eyened" DATABASE_USER validate_path
+DEFAULT_DB_PASSWORD=$(openssl rand -base64 16)
+get_input "Enter the password for user $DATABASE_USER (or press Enter for a random one)" "$DEFAULT_DB_PASSWORD" DATABASE_PASSWORD validate_path
+    
 
 DEFAULT_ADMIN_PASSWORD=$(openssl rand -base64 16)
 echo 
@@ -165,12 +153,21 @@ DATABASE_PATH="${DATABASE_PATH}"
 # port on host system to connect to the database
 DATABASE_PORT=${DATABASE_PORT}
 
-# root password for the database
-DATABASE_ROOT_PASSWORD="${DATABASE_ROOT_PASSWORD}"
+# database credentials
+DATABASE_USER="${DATABASE_USER}"
+DATABASE_PASSWORD="${DATABASE_PASSWORD}"
 EOF
 then
     print_error "Failed to create .env file"
     exit 1
+fi
+
+# Add root password only if it was supplied
+if [ -n "$DATABASE_ROOT_PASSWORD" ]; then
+    if ! echo "DATABASE_ROOT_PASSWORD=\"${DATABASE_ROOT_PASSWORD}\"" >> "$ENV_FILE"; then
+        print_error "Failed to append root password to .env file"
+        exit 1
+    fi
 fi
 
 print_status ".env file created successfully!"
@@ -233,6 +230,8 @@ Platform URL: http://${HOSTNAME}:${PORT}
 Adminer URL: http://${HOSTNAME}:8080
 Admin Username: ${ADMIN_USERNAME}
 Admin Password: ${ADMIN_PASSWORD}
+Database Username: ${DATABASE_USER}
+Database Password: ${DATABASE_PASSWORD}
 Database Root Password: ${DATABASE_ROOT_PASSWORD}
 EOF
 then
@@ -250,4 +249,4 @@ print_warning "Your credentials have been saved to $CREDS_FILE"
 print_warning "Please keep this file secure and delete it after you've noted the credentials"
 
 # Clear sensitive variables
-unset ADMIN_PASSWORD DATABASE_ROOT_PASSWORD DEFAULT_DB_PASSWORD DEFAULT_ADMIN_PASSWORD 
+unset ADMIN_PASSWORD DATABASE_ROOT_PASSWORD DATABASE_PASSWORD DEFAULT_DB_PASSWORD DEFAULT_ADMIN_PASSWORD 
