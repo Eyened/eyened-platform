@@ -222,31 +222,4 @@ echo -e "  ${YELLOW}docker-compose down${NC}"
 echo -e "\nNext time you want to start the platform, run:"
 echo -e "  ${YELLOW}USERID=$(id -u) GROUPID=$(id -g) docker-compose up -d${NC}"
 
-
-# Save credentials to a secure file
-print_status "Saving credentials to $CREDS_FILE..."
-if ! cat > "$CREDS_FILE" << EOF
-Platform URL: http://${HOSTNAME}:${PORT}
-Adminer URL: http://${HOSTNAME}:8080
-Admin Username: ${ADMIN_USERNAME}
-Admin Password: ${ADMIN_PASSWORD}
-Database Username: ${DATABASE_USER}
-Database Password: ${DATABASE_PASSWORD}
-Database Root Password: ${DATABASE_ROOT_PASSWORD}
-EOF
-then
-    print_error "Failed to create credentials file"
-    exit 1
-fi
-
-# Set secure permissions on credentials file
-if ! chmod 600 "$CREDS_FILE"; then
-    print_error "Failed to set secure permissions on credentials file"
-    exit 1
-fi
-
-print_warning "Your credentials have been saved to $CREDS_FILE"
-print_warning "Please keep this file secure and delete it after you've noted the credentials"
-
-# Clear sensitive variables
 unset ADMIN_PASSWORD DATABASE_ROOT_PASSWORD DATABASE_PASSWORD DEFAULT_DB_PASSWORD DEFAULT_ADMIN_PASSWORD 
