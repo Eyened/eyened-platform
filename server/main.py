@@ -26,11 +26,18 @@ async def lifespan(app: FastAPI):
     print("Starting up with settings:")
     print(settings)
 
+    if os.environ.get("DB_ROOT_PASSWORD") is not None:
+        try:
+            # create database tables and user if they don't exist
+            create_database()
+        except Exception as e:
+            raise RuntimeError(f"Error creating database: {e}") from e
+    else:
+        print("DB_ROOT_PASSWORD is not set, skipping database creation")
+    
     # before startup
     try:
-        session = next(get_db())
-        # create database tables if they don't exist
-        create_database()
+        session = next(get_db())        
         # initialize admin user
         init_admin(session)
         # initialize other objects
@@ -53,12 +60,10 @@ app.mount("/api", app_api)
 async def health_check():
     return {"status": "healthy"}
 
-if settings.viewer_env == "production":
+@app.get("/{path:path}")  # Catch-all route for file serving
+async def catch_all(path: str):
+    file_path = os.path.join("/client/build", path)
 
-    @app.get("/{path:path}")  # Catch-all route for file serving
-    async def catch_all(path: str):
-        file_path = os.path.join("/client/build", path)
-
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            return FileResponse(file_path)  # Serve existing file
-        return FileResponse(os.path.join("/client/build", "index.html"))
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)  # Serve existing file
+    return FileResponse(os.path.join("/client/build", "index.html"))
