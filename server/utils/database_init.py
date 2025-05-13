@@ -118,11 +118,6 @@ def init_admin(session: Session) -> None:
     if admin_username is None or admin_password is None:
         raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be set")
 
-    if admin_username == "admin" and admin_password == "admin":
-        raise ValueError(
-            "ADMIN_USERNAME and ADMIN_PASSWORD must be changed from default values"
-        )
-
     # Check if admin already exists
     existing_admin = (
         session.query(Creator).filter(Creator.CreatorName == admin_username).first()
