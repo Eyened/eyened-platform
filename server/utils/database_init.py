@@ -41,14 +41,18 @@ def create_database():
                     raise RuntimeError(
                         f"Database {settings.database.database} does not exist and could not be created. Error: {str(e)}"
                     )
-                    
-            # Create user if it doesn't exist
-            create_database_user(temp_engine)
     except Exception as e:
         raise RuntimeError(
             f"Could not check if database {settings.database.database} exists. Error: {str(e)}"
         )
 
+    # Create user if it doesn't exist
+    try:
+        create_database_user(temp_engine)
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not create database user for {settings.database.database}. Error: {str(e)}"
+        )
     # Now create tables using the correct database
     root_config.database = settings.database.database
     temp_engine = create_engine(create_connection_string(root_config))

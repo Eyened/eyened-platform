@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
             # create database tables and user if they don't exist
             create_database()
         except Exception as e:
-            raise RuntimeError(f"Error creating database") from e
+            raise RuntimeError(f"Error creating database: {e}") from e
     else:
         print("DB_ROOT_PASSWORD is not set, skipping database creation")
     
