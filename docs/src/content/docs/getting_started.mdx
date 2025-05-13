@@ -42,7 +42,7 @@ You can set up the Eyened platform in two ways:
 
 #### Option 1: Automated Setup (Recommended)
 
-We provide a setup script that automates the installation process:
+We provide a setup script that automates the installation process and includes enhanced security features:
 
 1. Clone our repository:
 
@@ -63,12 +63,16 @@ The script will:
 - Prompt you for configuration settings or use defaults
 - Create and configure the `.env` file
 - Create necessary directories for images, storage, and database
+- Generate secure random passwords for:
+  - Admin user
+  - Database root user
+  - Database application user
 - Build and start the containers
 - Save your credentials to a secure file
 - Display the URLs for accessing the platform
 
 :::note
-The setup script will create a `.platform_credentials` file containing your login information. Please keep this file secure and delete it after you've noted the credentials.
+The setup script will create a `.platform_credentials` file containing your login information. This file has restricted permissions (600) for security. Please keep this file secure and delete it after you've noted the credentials.
 :::
 
 #### Option 2: Manual Setup
@@ -99,6 +103,8 @@ If you prefer to set up manually:
     | DATABASE_PATH | Path to the database files | $HOME/eyened-platform/database |
     | DATABASE_PORT | Port to access the database from outside | 3306 |
     | DATABASE_ROOT_PASSWORD | Root password for external database access | (randomly generated) |
+    | DATABASE_USER | Username for database access | eyened |
+    | DATABASE_PASSWORD | Password for database access | (randomly generated) |
 
 4. Create the necessary directories:
 
