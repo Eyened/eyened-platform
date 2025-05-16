@@ -11,6 +11,9 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(),
     include_package_data=True,
+    package_data={
+        "eyened_orm": ["environments/*.env"],
+    },
     zip_safe=False,
     entry_points={
         "console_scripts": [
@@ -28,6 +31,7 @@ setup(
         "tqdm==4.*",
         "alembic==1.13.2",        
         "PyMySQL==1.0.2",
+        "mysql-connector-python==8.*",
         "pydicom==3.*",
         "GPUtil==1.*",
         "requests==2.*",

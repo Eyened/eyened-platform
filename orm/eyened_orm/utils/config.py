@@ -1,6 +1,7 @@
 from datetime import date
 from pathlib import Path
 from typing import Optional
+import importlib.resources
 
 from pydantic import Field
 from pydantic_settings import (BaseSettings, PydanticBaseSettingsSource,
@@ -116,9 +117,8 @@ def get_config(env:str | None = None) -> EyenedORMConfig:
     else:
         env_file = f"{env}.env"
     
-    # root directory of the project
-    dir_path = Path(__file__).parent.parent.parent.parent
-    env_path = dir_path / env_file
+    package_root = Path(importlib.resources.files("eyened_orm"))   
+    env_path = package_root / "environments" / env_file
     
     if not env_path.exists():
         raise FileNotFoundError(
