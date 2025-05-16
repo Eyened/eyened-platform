@@ -35,7 +35,7 @@
     }
 
     async function loadMore(event) {
-        await setParam("StudyDate~~>=", browserContext.next_cursor!);
+        await setParam("StudyDate~~gte", browserContext.next_cursor!);
         browserContext.loadDataFromServer();
     }
 
