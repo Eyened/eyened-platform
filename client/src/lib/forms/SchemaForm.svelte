@@ -172,7 +172,7 @@
         {:else if schema.type == "array" && schema.items !== undefined}
             {@render query(false)}
             <ol class="array">
-                {#each schemaValidator.value ?? [] as sub_value, i (i)}
+                {#each schemaValidator.value ?? [] as sub_value, i (i + '_' + JSON.stringify(sub_value))}
                     <li>
                         <span>{i}</span>
                         <SchemaForm
