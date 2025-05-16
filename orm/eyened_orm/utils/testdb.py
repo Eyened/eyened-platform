@@ -1,103 +1,13 @@
-from pathlib import Path
 import subprocess
 import tempfile
-
-from eyened_orm.utils.config import DatabaseSettings
 import mysql.connector
+from eyened_orm.utils.smart_dump import DatabaseDumper
+from eyened_orm.utils.paths import paths
 
-
-# These tables will be dumped partially using smartdump
-# Only the rows related to the smartdump query will be dumped
-# The rest of the tables will be dumped fully
-partial_tables = set(
-    [
-        "Patient",
-        "Study",
-        "Series",
-        "Annotation",
-        "FormAnnotation",
-        "ImageInstance",
-        "AnnotationData",
-        "Task",
-        "SubTask",
-        "SubTaskImageLink",
-    ]
-)
-
-
-def dump_database(db_config: DatabaseSettings, dump_file, no_data=False, no_create=False, tables=None):
-    source_db_string = (
-        f"{db_config.host}:{db_config.port}/{db_config.database}"
-    )
-
-    if tables is None:
-        tables = []
-
-    command = [
-        "mysqldump",
-        "--skip-triggers",
-        "--no-data" if no_data else "",
-        "--no-create-info" if no_create else "",
-        "-h",
-        db_config.host,
-        "-P",
-        db_config.port,
-        "-u",
-        db_config.user,
-        "-p" + db_config.password,  # password without space
-        db_config.database,
-        *tables,
-    ]
-    command = [tk for tk in command if tk != ""]
-
-    print(f"Dumping database {source_db_string}")
-    print(" ".join(command))
-    # Run the command and save the output to the specified dump file
-    # with open(dump_file, "w") as f:
-    result = subprocess.run(command, stdout=dump_file, stderr=subprocess.PIPE)
-
-    if result.returncode == 0:
-        print(f"Database dumped successfully into {dump_file.name}.")
-    else:
-        print("Error occurred during dumping the database.")
-        print(result.stderr)
-        return False
-
-
-def drop_create_db(test_db: DatabaseSettings):
-    sql_commands = f"""
-DROP DATABASE IF EXISTS `{test_db.database}`;
-CREATE DATABASE `{test_db.database}`;
-"""
-    command = [
-        "mysql",
-        "-h",
-        test_db.host,
-        "-P",
-        test_db.port,
-        "-u",
-        test_db.user,
-        "-p" + test_db.password,
-    ]
-
-    print("Dropping and creating the database..")
-    print(" ".join(command))
-    result = subprocess.run(
-        command, input=sql_commands, stderr=subprocess.PIPE, text=True, check=True
-    )
-
-    if result.returncode == 0:
-        print("Database dropped and created successfully.")
-    else:
-        print("Error occurred during dropping and creating the database.")
-        print(result.stderr)
-        return False
-
-
-def load_db(db_config: DatabaseSettings, dump_file, force=False):
-    # now load the dump file
-    command = [
-        "mysql",
+def build_command(command, db_config, args=[], include_database=True):
+    result = [
+        command,
+        *args,
         "-h",
         db_config.host,
         "-P",
@@ -105,107 +15,110 @@ def load_db(db_config: DatabaseSettings, dump_file, force=False):
         "-u",
         db_config.user,
         "-p" + db_config.password,
-        "--force" if force else "",
-        db_config.database,
     ]
+    if include_database:
+        result.append(db_config.database)
+    return result
 
-    command = [tk for tk in command if tk != ""]
-    command_string = " ".join(command)
+
+def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=[]):
+    args = ["--skip-triggers"]
+    if no_data:
+        args.append("--no-data")
+    if no_create:
+        args.append("--no-create-info")
+
+    command = build_command("mysqldump", db_config, args) + tables
+
+    result = subprocess.run(command, stdout=dump_file, stderr=subprocess.PIPE)
+
+    if result.returncode == 0:
+        print(f"Database dumped successfully into {dump_file.name}.")
+        return True
+    else:
+        print("Error occurred during dumping the database.")
+        print(result.stderr)
+        return False
+
+
+def drop_create_db(test_db):
+    db = test_db.database
+    sql_commands = f"DROP DATABASE IF EXISTS `{db}`;CREATE DATABASE `{db}`;"
+    command = build_command("mysql", test_db, include_database=False)
+
+    print("Creating empty database")
+    print(" ".join(command))
+    result = subprocess.run(
+        command, input=sql_commands, stderr=subprocess.PIPE, text=True, check=True
+    )
+
+    if result.returncode == 0:
+        print("Database created successfully.")
+        return True
+    else:
+        print("Error occurred during creating the database.")
+        print(result.stderr)
+        return False
+
+
+def load_db(db_config, dump_file, force=False):
+    args = ["--force"] if force else []
+    command = build_command("mysql", db_config, args)
 
     print("Loading database from dump.")
-    print(command_string)
-
-    # Execute the load command and pass the dump file
     result = subprocess.run(command, stdin=dump_file, stderr=subprocess.PIPE, text=True)
 
     if result.returncode == 0:
         print("Database loaded successfully.")
+        return True
     else:
         print("Error occurred during loading the database.")
         print(result.stderr)
         return False
 
 
-def get_table_names(db_config: DatabaseSettings):
-    import mysql.connector
-    # Connect to the MySQL database
-    connection = mysql.connector.connect(
-        host=db_config.host,
-        port=db_config.port,
-        user=db_config.user,
-        password=db_config.password,
-        database=db_config.database,
-    )
+class DatabaseTransfer:
+    def __init__(self, source_db, test_db):
+        self.source_db = source_db
+        self.test_db = test_db
 
-    try:
-        # Create a cursor object
-        cursor = connection.cursor()
+    def create_test_db(self, no_data=True):
+        """Create a test database from the source database.
 
-        # Query to get all table names
-        cursor.execute("SHOW TABLES")
+        Args:
+            no_data (bool): If True, the database will be created without data.
 
-        # Fetch and print all table names
-        tables = cursor.fetchall()
-        return [table[0] for table in tables]
+        """
 
-    finally:
-        # Close the connection
-        cursor.close()
-        connection.close()
+        drop_create_db(self.test_db)
 
+        with tempfile.NamedTemporaryFile(mode="w+t") as dump_file:
+            dump_database(self.source_db, dump_file, no_data=no_data)
+            dump_file.seek(0)
+            load_db(self.test_db, dump_file)
 
-def run_smartdump(db_config: DatabaseSettings, dump_file):
-    smartdump_path = (
-        Path.home() / ".config/composer/vendor/benmorel/smartdump/bin/smartdump"
-    )
+    def populate(self, root_conditions: dict):
+        
+        dumper = DatabaseDumper(self.source_db, paths, root_conditions)        
+        sql_statements = dumper.dump()
 
-    # dump the partial tables using smartdump
-    database = db_config.database
-    command = [
-        str(smartdump_path),
-        "--host",
-        db_config.host,
-        "--user",
-        db_config.user,
-        "--port",
-        db_config.port,
-        "--password",
-        db_config.password,
-        "--no-create-table",
-        f'"{database}.Annotation:WHERE PatientID=217250"',
-        f'"{database}.FormAnnotation:WHERE PatientID=217250"',
-        f"\"{database}.AnnotationData:WHERE DatasetIdentifier LIKE '217250%'\"",
-        f'"{database}.SubTaskImageLink:WHERE SubTaskID=8908"',
-        f'"{database}.AnnotationData:WHERE AnnotationID=1926813"',
-    ]
+        conn = mysql.connector.connect(**self.source_db.model_dump())
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT version_num FROM alembic_version;")
+            version = cursor.fetchone()[0]
 
-    command_string = " ".join(command)
-    print(command_string)
+        
 
-    # Execute the load command and pass the dump file
-    result = subprocess.run(
-        command_string, stdout=dump_file, stderr=subprocess.PIPE, shell=True
-    )
-
-    if result.returncode == 0:
-        print("Database loaded successfully.")
-    else:
-        print("Error occurred during loading the database.")
-        print(result.stderr)
-
-
-def populate(source_db: DatabaseSettings, test_db: DatabaseSettings):
-    all_tables = get_table_names(source_db)
-    full_tables = list(set(all_tables) - partial_tables)
-
-    # load the full tables
-    with tempfile.NamedTemporaryFile(mode='w+t') as dump_file:
-        dump_database(source_db, dump_file, no_create=True, tables=full_tables)
-        dump_file.seek(0)
-        load_db(test_db, dump_file)
-
-    # load the partial tables
-    with tempfile.NamedTemporaryFile(mode='w+t') as dump_file:
-        run_smartdump(source_db, dump_file)
-        dump_file.seek(0)
-        load_db(test_db, dump_file, force=True)
+        conn = mysql.connector.connect(**self.test_db.model_dump())
+        with conn.cursor() as cursor:
+            cursor.execute(f"INSERT INTO alembic_version (version_num) VALUES ('{version}');")
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")            
+            for sql, values in sql_statements:
+                try:
+                    cursor.execute(sql, values)
+                except mysql.connector.DatabaseError as e:
+                    # doesn't handle INSERT IGNORE well apparently
+                    pass
+            conn.commit()
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
+        conn.close()
