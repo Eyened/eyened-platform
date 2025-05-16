@@ -37,9 +37,8 @@ class DBManager:
     def yield_session(cls):
         """Context manager for session management."""
         if cls._SessionLocal is None:
-            raise RuntimeError(
-                "DBManager is not initialized. Call DBManager.init(config) first."
-            )
+            print("DBManager not initialized, using default config ('.env')")
+            cls.init()
 
         session = cls._SessionLocal()
         try:
@@ -51,9 +50,8 @@ class DBManager:
     def get_session(cls):
         """Returns a new session for manual control (useful for interactive shells)."""
         if cls._SessionLocal is None:
-            raise RuntimeError(
-                "DBManager is not initialized. Call DBManager.init(config) first."
-            )
+            print("DBManager not initialized, using default config ('.env')")
+            cls.init()
         session = cls._SessionLocal()  # User is responsible for closing it
         return session
 
@@ -61,7 +59,6 @@ class DBManager:
     def get_engine(cls):
         """Returns the engine instance."""
         if cls._engine is None:
-            raise RuntimeError(
-                "DBManager is not initialized. Call DBManager.init(config) first."
-            )
+            print("DBManager not initialized, using default config ('.env')")
+            cls.init()
         return cls._engine
