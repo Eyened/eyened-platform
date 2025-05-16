@@ -13,6 +13,15 @@ readonly DEFAULT_BASE_DIR="$HOME/eyened-platform"
 readonly CREDS_FILE=".platform_credentials"
 readonly ENV_FILE=".env"
 
+# Function to read value from .env file
+read_env_value() {
+    local key=$1
+    if [ -f "$ENV_FILE" ]; then
+        local value=$(grep "^${key}=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"')
+        echo "$value"
+    fi
+}
+
 # Function to print status messages
 print_status() {
     echo -e "${GREEN}[✓]${NC} $1"
@@ -99,18 +108,24 @@ echo
 
 # Get port with validation
 echo "Setting up port. This is where you will access the platform from your browser (or omit the port if you are using the default port 80)"
-get_input "Enter the port number for the platform" "$DEFAULT_PORT" PORT validate_port
+EXISTING_PORT=$(read_env_value "PORT")
+get_input "Enter the port number for the platform" "${EXISTING_PORT:-$DEFAULT_PORT}" PORT validate_port
 
 # Get paths with validation
 echo "Setting up paths. These are the directories on your host system that will store the images, annotations, thumbnails and the database."
-get_input "Enter the path to your images directory" "$DEFAULT_BASE_DIR/images" IMAGES_BASEPATH validate_path
-get_input "Enter the path to store annotations and thumbnails" "$DEFAULT_BASE_DIR/storage" STORAGE_BASEPATH validate_path
-get_input "Enter the path to store the database" "$DEFAULT_BASE_DIR/database" DATABASE_PATH validate_path
+EXISTING_IMAGES_PATH=$(read_env_value "IMAGES_BASEPATH")
+EXISTING_STORAGE_PATH=$(read_env_value "STORAGE_BASEPATH")
+EXISTING_DB_PATH=$(read_env_value "DATABASE_PATH")
+
+get_input "Enter the path to your images directory" "${EXISTING_IMAGES_PATH:-$DEFAULT_BASE_DIR/images}" IMAGES_BASEPATH validate_path
+get_input "Enter the path to store annotations and thumbnails" "${EXISTING_STORAGE_PATH:-$DEFAULT_BASE_DIR/storage}" STORAGE_BASEPATH validate_path
+get_input "Enter the path to store the database" "${EXISTING_DB_PATH:-$DEFAULT_BASE_DIR/database}" DATABASE_PATH validate_path
 
 # Get database configuration
 echo 
 echo "Setting up database configuration. This is used to connect to the database outside of the platform."
-get_input "Enter the database port" "3306" DATABASE_PORT validate_port
+EXISTING_DB_PORT=$(read_env_value "DATABASE_PORT")
+get_input "Enter the database port" "${EXISTING_DB_PORT:-3306}" DATABASE_PORT validate_port
 
 # Check if database exists and handle credentials accordingly
 if [ -s "$DATABASE_PATH" ]; then
@@ -118,18 +133,24 @@ if [ -s "$DATABASE_PATH" ]; then
 else
     echo "Database path does not exist or is empty. Creating new database."
     DEFAULT_ROOT_PASSWORD=$(openssl rand -base64 16)
-    get_input "Enter the database root password (or press Enter for a random one)" "$DEFAULT_ROOT_PASSWORD" DATABASE_ROOT_PASSWORD validate_path    
+    EXISTING_ROOT_PASSWORD=$(read_env_value "DATABASE_ROOT_PASSWORD")
+    get_input "Enter the database root password (or press Enter for a random one)" "${EXISTING_ROOT_PASSWORD:-$DEFAULT_ROOT_PASSWORD}" DATABASE_ROOT_PASSWORD validate_path    
 fi
-get_input "Enter the database username" "eyened" DATABASE_USER validate_path
-DEFAULT_DB_PASSWORD=$(openssl rand -base64 16)
-get_input "Enter the password for user $DATABASE_USER (or press Enter for a random one)" "$DEFAULT_DB_PASSWORD" DATABASE_PASSWORD validate_path
-    
 
+EXISTING_DB_USER=$(read_env_value "DATABASE_USER")
+get_input "Enter the database username" "${EXISTING_DB_USER:-eyened}" DATABASE_USER validate_path
+
+EXISTING_DB_PASSWORD=$(read_env_value "DATABASE_PASSWORD")
+DEFAULT_DB_PASSWORD=$(openssl rand -base64 16)
+get_input "Enter the password for user $DATABASE_USER (or press Enter for a random one)" "${EXISTING_DB_PASSWORD:-$DEFAULT_DB_PASSWORD}" DATABASE_PASSWORD validate_path
+
+EXISTING_ADMIN_USERNAME=$(read_env_value "ADMIN_USERNAME")
+EXISTING_ADMIN_PASSWORD=$(read_env_value "ADMIN_PASSWORD")
 DEFAULT_ADMIN_PASSWORD=$(openssl rand -base64 16)
 echo 
 echo "Setting up admin credentials. You will use these to login to the platform for the first time."
-get_input "Enter the admin username (or press Enter for 'admin')" "admin" ADMIN_USERNAME validate_path
-get_input "Enter the admin password (or press Enter for a random one)" "$DEFAULT_ADMIN_PASSWORD" ADMIN_PASSWORD validate_path
+get_input "Enter the admin username (or press Enter for 'admin')" "${EXISTING_ADMIN_USERNAME:-admin}" ADMIN_USERNAME validate_path
+get_input "Enter the admin password (or press Enter for a random one)" "${EXISTING_ADMIN_PASSWORD:-$DEFAULT_ADMIN_PASSWORD}" ADMIN_PASSWORD validate_path
 
 # Create .env file
 print_status "Creating .env file..."
