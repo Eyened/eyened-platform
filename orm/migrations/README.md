@@ -67,7 +67,17 @@ Generate the migration using:
 alembic revision --autogenerate -m "test"
 ```
 
-## Step 6: Testing
+If necessary, update the `upgrade` and `downgrade` methods in the generated python file in `alembic/versions`
+
+## Step 6: Apply migration
+
+```bash
+alembic upgrade head
+```
+
+This will sync the orm and database.
+
+## Step 7: Testing
 
 Depending on the nature of the changes, test the following on the new database layout:
 - Connect a viewer
