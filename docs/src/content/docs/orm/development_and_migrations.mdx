@@ -44,36 +44,38 @@ We use alembic for managing database migrations. This section explains our proce
 
 ### 1. Development repository
 
-Follow the *Development install* steps above to install eyened_orm. Alembic is installed with eyened_orm. Make sure the `alembic` command is available in the terminal.
+Make sure eyened_orm in installed (see getting_started)
+Alembic is installed with eyened_orm. Make sure the `alembic` command is available in the terminal.
 
-Rename `alembic.ini.sample` to `alembic.ini` and change the `sqlalchemy.url` with the test_database credentials:
-
-```
-sqlalchemy.url = mysql+pymysql://<USERNAME>:<PASSWORD>@<HOST>:<PORT>/<DATABASE>
-```
-
-Alembic reads the ORM objects with `Base.metadata` in `../alembic/env.py`. This is used only to generate automatic migrations (see below). The code in env.py will look for an `eyened_orm` Python package in the current environment. If you installed the ORM as above (Development install) you should be set up. Any changes to the ORM code will be directly accessible to alembic.
+To set up a testing environment, check the README here: https://github.com/Eyened/eyened-platform/tree/main/orm/migrations
 
 
-### 2. Repository for commiting to production (optional)
+:::note
+Alembic reads the ORM objects with `Base.metadata` in `../alembic/env.py`. 
+This is used only to generate automatic migrations (see below). 
+The code in env.py will look for an `eyened_orm` Python package in the current environment. 
+If you installed the ORM as above you should be set up. 
+Any changes to the ORM code will be directly accessible to alembic.
+:::
 
-Using a second repository pointing to the production database is a safe way to apply approved changes to the production database without having to deal with changing credentials. With this in place the workflow for deployment of approved changes is simply: 1) navigate to your "production" repository, 2) pull the latest changes that you want to deploy, 3) run the migration. More details below.
+### 2. Commiting to production
 
-To create a second repository, create a separate clone of the repository into a different folder:
-
-```
-git clone git@github.com:Eyened/eyened-orm.git eyened_orm_production
-```
-
-Rename `alembic.ini.sample` to `alembic.ini` and change the `sqlalchemy.url`. This time point `sqlalchemy.url` to the production database.  
+When committing migrations to production:
+1. Ensure all tests pass
+2. Create a pull request with the migration changes
+3. Get code review approval
+4. Merge to main branch
+5. Deploy the changes following the deployment procedure
 
 
 
 ## **Developing** migrations
 
-1. Prepare a copy of the production database called `test_database`
+1. Prepare a copy of the production database (see https://github.com/Eyened/eyened-platform/tree/main/orm/migrations)
 
-2. Change the ORM code to reflect the desired change in database structure. See `ORM conventions` above. Then move to the alembic folder <strong>eyened-orm/alembic_</strong>
+2. Change the ORM code to reflect the desired change in database structure. 
+See `ORM conventions` above. 
+Then move to the alembic folder <strong>eyened-orm/alembic_</strong>
 
 3. Auto-generate alembic migration:
 
@@ -81,11 +83,20 @@ Rename `alembic.ini.sample` to `alembic.ini` and change the `sqlalchemy.url`. Th
     alembic revision --autogenerate -m "my migration description"
     ```
 
-    This will create a new migration file in `alembic/versions`. Every migration *.py script contains two functions: `upgrade()` and `downgrade()`. `upgrade()` is the migration and will apply any changes necessary to make the database match the current state of the ORM. It should contain commands that apply your newly made changes to the database. If you auto-generate the migration without making any changes to the ORM (i.e.: when DB and ORM are in sync) the function should be blank (`pass`). The `downgrade()` function contains instructions to undo the migration.
+    This will create a new migration file in `alembic/versions`. 
+    Every migration *.py script contains two functions: `upgrade()` and `downgrade()`. 
+    `upgrade()` is the migration and will apply any changes necessary to make the database match the current state of the ORM.
+    It should contain commands that apply your newly made changes to the database. 
+    If you auto-generate the migration without making any changes to the ORM (i.e.: when DB and ORM are in sync) the function should be blank (`pass`). 
+    The `downgrade()` function contains instructions to undo the migration.
+
 
 4. Check if `alembic revision --autogenerate -m "test"` leaves a blank migration file. If not, fix discrepancies and generate a new commit.
 
-5. Manually edit the migration functions `upgrade()` and `downgrade()` -> **Check carefully**. Especially note that alembic cannot detect changes in table and column names and will instead generate eg. a `drop_column` command followed by an `add_column` command. These should be changed into [alter_column](https://alembic.sqlalchemy.org/en/latest/ops.html#alembic.operations.Operations.alter_column) or [rename_table](https://alembic.sqlalchemy.org/en/latest/ops.html#alembic.operations.Operations.rename_table). See [here for limitations of alembic auto-generation](https://alembic.sqlalchemy.org/en/latest/autogenerate.html#what-does-autogenerate-detect-and-what-does-it-not-detect). 
+5. Manually edit the migration functions `upgrade()` and `downgrade()` 
+:::caution
+**Check carefully**. Especially note that alembic cannot detect changes in table and column names and will instead generate eg. a `drop_column` command followed by an `add_column` command. These should be changed into [alter_column](https://alembic.sqlalchemy.org/en/latest/ops.html#alembic.operations.Operations.alter_column) or [rename_table](https://alembic.sqlalchemy.org/en/latest/ops.html#alembic.operations.Operations.rename_table). See [here for limitations of alembic auto-generation](https://alembic.sqlalchemy.org/en/latest/autogenerate.html#what-does-autogenerate-detect-and-what-does-it-not-detect). 
+:::
 
 6. Once you are satisfied with the migration file, run the migration on the test database:
     ```
@@ -99,92 +110,97 @@ Rename `alembic.ini.sample` to `alembic.ini` and change the `sqlalchemy.url`. Th
     ```
     ./export_alembic_sql.sh
     ```
+    This script is located in the `orm/alembic_` directory.
 
-9. Push the changes to the github repo 'eyened-orm' on a branch with a convenient name, that reflects the changes made. Submit a pull request in the eyened_orm repository to move it to 'master'. If you want to generate the migration automatically using <strong>Docker</strong>, proceed to <strong>1.3)</strong>
-
+9. Push the changes on a branch with a convenient name, that reflects the changes made. 
+Submit a pull request. 
 
 ## **Testing** migrations
 
-### Testing migrations using ORM utility
+:::note
+This documentation overlaps with README:
+https://github.com/Eyened/eyened-platform/tree/main/orm/migrations 
+:::
 
-#### Prerequisite: Run a database server
-You can use the `docker/docker-compose.yml` file to boot up a test database. Make sure to remove the services you don't need.
-
-#### Prerequisite: Install smartdump
-To make a smart dump of the database you need to install the following:
-```
-composer global require benmorel/smartdump
-```
-#### Fetch data and load in the test database
-
+### Environment
 The ORM includes a utility to easily create a copy of the production database into a running mysql server, for testing.
-For this to work the ORM needs access to the database credentials for both production and test database. For this add a `config.eyened.py` (production) and `config.test.py` (test) files as explained [above](#orm-credential-files).
+For this to work the ORM needs access to the database credentials for both production and test database. 
+Add a `source.env` (production) and `test.env` (test) files as explained in [ORM Configuration](/eyened-platform/orm/configuration) 
 
-Once this is done simply run to create a small test database with only patient 10001:
+Set up alembic to work with your testing enviroment:
 ```
-eorm test
+eorm set-connection-string -e test
 ```
+Where 'test' sets up the connection string in alembic based on the variables in `test.env`
 
-or to copy the entire database:
-```
-eorm full
-```
+### Create test database
+Once this is done, you have two options to populate the database:
 
-This will 1) dump production database to a temporary file, 2) drop and re-create the test database and 3) load the dumpfile into the new test database. Despite the name, this will not run any tests or run the migration.
+1. **Limited Data Copy** (Recommended for most development work):
+   ```
+   eorm test -s source -t test -r root_conditions.json
+   ```
+   This creates a small test database with only the data specified in `root_conditions.json`. 
+   The `-s source` and `-t test` parameters refer to the .env files for source and test databases.
 
-Now to test the migration:
+2. **Full Database Copy** (Use when you need the complete production dataset):
+   ```
+   eorm full -s source -t test
+   ```
+   This creates a complete copy of the production database.
+
+Both options will:
+1. Dump the production database to a temporary file 
+2. Drop and re-create the test database
+3. Load the dumpfile into the new test database
+
+Note: Despite the command name, neither option runs any tests or applies migrations - they only set up the database state.
+
+
+
+### Test the migration:
 
 1. Check out the relevant eyened_orm commit / branch that you wish test in your development repository (or test virtualenv set up for this purpose).
 2. Apply the migration on the test database (from the alembic folder):
     ```
     alembic upgrade head
     ```
-    This should always succeeed. If there are issues with running the migration it could be a bug or that other migrations have been applied in between. In this case changing the down_revision might be necessary. Be careful!
+TODO: or perhaps run this?
+    ```
+    alembic upgrade head --sql > migration.sql
+    ```
 
-
-### Testing migrations using Docker, in a central test_database
-
-If the ORM reflects the changes you want to make, create a database change request using docker. This container builds a test_database (using shared credentials). The container pulls the most recent production database (and applies the alembic migration). Follow these steps: 
-
-1.  **Review the .env file**
-In the `docker` directory, copy the `template.env` file to a `.env` file and enter the details for the production database. You can change the ports for the test database and phpmyadmin client, and set `ALEMBIC_AUTO_MIGRATION=true` if you want to automatically apply any remaining migration immediately.
-
-
-2. **Launch the containers**
-
-```
-cd docker
-docker-compose build
-docker-compose up
-```
-
-4. **Inspect database changes**
-Connect to the test_database using phpmyadmin, MySQLWorkbench or others, using the root user and password set in the `.env` file. If you did not set the `ALEMBIC_AUTO_MIGRATION` you can still apply the migration using 
-```
-docker exec test_alembic alembic upgrade head --sql > migration.sql
-```
-
-
+This should always succeed. 
+If there are issues with running the migration it could be a bug or that other migrations have been applied in between. 
+In this case changing the down_revision might be necessary. Be careful!
 
 ### What to test
 
 1. Test any code the migration might affect, including at least:
+    - Data integrity after migration
     - EyeNED viewer
-    - Automatic import scripts for ERGO-center images
+    - importing images
+  
 
-TODO: insert more details about the tests that we want to run.
+TODO: add unit tests
+
 
 ## **Applying** migrations to the production database
 
-When the team agrees on the changes, the datamanager applies the changes to the production database.
+The SQL migration file is located in: <strong>eyened-platform/orm/migrations/migration_output/migration_latest.sql</strong>
 
-Get the latest, to be applied, migration, by running:
-```
-./eyened-orm/alembic_/generate_latest_migration.sh
-```
-Run the SQL result on the production database using the mysql cli interface, using the 'root' account. The SQL result is located in: <strong>../eyened-orm/docker_alembic/migration_output/latest_migration.sql</strong>
-```
-docker exec -ti eyened_database bash
+TODO: check this
 
-mysql -u root -p'your_password' < /path_to_script/latest_migration.sql
+
+To apply the migration:
+
+1. Navigate to the docker directory (eyened-platform/docker):
+```
+cd docker
+```
+
+2. Execute the migration:
+```
+docker-compose exec database bash
+mysql -u root -p'your_password' < /path/to/migration_latest.sql
 ```
