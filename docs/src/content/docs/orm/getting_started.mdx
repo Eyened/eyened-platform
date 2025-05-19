@@ -21,8 +21,8 @@ The Eyened API may provide a more convenient way to interact with the database. 
 To install the ORM locally as a Python package:
 
 ```
-git clone https://github.com/Eyened/eyened-platform.git eyened_platform
-cd eyened_platform/orm
+git clone https://github.com/Eyened/eyened-platform.git 
+cd eyened-platform/orm
 pip install -e .
 ```
 
@@ -32,43 +32,16 @@ The easiest way to connect the ORM to a database from Python code, use the `DBMa
 
 ```python
 from eyened_orm import DBManager
-from eyened_orm.utils import get_config
-
-# Load configuration for a specific environment (e.g., "test", "prod")
-config = get_config("test")
-
-# Initialize the DBManager with the configuration
-DBManager.init(config)
-
+# Initialize with environment variables from `orm/eyened_orm/environments/prod.env`
+DBManager.init("prod")
 # Get a session to interact with the database
 session = DBManager.get_session()
 ```
 
-:::caution
-See [ORM Configuration](/eyened-platform/orm/configuration) for information on how to create configuration files for the ORM.
+:::tip
+See [ORM Configuration](/eyened-platform/orm/configuration) for more information on how to create environments or manually set up configuration files for the ORM.
 :::
 
-Alternatively, you can provide database credentials directly:
-
-```python
-from eyened_orm import get_session_local, init_orm
-from eyened_orm.utils.config import EyenedORMConfig,DatabaseSettings
-
-config = EyenedORMConfig(
-    database=DatabaseSettings(
-        DB_HOST="<HOSTNAME>",
-        DB_PORT="<PORT>",
-        DB_USER="<USER>",
-        DB_PASSWORD="<PASSWORD>",
-        DB_NAME="<DATABASE>"
-    ),
-    images_basepath="/PATH/TO/IMAGES",
-    annotations_path="/PATH/TO/ANNOTATIONS",
-    ...
-)
-
-DBManager.init(config)
-```
 
 ## Working with database objects
 
