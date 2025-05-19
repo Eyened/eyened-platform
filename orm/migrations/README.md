@@ -15,10 +15,16 @@ This guide outlines the process to:
    ```
 
 2. Create a new database in a docker environment:
+
+
    ```bash
    docker-compose build
    docker-compose up -d
    ```
+:::caution
+To avoid conflicts add a line `name: <your-name>` to the top of your `docker-compose.yaml` file
+:::
+
 
 ## Step 2: Set Up Environments for Data Transfer
 
