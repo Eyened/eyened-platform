@@ -79,12 +79,10 @@ async def get_form_annotation_value(
 
     return annotation.FormData
 
-
 @router.get("/form-annotations")
 async def get_form_annotations(
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    # Your existing code here, but use current_user.id instead of user_id
     pass
 
 @router.put("/form-annotations/{annotation_id}")
@@ -92,5 +90,4 @@ async def update_form_annotation(
     annotation_id: int,
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    # Your existing code here, but use current_user.id instead of user_id
     pass

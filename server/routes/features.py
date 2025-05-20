@@ -46,5 +46,4 @@ async def delete_feature(
 async def get_features(
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    # Your existing code here, but use current_user.id instead of user_id
     pass

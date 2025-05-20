@@ -21,68 +21,52 @@ import { TaskConstructor, type Task } from "./task";
 import { TaskDefinitionConstructor, type TaskDefinition } from "./taskDefinition";
 import { TaskStateConstructor, type TaskState } from "./taskState";
 
-export const constructors = {
-    annotationDatas: AnnotationDataConstructor,
-    annotations: AnnotationConstructor,
-    annotationTypes: AnnotationTypeConstructor,
-
-    creators: CreatorConstructor,
-    devices: DeviceConstructor,
-    deviceModels: DeviceModelConstructor,
-    features: FeatureConstructor,
-    formAnnotations: FormAnnotationConstructor,
-    formSchemas: FormSchemaConstructor,
-
-    instances: InstanceConstructor,
-    patients: PatientConstructor,
-    projects: ProjectConstructor,
-    scans: ScanConstructor,
-    series: SeriesConstructor,
-    studies: StudyConstructor,
-
-
-    taskDefinitions: TaskDefinitionConstructor,
-    tasks: TaskConstructor,
-    taskStates: TaskStateConstructor,
-    subTasks: SubTaskConstructor,
-    subTaskImageLinks: SubTaskImageLinkConstructor,
-
-    tags: TagConstructor,
-    instanceTags: InstanceTagConstructor,
-    studyTags: StudyTagConstructor,
-    annotationTags: AnnotationTagConstructor,
-};
 
 export class DataModel {
 
-    annotationDatas = new MutableItemCollection<AnnotationData>('annotationDatas');
-    annotations = new MutableItemCollection<Annotation>('annotations');
-    annotationTypes = new ItemCollection<AnnotationType>();
+    annotationDatas = new MutableItemCollection<AnnotationData>('annotation-data', AnnotationDataConstructor);
+    'annotation-data': MutableItemCollection<AnnotationData> = this.annotationDatas;
 
-    creators = new ItemCollection<Creator>();
-    devices = new ItemCollection<Device>();
-    deviceModels = new ItemCollection<DeviceModel>();
-    features = new MutableItemCollection<Feature>('features');
-    formAnnotations = new MutableItemCollection<FormAnnotation>('formAnnotations');
-    formSchemas = new ItemCollection<FormSchema>();
+    annotations = new MutableItemCollection<Annotation>('annotations', AnnotationConstructor);
 
-    instances = new ItemCollection<Instance>();
-    patients = new ItemCollection<Patient>();
-    projects = new ItemCollection<Project>();
-    scans = new ItemCollection<Scan>();
-    series = new ItemCollection<Series>();
-    studies = new ItemCollection<Study>();
+    annotationTypes = new ItemCollection<AnnotationType>('annotation-types', AnnotationTypeConstructor);
+    'annotation-types': ItemCollection<AnnotationType> = this.annotationTypes;
 
-    taskDefinitions = new MutableItemCollection<TaskDefinition>('taskDefinitions');
-    tasks = new MutableItemCollection<Task>('tasks');
-    taskStates = new ItemCollection<TaskState>();
-    subTasks = new MutableItemCollection<SubTask>('subTasks');
-    subTaskImageLinks = new MutableItemCollection<SubTaskImageLink>('subTaskImageLinks');
+    creators = new ItemCollection<Creator>('creators', CreatorConstructor);
+    devices = new ItemCollection<Device>('devices', DeviceConstructor);
+    deviceModels = new ItemCollection<DeviceModel>('device-models', DeviceModelConstructor);
+    'device-models': ItemCollection<DeviceModel> = this.deviceModels;
 
-    tags = new MutableItemCollection<Tag>('tags');
-    instanceTags = new MutableItemCollection<InstanceTag>('instanceTags');
-    studyTags = new MutableItemCollection<StudyTag>('studyTags');
-    annotationTags = new MutableItemCollection<AnnotationTag>('annotationTags');
+    features = new MutableItemCollection<Feature>('features', FeatureConstructor);
+    formAnnotations = new MutableItemCollection<FormAnnotation>('form-annotations', FormAnnotationConstructor);
+    'form-annotations': MutableItemCollection<FormAnnotation> = this.formAnnotations;
+    formSchemas = new ItemCollection<FormSchema>('form-schemas', FormSchemaConstructor);
+    'form-schemas': ItemCollection<FormSchema> = this.formSchemas;
+
+    instances = new ItemCollection<Instance>('instances', InstanceConstructor);
+    patients = new ItemCollection<Patient>('patients', PatientConstructor);
+    projects = new ItemCollection<Project>('projects', ProjectConstructor);
+    scans = new ItemCollection<Scan>('scans', ScanConstructor);
+    series = new ItemCollection<Series>('series', SeriesConstructor);
+    studies = new ItemCollection<Study>('studies', StudyConstructor);
+
+    taskDefinitions = new MutableItemCollection<TaskDefinition>('task-definitions', TaskDefinitionConstructor);
+    'task-definitions': MutableItemCollection<TaskDefinition> = this.taskDefinitions;
+    tasks = new MutableItemCollection<Task>('tasks', TaskConstructor);
+    taskStates = new ItemCollection<TaskState>('task-states', TaskStateConstructor);
+    'task-states': ItemCollection<TaskState> = this.taskStates;
+    subTasks = new MutableItemCollection<SubTask>('sub-tasks', SubTaskConstructor);
+    'sub-tasks': MutableItemCollection<SubTask> = this.subTasks;
+    subTaskImageLinks = new MutableItemCollection<SubTaskImageLink>('sub-task-image-links', SubTaskImageLinkConstructor);
+    'sub-task-image-links': MutableItemCollection<SubTaskImageLink> = this.subTaskImageLinks;
+
+    tags = new MutableItemCollection<Tag>('tags', TagConstructor);
+    instanceTags = new MutableItemCollection<InstanceTag>('instance-tags', InstanceTagConstructor);
+    'instance-tags': MutableItemCollection<InstanceTag> = this.instanceTags;
+    studyTags = new MutableItemCollection<StudyTag>('study-tags', StudyTagConstructor);
+    'study-tags': MutableItemCollection<StudyTag> = this.studyTags;
+    annotationTags = new MutableItemCollection<AnnotationTag>('annotation-tags', AnnotationTagConstructor);
+    'annotation-tags': MutableItemCollection<AnnotationTag> = this.annotationTags;
 }
 export const data = new DataModel();
 
@@ -105,7 +89,7 @@ export function clearData() {
     data['annotationDatas'].clear();
     data['annotations'].clear();
     data['formAnnotations'].clear();
-    
+
 }
 export function importData(itemCollections: { [key: string]: any[] }) {
 
@@ -119,7 +103,7 @@ export function importData(itemCollections: { [key: string]: any[] }) {
             continue;
         }
         const collection = data[key];
-        const constructor = constructors[key];
+        const constructor = collection.itemConstructor;
         const newItems = [];
         for (const itemData of items) {
             const id = constructor.getID(itemData);
@@ -153,8 +137,8 @@ export function importData(itemCollections: { [key: string]: any[] }) {
 }
 
 export function importItem(key: string, itemData: any) {
-    const constructor = constructors[key];
-    const collection = data[key];
+    const collection = data[key as keyof DataModel];
+    const constructor = collection.itemConstructor;
     const id = constructor.getID(itemData);
     if (collection.get(id)) {
         throw new Error(`Item with id ${id} already exists`);
