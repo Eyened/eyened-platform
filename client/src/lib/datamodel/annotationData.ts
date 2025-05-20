@@ -30,7 +30,7 @@ interface AnnotationDataParameters {
 
 const parameters: ItemMapping<any> = {
     toValue: (params: any) => {
-        const endpoint = `annotationDatas/${params.AnnotationID}_${params.ScanNr}/parameters`;
+        const endpoint = `annotation-data/${params.AnnotationID}_${params.ScanNr}/parameters`;
         const mediaType = 'application/json';
         const initialValue = {
             valuefloat: params.ValueFloat,
@@ -44,7 +44,7 @@ const parameters: ItemMapping<any> = {
     }
 }
 
-const value = ServerPropertyMapping(null, params => `annotationDatas/${params.AnnotationID}_${params.ScanNr}/value`, params => params.MediaType, false);
+const value = ServerPropertyMapping(null, params => `annotation-data/${params.AnnotationID}_${params.ScanNr}/file`, params => params.MediaType, false);
 export const AnnotationDataConstructor = new ItemConstructor<AnnotationData>(
     (params: any) => `${params.AnnotationID}_${params.ScanNr}`, {
     annotation: FKMapping('AnnotationID', 'annotations'),

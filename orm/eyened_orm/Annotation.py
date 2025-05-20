@@ -198,6 +198,14 @@ class AnnotationData(Base):
         annotation_data.MediaType = "image/png" if file_extension.lower() == "png" else "application/octet-stream"
         return annotation_data
 
+    @classmethod
+    def from_composite_id(cls, annotation_data_id: str, session: Session) -> AnnotationData:
+        annotation_id, scan_nr = map(int, annotation_data_id.split("_"))
+        return (
+            session.scalar(select(cls).filter_by(AnnotationID=annotation_id, ScanNr=scan_nr))
+        )
+
+
     def default_path(self, ext: str) -> str:
         a = self.Annotation
         return f"{a.Patient.PatientIdentifier}/{a.AnnotationID}_{self.ScanNr}.{ext}"

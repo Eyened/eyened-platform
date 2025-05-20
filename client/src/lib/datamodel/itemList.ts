@@ -1,7 +1,7 @@
 import { apiUrl } from '$lib/config';
-import { derived, get, writable, type Invalidator, type Readable, type Subscriber, type Unsubscriber } from 'svelte/store';
+import { derived, get, writable, type Readable, type Subscriber, type Unsubscriber } from 'svelte/store';
 import type { ItemConstructor } from './itemContructor';
-import { constructors, importItem } from './model';
+import { importItem } from './model';
 
 export interface Item {
     id: number | string;
@@ -15,7 +15,7 @@ export class FilterList<T> implements Readable<T[]> {
         return this.$[0];
     }
 
-    subscribe(run: Subscriber<T[]>, invalidate?: Invalidator<T[]> | undefined): Unsubscriber {
+    subscribe(run: Subscriber<T[]>, invalidate?: () => void): Unsubscriber {
         return this.items.subscribe(run, invalidate);
     }
 
@@ -95,6 +95,10 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
     protected readonly items: Map<number | string, T> = new Map();
     protected readonly store = writable(0);
 
+
+    constructor(public readonly endpoint: string, public readonly itemConstructor: ItemConstructor<T>) {
+    }
+
     clear() {
         this.items.clear();
         this.store.update(n => n + 1);
@@ -146,15 +150,14 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
 }
 export class MutableItemCollection<T extends Item> extends ItemCollection<T> {
 
-    constructor(private readonly endpoint: string) {
-        super();
+    constructor(endpoint: string, itemConstructor: ItemConstructor<T>) {
+        super(endpoint, itemConstructor);
     }
 
     async create(item: Omit<T, 'id'>): Promise<T> {
-        const itemConstructor = constructors[this.endpoint] as ItemConstructor<T>;
-        const apiParams = itemConstructor.toParams(item);
+        const apiParams = this.itemConstructor.toParams(item);
 
-        const resp = await fetch(`${apiUrl}/${this.endpoint}/new`, {
+        const resp = await fetch(`${apiUrl}/${this.endpoint}`, {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
