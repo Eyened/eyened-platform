@@ -11,7 +11,8 @@
 
     let featureName = $state("");
 
-    function createFeature() {
+    function createFeature(event: Event) {
+        event.preventDefault();
         features.create({
             name: featureName,
         });
@@ -23,8 +24,10 @@
     <h1>Features</h1>
     <div class="new-feature">
         <span>New Feature:</span>
-        <input type="text" bind:value={featureName} />
-        <button onclick={createFeature}>Create</button>
+        <form onsubmit={createFeature}>
+            <input type="text" bind:value={featureName} />
+            <button type="submit">Create</button>
+        </form>
     </div>
     <ul class="feature-list">
         {#each $features as feature}
