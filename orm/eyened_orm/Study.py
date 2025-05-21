@@ -1,21 +1,18 @@
-from __future__ import annotations
-
 import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import ForeignKey, String, func, select, Index
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy import select, Index
+from sqlalchemy.orm import Session
+from sqlmodel import Field, Relationship
 
-from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
-from .ImageInstance import ImageInstance
+from .base import Base
 
-from .Series import Series
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, Patient
+    from eyened_orm import Annotation, FormAnnotation, Patient, Series, ImageInstance
 
 
-class Study(Base):
+class Study(Base, table=True):
     """
     Study class representing a visit (study) of a patient.
     All images taken on the same day are grouped into a study.
@@ -23,61 +20,53 @@ class Study(Base):
     
     __tablename__ = "Study"
     __table_args__ = (
-        ForeignKeyIndex(__tablename__, "Patient", "PatientID"),
-        # one study per patient per date
-        CompositeUniqueConstraint("PatientID", "StudyDate"),
-        # Add index on StudyDate for faster ordering and filtering
-        Index('StudyDate_idx', 'StudyDate'),
+        Index("PatientIDStudyDate_UNIQUE", "StudyDate", "PatientID",unique=True),
+        Index("fk_Study_Patient1_idx", "PatientID"),
+        Index("StudyDate_idx", "StudyDate"),
+        Index("StudyRound", "StudyRound"),
     )
 
-    StudyID: Mapped[int] = mapped_column(primary_key=True)
+    StudyID: int = Field(primary_key=True)
 
-    PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
-    Patient: Mapped[Patient] = relationship(back_populates="Studies")
+    PatientID: int = Field(foreign_key="Patient.PatientID")
+    Patient: "Patient" = Relationship(back_populates="Studies")
 
-    Series: Mapped[List[Series]] = relationship(
-        back_populates="Study", cascade="all,delete-orphan"
-    )
+    Series: List["Series"] = Relationship(back_populates="Study")
+    Annotations: List["Annotation"] = Relationship(back_populates="Study")
+    FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Study")
 
-    Annotations: Mapped[List[Annotation]] = relationship(back_populates="Study")
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
-        back_populates="Study"
-    )
-
-    StudyRound: Mapped[Optional[int]] = mapped_column(
-        index=True
-    ) 
-    StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))
+    StudyRound: Optional[int] = Field(default=None)
+    StudyDescription: Optional[str] = Field(default=None, max_length=64)
     
-    StudyInstanceUid: Mapped[Optional[str]] = mapped_column(
-        "StudyInstanceUid", String(64), unique=True
+    StudyInstanceUid: Optional[str] = Field(
+        default=None, 
+        max_length=64, 
+        sa_column_kwargs={"unique": True}
     )
-    StudyDate: Mapped[datetime.date] = mapped_column("StudyDate")
+    StudyDate: datetime.date
 
     # datetimes
-    DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
+    DateInserted: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
-    patient_date_to_id_map = None
-
-
+    
 
     @classmethod
-    def by_id(cls, session: Session, id: int):
+    def by_id(cls, session: Session, id: int) -> Optional["Study"]:
         res = session.execute(select(Study).where(Study.StudyID == id)).first()
         if res is None:
             return None
         return res[0]
 
     @classmethod
-    def by_uid(cls, session: Session, StudyInstanceUid: str):
+    def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
         return session.scalar(
             select(Study).where(Study.StudyInstanceUid == StudyInstanceUid)
         )
 
     @classmethod
     def by_patient_and_date(
-        cls, session: Session, patient_id, study_date
-    ):
+        cls, session: Session, patient_id: int, study_date: datetime.date
+    ) -> Optional["Study"]:
         return session.scalar(
             select(Study)
             .where(Study.PatientID == patient_id)
@@ -85,14 +74,12 @@ class Study(Base):
         )
 
     @property
-    def age_years(self):
+    def age_years(self) -> Optional[float]:
         if self.StudyDate is None or self.Patient.BirthDate is None:
             return None
         return (self.StudyDate - self.Patient.BirthDate).days / 365.25
-    
 
-    def get_images(self, where=None, include_inactive=False) -> List[ImageInstance]:
-        from eyened_orm import Series, Study, Patient
+    def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
         session = Session.object_session(self)
         q = (
             select(ImageInstance)
@@ -105,7 +92,39 @@ class Study(Base):
             q = q.where(~ImageInstance.Inactive)
         if where is not None:
             q = q.where(where)
-        return session.scalars(q)
+        return session.scalars(q).all()
 
     def __repr__(self):
         return f"Study({self.StudyID}, {self.StudyDate}, {self.StudyInstanceUid}, {self.StudyDescription})"
+
+
+class Series(Base, table=True):
+    __tablename__ = "Series"
+    __table_args__ = (
+        Index("fk_Series_Study1_idx", "StudyID"),
+    )
+    SeriesID: int = Field(primary_key=True)
+
+    StudyID: int = Field(foreign_key="Study.StudyID", ondelete="CASCADE")
+    Study: "Study" = Relationship(back_populates="Series")
+
+    SeriesNumber: Optional[int] = Field(default=None)
+    SeriesInstanceUid: Optional[str] = Field(default=None, max_length=64, sa_column_kwargs={"unique": True})
+    
+    ImageInstances: List["ImageInstance"] = Relationship(back_populates="Series")
+    Annotations: List["Annotation"] = Relationship(back_populates="Series")
+
+    def __repr__(self):
+        return f"Series({self.SeriesID}, {self.SeriesNumber}, {self.SeriesInstanceUid})"
+
+    def get_images(self, where=None) -> List["ImageInstance"]:
+        session = Session.object_session(self)
+        q = (
+            select(ImageInstance)
+            .join_from(ImageInstance, Series)
+            .where(~ImageInstance.Inactive)
+            .where(Series.SeriesID == self.SeriesID)
+        )
+        if where is not None:
+            q = q.where(where)
+        return session.scalars(q).all()

@@ -1,49 +1,42 @@
-from __future__ import annotations
+from sqlalchemy import Index
+from sqlmodel import Field
+from .base import Base
 
-from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, ForeignKey, String, Table
-from sqlalchemy.orm import Mapped, mapped_column
-
-from eyened_orm.base import Base, ForeignKeyIndex
-
-if TYPE_CHECKING:
-    pass
-
-class Tag(Base):
+class Tag(Base, table=True):
     __tablename__ = "Tag"
-    TagID: Mapped[int] = mapped_column(primary_key=True)
-    TagName: Mapped[str] = mapped_column(String(256), unique=True)
+    TagID: int = Field(primary_key=True)
+    TagName: str = Field(max_length=256, sa_column_kwargs={"unique": True})
 
 
-tag_annotation_association_table = Table(
-    "AnnotationTag",
-    Base.metadata,
-    Column("TagID", ForeignKey("Tag.TagID"), nullable=False),
-    Column(
-        "AnnotationID",
-        ForeignKey("Annotation.AnnotationID"),
-        nullable=False),
-    ForeignKeyIndex("AnnotationTag", "Annotation", "AnnotationID"),
-    ForeignKeyIndex("AnnotationTag", "Tag", "TagID"),
-)
+class AnnotationTag(Base, table=True):
+    __tablename__ = "AnnotationTag"
+    __table_args__ = (
+        Index("fk_AnnotationTag_Tag1_idx", "TagID"),
+        Index("fk_AnnotationTag_Annotation1_idx", "AnnotationID"),
+    )
 
-tag_study_association_table = Table(
-    "StudyTag",
-    Base.metadata,
-    Column("TagID", ForeignKey("Tag.TagID"), nullable=False),
-    Column("StudyID", ForeignKey("Study.StudyID"), nullable=False),
-    ForeignKeyIndex("StudyTag", "Tag", "TagID"),
-    ForeignKeyIndex("StudyTag", "Study", "StudyID"),
-)
+    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
+    AnnotationID: int = Field(foreign_key="Annotation.AnnotationID", primary_key=True)
 
-tag_image_instance_association_table = Table(
-    "ImageInstanceTag",
-    Base.metadata,
-    Column("TagID", ForeignKey("Tag.TagID"), nullable=False),
-    Column("ImageInstanceID",
-        ForeignKey("ImageInstance.ImageInstanceID"),
-        nullable=False),
-    ForeignKeyIndex("ImageInstanceTag", "Tag", "TagID"),
-    ForeignKeyIndex("ImageInstanceTag", "ImageInstance", "ImageInstanceID"),
-)
+
+class StudyTag(Base, table=True):
+    __tablename__ = "StudyTag"
+    __table_args__ = (
+        Index("fk_StudyTag_Tag1_idx", "TagID"),
+        Index("fk_StudyTag_Study1_idx", "StudyID"),
+    )
+
+    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
+    StudyID: int = Field(foreign_key="Study.StudyID", primary_key=True)
+
+
+class ImageInstanceTag(Base, table=True):
+    __tablename__ = "ImageInstanceTag"
+    __table_args__ = (
+        Index("fk_ImageInstanceTag_Tag1_idx", "TagID"),
+        Index("fk_ImageInstanceTag_ImageInstance1_idx", "ImageInstanceID"),
+    )
+
+    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
+    ImageInstanceID: int = Field(foreign_key="ImageInstance.ImageInstanceID", primary_key=True)

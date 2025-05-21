@@ -4,7 +4,6 @@ from .FormAnnotation import *
 from .ImageInstance import *
 from .Patient import *
 from .Project import *
-from .Series import *
 from .Study import *
 from .Tag import *
 from .Task import *
