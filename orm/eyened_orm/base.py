@@ -4,10 +4,10 @@ import re
 from typing import Any, Dict, List, Type, TypeVar, Tuple
 
 from eyened_orm.utils.config import EyenedORMConfig
-from sqlalchemy import Index, MetaData, UniqueConstraint, select
+from sqlalchemy import select
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.types import JSON
-
+from sqlmodel import SQLModel
 # MySQLWB naming convention.
 # Additional functions: ForeignKeyIndex, CompositeUniqueConstraint (see below)
 naming_convention = {
@@ -18,7 +18,6 @@ naming_convention = {
     "pk": "%(column_0_name)s",
 }
 
-metadata = MetaData(naming_convention=naming_convention)
 T = TypeVar("T", bound="Base")
 
 def _convert_property_name(name: str) -> str:
@@ -59,11 +58,8 @@ class BaseMeta(type(DeclarativeBase)):
     def __getattribute__(cls, name: str) -> Any:
         return _get_attribute_with_conversion(cls, name)
 
-class Base(DeclarativeBase, metaclass=BaseMeta):
-    metadata = metadata  # Attach the metadata with the naming convention
-    type_annotation_map = {Dict[str, Any]: JSON}
-    config: EyenedORMConfig = None
-
+class Base(SQLModel):
+    
     def __getattr__(self, name: str) -> Any:
         """Override attribute access to handle property name conversion."""
         return _get_attribute_with_conversion(self, name)
@@ -88,6 +84,11 @@ class Base(DeclarativeBase, metaclass=BaseMeta):
             raise AttributeError(
                 f"Column '{column_name}' does not exist on {cls.__name__}")
         return session.scalar(select(cls).where(column == value))
+
+    @property
+    def config(self):
+        from eyened_orm.db import DBManager
+        return DBManager._config
 
     @property
     def columns(self):
@@ -115,24 +116,6 @@ class Base(DeclarativeBase, metaclass=BaseMeta):
 
     def to_list(self):
         return [to_dict(getattr(self, c.name)) for c in self.columns]
-
-
-def ForeignKeyIndex(referencing_table: str, referred_table: str, fk_column: str):
-    """Helper function to create a ForeignKey index with MySQLWB naming convention."""
-    fk_index_name = f"fk_{referencing_table}_{referred_table}1_idx"
-    return Index(fk_index_name, fk_column)
-
-
-def CompositeUniqueConstraint(column1: str, column2: str):
-    """Helper function to create a CompositeUniqueConstraint with MySQLWB naming convention."""
-    constraint_name = f"{column1}{column2}_UNIQUE"
-    return UniqueConstraint(column1, column2, name=f"{constraint_name}")
-
-
-def CompositeUniqueConstraintMulti(columns: Tuple[str]):
-    """Helper function to create a CompositeUniqueConstraint with MySQLWB naming convention."""
-    constraint_name = "".join(columns) + "_UNIQUE"
-    return UniqueConstraint(*columns, name=f"{constraint_name}")
 
 
 def to_dict(attrib):

@@ -1,7 +1,8 @@
 from contextlib import contextmanager
 
 from eyened_orm.utils.config import EyenedORMConfig, DatabaseSettings
-from sqlalchemy import create_engine
+
+from sqlmodel import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .base import Base
@@ -15,7 +16,7 @@ def create_connection_string(config: DatabaseSettings):
 class DBManager:
     _engine = None
     _SessionLocal = None
-
+    _config = None
     @classmethod
     def init(cls, config: None | str | EyenedORMConfig = None):
         """Initialize the database session factory with the given config."""
@@ -30,7 +31,7 @@ class DBManager:
                 autocommit=False, autoflush=False, bind=cls._engine
             )
 
-        Base.config = config
+        cls._config = config
 
     @classmethod
     @contextmanager

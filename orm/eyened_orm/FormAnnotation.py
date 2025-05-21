@@ -1,14 +1,15 @@
-from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pandas import DataFrame, json_normalize
-from sqlalchemy import ForeignKey, String, func, select, event
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy import func, select, event
+from sqlalchemy.orm import Session
 import json
-
+from sqlmodel import Field, Relationship
 from .base import Base
+from sqlalchemy.dialects.mysql import JSON
+from sqlalchemy import Column, DateTime, String
 
 if TYPE_CHECKING:
     from .Annotation import Creator
@@ -19,78 +20,71 @@ if TYPE_CHECKING:
     from .Task import SubTask
 
 
-class FormSchema(Base):
+class FormSchema(Base, table=True):
     __tablename__ = "FormSchema"
+    FormSchemaID: int = Field(primary_key=True)
+    SchemaName: str = Field(sa_column=Column(String(45), nullable=False, unique=True))
+    Schema: Dict[str, Any] | None = Field(sa_column=Column(JSON))
 
-    FormSchemaID: Mapped[int] = mapped_column(primary_key=True)
-    SchemaName: Mapped[Optional[str]] = mapped_column(String(45), unique=True)
-    Schema: Mapped[Optional[Dict[str, Any]]]
-
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
-        back_populates="FormSchema"
-    )
+    FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="FormSchema")
 
     def __repr__(self):
         return f"FormSchema({self.FormSchemaID}, {self.SchemaName})"
 
     @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional[FormSchema]:
+    def by_name(cls, session: Session, name: str) -> Optional["FormSchema"]:
         """Find a FormSchema by name (SchemaName)."""
         return session.scalar(select(cls).where(cls.SchemaName == name))
 
 
-class FormAnnotation(Base):
+class FormAnnotation(Base, table=True):
     __tablename__ = "FormAnnotation"
+    
+    FormAnnotationID: int = Field(primary_key=True)
 
-    FormAnnotationID: Mapped[int] = mapped_column(primary_key=True)
+    FormSchemaID: int = Field(foreign_key="FormSchema.FormSchemaID")
+    FormSchema: "FormSchema" = Relationship(back_populates="FormAnnotations")
 
-    FormSchemaID: Mapped[int] = mapped_column(
-        ForeignKey("FormSchema.FormSchemaID"), index=True
-    )
-    FormSchema: Mapped["FormSchema"] = relationship(back_populates="FormAnnotations")
+    PatientID: int = Field(foreign_key="Patient.PatientID")
+    Patient: "Patient" = Relationship(back_populates="FormAnnotations")
 
-    PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"), index=True)
-    Patient: Mapped[Optional["Patient"]] = relationship(
-        back_populates="FormAnnotations"
-    )
-
-    StudyID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Study.StudyID"), nullable=True, index=True
-    )
-    Study: Mapped[Optional["Study"]] = relationship(back_populates="FormAnnotations")
-
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"),
+    StudyID: Optional[int] = Field(
+        foreign_key="Study.StudyID",
         nullable=True,
-        index=True,
     )
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
-        back_populates="FormAnnotations"
-    )
+    Study: "Study" = Relationship(back_populates="FormAnnotations")
 
-    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"), index=True)
-    Creator: Mapped["Creator"] = relationship(back_populates="FormAnnotations")
+    ImageInstanceID: Optional[int] = Field(
+        foreign_key="ImageInstance.ImageInstanceID",
+        nullable=True,
+        ondelete="CASCADE"
+    )
+    ImageInstance: "ImageInstance" = Relationship(back_populates="FormAnnotations")
 
-    SubTaskID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("SubTask.SubTaskID"), nullable=True, index=True
+    CreatorID: int = Field(foreign_key="Creator.CreatorID")
+    Creator: "Creator" = Relationship(back_populates="FormAnnotations")
+
+    SubTaskID: Optional[int] = Field(
+        foreign_key="SubTask.SubTaskID",
+        nullable=True,
     )
-    SubTask: Mapped[Optional["SubTask"]] = relationship(
-        back_populates="FormAnnotations"
-    )
+    SubTask: "SubTask" = Relationship(back_populates="FormAnnotations")
 
     # actual data
-    FormData: Mapped[Optional[Dict[str, Any]]] = mapped_column(nullable=True)
+    FormData: Optional[Dict[str, Any]] = Field(sa_column=Column(JSON))
 
     # datetimes
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
+    DateInserted: datetime = Field(default_factory=datetime.now)
+    DateModified: Optional[datetime] = Field(
+        sa_column=Column(
+            DateTime, server_default=func.now(), server_onupdate=func.now()
+        )
     )
-    FormAnnotationReferenceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("FormAnnotation.FormAnnotationID"), nullable=True
+    FormAnnotationReferenceID: Optional[int] = Field(
+        foreign_key="FormAnnotation.FormAnnotationID", nullable=True
     )
 
-    Inactive: Mapped[bool] = mapped_column(default=False)
+    Inactive: bool = Field(default=False)
 
     def __repr__(self):
         return f"{self.FormAnnotationID}"
