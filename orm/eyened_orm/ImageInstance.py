@@ -428,7 +428,7 @@ class ModalityTable(Base, table=True):
 
     @classmethod
     def by_tag(cls, ModalityTag: str, session: Session) -> Optional["ModalityTable"]:
-        return cls.by_column(session, "ModalityTag", ModalityTag)
+        return cls.by_column(session, ModalityTag=ModalityTag)
 
 
 class Scan(Base, table=True):
@@ -441,6 +441,6 @@ class Scan(Base, table=True):
     ImageInstances: List["ImageInstance"] = Relationship(back_populates="Scan")
 
     @classmethod
-    def by_mode(cls, ScanMode: str, session: Session) -> "Scan":
-        return cls.by_column(session, "ScanMode", ScanMode)
+    def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
+        return cls.by_column(session, ScanMode=ScanMode)
 

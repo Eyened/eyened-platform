@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 class FormSchema(Base, table=True):
     __tablename__ = "FormSchema"
     _name_column: ClassVar[str] = "SchemaName"
-    
+
     FormSchemaID: int = Field(primary_key=True)
-    
+
     SchemaName: str = Field(max_length=45, unique=True)
     Schema: Dict[str, Any] | None = Field(sa_column=Column(JSON))
 
@@ -34,7 +34,7 @@ class FormSchema(Base, table=True):
 
 class FormAnnotation(Base, table=True):
     __tablename__ = "FormAnnotation"
-    
+
     FormAnnotationID: int = Field(primary_key=True)
 
     FormSchemaID: int = Field(foreign_key="FormSchema.FormSchemaID")
@@ -50,9 +50,7 @@ class FormAnnotation(Base, table=True):
     Study: "Study" = Relationship(back_populates="FormAnnotations")
 
     ImageInstanceID: int | None = Field(
-        foreign_key="ImageInstance.ImageInstanceID",
-        nullable=True,
-        ondelete="CASCADE"
+        foreign_key="ImageInstance.ImageInstanceID", nullable=True, ondelete="CASCADE"
     )
     ImageInstance: "ImageInstance" = Relationship(back_populates="FormAnnotations")
 
@@ -83,32 +81,43 @@ class FormAnnotation(Base, table=True):
 
     @classmethod
     def by_schema_and_creator(
-        session: Session, schema_name: str, creator_name: str = None
+        cls,
+        session: Session,
+        schema_name: str,
+        creator_name: str = None,
+        filterInactive: bool = True,
+        **kwargs
     ) -> List["FormAnnotation"]:
         """
         Get all FormAnnotations for a given schema and optionally filter by creator.
+        Additional filters can be passed as keyword arguments.
         """
+        from eyened_orm import FormSchema, Creator
         schema = FormSchema.by_name(session, schema_name)
 
         if schema is None:
             return []
 
-        q = (
-            select(FormAnnotation)
-            .where(FormAnnotation.FormSchemaID == schema.FormSchemaID)
-            .where(~FormAnnotation.Inactive)
-        )
+        # Build filter conditions
+        filter_kwargs = {
+            "FormSchemaID": schema.FormSchemaID,
+            **kwargs
+        }
+        if filterInactive:
+            filter_kwargs["Inactive"] = False
+
+        # Add creator filter if provided
         if creator_name is not None:
             creator = Creator.by_name(session, creator_name)
-            q = q.where(FormAnnotation.CreatorID == creator.CreatorID)
+            filter_kwargs["CreatorID"] = creator.CreatorID
 
-        return session.scalars(q).all()
+        return FormAnnotation.by_columns(session, **filter_kwargs)
 
     @classmethod
     def export_formannotations_by_schema(
-        cls, schema_name: str, creator_name: str = None
+        cls, session: Session, schema_name: str, creator_name: str = None
     ) -> DataFrame:
-        form_annotations = cls.by_schema_and_creator(schema_name, creator_name)
+        form_annotations = cls.by_schema_and_creator(session, schema_name, creator_name)
         data = [form_annotation.flat_data for form_annotation in form_annotations]
         return json_normalize(data)
 

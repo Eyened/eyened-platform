@@ -24,7 +24,7 @@ class Creator(Base, table=True):
     # Primary identifiers
     CreatorID: int = Field(primary_key=True)
     CreatorName: str = Field(max_length=45, unique=True)  # username in the application
-    EmployeeIdentifier: str | None = Field(max_length=256)  # employee number/code
+    EmployeeIdentifier: str | None = Field(max_length=255)  # employee number/code
 
     # differentiates between AI models and human users
     IsHuman: bool
@@ -42,7 +42,7 @@ class Creator(Base, table=True):
     # deprecated, use PasswordHash instead
     Password: bytes | None = Field(sa_column=Column(BINARY(32)))
     # user's password
-    PasswordHash: str | None = Field(max_length=256)
+    PasswordHash: str | None = Field(max_length=255)
 
     # not used currently
     Role: int | None
@@ -64,11 +64,3 @@ class Creator(Base, table=True):
         to_list() do not include the password.
         """
         return [c for c in super().columns() if c.name not in ["Password", "PasswordHash"]]
-
-    @classmethod
-    def name_to_id(cls, session: Session) -> dict[str, int]:
-        """Get a mapping of creator names to their IDs."""
-        return {
-            creator.CreatorName: creator.CreatorID
-            for creator in session.scalars(select(cls)).all()
-        }
