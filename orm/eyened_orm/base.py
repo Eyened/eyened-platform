@@ -49,7 +49,7 @@ T = TypeVar("T", bound="Base")
 
 class Base(SQLModel):
     """Base class for all ORM models with common functionality."""
-    
+
     # Common class variables
     _name_column: ClassVar[str | None] = None
 
@@ -117,13 +117,27 @@ class Base(SQLModel):
         return session.scalar(stmt)
 
     @classmethod
-    def filter(cls: type[T], session: Session, **kwargs) -> List[T]:
-        """Filter objects by keyword arguments."""
+    def name_to_id(cls, session: Session) -> dict[str, int]:
+        """Get a mapping of name column values to their IDs."""
+        return {
+            getattr(obj, cls._name_column): getattr(obj, cls.primary_key().name)
+            for obj in cls.fetch_all(session)
+        }
+
+    @classmethod
+    def by_column(cls: type[T], session: Session, **kwargs) -> Optional[T]:
+        """Generic method to query by any column."""
         conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
         stmt = select(cls).where(*conditions)
-        return list(session.scalars(stmt).all())
-    
-    
+        return session.scalar(stmt).first()
+
+    @classmethod
+    def by_columns(cls: type[T], session: Session, **kwargs) -> List[T]:
+        """Generic method to query by any columns."""
+        conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
+        stmt = select(cls).where(*conditions)
+        return session.scalars(stmt).all()
+
     @classmethod
     def columns(cls) -> List[Column]:
         """Return all columns of the table."""
@@ -151,4 +165,5 @@ class Base(SQLModel):
     def config(self):
         """Return the database configuration."""
         from eyened_orm.db import DBManager
+
         return DBManager._config

@@ -199,13 +199,15 @@ class AnnotationData(Base, table=True):
         return annotation_data
 
     @classmethod
-    def from_composite_id(
-        cls, annotation_data_id: str, session: Session
+    def by_composite_id(
+        cls, session: Session, annotation_data_id: str
     ) -> "AnnotationData":
+        """
+        Get an AnnotationData object from a composite ID string separated by an underscore.
+        (AnnotationID_ScanNr)
+        """
         annotation_id, scan_nr = map(int, annotation_data_id.split("_"))
-        return session.scalar(
-            select(cls).filter_by(AnnotationID=annotation_id, ScanNr=scan_nr)
-        )
+        return cls.by_pk(session, (annotation_id, scan_nr))
 
     def default_path(self, ext: str) -> str:
         a = self.Annotation
@@ -376,7 +378,7 @@ class AnnotationType(Base, table=True):
     Annotations: List["Annotation"] = Relationship(back_populates="AnnotationType")
 
     @classmethod
-    def name_interpretation_to_id(cls, session: Session):
+    def name_interpretation_to_id(cls, session: Session) -> dict[tuple[str, str], int]:
         return {
             (a.AnnotationTypeName, a.Interpretation): a.AnnotationTypeID
             for a in cls.fetch_all(session)
@@ -398,9 +400,3 @@ class Feature(Base, table=True):
     Modality: Optional[FeatureModalityEnum]
 
     DateInserted: datetime = Field(default_factory=datetime.now)
-
-    @classmethod
-    def name_to_id(cls, session: Session) -> dict[str, int]:
-        return {
-            feature.FeatureName: feature.FeatureID for feature in cls.fetch_all(session)
-        }
