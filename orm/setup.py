@@ -39,5 +39,5 @@ setup(
         "sqlmodel==0.0.24",
         "retinalysis-fundusprep==0.4.0"
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.10",
 )
