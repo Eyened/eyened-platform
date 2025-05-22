@@ -1,3 +1,4 @@
+from typing import ClassVar
 from sqlalchemy import Index
 from sqlmodel import Field
 from .base import Base
@@ -5,8 +6,10 @@ from .base import Base
 
 class Tag(Base, table=True):
     __tablename__ = "Tag"
+    _name_column: ClassVar[str] = "TagName"
+
     TagID: int = Field(primary_key=True)
-    TagName: str = Field(max_length=256, sa_column_kwargs={"unique": True})
+    TagName: str = Field(max_length=256, unique=True)
 
 
 class AnnotationTag(Base, table=True):
@@ -39,4 +42,6 @@ class ImageInstanceTag(Base, table=True):
     )
 
     TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
-    ImageInstanceID: int = Field(foreign_key="ImageInstance.ImageInstanceID", primary_key=True)
+    ImageInstanceID: int = Field(
+        foreign_key="ImageInstance.ImageInstanceID", primary_key=True
+    )

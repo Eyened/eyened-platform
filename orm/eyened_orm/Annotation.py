@@ -5,7 +5,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
 
 import numpy as np
 from PIL import Image
@@ -74,14 +74,14 @@ class Annotation(Base, table=True):
     AnnotationReferenceID: Optional[int] = Field(
         default=None, foreign_key="Annotation.AnnotationID"
     )
-    # AnnotationReference: Optional["Annotation"] = Relationship(
-    #     back_populates="ChildAnnotations",
-    #     sa_relationship_kwargs={"remote_side": "Annotation.AnnotationID"},
-    # )
-    # ChildAnnotations: List["Annotation"] = Relationship(
-    #     back_populates="AnnotationReference",
-    #     cascade_delete=True,
-    # )
+    AnnotationReference: Optional["Annotation"] = Relationship(
+        back_populates="ChildAnnotations",
+        sa_relationship_kwargs={"remote_side": "Annotation.AnnotationID"},
+    )
+    ChildAnnotations: List["Annotation"] = Relationship(
+        back_populates="AnnotationReference",
+        cascade_delete=True,
+    )
 
     # Actual data is stored in AnnotationData
     AnnotationData: List["AnnotationData"] = Relationship(
@@ -89,7 +89,7 @@ class Annotation(Base, table=True):
     )
 
     # soft delete
-    Inactive: bool = Field(default=False)
+    Inactive: bool = False
 
     DateInserted: datetime = Field(default_factory=datetime.now)
 
@@ -108,9 +108,6 @@ class Annotation(Base, table=True):
     @property
     def ProjectName(self):
         return self.Project.ProjectName
-
-    def __repr__(self):
-        return f"Annotation({self.AnnotationID}, {self.FeatureName}, {self.Creator.CreatorName})"
 
     @classmethod
     def create(
@@ -163,16 +160,17 @@ class AnnotationData(Base, table=True):
     Annotation: "Annotation" = Relationship(back_populates="AnnotationData")
 
     ScanNr: int = Field(primary_key=True)
-    DatasetIdentifier: str = Field(max_length=45, sa_column_kwargs={"unique": True})
+
+    DatasetIdentifier: str = Field(max_length=45, unique=True)
     MediaType: str = Field(max_length=45)
 
-    ValueInt: Optional[int] = Field(default=None)
-    ValueFloat: Optional[float] = Field(default=None)
+    ValueInt: int | None
+    ValueFloat: float | None
 
     # Different sql DBs have different size specification for blobs.
     # This maps to BLOB by default (up to 1GB in sqlite) and to LONGBLOB in MySQL.
     # see: https://docs.sqlalchemy.org/en/20/core/type_basics.html#using-uppercase-and-backend-specific-types-for-multiple-backends
-    ValueBlob: Optional[bytes] = Field(
+    ValueBlob: bytes | None = Field(
         default=None,
         sa_column=Column(LONGBLOB, nullable=True),
     )
@@ -224,9 +222,6 @@ class AnnotationData(Base, table=True):
         if not self.config:
             raise ValueError("Configuration not initialized")
         return self.config.trash_path / self.DatasetIdentifier
-
-    def __repr__(self):
-        return f"AnnotationData({self.AnnotationID}, {self.ScanNr}, {self.DatasetIdentifier}, {self.MediaType})"
 
     def load_data(self) -> Any:
         """Load the annotation data from the file."""
@@ -367,7 +362,6 @@ def receive_after_commit(session):
 
 class AnnotationType(Base, table=True):
     __tablename__ = "AnnotationType"
-
     __table_args__ = (
         UniqueConstraint(
             "AnnotationTypeName",
@@ -388,10 +382,6 @@ class AnnotationType(Base, table=True):
             for a in cls.fetch_all(session)
         }
 
-    def __repr__(self) -> str:
-        return f"AnnotationType({self.AnnotationTypeID}, {self.AnnotationTypeName}, {self.Interpretation})"
-
-
 class FeatureModalityEnum(enum.Enum):
     OCT = 1
     CF = 2
@@ -399,24 +389,18 @@ class FeatureModalityEnum(enum.Enum):
 
 class Feature(Base, table=True):
     __tablename__ = "Feature"
+    _name_column: ClassVar[str] = "FeatureName"
+    
     FeatureID: int = Field(primary_key=True)
     FeatureName: str = Field(max_length=60, unique=True)
 
     Annotations: List['Annotation'] = Relationship(back_populates="Feature")
-    Modality: Optional[FeatureModalityEnum] = Field(default=None)
+    Modality: Optional[FeatureModalityEnum]
 
     DateInserted: datetime = Field(default_factory=datetime.now)
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional["Feature"]:
-        """Find a feature by name (FeatureName)."""
-        return session.scalar(select(cls).where(cls.FeatureName == name))
 
     @classmethod
     def name_to_id(cls, session: Session) -> dict[str, int]:
         return {
             feature.FeatureName: feature.FeatureID for feature in cls.fetch_all(session)
         }
-
-    def __repr__(self) -> str:
-        return f"Feature({self.FeatureID}, {self.FeatureName})"

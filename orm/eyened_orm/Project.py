@@ -1,16 +1,16 @@
 import enum
 import string
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-import pandas as pd 
+import pandas as pd
 from sqlalchemy import Column, Text, select, Index
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
 
 from .base import Base
 
-if TYPE_CHECKING:   
+if TYPE_CHECKING:
     from eyened_orm import Patient, Task, Contact
 
 
@@ -22,12 +22,15 @@ class ExternalEnum(int, enum.Enum):
 
 class Project(Base, table=True):
     __tablename__ = "Project"
-    ProjectID: int = Field(primary_key=True)
-    ProjectName: str = Field(sa_column_kwargs={"unique": True}, max_length=45)
-    External: ExternalEnum
-    Description: str | None = Field(default=None, sa_column=Column(Text))
 
-    ContactID: int | None = Field(default=None, foreign_key="Contact.ContactID")
+    _name_column: ClassVar[str] = "ProjectName"
+
+    ProjectID: int = Field(primary_key=True)
+    ProjectName: str = Field(max_length=45, unique=True)
+    External: ExternalEnum
+    Description: str | None = Field(sa_column=Column(Text))
+
+    ContactID: int | None = Field(foreign_key="Contact.ContactID")
     Contact: Optional["Contact"] = Relationship(back_populates="Projects")
 
     Patients: List["Patient"] = Relationship(
@@ -35,16 +38,8 @@ class Project(Base, table=True):
     )
 
     DateInserted: datetime = Field(default_factory=datetime.now)
-    
-    DOI: str | None = Field(default=None, max_length=256)
 
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional["Project"]:
-        return session.scalar(select(Project).where((Project.ProjectName == name)))
-
-    def __repr__(self):
-        return f"Project({self.ProjectID}, {self.ProjectName}, {self.External})"
+    DOI: str | None = Field(max_length=256)
 
     def make_dataframe(self, session: Session) -> pd.DataFrame:
         """
@@ -102,12 +97,13 @@ class Contact(Base, table=True):
     __table_args__ = (
         Index("NameEmailInstitute_UNIQUE", "Name", "Email", "Institute", unique=True),
     )
+    _name_column: ClassVar[str] = "Name"
 
     ContactID: int = Field(primary_key=True)
     Name: str = Field(max_length=256)
     Email: str = Field(max_length=256)
-    Institute: str | None = Field(default=None, max_length=256)
-    Orcid: str | None = Field(default=None, max_length=256)
+    Institute: str | None = Field(max_length=256)
+    Orcid: str | None = Field(max_length=256)
 
     Projects: List["Project"] = Relationship(back_populates="Contact")
     Tasks: List["Task"] = Relationship(back_populates="Contact")
