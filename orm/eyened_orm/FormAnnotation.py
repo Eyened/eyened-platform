@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 from pandas import DataFrame, json_normalize
 from sqlalchemy import func, select, event
@@ -22,19 +22,14 @@ if TYPE_CHECKING:
 
 class FormSchema(Base, table=True):
     __tablename__ = "FormSchema"
+    _name_column: ClassVar[str] = "SchemaName"
+    
     FormSchemaID: int = Field(primary_key=True)
-    SchemaName: str = Field(sa_column=Column(String(45), nullable=False, unique=True))
+    
+    SchemaName: str = Field(max_length=45, unique=True)
     Schema: Dict[str, Any] | None = Field(sa_column=Column(JSON))
 
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="FormSchema")
-
-    def __repr__(self):
-        return f"FormSchema({self.FormSchemaID}, {self.SchemaName})"
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional["FormSchema"]:
-        """Find a FormSchema by name (SchemaName)."""
-        return session.scalar(select(cls).where(cls.SchemaName == name))
 
 
 class FormAnnotation(Base, table=True):
@@ -48,13 +43,13 @@ class FormAnnotation(Base, table=True):
     PatientID: int = Field(foreign_key="Patient.PatientID")
     Patient: "Patient" = Relationship(back_populates="FormAnnotations")
 
-    StudyID: Optional[int] = Field(
+    StudyID: int | None = Field(
         foreign_key="Study.StudyID",
         nullable=True,
     )
     Study: "Study" = Relationship(back_populates="FormAnnotations")
 
-    ImageInstanceID: Optional[int] = Field(
+    ImageInstanceID: int | None = Field(
         foreign_key="ImageInstance.ImageInstanceID",
         nullable=True,
         ondelete="CASCADE"
@@ -64,7 +59,7 @@ class FormAnnotation(Base, table=True):
     CreatorID: int = Field(foreign_key="Creator.CreatorID")
     Creator: "Creator" = Relationship(back_populates="FormAnnotations")
 
-    SubTaskID: Optional[int] = Field(
+    SubTaskID: int | None = Field(
         foreign_key="SubTask.SubTaskID",
         nullable=True,
     )
@@ -75,19 +70,16 @@ class FormAnnotation(Base, table=True):
 
     # datetimes
     DateInserted: datetime = Field(default_factory=datetime.now)
-    DateModified: Optional[datetime] = Field(
+    DateModified: datetime | None = Field(
         sa_column=Column(
             DateTime, server_default=func.now(), server_onupdate=func.now()
         )
     )
-    FormAnnotationReferenceID: Optional[int] = Field(
+    FormAnnotationReferenceID: int | None = Field(
         foreign_key="FormAnnotation.FormAnnotationID", nullable=True
     )
 
-    Inactive: bool = Field(default=False)
-
-    def __repr__(self):
-        return f"{self.FormAnnotationID}"
+    Inactive: bool = False
 
     @classmethod
     def by_schema_and_creator(
@@ -110,7 +102,7 @@ class FormAnnotation(Base, table=True):
             creator = Creator.by_name(session, creator_name)
             q = q.where(FormAnnotation.CreatorID == creator.CreatorID)
 
-        return session.execute(q).scalars().all()
+        return session.scalars(q).all()
 
     @classmethod
     def export_formannotations_by_schema(

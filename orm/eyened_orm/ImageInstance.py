@@ -1,18 +1,19 @@
-# Note: this can cause issues 
+# Note: this can cause issues
 # https://github.com/fastapi/sqlmodel/discussions/900
 # from future import annotations
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 import numpy as np
 import pydicom
 from PIL import Image
-from sqlalchemy import Column, String, select, Index
-from sqlalchemy.dialects.mysql import JSON, TINYBLOB, TEXT
+from sqlalchemy import Column, Index, select
+from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
+
 from .base import Base
 
 if TYPE_CHECKING:
@@ -77,7 +78,12 @@ class ImageInstance(Base, table=True):
         Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
         Index("fk_ImageInstance_Scan1_idx", "ScanID"),
         Index("SOPInstanceUid_UNIQUE", "SOPInstanceUid", unique=True),
-        Index("SourceInfoIDDatasetIdentifier_UNIQUE", "DatasetIdentifier", "SourceInfoID",unique=True),
+        Index(
+            "SourceInfoIDDatasetIdentifier_UNIQUE",
+            "DatasetIdentifier",
+            "SourceInfoID",
+            unique=True,
+        ),
     )
     ImageInstanceID: int = Field(primary_key=True)
 
@@ -99,57 +105,57 @@ class ImageInstance(Base, table=True):
     Scan: Optional["Scan"] = Relationship(back_populates="ImageInstances")
 
     # Image modality
-    Modality: Optional["Modality"]
+    Modality: Optional[Modality]
 
     # DICOM metadata
-    SOPInstanceUid: str | None = Field(default=None, sa_column=Column(String(64)))
-    SOPClassUid: str | None = Field(default=None, sa_column=Column(String(64)))
-    PhotometricInterpretation: str | None = Field(default=None, sa_column=Column(String(64)))
-    SamplesPerPixel: int | None = None
+    SOPInstanceUid: str | None = Field(max_length=64)
+    SOPClassUid: str | None = Field(max_length=64)
+    PhotometricInterpretation: str | None = Field(max_length=64)
+    SamplesPerPixel: int | None
     # Number of frames in a multi-frame image
-    NrOfFrames: int | None = None
+    NrOfFrames: int | None
     # Nominal slice thickness, in millimeters
-    SliceThickness: float | None = None
-    Rows_y: int | None = None
-    Columns_x: int | None = None
+    SliceThickness: float | None
+    Rows_y: int | None
+    Columns_x: int | None
     # Side of body examined (left or right)
-    Laterality: Optional["Laterality"]
+    Laterality: Optional[Laterality]
     # Type of equipment that acquired the data (OP = Ophthalmic Photography)
-    DICOMModality: Optional["ModalityType"]
-    AnatomicRegion: int | None = None
+    DICOMModality: Optional[ModalityType]
+    AnatomicRegion: int | None
     # Early Treatment Diabetic Retinopathy Study field position (not standard DICOM)
-    ETDRSField: Optional["ETDRSField"]
+    ETDRSField: Optional[ETDRSField]
     # Indicates angiography type (not standard DICOM)
-    Angiography: int | None = None
+    Angiography: int | None
     # Date and time the acquisition of data started
-    AcquisitionDateTime: datetime | None = None
+    AcquisitionDateTime: datetime | None
     # Indicates if pupil was dilated during image acquisition (ophthalmic-specific)
-    PupilDilated: bool | None = None
+    PupilDilated: bool | None
     # Horizontal dimension of field of view in millimeters
-    HorizontalFieldOfView: float | None = None
+    HorizontalFieldOfView: float | None
     # Axial resolution in millimeters (not standard DICOM)
-    ResolutionAxial: float | None = None
+    ResolutionAxial: float | None
     # Horizontal resolution in millimeters (not standard DICOM)
-    ResolutionHorizontal: float | None = None
+    ResolutionHorizontal: float | None
     # Vertical resolution in millimeters (not standard DICOM)
-    ResolutionVertical: float | None = None
+    ResolutionVertical: float | None
 
     # Relative filepath to the image file
-    DatasetIdentifier: str = Field(sa_column=Column(String(256), nullable=False))
+    DatasetIdentifier: str = Field(max_length=256)
 
     # Relative filepath to the thumbnail file
     # deprecated, use ThumbnailPath instead
-    ThumbnailIdentifier: str | None = Field(default=None, sa_column=Column(String(256)))
+    ThumbnailIdentifier: str | None = Field(max_length=256)
 
     # identifier for the thumbnail (project_id/thumbnail_name), needs suffix for different sizes
-    ThumbnailPath: str | None = Field(default=None, sa_column=Column(String(256)))
+    ThumbnailPath: str | None = Field(max_length=256)
 
     # Original IDs of the image in the source database
-    OldPath: str | None = Field(default=None, sa_column=Column(String(256)))
-    FDAIdentifier: int | None = None
+    OldPath: str | None = Field(max_length=256)
+    FDAIdentifier: int | None 
 
     # Considered removed from the database
-    Inactive: bool = Field(default=False)
+    Inactive: bool = False
 
     # Fundus-specific columns
     # CFROI contains the fundus bounds, eg.
@@ -178,17 +184,17 @@ class ImageInstance(Base, table=True):
     # keys prefixed with prep are keypoint locations in the preprocessed image
     CFKeypoints: Optional[Dict[str, Any]] = Field(sa_column=Column(JSON))
     # Model assessment of fundus quality
-    CFQuality: float | None = None
+    CFQuality: float | None
 
     # File checksum and data hash
     # FileChecksum is an MD5 hash of the file.
     # stored in case we want to someday implement file integrity checks
     # not meant to be used for duplicate checks
-    FileChecksum: bytes | None = Field(default=None, sa_column=Column(TINYBLOB))
+    FileChecksum: bytes | None = Field(sa_column=Column(TINYBLOB))
     # DataHash is the hash of the raw, uncompressed and decoded image information
     # used to prevent the insertion of duplicate images
     # and detect duplicates even when the metadata might be different
-    DataHash: bytes | None = Field(default=None, sa_column=Column(TINYBLOB))
+    DataHash: bytes | None = Field(sa_column=Column(TINYBLOB))
 
     # Datetimes - automatically filled
     DateInserted: datetime = Field(default_factory=datetime.now)
@@ -196,7 +202,7 @@ class ImageInstance(Base, table=True):
         default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now}
     )
     # DatePreprocessed is the date and time the image was last preprocessed
-    DatePreprocessed: datetime | None = None
+    DatePreprocessed: datetime | None
 
     # relationships:
     Annotations: List["Annotation"] = Relationship(
@@ -342,30 +348,25 @@ class ImageInstance(Base, table=True):
         """
         return [a for a in self.Annotations if a.CreatorID == creator.CreatorID]
 
-    def __repr__(self):
-        return f"ID: {self.ImageInstanceID} @ {self.SourceInfo.SourcePath} {self.DatasetIdentifier}"
-
 
 class DeviceModel(Base, table=True):
     __tablename__ = "DeviceModel"
     __table_args__ = (
-        Index("ManufacturerManufacturerModelName_UNIQUE", "Manufacturer", "ManufacturerModelName", unique=True),
+        Index(
+            "ManufacturerManufacturerModelName_UNIQUE",
+            "Manufacturer",
+            "ManufacturerModelName",
+            unique=True,
+        ),
     )
+    _name_column: ClassVar[str] = "ManufacturerModelName"
+    
     DeviceModelID: int = Field(primary_key=True)
 
     Manufacturer: str = Field(max_length=45)
     ManufacturerModelName: str = Field(max_length=45)
 
     DeviceInstances: List["DeviceInstance"] = Relationship(back_populates="DeviceModel")
-
-    def __init__(self, Manufacturer="", ManufacturerModelName=""):
-        self.Manufacturer = Manufacturer
-        self.ManufacturerModelName = ManufacturerModelName
-
-    def __repr__(self):
-        return (
-            f"{self.DeviceModelID} - {self.Manufacturer} {self.ManufacturerModelName}"
-        )
 
     @classmethod
     def by_manufacturer(
@@ -382,30 +383,31 @@ class DeviceModel(Base, table=True):
 class DeviceInstance(Base, table=True):
     __tablename__ = "DeviceInstance"
     __table_args__ = (
-        Index("DeviceModelIDDescription_UNIQUE", "DeviceModelID", "Description", unique=True),
+        Index(
+            "DeviceModelIDDescription_UNIQUE",
+            "DeviceModelID",
+            "Description",
+            unique=True,
+        ),
     )
 
     DeviceInstanceID: int = Field(primary_key=True)
     DeviceModelID: int = Field(foreign_key="DeviceModel.DeviceModelID")
     DeviceModel: "DeviceModel" = Relationship(back_populates="DeviceInstances")
 
-    SerialNumber: str | None = Field(default=None, sa_column=Column(TEXT))
+    SerialNumber: str | None = Field(sa_column=Column(TEXT))
     Description: str = Field(max_length=256)
 
     ImageInstances: List["ImageInstance"] = Relationship(
         back_populates="DeviceInstance"
     )
 
-    def __init__(
-        self, DeviceModelID: int, SerialNumber: str, Description: Optional[str] = None
-    ):
-        self.DeviceModelID = DeviceModelID
-        self.SerialNumber = SerialNumber
-        self.Description = Description
 
 
 class SourceInfo(Base, table=True):
     __tablename__ = "SourceInfo"
+    _name_column: ClassVar[str] = "SourceName"
+    
     SourceInfoID: int = Field(primary_key=True)
     SourceName: str = Field(max_length=64, unique=True)
 
@@ -414,33 +416,31 @@ class SourceInfo(Base, table=True):
 
     ImageInstances: List["ImageInstance"] = Relationship(back_populates="SourceInfo")
 
-    def __repr__(self) -> str:
-        return f"{self.SourceName}: {self.SourcePath}"
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional["SourceInfo"]:
-        return session.scalar(select(cls).where(cls.SourceName == name))
-
 
 class ModalityTable(Base, table=True):
     __tablename__ = "Modality"
+    _name_column: ClassVar[str] = "ModalityTag"
+        
     ModalityID: int = Field(primary_key=True)
-    ModalityTag: str = Field(sa_column=Column(String(40), nullable=False, unique=True))
+    ModalityTag: str = Field(max_length=40, unique=True)
 
     ImageInstances: List["ImageInstance"] = Relationship(back_populates="_Modality")
 
     @classmethod
     def by_tag(cls, ModalityTag: str, session: Session) -> Optional["ModalityTable"]:
-        return session.scalar(select(cls).where(cls.ModalityTag == ModalityTag))
+        return cls.by_column(session, "ModalityTag", ModalityTag)
 
 
 class Scan(Base, table=True):
     __tablename__ = "Scan"
+    _name_column: ClassVar[str] = "ScanMode"
+    
     ScanID: int = Field(primary_key=True)
-    ScanMode: str = Field(sa_column=Column(String(40), nullable=False, unique=True))
+    ScanMode: str = Field(max_length=40, unique=True)
 
     ImageInstances: List["ImageInstance"] = Relationship(back_populates="Scan")
 
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> "Scan":
-        return session.scalar(select(cls).where(cls.ScanMode == ScanMode))
+        return cls.by_column(session, "ScanMode", ScanMode)
+

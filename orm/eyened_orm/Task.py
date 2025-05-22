@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, ClassVar, List, Optional
 
 from sqlalchemy import Column, select, Text, Index
 from sqlalchemy.orm import Session
@@ -7,14 +7,17 @@ from sqlmodel import Field, Relationship
 
 from .FormAnnotation import FormAnnotation
 from .base import Base
+
 if TYPE_CHECKING:
-    from .ImageInstance import ImageInstance    
+    from .ImageInstance import ImageInstance
     from .Project import Contact
     from .Annotation import Creator
 
 
 class TaskDefinition(Base, table=True):
     __tablename__ = "TaskDefinition"
+    _name_column: ClassVar[str] = "TaskDefinitionName"
+
     TaskDefinitionID: int = Field(primary_key=True)
     TaskDefinitionName: str = Field(max_length=256)
 
@@ -23,30 +26,17 @@ class TaskDefinition(Base, table=True):
     # datetimes
     DateInserted: datetime = Field(default_factory=datetime.now)
 
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional["TaskDefinition"]:
-        return session.scalar(
-            select(TaskDefinition).where(TaskDefinition.TaskDefinitionName == name)
-        )
-
-    def __repr__(self):
-        return f"TaskDefinition({self.TaskDefinitionID}, {self.TaskDefinitionName}, {self.DateInserted})"
-
 
 class TaskState(Base, table=True):
     __tablename__ = "TaskState"
+
+    _name_column: ClassVar[str] = "TaskStateName"
+
     TaskStateID: int = Field(primary_key=True)
-    TaskStateName: str = Field(max_length=256)
+    TaskStateName: str = Field(max_length=255, unique=True)
 
     Tasks: List["Task"] = Relationship(back_populates="TaskState")
     SubTasks: List["SubTask"] = Relationship(back_populates="TaskState")
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional["TaskState"]:
-        return session.scalar(select(TaskState).where(TaskState.TaskStateName == name))
-
-    def __repr__(self):
-        return f"TaskState({self.TaskStateID}, {self.TaskStateName})"
 
 
 class Task(Base, table=True):
@@ -55,19 +45,21 @@ class Task(Base, table=True):
         Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),
         Index("fk_Task_TaskState1_idx", "TaskStateID"),
     )
+    _name_column: ClassVar[str] = "TaskName"
+
     TaskID: int = Field(primary_key=True)
 
     TaskName: str = Field(max_length=256)
-    Description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    Description: str | None = Field(sa_column=Column(Text))
 
     ## Contact
-    ContactID: Optional[int] = Field(default=None, foreign_key="Contact.ContactID")
+    ContactID: int | None = Field(foreign_key="Contact.ContactID")
     Contact: Optional["Contact"] = Relationship(back_populates="Tasks")
 
     TaskDefinitionID: int = Field(foreign_key="TaskDefinition.TaskDefinitionID")
     TaskDefinition: "TaskDefinition" = Relationship(back_populates="Tasks")
 
-    TaskStateID: Optional[int] = Field(default=None, foreign_key="TaskState.TaskStateID")
+    TaskStateID: int | None = Field(foreign_key="TaskState.TaskStateID")
     TaskState: "TaskState" = Relationship(back_populates="Tasks")
 
     SubTasks: List["SubTask"] = Relationship(back_populates="Task")
@@ -76,21 +68,19 @@ class Task(Base, table=True):
     DateInserted: datetime = Field(default_factory=datetime.now)
 
     @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional["Task"]:
-        return session.scalar(select(Task).where(Task.TaskName == name))
-
-    @classmethod
     def create_from_imagesets(
         cls: "Task",
         session: Session,
         taskdef_name: str,
         task_name: str,
         imagesets: List[List[int]],
-        creator_name: Optional[str] = None,
+        creator_name: str | None = None,
     ) -> "Task":
         from .Annotation import Creator
 
-        subtasks = [SubTask.create_from_image_ids(session, imset) for imset in imagesets]
+        subtasks = [
+            SubTask.create_from_image_ids(session, imset) for imset in imagesets
+        ]
         state = TaskState.by_name(session, "Not Started")
 
         if creator_name is not None:
@@ -106,7 +96,9 @@ class Task(Base, table=True):
             SubTasks=subtasks,
         )
 
-    def get_form_annotations(self, session: Session, schema_id: Optional[int] = None) -> List["FormAnnotation"]:
+    def get_form_annotations(
+        self, session: Session, schema_id: Optional[int] = None
+    ) -> List["FormAnnotation"]:
         """
         Returns all FormAnnotations for this task.
         If schema_id is provided, only returns FormAnnotations for that schema.
@@ -117,9 +109,6 @@ class Task(Base, table=True):
 
         return session.scalars(q).all()
 
-    def __repr__(self):
-        return f"Task({self.TaskID}, {self.TaskName}, {self.TaskDefinition}, {self.TaskState}, {self.DateInserted})"
-
 
 class SubTaskImageLink(Base, table=True):
     __tablename__ = "SubTaskImageLink"
@@ -129,8 +118,10 @@ class SubTaskImageLink(Base, table=True):
     )
 
     SubTaskImageLinkID: int = Field(primary_key=True)
+
     SubTaskID: int = Field(foreign_key="SubTask.SubTaskID")
     SubTask: "SubTask" = Relationship(back_populates="SubTaskImageLinks")
+
     ImageInstanceID: int = Field(foreign_key="ImageInstance.ImageInstanceID")
     ImageInstance: "ImageInstance" = Relationship(back_populates="SubTaskImageLinks")
 
@@ -151,18 +142,17 @@ class SubTask(Base, table=True):
     TaskStateID: int = Field(foreign_key="TaskState.TaskStateID")
     TaskState: "TaskState" = Relationship(back_populates="SubTasks")
 
-    CreatorID: Optional[int] = Field(default=None, foreign_key="Creator.CreatorID")
+    CreatorID: int | None = Field(foreign_key="Creator.CreatorID")
     Creator: Optional["Creator"] = Relationship(back_populates="SubTasks")
+
+    Comments: str | None = Field(sa_column=Column(Text))
 
     SubTaskImageLinks: List["SubTaskImageLink"] = Relationship(back_populates="SubTask")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="SubTask")
 
-    Comments: str | None = Field(default=None, sa_column=Column(Text))
-
-
     @classmethod
     def create_from_image_ids(
-        cls, session: Session, image_ids: List[int], task_state: Optional[str] = None
+        cls, session: Session, image_ids: List[int], task_state: str | None = None
     ) -> "SubTask":
         if task_state is None:
             task_state = "Not Started"
