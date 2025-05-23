@@ -1,5 +1,6 @@
 import os
 
+
 def collect_rows(rows):
     def to_dict(row):
         return {

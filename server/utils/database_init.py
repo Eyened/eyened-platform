@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, text
 from eyened_orm import Creator, SourceInfo, ModalityTable
 from eyened_orm.base import Base
-from ..utils.crypto import hash_password, password_hash
+
 from ..db import settings, DBManager
+from ..routes.auth import create_user
 
 
 
@@ -123,34 +124,19 @@ def init_admin(session: Session) -> None:
         session.query(Creator).filter(Creator.CreatorName == admin_username).first()
     )
 
-    print(f"Admin user: {admin_username}")
-    print(f"Admin password: {admin_password}")
     if existing_admin:
         print("Admin user already exists, skipping creation")
         return
 
-    # Create new admin user
-    new_admin = Creator()
-    new_admin.CreatorName = admin_username
-    new_admin.IsHuman = True
-    new_admin.Description = "Default admin user created during initialization"
-
     try:
-        # Try with Argon2 hash
-        new_admin.Password = hash_password(admin_password).encode('utf-8')
-        session.add(new_admin)
-        session.commit()
+        create_user(
+            session=session,
+            username=admin_username,
+            password=admin_password,
+            description="Default admin user created during initialization"
+        )
     except Exception as e:
-        session.rollback()  # Rollback the failed transaction
-        warnings.warn(f"Error with Argon2 hash, using legacy method: {str(e)}")
-        try:
-            # Try with legacy hash
-            new_admin.Password = password_hash(admin_password, settings.secret_key)
-            session.add(new_admin)
-            session.commit()
-        except Exception as e2:
-            session.rollback()  # Rollback the failed transaction
-            raise RuntimeError(f"Failed to create admin user: {str(e2)}")
+        raise RuntimeError(f"Failed to create admin user: {str(e)}")
 
 
 def init_other_objects(session):

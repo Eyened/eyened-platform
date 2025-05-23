@@ -1,15 +1,32 @@
 import os
 import uuid
 from datetime import datetime, timedelta
+from hashlib import pbkdf2_hmac
 
 from eyened_orm import Creator
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing_extensions import deprecated
 
-from ..db import get_db
-from ..utils.crypto import hash_password, password_hash, verify_password
 from ..config import settings
+from ..db import get_db
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(password: str, stored_hash: str):
+    return pwd_context.verify(password, stored_hash)
+
+
+@deprecated("Use hash_password() instead")
+def password_hash(password: str, secret_key: str):
+    return pbkdf2_hmac("sha256", password.encode(), secret_key.encode(), 10000)
+
 
 secure = False  # TODO: set to True when deploying (set up https)
 
@@ -86,7 +103,7 @@ def creator_to_response(creator: Creator) -> UserResponse:
     return UserResponse(
         id=creator.CreatorID,
         username=creator.CreatorName,
-        role=creator.Role if hasattr(creator, "Role") else None,
+        role=creator.Role
     )
 
 
@@ -99,30 +116,28 @@ async def me(
 
 
 
-def check_login(username: str, password: str, session: Session) -> Creator:
+def check_login(username: str, password: str, db: Session) -> Creator:
     creator = (
-        session.query(Creator).where(Creator.CreatorName == username).first()
+        db.query(Creator).where(Creator.CreatorName == username).first()
     )
     if creator is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    try:
-        if not verify_password(password, creator.Password):
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-    except ValueError as e:
-        print(e)
-        # check old hash
-        # TODO: remove this once all users have been migrated to argon2
-        valid = password_hash(password, settings.secret_key) == creator.Password
-        if valid:
-            new_hash = hash_password(password)
-            print('TODO: migrate user', creator.CreatorID, 'to new hash', new_hash)
-            #creator.Password = new_hash
-            #session.commit()
-            #session.refresh(creator)
-        else:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-    return creator
+    # First try the new Argon2 hash
+    if creator.PasswordHash and verify_password(password, creator.PasswordHash):
+        return creator
+
+    # If no new hash or verification failed, try old hash
+    if creator.Password and password_hash(password, settings.secret_key) == creator.Password:
+        # Migrate to new hash
+        new_hash = hash_password(password)
+        creator.PasswordHash = new_hash
+        creator.Password = None  # Clear old hash
+        db.commit()
+        db.refresh(creator)
+        return creator
+
+    raise HTTPException(status_code=401, detail="Invalid credentials")
         
 @router.post("/auth/login-password", response_model=UserResponse)
 async def login_password(
@@ -163,10 +178,11 @@ async def change_password(
     current_user: CurrentUser = Depends(get_current_user),
     session_id: str = Cookie(None),
 ):
-    
     creator = check_login(current_user.username, change_password_data.old_password, session)
 
-    creator.Password = password_hash(change_password_data.new_password, settings.secret_key)
+    # Set new password using Argon2
+    creator.PasswordHash = hash_password(change_password_data.new_password)
+    creator.Password = None  # Clear old hash if it exists
     session.commit()
 
     # Log out the user after password change
@@ -177,25 +193,52 @@ async def change_password(
     return creator_to_response(creator)
 
 
-@router.post("/auth/register", response_model=UserResponse)
-async def register_user(
-    user_data: UserLogin, response: Response, session: Session = Depends(get_db)
-):
+def create_user(
+    session: Session,
+    username: str,
+    password: str,
+    is_human: bool = True,
+    description: str | None = None,
+) -> Creator:
+    """Create a new user with the given credentials.
+    
+    Args:
+        session: Database session
+        username: Username for the new user
+        password: Password for the new user
+        is_human: Whether the user is a human (default: True)
+        description: Optional description of the user
+        
+    Returns:
+        Creator: The newly created user
+        
+    Raises:
+        HTTPException: If username already exists
+    """
     # Check if username already exists
     existing_user = (
-        session.query(Creator).where(Creator.CreatorName == user_data.username).first()
+        session.query(Creator).where(Creator.CreatorName == username).first()
     )
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
 
     # Create new user
     new_user = Creator(
-        CreatorName=user_data.username,
-        Password=password_hash(user_data.password, settings.secret_key),
-        IsHuman=1,
+        CreatorName=username,
+        PasswordHash=hash_password(password),
+        IsHuman=is_human,
+        Description=description,
     )
     session.add(new_user)
     session.commit()
     session.refresh(new_user)
+    
+    return new_user
 
+
+@router.post("/auth/register", response_model=UserResponse)
+async def register_user(
+    user_data: UserLogin, response: Response, session: Session = Depends(get_db)
+):
+    new_user = create_user(session, user_data.username, user_data.password)
     return creator_to_response(new_user)
