@@ -53,7 +53,7 @@ ActiveAnnotation = aliased(
     Annotation,
     select(Annotation)
     .filter(~Annotation.Inactive)
-    .filter(Annotation.AnnotationTypeID.in_(segmentation_annotation_types))
+    # .filter(Annotation.AnnotationTypeID.in_(segmentation_annotation_types))
     .subquery(name="active_annot"),
     name="active_annot",
 )
@@ -103,11 +103,11 @@ base_query = (
 )
 annotation_query = (
     select(ActiveAnnotation, AnnotationData)
-    .select_from(AnnotationData)
-    .join(ActiveAnnotation)
+    .select_from(ActiveAnnotation)
     .join(Feature)
     .join(AnnotationType)
     .join(AnnotationCreator)
+    .outerjoin(AnnotationData)
 )
 
 # optimization: skipping FormData, viewer will load on demand
@@ -172,7 +172,6 @@ def apply_filters(query, mappings, params):
             continue
         column = mappings[field]
         query = query.where(sqlalchemy_operators[operator](column, value))
-        print("where", field, operator, value)
     return query
 
 
@@ -240,6 +239,7 @@ def run_queries(
     annotation_query = annotation_query.where(
         ActiveAnnotation.ImageInstanceID.in_(image_ids)
     )
+    
     annotations = session.execute(annotation_query).all()
 
     patient_ids = {patient.PatientID for _, _, _, patient in instances}
@@ -272,7 +272,7 @@ async def get_instances(
     annotations = set()
     annotation_datas = set()
 
-    for instance, series, study, patient in i:
+    for instance, series, study, patient in i:        
         instances.add(instance)
         series_set.add(series)
         studies.add(study)
