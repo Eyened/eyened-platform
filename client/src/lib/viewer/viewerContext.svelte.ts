@@ -28,6 +28,7 @@ export class ViewerContext {
     cursorStyle: cursorStyle = $state('default');
     active: boolean = $state(false);
     updatePosition: boolean = $state(true);
+    viewerPlane: 'PRIMARY' | 'SECONDARY' | 'TERTIARY' = $state('PRIMARY');
 
     index = $state(0);
 

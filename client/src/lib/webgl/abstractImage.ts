@@ -1,19 +1,17 @@
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
-import type { Instance } from "$lib/datamodel/instance";
-import { data } from "$lib/datamodel/model";
-import type { Annotation } from "$lib/datamodel/annotation";
+import type { Instance } from "$lib/datamodel/instance.svelte";
+import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { FilterList } from "$lib/datamodel/itemList";
 import { Matrix } from "$lib/matrix";
-import { SegmentationController } from "./SegmentationController";
+import { SegmentationItem } from "./segmentationItem";
 
 export abstract class AbstractImage {
 
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-
-    public readonly segmentationController: SegmentationController;
+    public readonly segmentationItems = new Map<Annotation, SegmentationItem>();
 
     // in micrometers / pixel
     public readonly resolution: { x: number, y: number, z: number };
@@ -31,7 +29,6 @@ export abstract class AbstractImage {
         this.height = height;
         this.depth = depth;
 
-        this.segmentationController = new SegmentationController(this);
 
         this.resolution = { x: 1000 * width_mm / width, y: 1000 * height_mm / height, z: 1000 * depth_mm / depth };
         this.initTransform();
@@ -43,16 +40,25 @@ export abstract class AbstractImage {
 
     get segmentationAnnotations(): FilterList<Annotation> {
         const filter = (annotation: Annotation) => {
-            const { annotationType, feature } = annotation;
-            if (annotation.instance !== this.instance) return false;
+            if (annotation.annotationType.name == 'R/G mask') {
+                return true;
+            }
+            return annotation.annotationType.name.includes("Segmentation");
+        }
+        return this.instance.annotations.filter(filter);
+    }
 
-            if (!annotationType.name.includes('Segmentation')) return false;
-            if (feature.name == 'Macular layers') return false;
-            if (annotationType.name == 'Segmentation OCT Enface' && this.is3D) return false;
-            if (annotationType.name == 'Segmentation OCT B-scan' && !this.is3D) return false;
-            return true;
-        };
-        return data.annotations.filter(filter);
+
+    getSegmentationItem(annotation: Annotation): SegmentationItem {
+        // If the segmentationItem is already created, return it
+        if (this.segmentationItems.has(annotation)) {
+            return this.segmentationItems.get(annotation)!;
+        }
+
+        // Create new segmentation item
+        const segmentationItem = new SegmentationItem(this, annotation);
+        this.segmentationItems.set(annotation, segmentationItem);
+        return segmentationItem;
     }
 
     getAspectRatio() {
@@ -87,29 +93,6 @@ export abstract class AbstractImage {
         const bottom = canvas.clientHeight - rect.bottom;//canvas.clientHeight - rect.bottom + 1;
         const result = { left, bottom, width, height };
         return result;
-    }
-
-    // Segmentations with the same internal format reuse the same swapbuffer
-    // used to draw via passing shader on the gpu
-    _swapBuffers = new Map<number, WebGLTexture>();
-    getSwapBuffer(internalFormat: number, initializer: () => WebGLTexture): WebGLTexture {
-        if (!this._swapBuffers.has(internalFormat)) {
-            this._swapBuffers.set(internalFormat, initializer());
-        }
-        return this._swapBuffers.get(internalFormat)!
-    }
-
-    setSwapBuffer(internalFormat: number, texture: WebGLTexture) {
-        this._swapBuffers.set(internalFormat, texture);
-    }
-
-    getTextureForCanvas(canvas: HTMLCanvasElement) {
-        // upload canvas to texture
-        // reuse the same texture 
-        const gl = this.webgl.gl;
-        gl.bindTexture(gl.TEXTURE_2D, this.textureIO);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-        return this.textureIO;
     }
 
 
@@ -149,32 +132,11 @@ export abstract class AbstractImage {
         return this._ioContext;
     }
 
-    _textureIO: WebGLTexture | null = null;
-    get textureIO() {
-        if (!this._textureIO) {
-            this._textureIO = this.createTexture();
+    dispose() {
+        for (const segmentationItem of this.segmentationItems.values()) {
+            segmentationItem.dispose();
         }
-        return this._textureIO;
+        this.segmentationItems.clear();
     }
 
-    createTexture() {
-        const gl = this.webgl.gl;
-        const texture = gl.createTexture()!;
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-        return texture;
-    }
-    createTextureR8UI() {
-        const gl = this.webgl.gl;
-        const texture = gl.createTexture()!;
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, this.width, this.height, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-        return texture;
-    }
 }

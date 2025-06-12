@@ -18,12 +18,17 @@ if TYPE_CHECKING:
     )
 
 
-class SexEnum(int, enum.Enum):
+class SexEnum(enum.Enum):
     M = 1
     F = 2
 
+class PatientBase(Base):
+    PatientIdentifier: str = Field(max_length=45)
+    BirthDate: date | None
+    Sex: SexEnum | None 
+    ProjectID: int = Field(foreign_key="Project.ProjectID")
 
-class Patient(Base, table=True):
+class Patient(PatientBase, table=True):
     __tablename__ = "Patient"
     __table_args__ = (
         Index(
@@ -38,16 +43,9 @@ class Patient(Base, table=True):
     _name_column: ClassVar[str] = "PatientIdentifier"
 
     PatientID: int = Field(primary_key=True)
-    PatientIdentifier: str = Field(max_length=45)
-    BirthDate: date | None
-    Sex: SexEnum | None
-
-    ProjectID: int = Field(foreign_key="Project.ProjectID")
-    Project: "Project" = Relationship(back_populates="Patients")
-
     DateInserted: datetime = Field(default_factory=datetime.now)
-
-    # relationships
+    
+    Project: "Project" = Relationship(back_populates="Patients")
     Studies: List["Study"] = Relationship(back_populates="Patient", cascade_delete=True)
     Annotations: List["Annotation"] = Relationship(back_populates="Patient")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Patient")

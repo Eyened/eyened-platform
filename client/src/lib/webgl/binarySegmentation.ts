@@ -1,17 +1,16 @@
-import { getImage } from "$lib/data-loading/imageLoader";
-import type { Annotation } from "$lib/datamodel/annotation";
-import type { AnnotationData } from "$lib/datamodel/annotationData";
+// import { getImage } from "$lib/data-loading/imageLoader";
+import type { Annotation } from "$lib/datamodel/annotation.svelte";
+import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
+import type { DataRepresentation } from "$lib/datamodel/annotationType";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
-import { f } from "$lib/registration/affine";
 import type { Branch } from "$lib/types";
-import type { Segmentation } from "./SegmentationController";
+import { BaseSegmentation, type Segmentation } from "./baseSegmentation";
 import type { AbstractImage } from "./abstractImage";
-import type { ProbabilitySegmentation } from "./probabilitySegmentation.svelte";
 import { RenderTexture, type TextureDataFormat } from "./renderTexture";
-import type { SharedDataRG } from "./segmentationData";
+import type { SharedData } from "./segmentationData";
 import { SvelteMap } from "svelte/reactivity";
 
-export class BinarySegmentation implements Segmentation {
+export class BinarySegmentation extends BaseSegmentation {
 
     // bitmask for this segmentation (1 << layerIndex)
     public readonly layerBit: number;
@@ -25,6 +24,8 @@ export class BinarySegmentation implements Segmentation {
     private connectedComponents: WebGLTexture | undefined;
     private connectedComponentsValid: false | number = false;
 
+    private dataRepresentation = 'BINARY';
+
     /**
      * 
      * @param id: unique identifier (implemented as string of annotation.id)
@@ -37,14 +38,16 @@ export class BinarySegmentation implements Segmentation {
         readonly id: string,
         readonly image: AbstractImage,
         readonly annotation: Annotation,
-        readonly data: SharedDataRG,
-        readonly layerIndex: number
+        readonly data: SharedData,
+        readonly layerIndex: number,
+        readonly annotationPlane: AnnotationPlane
     ) {
-        this.layerBit = 1 << layerIndex;
+        super(id, image, annotation, annotationPlane);
+        this.layerBit = 1 << layerIndex        
     }
 
     initialize(annotationData: AnnotationData, dataRaw: any): void {
-        if (dataRaw instanceof HTMLCanvasElement) {
+        if (dataRaw instanceof HTMLCanvasElement || dataRaw instanceof WebGLTexture || dataRaw instanceof ImageBitmap) {
             this.import(annotationData.scanNr, dataRaw);
         } else if (dataRaw instanceof ArrayBuffer) {
             this.initializeArrayBuffer(annotationData, dataRaw);
@@ -54,37 +57,23 @@ export class BinarySegmentation implements Segmentation {
         }
     }
 
-    private getFormatAndBytes(): { format: TextureDataFormat; nBytes: number } {
-        const { interpretation } = this.annotation.annotationType;
-
-        if (interpretation === 'R/G mask') {
-            return { format: 'RG8', nBytes: 2 };
-        } else if (interpretation === 'Binary mask') {
-            return { format: 'R8', nBytes: 1 };
-        }
-
-        throw new Error(`Unsupported annotation interpretation: ${interpretation}`);
-    }
 
     initializeArrayBuffer(annotationData: AnnotationData, dataRaw: ArrayBuffer): void {
-        const { annotationType } = this.annotation;
-        const { format, nBytes } = this.getFormatAndBytes();
-        const { width, height, depth } = this.image;
-        const size = width * height * nBytes;
-        const renderTexture = new RenderTexture(this.image.webgl, width, height, format, null);
+        const { width, height, depth } = this;
 
-        if (annotationType.name === 'Segmentation OCT Volume') {
+        const renderTexture = new RenderTexture(this.webgl, width, height, 'R8UI', null);
+
+        if (annotationData.annotationPlane === "VOLUME") {
+            const size = width * height;
             for (let i = 0; i < depth; i++) {
                 const data = new Uint8Array(dataRaw.slice(i * size, (i + 1) * size));
                 renderTexture.setDataArray(data);
                 this.import(i, renderTexture.texture, 0.0);
             }
-        } else if (annotationType.name === 'Segmentation OCT B-scan') {
+        } else {
             const data = new Uint8Array(dataRaw);
             renderTexture.setDataArray(data);
             this.import(annotationData.scanNr, renderTexture.texture, 0.0);
-        } else {
-            throw new Error(`Unsupported annotation type: ${annotationType.name}`);
         }
         renderTexture.dispose();
     }
@@ -101,7 +90,6 @@ export class BinarySegmentation implements Segmentation {
      * @param settings: { mode: 'paint' | 'erase', questionable: boolean, erodeDilate: boolean }
      */
     draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void {
-        const { webgl: { shaders } } = this.image;
 
         const uniforms = {
             u_bitmask: this.layerBit,
@@ -112,9 +100,9 @@ export class BinarySegmentation implements Segmentation {
         };
 
         if (settings.erodeDilate) {
-            this.data.passShader(scanNr, shaders.erodeDilate, uniforms);
+            this.data.passShader(scanNr, this.shaders.erodeDilate, uniforms);
         } else {
-            this.data.passShader(scanNr, shaders.draw, uniforms);
+            this.data.passShader(scanNr, this.shaders.draw, uniforms);
         }
         this._after_update(scanNr);
     }
@@ -124,28 +112,25 @@ export class BinarySegmentation implements Segmentation {
      * @param scanNr 
      */
     clear(scanNr: number): void {
-        const { webgl: { shaders } } = this.image;
         const uniforms = {
             u_current: this.data.getTexture(scanNr),
             u_bitmask: this.layerBit
         };
-        this.data.passShader(scanNr, shaders.clear, uniforms);
+        this.data.passShader(scanNr, this.shaders.clear, uniforms);
         this._after_update(scanNr);
     }
 
     /**
      * Import the segmentation from the canvas
      * The red channel is used for the actual segmentation, the green channel for the questionable mask
-     * Only reads the green channel if the annotation interpretation is 'R/G mask'
+     * Only reads the green channel if the annotation is RG_MASK
      * 
      * @param scanNr 
      * @param canvas R/G mask
      */
-    import(scanNr: number, canvas: HTMLCanvasElement | WebGLTexture, u_threshold: number = 0.5): void {
-        const { webgl: { shaders } } = this.image;
-
+    import(scanNr: number, canvas: HTMLCanvasElement | WebGLTexture | ImageBitmap, u_threshold: number = 0.5): void {
         let u_drawing: WebGLTexture;
-        if (canvas instanceof HTMLCanvasElement) {
+        if (canvas instanceof HTMLCanvasElement || canvas instanceof ImageBitmap) {
             u_drawing = this.image.getTextureForCanvas(canvas);
         } else {
             u_drawing = canvas;
@@ -153,7 +138,7 @@ export class BinarySegmentation implements Segmentation {
         // Annotations with binary data are stored as single channel (black/white) images.
         // However the canvas is always 4 channels, so the green channel will also be set.
         // This should not be interpreted as the 'questionable' mask        
-        const u_has_questionable_mask = this.annotation.interpretation == 'R/G mask';
+        const u_has_questionable_mask = this.annotation.annotationType.dataRepresentation == 'RG_MASK';
 
         const uniforms = {
             u_current: this.data.getTexture(scanNr),
@@ -162,7 +147,7 @@ export class BinarySegmentation implements Segmentation {
             u_has_questionable_mask,
             u_threshold
         };
-        this.data.passShader(scanNr, shaders.import, uniforms);
+        this.data.passShader(scanNr, this.shaders.import, uniforms);
         this._after_update(scanNr);
     }
 
@@ -181,87 +166,62 @@ export class BinarySegmentation implements Segmentation {
      */
     importOther(scanNr: number, other: Segmentation): void {
         const ctx = this.image.getIOCtx();
-        other.export(scanNr, ctx);
-
-        // TODO: this conversion should probably be moved to the export function
-        if (this.annotation.interpretation === 'R/G mask') {
-            const otherInterpretation = other.annotation.interpretation
-            if (otherInterpretation === 'Binary mask') {
-                // other has no questionable mask, remove the green channel
-                const imageData = ctx.getImageData(0, 0, this.image.width, this.image.height);
-                const data = imageData.data;
-                for (let i = 0; i < data.length; i++) {
-                    data[4 * i + 1] = 0;
-                }
-                ctx.putImageData(imageData, 0, 0);
-            }
-            if (otherInterpretation === 'Probability') {
-                // apply threshold (should be moved to ProbabilitySegmentation?)
-                const imageData = ctx.getImageData(0, 0, this.image.width, this.image.height);
-                const data = imageData.data;
-                const th = (other as ProbabilitySegmentation).threshold * 255;
-                for (let i = 0; i < data.length; i++) {
-                    if (data[4 * i] < th) {
-                        data[4 * i] = 0;
-                    }
-                    // remove green channel (probability segmentation is exported to gray canvas)
-                    data[4 * i + 1] = 0;
-                }
-                ctx.putImageData(imageData, 0, 0);
-
-            }
-        }
+        // export the other segmentation to ctx, using the dataRepresentation of the current annotation
+        other.export(scanNr, ctx, this.dataRepresentation);
         this.import(scanNr, ctx.canvas);
     }
 
     /**
      * Export the segmentation to the canvas associated with the context
-     * The output uses the red channel for the actual segmentation, the green channel for the questionable mask
-     * Only writes the green channel if the annotation interpretation is 'R/G mask'
-     * 
-     * TODO: probably better to have different export functions for different interpretations
-     * 
+     * For BINARY: Creates a black/white image (R=G=B=255 for annotation)
+     * For RG_MASK: Creates an RGB image (R=255 for annotation, G=255 for questionable, B=0)
      * @param scanNr 
      * @param ctx 
+     * @param dataRepresentation if omitted, uses the dataRepresentation of the annotation
      */
-    export(scanNr: number, ctx: CanvasRenderingContext2D): void {
+    export(scanNr: number, ctx: CanvasRenderingContext2D, dataRepresentation?: DataRepresentation): void {
         // CPU-side implementation, not meant for real-time rendering
 
         const data = this.data.getBscan(scanNr);
-        const { width, height } = this.image;
-        const length = width * height;
+        const { width, height } = this;
         const imageData = ctx.getImageData(0, 0, width, height);
         const dataOut = imageData.data;
+        const isRGMask = (dataRepresentation || this.dataRepresentation) === 'RG_MASK';
 
-        const isRGMask = this.annotation.interpretation === 'R/G mask';
-
-        for (let i = 0; i < length; i++) {
+        for (let i = 0; i < width * height; i++) {
             const dataIndex = 2 * i;
             const dataOutIndex = 4 * i;
+            const hasAnnotation = data[dataIndex] & this.layerBit;
+            const hasQuestionable = data[dataIndex + 1] & this.layerBit;
 
-            if (data[dataIndex] & this.layerBit) {
-                dataOut[dataOutIndex] = 255; // red
-            }
-
-            if (isRGMask) {
-                if (data[dataIndex + 1] & this.layerBit) {
-                    dataOut[dataOutIndex + 1] = 255; // green
+            if (hasAnnotation) {
+                dataOut[dataOutIndex] = 255;     // R = 255 for annotation
+                if (!isRGMask) {
+                    // BINARY: Set all channels to 255                    
+                    dataOut[dataOutIndex + 1] = 255; // G
+                    dataOut[dataOutIndex + 2] = 255; // B
                 }
-            } else {
-                dataOut[dataOutIndex + 1] = 255; // green
-                dataOut[dataOutIndex + 2] = 255; // blue
             }
-            dataOut[dataOutIndex + 3] = 255; // alpha
+
+            if (isRGMask && hasQuestionable) {
+                dataOut[dataOutIndex + 1] = 255;     // G = 255 for questionable
+            }
+
+            dataOut[dataOutIndex + 3] = 255;         // Alpha = 255
         }
         ctx.putImageData(imageData, 0, 0);
     }
 
+    getData(scanNr: number): Uint8Array {
+        return this.data.getBscan(scanNr);
+    }
+
     dispose(): void {
-        for (let i = 0; i < this.image.depth; i++) {
+        for (let i = 0; i < this.depth; i++) {
             this.clear(i);
         }
         if (this.connectedComponents !== undefined) {
-            this.image.webgl.gl.deleteTexture(this.connectedComponents);
+            this.webgl.gl.deleteTexture(this.connectedComponents);
         }
     }
 
@@ -279,19 +239,19 @@ export class BinarySegmentation implements Segmentation {
     computeConnectedComponents(scanNr: number) {
         // data is a Uint8Array with 2 bytes per pixel (R and G)
         const data = this.data.getBscan(scanNr);
-        const { width, height } = this.image;
+        const { width, height } = this;
         const binaryArray = new Uint8Array(width * height);
         for (let i = 0; i < binaryArray.length; i++) {
             // note 2 * i to skip the green channel (only R is used)
             binaryArray[i] = data[2 * i] & this.layerBit;
         }
-        const label = BlobExtraction(binaryArray, this.image.width, this.image.height);
+        const label = BlobExtraction(binaryArray, width, height);
         // label contains the connected components (0 = background, 1 = first component, 2 = second component, ...)
 
         // upload to texture
-        const gl = this.image.webgl.gl;
+        const gl = this.webgl.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.connectedComponents!);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, this.image.width, this.image.height, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, label);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, width, height, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, label);
 
         this.connectedComponentsValid = scanNr;
     }
@@ -316,7 +276,7 @@ export class MaskedSegmentation extends BinarySegmentation {
         id: string,
         image: AbstractImage,
         annotation: Annotation,
-        data: SharedDataRG,
+        data: SharedData,
         layerIndex: number,
         public readonly maskSegmentation: BinarySegmentation,
         public readonly branch: Branch

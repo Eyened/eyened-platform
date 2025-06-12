@@ -5,13 +5,14 @@
 	import { Hide, PanelIcon, Show, Trash } from '../icons/icons';
 	import type { Branch, DialogueType } from '$lib/types';
 	import SegmentationTools from './SegmentationTools.svelte';
-	import type { AnnotationData } from '$lib/datamodel/annotationData';
+	import type { AnnotationData } from '$lib/datamodel/annotationData.svelte';
 	import type { Writable } from 'svelte/store';
 
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Annotation } from '$lib/datamodel/annotation.svelte';
 	import { SegmentationOverlay } from '$lib/viewer/overlays/SegmentationOverlay.svelte';
 	import { SegmentationContext } from './segmentationContext.svelte';
-	import { globalContext } from '$lib/main';
+	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	const globalContext = getContext<GlobalContext>('globalContext');
 
 	interface Props {
 		branch: Branch;
@@ -24,9 +25,8 @@
 	const isEditable = globalContext.canEdit(annotation);
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
-	const segmentationOverlay = getContext<SegmentationOverlay>('segmentationOverlay');
-	const segmentationController = viewerContext.image.segmentationController;
-
+	
+	
 	// TODO: find a cleaner solution?
 	const segmentationItem = segmentationController.getMaskedSegmentation(
 		annotation,
@@ -37,7 +37,7 @@
 	// by default show masked segmentation
 	segmentationOverlay.applyMasking.add(segmentation);
 
-	let active: boolean = $derived(segmentationContext.activeSegmentation == segmentation);
+	let active: boolean = $derived(segmentationContext.activeAnnotation == segmentation);
 
 	const dialogue = getContext<Writable<DialogueType>>('dialogue');
 
@@ -76,7 +76,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="main" class:active>
 	<div class="row toggle" onclick={toggleActive}>
-		<FeatureColorPicker {segmentation} />
+		<FeatureColorPicker segmentationItem={segmentation} />
 
 		<div>
 			{#if segmentationContext.hideSegmentations.has(segmentation)}

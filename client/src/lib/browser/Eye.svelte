@@ -12,6 +12,8 @@
     let { study, laterality }: Props = $props();
 
     const eye = { L: "OS", R: "OD" }[laterality];
+
+    const instances = study.instances;
     const filtered = study.instances.filter(
         (instance) => instance.laterality == laterality,
     );

@@ -1,17 +1,15 @@
-from eyened_orm import AnnotationType
+import os
 from types import SimpleNamespace
 
-import os
-import warnings
-from eyened_orm.db import create_connection_string
-from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, text
-from eyened_orm import Creator, SourceInfo, ModalityTable
+from eyened_orm import AnnotationType, Creator, ModalityTable, SourceInfo
+from eyened_orm.Annotation import DataRepresentation
 from eyened_orm.base import Base
+from eyened_orm.db import create_connection_string
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session
 
-from ..db import settings, DBManager
+from ..db import settings
 from ..routes.auth import create_user
-
 
 
 def create_database():
@@ -21,9 +19,9 @@ def create_database():
         password=os.environ.get("DB_ROOT_PASSWORD"),
         host=settings.database.host,
         port=settings.database.port,
-        database=None  # Don't specify database initially
+        database=None,  # Don't specify database initially
     )
-    
+
     temp_engine = create_engine(create_connection_string(root_config))
 
     # First check if database exists
@@ -37,7 +35,11 @@ def create_database():
             if not result.fetchone():
                 # Database doesn't exist, try to create it
                 try:
-                    conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {settings.database.database}"))
+                    conn.execute(
+                        text(
+                            f"CREATE DATABASE IF NOT EXISTS {settings.database.database}"
+                        )
+                    )
                 except Exception as e:
                     raise RuntimeError(
                         f"Database {settings.database.database} does not exist and could not be created. Error: {str(e)}"
@@ -73,16 +75,18 @@ def create_database_user(engine):
         with engine.connect() as conn:
             # Check if user exists
             result = conn.execute(
-                text(
-                    f"SELECT User FROM mysql.user WHERE User = '{db_user}'"
-                )
+                text(f"SELECT User FROM mysql.user WHERE User = '{db_user}'")
             )
             if result.fetchone():
                 print(f"Database user {db_user} already exists")
             else:
                 # Create user if it doesn't exist
                 try:
-                    conn.execute(text(f"CREATE USER '{db_user}'@'%' IDENTIFIED BY '{db_password}'"))
+                    conn.execute(
+                        text(
+                            f"CREATE USER '{db_user}'@'%' IDENTIFIED BY '{db_password}'"
+                        )
+                    )
                     print(f"Created database user: {db_user}")
                 except Exception as e:
                     raise RuntimeError(
@@ -91,19 +95,22 @@ def create_database_user(engine):
 
             # Grant limited privileges to user
             try:
-                conn.execute(text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {db_database}.* TO '{db_user}'@'%'"))
+                conn.execute(
+                    text(
+                        f"GRANT SELECT, INSERT, UPDATE, DELETE ON {db_database}.* TO '{db_user}'@'%'"
+                    )
+                )
                 conn.execute(text("FLUSH PRIVILEGES"))
-                print(f"Granted SELECT, INSERT, UPDATE, DELETE privileges to user {db_user} on database {db_database}")
+                print(
+                    f"Granted SELECT, INSERT, UPDATE, DELETE privileges to user {db_user} on database {db_database}"
+                )
             except Exception as e:
                 raise RuntimeError(
                     f"Could not grant privileges to user {db_user}. Error: {str(e)}"
                 )
 
     except Exception as e:
-        raise RuntimeError(
-            f"Could not manage database user {db_user}. Error: {str(e)}"
-        )
-
+        raise RuntimeError(f"Could not manage database user {db_user}. Error: {str(e)}")
 
 
 def init_admin(session: Session) -> None:
@@ -133,7 +140,7 @@ def init_admin(session: Session) -> None:
             session=session,
             username=admin_username,
             password=admin_password,
-            description="Default admin user created during initialization"
+            description="Default admin user created during initialization",
         )
     except Exception as e:
         raise RuntimeError(f"Failed to create admin user: {str(e)}")
@@ -157,34 +164,21 @@ def init_other_objects(session):
 
 
 def init_annotation_types(session):
-    types = (
-        "Segmentation 2D",
-        "Segmentation OCT B-scan",
-        "Segmentation OCT Enface",
-        "Segmentation OCT Volume",
-    )
-    interpretations = (
-        "Binary mask",
-        "Probability",
-        "R/G mask",
-        "Label numbers",
-        "Layer bits",
-    )
-    additional_types = [("Segmentation 2D masked", "R/G mask")]
+    expected_types = [
+        ("Binary mask", DataRepresentation.BINARY),
+        ("R/G mask", DataRepresentation.RG_MASK),
+        ("Probability", DataRepresentation.FLOAT),
+        # ("Retinal layers", DataRepresentation.MULTI_LABEL),
+        # ("Retinal layers", DataRepresentation.MULTI_CLASS),
+    ]
 
-    index = {
-        (a.AnnotationTypeName, a.Interpretation): a
-        for a in AnnotationType.fetch_all(session)
-    }
-    expected = [
-        (name, interpretation) for name in types for interpretation in interpretations
-    ] + additional_types
-
-    for name, interpretation in expected:
-        if (name, interpretation) not in index:
+    annotation_types = AnnotationType.fetch_all(session)
+    # make sure all expected types are in the database
+    for name, representation in expected_types:
+        if name not in [a.AnnotationTypeName for a in annotation_types]:
             annotation_type = AnnotationType(
-                AnnotationTypeName=name, Interpretation=interpretation
+                AnnotationTypeName=name, DataRepresentation=representation
             )
-            print("Adding annotation type:", name, interpretation)
             session.add(annotation_type)
+
     session.commit()

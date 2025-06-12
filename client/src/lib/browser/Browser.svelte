@@ -10,7 +10,13 @@
     import FilterConditions from "./FilterConditions.svelte";
     import FilterImages from "./FilterImages.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
-    import { globalContext } from "$lib/main";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { Contact } from "$lib/datamodel/contact.svelte";
+    const contacts = data.contacts;
+
+    const globalContext = getContext<GlobalContext>("globalContext");
     const { creator } = globalContext;
     const initials = creator.name
         .split(" ")

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Instance } from '$lib/datamodel/instance';
+	import type { Instance } from '$lib/datamodel/instance.svelte';
 
 	interface Props {
 		instance: Instance;

@@ -1,16 +1,13 @@
-import type { Annotation } from "$lib/datamodel/annotation";
-import type { Creator } from "$lib/datamodel/creator";
-import type { Feature } from "$lib/datamodel/feature";
-import type { Segmentation } from "$lib/webgl/SegmentationController";
+import type { Annotation } from "$lib/datamodel/annotation.svelte";
+import type { Creator } from "$lib/datamodel/creator.svelte";
 import { SvelteSet } from "svelte/reactivity";
 
 export class SegmentationContext {
-    public readonly hideCreators = new SvelteSet<Creator>();
-    public readonly hideFeatures = new SvelteSet<Feature>();
-    public readonly hideAnnotations = new SvelteSet<Annotation>();
-    public readonly hideSegmentations = new SvelteSet<Segmentation>();
-    public activeSegmentation: Segmentation | undefined = $state();
 
+    public readonly hideCreators = new SvelteSet<Creator>();
+    public readonly hideAnnotations = new SvelteSet<Annotation>();
+
+    public activeAnnotationID: number | undefined = $state();
 
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
@@ -20,19 +17,19 @@ export class SegmentationContext {
     constructor() { }
 
 
-    toggleShow(segmentation: Segmentation) {
-        if (this.hideSegmentations.has(segmentation)) {
-            this.hideSegmentations.delete(segmentation);
+    toggleShow(annotation: Annotation) {
+        if (this.hideAnnotations.has(annotation)) {
+            this.hideAnnotations.delete(annotation);
         } else {
-            this.hideSegmentations.add(segmentation);
+            this.hideAnnotations.add(annotation);
         }
     }
 
-    toggleActive(segmentation: Segmentation) {
-        if (this.activeSegmentation == segmentation) {
-            this.activeSegmentation = undefined;
+    toggleActive(annotation: Annotation) {
+        if (this.activeAnnotationID == annotation.id) {
+            this.activeAnnotationID = undefined;
         } else {
-            this.activeSegmentation = segmentation;
+            this.activeAnnotationID = annotation.id;
         }
     }
 }

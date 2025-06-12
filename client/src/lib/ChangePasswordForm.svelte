@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { apiUrl } from "$lib/config";
-    import { globalContext } from "$lib/main";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
     let password = $state("");
     let newPassword1 = $state("");
     let newPassword2 = $state("");
     let passwordsMatch = $derived(newPassword1 == newPassword2);
 
+    const globalContext = getContext<GlobalContext>("globalContext");
     const { userManager } = globalContext;
     const creator = userManager.creator;
 

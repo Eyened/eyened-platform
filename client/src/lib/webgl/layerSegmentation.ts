@@ -1,28 +1,31 @@
-import type { Annotation } from "$lib/datamodel/annotation";
-import type { AnnotationData } from "$lib/datamodel/annotationData";
-import { featureLabels } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
-import type { Segmentation } from "./SegmentationController";
-import type { AbstractImage } from "./abstractImage";
-import { LayerBoundaries } from "./layerBoundaries";
-import { CanvasToUint16Array, CanvasToUint8Array, MulticlassData, MultilabelData, Uint16ArrayToCanvas, Uint8ArrayToCanvasGray as Uint8ArrayToCanvasGray } from "./segmentationData";
+import type { Annotation } from "$lib/datamodel/annotation.svelte";
+import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
+import type { DataRepresentation } from "$lib/datamodel/annotationType";
+import type { Feature } from "$lib/datamodel/feature.svelte";
+import { data } from "$lib/datamodel/model";
 
-abstract class BaseSegmentation implements Segmentation {
-    public readonly dataInterpretation: { [layerName: string]: number };
-    abstract questionable_bit: number;
+import type { AbstractImage } from "./abstractImage";
+import { BaseSegmentation, type Segmentation } from "./baseSegmentation";
+import { LayerBoundaries } from "./layerBoundaries";
+import { CanvasToUint16Array, CanvasToUint8Array, MulticlassData, MultilabelData3D, MultilabelData2D, Uint16ArrayToCanvas, Uint8ArrayToCanvasGray as Uint8ArrayToCanvasGray } from "./segmentationData";
+
+abstract class MultiBaseSegmentation extends BaseSegmentation {
 
     constructor(
         public readonly id: string,
         public readonly image: AbstractImage,
         public readonly annotation: Annotation,
+        public readonly annotationPlane: AnnotationPlane,
+        public readonly featureLabels: Map<number, Feature>
     ) {
-        this.dataInterpretation = featureLabels[annotation.feature.name];
+        super(id, image, annotation, annotationPlane);
     }
 
-    abstract get data(): MulticlassData | MultilabelData;
+    abstract get data(): MulticlassData | MultilabelData3D | MultilabelData2D;
     abstract dispose(): void;
     abstract draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void;
     abstract clear(scanNr: number): void;
-    abstract export(scanNr: number, ctx: CanvasRenderingContext2D): void;
+    abstract export(scanNr: number, ctx: CanvasRenderingContext2D, dataRepresentation?: DataRepresentation): void;
     abstract import(scanNr: number, canvas: HTMLCanvasElement): void;
     abstract importBscanFromArrayBuffer(scanNr: number, data: ArrayBuffer): void;
     abstract importVolumeFromArrayBuffer(data: ArrayBuffer): void;
@@ -49,7 +52,7 @@ abstract class BaseSegmentation implements Segmentation {
         return neighbors;
     }
 
-    protected drawQuestionable(data: Uint8Array | Uint16Array, i: number, isPaint: boolean): void {
+    protected drawQuestionable(data: Uint8Array | Uint16Array | Uint32Array, i: number, isPaint: boolean): void {
         if (isPaint) { // add questionable bit
             data[i] |= this.questionable_bit;
         } else { // remove questionable bit
@@ -69,7 +72,7 @@ abstract class BaseSegmentation implements Segmentation {
         function getBuffer(): ArrayBuffer {
             if (dataRaw instanceof ArrayBuffer) {
                 return dataRaw;
-            } else if (dataRaw instanceof Uint8Array || dataRaw instanceof Uint16Array) {
+            } else if (dataRaw instanceof Uint8Array || dataRaw instanceof Uint16Array || dataRaw instanceof Uint32Array) {
                 return dataRaw.buffer as ArrayBuffer;
             } else if (dataRaw instanceof HTMLCanvasElement) {
                 const array = CanvasToUint8Array(dataRaw);
@@ -80,14 +83,18 @@ abstract class BaseSegmentation implements Segmentation {
         }
         const buffer = getBuffer();
 
-        const annotationType = this.annotation.annotationType.name;
-        if (annotationType === 'Segmentation OCT Volume') {
+        const annotationPlane = annotationData.annotationPlane;
+        if (annotationPlane === "VOLUME") {
             this.importVolumeFromArrayBuffer(buffer);
-        } else if (annotationType === 'Segmentation OCT B-scan') {
+        } else if (annotationPlane === "PRIMARY") {
             this.importBscanFromArrayBuffer(annotationData.scanNr, buffer);
         } else {
             throw new Error('Unsupported data type');
         }
+    }
+
+    getData(scanNr: number): Uint8Array | Uint16Array | Uint32Array {
+        return this.data.getBscan(scanNr);
     }
 }
 
@@ -98,8 +105,8 @@ export class MulticlassSegmentation extends BaseSegmentation {
     private _layerBoundaries: LayerBoundaries;
     private layerBoundariesValid: boolean = false;
 
-    constructor(id: string, image: AbstractImage, annotation: Annotation) {
-        super(id, image, annotation);
+    constructor(id: string, image: AbstractImage, annotation: Annotation, annotationPlane: AnnotationPlane) {
+        super(id, image, annotation, annotationPlane);
         this.data = new MulticlassData(image);
         this._layerBoundaries = new LayerBoundaries(image, this.data.texture);
     }
@@ -236,24 +243,28 @@ export class MulticlassSegmentation extends BaseSegmentation {
     }
 }
 
-export class MultilabelSegmentation extends BaseSegmentation {
-    public data: MultilabelData;
-    public questionable_bit: number = 1 << 15;
+export class MultilabelSegmentation extends MultiBaseSegmentation {
+    public data: MultilabelData2D | MultilabelData3D;
 
-    constructor(id: string, image: AbstractImage, annotation: Annotation) {
-        super(id, image, annotation);
-        this.data = new MultilabelData(image);
+    constructor(id: string, image: AbstractImage, annotation: Annotation, annotationPlane: AnnotationPlane) {
+        const featureLabels = getFeatureLabels(annotation);
+        super(id, image, annotation, annotationPlane, featureLabels);
+
+        if (this.depth < 2) {
+            this.data = new MultilabelData2D(image, this.width, this.height, featureLabels.size);
+        } else {
+            this.data = new MultilabelData3D(image.webgl.gl, this.width, this.height, this.depth, featureLabels.size);
+        }
     }
 
     dispose(): void {
         this.data.dispose();
     }
 
-    getBitmask(selectedLabelNames: string[]): number {
+    getBitmask(selectedFeatures: Feature[]): number {
         let bitmask = 0;
-        for (const labelName of selectedLabelNames) {
-            const i = this.dataInterpretation[labelName];
-            if (i) {
+        for (const [i, feature] of this.featureLabels) {
+            if (selectedFeatures.includes(feature)) {
                 bitmask |= 1 << (i - 1);
             }
         }
@@ -289,12 +300,18 @@ export class MultilabelSegmentation extends BaseSegmentation {
     }
 
     clear(scanNr: number): void {
-        this.data.setBscan(scanNr, new Uint16Array(this.image.width * this.image.height));
+        this.data.clearBscan(scanNr);
     }
 
     export(scanNr: number, ctx: CanvasRenderingContext2D): void {
         const data = this.data.getBscan(scanNr);
-        Uint16ArrayToCanvas(data, ctx);
+        if (data instanceof Uint8Array) {
+            Uint8ArrayToCanvasGray(data, ctx);
+        } else if (data instanceof Uint16Array) {
+            Uint16ArrayToCanvas(data, ctx);
+        } else if (data instanceof Uint32Array) {            
+            throw new Error("Unsupported data type");
+        }
     }
 
     import(scanNr: number, canvas: HTMLCanvasElement): void {
@@ -330,4 +347,15 @@ export class MultilabelSegmentation extends BaseSegmentation {
             throw new Error("Unsupported segmentation type");
         }
     }
+}
+
+function getFeatureLabels(annotation: Annotation): Map<number, Feature> {
+    const annotationType = annotation.annotationType;
+    let result: Map<number, Feature> = new Map();
+    const features = data.annotationTypeFeatures.filter((f) => f.annotationType == annotationType).$;
+    for (const f of features) {
+        result.set(f.feature_index, f.feature);
+    }
+    console.log('getFeatureLabels', result);
+    return result;
 }

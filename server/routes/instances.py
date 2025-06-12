@@ -1,4 +1,3 @@
-from collections import defaultdict
 from typing import Dict, List, Optional
 
 from eyened_orm import (
@@ -20,9 +19,9 @@ from eyened_orm import (
     Study,
 )
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from sqlalchemy import distinct, func, or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased, defer
 
 from .auth import CurrentUser, get_current_user
@@ -35,49 +34,16 @@ router = APIRouter()
 AnnotationCreator = aliased(Creator, name="annotation_creator")
 FormCreator = aliased(Creator, name="form_creator")
 
-
-segmentation_annotation_types = select(AnnotationType.AnnotationTypeID).where(
-    AnnotationType.AnnotationTypeName.in_(
-        [
-            "Segmentation 2D",
-            "Segmentation 2D masked",
-            "Segmentation OCT B-scan",
-            "Segmentation OCT Enface",
-            "Segmentation OCT Volume",
-        ]
-    )
-)
-
-# TODO: this can be removed once other annotation types are removed (using annotation table only for segmentations)
-ActiveAnnotation = aliased(
-    Annotation,
-    select(Annotation)
-    .filter(~Annotation.Inactive)
-    # .filter(Annotation.AnnotationTypeID.in_(segmentation_annotation_types))
-    .subquery(name="active_annot"),
-    name="active_annot",
-)
-
-
-ActiveFormAnnotation = aliased(
-    FormAnnotation,
-    select(FormAnnotation)
-    .filter(~FormAnnotation.Inactive)
-    .subquery(name="active_form_annot"),
-    name="active_form_annot",
-)
-
-
 # Pydantic models for response schemas
 class DataResponse(BaseModel):
 
-    instances: List[Dict]
-    series: List[Dict]
-    studies: List[Dict]
-    patients: List[Dict]
-    annotations: List[Dict]
-    annotationDatas: List[Dict]
-    formAnnotations: List[Dict]
+    instances: List[ImageInstance]
+    series: List[Series]
+    studies: List[Study]
+    patients: List[Patient]
+    annotations: List[Annotation]
+    annotation_data: List[AnnotationData] = Field(alias="annotation-data")
+    form_annotations: List[FormAnnotation] = Field(alias="form-annotations")
 
     class Config:
         arbitrary_types_allowed = True
@@ -101,9 +67,11 @@ base_query = (
     .outerjoin(DeviceInstance)
     .outerjoin(DeviceModel)
 )
+
 annotation_query = (
-    select(ActiveAnnotation, AnnotationData)
-    .select_from(ActiveAnnotation)
+    select(Annotation, AnnotationData)
+    .select_from(Annotation)
+    .filter(~Annotation.Inactive)
     .join(Feature)
     .join(AnnotationType)
     .join(AnnotationCreator)
@@ -112,8 +80,9 @@ annotation_query = (
 
 # optimization: skipping FormData, viewer will load on demand
 form_query = (
-    select(ActiveFormAnnotation)
-    .options(defer(ActiveFormAnnotation.FormData))
+    select(FormAnnotation)
+    .options(defer(FormAnnotation.FormData))
+    .filter(~FormAnnotation.Inactive)
     .join(Patient)
     .join(FormSchema)
     .join(FormCreator)
@@ -130,8 +99,8 @@ base_tables = [
     SourceInfo,
     Scan,
 ]
-annotation_tables = [ActiveAnnotation, Feature, AnnotationType, AnnotationCreator]
-form_tables = [ActiveFormAnnotation, FormSchema, FormCreator]
+annotation_tables = [Annotation, Feature, AnnotationType, AnnotationCreator]
+form_tables = [FormAnnotation, FormSchema, FormCreator]
 
 
 def get_mappings(tables):
@@ -187,30 +156,30 @@ def run_queries(
     if any(field in annotation_mappings for field, operator in params_decoded):
         query = (
             query.join(
-                ActiveAnnotation,
-                ImageInstance.ImageInstanceID == ActiveAnnotation.ImageInstanceID,
+                Annotation,
+                ImageInstance.ImageInstanceID == Annotation.ImageInstanceID,
             )
-            .join(Feature, ActiveAnnotation.FeatureID == Feature.FeatureID)
+            .join(Feature, Annotation.FeatureID == Feature.FeatureID)
             .join(
                 AnnotationType,
-                ActiveAnnotation.AnnotationTypeID == AnnotationType.AnnotationTypeID,
+                Annotation.AnnotationTypeID == AnnotationType.AnnotationTypeID,
             )
             .join(
                 AnnotationCreator,
-                ActiveAnnotation.CreatorID == AnnotationCreator.CreatorID,
+                Annotation.CreatorID == AnnotationCreator.CreatorID,
             )
         )
         query = apply_filters(query, annotation_mappings, params_decoded)
     if any(field in form_mappings for field, operator in params_decoded):
         query = (
             query.join(
-                ActiveFormAnnotation,
-                ActiveFormAnnotation.PatientID == Patient.PatientID,
+                FormAnnotation,
+                FormAnnotation.PatientID == Patient.PatientID,
             )
             .join(
-                FormSchema, ActiveFormAnnotation.FormSchemaID == FormSchema.FormSchemaID
+                FormSchema, FormAnnotation.FormSchemaID == FormSchema.FormSchemaID
             )
-            .join(FormCreator, ActiveFormAnnotation.CreatorID == FormCreator.CreatorID)
+            .join(FormCreator, FormAnnotation.CreatorID == FormCreator.CreatorID)
         )
         query = apply_filters(query, form_mappings, params_decoded)
 
@@ -237,13 +206,13 @@ def run_queries(
     image_ids = {instance.ImageInstanceID for instance, *_ in instances}
 
     annotation_query = annotation_query.where(
-        ActiveAnnotation.ImageInstanceID.in_(image_ids)
+        Annotation.ImageInstanceID.in_(image_ids)
     )
     
     annotations = session.execute(annotation_query).all()
 
     patient_ids = {patient.PatientID for _, _, _, patient in instances}
-    form_query = form_query.where(ActiveFormAnnotation.PatientID.in_(patient_ids))
+    form_query = form_query.where(FormAnnotation.PatientID.in_(patient_ids))
     form_annotations = session.scalars(form_query).all()
 
     return next_cursor, instances, annotations, form_annotations
@@ -290,8 +259,8 @@ async def get_instances(
                 "studies": studies,
                 "patients": patients,
                 "annotations": annotations,
-                "annotationDatas": annotation_datas,
-                "formAnnotations": form_annotations,
+                "annotation-data": annotation_datas,
+                "form-annotations": form_annotations,
             }.items()
         }
     }

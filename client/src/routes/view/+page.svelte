@@ -1,6 +1,6 @@
 <script lang="ts">
     import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
-    import { loadInstances } from "$lib/datamodel/api";
+    import { loadInstances } from "$lib/datamodel/api.svelte";
     import { page } from "$app/state";
     import { data } from "$lib/datamodel/model";
     import { browser } from "$app/environment";

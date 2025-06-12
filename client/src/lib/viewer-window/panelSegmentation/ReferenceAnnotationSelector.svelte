@@ -1,0 +1,34 @@
+<script lang="ts">
+    import type { Annotation } from "$lib/datamodel/annotation.svelte";
+
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+
+    interface Props {
+        image: AbstractImage;
+        annotation: Annotation;
+        resolve: (annotation: Annotation) => void;
+        reject: () => void;
+    }
+
+    let { image, annotation, resolve, reject }: Props = $props();
+    const segmentationAnnotations = image.segmentationAnnotations;
+    const referenceAnnotations = segmentationAnnotations.filter(
+        (a) => a.id != annotation.id,
+    );
+</script>
+
+<div>
+    <div>Select reference annotation:</div>
+    <ul>
+        {#each $referenceAnnotations as referenceAnnotation}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <li onclick={() => resolve(referenceAnnotation)}>
+                <span>[{referenceAnnotation.id}]</span>
+                <span>{referenceAnnotation.feature.name}</span>
+                <span>{referenceAnnotation.creator.name}</span>
+            </li>
+        {/each}
+    </ul>
+    <button onclick={reject}>Cancel</button>
+</div>

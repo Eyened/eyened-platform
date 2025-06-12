@@ -1,21 +1,41 @@
-import { DerivedProperty, ItemConstructor } from "./itemContructor";
-import type { FilterList, Item } from "./itemList";
-import { FKMapping } from "./mapping";
-import type { TaskDefinition } from "./taskDefinition";
-import type { DataModel } from "./model";
-import type { SubTask } from "./subTask";
+import { BaseItem } from "./itemList";
 
-export interface Task extends Item {
-    id: number,
-    name: string,
-    definition: TaskDefinition,
-    state: string,
-    subTasks: FilterList<SubTask>
+export interface ServerTask {
+    TaskID: number;
+    TaskName: string;
+    TaskDefinitionID: number;
+    TaskStateID: number;
+    DateInserted: Date;
+    Description?: string;
 }
+export class Task extends BaseItem {
+    static endpoint = 'tasks';
+    static mapping = {
+        'TaskName': 'name',
+        'TaskDefinitionID': 'definitionId',
+        'TaskStateID': 'stateId',
+        'DateInserted': 'dateInserted',
+        'Description': 'description',
+    };
 
-export const TaskConstructor = new ItemConstructor<Task>('TaskID', {
-    name: 'TaskName',
-    definition: FKMapping('TaskDefinitionID', 'taskDefinitions'),
-    state: 'TaskState',
-    subTasks: new DerivedProperty((self: Task, data: DataModel) => data.subTasks.filter(subtask => subtask.task === self))
-});
+    id!: number;
+    name!: string;
+    definitionId!: number;
+    stateId!: number;
+    dateInserted!: Date;
+    description?: string = $state(undefined);
+
+    constructor(item: ServerTask) {
+        super();
+        this.init(item);
+    }
+
+    init(item: ServerTask) {
+        this.id = item.TaskID;
+        this.name = item.TaskName;
+        this.definitionId = item.TaskDefinitionID;
+        this.stateId = item.TaskStateID;
+        this.dateInserted = item.DateInserted;
+        this.description = item.Description;
+    }
+}

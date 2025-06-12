@@ -1,12 +1,11 @@
 <script lang="ts">
     import { data } from "$lib/datamodel/model";
-    import { loadInstances } from "$lib/datamodel/api";
-    import type { Instance } from "$lib/datamodel/instance";
+    import { loadInstances } from "$lib/datamodel/api.svelte";
+    import type { Instance } from "$lib/datamodel/instance.svelte";
     import { Deferred } from "$lib/utils";
     import ImageWindow from "$lib/viewer-window/ImageWindow.svelte";
     import { WebGL } from "$lib/webgl/webgl";
     import { onMount } from "svelte";
-    import { re } from "mathjs";
 
     interface Props {
         data: { ImageInstanceID: number };

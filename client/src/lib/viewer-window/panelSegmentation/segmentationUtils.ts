@@ -1,6 +1,6 @@
-import { createAnnotation, type Annotation } from "$lib/datamodel/annotation";
-import type { AnnotationData } from "$lib/datamodel/annotationData";
-import type { Creator } from "$lib/datamodel/creator";
+import { Annotation } from "$lib/datamodel/annotation.svelte";
+import { AnnotationData } from "$lib/datamodel/annotationData.svelte";
+import type { Creator } from "$lib/datamodel/creator.svelte";
 import { data } from "$lib/datamodel/model";
 import type { DialogueType } from "$lib/types";
 import { colors } from "$lib/viewer/overlays/colors";
@@ -102,7 +102,7 @@ export async function createMaskedAnnotation(dialogue: Writable<DialogueType>,
 
     dialogue.set(`Creating annotation`);
 
-    const new_annotation = await createAnnotation(
+    const new_annotation = await Annotation.createFrom(
         annotation.instance!,
         feature,
         creator,
@@ -115,7 +115,7 @@ export async function createMaskedAnnotation(dialogue: Writable<DialogueType>,
         scanNr: scanNr,
         mediaType: 'application/json'
     };
-    const annotationData = await data.annotationDatas.create(item);
+    const annotationData = await AnnotationData.create(item);
     dialogue.set(`uploading annotation data...`);
 
     await annotationData.value.setValue(value);
@@ -126,20 +126,19 @@ export async function createMaskedAnnotation(dialogue: Writable<DialogueType>,
 export async function deleteAnnotation(dialogue: Writable<DialogueType>,
     annotation: Annotation,
     removeCallback: () => void) {
-    const { annotations, annotationDatas } = data;
+    const { annotations, annotationData } = data;
 
     const hide = () => dialogue.set(undefined);
     const reject = hide;
     const resolve = async () => {
         dialogue.set(`Deleting annotation ${annotation.id}`);
 
-        // remove all annotationDatas 
+        // remove all annotationData
         // currently does not remove them from server / database
-        // await Promise.all(get(annotation.annotationDatas).map((annotationData) => annotationDatas.delete(annotationData)));
-        annotation.annotationDatas.forEach((annotationData) => annotationDatas.delete(annotationData, false));
+        annotation.annotationData.forEach((annotationData) => annotationData.delete(false));
 
         // remove from database on server
-        await annotations.delete(annotation);
+        await annotation.delete();
         // remove drawing
         removeCallback();
         hide();

@@ -1,15 +1,14 @@
 <script lang="ts">
 	import type { ETDRSCoordinates, Position2D } from '$lib/types';
-	import { globalContext } from '$lib/main';
+	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { getContext } from 'svelte';
 	import ShowHideToggle from '../icons/ShowHideToggle.svelte';
 	import { Edit, PanelIcon, Trash } from '../icons/icons';
 	import type { ETDRSGridOverlay } from '$lib/viewer/overlays/ETDRSGridOverlay.svelte';
 	import type { ETDRSGridTool } from '$lib/viewer/tools/ETDRSGrid.svelte';
 	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
-	import type { ServerProperty } from '$lib/datamodel/serverProperty.svelte';
-	import { data } from '$lib/datamodel/model';
 
-	
+	const globalContext = getContext<GlobalContext>('globalContext');
 
 	interface Props {
 		overlay: ETDRSGridOverlay;
@@ -18,7 +17,7 @@
 	}
 	let { overlay, tool, formAnnotation }: Props = $props();
 
-	const item: ServerProperty<ETDRSCoordinates | undefined> = formAnnotation.value;
+	const item: ETDRSCoordinates | undefined = $state(formAnnotation.value);
 
 	let show = $derived(overlay.visible.has(formAnnotation));
 	let active = $derived(tool.annotation?.id == formAnnotation.id);
@@ -47,7 +46,7 @@
 		if (tool.annotation?.id == formAnnotation.id) {
 			tool.annotation = undefined;
 		}
-		data.formAnnotations.delete(formAnnotation);
+		formAnnotation.delete();
 	}
 </script>
 
@@ -79,15 +78,15 @@
 	</div>
 	<ul>
 		<li>
-			{#if $item && $item.fovea}
+			{#if item && item.fovea}
 				<span>Fovea:</span>
-				{@render coordinate($item.fovea)}
+				{@render coordinate(item.fovea)}
 			{/if}
 		</li>
 		<li>
-			{#if $item && $item.disc_edge}
+			{#if item && item.disc_edge}
 				<span>Disc edge:</span>
-				{@render coordinate($item.disc_edge)}
+				{@render coordinate(item.disc_edge)}
 			{/if}
 		</li>
 	</ul>

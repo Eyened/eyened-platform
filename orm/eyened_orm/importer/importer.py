@@ -218,10 +218,6 @@ class Importer:
         im = ImageInstance(**props)
         im.Series = series
 
-        # Set other required attributes
-        # TODO: remove once we remove them from the DB
-        im.SourceInfoID = 37
-        im.ModalityID = 14
         im.DatasetIdentifier = self.get_image_path(image_data)
         image_data["instance"] = im
         return im

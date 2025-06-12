@@ -1,6 +1,6 @@
 <script lang="ts">
 	import SegmentationItem from './SegmentationItem.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Annotation } from '$lib/datamodel/annotation.svelte';
 	import SegmentationItemMaskedInit from './SegmentationItemMaskedInit.svelte';
 	import SegmentationItemLayers from '../panelLayers/SegmentationItemLayers.svelte';
 	
@@ -9,20 +9,27 @@
 	}
 
 	let { annotation }: Props = $props();
-	const interpretation = annotation.annotationType.interpretation;
+	// const interpretation = annotation.annotationType.interpretation;
 
-	const isMasked = annotation.annotationType.name == 'Segmentation 2D masked';
-	const isMacularLayers = annotation.feature.name == 'Macular layers';
-	const isBinary =
-		!isMacularLayers && !isMasked && ['R/G mask', 'Binary mask'].includes(interpretation);
-	const isProbability = interpretation == 'Probability';
-	let isLayerNumbers = $state(interpretation == 'Label numbers');
-	const isLayerBits = interpretation == 'Layer bits';
+	// const isMasked = annotation.annotationType.name == 'Segmentation 2D masked';
+	// const isMacularLayers = annotation.feature.name == 'Macular layers';
+	// const isBinary =
+	// 	!isMacularLayers && !isMasked && ['R/G mask', 'Binary mask'].includes(interpretation);
+	// const isProbability = interpretation == 'Probability';
+	// let isLayerNumbers = $state(interpretation == 'Label numbers');
+	// const isLayerBits = interpretation == 'Layer bits';
+
+    const isMasked = false;
+    const isBinary = true;
+    const isProbability = false;
+    const isLayerNumbers = false;
+    const isLayerBits = false;
+
 
 	// TODO: fix annotation type in database
-	if (isMacularLayers && interpretation == 'R/G mask') {
-		isLayerNumbers = true;
-	}
+	// if (isMacularLayers && interpretation == 'R/G mask') {
+	// 	isLayerNumbers = true;
+	// }
 
 </script>
 

@@ -1,21 +1,21 @@
 <script lang="ts">
-	import type { Annotation } from '$lib/datamodel/annotation';
-	import SegmentationItemMasked from './SegmentationItemMasked.svelte';
+    import type { Annotation } from "$lib/datamodel/annotation.svelte";
+    import SegmentationItemMasked from "./SegmentationItemMasked.svelte";
 
-	interface Props {
-		annotation: Annotation;
-	}
+    interface Props {
+        annotation: Annotation;
+    }
 
-	let { annotation }: Props = $props();
-	const { annotationDatas } = annotation;
+    let { annotation }: Props = $props();
+    const { annotationData } = annotation;
 </script>
 
-{#each $annotationDatas as annotationData (annotationData.id)}
-	{#await annotationData.value.load()}
-		<p>Loading...{annotation.id} [{annotationData.scanNr}]</p>
-	{:then value}
-		{#if value?.maskID}
-			<SegmentationItemMasked {annotationData} maskID={value.maskID} />
-		{/if}
-	{/await}
+{#each $annotationData as ad (ad.id)}
+    {#await ad.value.load()}
+        <p>Loading...{annotation.id} [{ad.scanNr}]</p>
+    {:then value}
+        {#if value?.maskID}
+            <SegmentationItemMasked annotationData={ad} maskID={value.maskID} />
+        {/if}
+    {/await}
 {/each}

@@ -1,6 +1,32 @@
 import { apiUrl } from '$lib/config';
+import { decodeNpy } from '$lib/utils/npy_loader';
 import { importData } from './model';
 import type { Task } from './task';
+
+export class DataEndpoint<T> {
+    protected _loaded = false;
+    protected val: T | undefined = $state(undefined);
+
+    constructor(private readonly endpoint: string) {
+
+    }
+
+    async load(): Promise<T> {
+        // only loads on the first call
+        if (this._loaded) {
+            return this.val!;
+        }
+        const url = `${apiUrl}/${this.endpoint}`;
+        this.val = await load(url);
+        this._loaded = true;
+        return this.val!;
+    }
+
+    async update(data: T) {
+        console.log('update', data);
+    }
+}
+
 
 function generateUrlSearchParams(params: Record<string, string | number | Array<string | number>>): URLSearchParams {
     const searchParams = new URLSearchParams();
@@ -30,7 +56,7 @@ async function fetchSearchParams(endpoint: string, searchParams: URLSearchParams
 
 export async function loadSearchParams(searchParams: URLSearchParams) {
     const resp = await fetchSearchParams('instances', searchParams);
-    const { next_cursor, entities } = resp;    
+    const { next_cursor, entities } = resp;
     importData(entities);
     return next_cursor;
 }
@@ -63,4 +89,42 @@ export async function loadSubtasks(task: Task) {
     const response = await fetch(url);
     const data = await response.json();
     importData(data);
+}
+
+
+async function load(url: string) {
+    const resp = await fetch(url);
+    if (resp.status === 404 || resp.status === 204) {
+        return undefined;
+    } else if (resp.status !== 200) {
+        throw new Error(`Failed to load: ${resp.status} ${resp.statusText}`);
+    }
+
+    const responseType = resp.headers.get('Content-Type');
+    if (!responseType) {
+        throw new Error('No Content-Type header in response');
+    }
+
+    if (responseType.includes('application/json')) {
+        const value = await resp.json();
+        console.log('loaded', value);
+        return value;
+    } else if (responseType.includes('application/octet-stream')) {
+        const arrayBuffer = await resp.arrayBuffer();
+
+        const bytes = new Uint8Array(arrayBuffer);
+
+        // Check for the magic string "\x93NUMPY"
+        const magic = [0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59]; // \x93NUMPY
+        const isNpy = magic.every((byte, i) => bytes[i] === byte);
+        if (isNpy) {
+            return decodeNpy(arrayBuffer);
+        }
+        return arrayBuffer;
+    } else if (responseType.includes('image/png')) {
+        const blob = await resp.blob();
+        return await createImageBitmap(blob);
+    } else {
+        throw new Error(`Unsupported media type: ${responseType}`);
+    }
 }
