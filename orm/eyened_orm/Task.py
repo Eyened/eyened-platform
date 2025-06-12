@@ -33,7 +33,7 @@ class TaskState(Base, table=True):
     _name_column: ClassVar[str] = "TaskStateName"
 
     TaskStateID: int = Field(primary_key=True)
-    TaskStateName: str = Field(max_length=255, unique=True)
+    TaskStateName: str = Field(max_length=256, unique=True)
 
     Tasks: List["Task"] = Relationship(back_populates="TaskState")
     SubTasks: List["SubTask"] = Relationship(back_populates="TaskState")

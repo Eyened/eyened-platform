@@ -21,7 +21,8 @@
     import { SegmentationContext } from "./segmentationContext.svelte";
     import { SegmentationItem } from "$lib/webgl/segmentationItem";
     import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
-
+    import type { PaintSettings } from "$lib/webgl/segmentation";
+    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     interface Props {
         segmentationItem: SegmentationItem;
         selectedLabelNames?: string | string[];
@@ -29,18 +30,17 @@
 
     let { segmentationItem, selectedLabelNames = [] }: Props = $props();
 
-    const { segmentation } = segmentationItem;
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const image = viewerContext.image;
-    const segmentationContext = getContext<SegmentationContext>(
-        "segmentationContext",
+    const segmentationOverlay = getContext<SegmentationOverlay>(
+        "segmentationOverlay",
     );
-
+    const { segmentationContext } = segmentationOverlay;
     let activeTool: undefined | SegmentationTool = $state(undefined);
     let removeTool = () => {};
 
     let panelActive = $derived(viewerContext.activePanels.has("Segmentation"));
-    
+
     $effect(() => {
         if (!panelActive) {
             removeTool();
@@ -63,7 +63,6 @@
         removeTool = viewerContext.addOverlay(tool);
     }
     onDestroy(() => {
-        viewerContext.cursorStyle = "default";
         segmentationContext.erodeDilateActive = false;
         segmentationContext.questionableActive = false;
         removeTool();
@@ -71,14 +70,21 @@
 
     const drawingExecutor = {
         getCtx: () => image.getDrawingCtx(),
-        draw: (ctx: CanvasRenderingContext2D, mode: "paint" | "erase") => {
+        draw: async (
+            ctx: CanvasRenderingContext2D,
+            mode: "paint" | "erase",
+        ) => {
+            const paintSettings: PaintSettings = {
+                paint: mode == "paint",
+                dilateErode: segmentationContext.erodeDilateActive,
+                questionable: segmentationContext.questionableActive,
+            };
             try {
-                segmentationItem.draw(viewerContext.index, ctx.canvas, {
-                    mode,
-                    questionable: segmentationContext.questionableActive,
-                    erodeDilate: segmentationContext.erodeDilateActive,
-                    selectedLabelNames,
-                });
+                await segmentationItem.draw(
+                    viewerContext.index,
+                    ctx.canvas,
+                    paintSettings,
+                );
             } catch (e) {
                 console.error(e);
                 console.error("Cannot draw on segmentation");
@@ -96,16 +102,18 @@
         viewerContext,
         segmentationContext,
     );
-    const enhance =
-        segmentation instanceof ProbabilitySegmentation
-            ? new EnhanceTool(
-                  drawingExecutor,
-                  viewerContext,
-                  segmentationContext,
-                  segmentation,
-                  segmentationItem,
-              )
-            : undefined;
+    const isFloat =
+        segmentationItem.annotation.annotationType.dataRepresentation ==
+        "FLOAT";
+    const enhance = isFloat
+        ? new EnhanceTool(
+              drawingExecutor,
+              viewerContext,
+              segmentationContext,
+              segmentation,
+              segmentationItem,
+          )
+        : undefined;
 
     function toggle(key: "erodeDilateActive" | "questionableActive") {
         segmentationContext[key] = !segmentationContext[key];

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { Creator } from '$lib/datamodel/creator';
+	import type { Creator } from '$lib/datamodel/creator.svelte';
 	import SegmentationArea from './SegmentationArea.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Annotation } from '$lib/datamodel/annotation.svelte';
 
 	interface Props {
 		creator: Creator;

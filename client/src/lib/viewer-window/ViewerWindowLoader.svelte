@@ -4,7 +4,6 @@ Used to create the viewerwindow context.
 
 -->
 <script lang="ts">
-	import { globalContext } from '$lib/main';
 	import { Registration } from '$lib/registration/registration';
 	import { Deferred } from '$lib/utils';
 	import { WebGL } from '$lib/webgl/webgl';
@@ -15,6 +14,8 @@ Used to create the viewerwindow context.
 	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
 	import { data } from '$lib/datamodel/model';
 	import RegistrationItemLoader from './RegistrationItemLoader.svelte';
+	import { getContext } from 'svelte';
+    import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 
 	interface Props {
 		instanceIDs: number[];
@@ -29,7 +30,7 @@ Used to create the viewerwindow context.
 			mainCanvas.height = window.innerHeight;
 		}
 	}
-
+	const globalContext = getContext<GlobalContext>('globalContext');
 	const { creator } = globalContext;
 
 	const { promise, resolve } = new Deferred<ViewerWindowContext>();

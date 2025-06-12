@@ -1,15 +1,19 @@
 <script lang="ts">
-	import type { Feature } from '$lib/datamodel/feature';
+	type T = any;
 
-	interface Props {
-		values: Feature[];
-		onselect: (value: Feature) => void;
+	interface Named {
+		name: string;
 	}
 
-	let { values, onselect }: Props = $props();
+	interface Props<T extends Named> {
+		values: T[];
+		onselect: (value: T) => void;
+	}
+
+	let { values, onselect }: Props<T> = $props();
 	export const placeholder = 'Search...';
 	let filter = $state('');
-	let filtered: Feature[] = $derived.by(() => {
+	let filtered: T[] = $derived.by(() => {
 		if (filter) {
 			return values.filter((value) => value.name.toLowerCase().includes(filter.toLowerCase()));
 		} else {

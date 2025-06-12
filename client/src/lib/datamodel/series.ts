@@ -1,16 +1,49 @@
-import type { Instance } from "./instance";
-import { DerivedProperty, ItemConstructor } from "./itemContructor";
-import type { FilterList, Item } from "./itemList";
-import { FKMapping } from "./mapping";
-import type { DataModel } from "./model";
+import type { Instance } from "./instance.svelte";
+import { BaseItem, type FilterList } from "./itemList";
+import { data } from "./model";
 import type { Study } from "./study";
 
-export interface Series extends Item {
-    id: number,
-    study: Study,
-    instances: FilterList<Instance>
+export interface ServerSeries {
+    SeriesID: number;
+    StudyID: number;
+    SeriesDescription: string;
+    SeriesNumber: number;
+    SeriesInstanceUID: string;
 }
-export const SeriesConstructor = new ItemConstructor<Series>('SeriesID', {
-    study: FKMapping('StudyID', 'studies'),
-    instances: new DerivedProperty((self: Series, data: DataModel) => data.instances.filter(instance => instance.series == self))
-});
+
+export class Series extends BaseItem {
+    static endpoint = 'series';
+    static mapping = {
+        'StudyID': 'studyId',
+        'SeriesDescription': 'description',
+        'SeriesNumber': 'number',
+        'SeriesInstanceUID': 'instanceUID',
+    };
+
+    id!: number;
+    studyId!: number;
+    description!: string;
+    number!: number;
+    instanceUID!: string;
+
+    constructor(item: ServerSeries) {
+        super();
+        this.init(item);
+    }
+
+    init(item: ServerSeries) {
+        this.id = item.SeriesID;
+        this.studyId = item.StudyID;
+        this.description = item.SeriesDescription;
+        this.number = item.SeriesNumber;
+        this.instanceUID = item.SeriesInstanceUID;
+    }
+
+    get instances(): FilterList<Instance> {
+        return data.instances.filter(instance => instance.seriesId == this.id);
+    }
+
+    get study(): Study {
+        return data.studies.get(this.studyId)!;
+    }
+}

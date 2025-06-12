@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { globalContext } from './main';
 	import ChangePasswordForm from './ChangePasswordForm.svelte';
+	import { getContext } from 'svelte';
+	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 
+	const globalContext = getContext<GlobalContext>("globalContext");
 	const { userManager, creator } = globalContext;
 	function logout() {
 		globalContext.popupComponent = null;

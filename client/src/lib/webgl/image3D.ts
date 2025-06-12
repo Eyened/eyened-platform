@@ -1,10 +1,11 @@
-import type { Instance } from "$lib/datamodel/instance";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import { Matrix } from "$lib/matrix";
 import { LinePhotoLocator } from "$lib/registration/photoLocators";
 import { getPrivateEyeRegistrationHeidelberg } from "$lib/registration/privateEyeRegistrationHeidelberg";
 import { AbstractImage } from "./abstractImage";
 import { Image2D } from "./image2D";
 import { RenderTexture } from "./renderTexture";
+import { TextureData } from "./texture";
 import type { Dimensions } from "./types";
 import type { WebGL } from "./webgl";
 
@@ -23,55 +24,23 @@ export class Image3D extends AbstractImage {
         super(instance, webgl, img_id, dimensions, meta, initTexture(webgl.gl, dimensions, data));
     }
 
-    createEnfaceProjection(): Image2D {
-        const texture_out = new RenderTexture(this.webgl, this.width, this.depth, 'R32UI', null);
-        const rendertarget = texture_out.getRenderTarget();
+    async createEnfaceProjection(): Promise<Image2D> {
+        const textureData = new TextureData(this.webgl.gl, this.width, this.depth, 'R32UI');
+
+        const top = new TextureData(this.webgl.gl, this.width, this.depth, 'R16UI');
+        const bottom = new TextureData(this.webgl.gl, this.width, this.depth, 'R16UI');
+
+        top.uploadData(new Uint16Array(this.width * this.depth).fill(0));
+        bottom.uploadData(new Uint16Array(this.width * this.depth).fill(this.height));
+
         const uniforms = {
-            u_volumeTexture: this.texture,
-            u_height: this.height
+            u_volume: this.texture,
+            u_top: top.texture,
+            u_bottom: bottom.texture
         };
-        this.webgl.shaders.enfaceProjection.pass(rendertarget, uniforms)
-        const sumValues = texture_out.readData();
-        texture_out.dispose();
+        textureData.passShader(this.webgl.shaders.enfaceProjection, uniforms);
 
-        // CPU implementation for reference (much slower)
-        // const sumValues = new Float32Array(this.width * this.depth);
-        // for (let x = 0; x < this.width; x++) {
-        //     for (let y = 0; y < this.depth; y++) {
-        //         let sum = 0;
-        //         for (let z = 0; z < this.height; z++) {
-        //             const i = x + z * this.width + y * this.width * this.height;
-        //             sum += this.data[i];
-        //         }
-        //         sumValues[x + y * this.width] = sum;
-        //     }
-        // }
-
-
-        const { min, max } = sumValues.reduce(
-            (acc: { min: number, max: number }, val: number) => ({
-                min: Math.min(acc.min, val),
-                max: Math.max(acc.max, val),
-            }),
-            { min: Infinity, max: -Infinity }
-        );
-        const f = 255 / (max - min);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = this.width;
-        canvas.height = this.depth;
-        const ctx = canvas.getContext('2d')!;
-
-        const imageData = ctx.getImageData(0, 0, this.width, this.depth);
-        const img_data = imageData.data;
-        for (let i = 0; i < sumValues.length; i++) {
-            const g = f * (sumValues[i] - min);
-            img_data[4 * i] = g;
-            img_data[4 * i + 1] = g;
-            img_data[4 * i + 2] = g;
-            img_data[4 * i + 3] = 255;
-        }
-        ctx.putImageData(imageData, 0, 0);
+        const bitmap = await this.normalize(textureData);
 
         const webgl = this.webgl;
         const proj_img_id = `${this.image_id}_proj`;
@@ -86,7 +55,13 @@ export class Image3D extends AbstractImage {
         };
         const meta = this.meta;
 
-        const result = Image2D.fromCanvas(this.instance, webgl, proj_img_id, canvas, proj_dimensions, meta);
+        const result = Image2D.fromBitmap(this.instance, webgl, proj_img_id, bitmap, proj_dimensions, meta);
+
+        this.setOrientation(result);
+        return result;
+    }
+
+    private setOrientation(result: Image2D) {
         if (this.instance.scan?.mode == 'Vertical 3DSCAN') {
             // rotate 90 degrees around center
             const { width, height } = result.dimensions;
@@ -115,9 +90,31 @@ export class Image3D extends AbstractImage {
                 result.transform = flip.multiply(result.transform);
             }
         }
-        return result;
     }
 
+    private async normalize(textureData: TextureData): Promise<ImageBitmap> {
+        const sumValues = textureData.data as Uint32Array;
+
+        const { min, max } = sumValues.reduce(
+            (acc: { min: number; max: number; }, val: number) => ({
+                min: Math.min(acc.min, val),
+                max: Math.max(acc.max, val),
+            }),
+            { min: Infinity, max: -Infinity }
+        );
+        const f = 255 / (max - min);
+        const imageData = new ImageData(this.width, this.depth);
+        const img_data = imageData.data;
+        for (let i = 0; i < sumValues.length; i++) {
+            const g = f * (sumValues[i] - min);
+            img_data[4 * i] = g;
+            img_data[4 * i + 1] = g;
+            img_data[4 * i + 2] = g;
+            img_data[4 * i + 3] = 255;
+        }
+        const bitmap = await createImageBitmap(imageData);
+        return bitmap;
+    }
 }
 
 function initTexture(gl: WebGL2RenderingContext, dimensions: Dimensions, data: Uint8Array): WebGLTexture {

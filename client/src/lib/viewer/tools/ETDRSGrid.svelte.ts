@@ -23,10 +23,11 @@ export class ETDRSGridTool implements Overlay {
 		if (!this.annotation) return;
 
 		const updateLandmark = async (name: 'fovea' | 'disc_edge') => {
-			const value = this.annotation!.value;
-			const data = await value.load() || {};
+			// const value = this.annotation!.value;
+			// const data = await value.load() || {};
+            const data = this.annotation!.value || {};
 			data[name] = viewerContext.viewerToImageCoordinates(cursor);
-			value.setValue(data);
+			this.annotation!.update({ value: data });
 		};
 		if (event.button === 0) updateLandmark('fovea');
 		if (event.button === 2) updateLandmark('disc_edge');
@@ -35,7 +36,7 @@ export class ETDRSGridTool implements Overlay {
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
 		if (!this.annotation) return;
 
-		const coordinates: ETDRSCoordinates = this.annotation.value.value;
+		const coordinates: ETDRSCoordinates = this.annotation.value;
 		if (!coordinates) return;
 		const ctx = viewerContext.context2D;
 		ctx.lineWidth = 1;

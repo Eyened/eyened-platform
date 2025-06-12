@@ -1,12 +1,12 @@
 <script lang="ts">
     import type { Study } from "$lib/datamodel/study";
-    import type { Instance } from "$lib/datamodel/instance";
+    import type { Instance } from "$lib/datamodel/instance.svelte";
 
     import { data } from "$lib/datamodel/model";
     import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
     import type { FormAnnotation } from "$lib/datamodel/formAnnotation";
-    import { globalContext } from "$lib/main";
     import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import type { TaskContext } from "$lib/types";
 
     interface Props {
@@ -19,6 +19,7 @@
     let { title, split_laterality, study, schema_name, create_new }: Props =
         $props();
 
+    const globalContext = getContext<GlobalContext>("globalContext");
     const { creator } = globalContext;
     const taskContext = getContext<TaskContext | undefined>("taskContext");
 

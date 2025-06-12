@@ -4,10 +4,11 @@
 	import type { TaskContext } from '$lib/types';
 	import { data } from '$lib/datamodel/model';
 	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
-	import type { FormSchema } from '$lib/datamodel/formSchema';
+	import type { FormSchema } from '$lib/datamodel/formSchema.sveltets';
 	import FormItem from './FormItem.svelte';
-	import { globalContext } from '$lib/main';
-
+    import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+    
+    const globalContext = getContext<GlobalContext>('globalContext');
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const { creator, annotationsFilter, formShortcut } = globalContext;
 	const { formSchemas, formAnnotations } = data;

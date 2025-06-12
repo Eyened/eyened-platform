@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext, onDestroy } from 'svelte';
-	import { globalContext } from '$lib/main';
+	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 	import { PanelIcon, Trash } from '../icons/icons';
 	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
 	import { data } from '$lib/datamodel/model';
@@ -13,6 +13,7 @@
 		activator: { activeID: number | undefined; toggle: (formAnnotation: FormAnnotation) => void };
 	}
 	let { formAnnotation, active: panelActive, activator }: Props = $props();
+	const globalContext = getContext<GlobalContext>('globalContext');
 	const canEditForm = globalContext.canEdit(formAnnotation);
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
@@ -77,7 +78,7 @@
 		{/each}
 	{/if}
 	<div class="linked-images">
-		<!-- {#each $annotationDatas as annotationData}
+		<!-- {#each $annotationData as annotationData}
 			<RegistrationItemImageIds {annotationData} />
 		{/each} -->
 	</div>

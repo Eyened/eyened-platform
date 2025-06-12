@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getContext, onDestroy } from 'svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import { createFormAnnotation, data } from '$lib/datamodel/model';
+	import { data } from '$lib/datamodel/model';
 	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import {
 		ETDRSGridOverlay,
@@ -9,11 +9,11 @@
 	} from '$lib/viewer/overlays/ETDRSGridOverlay.svelte';
 	import { ETDRSGridTool } from '$lib/viewer/tools/ETDRSGrid.svelte';
 	import ETDRSGridItem from './ETDRSGridItem.svelte';
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import { FormAnnotation } from '$lib/datamodel/formAnnotation';
 	import type { TaskContext } from '$lib/types';
 	import { PanelIcon } from '../icons/icons';
 	import ShowHideToggle from '../icons/ShowHideToggle.svelte';
-	import type { FormSchema } from '$lib/datamodel/formSchema';
+	import type { FormSchema } from '$lib/datamodel/formSchema.svelte';
 
 	interface Props {
 		active: boolean;
@@ -49,7 +49,7 @@
 	const filtered = formAnnotations.filter(filter);
 
 	async function create() {
-		createFormAnnotation(creator, instance, etdrsSchema, taskContext?.subTask);
+        await FormAnnotation.createFrom(creator, instance, etdrsSchema, taskContext?.subTask);
 	}
 
 	const overlay = new ETDRSGridOverlay(registration);

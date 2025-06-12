@@ -6,13 +6,13 @@
     import { openNewWindow } from "$lib/newWindow";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import { globalContext } from "$lib/main";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import Duplicate from "../icons/Duplicate.svelte";
     import type { TaskContext } from "$lib/types";
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
-
+    const globalContext = getContext<GlobalContext>("globalContext");   
     const { creator } = globalContext;
 
     interface Props {

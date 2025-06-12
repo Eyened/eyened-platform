@@ -1,4 +1,4 @@
-import type { Instance } from "$lib/datamodel/instance";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 

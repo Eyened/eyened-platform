@@ -1,12 +1,13 @@
+import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { Position2D } from "$lib/types";
 import type { PixelShaderProgram } from "./FragmentShaderProgram";
 import type { AbstractImage } from "./abstractImage";
-import type { Annotation } from "$lib/datamodel/annotation";
 
-import type { Segmentation } from "./SegmentationController";
-import { ProbabilityData, Uint8ArrayToCanvasGray } from "./segmentationData";
+import type { AnnotationData } from "$lib/datamodel/annotationData.svelte";
+import type { DataRepresentation } from "$lib/datamodel/annotationType";
 import { SvelteMap } from "svelte/reactivity";
-import type { AnnotationData } from "$lib/datamodel/annotationData";
+import type { Segmentation } from "./SegmentationController";
+import { ProbabilityData, Uint8ArrayToCanvas } from "./segmentationData";
 
 export class ProbabilitySegmentation implements Segmentation {
 
@@ -79,9 +80,14 @@ export class ProbabilitySegmentation implements Segmentation {
         this._after_update(scanNr);
     }
 
-    export(scanNr: number, ctx: CanvasRenderingContext2D): void {
+    export(scanNr: number, ctx: CanvasRenderingContext2D, dataRepresentation?: DataRepresentation): void {
         const data = this.data.getBscan(scanNr);
-        Uint8ArrayToCanvasGray(data, ctx);
+        // if dataRepresentation is omitted, use FLOAT (default for probabilitySegmentation)
+        Uint8ArrayToCanvas(data, ctx, dataRepresentation || 'FLOAT', this.threshold);
+    }
+
+    getData(scanNr: number): Uint8Array {
+        return this.data.getBscan(scanNr);
     }
 
     public drawEnhance(scanNr: number, settings: {

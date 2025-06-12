@@ -8,17 +8,11 @@ uniform vec2 u_scale;
 uniform vec3 u_image_size;
 
 uniform usampler2D u_annotation;
-uniform usampler2D u_mask;
-uniform uint u_mask_bit;
 uniform uint u_layer_bit;
 
 uniform bool u_smooth;
 uniform bool u_outline;
 uniform float u_alpha;
-uniform int u_active_layer;
-uniform int u_highlight_layer;
-uniform float u_inactive_alpha;
-uniform int u_drawing_mode; // 0 when inactive, 1 while painting, 2 while erasing
 uniform vec3 u_color;
 
 in vec2 v_uv;
@@ -108,13 +102,7 @@ void main() {
 	if(!(drawing || questionable)) {
 		discard;
 	}
-	if(u_mask_bit > 0u) {
-		uint mask_bit = texture(u_mask, v_uv).r & u_mask_bit;
 
-		if(mask_bit == 0u) {
-			discard;
-		}
-	}
 
 	vec4 feature_color = vec4(u_color, 1.0f);
 

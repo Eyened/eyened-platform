@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Feature } from "$lib/datamodel/feature";
+    import type { Feature } from "$lib/datamodel/feature.svelte";
     import { data } from "$lib/datamodel/model";
     import { PanelIcon, Trash } from "$lib/viewer-window/icons/icons";
 

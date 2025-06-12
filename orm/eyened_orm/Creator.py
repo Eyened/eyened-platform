@@ -5,13 +5,28 @@ from sqlmodel import Field, Relationship
 from sqlalchemy import Column, select, BINARY
 from sqlalchemy.orm import Session
 
-from .base import Base
+from .base import Base, PrivateField
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, FormAnnotation, SubTask
 
 
-class Creator(Base, table=True):
+class CreatorBase(Base):
+    CreatorName: str = Field(max_length=45, unique=True)
+    EmployeeIdentifier: str | None = Field(max_length=255, default=None)
+    # differentiates between AI models and human users
+    IsHuman: bool
+    # paths where the model can be found
+    Path: str | None = Field(max_length=80, default=None)
+    # the model's version
+    Version: int | None
+    # model/user description
+    Description: str | None = Field(max_length=1000, default=None)
+    # not used currently
+    Role: int | None
+
+
+class Creator(CreatorBase, table=True):
     """
     Represents a creator entity in the system, which can be either a human user or an AI model.
     Creators can perform annotations, form annotations, and subtasks.
@@ -21,31 +36,13 @@ class Creator(Base, table=True):
 
     _name_column: ClassVar[str] = "CreatorName"
 
-    # Primary identifiers
-    CreatorID: int = Field(primary_key=True)
-    CreatorName: str = Field(max_length=45, unique=True)  # username in the application
-    EmployeeIdentifier: str | None = Field(max_length=255)  # employee number/code
-
-    # differentiates between AI models and human users
-    IsHuman: bool
-
-    # paths where the model can be found
-    Path: str | None = Field(max_length=80)
-
-    # model/user description
-    Description: str | None = Field(max_length=1000)
-
-    # the model's version
-    Version: int | None
+    CreatorID: int | None = Field(default=None, primary_key=True)
 
     # Authentication and authorization
     # deprecated, use PasswordHash instead
-    Password: bytes | None = Field(sa_column=Column(BINARY(32)))
+    Password: bytes | None = PrivateField(sa_column=Column(BINARY(32)))
     # user's password
-    PasswordHash: str | None = Field(max_length=255)
-
-    # not used currently
-    Role: int | None
+    PasswordHash: str | None = PrivateField(max_length=255)
 
     # creation timestamp
     DateInserted: datetime = Field(default_factory=datetime.now)
@@ -54,13 +51,3 @@ class Creator(Base, table=True):
     Annotations: List["Annotation"] = Relationship(back_populates="Creator")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Creator")
     SubTasks: List["SubTask"] = Relationship(back_populates="Creator")
-
-    @classmethod
-    def columns(cls):
-        """
-        Get all columns except for sensitive ones (Password).
-
-        This overrides the method in Base and ensures that to_dict() and
-        to_list() do not include the password.
-        """
-        return [c for c in super().columns() if c.name not in ["Password", "PasswordHash"]]

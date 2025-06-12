@@ -4,7 +4,7 @@ import type { Registration } from "$lib/registration/registration";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteSet } from "svelte/reactivity";
-import type { Instance } from "$lib/datamodel/instance";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 
 const [C, I, O] = [1, 3, 6];
 const additionalCircles = {

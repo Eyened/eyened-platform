@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AnnotationData } from '$lib/datamodel/annotationData';
+	import type { AnnotationData } from '$lib/datamodel/annotationData.svelte';
 	import type { DialogueType } from '$lib/types';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
 	import { getContext } from 'svelte';
@@ -9,7 +9,9 @@
 	import { data } from '$lib/datamodel/model';
 	import { addBranch, deleteAnnotation } from './segmentationUtils';
 	import type { SegmentationContext } from './segmentationContext.svelte';
-	import { globalContext } from '$lib/main';
+	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+
+	const globalContext = getContext<GlobalContext>('globalContext');
 
 	interface Props {
 		maskID: number;
@@ -46,9 +48,9 @@
 	}
 
 	function removeAnnotation() {
-		deleteAnnotation(dialogue, annotation, () =>
-			image.segmentationController.removeAnnotation(annotation)
-		);
+		// deleteAnnotation(dialogue, annotation, () =>
+		// 	image.segmentationController.removeAnnotation(annotation)
+		// );
 	}
 </script>
 

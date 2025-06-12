@@ -69,90 +69,68 @@ class ETDRSField(Enum):
     F7 = 7
 
 
-class ImageInstance(Base, table=True):
-    __tablename__ = "ImageInstance"
-    __table_args__ = (
-        Index("fk_ImageInstance_Series1_idx", "SeriesID"),
-        Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
-        Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
-        Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
-        Index("fk_ImageInstance_Scan1_idx", "ScanID"),
-        Index("SOPInstanceUid_UNIQUE", "SOPInstanceUid", unique=True),
-        Index(
-            "SourceInfoIDDatasetIdentifier_UNIQUE",
-            "DatasetIdentifier",
-            "SourceInfoID",
-            unique=True,
-        ),
-    )
-    ImageInstanceID: int = Field(primary_key=True)
-
-    SeriesID: int = Field(foreign_key="Series.SeriesID", ondelete="CASCADE")
-    Series: "Series" = Relationship(back_populates="ImageInstances")
-
-    # # TODO: not needed anymore?
-    SourceInfoID: int = Field(foreign_key="SourceInfo.SourceInfoID")
-    SourceInfo: "SourceInfo" = Relationship(back_populates="ImageInstances")
-
-    DeviceInstanceID: int = Field(foreign_key="DeviceInstance.DeviceInstanceID")
-    DeviceInstance: "DeviceInstance" = Relationship(back_populates="ImageInstances")
-
-    # # TODO: redundant with Modality enum
-    ModalityID: int = Field(foreign_key="Modality.ModalityID")
-    _Modality: "ModalityTable" = Relationship(back_populates="ImageInstances")
-
-    ScanID: Optional[int] = Field(foreign_key="Scan.ScanID")
-    Scan: Optional["Scan"] = Relationship(back_populates="ImageInstances")
+class ImageInstanceBase(Base):
+    SeriesID: int | None = Field(foreign_key="Series.SeriesID", ondelete="CASCADE", default=None)
+    SourceInfoID: int | None = Field(foreign_key="SourceInfo.SourceInfoID", default=None)
+    DeviceInstanceID: int | None = Field(foreign_key="DeviceInstance.DeviceInstanceID", default=None)
+    # TODO: redundant with Modality enum
+    ModalityID: int | None = Field(foreign_key="Modality.ModalityID", default=None)
+    ScanID: int | None = Field(foreign_key="Scan.ScanID", default=None)
 
     # Image modality
     Modality: Optional[Modality]
-
+    
     # DICOM metadata
-    SOPInstanceUid: str | None = Field(max_length=64)
-    SOPClassUid: str | None = Field(max_length=64)
-    PhotometricInterpretation: str | None = Field(max_length=64)
+    SOPInstanceUid: str | None = Field(max_length=64, default=None)
+    SOPClassUid: str | None = Field(max_length=64, default=None)
+    PhotometricInterpretation: str | None = Field(max_length=64, default=None)
     SamplesPerPixel: int | None
-    # Number of frames in a multi-frame image
-    NrOfFrames: int | None
-    # Nominal slice thickness, in millimeters
-    SliceThickness: float | None
-    Rows_y: int | None
-    Columns_x: int | None
-    # Side of body examined (left or right)
-    Laterality: Optional[Laterality]
-    # Type of equipment that acquired the data (OP = Ophthalmic Photography)
-    DICOMModality: Optional[ModalityType]
-    AnatomicRegion: int | None
-    # Early Treatment Diabetic Retinopathy Study field position (not standard DICOM)
-    ETDRSField: Optional[ETDRSField]
-    # Indicates angiography type (not standard DICOM)
-    Angiography: int | None
-    # Date and time the acquisition of data started
-    AcquisitionDateTime: datetime | None
-    # Indicates if pupil was dilated during image acquisition (ophthalmic-specific)
+
+    # image dimensions
+    # Note on image orientation conventions:
+    #
+    # The physical direction of Rows and Columns can differ between imaging modalities:
+    #
+    # CFI and other fundus imaging modalities (typically):
+    #     - Rows: height in the fundus (superior <-> inferior)
+    #     - Columns: width in the fundus (lateral <-> temporal)
+    #     - NrOfFrames: 1 for single-frame images
+    # OCT, for a raster/volume with horizontal B-scans:
+    #     - Rows: height of the B-scan (vitreous <-> choroid)
+    #     - Columns: width of the B-scan (lateral <-> temporal)
+    #     - NrOfFrames: number of B-scans (superior <-> inferior for horizontal B-scan)
+    NrOfFrames: int | None  # Used to for number of B-scans in OCT
+    Rows_y: int | None  # Height of the image (in pixels)
+    Columns_x: int | None  # Width of the image (in pixels)
+
+    # resolution (all in millimeters)
+    SliceThickness: float | None  # Nominal slice thickness for raster OCT scans
+    ResolutionAxial: float | None  # OCT-depth resolution (vitreous <-> choroid)
+    ResolutionHorizontal: float | None  # Enface resolution (lateral <-> temporal)
+    ResolutionVertical: float | None  # Enface resolution (superior <-> inferior)
+
+    HorizontalFieldOfView: float | None  # in degrees
+
+    Laterality: Optional[Laterality]  # L or R
+    DICOMModality: Optional[ModalityType]  # OP, OPT, SC
+    AnatomicRegion: int | None  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
+    ETDRSField: Optional[ETDRSField]  # F1-F7
+    Angiography: int | None  # 0 = non-angiography, 1 = angiography
+
+    AcquisitionDateTime: (
+        datetime | None
+    )  # Date and time the acquisition of data started
     PupilDilated: bool | None
-    # Horizontal dimension of field of view in millimeters
-    HorizontalFieldOfView: float | None
-    # Axial resolution in millimeters (not standard DICOM)
-    ResolutionAxial: float | None
-    # Horizontal resolution in millimeters (not standard DICOM)
-    ResolutionHorizontal: float | None
-    # Vertical resolution in millimeters (not standard DICOM)
-    ResolutionVertical: float | None
 
     # Relative filepath to the image file
     DatasetIdentifier: str = Field(max_length=256)
 
-    # Relative filepath to the thumbnail file
-    # deprecated, use ThumbnailPath instead
-    ThumbnailIdentifier: str | None = Field(max_length=256)
-
     # identifier for the thumbnail (project_id/thumbnail_name), needs suffix for different sizes
     ThumbnailPath: str | None = Field(max_length=256)
 
-    # Original IDs of the image in the source database
+    # Used to link to IDs of the image in the source database
     OldPath: str | None = Field(max_length=256)
-    FDAIdentifier: int | None 
+    FDAIdentifier: int | None
 
     # Considered removed from the database
     Inactive: bool = False
@@ -160,26 +138,23 @@ class ImageInstance(Base, table=True):
     # Fundus-specific columns
     # CFROI contains the fundus bounds, eg.
     # {
-    # "lines": {},
-    # "max_x": 2048,
-    # "max_y": 1536,
-    # "min_x": 0,
-    # "min_y": 0,
-    # "center": [1021.7938260323712, 751.6328910976617],
-    # "radius": 688.1397816206166,
+    #     "lines": {},
+    #     "max_x": 2048,
+    #     "max_y": 1536,
+    #     "min_x": 0,
+    #     "min_y": 0,
+    #     "center": [1021.7938260323712, 751.6328910976617],
+    #     "radius": 688.1397816206166,
     # }
     # Can be read by CFIBounds from rtnls_fundusprep
-    # from rtnls_fundusprep.cfi_bounds import CFIBounds
-    # bounds = copy.deepcopy(image_instance.CFROI)
-    # bounds["hw"] = (image_instance.Rows_y, image_instance.Columns_x)
-    # cfroi = CFIBounds(**bounds)
+
     CFROI: Optional[Dict[str, Any]] = Field(sa_column=Column(JSON))
     # CFKeypoints holds fundus keypoint data
     # {
-    # "fovea_xy": [525.3117339804495, 781.470218347899],
-    # "disc_edge_xy": [1038.7284831576292, 778.7821723259435],
-    # "prep_fovea_xy": [142.60000610351562, 534.2000122070312],
-    # "prep_disc_edge_xy": [524.5999755859375, 532.2000122070312]
+    #     "fovea_xy": [525.3117339804495, 781.470218347899],
+    #     "disc_edge_xy": [1038.7284831576292, 778.7821723259435],
+    #     "prep_fovea_xy": [142.60000610351562, 534.2000122070312],
+    #     "prep_disc_edge_xy": [524.5999755859375, 532.2000122070312]
     # }
     # keys prefixed with prep are keypoint locations in the preprocessed image
     CFKeypoints: Optional[Dict[str, Any]] = Field(sa_column=Column(JSON))
@@ -195,6 +170,39 @@ class ImageInstance(Base, table=True):
     # used to prevent the insertion of duplicate images
     # and detect duplicates even when the metadata might be different
     DataHash: bytes | None = Field(sa_column=Column(TINYBLOB))
+
+
+class ImageInstance(ImageInstanceBase, table=True):
+    __tablename__ = "ImageInstance"
+    __table_args__ = (
+        Index("fk_ImageInstance_Series1_idx", "SeriesID"),
+        Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
+        Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
+        Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
+        Index("fk_ImageInstance_Scan1_idx", "ScanID"),
+        Index("SOPInstanceUid_UNIQUE", "SOPInstanceUid", unique=True),
+        Index(
+            "SourceInfoIDDatasetIdentifier_UNIQUE",
+            "DatasetIdentifier",
+            "SourceInfoID",
+            unique=True,
+        ),
+    )
+    ImageInstanceID: int | None = Field(default=None, primary_key=True)
+
+    # repeating field, but non-nullable
+    SeriesID: int = Field(foreign_key="Series.SeriesID", ondelete="CASCADE")
+    SourceInfoID: int = Field(foreign_key="SourceInfo.SourceInfoID")
+    DeviceInstanceID: int = Field(foreign_key="DeviceInstance.DeviceInstanceID")
+    # TODO: redundant with Modality enum
+    ModalityID: int = Field(foreign_key="Modality.ModalityID")
+    
+    # relationships:
+    Series: "Series" = Relationship(back_populates="ImageInstances")
+    SourceInfo: "SourceInfo" = Relationship(back_populates="ImageInstances")
+    DeviceInstance: "DeviceInstance" = Relationship(back_populates="ImageInstances")
+    _Modality: "ModalityTable" = Relationship(back_populates="ImageInstances")
+    Scan: Optional["Scan"] = Relationship(back_populates="ImageInstances")
 
     # Datetimes - automatically filled
     DateInserted: datetime = Field(default_factory=datetime.now)
@@ -360,7 +368,7 @@ class DeviceModel(Base, table=True):
         ),
     )
     _name_column: ClassVar[str] = "ManufacturerModelName"
-    
+
     DeviceModelID: int = Field(primary_key=True)
 
     Manufacturer: str = Field(max_length=45)
@@ -380,7 +388,13 @@ class DeviceModel(Base, table=True):
         )
 
 
-class DeviceInstance(Base, table=True):
+class DeviceInstanceBase(Base):
+    DeviceModelID: int = Field(foreign_key="DeviceModel.DeviceModelID")
+    SerialNumber: str | None = Field(sa_column=Column(TEXT))
+    Description: str = Field(max_length=256)
+
+
+class DeviceInstance(DeviceInstanceBase, table=True):
     __tablename__ = "DeviceInstance"
     __table_args__ = (
         Index(
@@ -392,22 +406,17 @@ class DeviceInstance(Base, table=True):
     )
 
     DeviceInstanceID: int = Field(primary_key=True)
-    DeviceModelID: int = Field(foreign_key="DeviceModel.DeviceModelID")
     DeviceModel: "DeviceModel" = Relationship(back_populates="DeviceInstances")
-
-    SerialNumber: str | None = Field(sa_column=Column(TEXT))
-    Description: str = Field(max_length=256)
 
     ImageInstances: List["ImageInstance"] = Relationship(
         back_populates="DeviceInstance"
     )
 
 
-
 class SourceInfo(Base, table=True):
     __tablename__ = "SourceInfo"
     _name_column: ClassVar[str] = "SourceName"
-    
+
     SourceInfoID: int = Field(primary_key=True)
     SourceName: str = Field(max_length=64, unique=True)
 
@@ -420,7 +429,7 @@ class SourceInfo(Base, table=True):
 class ModalityTable(Base, table=True):
     __tablename__ = "Modality"
     _name_column: ClassVar[str] = "ModalityTag"
-        
+
     ModalityID: int = Field(primary_key=True)
     ModalityTag: str = Field(max_length=40, unique=True)
 
@@ -431,16 +440,17 @@ class ModalityTable(Base, table=True):
         return cls.by_column(session, ModalityTag=ModalityTag)
 
 
-class Scan(Base, table=True):
-    __tablename__ = "Scan"
-    _name_column: ClassVar[str] = "ScanMode"
-    
-    ScanID: int = Field(primary_key=True)
+class ScanBase(Base):
     ScanMode: str = Field(max_length=40, unique=True)
 
+class Scan(ScanBase, table=True):
+    __tablename__ = "Scan"
+    _name_column: ClassVar[str] = "ScanMode"
+
+    ScanID: int = Field(primary_key=True)
+    
     ImageInstances: List["ImageInstance"] = Relationship(back_populates="Scan")
 
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
         return cls.by_column(session, ScanMode=ScanMode)
-

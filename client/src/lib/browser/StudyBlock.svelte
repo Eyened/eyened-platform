@@ -5,14 +5,13 @@
     import StudyBlockForms from "./StudyBlockForms.svelte";
     import AdditionalDataSources from "./AdditionalDataSources.svelte";
     import extensions from "$lib/extensions";
-    
+
     interface Props {
         study: Study;
         mode?: "full" | "overlay";
     }
 
     let { study, mode = "full" }: Props = $props();
-
     let collapse = $state(false);
 
     const age = Math.floor(
@@ -25,7 +24,6 @@
         project: study.patient.project,
     };
     const { additional_data_sources } = extensions.browser.study;
-
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -63,12 +61,11 @@
     div.block {
         padding: 0.3em;
         flex-direction: column;
-        
+
         border: 1px solid rgb(181, 188, 206);
         border-radius: 2px;
         box-shadow: rgba(149, 157, 165, 0.2) 0px 6px 12px;
         margin-bottom: 1em;
-
     }
     div {
         display: flex;

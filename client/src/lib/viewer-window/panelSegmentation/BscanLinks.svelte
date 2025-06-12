@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Annotation } from '$lib/datamodel/annotation.svelte';
 	import { Registration } from '../../registration/registration';
 	import { ViewerContext } from '$lib/viewer/viewerContext.svelte';
 
@@ -14,7 +14,7 @@
 
 	let { annotation, segmentation }: Props = $props();
 
-	const { annotationDatas } = annotation;
+	const { annotationData } = annotation;
 	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
 	const viewerContext = getContext<ViewerContext>('viewerContext');
     const registration = viewerContext.registration;
@@ -26,14 +26,14 @@
 		viewerContext.lockScroll = false;
 		registration.setPosition(segmentation.image.image_id, { x: 0, y: 0, index: scanNr });
 		setTimeout(() => (viewerContext.lockScroll = lock), 0);
-		segmentationContext.activeSegmentation = segmentation;
+		segmentationContext.activeAnnotation = segmentation;
 	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="row links">
-	{#each $annotationDatas as a, i (a.scanNr)}
+	{#each $annotationData as a, i (a.scanNr)}
 		{#if i > 0}|{/if}
 		<span
 			class="link-scan"

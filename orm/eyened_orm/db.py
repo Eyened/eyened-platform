@@ -22,8 +22,10 @@ class DBManager:
         """Initialize the database session factory with the given config."""
         if config is None or isinstance(config, str):
             from eyened_orm.utils.config import get_config
-            cls._config = get_config(config)
-
+            config = get_config(config)
+        cls._config = config
+        Base.set_config(config)
+        
         conn_string = create_connection_string(cls._config.database)
         if cls._engine is None:
             cls._engine = create_engine(conn_string, pool_pre_ping=True)

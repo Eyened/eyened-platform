@@ -4,7 +4,7 @@ import { colorStandardization } from "$lib/image-processing/color-standardizatio
 
 import { AbstractImage } from "./abstractImage";
 import type { RenderTexture } from "./renderTexture";
-import type { Instance } from "$lib/datamodel/instance";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import type { RenderMode } from "$lib/viewer/viewer-utils";
 
 // Define metadata interface
@@ -21,20 +21,19 @@ export class Image2D extends AbstractImage {
     standardizedMuSigma?: RenderTexture;
     standardizedHistogram?: RenderTexture;
 
-    isGrayscale: boolean;
     private _pixels: Uint8Array | undefined;
 
     private constructor(
         instance: Instance,
         webgl: WebGL,
         image_id: string,
-        public readonly canvas: HTMLCanvasElement,
+
         public readonly texture: WebGLTexture,
         dimensions: Dimensions,
         meta: ImageMetadata
     ) {
         super(instance, webgl, image_id, dimensions, meta, texture);
-        this.isGrayscale = isImageGrayscale(canvas);
+        // this.isGrayscale = isImageGrayscale(canvas);
         this.preprocess();
     }
 
@@ -46,22 +45,22 @@ export class Image2D extends AbstractImage {
         this.sharpened = sharpened;
         this.CLAHE = clahe;
 
-        if (!this.isGrayscale) {
-            const { muSigma, hist } = colorStandardization(this);
-            this.standardizedMuSigma = muSigma;
-            this.standardizedHistogram = hist;
-            // this.CLAHE = clahe;
-        } else {
-            // Perhaps need a better solution here. 
-            this.standardizedMuSigma = this.contrastEnhanced;
-            this.standardizedHistogram = this.contrastEnhanced;
-            this.CLAHE = this.contrastEnhanced;
-        }
+        // if (!this.isGrayscale) {
+        //     const { muSigma, hist } = colorStandardization(this);
+        //     this.standardizedMuSigma = muSigma;
+        //     this.standardizedHistogram = hist;
+        //     // this.CLAHE = clahe;
+        // } else {
+        // Perhaps need a better solution here. 
+        // this.standardizedMuSigma = this.contrastEnhanced;
+        // this.standardizedHistogram = this.contrastEnhanced;
+        // this.CLAHE = this.contrastEnhanced;
+        // }
     }
 
-    static fromCanvas(instance: Instance, webgl: WebGL, image_id: string, canvas: HTMLCanvasElement, dimensions: Dimensions, meta: any) {
-        const texture = initTexture(webgl.gl, canvas);
-        return new Image2D(instance, webgl, image_id, canvas, texture, dimensions, meta);
+    static fromBitmap(instance: Instance, webgl: WebGL, image_id: string, bitmap: ImageBitmap, dimensions: Dimensions, meta: any) {
+        const texture = initTexture(webgl.gl, bitmap);
+        return new Image2D(instance, webgl, image_id, texture, dimensions, meta);
     }
 
     static fromPixelData(instance: Instance, webgl: WebGL, image_id: string, pixelData: Uint8Array, dimensions: Dimensions, meta: any) {
@@ -79,17 +78,17 @@ export class Image2D extends AbstractImage {
         }
     }
 
-    private getPixelData(): Uint8Array {
-        const gl = this.webgl.gl;
-        const fb = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-        const data = new Uint8Array(4 * this.canvas.width * this.canvas.height);
-        gl.readPixels(0, 0, this.canvas.width, this.canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.deleteFramebuffer(fb);
-        return data;
-    }
+    // private getPixelData(): Uint8Array {
+    //     const gl = this.webgl.gl;
+    //     const fb = gl.createFramebuffer();
+    //     gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    //     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+    //     const data = new Uint8Array(4 * this.canvas.width * this.canvas.height);
+    //     gl.readPixels(0, 0, this.canvas.width, this.canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    //     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    //     gl.deleteFramebuffer(fb);
+    //     return data;
+    // }
 
     selectTexture(renderMode: RenderMode) {
         const textureMap = {
@@ -105,7 +104,7 @@ export class Image2D extends AbstractImage {
     }
 }
 
-function initTexture(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement): WebGLTexture {
+function initTexture(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement | ImageBitmap): WebGLTexture {
 
     const texture = gl.createTexture()!;
 

@@ -2,7 +2,7 @@
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
 	import { getContext, setContext } from 'svelte';
 	import CreatorSegmentations from '../panelSegmentation/CreatorSegmentations.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Annotation } from '$lib/datamodel/annotation.svelte';
 	import { data } from '$lib/datamodel/model';
 	import { SegmentationContext } from '../panelSegmentation/segmentationContext.svelte';
 

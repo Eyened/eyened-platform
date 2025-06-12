@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getThumbUrl } from '$lib/data-loading/utils';
-	import type { Instance } from '$lib/datamodel/instance';
+	import type { Instance } from '$lib/datamodel/instance.svelte';
 	import InstanceSegmentationTable from './InstanceSegmentationTable.svelte';
 
 	interface Props {

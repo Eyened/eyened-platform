@@ -1,6 +1,7 @@
 import { CFImageProcessing } from '$lib/image-processing/CFImageProcessing';
 import { ProgramInfo } from './programInfo';
 import { Shaders } from './shaders';
+import { BinaryMaskManager } from './texture';
 import type { RenderBounds } from './types';
 
 export class WebGL {
@@ -10,6 +11,7 @@ export class WebGL {
 
     shaders: Shaders;
     cfImageProcessing: CFImageProcessing;
+    binaryMaskManager: BinaryMaskManager;
 
     constructor(canvas: HTMLCanvasElement) {
 
@@ -24,6 +26,7 @@ export class WebGL {
         const ext1 = gl.getExtension('EXT_color_buffer_float');
 
         this.shaders = new Shaders(this);
+        this.binaryMaskManager = new BinaryMaskManager(this.gl);
         this.cfImageProcessing = new CFImageProcessing(this);
     }
 

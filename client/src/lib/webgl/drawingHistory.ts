@@ -6,20 +6,12 @@ export class DrawingHistory {
 
     private readonly maxSize: number;
     private readonly trigger = writable(0);
-    initialized = false;
 
     constructor(maxSize: number = 10) {
         this.undoStack = [];
         this.redoStack = [];
         this.trigger.update(n => n + 1);
         this.maxSize = maxSize;
-    }
-
-    initialize(drawing: string): void {
-        this.initialized = true;
-        this.undoStack = [drawing];
-        this.redoStack = [];
-        this.trigger.update(n => n + 1);
     }
 
     checkpoint(drawing: string): void {
@@ -55,45 +47,4 @@ export class DrawingHistory {
         }
 
     }
-}
-
-export class UndoRedo {
-    private history: DrawingHistory[];
-
-    constructor(
-        readonly depth: number,
-        public maxUndo: number = 10
-    ) {
-        
-        this.history = Array.from({ length: depth }).map(() => new DrawingHistory(maxUndo));
-    }
-
-    isInitialized(scanNr: number): boolean {
-        return this.history[scanNr].initialized;
-    }
-
-    initialize(scanNr: number, drawing: string): void {
-        this.history[scanNr].initialize(drawing);
-    }
-
-    checkpoint(scanNr: number, drawing: string): void {
-        this.history[scanNr].checkpoint(drawing);
-    }
-
-    canUndo(scanNr: number): Readable<boolean> {
-        return this.history[scanNr].canUndo;
-    }
-
-    canRedo(scanNr: number): Readable<boolean> {
-        return this.history[scanNr].canRedo;
-    }
-    
-    undo(scanNr: number): string | undefined {
-        return this.history[scanNr].undo();
-    }
-
-    redo(scanNr: number): string | undefined {
-        return this.history[scanNr].redo();
-    }
-
 }

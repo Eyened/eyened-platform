@@ -115,6 +115,7 @@ export class BrushTool extends SegmentationTool {
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        super.repaint(viewerContext, renderTarget);
 		const ctx = viewerContext.context2D;
 		if (!this.drawingState || !this.currentPoints) return;
 

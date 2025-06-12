@@ -1,9 +1,9 @@
 <script lang="ts">
-    import type { Creator } from "$lib/datamodel/creator";
+    import type { Creator } from "$lib/datamodel/creator.svelte";
     import SegmentationGroup from "./SegmentationGroup.svelte";
-    import type { Annotation } from "$lib/datamodel/annotation";
+    import type { Annotation } from "$lib/datamodel/annotation.svelte";
     import { getContext } from "svelte";
-    import { SegmentationContext } from "./segmentationContext.svelte";
+    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
 
     interface Props {
         creator: Creator;
@@ -11,10 +11,10 @@
     }
     let { creator, annotations }: Props = $props();
 
-    const segmentationContext = getContext<SegmentationContext>(
-        "segmentationContext",
+    const segmentationOverlay = getContext<SegmentationOverlay>(
+        "segmentationOverlay",
     );
-    const { hideCreators, hideFeatures, hideAnnotations } = segmentationContext;
+    const { hideCreators } = segmentationOverlay.segmentationContext;
     function toggle() {
         if (hideCreators.has(creator)) {
             hideCreators.delete(creator);
@@ -32,11 +32,7 @@
 </span>
 
 {#each annotations as annotation (annotation.id)}
-    <div
-        class="item"
-        class:hide={hideFeatures.has(annotation.feature) ||
-            hideCreators.has(annotation.creator)}
-    >
+    <div class="item" class:hide={hideCreators.has(annotation.creator)}>
         <SegmentationGroup {annotation} />
     </div>
 {/each}

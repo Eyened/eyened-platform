@@ -3,13 +3,14 @@ from sqlalchemy import Index
 from sqlmodel import Field
 from .base import Base
 
+class TagBase(Base):
+    TagName: str = Field(max_length=256, unique=True)
 
-class Tag(Base, table=True):
+class Tag(TagBase, table=True):
     __tablename__ = "Tag"
     _name_column: ClassVar[str] = "TagName"
 
     TagID: int = Field(primary_key=True)
-    TagName: str = Field(max_length=256, unique=True)
 
 
 class AnnotationTag(Base, table=True):

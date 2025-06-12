@@ -1,7 +1,7 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { loadInstances } from "$lib/datamodel/api";
-import type { Creator } from "$lib/datamodel/creator";
-import type { Instance } from "$lib/datamodel/instance";
+import { loadInstances } from "$lib/datamodel/api.svelte";
+import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import { data } from "$lib/datamodel/model";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";

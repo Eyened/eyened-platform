@@ -1,30 +1,19 @@
-import type { Annotation } from "$lib/datamodel/annotation";
-import type { AnnotationData } from "$lib/datamodel/annotationData";
+import type { Annotation } from "$lib/datamodel/annotation.svelte";
+import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
+import type { DataRepresentation } from "$lib/datamodel/annotationType";
 import type { Branch } from "$lib/types";
 import type { AbstractImage } from "./abstractImage";
+import type { Segmentation } from "./baseSegmentation";
 import { BinarySegmentation, MaskedSegmentation } from "./binarySegmentation";
 import { MulticlassSegmentation, MultilabelSegmentation } from "./layerSegmentation";
 import { ProbabilitySegmentation } from "./probabilitySegmentation.svelte";
-import { SharedDataRG } from "./segmentationData";
+import { SharedData } from "./segmentationData";
 import { SegmentationItem } from "./segmentationItem";
-
-export interface Segmentation {
-    id: string;
-    annotation: Annotation;
-    image: AbstractImage;
-    draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void;
-    clear(scanNr: number): void;
-    export(scanNr: number, ctx: CanvasRenderingContext2D): void;
-    import(scanNr: number, canvas: HTMLCanvasElement): void;
-    importOther(scanNr: number, other: Segmentation): void;
-    dispose(): void;    
-    initialize(annotationData:AnnotationData, dataRaw:any): void;
-}
 
 
 export class SegmentationController {
 
-    public readonly sharedData = new Map<SharedDataRG, (BinarySegmentation | undefined)[]>();
+    public readonly sharedData = new Map<SharedData, (BinarySegmentation | undefined)[]>();
     public readonly segmentationItems = new Map<string, SegmentationItem>();
     private readonly annotationSegmentations: Map<Annotation, Segmentation[]> = new Map();
     public readonly allSegmentations: Segmentation[] = [];
@@ -46,40 +35,35 @@ export class SegmentationController {
      * @param annotation 
      * @returns 
      */
-    getSegmentationItem(annotation: Annotation): SegmentationItem {
-        const id = `${annotation.id}`;
+    getSegmentationItem(annotation: Annotation, viewerPlane: AnnotationPlane): SegmentationItem {
+        const id = `${annotation.id}_${viewerPlane}`;
         if (this.segmentationItems.has(id)) {
             return this.segmentationItems.get(id)!;
         }
-        return this.createSegmentation(annotation);
-    }
+        const type = annotation.annotationType.dataRepresentation;
 
-    private createSegmentation(annotation: Annotation): SegmentationItem {
-        const id = `${annotation.id}`;
-        const type = getAnnotationType(annotation);
         let segmentation: Segmentation;
-        if (type == 'Binary') {
-            segmentation = this.createBinarySegmentation(id, annotation);
-        } else if (type == 'Probability') {
-            segmentation = new ProbabilitySegmentation(id, this.image, annotation);
-        } else if (type == 'Multiclass') {
-            segmentation = new MulticlassSegmentation(id, this.image, annotation);
-        } else if (type == 'Multilabel') {
-            segmentation = new MultilabelSegmentation(id, this.image, annotation);
-        } else if (type == 'Masked') {
-            // should be created instead via getMaskedSegmentation
-            throw new Error('Should not be called for masked segmentations');
+        if (type == 'BINARY' || type == 'RG_MASK') {
+            segmentation = this.createBinarySegmentation(id, annotation, viewerPlane);
+        } else if (type == 'FLOAT') {
+            segmentation = new ProbabilitySegmentation(id, this.image, annotation, viewerPlane);
+        } else if (type == 'MULTI_CLASS') {
+            segmentation = new MulticlassSegmentation(id, this.image, annotation, viewerPlane);
+        } else if (type == 'MULTI_LABEL') {
+            segmentation = new MultilabelSegmentation(id, this.image, annotation, viewerPlane);
         } else {
             throw new Error('Unknown annotation type');
         }
+
         const segmentationItem = new SegmentationItem(this.image, annotation, segmentation);
         this.add(annotation, segmentationItem);
+
         return segmentationItem;
     }
 
-    private createBinarySegmentation(id: string, annotation: Annotation) {
+    private createBinarySegmentation(id: string, annotation: Annotation, viewerPlane: AnnotationPlane) {
         const { data, index } = this.getNextDataIndex();
-        const segmentation = new BinarySegmentation(id, this.image, annotation, data, index);
+        const segmentation = new BinarySegmentation(id, this.image, annotation, data, index, viewerPlane);
         this.sharedData.get(data)![index] = segmentation;
         return segmentation;
     }
@@ -100,7 +84,6 @@ export class SegmentationController {
         } else {
             this.annotationSegmentations.set(annotation, [segmentation]);
         }
-
     }
 
 
@@ -117,9 +100,10 @@ export class SegmentationController {
         if (this.segmentationItems.has(id)) {
             return this.segmentationItems.get(id)!;
         }
-        
-        const type = getAnnotationType(annotation);
-        if (type != 'Masked') {
+
+        const type = annotation.annotationType.dataRepresentation;
+        throw new Error(`not implemented`);
+        if (type != 'RG_MASK') {
             throw new Error(`Annotation is not masked: ${type} ${annotation.id}`);
         }
         const maskSegmentationItem = this.getSegmentationItem(maskAnnotation);
@@ -194,32 +178,10 @@ export class SegmentationController {
             }
         }
         // No free space found, create new data
-        const data = new SharedDataRG(this.image);
+        const data = new SharedData(this.image, this.image.width, this.image.height, this.image.depth);
         const segmentations = Array.from({ length: data.size }) as (BinarySegmentation | undefined)[];
         this.sharedData.set(data, segmentations);
         return { data, index: 0 };
     }
 
-}
-
-
-function getAnnotationType(annotation: Annotation) {
-    const { annotationType: { name, interpretation } } = annotation;
-    if (interpretation == 'R/G mask' || interpretation == 'Binary mask') {
-        if (['Segmentation 2D',
-            'Segmentation OCT B-scan',
-            'Segmentation OCT Enface',
-            'Segmentation OCT Volume'].includes(name)) {
-            return 'Binary';
-        } else if (name == 'Segmentation 2D masked') {
-            return 'Masked';
-        }
-    } else if (interpretation == 'Probability') {
-        return 'Probability';
-    } else if (interpretation == 'Label numbers') {
-        return 'Multiclass';
-    } else if (interpretation == 'Layer bits') {
-        return 'Multilabel';
-    }
-    throw new Error('Unknown annotation type');
 }

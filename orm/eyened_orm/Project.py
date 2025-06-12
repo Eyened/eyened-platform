@@ -20,26 +20,27 @@ class ExternalEnum(int, enum.Enum):
     M = 3
 
 
-class Project(Base, table=True):
-    __tablename__ = "Project"
+class ProjectBase(Base):
 
-    _name_column: ClassVar[str] = "ProjectName"
-
-    ProjectID: int = Field(primary_key=True)
     ProjectName: str = Field(max_length=45, unique=True)
     External: ExternalEnum
-    Description: str | None = Field(sa_column=Column(Text))
-
+    Description: str | None = Field(sa_column=Column(Text), default=None)
     ContactID: int | None = Field(foreign_key="Contact.ContactID")
+    DOI: str | None = Field(max_length=256, default=None)
+
+
+class Project(ProjectBase, table=True):
+
+    __tablename__ = "Project"
+    _name_column: ClassVar[str] = "ProjectName"
+    ProjectID: int = Field(primary_key=True)
+    DateInserted: datetime = Field(default_factory=datetime.now)
+
     Contact: Optional["Contact"] = Relationship(back_populates="Projects")
 
     Patients: List["Patient"] = Relationship(
         back_populates="Project", cascade_delete=True
     )
-
-    DateInserted: datetime = Field(default_factory=datetime.now)
-
-    DOI: str | None = Field(max_length=256)
 
     def make_dataframe(self, session: Session) -> pd.DataFrame:
         """
@@ -91,8 +92,13 @@ class Project(Base, table=True):
             )
         )
 
+class ContactBase(Base):
+    Name: str = Field(max_length=256)
+    Email: str = Field(max_length=256)
+    Institute: str | None = Field(max_length=256, default=None)
+    Orcid: str | None = Field(max_length=256, default=None)
 
-class Contact(Base, table=True):
+class Contact(ContactBase, table=True):
     __tablename__ = "Contact"
     __table_args__ = (
         Index("NameEmailInstitute_UNIQUE", "Name", "Email", "Institute", unique=True),
@@ -100,10 +106,6 @@ class Contact(Base, table=True):
     _name_column: ClassVar[str] = "Name"
 
     ContactID: int = Field(primary_key=True)
-    Name: str = Field(max_length=256)
-    Email: str = Field(max_length=256)
-    Institute: str | None = Field(max_length=256)
-    Orcid: str | None = Field(max_length=256)
-
+    
     Projects: List["Project"] = Relationship(back_populates="Contact")
     Tasks: List["Task"] = Relationship(back_populates="Contact")

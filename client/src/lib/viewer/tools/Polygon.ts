@@ -60,6 +60,7 @@ export class PolygonTool extends SegmentationTool {
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        super.repaint(viewerContext, renderTarget);
 		const flipDrawErase = this.flipDrawErase;
 		if (!this.drawingState || !this.currentPoints || this.currentPoints.length == 0) return;
 

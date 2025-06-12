@@ -1,5 +1,5 @@
-import type { Annotation } from '$lib/datamodel/annotation';
-import type { Creator } from '$lib/datamodel/creator';
+import type { Annotation } from '$lib/datamodel/annotation.svelte';
+import type { Creator } from '$lib/datamodel/creator.svelte';
 import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
 import { UserManager } from '$lib/usermanager';
 
@@ -25,7 +25,7 @@ export class GlobalContext {
         this.userManager = new UserManager()
     }
 
-    async init(pathname: string) {
+    async init(pathname: string) {        
         await this.userManager.init(pathname);
     }
 

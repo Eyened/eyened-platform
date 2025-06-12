@@ -16,7 +16,7 @@ layout(location = 0) out vec4 color_out;
 void main() {
     float val = texture(u_annotation, v_uv).r;
     // color_out = vec4(val);
-    
+
     if(val > u_threshold) {
         color_out = vec4(u_color, 1);
     }

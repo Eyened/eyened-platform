@@ -1,152 +1,97 @@
 import type { Color } from "$lib/utils";
-import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-import type { TextureShaderProgram } from "$lib/webgl/FragmentShaderProgram";
-import type { Segmentation, SegmentationController } from "$lib/webgl/SegmentationController";
-import { MaskedSegmentation } from "$lib/webgl/binarySegmentation";
+import { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
 import { ConnectedComponentsOverlay } from "./ConnectedComponentsOverlay";
-import { ProbabilitySegmentation } from "$lib/webgl/probabilitySegmentation.svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { SegmentationItem } from "$lib/webgl/segmentationItem";
+import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+import type { Annotation } from "$lib/datamodel/annotation.svelte";
+import type { FilterList } from "$lib/datamodel/itemList";
 
 export class SegmentationOverlay implements Overlay {
 
-	private featureColors = new SvelteMap<Segmentation, Color>();
+    private featureColors = new SvelteMap<Annotation, Color>();
 
-	private readonly renderFeatures: TextureShaderProgram;
-	private readonly renderProbability: TextureShaderProgram;
-	public readonly connectedComponentsOverlay: ConnectedComponentsOverlay;
+    public readonly connectedComponentsOverlay: ConnectedComponentsOverlay;
 
-	public readonly applyMasking = new SvelteSet<Segmentation>();
-	public readonly renderOutline = $state(false);
-	public readonly alpha = $state(0.8);
+    public readonly applyMasking = new SvelteSet<SegmentationItem>();
+    public readonly renderOutline = $state(false);
+    public readonly alpha = $state(0.8);
+    public readonly segmentationContext: SegmentationContext;
+    public readonly annotations: FilterList<Annotation>;
 
-	constructor(
-		private readonly viewerContext: ViewerContext,
-		private readonly segmentationController: SegmentationController,
-		public readonly segmentationContext: SegmentationContext,
-	) {
-		const shaders = viewerContext.shaders;
-		this.renderFeatures = shaders.renderFeatures;
-		this.renderProbability = shaders.renderProbability;
-		this.connectedComponentsOverlay = new ConnectedComponentsOverlay(viewerContext, segmentationContext);
-	}
+    constructor(
+        private readonly viewerContext: ViewerContext,
+        private readonly globalContext: GlobalContext
 
-	toggleMasking(segmentation: Segmentation) {
-		if (this.applyMasking.has(segmentation)) {
-			this.applyMasking.delete(segmentation);
-		} else {
-			this.applyMasking.add(segmentation);
-		}
-	}
+    ) {
+        this.segmentationContext = new SegmentationContext();
+        const image = viewerContext.image;
+        this.annotations = image.segmentationAnnotations.filter(globalContext.annotationsFilter);
 
-	setFeatureColor(segmentation: Segmentation, color: Color) {
-		this.featureColors.set(segmentation, color);
-	}
+        this.connectedComponentsOverlay = new ConnectedComponentsOverlay(viewerContext, this.segmentationContext);
+    }
 
-	private _colorIndex = 0;
-	getFeatureColor(segmentation: Segmentation): Color {
-		let color = this.featureColors.get(segmentation);
-		if (!color) {
-			color = colors[(this._colorIndex++) % colors.length];
-			this.featureColors.set(segmentation, color);
-		}
-		return color;
-	}
+    toggleMasking(segmentation: SegmentationItem) {
+        if (this.applyMasking.has(segmentation)) {
+            this.applyMasking.delete(segmentation);
+        } else {
+            this.applyMasking.add(segmentation);
+        }
+    }
 
-	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-		const { hideOverlays } = viewerContext;
-		if (hideOverlays) {
-			return;
-		}
+    setFeatureColor(annotation: Annotation, color: Color) {
+        this.featureColors.set(annotation, color);
+    }
 
-		this.paintBinarySegmentations(viewerContext, renderTarget);
-		this.paintProbability(viewerContext, renderTarget);
-		this.connectedComponentsOverlay.paint(viewerContext, renderTarget);
-	}
+    private _colorIndex = 0;
+    getFeatureColor(annotation: Annotation): Color {
+        let color = this.featureColors.get(annotation);
+        if (!color) {
+            color = colors[(this._colorIndex++) % colors.length];
+            this.setFeatureColor(annotation, color);
+        }
+        return color;
+    }
 
+    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        const { image, index, hideOverlays } = viewerContext;
+        if (hideOverlays) {
+            return;
+        }
+        const {
+            hideCreators,
+            hideAnnotations
+        } = this.segmentationContext;
 
-	paintBinarySegmentations(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-		// console.log('paintBinarySegmentations')
-		const { image: { segmentationController }, index } = viewerContext;
-		const {
-			hideCreators,
-			hideFeatures,
-			hideSegmentations,
-			hideAnnotations
-		} = this.segmentationContext;
+        const baseUniforms = getBaseUniforms(viewerContext);
+        const uniforms = {
+            ...baseUniforms,
+            u_alpha: this.alpha,
+            u_smooth: true,
+            u_outline: this.renderOutline
+        };
 
-		const baseUniforms = getBaseUniforms(viewerContext);
-		const uniforms = {
-			...baseUniforms,
-			u_alpha: this.alpha,
-			u_smooth: true
-		};
+        for (const annotation of this.annotations.$) {
+            const segmentationItem = image.segmentationItems.get(annotation);
+            if (!segmentationItem) continue;
+            const segmentation = segmentationItem.getSegmentation(index);
 
-		// each sharedData holds a set of segmentations		
-		for (const [data, segmentations] of segmentationController.sharedData.entries()) {
+            if (!segmentation) continue;
+            if (hideAnnotations.has(annotation)) continue;
+            if (hideCreators.has(annotation.creator)) continue;
 
-			for (const segmentation of segmentations) {
-				if (!segmentation) continue;
-				const { annotation } = segmentation;
+            uniforms.u_color = this.getFeatureColor(annotation).map(c => c / 255);
 
-				if (hideAnnotations.has(annotation)) continue;
-				if (hideSegmentations.has(segmentation)) continue;
-				if (hideCreators.has(annotation.creator)) continue;
-				if (hideFeatures.has(annotation.feature)) continue;
-
-				if (this.connectedComponentsOverlay.mode.has(segmentation)) continue;
-
-				uniforms.u_annotation = data.getTexture(index);
-				uniforms.u_layer_bit = segmentation.layerBit;
-				uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-				uniforms.u_outline = this.renderOutline;
-				if (segmentation instanceof MaskedSegmentation && this.applyMasking.has(segmentation)) {
-					uniforms.u_mask = segmentation.maskSegmentation.data.getTexture(index);
-					uniforms.u_mask_bit = segmentation.maskSegmentation.layerBit;
-				} else {
-					// need to set the texture to something, otherwise the shader might not work
-					uniforms.u_mask = uniforms.u_annotation;
-					uniforms.u_mask_bit = 0;
-				}
-				this.renderFeatures.pass(renderTarget, uniforms);
-			}
-		}
-	}
-
-
-	paintProbability(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-
-		const { index } = viewerContext;
-		const {
-			hideCreators,
-			hideFeatures,
-			hideSegmentations,
-			hideAnnotations
-		} = this.segmentationContext;
-
-		const baseUniforms = getBaseUniforms(viewerContext);
-		const uniforms = {
-			...baseUniforms
-		};
-		for (const segmentation of this.segmentationController.allSegmentations) {
-			const { annotation } = segmentation;
-			if (hideAnnotations.has(annotation)) continue;
-
-
-			if (hideSegmentations.has(segmentation)) continue;
-			if (hideCreators.has(annotation.creator)) continue;
-			if (hideFeatures.has(annotation.feature)) continue;
-			if (segmentation instanceof ProbabilitySegmentation) {
-				uniforms.u_annotation = segmentation.getTexture(index);
-				uniforms.u_threshold = segmentation.threshold;
-				uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-				this.renderProbability.pass(renderTarget, uniforms);
-			}
-		}
-	}
+            for (const ad of annotation.annotationData.$) {
+                uniforms.u_threshold = ad.valueFloat ?? 0.5;
+            }
+            segmentation.render(renderTarget, uniforms);
+        }
+    }
 
 }

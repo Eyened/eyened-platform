@@ -1,9 +1,51 @@
+import enum
 import re
-from typing import Any, ClassVar, List, Optional, Type, TypeVar, Dict
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Literal,
+    get_args,
+    Union,
+)
 
-from sqlalchemy import select, Column
+from eyened_orm.utils.config import DatabaseSettings
+from pydantic import create_model
+from sqlalchemy import Column, select
 from sqlalchemy.orm import Session
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, Field
+
+def PrivateField(**kwargs):
+    field_info = Field(**kwargs)
+    json_schema_extra = field_info.json_schema_extra or {}
+    json_schema_extra["private"] = True
+    field_info.json_schema_extra = json_schema_extra
+    return field_info
+
+def create_patch_model(name: str, base_model: type[SQLModel]) -> type[SQLModel]:
+    """Create a Pydantic model with all fields optional useful for patching"""
+
+    def get_field_type(field: Field) -> Any:
+        if isinstance(field.annotation, type) and issubclass(
+            field.annotation, enum.Enum
+        ):
+            # for enums, accept string values
+            return Optional[str]
+        return Optional[field.annotation]
+
+    return create_model(
+        name,
+        __base__=SQLModel,
+        **{
+            field_name: (get_field_type(field), None)
+            for field_name, field in base_model.model_fields.items()
+            if not (field.json_schema_extra or {}).get("private", False)
+        },
+    )
 
 
 def _convert_property_name(name: str) -> str:
@@ -52,6 +94,15 @@ class Base(SQLModel):
 
     # Common class variables
     _name_column: ClassVar[str | None] = None
+    config: ClassVar[DatabaseSettings] = None
+
+    class Config:
+        use_enum_values = False  # This tells Pydantic NOT to convert Enum to .value
+        json_encoders = {enum.Enum: lambda x: x.name if isinstance(x, enum.Enum) else x}
+
+    @classmethod
+    def set_config(cls, config: DatabaseSettings):
+        cls.config = config
 
     def __getattr__(self, name: str) -> Any:
         """Override attribute access to handle property name conversion.
@@ -64,7 +115,8 @@ class Base(SQLModel):
         """Find an object by its name column value."""
         if cls._name_column is None:
             raise AttributeError(f"{cls.__name__} has no name column")
-        return cls.by_column(session, cls._name_column, name)
+        kwargs = {cls._name_column: name}
+        return cls.by_column(session, **kwargs)
 
     @classmethod
     def fetch_all(cls: Type[T], session: Session) -> List[T]:
@@ -129,7 +181,7 @@ class Base(SQLModel):
         """Generic method to query by any column."""
         conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
         stmt = select(cls).where(*conditions)
-        return session.scalar(stmt).first()
+        return session.scalar(stmt)
 
     @classmethod
     def by_columns(cls: type[T], session: Session, **kwargs) -> List[T]:
@@ -148,22 +200,31 @@ class Base(SQLModel):
         """Return columns that are not foreign keys."""
         return [c for c in cls.columns() if not c.foreign_keys]
 
+    def get_value(self, column: Column):
+        val = getattr(self, column.name)
+        if isinstance(val, enum.Enum):
+            return val.name
+        return val
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert the object to a dictionary."""
-        return {c.name: getattr(self, c.name) for c in self.columns()}
+        return {
+            c.name: self.get_value(c)
+            for c in self.columns()
+            if not (self.__class__.model_fields[c.name].json_schema_extra or {}).get("private", False)
+        }
 
     def to_list(self) -> List[Any]:
         """Convert the object to a list of values."""
-        return [getattr(self, c.name) for c in self.columns()]
+        return [self.get_value(c) for c in self.columns()]
 
     def __repr__(self) -> str:
         """String representation of the object."""
         args = ", ".join([f"{c.name}={getattr(self, c.name)}" for c in self.columns()])
         return f"{self.__class__.__name__}({args})"
 
-    @property
-    def config(self):
-        """Return the database configuration."""
-        from eyened_orm.db import DBManager
+    def __hash__(self):
+        return id(self)
 
-        return DBManager._config
+    def __eq__(self, other):
+        return self is other

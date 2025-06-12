@@ -1,10 +1,9 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import { authClient } from "../auth";
-import { loadBase } from "./datamodel/api";
-import type { Creator } from "./datamodel/creator";
+import { loadBase } from "./datamodel/api.svelte";
+import { type Creator } from "./datamodel/creator.svelte";
 import { data } from "./datamodel/model";
-
 
 export class UserManager {
 
@@ -35,11 +34,11 @@ export class UserManager {
     async login(username: string, password: string, rememberMe: boolean) {
         const resp = await authClient.login(username, password, rememberMe);
         await this.setCreator(resp.id);
-        
+
         // Get the redirect URL from the query parameters
         const params = new URLSearchParams(window.location.search);
         const redirectUrl = params.get('redirect');
-        
+
         // If there's a redirect URL, go there, otherwise go to the root
         if (redirectUrl) {
             await goto(decodeURIComponent(redirectUrl));
@@ -56,7 +55,7 @@ export class UserManager {
 
     async changePassword(oldPassword: string, newPassword: string) {
         const resp = await authClient.changePassword(oldPassword, newPassword);
-        
+
     }
 
     private async setCreator(id: number) {

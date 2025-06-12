@@ -1,12 +1,26 @@
-import { ItemConstructor } from "./itemContructor";
-import type { Item } from "./itemList";
+import { BaseItem } from "./itemList";
 
-export interface TaskState extends Item {
-    id: number;
-    name: string;
+export interface ServerTaskState {
+    TaskStateID: number;
+    TaskStateName: string;
 }
 
-export const TaskStateConstructor = new ItemConstructor<TaskState>(
-    'TaskStateID', {
-    name: 'TaskStateName',
-});
+export class TaskState extends BaseItem {
+    static endpoint = 'taskStates';
+    static mapping = {
+        'TaskStateName': 'name',
+    };
+
+    id!: number;
+    name!: string;
+
+    constructor(item: ServerTaskState) {
+        super();
+        this.init(item);
+    }
+
+    init(item: ServerTaskState) {
+        this.id = item.TaskStateID;
+        this.name = item.TaskStateName;
+    }
+}

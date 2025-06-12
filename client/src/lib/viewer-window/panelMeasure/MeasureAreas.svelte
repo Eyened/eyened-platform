@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Annotation } from '$lib/datamodel/annotation.svelte';
 	import type { MeasureTool } from '$lib/viewer/tools/Measure.svelte';
-	import { BinarySegmentation } from '$lib/webgl/binarySegmentation';
-	import { ProbabilitySegmentation } from '$lib/webgl/probabilitySegmentation.svelte';
-	import type { Creator } from '$lib/datamodel/creator';
+	import type { Creator } from '$lib/datamodel/creator.svelte';
 	import CreatorAreas from './CreatorAreas.svelte';
+    import { BinarySegmentation, ProbabilitySegmentation } from '$lib/webgl/segmentation';
 
 	interface Props {
 		measureTool: MeasureTool;
@@ -25,15 +24,18 @@
 			if (annotation.annotationType.name !== 'Segmentation 2D') {
 				continue;
 			}
-			const segmentationItem = image.segmentationController.getSegmentationItem(annotation);
-			const segmentation = segmentationItem.segmentation;
+			
+            const segmentationItem = image.getSegmentationItem(annotation);
+			const segmentation = segmentationItem.getSegmentation(viewerContext.index);
 
 			if (
 				segmentation instanceof BinarySegmentation ||
 				segmentation instanceof ProbabilitySegmentation
 			) {
 				const scanNr = viewerContext.index;
-				const area = segmentation.pixelArea.get(scanNr);
+				// const area = segmentation.pixelArea.get(scanNr);
+                // TODO: implement pixelArea
+                const area = 0;
 				const areamm2 =
 					area == undefined
 						? undefined

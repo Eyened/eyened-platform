@@ -12,7 +12,14 @@ if TYPE_CHECKING:
     from eyened_orm import Annotation, FormAnnotation, Patient, Series, ImageInstance
 
 
-class Study(Base, table=True):
+class StudyBase(Base):
+    PatientID: int = Field(foreign_key="Patient.PatientID")
+    StudyRound: int | None 
+    StudyDescription: str | None = Field(max_length=64, default=None)
+    StudyInstanceUid: str | None = Field(max_length=64, unique=True, default=None)
+    StudyDate: datetime.date
+
+class Study(StudyBase, table=True):
     """
     Study class representing a visit (study) of a patient.
     All images taken on the same day are grouped into a study.
@@ -27,23 +34,13 @@ class Study(Base, table=True):
     )
 
     StudyID: int = Field(primary_key=True)
-
-    PatientID: int = Field(foreign_key="Patient.PatientID")
+    DateInserted: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    
     Patient: "Patient" = Relationship(back_populates="Studies")
-
     Series: List["Series"] = Relationship(back_populates="Study")
     Annotations: List["Annotation"] = Relationship(back_populates="Study")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Study")
-
-    StudyRound: int | None = Field()
-    StudyDescription: str | None = Field(max_length=64)
-
-    StudyInstanceUid: str | None = Field(max_length=64, unique=True)
-    StudyDate: datetime.date
-
-    # datetimes
-    DateInserted: datetime.datetime = Field(default_factory=datetime.datetime.now)
-
+    
     @classmethod
     def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
         return cls.by_column(session, "StudyInstanceUid", StudyInstanceUid)
@@ -73,18 +70,18 @@ class Study(Base, table=True):
             q = q.where(where)
         return session.scalars(q).all()
 
-class Series(Base, table=True):
+class SeriesBase(Base):
+    StudyID: int = Field(foreign_key="Study.StudyID")
+    SeriesNumber: int | None
+    SeriesInstanceUid: str | None = Field(max_length=64, unique=True, default=None)
+
+class Series(SeriesBase, table=True):
     __tablename__ = "Series"
     __table_args__ = (Index("fk_Series_Study1_idx", "StudyID"),)
 
     SeriesID: int = Field(primary_key=True)
 
-    StudyID: int = Field(foreign_key="Study.StudyID", ondelete="CASCADE")
     Study: "Study" = Relationship(back_populates="Series")
-
-    SeriesNumber: int | None
-    SeriesInstanceUid: str | None = Field(max_length=64, unique=True)
-
     ImageInstances: List["ImageInstance"] = Relationship(back_populates="Series")
     Annotations: List["Annotation"] = Relationship(back_populates="Series")
 
