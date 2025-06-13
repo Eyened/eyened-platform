@@ -43,7 +43,7 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: int
     username: str
-    role: str | None
+    role: int | None
 
 
 class SessionData(BaseModel):

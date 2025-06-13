@@ -1,7 +1,7 @@
 import type { ETDRSCoordinates, Position2D } from '$lib/types';
 import type { Overlay, ViewerEvent } from '../viewer-utils';
 import type { RenderTarget } from '$lib/webgl/types';
-import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 import type { ViewerContext } from '../viewerContext.svelte';
 
 const strokeStyleFovea = 'rgba(255, 255, 0, 1)';

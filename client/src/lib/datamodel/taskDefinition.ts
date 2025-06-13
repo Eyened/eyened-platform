@@ -6,7 +6,7 @@ export interface ServerTaskDefinition {
 }
 
 export class TaskDefinition extends BaseItem {
-    static endpoint = 'taskDefinitions';
+    static endpoint = 'task-definitions';
     static mapping = {
         'TaskDefinitionName': 'name',
     };

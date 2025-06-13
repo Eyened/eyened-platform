@@ -3,7 +3,7 @@
     import { getContext } from "svelte";
     import { data } from "$lib/datamodel/model";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation";
+    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import type { TaskContext } from "$lib/types";
     import RegistrationItem from "./RegistrationItem.svelte";
     import type { FormSchema } from "$lib/datamodel/formSchema.svelte";

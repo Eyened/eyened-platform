@@ -2,21 +2,15 @@ import enum
 from datetime import date, datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import select, Index
+from sqlalchemy import Index, select
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
+
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import (
-        Annotation,
-        FormAnnotation,
-        Project,
-        Series,
-        Study,
-        ImageInstance,
-    )
-
+    from eyened_orm import (Annotation, FormAnnotation, ImageInstance, Project,
+                            Study)
 
 class SexEnum(enum.Enum):
     M = 1

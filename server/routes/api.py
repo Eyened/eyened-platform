@@ -17,7 +17,7 @@ router = APIRouter()
 # Pydantic model for response validation
 class DataResponse(BaseModel):
     features: List[Feature]
-    creators: List[Dict]
+    creators: List[Creator]
     contacts: List[Contact]
     annotation_types: List[AnnotationType] = Field(alias="annotation-types")
     annotation_type_features: List[AnnotationTypeFeature] = Field(alias="annotation-type-features")

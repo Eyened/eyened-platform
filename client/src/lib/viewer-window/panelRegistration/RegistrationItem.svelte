@@ -2,7 +2,7 @@
 	import { getContext, onDestroy } from 'svelte';
 	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 	import { PanelIcon, Trash } from '../icons/icons';
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import { data } from '$lib/datamodel/model';
 	import { RegistrationTool } from '$lib/viewer/tools/Registration';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';

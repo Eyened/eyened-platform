@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TaskMain from '$lib/tasks/TaskMain.svelte';
 	import { data as modelData } from '$lib/datamodel/model.js';
-	import { loadSubtasks } from '$lib/datamodel/api.svelte.js';
+	import { loadSubtasks } from '$lib/datamodel/api.js';
 	import { derived } from 'svelte/store';
 
 	let { data } = $props();

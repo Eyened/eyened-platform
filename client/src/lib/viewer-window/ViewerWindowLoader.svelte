@@ -11,7 +11,7 @@ Used to create the viewerwindow context.
 	import BrowserOverlay from './BrowserOverlay.svelte';
 	import ViewerWindow from './ViewerWindow.svelte';
 	import { ViewerWindowContext } from './viewerWindowContext.svelte';
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import { data } from '$lib/datamodel/model';
 	import RegistrationItemLoader from './RegistrationItemLoader.svelte';
 	import { getContext } from 'svelte';

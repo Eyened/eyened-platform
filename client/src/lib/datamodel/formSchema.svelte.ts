@@ -8,7 +8,7 @@ export interface ServerFormSchema {
 }
 
 export class FormSchema extends BaseItem {
-    static endpoint = 'formSchemas';
+    static endpoint = 'form-schemas';
     static mapping = {
         'SchemaName': 'name',
         'Schema': 'schema',

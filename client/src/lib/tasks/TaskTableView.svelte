@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { data } from '$lib/datamodel/model';
-	import type { Task } from '$lib/datamodel/task';
+	import type { Task } from '$lib/datamodel/task.svelte';
 	import type { TaskState } from '$lib/datamodel/taskState';
 	import { get_url_params } from '$lib/utils';
 	import SubTaskRow from './SubTaskRow.svelte';
@@ -13,7 +13,7 @@
 
 	let { task }: Props = $props();
 
-	const content = data.subTasks.filter((subTask) => subTask.task === task);
+	const content = task.subTasks;
 
 	const states = data.taskStates;
 

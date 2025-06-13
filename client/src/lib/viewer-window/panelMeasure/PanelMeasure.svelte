@@ -6,7 +6,7 @@
 	import MeasureAreas from './MeasureAreas.svelte';
 	import { data } from '$lib/datamodel/model';
 	import Line from './Line.svelte';
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import SetResolutionEtdrs from './SetResolutionETDRS.svelte';
 	interface props {
 		active: boolean;

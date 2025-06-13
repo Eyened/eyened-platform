@@ -1,45 +1,50 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import Column, select, Text, Index
+from sqlalchemy import Column, Index, Text, select
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
 
-from .FormAnnotation import FormAnnotation
 from .base import Base
 
 if TYPE_CHECKING:
-    from .ImageInstance import ImageInstance
-    from .Project import Contact
-    from .Annotation import Creator
+    from eyened_orm import (Contact, Creator, FormAnnotation, ImageInstance,
+                            SubTask, TaskDefinition, TaskState)
 
+class TaskDefinitionBase(Base):
+    TaskDefinitionName: str = Field(max_length=256)
 
-class TaskDefinition(Base, table=True):
+class TaskStateBase(Base):
+    TaskStateName: str = Field(max_length=256, unique=True)
+
+class TaskDefinition(TaskDefinitionBase, table=True):
     __tablename__ = "TaskDefinition"
     _name_column: ClassVar[str] = "TaskDefinitionName"
 
     TaskDefinitionID: int = Field(primary_key=True)
-    TaskDefinitionName: str = Field(max_length=256)
 
     Tasks: List["Task"] = Relationship(back_populates="TaskDefinition")
-
-    # datetimes
     DateInserted: datetime = Field(default_factory=datetime.now)
 
-
-class TaskState(Base, table=True):
+class TaskState(TaskStateBase, table=True):
     __tablename__ = "TaskState"
 
     _name_column: ClassVar[str] = "TaskStateName"
 
     TaskStateID: int = Field(primary_key=True)
-    TaskStateName: str = Field(max_length=256, unique=True)
 
     Tasks: List["Task"] = Relationship(back_populates="TaskState")
     SubTasks: List["SubTask"] = Relationship(back_populates="TaskState")
 
+class TaskBase(Base):
+    TaskName: str = Field(max_length=256)
+    Description: str | None = Field(sa_column=Column(Text))
+    ContactID: int | None = Field(foreign_key="Contact.ContactID", default=None)
+    TaskDefinitionID: int = Field(foreign_key="TaskDefinition.TaskDefinitionID")
+    TaskStateID: int | None = Field(foreign_key="TaskState.TaskStateID", default=None)
+    
 
-class Task(Base, table=True):
+class Task(TaskBase, table=True):
     __tablename__ = "Task"
     __table_args__ = (
         Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),
@@ -48,24 +53,12 @@ class Task(Base, table=True):
     _name_column: ClassVar[str] = "TaskName"
 
     TaskID: int = Field(primary_key=True)
-
-    TaskName: str = Field(max_length=256)
-    Description: str | None = Field(sa_column=Column(Text))
-
-    ## Contact
-    ContactID: int | None = Field(foreign_key="Contact.ContactID")
-    Contact: Optional["Contact"] = Relationship(back_populates="Tasks")
-
-    TaskDefinitionID: int = Field(foreign_key="TaskDefinition.TaskDefinitionID")
-    TaskDefinition: "TaskDefinition" = Relationship(back_populates="Tasks")
-
-    TaskStateID: int | None = Field(foreign_key="TaskState.TaskStateID")
-    TaskState: "TaskState" = Relationship(back_populates="Tasks")
-
-    SubTasks: List["SubTask"] = Relationship(back_populates="Task")
-
-    # datetimes
     DateInserted: datetime = Field(default_factory=datetime.now)
+
+    Contact: Optional["Contact"] = Relationship(back_populates="Tasks")
+    TaskDefinition: "TaskDefinition" = Relationship(back_populates="Tasks")
+    TaskState: "TaskState" = Relationship(back_populates="Tasks")
+    SubTasks: List["SubTask"] = Relationship(back_populates="Task")
 
     @classmethod
     def create_from_imagesets(
@@ -110,23 +103,27 @@ class Task(Base, table=True):
         return session.scalars(q).all()
 
 
-class SubTaskImageLink(Base, table=True):
+class SubTaskImageLinkBase(Base):
+    SubTaskID: int = Field(foreign_key="SubTask.SubTaskID", primary_key=True)
+    ImageInstanceID: int = Field(foreign_key="ImageInstance.ImageInstanceID", primary_key=True)
+
+class SubTaskImageLink(SubTaskImageLinkBase, table=True):
     __tablename__ = "SubTaskImageLink"
     __table_args__ = (
         Index("fk_SubTaskImageLink_SubTask1_idx", "SubTaskID"),
         Index("fk_SubTaskImageLink_ImageInstance1_idx", "ImageInstanceID"),
     )
 
-    SubTaskImageLinkID: int = Field(primary_key=True)
-
-    SubTaskID: int = Field(foreign_key="SubTask.SubTaskID")
     SubTask: "SubTask" = Relationship(back_populates="SubTaskImageLinks")
-
-    ImageInstanceID: int = Field(foreign_key="ImageInstance.ImageInstanceID")
     ImageInstance: "ImageInstance" = Relationship(back_populates="SubTaskImageLinks")
 
+class SubTaskBase(Base):
+    TaskID: int = Field(foreign_key="Task.TaskID")
+    TaskStateID: int = Field(foreign_key="TaskState.TaskStateID")
+    CreatorID: int | None = Field(foreign_key="Creator.CreatorID", default=None)
+    Comments: str | None = Field(sa_column=Column(Text), default=None)
 
-class SubTask(Base, table=True):
+class SubTask(SubTaskBase, table=True):
     __tablename__ = "SubTask"
     __table_args__ = (
         Index("fk_SubTask_Creator1_idx", "CreatorID"),
@@ -136,17 +133,9 @@ class SubTask(Base, table=True):
 
     SubTaskID: int = Field(primary_key=True)
 
-    TaskID: int = Field(foreign_key="Task.TaskID")
     Task: "Task" = Relationship(back_populates="SubTasks")
-
-    TaskStateID: int = Field(foreign_key="TaskState.TaskStateID")
     TaskState: "TaskState" = Relationship(back_populates="SubTasks")
-
-    CreatorID: int | None = Field(foreign_key="Creator.CreatorID")
     Creator: Optional["Creator"] = Relationship(back_populates="SubTasks")
-
-    Comments: str | None = Field(sa_column=Column(Text))
-
     SubTaskImageLinks: List["SubTaskImageLink"] = Relationship(back_populates="SubTask")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="SubTask")
 

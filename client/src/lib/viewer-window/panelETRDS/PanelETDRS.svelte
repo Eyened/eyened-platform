@@ -9,7 +9,7 @@
 	} from '$lib/viewer/overlays/ETDRSGridOverlay.svelte';
 	import { ETDRSGridTool } from '$lib/viewer/tools/ETDRSGrid.svelte';
 	import ETDRSGridItem from './ETDRSGridItem.svelte';
-	import { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import type { TaskContext } from '$lib/types';
 	import { PanelIcon } from '../icons/icons';
 	import ShowHideToggle from '../icons/ShowHideToggle.svelte';
