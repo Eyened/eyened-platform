@@ -4,7 +4,7 @@
 
     import { data } from "$lib/datamodel/model";
     import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation";
+    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { getContext } from "svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import type { TaskContext } from "$lib/types";

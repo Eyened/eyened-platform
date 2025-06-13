@@ -7,7 +7,7 @@
     import { page } from "$app/state";
     import { BrowserContext } from "$lib/browser/browserContext.svelte";
     import BrowserContent from "$lib/browser/BrowserContent.svelte";
-    import { loadParams } from "$lib/datamodel/api.svelte";
+    import { loadParams } from "$lib/datamodel/api";
     import type { TaskContext } from "$lib/types";
 
     interface Props {

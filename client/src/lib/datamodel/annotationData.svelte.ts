@@ -1,5 +1,5 @@
 import type { Annotation } from "./annotation.svelte";
-import { DataEndpoint } from "./api.svelte";
+import { DataEndpoint } from "./api";
 import { BaseItem } from "./itemList";
 import { data } from "./model";
 

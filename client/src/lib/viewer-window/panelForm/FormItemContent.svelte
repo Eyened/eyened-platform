@@ -3,7 +3,7 @@
     import { getDefault, resolveRefs } from "$lib/forms/schemaType";
     import { onMount, setContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation";
+    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { browser } from "$app/environment";
 
     interface Props {

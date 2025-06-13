@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import {
 		getAffineTransforms,
 		getPointsetRegistrations

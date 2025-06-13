@@ -1,6 +1,6 @@
 import type { Annotation } from '$lib/datamodel/annotation.svelte';
 import type { Creator } from '$lib/datamodel/creator.svelte';
-import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 import { UserManager } from '$lib/usermanager';
 
 export type ComponentDef = {

@@ -6,7 +6,7 @@
 	import { Edit, PanelIcon, Trash } from '../icons/icons';
 	import type { ETDRSGridOverlay } from '$lib/viewer/overlays/ETDRSGridOverlay.svelte';
 	import type { ETDRSGridTool } from '$lib/viewer/tools/ETDRSGrid.svelte';
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 
 	const globalContext = getContext<GlobalContext>('globalContext');
 

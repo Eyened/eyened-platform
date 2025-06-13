@@ -5,7 +5,7 @@ import { BaseItem } from "./itemList";
 import { data } from "./model";
 import type { Patient } from "./patient";
 import type { Study } from "./study";
-import type { SubTask } from "./subTask";
+import type { SubTask } from "./subTask.svelte";
 
 export interface ServerFormAnnotation {
     FormAnnotationID: number,

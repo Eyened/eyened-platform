@@ -2,7 +2,7 @@
     import FormItemContent from "./FormItemContent.svelte";
     import { PanelIcon, Trash } from "../icons/icons";
     import { data } from "$lib/datamodel/model";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation";
+    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { openNewWindow } from "$lib/newWindow";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";

@@ -1,7 +1,7 @@
 import { ItemConstructor } from "./itemContructor";
 import type { Item } from "./itemList";
 import { FKMapping } from "./mapping";
-import type { SubTask } from "./subTask";
+import type { SubTask } from "./subTask.svelte";
 
 export interface SubTaskImageLink extends Item {
     instanceid: number;

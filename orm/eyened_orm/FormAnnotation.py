@@ -1,83 +1,63 @@
+import json
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List
 
 from pandas import DataFrame, json_normalize
-from sqlalchemy import func, select, event
-from sqlalchemy.orm import Session
-import json
-from sqlmodel import Field, Relationship
-from .base import Base
+from sqlalchemy import Column, DateTime, event, func
 from sqlalchemy.dialects.mysql import JSON
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy.orm import Session
+from sqlmodel import Field, Relationship
+
+from .base import Base
 
 if TYPE_CHECKING:
-    from .Annotation import Creator
-    from .FormAnnotation import FormAnnotation
-    from .ImageInstance import ImageInstance
-    from .Patient import Patient
-    from .Study import Study
-    from .Task import SubTask
+    from eyened_orm import (Creator, FormSchema, ImageInstance, Patient, Study,
+                            SubTask)
 
 
-class FormSchema(Base, table=True):
+class FormSchemaBase(Base):
+    SchemaName: str = Field(max_length=45, unique=True)
+    Schema: Dict[str, Any] | None = Field(sa_column=Column(JSON), default=None)
+
+class FormSchema(FormSchemaBase, table=True):
     __tablename__ = "FormSchema"
     _name_column: ClassVar[str] = "SchemaName"
 
     FormSchemaID: int = Field(primary_key=True)
 
-    SchemaName: str = Field(max_length=45, unique=True)
-    Schema: Dict[str, Any] | None = Field(sa_column=Column(JSON))
-
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="FormSchema")
 
 
-class FormAnnotation(Base, table=True):
+class FormAnnotationBase(Base):
+    FormSchemaID: int = Field(foreign_key="FormSchema.FormSchemaID")
+    PatientID: int = Field(foreign_key="Patient.PatientID")
+    StudyID: int | None = Field(foreign_key="Study.StudyID", default=None)
+    ImageInstanceID: int | None = Field(foreign_key="ImageInstance.ImageInstanceID", default=None)
+    CreatorID: int = Field(foreign_key="Creator.CreatorID")
+    SubTaskID: int | None = Field(foreign_key="SubTask.SubTaskID", default=None)
+    FormData: Dict[str, Any] | None = Field(sa_column=Column(JSON), default=None)
+    FormAnnotationReferenceID: int | None = Field(foreign_key="FormAnnotation.FormAnnotationID", default=None)
+    Inactive: bool = False
+    
+class FormAnnotation(FormAnnotationBase, table=True):
     __tablename__ = "FormAnnotation"
 
     FormAnnotationID: int = Field(primary_key=True)
-
-    FormSchemaID: int = Field(foreign_key="FormSchema.FormSchemaID")
-    FormSchema: "FormSchema" = Relationship(back_populates="FormAnnotations")
-
-    PatientID: int = Field(foreign_key="Patient.PatientID")
-    Patient: "Patient" = Relationship(back_populates="FormAnnotations")
-
-    StudyID: int | None = Field(
-        foreign_key="Study.StudyID",
-        nullable=True,
-    )
-    Study: "Study" = Relationship(back_populates="FormAnnotations")
-
-    ImageInstanceID: int | None = Field(
-        foreign_key="ImageInstance.ImageInstanceID", nullable=True, ondelete="CASCADE"
-    )
-    ImageInstance: "ImageInstance" = Relationship(back_populates="FormAnnotations")
-
-    CreatorID: int = Field(foreign_key="Creator.CreatorID")
-    Creator: "Creator" = Relationship(back_populates="FormAnnotations")
-
-    SubTaskID: int | None = Field(
-        foreign_key="SubTask.SubTaskID",
-        nullable=True,
-    )
-    SubTask: "SubTask" = Relationship(back_populates="FormAnnotations")
-
-    # actual data
-    FormData: Optional[Dict[str, Any]] = Field(sa_column=Column(JSON))
-
-    # datetimes
     DateInserted: datetime = Field(default_factory=datetime.now)
     DateModified: datetime | None = Field(
         sa_column=Column(
             DateTime, server_default=func.now(), server_onupdate=func.now()
         )
     )
-    FormAnnotationReferenceID: int | None = Field(
-        foreign_key="FormAnnotation.FormAnnotationID", nullable=True
-    )
 
-    Inactive: bool = False
+    FormSchema: "FormSchema" = Relationship(back_populates="FormAnnotations")
+    Patient: "Patient" = Relationship(back_populates="FormAnnotations")
+    Study: "Study" = Relationship(back_populates="FormAnnotations")
+    ImageInstance: "ImageInstance" = Relationship(back_populates="FormAnnotations")
+    Creator: "Creator" = Relationship(back_populates="FormAnnotations")
+    SubTask: "SubTask" = Relationship(back_populates="FormAnnotations")
+
 
     @classmethod
     def by_schema_and_creator(
@@ -92,7 +72,7 @@ class FormAnnotation(Base, table=True):
         Get all FormAnnotations for a given schema and optionally filter by creator.
         Additional filters can be passed as keyword arguments.
         """
-        from eyened_orm import FormSchema, Creator
+        from eyened_orm import Creator, FormSchema
         schema = FormSchema.by_name(session, schema_name)
 
         if schema is None:

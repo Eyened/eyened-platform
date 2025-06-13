@@ -4,14 +4,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
 import pandas as pd
-from sqlalchemy import Column, Text, select, Index
+from sqlalchemy import Column, Index, Text, select
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Patient, Task, Contact
+    from eyened_orm import Contact, Patient, Task
 
 
 class ExternalEnum(int, enum.Enum):

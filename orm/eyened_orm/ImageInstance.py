@@ -356,8 +356,11 @@ class ImageInstance(ImageInstanceBase, table=True):
         """
         return [a for a in self.Annotations if a.CreatorID == creator.CreatorID]
 
+class DeviceModelBase(Base):
+    Manufacturer: str = Field(max_length=45)
+    ManufacturerModelName: str = Field(max_length=45)
 
-class DeviceModel(Base, table=True):
+class DeviceModel(DeviceModelBase, table=True):
     __tablename__ = "DeviceModel"
     __table_args__ = (
         Index(
@@ -370,9 +373,6 @@ class DeviceModel(Base, table=True):
     _name_column: ClassVar[str] = "ManufacturerModelName"
 
     DeviceModelID: int = Field(primary_key=True)
-
-    Manufacturer: str = Field(max_length=45)
-    ManufacturerModelName: str = Field(max_length=45)
 
     DeviceInstances: List["DeviceInstance"] = Relationship(back_populates="DeviceModel")
 

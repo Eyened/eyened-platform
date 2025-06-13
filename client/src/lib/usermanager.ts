@@ -1,7 +1,7 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import { authClient } from "../auth";
-import { loadBase } from "./datamodel/api.svelte";
+import { loadBase } from "./datamodel/api";
 import { type Creator } from "./datamodel/creator.svelte";
 import { data } from "./datamodel/model";
 

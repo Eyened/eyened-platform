@@ -1,5 +1,5 @@
-import type { SubTask } from './datamodel/subTask';
-import type { Task } from './datamodel/task';
+import type { SubTask } from './datamodel/subTask.svelte';
+import type { Task } from './datamodel/task.svelte';
 import type { Color } from './utils';
 
 export type int = number;

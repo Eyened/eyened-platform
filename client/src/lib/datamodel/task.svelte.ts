@@ -1,4 +1,7 @@
-import { BaseItem } from "./itemList";
+import { BaseItem, FilterList } from "./itemList";
+import { data } from "./model";
+import type { SubTask } from "./subTask.svelte";
+import type { TaskState } from "./taskState";
 
 export interface ServerTask {
     TaskID: number;
@@ -21,7 +24,7 @@ export class Task extends BaseItem {
     id!: number;
     name!: string;
     definitionId!: number;
-    stateId!: number;
+    stateId: number = $state(0);
     dateInserted!: Date;
     description?: string = $state(undefined);
 
@@ -37,5 +40,11 @@ export class Task extends BaseItem {
         this.stateId = item.TaskStateID;
         this.dateInserted = item.DateInserted;
         this.description = item.Description;
+    }
+
+    state: TaskState = $derived(data.taskStates.get(this.stateId)!);
+
+    get subTasks(): FilterList<SubTask> {
+        return data.subTasks.filter(subTask => subTask.taskId === this.id);
     }
 }
