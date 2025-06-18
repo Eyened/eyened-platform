@@ -1,10 +1,17 @@
 import os
 from types import SimpleNamespace
 
-from eyened_orm import AnnotationType, Creator, ModalityTable, SourceInfo
-from eyened_orm.Annotation import DataRepresentation
-from eyened_orm.base import Base
-from eyened_orm.db import create_connection_string
+from eyened_orm import (
+    Annotation,
+    AnnotationType,
+    Creator,
+    DataRepresentation,
+    ModalityTable,
+    SourceInfo,
+    TaskState,
+    base,
+    db,
+)
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
@@ -180,5 +187,21 @@ def init_annotation_types(session):
                 AnnotationTypeName=name, DataRepresentation=representation
             )
             session.add(annotation_type)
+
+    session.commit()
+
+
+def init_task_states(session):
+    expected_states = [
+        "Not started",
+        "In progress",
+        "Ready",
+    ]
+
+    task_states = TaskState.fetch_all(session)
+    for name in expected_states:
+        if name not in [t.TaskStateName for t in task_states]:
+            task_state = TaskState(TaskStateName=name)
+            session.add(task_state)
 
     session.commit()

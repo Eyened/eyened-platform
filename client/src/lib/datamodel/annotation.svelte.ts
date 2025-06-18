@@ -88,7 +88,7 @@ export class Annotation extends BaseItem {
         return data.features.get(this.featureId)!;
     }
     get instance(): Instance {
-        return data.instances.get(this.instanceId!)!;
+        return data.images.get(this.instanceId!)!;
     }
     get study(): Study {
         return data.studies.get(this.studyId!)!;

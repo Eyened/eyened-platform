@@ -20,6 +20,7 @@ from server.utils.database_init import (
     create_database,
     init_admin,
     init_annotation_types,
+    init_task_states,
     init_other_objects,
 )
 
@@ -58,6 +59,8 @@ async def lifespan(app: FastAPI):
         init_other_objects(session)
         # initialize annotation types
         init_annotation_types(session)
+        # initialize task states
+        init_task_states(session)
     except Exception as e:
         raise RuntimeError(f"Error initializing database objects") from e
     finally:

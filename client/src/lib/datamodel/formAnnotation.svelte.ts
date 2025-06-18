@@ -92,7 +92,7 @@ export class FormAnnotation extends BaseItem {
     }
 
     public get instance(): Instance {
-        return data.instances.get(this.instanceId)!;
+        return data.images.get(this.instanceId)!;
     }
 
     public get creator(): Creator {

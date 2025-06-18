@@ -40,7 +40,9 @@ interface BaseItemConstructor {
     mapping: MappingDefinition;
     endpoint: string;
 }
-
+export interface Item {
+    id: number | string;
+}
 export abstract class BaseItem {
     abstract id: number | string;
     static endpoint: string;
@@ -127,6 +129,72 @@ export abstract class BaseItem {
         removeData({ [this.endpoint]: [this.id] });
     }
 }
+interface BaseLinkingItemConstructor {
+    new(parentId: number, childId: number): BaseLinkingItem;
+    parentResource: string;
+    childResource: string;
+    parentIdField: string;
+    childIdField: string;
+    endpoint: string;
+}
+export abstract class BaseLinkingItem implements Item {
+    abstract id: string;
+
+    static endpoint: string;
+    static parentResource: string;
+    static childResource: string;
+    static parentIdField: string;
+    static childIdField: string;
+
+    get endpoint(): string {
+        return (this.constructor as BaseLinkingItemConstructor).endpoint;
+    }
+    get parentResource(): string {
+        return (this.constructor as BaseLinkingItemConstructor).parentResource;
+    }
+    get childResource(): string {
+        return (this.constructor as BaseLinkingItemConstructor).childResource;
+    }
+    get parentIdField(): string {
+        return (this.constructor as BaseLinkingItemConstructor).parentIdField;
+    }
+    get childIdField(): string {
+        return (this.constructor as BaseLinkingItemConstructor).childIdField;
+    }
+
+    constructor(
+        public readonly parentId: number,
+        public readonly childId: number) {
+    }
+
+    static async create(item: any) {
+        const parentId = item[this.parentIdField];
+        const childId = item[this.childIdField];
+        const url = `${apiUrl}/${this.parentResource}/${parentId}/${this.childResource}/${childId}`;
+        const response = await fetch(url, { method: 'POST' });
+
+        if (!response.ok) {
+            throw new Error(`Failed to create ${url}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        importData(data);
+        return response.status;
+    }
+
+    async delete(fromServer: boolean = true) {
+        if (fromServer) {
+            const url = `${apiUrl}/${this.parentResource}/${this.parentId}/${this.childResource}/${this.childId}`;
+            const response = await fetch(url, { method: 'DELETE' });
+            if (!response.ok) {
+                throw new Error(`Failed to delete ${this.endpoint} ${this.id}: ${response.statusText}`);
+            }
+        }
+        removeData({ [this.endpoint]: [this.id] });
+    }
+
+}
+
 
 
 export class FilterList<T> implements Readable<T[]> {
@@ -213,7 +281,7 @@ export class FilterList<T> implements Readable<T[]> {
     }
 }
 
-export class ItemCollection<T extends BaseItem> implements Readable<T[]> {
+export class ItemCollection<T extends Item> implements Readable<T[]> {
     protected readonly items: Map<number | string, T> = new Map();
     protected readonly store = writable(0);
 

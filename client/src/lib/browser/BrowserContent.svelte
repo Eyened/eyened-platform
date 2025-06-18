@@ -4,7 +4,7 @@
     import Patient from "./Patient.svelte";
 
     interface Props {
-        renderMode?: "studies" | "instances";
+        renderMode?: "studies" | "images";
         mode?: "full" | "overlay";
     }
 
@@ -13,7 +13,7 @@
     const { instances, patients } = data;
 </script>
 
-{#if renderMode == "instances"}
+{#if renderMode == "images"}
     {#if $instances.length}
         <InstancesTable instances={$instances} />
     {:else}

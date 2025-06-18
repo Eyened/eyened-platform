@@ -2,7 +2,7 @@
 	import TaskTableView from '$lib/tasks/TaskTableView.svelte';
 	import { goto } from '$app/navigation';
 	import { data as modelData } from '$lib/datamodel/model.js';
-	import { loadSubtasks } from '$lib/datamodel/api.js';
+	import { loadSubtasks } from '$lib/datamodel/api.svelte.js';
 	import { page } from '$app/state';
 
 	let { data } = $props();

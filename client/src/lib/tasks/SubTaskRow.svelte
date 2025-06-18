@@ -2,8 +2,12 @@
     import { page } from "$app/state";
     import { BrowserContext } from "$lib/browser/browserContext.svelte";
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
+    import { data } from "$lib/datamodel/model";
 
-    import type { SubTask } from "$lib/datamodel/subTask.svelte";
+    import {
+        SubTaskImageLink,
+        type SubTask,
+    } from "$lib/datamodel/subTask.svelte";
     import { setContext } from "svelte";
 
     interface Props {
@@ -12,7 +16,17 @@
     }
 
     let { i, subTask }: Props = $props();
-    const { state, instances } = subTask;
+    const { state: taskState, instances } = subTask;
+
+    const browserContext = new BrowserContext([]);
+    browserContext.thumbnailSize = 4;
+    setContext("browserContext", browserContext);
+
+    let comments = $state(subTask.comments ?? "");
+
+    function updateComments() {
+        subTask.update({ comments });
+    }
 
     async function handleGrade(index: number) {
         const suffix_string = `?${page.url.searchParams.toString()}`;
@@ -21,19 +35,44 @@
         );
         window.location.href = url.href;
     }
-    const browserContext = new BrowserContext([]);
-    browserContext.thumbnailSize = 4;
-    setContext("browserContext", browserContext);
+    let newImageId: number | undefined = $state();
+    function addImage() {
+        SubTaskImageLink.create({
+            subTaskId: subTask.id,
+            imageId: newImageId,
+        });
+    }
+
+    function removeSelectedImages() {
+        const imageIds = browserContext.selection.slice();
+        for (const id of imageIds) {
+            const link = data.subTaskImageLinks.get(`${subTask.id}_${id}`);
+            if (link) {
+                link.delete();
+            } else {
+                console.warn(`Link ${subTask.id}_${id} not found`);
+            }
+            browserContext.selection.splice(
+                browserContext.selection.indexOf(id),
+                1,
+            );
+        }
+    }
+
+    console.log(subTask.instances.map((instance) => instance.id));
+    let imagesString = $state(
+        subTask.instances.map((instance) => instance.id).$.join(","),
+    );
 </script>
 
 <tr>
     <td>{i}</td>
     <td
-        class:unknown={state.name == "Unknown"}
-        class:ready={state.name == "Ready"}
-        class:busy={state.name == "Busy"}
+        class:unknown={taskState.name == "Unknown"}
+        class:ready={taskState.name == "Ready"}
+        class:busy={taskState.name == "Busy"}
     >
-        {state.name}
+        {taskState.name}
     </td>
     <td>
         <button onclick={() => handleGrade(i)}>View</button>
@@ -44,6 +83,22 @@
                 <InstanceComponent {instance} />
             {/each}
         </div>
+
+        <input type="number" bind:value={newImageId} />
+        <button onclick={addImage} disabled={newImageId == undefined}>
+            Add image
+        </button>
+
+        <button
+            onclick={removeSelectedImages}
+            disabled={browserContext.selection.length == 0}
+        >
+            Remove {browserContext.selection.length} images from sub-task
+        </button>
+    </td>
+    <td>
+        <textarea bind:value={comments} onchange={updateComments} rows={3}>
+        </textarea>
     </td>
 </tr>
 

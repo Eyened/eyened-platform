@@ -1,7 +1,7 @@
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { loadSearchParams } from "$lib/datamodel/api";
+import { loadSearchParams } from "$lib/datamodel/api.svelte";
 import type { Instance } from "$lib/datamodel/instance.svelte";
 import { clearData } from "$lib/datamodel/model";
 
