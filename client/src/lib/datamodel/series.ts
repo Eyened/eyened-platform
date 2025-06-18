@@ -40,7 +40,7 @@ export class Series extends BaseItem {
     }
 
     get instances(): FilterList<Instance> {
-        return data.instances.filter(instance => instance.seriesId == this.id);
+        return data.images.filter(instance => instance.seriesId == this.id);
     }
 
     get study(): Study {

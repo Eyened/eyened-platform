@@ -55,7 +55,7 @@ async def get_tasks(current_user: CurrentUser = Depends(get_current_user)):
     }
 
 
-@router.put("/subtasks/{SubTaskID}/taskstateid")
+@router.put("/sub-tasks/{SubTaskID}/taskstateid")
 async def update_task_state_id(
     SubTaskID: int,
     state_id: int = Body(...),
@@ -158,7 +158,7 @@ async def delete_task(
     return Response(status_code=204)
 
 
-@router.get("/tasks/{taskid}/subtasks")
+@router.get("/tasks/{taskid}/sub-tasks")
 async def get_subtasks(
     taskid: int,
     db: Session = Depends(get_db),
@@ -175,7 +175,7 @@ async def get_subtasks(
     }
 
 
-@router.get("/tasks/{taskid}/subtasks/{index}")
+@router.get("/tasks/{taskid}/sub-tasks/{index}")
 async def get_subtask_from_task(
     taskid: int,
     index: int,
@@ -193,7 +193,7 @@ async def get_subtask_from_task(
         raise HTTPException(status_code=404, detail="SubTask index out of range")
 
 
-@router.put("/subtasks/{subtaskid}/state")
+@router.put("/sub-tasks/{subtaskid}/state")
 async def update_subtask_state(
     subtaskid: int,
     state_data: TaskStateUpdate,

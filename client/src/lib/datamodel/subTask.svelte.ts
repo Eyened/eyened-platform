@@ -1,7 +1,8 @@
+import { apiUrl } from "$lib/config";
 import type { Creator } from "./creator.svelte";
 import type { Instance } from "./instance.svelte";
-import { BaseItem, FilterList } from "./itemList";
-import { data } from "./model";
+import { BaseItem, BaseLinkingItem, FilterList } from "./itemList";
+import { data, removeData } from "./model";
 import type { Task } from "./task.svelte";
 import type { TaskState } from "./taskState";
 
@@ -14,7 +15,7 @@ export interface ServerSubTask {
 }
 
 export class SubTask extends BaseItem {
-    static endpoint = 'subtasks';
+    static endpoint = 'sub-tasks';
 
     static mapping = {
         'TaskID': 'taskId',
@@ -47,37 +48,39 @@ export class SubTask extends BaseItem {
     }
     state: TaskState = $derived(data.taskStates.get(this.taskStateId)!);
     creator: Creator = $derived(data.creators.get(this.creatorId)!);
-    
+
     get instances(): FilterList<Instance> {
         return data.subTaskImageLinks
             .filter(link => link.subTaskId === this.id)
-            .map(link => data.instances.get(link.imageInstanceId)!);
+            .map(link => data.instances.get(link.imageId)!);
     }
 }
 export interface ServerSubTaskImageLink {
     SubTaskID: number;
     ImageInstanceID: number;
 }
-export class SubTaskImageLink extends BaseItem {
+export class SubTaskImageLink extends BaseLinkingItem {
     static endpoint = 'sub-task-image-links';
-
-    static mapping = {
-        'SubTaskID': 'subTaskId',
-        'ImageInstanceID': 'imageInstanceId'
-    };
+    static parentResource = 'sub-tasks';
+    static childResource = 'image-links';
+    static parentIdField = 'subTaskId';
+    static childIdField = 'imageId';
 
     id!: string;
-    subTaskId!: number;
-    imageInstanceId!: number;
 
     constructor(item: ServerSubTaskImageLink) {
-        super();
+        super(item.SubTaskID, item.ImageInstanceID);
         this.init(item);
+    }
+
+    get subTaskId(): number {
+        return this.parentId;
+    }
+    get imageId(): number {
+        return this.childId;
     }
 
     init(item: ServerSubTaskImageLink) {
         this.id = `${item.SubTaskID}_${item.ImageInstanceID}`;
-        this.subTaskId = item.SubTaskID;
-        this.imageInstanceId = item.ImageInstanceID;
     }
 }

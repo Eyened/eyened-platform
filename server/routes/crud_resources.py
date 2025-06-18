@@ -1,3 +1,4 @@
+from sqlmodel import Field
 from eyened_orm import (
     Annotation,
     AnnotationBase,
@@ -40,11 +41,12 @@ from eyened_orm import (
     TaskState,
     TaskStateBase,
     SubTaskImageLink,
-    SubTaskImageLinkBase,
 )
 from eyened_orm.base import create_patch_model
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import NoResultFound, MultipleResultsFound
+from pydantic import BaseModel, create_model
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
@@ -174,77 +176,82 @@ def create_crud_routes(
     return router
 
 
-def create_linking_routes(
-    model_class,
-    base_model,
-    route_prefix: str,
-):
-    """
-    Creates a set of CRUD routes for a linking table with composite primary key.
+def create_linking_routes(model, parent, child_route, child):
+    model_resource, model_class = model
+    parent_resource, parent_class = parent
+    child_resource, child_class = child
+    parent_id_field = parent_class.__table__.primary_key.columns[0].name
+    child_id_field = child_class.__table__.primary_key.columns[0].name
 
-    Args:
-        model_class: SQLModel model class
-        base_model: Pydantic base model for the entity
-        route_prefix: URL prefix for the routes (e.g. "subtask-images" for /subtask-images/...)
-    """
-    # PatchModel is a Pydantic model with all fields optional
-    # useful for filtering on columns
-    PatchModel = create_patch_model(f"{model_class.__name__}Patch", base_model)
-
-    # Get all primary key columns
-    pk_columns = model_class.__table__.primary_key.columns
-
-    @router.get(f"/{route_prefix}", response_model=list[model_class])
+    @router.get(
+        f"/{parent_resource}/{{parent_id}}/{child_route}",
+        response_model=list[model_class],
+    )
     async def list_items(
-        filter: PatchModel = Depends(),  # FastAPI will parse all query params into this model
+        parent_id: int,
         db: Session = Depends(get_db),
         current_user: CurrentUser = Depends(get_current_user),
     ):
-        query = db.query(model_class)
-
-        conditions = [
-            getattr(model_class, key) == value
-            for key, value in filter.model_dump().items()
-            if value is not None
-        ]
-
-        if conditions:
-            query = query.filter(*conditions)
-
+        query = db.query(model_class).filter(
+            getattr(model_class, parent_id_field) == parent_id
+        )
         return query.all()
 
-    # Create the route path with named parameters for each primary key
-    pk_path_params = "/".join(f"{{{col.name}}}" for col in pk_columns)
-    route_path = f"/{route_prefix}/{pk_path_params}"
+    print("post", f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}")
 
-    @router.post(f"/{route_prefix}", response_model=model_class, status_code=201)
+    @router.post(
+        f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}",
+        response_model=dict,
+        status_code=201,
+    )
     async def create_item(
-        item: base_model,
+        parent_id: int,
+        child_id: int,
         db: Session = Depends(get_db),
         current_user: CurrentUser = Depends(get_current_user),
     ):
         """Create a new linking item."""
-        db_item = model_class(**item.model_dump())
+        db_item = model_class(**{parent_id_field: parent_id, child_id_field: child_id})
         db.add(db_item)
         db.commit()
         db.refresh(db_item)
-        return db_item
 
-    @router.delete(route_path, status_code=204)
+        # Get the actual related objects
+        parent_item = db.get(parent_class, parent_id)
+        child_item = db.get(child_class, child_id)
+
+        return {
+            parent_resource: [parent_item],
+            child_resource: [child_item],
+            model_resource: [db_item],
+        }
+
+    print("delete", f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}")
+
+    @router.delete(
+        f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}",
+        status_code=204,
+    )
     async def delete_item(
+        parent_id: int,
+        child_id: int,
         db: Session = Depends(get_db),
         current_user: CurrentUser = Depends(get_current_user),
-        **pk_values: int,  # This will capture all the named parameters
     ):
-        """Delete a linking item by composite ID."""
-        # Build the filter conditions for each primary key column
-        conditions = [col == pk_values[col.name] for col in pk_columns]
-
-        query = db.query(model_class).filter(*conditions)
-        item = query.first()
-        if not item:
+        """Delete a linking item by parent and child IDs."""
+        query = db.query(model_class).filter(
+            getattr(model_class, parent_id_field) == parent_id,
+            getattr(model_class, child_id_field) == child_id,
+        )
+        try:
+            item = query.one()
+        except NoResultFound:
             raise HTTPException(
                 status_code=404, detail=f"{model_class.__name__} not found"
+            )
+        except MultipleResultsFound:
+            raise HTTPException(
+                status_code=400, detail=f"{model_class.__name__} multiple results found"
             )
 
         db.delete(item)
@@ -255,7 +262,7 @@ def create_linking_routes(
 
 
 create_crud_routes(
-    ImageInstance, ImageInstanceBase, "images", soft_delete_field="Inactive"
+    ImageInstance, ImageInstanceBase, "instances", soft_delete_field="Inactive"
 )
 create_crud_routes(Study, StudyBase, "studies")
 create_crud_routes(Series, SeriesBase, "series")
@@ -283,7 +290,13 @@ create_crud_routes(
     Annotation, AnnotationBase, "annotations", soft_delete_field="Inactive"
 )
 
-create_linking_routes(SubTaskImageLink, SubTaskImageLinkBase, "sub-task-image-links")
+
+create_linking_routes(
+    ("sub-task-image-links", SubTaskImageLink), 
+    ("sub-tasks", SubTask), 
+    "image-links",
+    ("instances", ImageInstance)
+)
 
 
 @router.get(
@@ -300,7 +313,7 @@ async def get_task_subtask_image_links(
     )
 
 
-@router.get("/tasks/{task_id}/subtasks-with-images")
+@router.get("/tasks/{task_id}/sub-tasks-with-images")
 async def get_task_subtasks_with_images(
     task_id: int,
     db: Session = Depends(get_db),
@@ -309,25 +322,23 @@ async def get_task_subtasks_with_images(
     """Get all subtasks for a task along with their associated image links and image instances."""
     # Get all subtasks for this task
     subtasks = db.query(SubTask).filter(SubTask.TaskID == task_id).all()
-    subtask_ids = {st.SubTaskID for st in subtasks}
-
+    
     # Get all image links for these subtasks
-    image_links = (
+    links = (
         db.query(SubTaskImageLink)
-        .filter(SubTaskImageLink.SubTaskID.in_(subtask_ids))
+        .filter(SubTaskImageLink.SubTaskID.in_({st.SubTaskID for st in subtasks}))
         .all()
     )
-    image_ids = {link.ImageInstanceID for link in image_links   }
 
     # Get all related image instances
-    image_instances = (
+    images = (
         db.query(ImageInstance)
-        .filter(ImageInstance.ImageInstanceID.in_(image_ids))
+        .filter(ImageInstance.ImageInstanceID.in_({link.ImageInstanceID for link in links}))
         .all()
     )
 
     return {
         "sub-tasks": subtasks,
-        "sub-task-image-links": image_links,
-        "instances": image_instances,
+        "sub-task-image-links": links,
+        "instances": images,
     }

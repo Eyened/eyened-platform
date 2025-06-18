@@ -1,26 +1,23 @@
-import { BaseItem, ItemCollection } from "./itemList";
-
+import { Annotation } from "./annotation.svelte";
+import { AnnotationData } from "./annotationData.svelte";
+import { AnnotationType, AnnotationTypeFeature } from "./annotationType";
 import { Contact } from "./contact.svelte";
 import { Creator } from "./creator.svelte";
-import { Project } from "./project.svelte";
-import { Patient } from "./patient";
+import { Device, DeviceModel } from "./device.svelte";
+import { Feature } from "./feature.svelte";
+import { FormAnnotation } from "./formAnnotation.svelte";
+import { FormSchema } from "./formSchema.svelte";
 import { Instance } from "./instance.svelte";
+import { ItemCollection } from "./itemList";
+import { Patient } from "./patient";
+import { Project } from "./project.svelte";
+import { Scan } from "./scan";
 import { Series } from "./series";
 import { Study } from "./study";
-import { AnnotationData } from "./annotationData.svelte";
-import { Annotation } from "./annotation.svelte";
-import { FormAnnotation } from "./formAnnotation.svelte";
-import { Device } from "./device.svelte";
-import { DeviceModel } from "./device.svelte";
-import { FormSchema } from "./formSchema.svelte";
-import { AnnotationType, AnnotationTypeFeature } from "./annotationType";
-import { Feature } from "./feature.svelte";
-import { Scan } from "./scan";
+import { SubTask, SubTaskImageLink } from "./subTask.svelte";
+import { Task } from "./task.svelte";
 import { TaskDefinition } from "./taskDefinition";
 import { TaskState } from "./taskState";
-import { Task } from "./task.svelte";
-import { SubTask } from "./subTask.svelte";
-import { SubTaskImageLink } from "./subTask.svelte";
 
 export const itemClassMap = {
     creators: Creator,
@@ -93,7 +90,7 @@ data.subTasks = data["sub-tasks"];
 data.subTaskImageLinks = data["sub-task-image-links"];
 
 export function clearData() {
-    data.instances.clear();
+    data.images.clear();
     data.series.clear();
     data.studies.clear();
     data.patients.clear();

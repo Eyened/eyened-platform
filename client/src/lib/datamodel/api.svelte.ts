@@ -1,6 +1,6 @@
 import { apiUrl } from '$lib/config';
 import { decodeNpy } from '$lib/utils/npy_loader';
-import { data, importData } from './model';
+import { importData } from './model';
 import type { Task } from './task.svelte';
 
 export class DataEndpoint<T> {
@@ -85,7 +85,7 @@ export async function loadBase() {
 }
 
 export async function loadSubtasks(task: Task) {
-    const url = new URL(`${apiUrl}/tasks/${task.id}/subtasks-with-images`);
+    const url = new URL(`${apiUrl}/tasks/${task.id}/sub-tasks-with-images`);
     const response = await fetch(url);
     const data = await response.json();
     importData(data);

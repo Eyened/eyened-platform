@@ -17,7 +17,7 @@
 	}
 
 	let { image }: Props = $props();
-	const { instances } = data;
+	const { images: instances } = data;
 	const renderer = new MultiImageRenderer(image, registration);
 	class MultiViewerContext extends ViewerContext {
 		constructor(image: AbstractImage, registration: Registration) {

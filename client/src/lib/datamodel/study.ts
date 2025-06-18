@@ -47,7 +47,7 @@ export class Study extends BaseItem {
         return data.patients.get(this.patientId)!;
     }
     get instances(): FilterList<Instance> {
-        return data.instances.filter(instance => instance.series.studyId == this.id);
+        return data.images.filter(instance => instance.series.studyId == this.id);
     }
     get series(): FilterList<Series> {
         return data.series.filter(series => series.studyId == this.id);

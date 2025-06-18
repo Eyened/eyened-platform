@@ -15,7 +15,7 @@ Some UI components on the top right of the viewer window.
     const globalContext = getContext<GlobalContext>('globalContext');
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
 	const { creator } = viewerWindowContext;
-	const { instances } = data;
+	const { images: instances } = data;
 
 	let firstCFIImage: undefined | Image2D = $state(undefined);
 	onMount(async () => {

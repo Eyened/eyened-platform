@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { globalContext } from '$lib/main';
-	import type { TaskContext } from '$lib/types';
-	import ViewerWindowLoader from '$lib/viewer-window/ViewerWindowLoader.svelte';
-	import { setContext } from 'svelte';
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { TaskContext } from "$lib/types";
+    import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
+    import { getContext, setContext } from "svelte";
 
-	const taskContext: TaskContext = $props();
-	setContext('taskContext', taskContext);
+    const taskContext: TaskContext = $props();
+    setContext("taskContext", taskContext);
+    const globalContext = getContext<GlobalContext>("globalContext");
 
-	
-	globalContext.updateConfig(taskContext.taskConfig);
+    globalContext.updateConfig(taskContext.taskConfig);
 
-	const instanceIDs = taskContext.subTask.instanceIds;
+    const instanceIDs = taskContext.subTask.instances.map(instance => instance.id);
 </script>
 
 <ViewerWindowLoader instanceIDs={$instanceIDs} />

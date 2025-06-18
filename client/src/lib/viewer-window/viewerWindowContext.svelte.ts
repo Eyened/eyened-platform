@@ -1,5 +1,5 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { loadInstances } from "$lib/datamodel/api";
+import { loadInstances } from "$lib/datamodel/api.svelte";
 import type { Creator } from "$lib/datamodel/creator.svelte";
 import type { Instance } from "$lib/datamodel/instance.svelte";
 import { data } from "$lib/datamodel/model";
@@ -59,7 +59,7 @@ export class ViewerWindowContext {
         loop();
         this.unsubscribe = this._instanceIds.subscribe((ids) => {
             for (const id of ids) {
-                const instance = data.instances.get(id);
+                const instance = data.images.get(id);
                 if (instance) {
                     this.loadImage(instance);
                 } else {
@@ -91,7 +91,7 @@ export class ViewerWindowContext {
 
     async setInstanceIDs(ids: number[]) {
         // ensure metadata of all instances is loaded
-        const missingIds = ids.filter((id) => !data.instances.has(id));
+        const missingIds = ids.filter((id) => !data.images.has(id));
         await loadInstances(missingIds);
         this._instanceIds.set(ids);
     }
@@ -169,7 +169,7 @@ export class ViewerWindowContext {
     }
 
     getImages(instanceID: number): Promise<LoadedImages> {
-        const instance = data.instances.get(instanceID);
+        const instance = data.images.get(instanceID);
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);
         }
