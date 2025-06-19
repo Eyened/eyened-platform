@@ -1,5 +1,5 @@
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
-import type { Unsubscriber } from "svelte/store";
+import { readable, readonly, writable, type Readable, type Unsubscriber } from "svelte/store";
 import type { AbstractImage } from "./abstractImage";
 import { SegmentationState } from "./segmentationState";
 import type { Segmentation, PaintSettings } from "./segmentation";
@@ -42,7 +42,7 @@ export class SegmentationItem {
     async getSegmentationState(scanNr: number, create: boolean = false): Promise<SegmentationState> {
         if (create && !this.segmentations.has(scanNr)) {
             const annotationPlane = "PRIMARY";
-            let annotationData = this.annotation.annotationData.find(d => d.scanNr == scanNr && d.annotationPlane == annotationPlane);
+            let annotationData = this.annotation.annotationData.find$(d => d.scanNr == scanNr && d.annotationPlane == annotationPlane);
             if (!annotationData) {
                 await AnnotationData.createFrom(this.annotation, scanNr, annotationPlane);
             } else {
@@ -62,12 +62,21 @@ export class SegmentationItem {
         await segmentationState.draw(drawing, settings);
     }
 
-    canUndo(scanNr: number) {
-        return this.segmentations.getSync(scanNr)?.canUndo;
+
+    canUndo(scanNr: number): Readable<boolean> {
+        return readable<boolean>(false, (set) => {
+            let unsub: Unsubscriber | undefined;
+            this.segmentations.get(scanNr).then(state => unsub = state.canUndo.subscribe(set));
+            return () => unsub?.();
+        });
     }
 
     canRedo(scanNr: number) {
-        return this.segmentations.getSync(scanNr)?.canRedo;
+        return readable<boolean>(false, (set) => {
+            let unsub: Unsubscriber | undefined;
+            this.segmentations.get(scanNr).then(state => unsub = state.canRedo.subscribe(set));
+            return () => unsub?.();
+        });
     }
 
     async undo(scanNr: number) {

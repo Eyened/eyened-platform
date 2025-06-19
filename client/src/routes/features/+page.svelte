@@ -1,22 +1,16 @@
 <script lang="ts">
-    import type { Feature } from "$lib/datamodel/feature.svelte";
+    import { Feature } from "$lib/datamodel/feature.svelte";
     import { data } from "$lib/datamodel/model";
-    import { PanelIcon, Trash } from "$lib/viewer-window/icons/icons";
+    import FeatureRow from "./FeatureRow.svelte";
 
     const { features } = data;
 
-    function deleteFeature(feature: Feature) {
-        features.delete(feature);
-    }
-
-    let featureName = $state("");
+    let name = $state("");
 
     function createFeature(event: Event) {
         event.preventDefault();
-        features.create({
-            name: featureName,
-        });
-        featureName = "";
+        Feature.create({ name });
+        name = "";
     }
 </script>
 
@@ -25,24 +19,13 @@
     <div class="new-feature">
         <span>New Feature:</span>
         <form onsubmit={createFeature}>
-            <input type="text" bind:value={featureName} />
+            <input type="text" bind:value={name} />
             <button type="submit">Create</button>
         </form>
     </div>
     <ul class="feature-list">
         {#each $features as feature}
-            <li class="feature-row">
-                <span>[{feature.id}]</span>
-                <span>{feature.name}</span>
-
-                <PanelIcon
-                    onclick={() => deleteFeature(feature)}
-                    color="red"
-                    backgroundColor="white"
-                >
-                    <Trash />
-                </PanelIcon>
-            </li>
+            <FeatureRow {feature} />
         {/each}
     </ul>
 </div>
@@ -58,18 +41,7 @@
     .new-feature {
         flex-direction: row;
     }
-    li.feature-row {
-        display: flex;
-        padding-left: 0.5em;
 
-        align-items: center;
-    }
-    .feature-row:hover {
-        background-color: rgba(0, 0, 0, 0.1);
-    }
-    .feature-row span {
-        padding-left: 0.5em;
-    }
     div.main {
         overflow-y: auto;
     }

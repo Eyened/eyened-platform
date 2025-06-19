@@ -1,52 +1,20 @@
-from sqlmodel import Field
-from eyened_orm import (
-    Annotation,
-    AnnotationBase,
-    AnnotationType,
-    AnnotationTypeBase,
-    Contact,
-    ContactBase,
-    Creator,
-    CreatorBase,
-    DeviceInstance,
-    DeviceInstanceBase,
-    DeviceModel,
-    DeviceModelBase,
-    Feature,
-    FeatureBase,
-    FormAnnotation,
-    FormAnnotationBase,
-    FormSchema,
-    FormSchemaBase,
-    ImageInstance,
-    ImageInstanceBase,
-    Patient,
-    PatientBase,
-    Project,
-    ProjectBase,
-    Scan,
-    ScanBase,
-    Series,
-    SeriesBase,
-    Study,
-    StudyBase,
-    SubTask,
-    SubTaskBase,
-    Tag,
-    TagBase,
-    Task,
-    TaskBase,
-    TaskDefinition,
-    TaskDefinitionBase,
-    TaskState,
-    TaskStateBase,
-    SubTaskImageLink,
-)
+from eyened_orm import (Annotation, AnnotationBase, AnnotationType,
+                        AnnotationTypeBase, Contact, ContactBase, Creator,
+                        CreatorBase, DeviceInstance, DeviceInstanceBase,
+                        DeviceModel, DeviceModelBase, Feature, FeatureBase,
+                        FormAnnotation, FormAnnotationBase, FormSchema,
+                        FormSchemaBase, ImageInstance, ImageInstanceBase,
+                        Patient, PatientBase, Project, ProjectBase, Scan,
+                        ScanBase, Series, SeriesBase, Study, StudyBase,
+                        SubTask, SubTaskBase, SubTaskImageLink, Tag, TagBase,
+                        Task, TaskBase, TaskDefinition, TaskDefinitionBase,
+                        TaskState, TaskStateBase)
 from eyened_orm.base import create_patch_model
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import NoResultFound, MultipleResultsFound
-from pydantic import BaseModel, create_model
+
+from server.routes.utils import collect_rows
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
@@ -143,11 +111,12 @@ def create_crud_routes(
         db: Session = Depends(get_db),
         current_user: CurrentUser = Depends(get_current_user),
     ):
-        print("patching item", item_id)
+        print("[params]", params.model_dump(exclude_unset=True))
         item = get_item_or_404(db, model_class, item_id, soft_delete_field)
-        for key, value in params.model_dump().items():
-            if value is not None:
-                setattr(item, key, value)
+        for key, value in params.model_dump(exclude_unset=True).items():
+            print("patching item", key, value)
+            setattr(item, key, value)
+
         db.commit()
         db.refresh(item)
         return item
@@ -292,10 +261,10 @@ create_crud_routes(
 
 
 create_linking_routes(
-    ("sub-task-image-links", SubTaskImageLink), 
-    ("sub-tasks", SubTask), 
+    ("sub-task-image-links", SubTaskImageLink),
+    ("sub-tasks", SubTask),
     "image-links",
-    ("instances", ImageInstance)
+    ("instances", ImageInstance),
 )
 
 
@@ -322,7 +291,7 @@ async def get_task_subtasks_with_images(
     """Get all subtasks for a task along with their associated image links and image instances."""
     # Get all subtasks for this task
     subtasks = db.query(SubTask).filter(SubTask.TaskID == task_id).all()
-    
+
     # Get all image links for these subtasks
     links = (
         db.query(SubTaskImageLink)
@@ -331,14 +300,26 @@ async def get_task_subtasks_with_images(
     )
 
     # Get all related image instances
-    images = (
-        db.query(ImageInstance)
-        .filter(ImageInstance.ImageInstanceID.in_({link.ImageInstanceID for link in links}))
-        .all()
-    )
+    image_ids = {link.ImageInstanceID for link in links}
+
+    instances = ImageInstance.by_ids(db, image_ids)
+    series_ids = {instance.SeriesID for instance in instances}
+    series = Series.by_ids(db, series_ids)
+    study_ids = {series.StudyID for series in series}
+    studies = Study.by_ids(db, study_ids)
+    patient_ids = {study.PatientID for study in studies}
+    patients = Patient.by_ids(db, patient_ids)
 
     return {
         "sub-tasks": subtasks,
         "sub-task-image-links": links,
-        "instances": images,
+        **{
+            k: collect_rows(v)
+            for k, v in {
+                "instances": instances,
+                "series": series,
+                "studies": studies,
+                "patients": patients,
+            }.items()
+        },
     }

@@ -58,11 +58,6 @@
             );
         }
     }
-
-    console.log(subTask.instances.map((instance) => instance.id));
-    let imagesString = $state(
-        subTask.instances.map((instance) => instance.id).$.join(","),
-    );
 </script>
 
 <tr>

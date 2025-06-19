@@ -27,7 +27,7 @@
 		'RegistrationSet'
 	]);
 
-	const allSchemas = formSchemas.filter((schema) => !exclude.has(schema.name)).$;
+	const allSchemas = formSchemas.filter((schema) => !exclude.has(schema.name));
 	let selectedSchema: FormSchema | undefined = $state();
 
 	const filters = [
@@ -93,7 +93,7 @@
 		<div>
 			<select bind:value={selectedSchema}>
 				<option value={undefined}>-- select form type --</option>
-				{#each allSchemas as schema}
+				{#each $allSchemas as schema}
 					<option value={schema}>{schema.name}</option>
 				{/each}
 			</select>

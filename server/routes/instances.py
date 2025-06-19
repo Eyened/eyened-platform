@@ -233,29 +233,19 @@ async def get_instances(
     next_cursor, i, a, form_annotations = run_queries(
         session, multiparams, cursor, limit, base_query, annotation_query, form_query
     )
-
-    instances = set()
-    series_set = set()
-    studies = set()
-    patients = set()
-    annotations = set()
-    annotation_datas = set()
-
-    for instance, series, study, patient in i:        
-        instances.add(instance)
-        series_set.add(series)
-        studies.add(study)
-        patients.add(patient)
-    for annotation, annotation_data in a:
-        annotations.add(annotation)
-        annotation_datas.add(annotation_data)
-
+    instances = {instance for instance, _, _, _ in i}
+    series = {series for _, series, _, _ in i}
+    studies = {study for _, _, study, _ in i}
+    patients = {patient for _, _, _, patient in i}
+    annotations = {annotation for annotation, _ in a}
+    annotation_datas = {annotation_data for _, annotation_data in a}
+    
     response = {
         "entities": {
             k: collect_rows(v)
             for k, v in {
                 "instances": instances,
-                "series": series_set,
+                "series": series,
                 "studies": studies,
                 "patients": patients,
                 "annotations": annotations,

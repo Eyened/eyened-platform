@@ -23,7 +23,7 @@ export function getPrivateEyeRegistrationHeidelberg(image: AbstractImage): Photo
     });
     if (!linked_image) return [];
 
-    const enfaceInstance = instance.series.instances.find(instance => getSourceID(instance) == linked_image.source_id);
+    const enfaceInstance = instance.series.instances.find$(instance => getSourceID(instance) == linked_image.source_id);
     if (!enfaceInstance) return [];
     const enfaceID = `${enfaceInstance.id}`;
     const octID = `${instance.id}`;

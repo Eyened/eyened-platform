@@ -45,7 +45,7 @@ export class SegmentationState {
     }
 
     private async initialize() {
-        const data = await this.annotationData.value.load();
+        const data = await this.annotationData.file.load();
         if (data) {
             if (data instanceof NPYArray) {
                 this.segmentation.importData(data.data);
@@ -139,7 +139,7 @@ export async function updateServer(image: AbstractImage, segmentation: Segmentat
     }
     const dataURL = ctx.canvas.toDataURL();
     if (serverValue) {
-        await annotationData.value.setValue(serverValue);
+        await annotationData.file.update(serverValue);
     }
 
     return dataURL;

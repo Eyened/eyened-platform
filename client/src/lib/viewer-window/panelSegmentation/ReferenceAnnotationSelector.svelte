@@ -2,6 +2,7 @@
     import type { Annotation } from "$lib/datamodel/annotation.svelte";
 
     import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { PanelIcon, Trash } from "../icons/icons";
 
     interface Props {
         image: AbstractImage;
@@ -21,9 +22,12 @@
     <div>Select reference annotation:</div>
     <ul>
         {#each $referenceAnnotations as referenceAnnotation}
+            {@const current =
+                referenceAnnotation.id == annotation.annotationReferenceId}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li onclick={() => resolve(referenceAnnotation)}>
+            <li onclick={() => resolve(referenceAnnotation)} class:current>
+
                 <span>[{referenceAnnotation.id}]</span>
                 <span>{referenceAnnotation.feature.name}</span>
                 <span>{referenceAnnotation.creator.name}</span>
@@ -32,3 +36,21 @@
     </ul>
     <button onclick={reject}>Cancel</button>
 </div>
+
+<style>
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+    li {
+        padding: 0.5em;
+        border-bottom: 1px solid #ccc;
+        cursor: pointer;
+    }
+    li.current {
+        background-color: #f0fff0;
+    }
+    li:hover {
+        background-color: #f0f0f0;
+    }
+</style>

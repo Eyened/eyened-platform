@@ -9,24 +9,35 @@
     import BrowserContent from "$lib/browser/BrowserContent.svelte";
     import { loadParams } from "$lib/datamodel/api.svelte";
     import type { TaskContext } from "$lib/types";
+    import { SubTaskImageLink } from "$lib/datamodel/subTask.svelte";
 
     interface Props {
         viewerWindowContext: ViewerWindowContext;
     }
 
     let { viewerWindowContext }: Props = $props();
-    const { subTaskImageLinks, images: instances } = data;
+    const { subTaskImageLinks } = data;
     const instanceIds = viewerWindowContext.instanceIds;
-    const initialInstanceIds = $instanceIds;
+    const initialInstanceIds = $instanceIds.slice();
 
     const browserContext = new BrowserContext(initialInstanceIds);
 
     setContext("browserContext", browserContext);
 
-    const patientIds = initialInstanceIds.map(
-        (i) => instances.get(i)!.patient.identifier,
+    const patientIdentifiers = [
+        ...new Set(
+            initialInstanceIds.map(
+                (i) => data.instances.get(i)!.patient.identifier,
+            ),
+        ),
+    ];
+    const loading = loadParams({ PatientIdentifier: patientIdentifiers });
+    const patients = data.patients.filter((patient) =>
+        patientIdentifiers.includes(patient.identifier),
     );
-    const loading = loadParams({ PatientIdentifier: patientIds });
+    const instances = data.instances.filter((instance) =>
+        patientIdentifiers.includes(instance.patient.identifier),
+    );
 
     const taskContext = getContext<TaskContext>("taskContext");
     const subTask = taskContext?.subTask;
@@ -59,16 +70,17 @@
             (id) => !currentInstanceIds.includes(id),
         );
 
-        for (const instanceid of newInstanceIds) {
-            subTaskImageLinks.create({ subTask, instanceid });
+        for (const instanceId of newInstanceIds) {
+            SubTaskImageLink.create({ subTaskId: subTask.id, instanceId });
         }
-        for (const instanceid of removedInstanceIds) {
+        for (const instanceId of removedInstanceIds) {
             const link = subTaskImageLinks.find(
                 (link) =>
-                    link.subTask == subTask && link.instanceid == instanceid,
+                    link.subTaskId == subTask.id &&
+                    link.instanceId == instanceId,
             );
             if (link) {
-                subTaskImageLinks.delete(link);
+                link.delete();
             } else {
                 console.error("Could not find link to delete");
             }
@@ -79,7 +91,7 @@
 <div id="browser-overlay">
     <div class="button-container">
         {#if subTask}
-            <label for="updateImageLinks">Update image links</label>
+            <label for="updateImageLinks">Update task image links</label>
             <input
                 id="updateImageLinks"
                 type="checkbox"
@@ -89,7 +101,7 @@
         <button class="close-button" onclick={close}>Close</button>
     </div>
     <div id="selection">
-        {#each browserContext.selection.map((i) => instances.get(i)!) as instance (instance.id)}
+        {#each browserContext.selection.map((i) => data.instances.get(i)!) as instance (instance.id)}
             <InstanceComponent {instance} />
         {/each}
     </div>
@@ -97,7 +109,11 @@
         {#await loading}
             <div class="loader">Loading...</div>
         {:then}
-            <BrowserContent mode="overlay" />
+            <BrowserContent
+                mode="overlay"
+                instances={$instances}
+                patients={$patients}
+            />
         {/await}
     </div>
 </div>
@@ -132,6 +148,9 @@
         display: flex;
         justify-content: center;
         padding: 20px;
+    }
+    label {
+        align-self: center;
     }
     .close-button {
         background-color: #85c1e9;

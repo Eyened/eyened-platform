@@ -59,7 +59,7 @@ export class ViewerWindowContext {
         loop();
         this.unsubscribe = this._instanceIds.subscribe((ids) => {
             for (const id of ids) {
-                const instance = data.images.get(id);
+                const instance = data.instances.get(id);
                 if (instance) {
                     this.loadImage(instance);
                 } else {
@@ -91,7 +91,7 @@ export class ViewerWindowContext {
 
     async setInstanceIDs(ids: number[]) {
         // ensure metadata of all instances is loaded
-        const missingIds = ids.filter((id) => !data.images.has(id));
+        const missingIds = ids.filter((id) => !data.instances.has(id));
         await loadInstances(missingIds);
         this._instanceIds.set(ids);
     }
@@ -136,7 +136,7 @@ export class ViewerWindowContext {
 
         for (const locator of photoLocators) {
             for (const key of ['enfaceImageId', 'octImageId']) {
-                const image_id = locator[key];
+                const image_id = locator[key as keyof PhotoLocator];
                 if (!this.photoLocators.has(image_id)) {
                     this.photoLocators.set(image_id, []);
                 }
@@ -169,7 +169,7 @@ export class ViewerWindowContext {
     }
 
     getImages(instanceID: number): Promise<LoadedImages> {
-        const instance = data.images.get(instanceID);
+        const instance = data.instances.get(instanceID);
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);
         }

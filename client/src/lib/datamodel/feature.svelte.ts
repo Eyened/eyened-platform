@@ -8,7 +8,7 @@ export interface ServerFeature {
 export class Feature extends BaseItem {
     static endpoint = 'features';
     static mapping = {
-        name: 'FeatureName',
+        'FeatureName': 'name',
     };
 
     id: number = 0;

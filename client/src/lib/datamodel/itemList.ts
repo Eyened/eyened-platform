@@ -57,9 +57,12 @@ export abstract class BaseItem {
     abstract init(serverItem: any): void;
 
     async update(item: any) {
+        console.log('update', item);
         const updateParams: any = {};
         for (const key in item) {
+            console.log('key', key);
             if (key in this) {
+                console.log('key in this', key);
                 if (isStateProperty(this, key)) {
                     updateParams[key] = item[key];
                 } else {
@@ -201,6 +204,10 @@ export class FilterList<T> implements Readable<T[]> {
 
     constructor(public readonly items: Readable<T[]>) { }
 
+    private derive<S>(fn: (items: T[]) => S[]): FilterList<S> {
+        return new FilterList(derived(this.items, fn));
+    }
+
     first(): T | undefined {
         return this.$[0];
     }
@@ -209,26 +216,43 @@ export class FilterList<T> implements Readable<T[]> {
         return this.items.subscribe(run, invalidate);
     }
 
-    find(predicate: (value: T) => boolean): T | undefined {
+    get(index: number): Readable<T | undefined> {
+        return derived(this.items, lst => lst[index]);
+    }
+
+    get$(index: number): T | undefined {
+        return this.$[index];
+    }
+
+    find$(predicate: (value: T) => boolean): T | undefined {
         const items = get(this.items);
         return items.find(predicate);
     }
 
     filter(predicate: (value: T) => boolean): FilterList<T> {
-        return new FilterList(derived(this.items, lst => lst.filter(predicate)));
+        return this.derive(lst => lst.filter(predicate));
     }
 
     sort(compareFn: (a: T, b: T) => number): FilterList<T> {
-        return new FilterList(derived(this.items, lst => lst.slice().sort(compareFn)));
+        return this.derive(lst => lst.slice().sort(compareFn));
+    }
+
+    forEach$(callback: (value: T) => void): void {
+        this.$.forEach(callback);
     }
 
     map<S>(mapFn: (value: T) => S): FilterList<S> {
-        return new FilterList(derived(this.items, lst => lst.map(mapFn)));
+        return this.derive(lst => lst.map(mapFn));
     }
 
-    forEach(callback: (value: T) => void): void {
-        get(this.items).forEach(callback);
+    map$<S>(mapFn: (value: T) => S): S[] {
+        return this.$.map(mapFn);
     }
+
+    flatMap<S>(mapFn: (value: T) => S[]): FilterList<S> {
+        return this.derive(lst => lst.flatMap(mapFn));
+    }
+
 
     reduce<S>(reducer: (accumulator: S, currentValue: T) => S, initialValue: S): Readable<S> {
         return derived(this.items, lst => lst.reduce(reducer, initialValue));
@@ -289,9 +313,25 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
     constructor() {
     }
 
+    private emit() {
+        this.store.update(n => n + 1);
+    }
+
+    importItems(items: T[]) {
+        for (const item of items) {
+            this.items.set(item.id, item);
+        }
+        this.emit();
+    }
+
     clear() {
         this.items.clear();
-        this.store.update(n => n + 1);
+        this.emit();
+    }
+
+    delete(id: number | string) {
+        this.items.delete(id);
+        this.emit();
     }
 
     get(id: number | string): T | undefined {
@@ -306,40 +346,38 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
         return this.values()[0];
     }
 
-    importItems(items: T[]) {
-        for (const item of items) {
-            this.items.set(item.id, item);
-        }
-        this.store.update(n => n + 1);
-    }
-
     subscribe(run: Subscriber<T[]>): Unsubscriber {
-        return this.store.subscribe(_ => run(Array.from(this.items.values())));
-    }
-
-    filter(predicate: (value: T) => boolean): FilterList<T> {
-        return new FilterList(this).filter(predicate);
+        return this.store.subscribe(_ => run(this.values()));
     }
 
     get filterlist() {
         return new FilterList(this);
     }
 
+    filter(predicate: (value: T) => boolean): FilterList<T> {
+        return this.filterlist.filter(predicate);
+    }
+
+    filter$(predicate: (value: T) => boolean): T[] {
+        return this.values().filter(predicate);
+    }
+
+
     values(): T[] {
         return Array.from(this.items.values());
     }
 
     find(predicate: (value: T) => boolean): T | undefined {
-        const items = Array.from(this.items.values());
-        return items.find(predicate);
+        return this.values().find(predicate);
     }
 
     map<S>(predicate: (value: T) => S): FilterList<S> {
-        return new FilterList(this).map(predicate);
+        return this.filterlist.map(predicate);
     }
 
-    delete(id: number | string) {
-        this.items.delete(id);
-        this.store.update(n => n + 1);
+    flatMap<S>(predicate: (value: T) => S[]): FilterList<S> {
+        return this.filterlist.flatMap(predicate);
     }
+
+
 }
