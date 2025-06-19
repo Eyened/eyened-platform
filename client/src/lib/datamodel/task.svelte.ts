@@ -1,6 +1,7 @@
 import { BaseItem, FilterList } from "./itemList";
 import { data } from "./model";
 import type { SubTask } from "./subTask.svelte";
+import type { TaskDefinition } from "./taskDefinition";
 import type { TaskState } from "./taskState";
 
 export interface ServerTask {
@@ -45,6 +46,11 @@ export class Task extends BaseItem {
     state: TaskState = $derived(data.taskStates.get(this.stateId)!);
 
     get subTasks(): FilterList<SubTask> {
-        return data.subTasks.filter(subTask => subTask.taskId === this.id);
+        // Note: the sorting is important because the routes use the index to load the subtask
+        return data.subTasks.filter(subTask => subTask.taskId === this.id).sort((a, b) => a.id - b.id);
+    }
+
+    get definition(): TaskDefinition {
+        return data.taskDefinitions.get(this.definitionId)!;
     }
 }

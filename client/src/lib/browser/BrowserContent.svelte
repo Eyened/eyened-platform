@@ -1,27 +1,34 @@
 <script lang="ts">
-    import { data } from "$lib/datamodel/model";
     import InstancesTable from "./InstancesTable.svelte";
-    import Patient from "./Patient.svelte";
+    import type { Instance } from "$lib/datamodel/instance.svelte.ts";
+    import type { Patient } from "$lib/datamodel/patient.ts";
+    import PatientComponent from "./PatientComponent.svelte";
 
     interface Props {
+        instances: Instance[];
+        patients: Patient[];
         renderMode?: "studies" | "images";
         mode?: "full" | "overlay";
     }
 
-    let { renderMode = "studies", mode = "full" }: Props = $props();
-
-    const { instances, patients } = data;
+    let {
+        instances,
+        patients,
+        renderMode = "studies",
+        mode = "full",
+    }: Props = $props();
+    
 </script>
 
 {#if renderMode == "images"}
-    {#if $instances.length}
-        <InstancesTable instances={$instances} />
+    {#if instances.length}
+        <InstancesTable {instances} />
     {:else}
         <div class="no-content">No images found</div>
     {/if}
-{:else if $patients.length}
-    {#each $patients as patient}
-        <Patient {patient} {mode} />
+{:else if patients.length}
+    {#each patients as patient}
+        <PatientComponent {patient} {mode} />
     {/each}
 {:else}
     <div class="no-content">No studies found</div>

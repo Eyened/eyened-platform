@@ -16,6 +16,7 @@
     
     const globalContext = getContext<GlobalContext>("globalContext");
     const { creator } = globalContext;
+    const { instances, patients } = data;
     const initials = creator.name
         .split(" ")
         .map((name) => name[0])
@@ -27,6 +28,8 @@
     onMount(() => {
         browserContext.loadDataFromServer();
     });
+
+
 
     let renderMode = $state(true);
 
@@ -116,7 +119,11 @@
     </div>
 
     <div id="content">
-        <BrowserContent renderMode={renderMode ? "studies" : "images"} />
+        <BrowserContent
+            renderMode={renderMode ? "studies" : "images"}
+            instances={$instances}
+            patients={$patients}
+        />
     </div>
 
     <div id="selection">

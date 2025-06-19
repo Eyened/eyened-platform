@@ -19,12 +19,14 @@ from sqlalchemy import Column, select
 from sqlalchemy.orm import Session
 from sqlmodel import SQLModel, Field
 
+
 def PrivateField(**kwargs):
     field_info = Field(**kwargs)
     json_schema_extra = field_info.json_schema_extra or {}
     json_schema_extra["private"] = True
     field_info.json_schema_extra = json_schema_extra
     return field_info
+
 
 def create_patch_model(name: str, base_model: type[SQLModel]) -> type[SQLModel]:
     """Create a Pydantic model with all fields optional useful for patching"""
@@ -144,11 +146,13 @@ class Base(SQLModel):
         return session.scalar(stmt)
 
     @classmethod
-    def by_ids(cls: type[T], session: Session, ids: List[int]) -> List[T]:
-        """Get objects by single-column primary key."""
+    def by_ids(cls: Type[T], session: Session, ids: List[int]) -> List[T]:
+        """Fetch objects by single-column primary key."""
+        if not ids:
+            return []
         pk_col = cls.primary_key()
-        stmt = select(cls).where(pk_col.in_(ids))
-        return list(session.scalars(stmt).all())
+        stmt = select(cls).where(pk_col.in_(set(ids)))
+        return session.scalars(stmt).all()
 
     @classmethod
     def by_pk(cls: type[T], session: Session, pk: int | tuple) -> Optional[T]:
@@ -211,7 +215,9 @@ class Base(SQLModel):
         return {
             c.name: self.get_value(c)
             for c in self.columns()
-            if not (self.__class__.model_fields[c.name].json_schema_extra or {}).get("private", False)
+            if not (self.__class__.model_fields[c.name].json_schema_extra or {}).get(
+                "private", False
+            )
         }
 
     def to_list(self) -> List[Any]:

@@ -6,7 +6,7 @@
     import type { BrowserContext } from "./browserContext.svelte";
 
     const browserContext = getContext<BrowserContext>("browserContext");
-    const { images: instances } = data;
+    const { instances } = data;
 
     function clear() {
         browserContext.selection = [];

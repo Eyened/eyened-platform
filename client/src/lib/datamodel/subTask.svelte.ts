@@ -52,7 +52,7 @@ export class SubTask extends BaseItem {
     get instances(): FilterList<Instance> {
         return data.subTaskImageLinks
             .filter(link => link.subTaskId === this.id)
-            .map(link => data.instances.get(link.imageId)!);
+            .map(link => data.instances.get(link.instanceId)!);
     }
 }
 export interface ServerSubTaskImageLink {
@@ -64,7 +64,7 @@ export class SubTaskImageLink extends BaseLinkingItem {
     static parentResource = 'sub-tasks';
     static childResource = 'image-links';
     static parentIdField = 'subTaskId';
-    static childIdField = 'imageId';
+    static childIdField = 'instanceId';
 
     id!: string;
 
@@ -76,7 +76,7 @@ export class SubTaskImageLink extends BaseLinkingItem {
     get subTaskId(): number {
         return this.parentId;
     }
-    get imageId(): number {
+    get instanceId(): number {
         return this.childId;
     }
 

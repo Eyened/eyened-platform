@@ -57,7 +57,7 @@ export interface ServerInstance {
     ThumbnailPath?: string;
 }
 export class Instance extends BaseItem {
-    static endpoint = 'images';
+    static endpoint = 'instances';
     static mapping = {
         'SeriesID': 'seriesId',
         'DeviceInstanceID': 'deviceId',
@@ -111,6 +111,7 @@ export class Instance extends BaseItem {
     }
 
     init(item: ServerInstance) {
+
         this.id = item.ImageInstanceID;
         this.seriesId = item.SeriesID;
         this.deviceId = item.DeviceInstanceID;
@@ -143,11 +144,11 @@ export class Instance extends BaseItem {
     }
 
     get patient(): Patient {
-        return data.patients.get(this.series.study.patientId)!;
+        return data.patients.get(this.study.patientId)!;
     }
 
     get project(): Project {
-        return data.projects.get(this.series.study.patient.projectId)!;
+        return data.projects.get(this.patient.projectId)!;
     }
 
     get device(): Device {
@@ -164,9 +165,9 @@ export class Instance extends BaseItem {
 }
 
 export function getInstanceByDataSetIdentifier(datasetIdentifier: string): Instance | undefined {
-    return data.images.find(instance => instance.datasetIdentifier == datasetIdentifier);
+    return data.instances.find(instance => instance.datasetIdentifier == datasetIdentifier);
 }
 
 export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): Instance | undefined {
-    return data.images.find(instance => instance.SOPInstanceUid == SOPInstanceUid);
+    return data.instances.find(instance => instance.SOPInstanceUid == SOPInstanceUid);
 }

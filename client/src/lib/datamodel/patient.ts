@@ -1,6 +1,7 @@
 import { BaseItem, type FilterList } from "./itemList";
 import type { Study } from "./study";
 import { data } from "./model";
+import type { Instance } from "./instance.svelte";
 
 export interface ServerPatient {
     PatientID: number,
@@ -43,5 +44,9 @@ export class Patient extends BaseItem {
 
     get studies(): FilterList<Study> {
         return data.studies.filter(study => study.patientId == this.id);
+    }
+
+    get instances(): FilterList<Instance> {
+        return data.instances.filter(instance => instance.patient.id == this.id);
     }
 }

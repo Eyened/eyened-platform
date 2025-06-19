@@ -90,7 +90,7 @@ data.subTasks = data["sub-tasks"];
 data.subTaskImageLinks = data["sub-task-image-links"];
 
 export function clearData() {
-    data.images.clear();
+    data.instances.clear();
     data.series.clear();
     data.studies.clear();
     data.patients.clear();

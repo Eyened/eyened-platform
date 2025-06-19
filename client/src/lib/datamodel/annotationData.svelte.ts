@@ -20,6 +20,7 @@ export interface ServerAnnotationData {
 export class AnnotationData extends BaseItem {
     static endpoint = 'annotation-data';
     static mapping = {
+        AnnotationID: 'annotationId',
         ScanNr: 'scanNr',
         AnnotationPlane: 'annotationPlane',
         DateModified: 'modified',
@@ -36,7 +37,7 @@ export class AnnotationData extends BaseItem {
     datasetIdentifier!: string;
     valueFloat?: number;
     valueInt?: number;
-    value!: DataEndpoint<any>;
+    file!: DataEndpoint<any>;
 
     constructor(serverItem: ServerAnnotationData) {
         super();
@@ -52,7 +53,7 @@ export class AnnotationData extends BaseItem {
         this.datasetIdentifier = serverItem.DatasetIdentifier;
         this.valueFloat = serverItem.ValueFloat;
         this.valueInt = serverItem.ValueInt;
-        this.value = new DataEndpoint<any>(`${AnnotationData.endpoint}/${this.id}/value`);
+        this.file = new DataEndpoint<any>(`${AnnotationData.endpoint}/${this.id}/file`);
     }
 
     static createFrom(annotation: Annotation, scanNr: number, annotationPlane: string) {

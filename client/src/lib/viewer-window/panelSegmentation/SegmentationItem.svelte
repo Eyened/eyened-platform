@@ -72,7 +72,7 @@
 
     async function removeAnnotation() {
         const resolve = () => {
-            annotation.annotationData.forEach((annotationData) =>
+            annotation.annotationData.forEach$((annotationData) =>
                 annotationData.delete(false),
             );
             // remove from database on server
@@ -119,8 +119,8 @@
                 image,
             },
             (other: Annotation) => {
-                annotation.patch({
-                    AnnotationReferenceID: other.id,
+                annotation.update({
+                    annotationReferenceId: other.id,
                 });
             },
         );
@@ -143,6 +143,10 @@
                 );
             },
         );
+    }
+
+    function removeReference() {
+        annotation.update({ annotationReferenceId: null });
     }
 
     let notOnBscan = $derived.by(() => {
@@ -256,6 +260,14 @@
             >
                 <Intersection />
             </PanelIcon>
+            {#if annotation.annotationReferenceId}
+                <span
+                    class="reference-annotation"
+                    onclick={() => removeReference()}
+                >
+                    [{annotation.annotationReferenceId}]
+                </span>
+            {/if}
         </div>
         <div class="row">
             {#if segmentationItem && isEditable}
@@ -306,5 +318,13 @@
         font-size: x-small;
         align-items: end;
         flex: 0;
+    }
+    span.reference-annotation {
+        font-size: xx-small;
+        opacity: 0.5;
+        cursor: pointer;
+    }
+    span.reference-annotation:hover {
+        opacity: 1;
     }
 </style>
