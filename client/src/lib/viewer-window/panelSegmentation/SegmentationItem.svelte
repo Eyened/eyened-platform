@@ -176,6 +176,10 @@
         //     segmentation as BinarySegmentation,
         // );
     }
+
+    function toggleApplyMask() {
+        segmentationOverlay.toggleMasking(segmentationItem);
+    }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -269,6 +273,14 @@
                 </span>
             {/if}
         </div>
+        <div class="row">
+			{#if segmentationOverlay.applyMasking.has(segmentationItem)}
+				<PanelIcon onclick={toggleApplyMask} tooltip="Show"><Hide /></PanelIcon>
+			{:else}
+				<PanelIcon onclick={toggleApplyMask} tooltip="Hide"><Show /></PanelIcon>
+			{/if}
+			Apply masking
+		</div>
         <div class="row">
             {#if segmentationItem && isEditable}
                 <SegmentationTools {segmentationItem} />

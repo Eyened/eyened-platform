@@ -10,6 +10,11 @@ uniform uint u_bitmask;
 
 uniform usampler2D u_questionable_mask;
 uniform uint u_questionable_bitmask;
+uniform bool u_has_questionable_mask;
+
+uniform usampler2D u_mask;
+uniform uint u_mask_bitmask;
+uniform bool u_has_mask;
 
 uniform bool u_smooth;
 uniform bool u_outline;
@@ -62,20 +67,32 @@ float bilinear(usampler2D binary_mask, uint bitmask, vec2 pos) {
     return u;
 }
 
+bool getMask(usampler2D mask, uint bitmask, vec2 pos) {
+    if(u_smooth) {
+        return bilinear(mask, bitmask, pos) > 0.5f;
+    } else {
+        return (bitmask & texelFetch(mask, ivec2(pos), 0).r) > 0u;
+    }
+}
+
 void main() {
 
     color_out = vec4(0.0f);
 
     bool drawing;
     bool questionable;
+    bool mask;
     vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
-    if(u_smooth) {
-        drawing = bilinear(u_binary_mask, u_bitmask, p) > 0.5f;
-        questionable = bilinear(u_questionable_mask, u_questionable_bitmask, p) > 0.5f;
+    drawing = getMask(u_binary_mask, u_bitmask, p);
+    if(u_has_questionable_mask) {
+        questionable = getMask(u_questionable_mask, u_questionable_bitmask, p);
     } else {
-        ivec2 ipos = ivec2(p);
-        drawing = (u_bitmask & texelFetch(u_binary_mask, ipos, 0).r) > 0u;
-        questionable = (u_questionable_bitmask & texelFetch(u_questionable_mask, ipos, 0).r) > 0u;
+        questionable = false;
+    }
+
+    if(u_has_mask) {
+        mask = getMask(u_mask, u_mask_bitmask, p);
+        drawing = drawing && mask;
     }
 
     if(!(drawing || questionable)) {

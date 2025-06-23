@@ -11,6 +11,7 @@ import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { FilterList } from "$lib/datamodel/itemList";
+import { BinarySegmentation } from "$lib/webgl/segmentation";
 
 export class SegmentationOverlay implements Overlay {
 
@@ -90,6 +91,26 @@ export class SegmentationOverlay implements Overlay {
             for (const ad of annotation.annotationData.$) {
                 uniforms.u_threshold = ad.valueFloat ?? 0.5;
             }
+
+            const applyMask = this.applyMasking.has(segmentationItem);
+            uniforms.u_has_mask = false;
+            uniforms.u_mask = null;
+            uniforms.u_mask_bitmask = 0;
+            if (applyMask) {
+                const reference = annotation.annotationReference;
+                if (reference) {
+                    const referenceSegmentationItem = image.segmentationItems.get(reference);
+                    if (!referenceSegmentationItem) continue;
+                    const mask = referenceSegmentationItem.getSegmentation(index);                    
+                    if (mask instanceof BinarySegmentation) {
+                        uniforms.u_has_mask = true;
+                        uniforms.u_mask = mask.binaryMask.texture;
+                        uniforms.u_mask_bitmask = mask.binaryMask.bitmask;                        
+                    }
+                    
+                }
+            }
+
             segmentation.render(renderTarget, uniforms);
         }
     }

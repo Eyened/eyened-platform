@@ -11,14 +11,13 @@
         Undo,
         Redo,
     } from "../icons/icons";
-    import { ProbabilitySegmentation } from "$lib/webgl/probabilitySegmentation.svelte";
+    
     import Toggle from "$lib/Toggle.svelte";
     import BrushradiusControl from "./BrushradiusControl.svelte";
     import { PolygonTool } from "$lib/viewer/tools/Polygon";
     import { BrushTool } from "$lib/viewer/tools/Brush";
     import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte";
 
-    import { SegmentationContext } from "./segmentationContext.svelte";
     import { SegmentationItem } from "$lib/webgl/segmentationItem";
     import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
     import type { PaintSettings } from "$lib/webgl/segmentation";
