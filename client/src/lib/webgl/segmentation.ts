@@ -145,17 +145,21 @@ export class BinarySegmentation implements Segmentation {
         return this.binaryMask.bitmask;
     }
 
-    render(renderTarget: RenderTarget, uniforms: any): void {
-        uniforms = {
+    protected getUniforms(uniforms: any): any {
+        
+        return {
             ...uniforms,
+            u_binary_mask: this.texture,
             u_bitmask: this.bitmask,
-            u_binary_mask: this.texture
+            
+            u_questionable_mask: this.texture,
+            u_questionable_bitmask: 0,
+            u_has_questionable_mask: false,
         }
-        // pass 
-        uniforms.u_questionable_mask = this.texture;
-        uniforms.u_questionable_bitmask = 0;
-        this.shaders.renderBinary.pass(renderTarget, uniforms);
+    }
 
+    render(renderTarget: RenderTarget, uniforms: any): void {
+        this.shaders.renderBinary.pass(renderTarget, this.getUniforms(uniforms));
     }
 }
 
@@ -234,16 +238,14 @@ export class QuestionableSegmentation extends BinarySegmentation {
         this.questionableMask.dispose();
     }
 
-    render(renderTarget: RenderTarget, uniforms: any): void {
-        uniforms = {
-            ...uniforms,
-            u_bitmask: this.bitmask,
-            u_binary_mask: this.texture,
-            u_questionable_mask: this.questionableMask.texture,
-            u_questionable_bitmask: this.questionableMask.bitmask
-        }
-        this.shaders.renderBinary.pass(renderTarget, uniforms);
 
+    protected getUniforms(uniforms: any): any {
+        return {    
+            ...super.getUniforms(uniforms),
+            u_questionable_mask: this.questionableMask.texture,
+            u_questionable_bitmask: this.questionableMask.bitmask,
+            u_has_questionable_mask: true            
+        }
     }
 }
 

@@ -1,9 +1,9 @@
 <script lang="ts">
     import type { Creator } from "$lib/datamodel/creator.svelte";
-    import SegmentationGroup from "./SegmentationGroup.svelte";
     import type { Annotation } from "$lib/datamodel/annotation.svelte";
     import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import SegmentationItem from "./SegmentationItem.svelte";
 
     interface Props {
         creator: Creator;
@@ -33,7 +33,7 @@
 
 {#each annotations as annotation (annotation.id)}
     <div class="item" class:hide={hideCreators.has(annotation.creator)}>
-        <SegmentationGroup {annotation} />
+        <SegmentationItem {annotation} />
     </div>
 {/each}
 

@@ -88,7 +88,7 @@ export class Annotation extends BaseItem {
         return data.features.get(this.featureId)!;
     }
     get instance(): Instance {
-        return data.images.get(this.instanceId!)!;
+        return data.instances.get(this.instanceId!)!;
     }
     get study(): Study {
         return data.studies.get(this.studyId!)!;
@@ -98,5 +98,9 @@ export class Annotation extends BaseItem {
     }
     get annotationData(): FilterList<AnnotationData> {
         return data.annotationData.filter(annotationData => annotationData.annotationId == this.id);
+    }
+    get annotationReference(): Annotation | undefined {
+        if (!this.annotationReferenceId) return undefined;
+        return data.annotations.get(this.annotationReferenceId);
     }
 }
