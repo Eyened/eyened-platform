@@ -1,11 +1,10 @@
-import type { Color } from "$lib/utils";
+import { toggleInSet, type Color } from "$lib/utils";
 import { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
-import { ConnectedComponentsOverlay } from "./ConnectedComponentsOverlay";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
@@ -17,32 +16,24 @@ export class SegmentationOverlay implements Overlay {
 
     private featureColors = new SvelteMap<Annotation, Color>();
 
-    public readonly connectedComponentsOverlay: ConnectedComponentsOverlay;
-
+    public readonly applyConnectedComponents = new SvelteSet<SegmentationItem>();
     public readonly applyMasking = new SvelteSet<SegmentationItem>();
     public readonly renderOutline = $state(false);
-    public readonly alpha = $state(0.8);
-    public readonly segmentationContext: SegmentationContext;
+    public readonly alpha = $state(1.0);
+    public readonly segmentationContext = new SegmentationContext();
     public readonly annotations: FilterList<Annotation>;
 
-    constructor(
-        private readonly viewerContext: ViewerContext,
-        private readonly globalContext: GlobalContext
-
-    ) {
-        this.segmentationContext = new SegmentationContext();
+    constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
         const image = viewerContext.image;
         this.annotations = image.segmentationAnnotations.filter(globalContext.annotationsFilter);
-
-        this.connectedComponentsOverlay = new ConnectedComponentsOverlay(viewerContext, this.segmentationContext);
     }
 
     toggleMasking(segmentation: SegmentationItem) {
-        if (this.applyMasking.has(segmentation)) {
-            this.applyMasking.delete(segmentation);
-        } else {
-            this.applyMasking.add(segmentation);
-        }
+        toggleInSet(this.applyMasking, segmentation);
+    }
+
+    toggleConnectedComponents(segmentationItem: SegmentationItem) {
+        toggleInSet(this.applyConnectedComponents, segmentationItem);
     }
 
     setFeatureColor(annotation: Annotation, color: Color) {
@@ -101,18 +92,20 @@ export class SegmentationOverlay implements Overlay {
                 if (reference) {
                     const referenceSegmentationItem = image.segmentationItems.get(reference);
                     if (!referenceSegmentationItem) continue;
-                    const mask = referenceSegmentationItem.getSegmentation(index);                    
+                    const mask = referenceSegmentationItem.getSegmentation(index);
                     if (mask instanceof BinarySegmentation) {
                         uniforms.u_has_mask = true;
                         uniforms.u_mask = mask.binaryMask.texture;
-                        uniforms.u_mask_bitmask = mask.binaryMask.bitmask;                        
+                        uniforms.u_mask_bitmask = mask.binaryMask.bitmask;
                     }
-                    
                 }
             }
 
-            segmentation.render(renderTarget, uniforms);
+            if (this.applyConnectedComponents.has(segmentationItem)) {
+                (segmentation as BinarySegmentation).renderConnectedComponents(renderTarget, uniforms);
+            } else {
+                segmentation.render(renderTarget, uniforms);
+            }
         }
     }
-
 }

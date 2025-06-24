@@ -5,6 +5,7 @@ import { SegmentationState } from "./segmentationState";
 import type { Segmentation, PaintSettings } from "./segmentation";
 import { DeferredMap } from "$lib/utils/deferred";
 import { AnnotationData } from "$lib/datamodel/annotationData.svelte";
+import { asyncReadable } from "$lib/utils";
 
 
 export class SegmentationItem {
@@ -64,19 +65,11 @@ export class SegmentationItem {
 
 
     canUndo(scanNr: number): Readable<boolean> {
-        return readable<boolean>(false, (set) => {
-            let unsub: Unsubscriber | undefined;
-            this.segmentations.get(scanNr).then(state => unsub = state.canUndo.subscribe(set));
-            return () => unsub?.();
-        });
+        return asyncReadable(this.segmentations.get(scanNr).then(state => state.canUndo), false);
     }
 
     canRedo(scanNr: number) {
-        return readable<boolean>(false, (set) => {
-            let unsub: Unsubscriber | undefined;
-            this.segmentations.get(scanNr).then(state => unsub = state.canRedo.subscribe(set));
-            return () => unsub?.();
-        });
+        return asyncReadable(this.segmentations.get(scanNr).then(state => state.canRedo), false);
     }
 
     async undo(scanNr: number) {
