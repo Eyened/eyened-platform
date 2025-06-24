@@ -117,8 +117,8 @@ export abstract class BaseItem {
         }
 
         const data = await response.json();
-        importData({ [this.endpoint]: [data] });
-        return response.status;
+        const imported = importData({ [this.endpoint]: [data] })
+        return imported[this.endpoint][0];        
     }
 
     async delete(fromServer: boolean = true) {

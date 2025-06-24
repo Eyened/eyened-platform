@@ -1,6 +1,8 @@
+import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
+import { colorsFlat } from "$lib/viewer/overlays/colors";
 import type { AbstractImage } from "./abstractImage";
 import type { Shaders } from "./shaders";
-import { TextureData, type BinaryMask, type ImageType, type TypedArray } from "./texture";
+import { createTextureR8UI, TextureData, type BinaryMask, type ImageType, type TypedArray } from "./texture";
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
 
@@ -62,11 +64,12 @@ export class BinarySegmentation implements Segmentation {
             u_import_channel: importOptions.channel
         };
         this.binaryMask.passShader(this.shaders.import, uniforms);
+        this.connectedComponentsValid = false;
     }
 
     /**
      * exports the binary mask to a canvas (attached to the context)
-     * writes white (255,255,255) for the values > 0, black (0,0,0) for the values == 0
+     * writes white (255,255,255,255) for values > 0, black (0,0,0,255) for background (values == 0)
      * @param ctx the context to export to
      */
     exportImage(ctx: CanvasRenderingContext2D): void {
@@ -93,6 +96,7 @@ export class BinarySegmentation implements Segmentation {
      */
     importData(data: TypedArray): void {
         this.binaryMask.setData(data);
+        this.connectedComponentsValid = false;
     }
 
     /**
@@ -110,6 +114,7 @@ export class BinarySegmentation implements Segmentation {
      */
     draw(drawing: ImageType, paintSettings: PaintSettings): void {
         this._drawMask(this.binaryMask, drawing, paintSettings);
+        this.connectedComponentsValid = false;
     }
 
     protected _drawMask(mask: BinaryMask, drawing: ImageType, paintSettings: PaintSettings): void {
@@ -146,12 +151,12 @@ export class BinarySegmentation implements Segmentation {
     }
 
     protected getUniforms(uniforms: any): any {
-        
+
         return {
             ...uniforms,
             u_binary_mask: this.texture,
             u_bitmask: this.bitmask,
-            
+
             u_questionable_mask: this.texture,
             u_questionable_bitmask: 0,
             u_has_questionable_mask: false,
@@ -160,6 +165,45 @@ export class BinarySegmentation implements Segmentation {
 
     render(renderTarget: RenderTarget, uniforms: any): void {
         this.shaders.renderBinary.pass(renderTarget, this.getUniforms(uniforms));
+    }
+
+
+    private connectedComponents: WebGLTexture | undefined;
+    private connectedComponentsValid: boolean = false;
+
+
+    computeConnectedComponents() {
+
+        const data = this.binaryMask.getData();
+        const { width, height } = this.image;
+        const label = BlobExtraction(data, width, height);
+        // label contains the connected components (0 = background, 1 = first component, 2 = second component, ...)
+
+        // upload to texture
+        const gl = this.webgl.gl;
+        gl.bindTexture(gl.TEXTURE_2D, this.connectedComponents!);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, width, height, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, label);
+
+        this.connectedComponentsValid = true;
+    }
+
+    getConnectedComponents(): WebGLTexture {
+        if (this.connectedComponents === undefined) {
+            this.connectedComponents = createTextureR8UI(this.webgl.gl, this.image.width, this.image.height);
+        }
+        if (this.connectedComponentsValid == false) {
+            this.computeConnectedComponents();
+        }
+        return this.connectedComponents;
+    }
+
+    renderConnectedComponents(renderTarget: RenderTarget, uniforms: any): void {
+        uniforms = {
+            ...uniforms,
+            u_annotation: this.getConnectedComponents(),
+            u_colors: colorsFlat
+        }
+        this.shaders.renderConnectedComponents.pass(renderTarget, uniforms);
     }
 }
 
@@ -190,6 +234,15 @@ export class QuestionableSegmentation extends BinarySegmentation {
         this.questionableMask.passShader(this.shaders.import, uniforms);
     }
 
+
+    /**
+    * exports the binary and questionable masks to a canvas (attached to the context)
+    * writes:
+    * - red (255,0,0,255) for values > 0 in the binary mask
+    * - green (0,255,0,255) for values > 0 in the questionable mask
+    * - black (0,0,0,255) for background (values == 0)
+    * @param ctx the context to export to
+    */
     exportImage(ctx: CanvasRenderingContext2D): void {
         const binaryData = this.binaryMask.getData();
         const questionableData = this.questionableMask.getData();
@@ -240,11 +293,11 @@ export class QuestionableSegmentation extends BinarySegmentation {
 
 
     protected getUniforms(uniforms: any): any {
-        return {    
+        return {
             ...super.getUniforms(uniforms),
             u_questionable_mask: this.questionableMask.texture,
             u_questionable_bitmask: this.questionableMask.bitmask,
-            u_has_questionable_mask: true            
+            u_has_questionable_mask: true
         }
     }
 }

@@ -41,7 +41,7 @@ function getSwapManager(gl: WebGL2RenderingContext): SwapTextureManager {
     return SwapTextureManager.instance;
 }
 
-function createTexture(gl: WebGL2RenderingContext, format: TextureFormat, width: number, height: number): WebGLTexture {
+export function createTexture(gl: WebGL2RenderingContext, format: TextureFormat, width: number, height: number): WebGLTexture {
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texStorage2D(gl.TEXTURE_2D, 1, format.internalFormat, width, height);
@@ -64,6 +64,16 @@ function createTextureIO(gl: WebGL2RenderingContext, width: number, height: numb
     return texture;
 }
 
+export function createTextureR8UI(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
+    const texture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, width, height, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return texture;
+}
 class SwapTextureManager {
     static instance: SwapTextureManager;
     private swapTextures: Map<string, SwapTexture> = new Map();

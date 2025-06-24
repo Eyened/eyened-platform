@@ -14,7 +14,7 @@
     import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
     import BscanLinks from "./BscanLinks.svelte";
     import ConnectedComponents from "../icons/ConnectedComponents.svelte";
-    import { type Annotation } from "$lib/datamodel/annotation.svelte";
+    import { Annotation } from "$lib/datamodel/annotation.svelte";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import {} from "./segmentationUtils";
     import { data } from "$lib/datamodel/model";
@@ -28,6 +28,7 @@
     import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
     import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import Page from "../../../routes/+page.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -102,12 +103,12 @@
             annotationType: rgMaskAnnotationType,
             creator,
         };
-        const newAnnotation = await data.annotations.create(item);
+        const newAnnotation = await Annotation.create(item);
+        
         const newSegmentationItem = image.getSegmentationItem(newAnnotation);
-
         const scanNr = viewerContext.index;
-        newSegmentationItem?.importOther(scanNr, segmentation!);
-
+        await newSegmentationItem.importOther(scanNr, segmentation!);
+        
         dialogueManager.hide();
     }
 
@@ -136,11 +137,15 @@
             (other: Annotation) => {
                 const otherSegmentation = image
                     .getSegmentationItem(other)
-                    ?.getSegmentation();
-                segmentationItem?.importOther(
-                    viewerContext.index,
-                    otherSegmentation,
-                );
+                    ?.getSegmentation(viewerContext.index);
+                if (otherSegmentation) {
+                    segmentationItem?.importOther(
+                        viewerContext.index,
+                        otherSegmentation,
+                    );
+                } else {
+                    console.warn("Import from other: no segmentation found for annotation", other.id);
+                }
             },
         );
     }
@@ -165,16 +170,9 @@
         }
     });
 
-    // const connectedComponentsOverlay =
-    //     segmentationOverlay.connectedComponentsOverlay;
-    // let connectedComponentsActive = $derived(
-    //     connectedComponentsOverlay.mode.has(segmentation),
-    // );
-    let connectedComponentsActive = false;
+    let connectedComponentsActive = $derived(segmentationOverlay.applyConnectedComponents.has(segmentationItem));
     function toggleConnectedComponents() {
-        // connectedComponentsOverlay.toggleMode(
-        //     segmentation as BinarySegmentation,
-        // );
+        segmentationOverlay.toggleConnectedComponents(segmentationItem);
     }
 
     function toggleApplyMask() {

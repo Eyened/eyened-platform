@@ -41,7 +41,7 @@ export class SegmentationState {
             // this.segmentation = new BinarySegmentation(image);
         }
 
-        this.initialize();
+        this.isDrawing = this.initialize();
     }
 
     private async initialize() {
@@ -55,7 +55,8 @@ export class SegmentationState {
                 console.log(data);
                 throw new Error('Unsupported data type', data);
             }
-        }
+        } 
+        console.log('initialize', data);
         const ctx = this.image.getIOCtx();
         this.segmentation.exportImage(ctx);
         this.history.checkpoint(ctx.canvas.toDataURL());
@@ -63,17 +64,21 @@ export class SegmentationState {
 
     async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
         await this.isDrawing; // wait for previous drawing to finish
-
+        console.log('draw');
         this.segmentation.draw(drawing, settings);
         this.isDrawing = this.checkpoint();
     }
 
     importOther(other: Segmentation) {
-        this.segmentation.importOther(other);
+        const ctx = this.image.getIOCtx();
+        other.exportImage(ctx);
+        this.segmentation.importImage(ctx.canvas);
+        
         this.checkpoint();
     }
 
     async checkpoint() {
+        console.log('checkpoint');
         const dataURL = await updateServer(this.image, this.segmentation, this.annotationData);
         this.history.checkpoint(dataURL);
     }
