@@ -1,4 +1,6 @@
-import { BaseItem } from "./itemList";
+import type { Feature } from "./feature.svelte";
+import { BaseItem, BaseLinkingItem, FilterList } from "./itemList";
+import { data } from "./model";
 
 export type DataRepresentation = 'BINARY' | 'RG_MASK' | 'FLOAT' | 'MULTI_LABEL' | 'MULTI_CLASS';
 
@@ -13,10 +15,10 @@ export class AnnotationType extends BaseItem {
         'AnnotationTypeName': 'name',
         'DataRepresentation': 'dataRepresentation',
     };
-    static endpoint = 'annotationTypes';
+    static endpoint = 'annotation-types';
 
     id!: number;
-    name!: string;
+    name: string = $state("");
     dataRepresentation!: DataRepresentation;
 
     constructor(serverItem: ServerAnnotationType) {
@@ -29,6 +31,20 @@ export class AnnotationType extends BaseItem {
         this.name = serverItem.AnnotationTypeName;
         this.dataRepresentation = serverItem.DataRepresentation;
     }
+
+    get baseFeature(): Feature | undefined {
+        return data.annotationTypeFeatures
+            .filter(f => f.annotationTypeId == this.id)
+            .filter(f => f.featureIndex == -1)
+            .map(f => f.feature)
+            .first();
+    }
+
+    get annotatedFeatures(): FilterList<AnnotationTypeFeature> {
+        return data.annotationTypeFeatures
+            .filter(f => f.annotationTypeId == this.id)
+            .filter((f) => f.featureIndex >= 0);
+    }
 }
 
 export interface ServerAnnotationTypeFeature {
@@ -37,22 +53,26 @@ export interface ServerAnnotationTypeFeature {
     FeatureIndex: number;
 }
 
-export class AnnotationTypeFeature extends BaseItem {
+export class AnnotationTypeFeature extends BaseLinkingItem {
+    static endpoint = 'annotation-type-features';
+    static parentResource = 'annotation-types';
+    static childResource = 'features';
+    static parentIdField = 'annotationTypeId';
+    static childIdField = 'featureId';
     static mapping = {
         'AnnotationTypeID': 'annotationTypeId',
         'FeatureID': 'featureId',
-        'FeatureIndex': 'featureIndex',
+        'FeatureIndex': 'featureIndex'
     };
-    static endpoint = 'annotationTypeFeatures';
 
     id!: string;
+    featureIndex!: number;
     annotationTypeId!: number;
     featureId!: number;
-    featureIndex!: number;
 
-    constructor(serverItem: ServerAnnotationTypeFeature) {
-        super();
-        this.init(serverItem);
+    constructor(item: ServerAnnotationTypeFeature) {
+        super(item.AnnotationTypeID, item.FeatureID);
+        this.init(item);
     }
 
     init(serverItem: ServerAnnotationTypeFeature) {
@@ -61,4 +81,14 @@ export class AnnotationTypeFeature extends BaseItem {
         this.featureId = serverItem.FeatureID;
         this.featureIndex = serverItem.FeatureIndex;
     }
+
+    get feature(): Feature {
+        return data.features.get(this.featureId)!;
+    }
+
+    get annotationType(): AnnotationType {
+        return data.annotationTypes.get(this.annotationTypeId)!;
+    }
+
+
 }

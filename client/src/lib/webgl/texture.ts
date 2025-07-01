@@ -1,4 +1,5 @@
 import type { PixelShaderProgram } from "./FragmentShaderProgram";
+import type { DrawingArray } from "./segmentation";
 import type { RenderTarget } from "./types";
 
 export type TypedArray = Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
@@ -11,29 +12,50 @@ interface TextureFormat {
     filtering: number;
 }
 
-class SwapTexture {
-    constructor(
-        public readonly gl: WebGL2RenderingContext,
-        public texture: WebGLTexture,
-        public readonly framebuffer: WebGLFramebuffer,
-        public readonly key: string,
-        public readonly textureIO: WebGLTexture
-    ) { }
+interface SwapTexture {
+    gl: WebGL2RenderingContext;
+    texture: WebGLTexture;
+    framebuffer: WebGLFramebuffer;
+    key: string;
+}
+class SwapTextureManager {
+    static instance: SwapTextureManager;
+    private swapTextures: Map<string, SwapTexture> = new Map();
+    public readonly framebuffer: WebGLFramebuffer;
 
-    getTextureForImage(image: ImageType): WebGLTexture {
-        // upload canvas to texture
-        // reuse the same texture 
-        const gl = this.gl;
-        gl.bindTexture(gl.TEXTURE_2D, this.textureIO);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        return this.textureIO;
+    constructor(private gl: WebGL2RenderingContext) {
+        this.framebuffer = gl.createFramebuffer()!;
     }
 
-    setTexture(texture: WebGLTexture): void {
-        this.texture = texture;
+    private getTextureKey(format: TextureFormat, width: number, height: number): string {
+        return `${format.internalFormat}_${width}_${height}_${format.filtering}`;
     }
+
+    getSwapTexture(format: TextureFormat, width: number, height: number): SwapTexture {
+        const key = this.getTextureKey(format, width, height);
+        let swap = this.swapTextures.get(key);
+        if (!swap) {
+            const texture = createTexture(this.gl, format, width, height);
+            // const textureIO = createTextureIO(this.gl, width, height);
+            swap = { gl: this.gl, texture, framebuffer: this.framebuffer, key };
+            this.swapTextures.set(key, swap);
+        }
+        return swap;
+    }
+
 }
 
+let swapIOCache: WebGLTexture | undefined = undefined;
+
+export function imageToTexture(gl: WebGL2RenderingContext, image: ImageType): WebGLTexture {
+    let swapIO = swapIOCache;
+    if (!swapIO) {
+        swapIO = createTextureIO(gl, image.width, image.height);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, swapIO);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, image.width, image.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    return swapIO;
+}
 function getSwapManager(gl: WebGL2RenderingContext): SwapTextureManager {
     if (!SwapTextureManager.instance) {
         SwapTextureManager.instance = new SwapTextureManager(gl);
@@ -55,7 +77,6 @@ export function createTexture(gl: WebGL2RenderingContext, format: TextureFormat,
 function createTextureIO(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -74,32 +95,6 @@ export function createTextureR8UI(gl: WebGL2RenderingContext, width: number, hei
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return texture;
 }
-class SwapTextureManager {
-    static instance: SwapTextureManager;
-    private swapTextures: Map<string, SwapTexture> = new Map();
-    public readonly framebuffer: WebGLFramebuffer;
-
-    constructor(private gl: WebGL2RenderingContext) {
-        this.framebuffer = gl.createFramebuffer()!;
-    }
-
-    private getTextureKey(format: TextureFormat, width: number, height: number): string {
-        return `${format.internalFormat}_${width}_${height}_${format.filtering}`;
-    }
-
-    getSwapTexture(format: TextureFormat, width: number, height: number): SwapTexture {
-        const key = this.getTextureKey(format, width, height);
-        let swap = this.swapTextures.get(key);
-        if (!swap) {
-            const texture = createTexture(this.gl, format, width, height);
-            const textureIO = createTextureIO(this.gl, width, height);
-            swap = new SwapTexture(this.gl, texture, this.framebuffer, key, textureIO);
-            this.swapTextures.set(key, swap);
-        }
-        return swap;
-    }
-
-}
 
 const INT_FORMAT = {
     format: WebGL2RenderingContext.RED_INTEGER,
@@ -110,7 +105,7 @@ const FLOAT_FORMAT = {
     type: WebGL2RenderingContext.UNSIGNED_BYTE,
     filtering: WebGL2RenderingContext.LINEAR
 }
-const TEXTURE_FORMATS: Record<'R8' | 'R8UI' | 'R16UI' | 'R32UI', TextureFormat> = {
+const TEXTURE_FORMATS: Record<'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F', TextureFormat> = {
     // Used for probability maps
     R8: {
         ...FLOAT_FORMAT,
@@ -133,17 +128,22 @@ const TEXTURE_FORMATS: Record<'R8' | 'R8UI' | 'R16UI' | 'R32UI', TextureFormat> 
         ...INT_FORMAT,
         type: WebGL2RenderingContext.UNSIGNED_INT,
         internalFormat: WebGL2RenderingContext.R32UI
+    },
+    // Used for probability maps (higher precision alternative to R8)
+    R32F: {
+        ...FLOAT_FORMAT,
+        internalFormat: WebGL2RenderingContext.R32F
     }
 };
 
 export class TextureData {
     private _texture: WebGLTexture | null = null;
-    private cpuData: Uint8Array | Uint16Array | Uint32Array | null = null;
+    private cpuData: Uint8Array | Uint16Array | Uint32Array | Float32Array | null = null;
     private gpuDirty = false;
     private cpuDirty = false;
     textureFormat: TextureFormat;
     renderTarget: RenderTarget;
-    private arrayType: new (length: number) => Uint8Array | Uint16Array | Uint32Array;
+    private arrayType: new (length: number) => Uint8Array | Uint16Array | Uint32Array | Float32Array;
 
     constructor(
         private readonly gl: WebGL2RenderingContext,
@@ -156,8 +156,12 @@ export class TextureData {
             this.arrayType = Uint8Array;
         } else if (this.format === 'R16UI') {
             this.arrayType = Uint16Array;
-        } else {
+        } else if (this.format === 'R32UI') {
             this.arrayType = Uint32Array;
+        } else if (this.format === 'R32F') {
+            this.arrayType = Float32Array;
+        } else {
+            throw new Error(`Unsupported format: ${this.format}`);
         }
         this.renderTarget = {
             framebuffer: getSwapManager(gl).framebuffer,
@@ -176,7 +180,7 @@ export class TextureData {
         return this._texture;
     }
 
-    private _getData(): Uint8Array | Uint16Array | Uint32Array {
+    private _getData(): DrawingArray {
         if (!this.cpuData) {
             this.cpuData = new this.arrayType(this.width * this.height);
         }
@@ -211,12 +215,12 @@ export class TextureData {
         return this._getTexture();
     }
 
-    get data(): Uint8Array | Uint16Array | Uint32Array {
+    get data(): DrawingArray {
         this.updateCPU();
         return this._getData();
     }
 
-    uploadData(data: Uint8Array | Uint16Array | Uint32Array): void {
+    uploadData(data: DrawingArray): void {
         this._getData().set(data);
         this.gpuDirty = true;
         this.cpuDirty = false;
@@ -241,11 +245,12 @@ export class TextureData {
         // Execute the shader (renders to swap texture)
         shader.pass(this.renderTarget, uniforms);
 
-
-        // Swap textures (swap texture is now the current texture)
+        // Swap textures 
         const current = this._texture!;
+        // use swap texture as current texture
         this._texture = swap.texture;
-        swap.setTexture(current);
+        // update texture in swap so it can be reused
+        swap.texture = current;
 
         // Mark CPU data as dirty since GPU data has changed
         this.cpuDirty = true;
@@ -256,9 +261,12 @@ export class TextureData {
         this.cpuDirty = false;
     }
 
-    getTextureForImage(image: ImageType): WebGLTexture {
-        const swap = getSwapManager(this.gl).getSwapTexture(this.textureFormat, this.width, this.height);
-        return swap.getTextureForImage(image);
+    dispose(): void {
+        if (this._texture) {
+            this.gl.deleteTexture(this._texture);
+            this._texture = null;
+        }
+        this.cpuData = null;
     }
 }
 
@@ -289,12 +297,12 @@ export class BinaryMask {
         this.textureData.markGPUDirty();
     }
 
-    getData(): Uint8Array {
+    getData(value: number = 1): Uint8Array {
         const data = this.textureData.data;
         const result = new Uint8Array(data.length);
         for (let i = 0; i < data.length; i++) {
             if (data[i] & this.bitmask) {
-                result[i] = 255;
+                result[i] = value;
             } else {
                 result[i] = 0;
             }
@@ -318,9 +326,9 @@ export class BinaryMask {
         this.textureDataAllocation.freeMask(this);
     }
 
-    getTextureForImage(image: ImageType): WebGLTexture {
-        return this.textureData.getTextureForImage(image);
-    }
+    // getTextureForImage(image: ImageType): WebGLTexture {
+    //     return this.textureData.getTextureForImage(image);
+    // }
 }
 
 class TextureDataAllocation {

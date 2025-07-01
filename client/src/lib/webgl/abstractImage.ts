@@ -37,18 +37,6 @@ export abstract class AbstractImage {
     abstract is3D: boolean;
     abstract is2D: boolean;
 
-
-    get segmentationAnnotations(): FilterList<Annotation> {
-        const filter = (annotation: Annotation) => {
-            if (annotation.annotationType.name == 'R/G mask') {
-                return true;
-            }
-            return annotation.annotationType.name.includes("Segmentation");
-        }
-        return this.instance.annotations.filter(filter);
-    }
-
-
     getSegmentationItem(annotation: Annotation): SegmentationItem {
         // If the segmentationItem is already created, return it
         if (this.segmentationItems.has(annotation)) {

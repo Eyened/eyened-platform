@@ -1,4 +1,4 @@
-import type { DataRepresentation } from "$lib/datamodel/annotationType";
+import type { DataRepresentation } from "$lib/datamodel/annotationType.svelte";
 import type { PixelShaderProgram } from "./FragmentShaderProgram";
 import type { AbstractImage } from "./abstractImage";
 type TypedArray = Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;

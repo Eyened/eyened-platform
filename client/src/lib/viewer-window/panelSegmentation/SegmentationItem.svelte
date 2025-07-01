@@ -28,7 +28,7 @@
     import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
     import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import Page from "../../../routes/+page.svelte";
+    import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -48,8 +48,11 @@
     const { segmentationContext } = segmentationOverlay;
 
     const segmentationItem = image.getSegmentationItem(annotation);
+
     let segmentationState = $state<SegmentationState | undefined>(undefined);
     let segmentation = $derived(segmentationState?.segmentation);
+
+    let activeIndex = $state<number | number[]>(0);
 
     onMount(async () => {
         segmentationState = await segmentationItem.getSegmentationState(
@@ -100,15 +103,17 @@
 
         const item = {
             ...annotation,
-            annotationType: rgMaskAnnotationType,
-            creator,
+            annotationReferenceId: annotation.annotationReferenceId,
+            annotationTypeId: rgMaskAnnotationType!.id,
+            creatorId: creator.id,
         };
+
         const newAnnotation = await Annotation.create(item);
-        
+
         const newSegmentationItem = image.getSegmentationItem(newAnnotation);
         const scanNr = viewerContext.index;
         await newSegmentationItem.importOther(scanNr, segmentation!);
-        
+
         dialogueManager.hide();
     }
 
@@ -144,7 +149,10 @@
                         otherSegmentation,
                     );
                 } else {
-                    console.warn("Import from other: no segmentation found for annotation", other.id);
+                    console.warn(
+                        "Import from other: no segmentation found for annotation",
+                        other.id,
+                    );
                 }
             },
         );
@@ -170,7 +178,9 @@
         }
     });
 
-    let connectedComponentsActive = $derived(segmentationOverlay.applyConnectedComponents.has(segmentationItem));
+    let connectedComponentsActive = $derived(
+        segmentationOverlay.applyConnectedComponents.has(segmentationItem),
+    );
     function toggleConnectedComponents() {
         segmentationOverlay.toggleConnectedComponents(segmentationItem);
     }
@@ -182,7 +192,15 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="main" class:active class:notOnBscan>
+<div
+    class="main"
+    class:active
+    class:notOnBscan
+    onmouseenter={() =>
+        (segmentationOverlay.highlightedSegmentationItem = segmentationItem)}
+    onmouseleave={() =>
+        (segmentationOverlay.highlightedSegmentationItem = undefined)}
+>
     {#if active && image.is3D && annotationType.name != "Segmentation OCT Volume" && segmentation}
         <BscanLinks {annotation} {segmentation} />
     {/if}
@@ -193,23 +211,10 @@
 
         <div>
             {#if segmentationContext.hideAnnotations.has(annotation)}
-                <PanelIcon onclick={toggleShow} tooltip="Show">
-                    <Hide />
-                </PanelIcon>
+                <PanelIcon onclick={toggleShow} tooltip="Show" Icon={Hide} />
             {:else}
-                <PanelIcon onclick={toggleShow} tooltip="Hide">
-                    <Show />
-                </PanelIcon>
+                <PanelIcon onclick={toggleShow} tooltip="Hide" Icon={Show} />
             {/if}
-
-            <PanelIcon
-                active={connectedComponentsActive}
-                onclick={toggleConnectedComponents}
-                tooltip={(connectedComponentsActive ? "Hide" : "Show") +
-                    " connected components"}
-            >
-                <ConnectedComponents />
-            </PanelIcon>
         </div>
 
         <div class="expand" onclick={activate}>
@@ -220,13 +225,20 @@
         </div>
 
         {#if isEditable}
-            <PanelIcon onclick={removeAnnotation} tooltip="Delete">
-                <Trash />
-            </PanelIcon>
+            <PanelIcon
+                onclick={removeAnnotation}
+                tooltip="Delete"
+                Icon={Trash}
+            />
         {/if}
     </div>
 
     {#if active}
+        <div class="row">
+            {#if segmentationItem && isEditable}
+                <SegmentationTools {segmentationItem} {activeIndex} />
+            {/if}
+        </div>
         {#if segmentation instanceof ProbabilitySegmentation}
             <div class="row">
                 <ThresholdSlider {annotation} />
@@ -236,32 +248,33 @@
             <PanelIcon
                 onclick={() => duplicate("R/G mask")}
                 tooltip="Duplicate"
-            >
-                <Duplicate />
-            </PanelIcon>
+                Icon={Duplicate}
+            />
 
             {#if segmentation instanceof ProbabilitySegmentation}
                 <PanelIcon
                     onclick={() => duplicate("Probability")}
                     tooltip="Duplicate Probability"
-                >
-                    <Duplicate />
-                </PanelIcon>
+                    Icon={Duplicate}
+                />
             {/if}
             {#if isEditable}
                 <PanelIcon
                     onclick={importFromOther}
                     tooltip="Import from other"
-                >
-                    <ImportSegmentation />
-                </PanelIcon>
+                    Icon={ImportSegmentation}
+                />
             {/if}
-            <PanelIcon
-                onclick={setAnnotationReference}
-                tooltip="Choose reference mask"
-            >
-                <Intersection />
-            </PanelIcon>
+        </div>
+        <div class="row">
+            {#if !(annotation.annotationType.dataRepresentation == "MULTI_LABEL" || annotation.annotationType.dataRepresentation == "MULTI_CLASS")}
+                <PanelIcon
+                    onclick={setAnnotationReference}
+                    tooltip="Choose reference mask"
+                    Icon={Intersection}
+                />
+            {/if}
+
             {#if annotation.annotationReferenceId}
                 <span
                     class="reference-annotation"
@@ -269,21 +282,35 @@
                 >
                     [{annotation.annotationReferenceId}]
                 </span>
+                {#if segmentationOverlay.applyMasking.has(segmentationItem)}
+                    <PanelIcon
+                        onclick={toggleApplyMask}
+                        tooltip="Show"
+                        Icon={Hide}
+                    />
+                {:else}
+                    <PanelIcon
+                        onclick={toggleApplyMask}
+                        tooltip="Hide"
+                        Icon={Show}
+                    />
+                {/if}
             {/if}
         </div>
-        <div class="row">
-			{#if segmentationOverlay.applyMasking.has(segmentationItem)}
-				<PanelIcon onclick={toggleApplyMask} tooltip="Show"><Hide /></PanelIcon>
-			{:else}
-				<PanelIcon onclick={toggleApplyMask} tooltip="Hide"><Show /></PanelIcon>
-			{/if}
-			Apply masking
-		</div>
-        <div class="row">
-            {#if segmentationItem && isEditable}
-                <SegmentationTools {segmentationItem} />
-            {/if}
-        </div>
+        {#if segmentation instanceof BinarySegmentation}
+            <div class="row">
+                <PanelIcon
+                    active={connectedComponentsActive}
+                    onclick={toggleConnectedComponents}
+                    tooltip={(connectedComponentsActive ? "Hide" : "Show") +
+                        " connected components"}
+                    Icon={ConnectedComponents}
+                />
+            </div>
+        {/if}
+        {#if annotation.annotationType.dataRepresentation == "MULTI_LABEL" || annotation.annotationType.dataRepresentation == "MULTI_CLASS"}
+            <MultiFeatureSelector {annotation} bind:activeIndex />
+        {/if}
     {/if}
 </div>
 

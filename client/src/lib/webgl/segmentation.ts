@@ -1,10 +1,15 @@
+import type { AnnotationType } from "$lib/datamodel/annotationType.svelte";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
+import type { Position2D } from "$lib/types";
 import { colorsFlat } from "$lib/viewer/overlays/colors";
 import type { AbstractImage } from "./abstractImage";
+import type { TextureShaderProgram } from "./FragmentShaderProgram";
 import type { Shaders } from "./shaders";
-import { createTextureR8UI, TextureData, type BinaryMask, type ImageType, type TypedArray } from "./texture";
+import { imageToTexture, createTextureR8UI, TextureData, type BinaryMask, type ImageType, type TypedArray } from "./texture";
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
+
+export type DrawingArray = Uint8Array | Uint16Array | Uint32Array | Float32Array;
 
 export interface ImportOptions {
     threshold?: number;
@@ -15,28 +20,30 @@ export interface PaintSettings {
     paint?: boolean;
     dilateErode?: boolean;
     questionable?: boolean;
+    activeIndex?: number | number[];
 }
 
-export interface Segmentation {
-    importImage(image: ImageType, importOptions?: ImportOptions): void;
-    exportImage(ctx: CanvasRenderingContext2D): void;
-    importData(data: TypedArray): void;
-    exportData(): Uint8Array;
-    draw(drawing: ImageType, paintSettings: PaintSettings): void;
-    clear(): void;
-    dispose(): void;
-    render(renderTarget: RenderTarget, uniforms: any): void;
+export abstract class Segmentation {
+    constructor(
+        protected readonly image: AbstractImage
+    ) { }
+
+    abstract importData(data: ArrayBuffer): void;
+    abstract exportData(): DrawingArray;
+    abstract draw(drawing: ImageType, paintSettings: PaintSettings): void;
+    abstract clear(): void;
+    abstract dispose(): void;
+    abstract render(renderTarget: RenderTarget, uniforms: any): void;
 }
 
-export class BinarySegmentation implements Segmentation {
+export class BinarySegmentation extends Segmentation {
 
     protected _binaryMask: BinaryMask | null = null;
     protected webgl: WebGL;
     protected shaders: Shaders;
 
-    constructor(
-        protected readonly image: AbstractImage
-    ) {
+    constructor(image: AbstractImage) {
+        super(image);
         this.webgl = this.image.webgl;
         this.shaders = this.webgl.shaders;
     }
@@ -48,63 +55,18 @@ export class BinarySegmentation implements Segmentation {
         return this._binaryMask!;
     }
 
-    /**
-     * reads the channel of the canvas and sets the binary mask to the values > threshold     
-     * @param canvas the canvas to import from
-     * @param threshold in [0,1] (0-255 in the canvas)
-     * @param channel the channel to import from (r=0, g=1, b=2, a=3)
-     */
-    importImage(image: ImageType, importOptions: ImportOptions = { threshold: 0.5, channel: 0 }): void {
-        const canvas = new OffscreenCanvas(image.width, image.height);
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(image, 0, 0);
-        const uniforms = {
-            u_import: this.binaryMask.getTextureForImage(image),
-            u_threshold: importOptions.threshold,
-            u_import_channel: importOptions.channel
-        };
-        this.binaryMask.passShader(this.shaders.import, uniforms);
-        this.connectedComponentsValid = false;
-    }
-
-    /**
-     * exports the binary mask to a canvas (attached to the context)
-     * writes white (255,255,255,255) for values > 0, black (0,0,0,255) for background (values == 0)
-     * @param ctx the context to export to
-     */
-    exportImage(ctx: CanvasRenderingContext2D): void {
-        const data = this.binaryMask.getData();
-        const { width, height } = this.image;
-
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const dataOut = imageData.data;
-        for (let i = 0; i < width * height; i++) {
-            const dataOutIndex = 4 * i;
-            if (data[i] > 0) {
-                dataOut[dataOutIndex] = 255;
-                dataOut[dataOutIndex + 1] = 255;
-                dataOut[dataOutIndex + 2] = 255;
-            }
-            dataOut[dataOutIndex + 3] = 255;
-        }
-        ctx.putImageData(imageData, 0, 0);
-    }
-
-    /**
-     * imports the binary mask from a Uint8Array
-     * @param data the data to import from (values > 0 are considered as 1)
-     */
-    importData(data: TypedArray): void {
-        this.binaryMask.setData(data);
+    importData(data: ArrayBuffer): void {
+        const typedArray = new Uint8Array(data);
+        this.binaryMask.setData(typedArray);
         this.connectedComponentsValid = false;
     }
 
     /**
      * exports the binary mask to a Uint8Array
-     * @returns a Uint8Array with values == 255 for the values > 0 in the binary mask
+     * @returns a Uint8Array with 1 for foreground pixels and 0 for background pixels
      */
     exportData(): Uint8Array {
-        return this.binaryMask.getData();
+        return this.binaryMask.getData(1);
     }
 
     /**
@@ -119,8 +81,9 @@ export class BinarySegmentation implements Segmentation {
 
     protected _drawMask(mask: BinaryMask, drawing: ImageType, paintSettings: PaintSettings): void {
         const uniforms = {
-            u_drawing: mask.getTextureForImage(drawing),
-            u_paint: paintSettings.paint
+            u_drawing: imageToTexture(this.webgl.gl, drawing),
+            u_paint: paintSettings.paint,
+            u_mode: true // multi-label logic is used for binary masks
         };
         if (paintSettings.dilateErode) {
             mask.passShader(this.shaders.erodeDilate, uniforms);
@@ -128,16 +91,11 @@ export class BinarySegmentation implements Segmentation {
             mask.passShader(this.shaders.draw, uniforms);
         }
     }
-    /**
-     * clears the binary mask (sets all values to 0)
-     */
+
     clear(): void {
         this.binaryMask.clearData();
     }
 
-    /**
-     * disposes the binary mask (frees the memory)
-     */
     dispose(): void {
         this.binaryMask.dispose();
     }
@@ -150,7 +108,7 @@ export class BinarySegmentation implements Segmentation {
         return this.binaryMask.bitmask;
     }
 
-    protected getUniforms(uniforms: any): any {
+    protected getRenderUniforms(uniforms: any): any {
 
         return {
             ...uniforms,
@@ -164,7 +122,7 @@ export class BinarySegmentation implements Segmentation {
     }
 
     render(renderTarget: RenderTarget, uniforms: any): void {
-        this.shaders.renderBinary.pass(renderTarget, this.getUniforms(uniforms));
+        this.shaders.renderBinary.pass(renderTarget, this.getRenderUniforms(uniforms));
     }
 
 
@@ -173,7 +131,6 @@ export class BinarySegmentation implements Segmentation {
 
 
     computeConnectedComponents() {
-
         const data = this.binaryMask.getData();
         const { width, height } = this.image;
         const label = BlobExtraction(data, width, height);
@@ -221,55 +178,37 @@ export class QuestionableSegmentation extends BinarySegmentation {
         return this._questionableMask!;
     }
 
-    importImage(image: ImageType, importOptions: ImportOptions = { threshold: 0.5, channel: 0 }): void {
-        const uniforms = {
-            u_import: this.binaryMask.getTextureForImage(image),
-            u_threshold: importOptions.threshold,
-            u_import_channel: 0
-        };
-        // red channel to binary mask
-        this.binaryMask.passShader(this.shaders.import, uniforms);
-        // green channel to questionable mask
-        uniforms.u_import_channel = 1;
-        this.questionableMask.passShader(this.shaders.import, uniforms);
+    importData(data: ArrayBuffer): void {
+        const typedArray = new Uint8Array(data);
+        const b = new Uint8Array(this.image.width * this.image.height);
+        const q = new Uint8Array(this.image.width * this.image.height);
+        for (let i = 0; i < this.image.width * this.image.height; i++) {
+            b[i] = typedArray[i] & 1;
+            q[i] = (typedArray[i] >> 1) & 1;
+        }
+        this.binaryMask.setData(b);
+        this.questionableMask.setData(q);
     }
-
 
     /**
-    * exports the binary and questionable masks to a canvas (attached to the context)
-    * writes:
-    * - red (255,0,0,255) for values > 0 in the binary mask
-    * - green (0,255,0,255) for values > 0 in the questionable mask
-    * - black (0,0,0,255) for background (values == 0)
-    * @param ctx the context to export to
-    */
-    exportImage(ctx: CanvasRenderingContext2D): void {
-        const binaryData = this.binaryMask.getData();
-        const questionableData = this.questionableMask.getData();
-        const { width, height } = this.image;
-
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const dataOut = imageData.data;
-        for (let i = 0; i < width * height; i++) {
-            const dataOutIndex = 4 * i;
-            if (binaryData[i] > 0) {
-                dataOut[dataOutIndex] = 255;
+     * exports the questionable mask to a Uint8Array
+     * @returns a Uint8Array with bitmask 1 for annotated pixels, bitmask 2 (1<<1) for questionable pixels and 0 for background pixels
+     */
+    exportData(): Uint8Array {
+        const result = new Uint8Array(this.image.width * this.image.height);
+        const q = this.questionableMask.getData();
+        const b = this.binaryMask.getData();
+        for (let i = 0; i < this.image.width * this.image.height; i++) {
+            let bitmask = 0;
+            if (b[i] > 0) {
+                bitmask |= 1
             }
-            if (questionableData[i] > 0) {
-                dataOut[dataOutIndex + 1] = 255;
+            if (q[i] > 0) {
+                bitmask |= 1 << 1;
             }
-            dataOut[dataOutIndex + 2] = 0;
-            dataOut[dataOutIndex + 3] = 255;
+            result[i] = bitmask;
         }
-        ctx.putImageData(imageData, 0, 0);
-    }
-
-    importQuestionableData(data: TypedArray): void {
-        this.questionableMask.setData(data);
-    }
-
-    exportQuestionableData(): Uint8Array {
-        return this.questionableMask.getData();
+        return result;
     }
 
 
@@ -292,107 +231,178 @@ export class QuestionableSegmentation extends BinarySegmentation {
     }
 
 
-    protected getUniforms(uniforms: any): any {
+    protected getRenderUniforms(uniforms: any): any {
         return {
-            ...super.getUniforms(uniforms),
+            ...super.getRenderUniforms(uniforms),
             u_questionable_mask: this.questionableMask.texture,
             u_questionable_bitmask: this.questionableMask.bitmask,
             u_has_questionable_mask: true
         }
     }
 }
-
-export class ProbabilitySegmentation implements Segmentation {
-
-    protected _data: TextureData | null = null;
-
-    constructor(private readonly image: AbstractImage) {
-
+abstract class DataSegmentation extends Segmentation {
+    textureData: TextureData;
+    constructor(image: AbstractImage, readonly dataType: 'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F') {
+        super(image);
+        this.textureData = new TextureData(image.webgl.gl, image.width, image.height, dataType);
     }
 
-    get data(): TextureData {
-        if (!this._data) {
-            this._data = new TextureData(this.image.webgl.gl, this.image.width, this.image.height, 'R8');
+    importData(data: ArrayBuffer): void {
+        let typedArray: TypedArray;
+        if (this.dataType == 'R8' || this.dataType == 'R8UI') {
+            typedArray = new Uint8Array(data);
+        } else if (this.dataType == 'R16UI') {
+            typedArray = new Uint16Array(data);
+        } else if (this.dataType == 'R32UI') {
+            typedArray = new Uint32Array(data);
+        } else if (this.dataType == 'R32F') {
+            typedArray = new Float32Array(data);
+        } else {
+            throw new Error("DataSegmentation: invalid data type");
         }
-        return this._data!;
+        this.textureData.uploadData(typedArray);
     }
-
-
-    importImage(image: ImageType): void {
-        const uniforms = {
-            u_import: this.data.getTextureForImage(image)
-        };
-        this.data.passShader(this.image.webgl.shaders.importProbability, uniforms);
-    }
-
-    exportImage(ctx: CanvasRenderingContext2D): void {
-        const data = this.data.data;
-        const { width, height } = this.image;
-
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const dataOut = imageData.data;
-        for (let i = 0; i < width * height; i++) {
-            const value = data[i];
-            dataOut[4 * i] = value;
-            dataOut[4 * i + 1] = value;
-            dataOut[4 * i + 2] = value;
-            dataOut[4 * i + 3] = 255;
-        }
-        ctx.putImageData(imageData, 0, 0);
-    }
-    importData(data: TypedArray): void {
-        throw new Error("Method not implemented.");
-    }
-    exportData(): Uint8Array {
-        throw new Error("Method not implemented.");
-    }
-    draw(drawing: HTMLCanvasElement, paintSettings: PaintSettings): void {
-        throw new Error("Method not implemented.");
+    exportData(): DrawingArray {
+        return this.textureData.data;
     }
     clear(): void {
-        throw new Error("Method not implemented.");
+        this.textureData.clearData();
     }
     dispose(): void {
-        throw new Error("Method not implemented.");
+        this.textureData.dispose();
+    }
+}
+
+export class ProbabilitySegmentation extends DataSegmentation {
+
+    u_hard: boolean = true;
+    constructor(image: AbstractImage) {
+        super(image, 'R8');
+    }
+
+    drawEnhance(settings: {
+        brushRadius: number,
+        hardness: number,
+        pressure: number,
+        erase: boolean,
+        enhance: boolean,
+        point: Position2D
+    }): void {
+
+        const uniforms = {
+            u_current: this.textureData.texture,
+            u_position: [settings.point.x, settings.point.y],
+            u_enhance: settings.enhance,
+            u_radius: settings.brushRadius,
+            u_pressure: settings.pressure,
+            u_hardness: settings.hardness,
+            u_erase: settings.erase,
+        }
+        this.u_hard = false;
+        this.textureData.passShader(this.image.webgl.shaders.drawEnhance, uniforms);
+    }
+
+    draw(drawing: ImageType, paintSettings: PaintSettings): void {
+        // TODO: this is a hack to make the enhance tool work
+        if (!drawing) {            
+            this.u_hard = true;
+            return;
+        }
+        const uniforms = {
+            u_current: this.textureData.texture,
+            u_drawing: imageToTexture(this.image.webgl.gl, drawing),
+            u_paint: paintSettings.paint,
+            u_questionable: paintSettings.questionable            
+        };
+        this.textureData.passShader(this.image.webgl.shaders.drawHard, uniforms);
     }
 
     render(renderTarget: RenderTarget, uniforms: any): void {
         uniforms = {
             ...uniforms,
-            u_annotation: this.data.texture
+            u_annotation: this.textureData.texture,
+            u_hard: this.u_hard
         }
         this.image.webgl.shaders.renderProbability.pass(renderTarget, uniforms);
     }
 }
 
-export class MultiClassSegmentation implements Segmentation {
+abstract class BaseMultiSegmentation extends DataSegmentation {
 
-    constructor(private readonly image: AbstractImage) {
-
+    constructor(image: AbstractImage,
+        private readonly annotationType: AnnotationType,
+        dataType: 'R8UI' | 'R16UI' | 'R32UI') {
+        super(image, dataType);
     }
 
-    importImage(image: ImageType): void {
-        throw new Error("Method not implemented.");
-    }
-    exportImage(ctx: CanvasRenderingContext2D): void {
-        throw new Error("Method not implemented.");
-    }
-    importData(data: TypedArray): void {
-        throw new Error("Method not implemented.");
-    }
-    exportData(): Uint8Array {
-        throw new Error("Method not implemented.");
-    }
+
+
+    abstract getBitmask(activeIndex: number | number[]): number;
+    abstract getRenderShader(): TextureShaderProgram;
+
     draw(drawing: HTMLCanvasElement, paintSettings: PaintSettings): void {
-        throw new Error("Method not implemented.");
+        if (!paintSettings.activeIndex) {
+            console.warn("MultiLabelSegmentation: no active indices");
+            return;
+        }
+        const bitmask = this.getBitmask(paintSettings.activeIndex);
+        const uniforms = {
+            u_current: this.textureData.texture,
+            u_drawing: imageToTexture(this.image.webgl.gl, drawing),
+            u_paint: paintSettings.paint,
+            u_bitmask: bitmask,
+            u_mode: this.annotationType.dataRepresentation == 'MULTI_LABEL'
+        };
+        if (paintSettings.dilateErode) {
+            //TODO: implement erodeDilate for multi-label segmentation
+        } else {
+            this.textureData.passShader(this.image.webgl.shaders.draw, uniforms);
+        }
     }
+
     clear(): void {
-        throw new Error("Method not implemented.");
+        this.textureData.clearData();
     }
+
     dispose(): void {
-        throw new Error("Method not implemented.");
+        this.textureData.dispose();
     }
+
     render(renderTarget: RenderTarget, uniforms: any): void {
-        throw new Error("Method not implemented.");
+        uniforms = {
+            ...uniforms,
+            u_annotation: this.textureData.texture,
+            u_colors: colorsFlat,
+            u_boundaries: undefined
+        }
+        this.getRenderShader().pass(renderTarget, uniforms);
+    }
+}
+export class MultiClassSegmentation extends BaseMultiSegmentation {
+    constructor(image: AbstractImage, annotationType: AnnotationType, dataType: 'R8UI' | 'R16UI' | 'R32UI') {
+        super(image, annotationType, dataType);
+    }
+    getBitmask(activeIndex: number): number {
+        return activeIndex;
+    }
+    getRenderShader() {
+        return this.image.webgl.shaders.renderMultiClass;
+    }
+}
+
+export class MultiLabelSegmentation extends BaseMultiSegmentation {
+    constructor(image: AbstractImage, annotationType: AnnotationType, dataType: 'R8UI' | 'R16UI' | 'R32UI') {
+        super(image, annotationType, dataType);
+    }
+    getBitmask(activeIndices: number[]): number {
+        let bitmask = 0;
+        for (const i of activeIndices) {
+            bitmask |= 1 << (i - 1);
+        }
+        return bitmask;
+    }
+
+    getRenderShader() {
+        return this.image.webgl.shaders.renderMultiLabel;
     }
 }

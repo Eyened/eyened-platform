@@ -1,6 +1,6 @@
 import { Annotation } from "./annotation.svelte";
 import { AnnotationData } from "./annotationData.svelte";
-import { AnnotationType, AnnotationTypeFeature } from "./annotationType";
+import { AnnotationType, AnnotationTypeFeature } from "./annotationType.svelte";
 import { Contact } from "./contact.svelte";
 import { Creator } from "./creator.svelte";
 import { Device, DeviceModel } from "./device.svelte";

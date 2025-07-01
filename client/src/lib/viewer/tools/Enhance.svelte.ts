@@ -1,4 +1,4 @@
-import type { ProbabilitySegmentation } from "$lib/webgl/probabilitySegmentation.svelte";
+import type { ProbabilitySegmentation } from "$lib/webgl/segmentation";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { DrawingExecutor } from "./segmentation";
 import { BrushTool } from "./Brush";
@@ -27,7 +27,6 @@ export class EnhanceTool extends BrushTool {
     startDraw() {
 
         this.drawInterval = setInterval(() => {
-            const index = this.viewerContext.index;
             if (this.lastPosition) {
 
                 const settings = {
@@ -38,7 +37,7 @@ export class EnhanceTool extends BrushTool {
                     erase: this.mode === 'erase',
                     point: this.lastPosition
                 };
-                this.segmentation.drawEnhance(index, settings)
+                this.segmentation.drawEnhance(settings)
             }
         }, 1000 / 30); // 30 times per second
 
@@ -49,9 +48,8 @@ export class EnhanceTool extends BrushTool {
         if (this.drawInterval) {
             clearInterval(this.drawInterval);
             this.drawInterval = undefined;
-            const index = this.viewerContext.index;
-            this.segmentation.endDraw(index);
-            this.segmentationItem.checkpoint(index);
+            const scanNr = this.viewerContext.index;            
+            this.segmentationItem.draw(scanNr, null, {});
         }
     }
 

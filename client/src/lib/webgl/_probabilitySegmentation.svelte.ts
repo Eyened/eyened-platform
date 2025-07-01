@@ -4,10 +4,10 @@ import type { PixelShaderProgram } from "./FragmentShaderProgram";
 import type { AbstractImage } from "./abstractImage";
 
 import type { AnnotationData } from "$lib/datamodel/annotationData.svelte";
-import type { DataRepresentation } from "$lib/datamodel/annotationType";
+import type { DataRepresentation } from "$lib/datamodel/annotationType.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import type { Segmentation } from "./_SegmentationController";
-import { ProbabilityData, Uint8ArrayToCanvas } from "./segmentationData";
+import { ProbabilityData, Uint8ArrayToCanvas } from "./_segmentationData";
 
 export class ProbabilitySegmentation implements Segmentation {
 

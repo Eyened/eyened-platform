@@ -1,13 +1,13 @@
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
-import type { DataRepresentation } from "$lib/datamodel/annotationType";
+import type { DataRepresentation } from "$lib/datamodel/annotationType.svelte";
 import type { Feature } from "$lib/datamodel/feature.svelte";
 import { data } from "$lib/datamodel/model";
 
 import type { AbstractImage } from "./abstractImage";
 import { BaseSegmentation, type Segmentation } from "./baseSegmentation";
 import { LayerBoundaries } from "./layerBoundaries";
-import { CanvasToUint16Array, CanvasToUint8Array, MulticlassData, MultilabelData3D, MultilabelData2D, Uint16ArrayToCanvas, Uint8ArrayToCanvasGray as Uint8ArrayToCanvasGray } from "./segmentationData";
+import { CanvasToUint16Array, CanvasToUint8Array, MulticlassData, MultilabelData3D, MultilabelData2D, Uint16ArrayToCanvas, Uint8ArrayToCanvasGray as Uint8ArrayToCanvasGray } from "./_segmentationData";
 
 abstract class MultiBaseSegmentation extends BaseSegmentation {
 

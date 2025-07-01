@@ -64,12 +64,12 @@ export class LayerSegmentationOverlay implements Overlay {
 		};
 
 		if (this.segmentation instanceof MultilabelSegmentation) {
-			this.shaders.renderLayerBits.pass(renderTarget, uniforms);
+			this.shaders.renderMultiLabel.pass(renderTarget, uniforms);
 		} else {
 			if (this.segmentation.layerBoundaries) {
 				uniforms.u_boundaries = this.segmentation.layerBoundaries.texture;
 			}
-			this.shaders.renderLabelNumbers.pass(renderTarget, uniforms);
+			this.shaders.renderMultiClass.pass(renderTarget, uniforms);
 		}
 
 	}

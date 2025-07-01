@@ -14,7 +14,7 @@
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
     const {
-        image: { segmentationAnnotations },
+        image: { instance },
     } = viewerContext;
 
     const { creator } = globalContext;
@@ -28,12 +28,12 @@
 
     const { segmentationContext } = overlay;
 
-    
     const creatorSegmentations = overlay.annotations.groupBy((a) => a.creator);
 
     // hide all on load
-    for (const annotation of $segmentationAnnotations) {
-        segmentationContext.hideCreators.add(annotation.creator);
+    const segmentations = instance.annotations.filter(globalContext.annotationsFilter);
+    for (const annotation of $segmentations) {
+        // segmentationContext.hideCreators.add(annotation.creator);
     }
 
     const creatorSegmentationsSorted: Readable<[Creator, Annotation[]][]> =

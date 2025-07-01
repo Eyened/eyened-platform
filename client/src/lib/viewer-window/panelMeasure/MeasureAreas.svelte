@@ -6,6 +6,7 @@
 	import type { Creator } from '$lib/datamodel/creator.svelte';
 	import CreatorAreas from './CreatorAreas.svelte';
     import { BinarySegmentation, ProbabilitySegmentation } from '$lib/webgl/segmentation';
+    import { GlobalContext } from '$lib/data-loading/globalContext.svelte';
 
 	interface Props {
 		measureTool: MeasureTool;
@@ -15,12 +16,13 @@
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const { image } = viewerContext;
-	const { segmentationAnnotations } = image;
+	const globalContext = getContext<GlobalContext>('globalContext');
+	const segmentations = image.instance.annotations.filter(globalContext.annotationsFilter);
 
 	type row = [Annotation, number, number | undefined];
 	let all_areas: Map<Creator, row[]> = $derived.by(() => {
 		const areas = new Map<Creator, row[]>();
-		for (const annotation of $segmentationAnnotations) {
+		for (const annotation of $segmentations) {
 			if (annotation.annotationType.name !== 'Segmentation 2D') {
 				continue;
 			}

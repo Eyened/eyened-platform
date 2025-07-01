@@ -18,14 +18,17 @@ export class SegmentationOverlay implements Overlay {
 
     public readonly applyConnectedComponents = new SvelteSet<SegmentationItem>();
     public readonly applyMasking = new SvelteSet<SegmentationItem>();
-    public readonly renderOutline = $state(false);
-    public readonly alpha = $state(1.0);
+    public renderOutline = $state(false);
+    public alpha = $state(1.0);
+    public highlightedFeatureIndex = $state<number | undefined>(undefined);
+    public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
     public readonly segmentationContext = new SegmentationContext();
     public readonly annotations: FilterList<Annotation>;
 
     constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
         const image = viewerContext.image;
-        this.annotations = image.segmentationAnnotations.filter(globalContext.annotationsFilter);
+        const instance = image.instance;
+        this.annotations = instance.annotations.filter(globalContext.annotationsFilter);
     }
 
     toggleMasking(segmentation: SegmentationItem) {
@@ -66,6 +69,7 @@ export class SegmentationOverlay implements Overlay {
             u_alpha: this.alpha,
             u_smooth: true,
             u_outline: this.renderOutline
+            
         };
 
         for (const annotation of this.annotations.$) {
@@ -81,6 +85,11 @@ export class SegmentationOverlay implements Overlay {
 
             for (const ad of annotation.annotationData.$) {
                 uniforms.u_threshold = ad.valueFloat ?? 0.5;
+            }
+            if (this.highlightedSegmentationItem == segmentationItem) {
+                uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex;
+            } else {
+                uniforms.u_highlighted_feature_index = 0;
             }
 
             const applyMask = this.applyMasking.has(segmentationItem);

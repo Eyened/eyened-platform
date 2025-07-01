@@ -194,7 +194,7 @@ def init_annotation_types(session):
 def init_task_states(session):
     expected_states = [
         "Not started",
-        "In progress",
+        "Busy",
         "Ready",
     ]
 

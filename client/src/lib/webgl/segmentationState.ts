@@ -1,12 +1,13 @@
 import type { AnnotationData } from "$lib/datamodel/annotationData.svelte";
-import { NPYArray } from "$lib/utils/npy_loader";
+import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory";
-import { BinarySegmentation, MultiClassSegmentation, ProbabilitySegmentation, QuestionableSegmentation, type PaintSettings, type Segmentation } from "./segmentation";
+import { Base64Serializer } from "./imageEncoder";
+import { BinarySegmentation, MultiClassSegmentation, MultiLabelSegmentation, ProbabilitySegmentation, QuestionableSegmentation, type DrawingArray, type PaintSettings, type Segmentation } from "./segmentation";
 
 export class SegmentationState {
 
-    protected history: DrawingHistory;
+    protected history: DrawingHistory<string>;
     public readonly segmentation: Segmentation;
 
     private isDrawing = Promise.resolve();
@@ -15,32 +16,44 @@ export class SegmentationState {
         readonly image: AbstractImage,
         readonly annotationData: AnnotationData
     ) {
-        this.history = new DrawingHistory();
+
 
         const annotationType = annotationData.annotation.annotationType;
-        //TODO: use annotationType.dataRepresentation
-        const is_binary = annotationType.id == 13;
-        const is_rg_mask = annotationType.id == 2 || annotationType.name == 'R/G mask';
-        const is_float = annotationType.id == 14;
 
-        
-
-        if (is_binary) {
+        let dataType: 'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F' = 'R8UI';
+        if (annotationType.dataRepresentation == "BINARY" && annotationType.name == "Binary") {
             this.segmentation = new BinarySegmentation(image);
-        } else if (is_rg_mask) {
+            dataType = 'R8UI';
+        } else if (annotationType.dataRepresentation == "RG_MASK" && annotationType.name == "R/G mask") {
             this.segmentation = new QuestionableSegmentation(image);
-        } else if (is_float) {
+            dataType = 'R8UI';
+        } else if (annotationType.dataRepresentation == "FLOAT" && annotationType.name == "Probability") {
             this.segmentation = new ProbabilitySegmentation(image);
-        } else if (annotationType.id == 4) {
-            // layer segmentation
-            this.segmentation = new MultiClassSegmentation(image);
-        } else {
-            console.log(annotationType);
-            // throw new Error(`Unsupported data representation: ${annotationType.dataRepresentation}`);
-            console.log(`Unsupported data representation: ${annotationType.dataRepresentation}`);
-            // this.segmentation = new BinarySegmentation(image);
-        }
+            dataType = 'R8';
+        } else if (annotationType.dataRepresentation == "MULTI_CLASS" || annotationType.dataRepresentation == "MULTI_LABEL") {
+            // Note: we cannot add features to the annotationType dynamically (it's not responsive after this point)
+            const annotatedFeatures = annotationType.annotatedFeatures.$;
+            const nFeatures = annotatedFeatures.length;
+            if (nFeatures > 32) {
+                throw new Error("MultiLabelSegmentation: too many features");
+            }
+            if (nFeatures > 16) {
+                dataType = 'R32UI';
+            } else if (nFeatures > 8) {
+                dataType = 'R16UI';
+            } else {
+                dataType = 'R8UI';
+            }
+            if (annotationType.dataRepresentation == "MULTI_CLASS") {
+                this.segmentation = new MultiClassSegmentation(image, annotationType, dataType);
+            } else if (annotationType.dataRepresentation == "MULTI_LABEL") {
+                this.segmentation = new MultiLabelSegmentation(image, annotationType, dataType);
+            }
 
+        } else {
+            throw new Error(`Unsupported data representation: ${annotationType.dataRepresentation}`);
+        }
+        this.history = new DrawingHistory<string>(new Base64Serializer(dataType, image.width, image.height));
         this.isDrawing = this.initialize();
     }
 
@@ -48,39 +61,42 @@ export class SegmentationState {
         const data = await this.annotationData.file.load();
         if (data) {
             if (data instanceof NPYArray) {
-                this.segmentation.importData(data.data);
-            } else if (data instanceof HTMLCanvasElement || data instanceof ImageBitmap) {
-                this.segmentation.importImage(data);
+                this.segmentation.importData(data.data as DrawingArray);
+                // } else if (data instanceof HTMLCanvasElement || data instanceof ImageBitmap) {
+                //     this.segmentation.importImage(data);
+            } else if (data instanceof ArrayBuffer) {
+                this.segmentation.importData(data);
             } else {
                 console.log(data);
+                console.log(this.image.width, this.image.height);
                 throw new Error('Unsupported data type', data);
             }
-        } 
-        console.log('initialize', data);
+        }
         const ctx = this.image.getIOCtx();
-        this.segmentation.exportImage(ctx);
-        this.history.checkpoint(ctx.canvas.toDataURL());
+        // this.segmentation.exportImage(ctx);
+        // this.history.checkpoint(ctx.canvas.toDataURL());
+        this.history.checkpoint(this.segmentation.exportData());
     }
 
     async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
         await this.isDrawing; // wait for previous drawing to finish
-        console.log('draw');
         this.segmentation.draw(drawing, settings);
         this.isDrawing = this.checkpoint();
     }
 
     importOther(other: Segmentation) {
-        const ctx = this.image.getIOCtx();
-        other.exportImage(ctx);
-        this.segmentation.importImage(ctx.canvas);
-        
-        this.checkpoint();
+        console.warn('importOther is not implemented');
+        // const ctx = this.image.getIOCtx();
+        // other.exportImage(ctx);
+        // this.segmentation.importImage(ctx.canvas);
+
+        // this.checkpoint();
     }
 
     async checkpoint() {
-        console.log('checkpoint');
-        const dataURL = await updateServer(this.image, this.segmentation, this.annotationData);
-        this.history.checkpoint(dataURL);
+        const data = this.segmentation.exportData();
+        await updateServer(this.annotationData, data, this.image);
+        this.history.checkpoint(data);
     }
 
     get canUndo() {
@@ -92,20 +108,18 @@ export class SegmentationState {
     }
 
     async undo() {
-        const imageString = this.history.undo();
-        if (imageString) {
-            const image = await getImage(imageString);
-            this.segmentation.importImage(image);
-            await updateServer(this.image, this.segmentation, this.annotationData);
+        const data = await this.history.undo();
+        if (data) {
+            this.segmentation.importData(data);
+            await updateServer(this.annotationData, data, this.image);
         }
     }
 
     async redo() {
-        const imageString = this.history.redo();
-        if (imageString) {
-            const canvas = await getImage(imageString);
-            this.segmentation.importImage(canvas);
-            await updateServer(this.image, this.segmentation, this.annotationData);
+        const data = await this.history.redo();
+        if (data) {
+            this.segmentation.importData(data);
+            await updateServer(this.annotationData, data, this.image);
         }
     }
 
@@ -123,29 +137,33 @@ async function getImage(imageString: string): Promise<HTMLImageElement> {
     });
 }
 
-export async function updateServer(image: AbstractImage, segmentation: Segmentation, annotationData: AnnotationData): Promise<string> {
+// export async function updateServer(image: AbstractImage, segmentation: Segmentation, annotationData: AnnotationData, data: DrawingArray) {
 
 
-    const ctx = image.getDrawingCtx();
-    segmentation.exportImage(ctx);
-    ctx.canvas.toDataURL();
+//     const ctx = image.getDrawingCtx();
+//     segmentation.exportImage(ctx);
+//     ctx.canvas.toDataURL();
 
-    let serverValue;
-    switch (annotationData.annotation.annotationType.dataRepresentation) {
-        case 'BINARY':
-        case 'RG_MASK':
-        case 'FLOAT':
-            serverValue = ctx.canvas;
-            break;
-        case 'MULTI_LABEL':
-        case 'MULTI_CLASS':
-            console.log('TODO: implement!')
-            break;
-    }
-    const dataURL = ctx.canvas.toDataURL();
-    if (serverValue) {
-        await annotationData.file.update(serverValue);
-    }
+//     let serverValue;
+//     switch (annotationData.annotation.annotationType.dataRepresentation) {
+//         case 'BINARY':
+//         case 'RG_MASK':
+//         case 'FLOAT':
+//             serverValue = ctx.canvas;
+//             break;
+//         case 'MULTI_LABEL':
+//         case 'MULTI_CLASS':
+//             console.log('TODO: implement!')
+//             break;
+//     }
+//     const dataURL = ctx.canvas.toDataURL();
+//     if (serverValue) {
+//         await annotationData.file.update(serverValue);
+//     }
 
-    return dataURL;
+//     return dataURL;
+// }
+function updateServer(annotationData: AnnotationData, data: DrawingArray, image: AbstractImage) {
+    const npy = encodeNpy(data, [image.height, image.width]);
+    return annotationData.file.update(npy);
 }

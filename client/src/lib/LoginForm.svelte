@@ -1,5 +1,8 @@
 <script lang="ts">
-    import { globalContext } from "./main";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+
+    const globalContext = getContext<GlobalContext>("globalContext");
 
     let username = $state("");
     let password = $state("");
@@ -12,7 +15,11 @@
             return;
         }
         try {
-            await globalContext.userManager.login(username, password, rememberMe);
+            await globalContext.userManager.login(
+                username,
+                password,
+                rememberMe,
+            );
             error = null;
         } catch (err) {
             error =
@@ -39,11 +46,7 @@
                 bind:value={password}
             />
             <label for="rememberMe">Remember me:</label>
-            <input
-                type="checkbox"
-                id="rememberMe"
-                bind:checked={rememberMe}
-            />
+            <input type="checkbox" id="rememberMe" bind:checked={rememberMe} />
             {#if error}
                 <div class="error" style="grid-column: 1 / 3;">{error}</div>
             {/if}

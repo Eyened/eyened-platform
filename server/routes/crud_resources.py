@@ -1,14 +1,47 @@
-from eyened_orm import (Annotation, AnnotationBase, AnnotationType,
-                        AnnotationTypeBase, Contact, ContactBase, Creator,
-                        CreatorBase, DeviceInstance, DeviceInstanceBase,
-                        DeviceModel, DeviceModelBase, Feature, FeatureBase,
-                        FormAnnotation, FormAnnotationBase, FormSchema,
-                        FormSchemaBase, ImageInstance, ImageInstanceBase,
-                        Patient, PatientBase, Project, ProjectBase, Scan,
-                        ScanBase, Series, SeriesBase, Study, StudyBase,
-                        SubTask, SubTaskBase, SubTaskImageLink, Tag, TagBase,
-                        Task, TaskBase, TaskDefinition, TaskDefinitionBase,
-                        TaskState, TaskStateBase)
+from eyened_orm import (
+    Annotation,
+    AnnotationBase,
+    AnnotationType,
+    AnnotationTypeBase,
+    AnnotationTypeFeature,
+    Contact,
+    ContactBase,
+    Creator,
+    CreatorBase,
+    DeviceInstance,
+    DeviceInstanceBase,
+    DeviceModel,
+    DeviceModelBase,
+    Feature,
+    FeatureBase,
+    FormAnnotation,
+    FormAnnotationBase,
+    FormSchema,
+    FormSchemaBase,
+    ImageInstance,
+    ImageInstanceBase,
+    Patient,
+    PatientBase,
+    Project,
+    ProjectBase,
+    Scan,
+    ScanBase,
+    Series,
+    SeriesBase,
+    Study,
+    StudyBase,
+    SubTask,
+    SubTaskBase,
+    SubTaskImageLink,
+    Tag,
+    TagBase,
+    Task,
+    TaskBase,
+    TaskDefinition,
+    TaskDefinitionBase,
+    TaskState,
+    TaskStateBase,
+)
 from eyened_orm.base import create_patch_model
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import MultipleResultsFound, NoResultFound
@@ -145,8 +178,8 @@ def create_crud_routes(
     return router
 
 
-def create_linking_routes(model, parent, child_route, child):
-    model_resource, model_class = model
+def create_linking_routes(model_resource, model_class, parent, child_route, child):
+
     parent_resource, parent_class = parent
     child_resource, child_class = child
     parent_id_field = parent_class.__table__.primary_key.columns[0].name
@@ -166,8 +199,6 @@ def create_linking_routes(model, parent, child_route, child):
         )
         return query.all()
 
-    print("post", f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}")
-
     @router.post(
         f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}",
         response_model=dict,
@@ -176,11 +207,18 @@ def create_linking_routes(model, parent, child_route, child):
     async def create_item(
         parent_id: int,
         child_id: int,
+        item: model_class,
         db: Session = Depends(get_db),
         current_user: CurrentUser = Depends(get_current_user),
     ):
         """Create a new linking item."""
-        db_item = model_class(**{parent_id_field: parent_id, child_id_field: child_id})
+        db_item = model_class(
+            **{
+                parent_id_field: parent_id,
+                child_id_field: child_id,
+                **item.model_dump(),
+            }
+        )
         db.add(db_item)
         db.commit()
         db.refresh(db_item)
@@ -261,10 +299,19 @@ create_crud_routes(
 
 
 create_linking_routes(
-    ("sub-task-image-links", SubTaskImageLink),
+    "sub-task-image-links",
+    SubTaskImageLink,
     ("sub-tasks", SubTask),
     "image-links",
     ("instances", ImageInstance),
+)
+
+create_linking_routes(
+    "annotation-type-features",
+    AnnotationTypeFeature,
+    ("annotation-types", AnnotationType),
+    "features",
+    ("features", Feature),
 )
 
 

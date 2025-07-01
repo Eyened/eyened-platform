@@ -35,11 +35,11 @@
         );
         window.location.href = url.href;
     }
-    let newImageId: number | undefined = $state();
+    let newInstanceId: number | undefined = $state();
     function addImage() {
         SubTaskImageLink.create({
             subTaskId: subTask.id,
-            imageId: newImageId,
+            instanceId: newInstanceId,
         });
     }
 
@@ -79,8 +79,8 @@
             {/each}
         </div>
 
-        <input type="number" bind:value={newImageId} />
-        <button onclick={addImage} disabled={newImageId == undefined}>
+        <input type="number" bind:value={newInstanceId} />
+        <button onclick={addImage} disabled={newInstanceId == undefined}>
             Add image
         </button>
 

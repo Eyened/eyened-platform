@@ -65,7 +65,10 @@ export class SubTaskImageLink extends BaseLinkingItem {
     static childResource = 'image-links';
     static parentIdField = 'subTaskId';
     static childIdField = 'instanceId';
-
+    static mapping = {
+        'SubTaskID': 'subTaskId',
+        'ImageInstanceID': 'instanceId'
+    };
     id!: string;
 
     constructor(item: ServerSubTaskImageLink) {
