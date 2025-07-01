@@ -3,8 +3,8 @@ import { PixelShaderProgram, TextureShaderProgram, TextureShaderProgram3D } from
 import fs_render_features from '$lib/viewer/overlays/fs_render_features.frag';
 import fs_render_probability from '$lib/viewer/overlays/fs_render_probability.frag';
 import fs_render_connected_components from '$lib/viewer/overlays/fs_render_connected_components.frag';
-import fs_render_label_numbers from '$lib/viewer/overlays/fs_render_label_numbers.frag';
-import fs_render_layer_bits from '$lib/viewer/overlays/fs_render_layer_bits.frag';
+import fs_render_multi_class from '$lib/viewer/overlays/fs_render_multi_class.frag';
+import fs_render_multi_label from '$lib/viewer/overlays/fs_render_multi_label.frag';
 import fs_render_layers_enface from '$lib/viewer/overlays/fs_render_layers_enface.frag';
 import fs_render_binary from '$lib/viewer/overlays/fs_render_binary.frag';
 
@@ -31,8 +31,8 @@ export class Shaders {
     renderBinary: TextureShaderProgram;
     renderProbability: TextureShaderProgram;
     renderConnectedComponents: TextureShaderProgram;
-    renderLabelNumbers: TextureShaderProgram3D;
-    renderLayerBits: TextureShaderProgram3D;
+    renderMultiClass: TextureShaderProgram;
+    renderMultiLabel: TextureShaderProgram;
     renderLayersEnface: TextureShaderProgram;
     drawEnhance: PixelShaderProgram;
     drawHard: PixelShaderProgram;
@@ -53,8 +53,8 @@ export class Shaders {
         this.renderBinary = new TextureShaderProgram(webgl, fs_render_binary);
         this.renderProbability = new TextureShaderProgram(webgl, fs_render_probability);
         this.renderConnectedComponents = new TextureShaderProgram(webgl, fs_render_connected_components);
-        this.renderLabelNumbers = new TextureShaderProgram3D(webgl, fs_render_label_numbers);
-        this.renderLayerBits = new TextureShaderProgram3D(webgl, fs_render_layer_bits);
+        this.renderMultiClass = new TextureShaderProgram(webgl, fs_render_multi_class);
+        this.renderMultiLabel = new TextureShaderProgram(webgl, fs_render_multi_label);
         this.renderLayersEnface = new TextureShaderProgram3D(webgl, fs_render_layers_enface);
 
         this.drawEnhance = new PixelShaderProgram(webgl, fs_draw_enhance);

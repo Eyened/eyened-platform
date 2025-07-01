@@ -35,8 +35,8 @@ export class AnnotationData extends BaseItem {
     annotationPlane!: AnnotationPlane;
     modified!: Date;
     datasetIdentifier!: string;
-    valueFloat?: number;
-    valueInt?: number;
+    valueFloat?: number = $state(undefined);
+    valueInt?: number = $state(undefined);
     file!: DataEndpoint<any>;
 
     constructor(serverItem: ServerAnnotationData) {
@@ -68,53 +68,3 @@ export class AnnotationData extends BaseItem {
         return data.annotations.get(this.annotationId)!;
     }
 }
-
-// export interface AnnotationData extends Item {
-//     id: string,
-//     annotation: Annotation,
-//     annotationType: AnnotationType,
-//     feature: Feature,
-//     scanNr: number,
-//     annotationPlane: AnnotationPlane,    
-//     modified?: Date,
-//     filename: string,
-//     value: ServerProperty<any>,
-
-//     parameters: ServerProperty<{
-//         valuefloat?: number,
-//         valueint?: number
-//     }>
-// }
-// interface AnnotationDataParameters {
-//     valuefloat?: number,
-//     valueint?: number
-// }
-
-// const parameters: ItemMapping<any> = {
-//     toValue: (params: any) => {
-//         const endpoint = `annotation-data/${params.AnnotationID}_${params.ScanNr}/parameters`;
-//         const initialValue = {
-//             valuefloat: params.ValueFloat,
-//             valueint: params.ValueInt
-//         };
-//         return new WriteOnlyServerProperty<AnnotationDataParameters>({ endpoint, initialValue });
-//     },
-//     toParam: (params: any, value: WriteOnlyServerProperty<AnnotationDataParameters>) => {
-//         params.valueFloat = value.value?.valuefloat;
-//         params.valueInt = value.value?.valueint;
-//     }
-// }
-
-// const value = ServerPropertyMapping(null, params => `annotation-data/${params.AnnotationID}_${params.ScanNr}/file`, false);
-// export const AnnotationDataConstructor = new ItemConstructor<AnnotationData>(
-//     (params: any) => `${params.AnnotationID}_${params.ScanNr}`, {
-//     annotation: FKMapping('AnnotationID', 'annotations'),
-//     annotationType: PropertyChain(['annotation', 'annotationType']),
-//     feature: PropertyChain(['annotation', 'feature']),
-//     scanNr: 'ScanNr',
-//     annotationPlane: 'AnnotationPlane',
-//     modified: 'DateModified',
-//     filename: 'DatasetIdentifier',
-//     value,
-//     parameters
-// });

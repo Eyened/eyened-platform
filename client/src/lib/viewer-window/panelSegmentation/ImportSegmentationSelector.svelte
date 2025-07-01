@@ -10,7 +10,7 @@
     }
 
     let { image, annotation, resolve, reject }: Props = $props();
-    const segmentationAnnotations = image.segmentationAnnotations;
+    const segmentationAnnotations = image.instance.annotations;
     const referenceAnnotations = segmentationAnnotations.filter(
         (a) => a.id != annotation.id,
     );

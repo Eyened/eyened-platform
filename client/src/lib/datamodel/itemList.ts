@@ -57,12 +57,9 @@ export abstract class BaseItem {
     abstract init(serverItem: any): void;
 
     async update(item: any) {
-        console.log('update', item);
         const updateParams: any = {};
-        for (const key in item) {
-            console.log('key', key);
+        for (const key in item) {            
             if (key in this) {
-                console.log('key in this', key);
                 if (isStateProperty(this, key)) {
                     updateParams[key] = item[key];
                 } else {
@@ -118,7 +115,7 @@ export abstract class BaseItem {
 
         const data = await response.json();
         const imported = importData({ [this.endpoint]: [data] })
-        return imported[this.endpoint][0];        
+        return imported[this.endpoint][0];
     }
 
     async delete(fromServer: boolean = true) {
@@ -139,6 +136,7 @@ interface BaseLinkingItemConstructor {
     parentIdField: string;
     childIdField: string;
     endpoint: string;
+    mapping: MappingDefinition;
 }
 export abstract class BaseLinkingItem implements Item {
     abstract id: string;
@@ -148,6 +146,7 @@ export abstract class BaseLinkingItem implements Item {
     static childResource: string;
     static parentIdField: string;
     static childIdField: string;
+    static mapping: MappingDefinition;
 
     get endpoint(): string {
         return (this.constructor as BaseLinkingItemConstructor).endpoint;
@@ -164,25 +163,37 @@ export abstract class BaseLinkingItem implements Item {
     get childIdField(): string {
         return (this.constructor as BaseLinkingItemConstructor).childIdField;
     }
-
+    get mapping(): MappingDefinition {
+        return (this.constructor as BaseLinkingItemConstructor).mapping;
+    }
     constructor(
         public readonly parentId: number,
         public readonly childId: number) {
     }
 
     static async create(item: any) {
+        const serverParams = toServer(item, this.mapping);
         const parentId = item[this.parentIdField];
         const childId = item[this.childIdField];
         const url = `${apiUrl}/${this.parentResource}/${parentId}/${this.childResource}/${childId}`;
-        const response = await fetch(url, { method: 'POST' });
+        const response = await fetch(url,
+            {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(serverParams)
+            }
+        );
 
         if (!response.ok) {
             throw new Error(`Failed to create ${url}: ${response.statusText}`);
         }
-
         const data = await response.json();
-        importData(data);
-        return response.status;
+        const imported = importData(data);
+        return imported[this.endpoint][0];
+
     }
 
     async delete(fromServer: boolean = true) {

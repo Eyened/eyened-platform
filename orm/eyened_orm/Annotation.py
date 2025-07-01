@@ -371,15 +371,15 @@ def receive_after_commit(session):
 class DataRepresentation(Enum):
     # Grayscale PNG (when stored as RGB/RGBA, the red channel is read)
     # 0 = background, >0 = foreground
-    BINARY = "binary"
+    BINARY = "BINARY"
 
     # Two-channel binary mask stored in R and G:
     # R = annotation, G = uncertain/questionable region
-    RG_MASK = "rg_mask"
+    RG_MASK = "RG_MASK"
 
     # Per-pixel float mask (e.g., soft segmentation, probability map)
     # If stored as 8-bit unsigned integers (0–255) scaled to [0.0–1.0]
-    FLOAT = "float"
+    FLOAT = "FLOAT"
 
     # Multi-label segmentation — each bit in an integer represents a label.
     # For example:
@@ -388,7 +388,7 @@ class DataRepresentation(Enum):
     #   0x02 => 00000010 => feature 2 present
     #   0x04 => 00000100 => feature 3 present
     #   0x03 => 00000011 => feature 1 + feature 2 present
-    MULTI_LABEL = "multi_label"
+    MULTI_LABEL = "MULTI_LABEL"
 
     # Multi-class segmentation — each voxel/pixel is assigned exactly one class.
     # For example:
@@ -397,7 +397,7 @@ class DataRepresentation(Enum):
     #   2 = GCL
     #   3 = IPL
     #   ...
-    MULTI_CLASS = "multi_class"
+    MULTI_CLASS = "MULTI_CLASS"
 
 
 class AnnotationTypeBase(Base):

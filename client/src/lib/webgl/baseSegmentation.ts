@@ -1,6 +1,6 @@
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
-import type { DataRepresentation } from "$lib/datamodel/annotationType";
+import type { DataRepresentation } from "$lib/datamodel/annotationType.svelte";
 import type { AbstractImage } from "./abstractImage";
 import type { Shaders } from "./shaders";
 import type { WebGL } from "./webgl";

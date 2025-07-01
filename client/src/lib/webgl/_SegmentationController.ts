@@ -1,13 +1,13 @@
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
-import type { DataRepresentation } from "$lib/datamodel/annotationType";
+import type { DataRepresentation } from "$lib/datamodel/annotationType.svelte";
 import type { Branch } from "$lib/types";
 import type { AbstractImage } from "./abstractImage";
 import type { Segmentation } from "./baseSegmentation";
 import { BinarySegmentation, MaskedSegmentation } from "./binarySegmentation";
 import { MulticlassSegmentation, MultilabelSegmentation } from "./layerSegmentation";
 import { ProbabilitySegmentation } from "./probabilitySegmentation.svelte";
-import { SharedData } from "./segmentationData";
+import { SharedData } from "./_segmentationData";
 import { SegmentationItem } from "./segmentationItem";
 
 

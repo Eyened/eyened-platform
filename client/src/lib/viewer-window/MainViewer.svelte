@@ -17,6 +17,7 @@
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import MainIcon from "./icons/MainIcon.svelte";
     import PanelHeader from "./PanelHeader.svelte";
+
     import {
         Close,
         Info,
@@ -49,11 +50,7 @@
     setContext("viewerContext", viewerContext);
 
     const { activePanels } = viewerContext;
-    const params = get_url_params();
-
-    if (params["panel"]) {
-        activePanels.add(params["panel"] as PanelName);
-    }
+    activePanels.add("Segmentation");
 
     const dialogue = writable<DialogueType>(undefined);
     setContext("dialogue", dialogue);
@@ -100,11 +97,11 @@
     )!;
 
     const panels = [
-        { name: "Info" as PanelName, component: PanelInfo, icon: Info },
+        { name: "Info" as PanelName, component: PanelInfo, Icon: Info },
         {
             name: "Rendering" as PanelName,
             component: PanelRendering,
-            icon: Rendering,
+            Icon: Rendering,
         },
     ];
 
@@ -112,7 +109,7 @@
         panels.push({
             name: "ETDRS" as PanelName,
             component: PanelETDRS,
-            icon: ETDRS,
+            Icon: ETDRS,
             props: { etdrsSchema, active: false },
         });
     }
@@ -121,7 +118,7 @@
         panels.push({
             name: "Registration" as PanelName,
             component: PanelRegistration,
-            icon: Registration,
+            Icon: Registration,
             props: { registrationSchema, active: false },
         });
     }
@@ -130,21 +127,21 @@
         {
             name: "Measure" as PanelName,
             component: PanelMeasure,
-            icon: Measure,
+            Icon: Measure,
             props: { active: false },
         },
-        { name: "Form" as PanelName, component: PanelForm, icon: Form },
+        { name: "Form" as PanelName, component: PanelForm, Icon: Form },
         {
             name: "Segmentation" as PanelName,
             component: PanelSegmentation,
-            icon: Draw,
+            Icon: Draw,
         },
     );
     if (image.is3D) {
         panels.push({
             name: "LayerSegmentation" as PanelName,
             component: PanelLayers,
-            icon: Layers,
+            Icon: Layers,
         });
     }
 </script>
@@ -157,6 +154,8 @@
     </div>
     <div id="right">
         <div id="close" class:vertical={minimize}>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <span
                 class="image-id"
                 onclick={() => (minimize = !minimize)}
@@ -165,15 +164,11 @@
                 &#9660; [{image.image_id}]
             </span>
 
-            <MainIcon onclick={closePanel} tooltip="Close">
-                {#snippet icon()}
-                    <Close />
-                {/snippet}
-            </MainIcon>
+            <MainIcon onclick={closePanel} tooltip="Close" Icon={Close} />
 
             {#if minimize}
-                <MainIcon onclick={() => (minimize = false)} tooltip="Close">
-                    {#snippet icon()}
+                <MainIcon onclick={() => (minimize = false)} tooltip="minimize">
+                    {#snippet iconSnippet()}
                         <span class="dots">&#8942;</span>
                     {/snippet}
                 </MainIcon>
@@ -181,12 +176,8 @@
         </div>
 
         <div id="panels" class:minimize>
-            {#each panels as { name, component: Component, icon: Icon, props = { } }}
-                <PanelHeader text={name} panelName={name}>
-                    {#snippet icon()}
-                        <Icon />
-                    {/snippet}
-                </PanelHeader>
+            {#each panels as { name, component: Component, Icon, props = { } }}
+                <PanelHeader text={name} panelName={name} {Icon} />
                 <div
                     class="panel {activePanels.has(name)
                         ? 'expanded'

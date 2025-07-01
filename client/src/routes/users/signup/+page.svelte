@@ -1,5 +1,8 @@
 <script lang="ts">
-    import { globalContext } from "$lib/main";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+
+    const globalContext = getContext<GlobalContext>("globalContext");
 
     const userManager = globalContext.userManager;
 

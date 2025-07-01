@@ -8,7 +8,7 @@
     import { featureSetColorFundus, featureSetOCT } from "$lib/viewer-config";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
-    import type { AnnotationType } from "$lib/datamodel/annotationType";
+    import type { AnnotationType } from "$lib/datamodel/annotationType.svelte";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { Annotation } from "$lib/datamodel/annotation.svelte";
 
@@ -21,7 +21,8 @@
     const segmentationContext = segmentationOverlay.segmentationContext;
     const { annotationTypes, features, annotationTypeFeatures } = data;
 
-    const annotationType = annotationTypes.find((t) => t.name == "R/G mask")!;
+    const rgAnnotationType = annotationTypes.find((t) => t.name == "R/G mask")!;
+    const probabilityAnnotationType = annotationTypes.find((t) => t.name == "Probability")!;
 
     const dialogue = getContext<Writable<DialogueType>>("dialogue");
 
@@ -29,7 +30,7 @@
 
     async function create(feature: Feature, annotationType: AnnotationType) {
         dialogue.set(`Creating annotation...`);
-
+        console.log(feature, annotationType);
         const annotation = await Annotation.createFrom(
             image.instance,
             feature,
@@ -60,25 +61,29 @@
     const availableFeatures = features.filter((f) => {
         // TODO: filter features that are not available for the current image?
         return true;
-    }).$;
+    });
 
-    const multiLabelAnnotationTypeFeatures = annotationTypeFeatures.filter(
-        (f) => {
-            return (
-                f.feature_index == -1 &&
-                f.annotationType.dataRepresentation == "MULTI_LABEL"
-            );
-        },
-    ).$;
-    const multiLabelFeatures = multiLabelAnnotationTypeFeatures.map(
-        (f) => f.feature,
-    );
-    const multiLabelFeaturesMapping = new Map(
-        multiLabelAnnotationTypeFeatures.map((f) => [
-            f.feature,
-            f.annotationType,
-        ]),
-    );
+    function createAnnotationTypeFeatures(dataRepresentation: string) {
+        return annotationTypeFeatures
+            .filter((f) => {
+                return (
+                    f.featureIndex == -1 &&
+                    f.annotationType.dataRepresentation == dataRepresentation
+                );
+            })
+            .map((f) => {
+                return {
+                    name: f.annotationType.name,
+                    feature: f.feature,
+                    annotationType: f.annotationType,
+                };
+            });
+    }
+
+    const multiLabelAnnotationTypeFeatures =
+        createAnnotationTypeFeatures("MULTI_LABEL");
+    const multiClassAnnotationTypeFeatures =
+        createAnnotationTypeFeatures("MULTI_CLASS");
 </script>
 
 <div class="new">
@@ -94,23 +99,31 @@
             {/each}
         </select>
         <button
-            onclick={() => create(selectedFeature!, annotationType)}
+            onclick={() => create(selectedFeature!, rgAnnotationType)}
             disabled={selectedFeature == undefined}
         >
             Create
         </button>
     </div>
-
-    <span> R/G mask </span>
     <FeatureSelect
+        name="Feature"
         values={availableFeatures}
-        onselect={(feature) => create(feature, annotationType)}
+        onselect={(feature) => create(feature, rgAnnotationType)}
     />
-    <span> Multi-label </span>
     <FeatureSelect
-        values={multiLabelFeatures}
-        onselect={(feature) =>
-            create(feature, multiLabelFeaturesMapping.get(feature)!)}
+        name="Multi-label"
+        values={multiLabelAnnotationTypeFeatures}
+        onselect={(item) => create(item.feature, item.annotationType)}
+    />
+    <FeatureSelect
+        name="Multi-class"
+        values={multiClassAnnotationTypeFeatures}
+        onselect={(item) => create(item.feature, item.annotationType)}
+    />
+    <FeatureSelect
+        name="Probability"
+        values={availableFeatures}
+        onselect={(feature) => create(feature, probabilityAnnotationType)}
     />
 </div>
 

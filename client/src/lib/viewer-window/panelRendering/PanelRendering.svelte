@@ -14,7 +14,10 @@
 		CLAHE: 'CLA<u>H</u>E',
 		Sharpened: '<u>S</u>harpened',
 		'Histogram matched': 'Histogram <u>m</u>atched',
-		Luminance: '<u>L</u>uminance'
+		Luminance: '<u>L</u>uminance',
+		Red: 'Red',
+		Green: 'Green',
+		Blue: 'Blue',
 	};
 </script>
 

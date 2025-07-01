@@ -1,13 +1,13 @@
 // import { getImage } from "$lib/data-loading/imageLoader";
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
-import type { DataRepresentation } from "$lib/datamodel/annotationType";
+import type { DataRepresentation } from "$lib/datamodel/annotationType.svelte";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
 import type { Branch } from "$lib/types";
 import { BaseSegmentation, type Segmentation } from "./baseSegmentation";
 import type { AbstractImage } from "./abstractImage";
 import { RenderTexture, type TextureDataFormat } from "./renderTexture";
-import type { SharedData } from "./segmentationData";
+import type { SharedData } from "./_segmentationData";
 import { SvelteMap } from "svelte/reactivity";
 
 export class BinarySegmentation extends BaseSegmentation {

@@ -1,5 +1,5 @@
 import type { AnnotationData } from "./annotationData.svelte";
-import type { AnnotationType } from "./annotationType";
+import type { AnnotationType } from "./annotationType.svelte";
 import type { Creator } from "./creator.svelte";
 import type { Feature } from "./feature.svelte";
 import type { Instance } from "./instance.svelte";

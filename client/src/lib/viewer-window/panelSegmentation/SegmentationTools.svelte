@@ -11,7 +11,7 @@
         Undo,
         Redo,
     } from "../icons/icons";
-    
+
     import Toggle from "$lib/Toggle.svelte";
     import BrushradiusControl from "./BrushradiusControl.svelte";
     import { PolygonTool } from "$lib/viewer/tools/Polygon";
@@ -20,14 +20,14 @@
 
     import { SegmentationItem } from "$lib/webgl/segmentationItem";
     import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
-    import type { PaintSettings } from "$lib/webgl/segmentation";
+    import type { PaintSettings, ProbabilitySegmentation } from "$lib/webgl/segmentation";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     interface Props {
         segmentationItem: SegmentationItem;
-        selectedLabelNames?: string | string[];
+        activeIndex?: number | number[];
     }
 
-    let { segmentationItem, selectedLabelNames = [] }: Props = $props();
+    let { segmentationItem, activeIndex = $bindable([]) }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const image = viewerContext.image;
@@ -77,9 +77,10 @@
                 paint: mode == "paint",
                 dilateErode: segmentationContext.erodeDilateActive,
                 questionable: segmentationContext.questionableActive,
+                activeIndex,
             };
             try {
-                await segmentationItem.draw(
+                await segmentationItem.draw(    
                     viewerContext.index,
                     ctx.canvas,
                     paintSettings,
@@ -104,16 +105,23 @@
     const isFloat =
         segmentationItem.annotation.annotationType.dataRepresentation ==
         "FLOAT";
-    const enhance = isFloat
-        ? new EnhanceTool(
-              drawingExecutor,
-              viewerContext,
-              segmentationContext,
-              segmentation,
-              segmentationItem,
-          )
-        : undefined;
 
+    let enhance: EnhanceTool | undefined = $state(undefined);
+    if (isFloat) {
+        // The enhance tool is only available for probability segmentations
+        // The segmentationState will be created before drawing starts
+        segmentationItem.getSegmentationState(viewerContext.index, true).then(state => {
+            const segmentation = state.segmentation as ProbabilitySegmentation;
+            enhance = new EnhanceTool(
+                drawingExecutor,
+                viewerContext,
+                segmentationContext,
+                segmentation,
+                segmentationItem,
+            );
+        });
+    }
+   
     function toggle(key: "erodeDilateActive" | "questionableActive") {
         segmentationContext[key] = !segmentationContext[key];
     }

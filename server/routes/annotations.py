@@ -1,7 +1,8 @@
 import gzip
 import os
 
-from eyened_orm import Annotation, AnnotationPlane, AnnotationData
+from eyened_orm import Annotation, AnnotationPlane, AnnotationData, AnnotationDataBase
+from eyened_orm.base import create_patch_model
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -146,6 +147,28 @@ async def update_annotation_data_file(
                 f.write(data)
 
     return Response(status_code=204)
+
+
+PatchModel = create_patch_model(f"AnnotationData_Patch", AnnotationDataBase)
+@router.patch("/annotation-data/{data_id}")
+async def update_annotation_data(
+    data_id: str,
+    params: PatchModel,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):  
+    annotation_data = AnnotationData.by_composite_id(db, data_id)
+    if annotation_data is None:
+        raise HTTPException(status_code=404, detail="Annotation data not found")
+    print("[params]", params.model_dump(exclude_unset=True))
+    
+    for key, value in params.model_dump(exclude_unset=True).items():
+        print("patching item", key, value)
+        setattr(annotation_data, key, value)
+
+    db.commit()
+    db.refresh(annotation_data)
+    return annotation_data
 
 
 @router.delete("/annotation-data/{data_id}", status_code=204)

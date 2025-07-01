@@ -16,7 +16,7 @@
     }
 </script>
 
-<li class="feature-row">
+<li>
     <span>[{feature.id}]</span>
     <span><input type="text" bind:value={name} /></span>
     <button onclick={updateFeature} disabled={name == feature.name}
@@ -32,16 +32,16 @@
 </li>
 
 <style>
-    li.feature-row {
+    li {
         display: flex;
         padding-left: 0.5em;
 
         align-items: center;
     }
-    .feature-row:hover {
+    li:hover {
         background-color: rgba(0, 0, 0, 0.1);
     }
-    .feature-row span {
+    span {
         padding-left: 0.5em;
     }
 </style>

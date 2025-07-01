@@ -2,7 +2,7 @@ import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { ViewerContext } from "./viewerContext.svelte";
 
-export type RenderMode = 'Original' | 'Luminance' | 'Contrast enhanced' | 'Color balanced' | 'CLAHE' | 'Sharpened' | 'Histogram matched';
+export type RenderMode = 'Original' | 'Luminance' | 'Contrast enhanced' | 'Color balanced' | 'CLAHE' | 'Sharpened' | 'Histogram matched' | 'Red' | 'Green' | 'Blue';
 
 export type WindowLevel = { min: number; max: number; };
 

@@ -1,8 +1,6 @@
 <script lang="ts">
     import type { Annotation } from "$lib/datamodel/annotation.svelte";
-
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { PanelIcon, Trash } from "../icons/icons";
 
     interface Props {
         image: AbstractImage;
@@ -12,7 +10,7 @@
     }
 
     let { image, annotation, resolve, reject }: Props = $props();
-    const segmentationAnnotations = image.segmentationAnnotations;
+    const segmentationAnnotations = image.instance.annotations;
     const referenceAnnotations = segmentationAnnotations.filter(
         (a) => a.id != annotation.id,
     );

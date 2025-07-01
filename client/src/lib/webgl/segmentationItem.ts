@@ -1,5 +1,5 @@
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
-import { readable, readonly, writable, type Readable, type Unsubscriber } from "svelte/store";
+import { type Readable, type Unsubscriber } from "svelte/store";
 import type { AbstractImage } from "./abstractImage";
 import { SegmentationState } from "./segmentationState";
 import type { Segmentation, PaintSettings } from "./segmentation";
@@ -12,7 +12,9 @@ export class SegmentationItem {
 
     unsubscribe: Unsubscriber;
 
-    private segmentations: DeferredMap<number, SegmentationState> = new DeferredMap();
+    // mapping of scanNr to SegmentationState
+    // a SegmentationState is created when a new annotationData is added
+    private segmentationStates: DeferredMap<number, SegmentationState> = new DeferredMap();
 
     constructor(
         readonly image: AbstractImage,
@@ -22,12 +24,12 @@ export class SegmentationItem {
         this.unsubscribe = annotation.annotationData.subscribe(data => {
             for (const annotationData of data) {
                 const index = annotationData.scanNr;
-                if (this.segmentations.has(index)) {
+                if (this.segmentationStates.has(index)) {
                     continue;
                 }
                 const segmentationState = new SegmentationState(this.image, annotationData);
                 // this should resolve all the waiters for this key
-                this.segmentations.set(index, segmentationState);
+                this.segmentationStates.set(index, segmentationState);
             }
         });
     }
@@ -37,11 +39,11 @@ export class SegmentationItem {
     }
 
     getSegmentation(scanNr: number): Segmentation | undefined {
-        return this.segmentations.getSync(scanNr)?.segmentation;
+        return this.segmentationStates.getSync(scanNr)?.segmentation;
     }
 
     async getSegmentationState(scanNr: number, create: boolean = false): Promise<SegmentationState> {
-        if (create && !this.segmentations.has(scanNr)) {
+        if (create && !this.segmentationStates.has(scanNr)) {
             const annotationPlane = "PRIMARY";
             let annotationData = this.annotation.annotationData.find$(d => d.scanNr == scanNr && d.annotationPlane == annotationPlane);
             if (!annotationData) {
@@ -50,7 +52,7 @@ export class SegmentationItem {
                 console.warn("SegmentationItem.getSegmentationState: annotationData already exists", scanNr);
             }
         }
-        return this.segmentations.get(scanNr);
+        return this.segmentationStates.get(scanNr);
     }
 
     async importOther(scanNr: number, segmentation: Segmentation) {
@@ -65,15 +67,15 @@ export class SegmentationItem {
 
 
     canUndo(scanNr: number): Readable<boolean> {
-        return asyncReadable(this.segmentations.get(scanNr).then(state => state.canUndo), false);
+        return asyncReadable(this.segmentationStates.get(scanNr).then(state => state.canUndo), false);
     }
 
     canRedo(scanNr: number) {
-        return asyncReadable(this.segmentations.get(scanNr).then(state => state.canRedo), false);
+        return asyncReadable(this.segmentationStates.get(scanNr).then(state => state.canRedo), false);
     }
 
     async undo(scanNr: number) {
-        const segmentationState = this.segmentations.getSync(scanNr);
+        const segmentationState = this.segmentationStates.getSync(scanNr);
         if (segmentationState) {
             segmentationState.undo();
         } else {
@@ -82,7 +84,7 @@ export class SegmentationItem {
     }
 
     async redo(scanNr: number) {
-        const segmentationState = this.segmentations.getSync(scanNr);
+        const segmentationState = this.segmentationStates.getSync(scanNr);
         if (segmentationState) {
             segmentationState.redo();
         } else {
