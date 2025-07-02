@@ -21,9 +21,9 @@
     const segmentationContext = segmentationOverlay.segmentationContext;
     const { annotationTypes, features, annotationTypeFeatures } = data;
 
-    const rgAnnotationType = annotationTypes.find((t) => t.name == "R/G mask")!;
-    const binaryAnnotationType = annotationTypes.find((t) => t.name == "Binary mask")!;
-    const probabilityAnnotationType = annotationTypes.find((t) => t.name == "Probability")!;
+    const qType = annotationTypes.find((t) => t.name == "Binary + Questionable")!;
+    const bType = annotationTypes.find((t) => t.name == "Binary")!;
+    const pType = annotationTypes.find((t) => (t.name == "Probability" && t.dataType == "R8"))!;
 
     const dialogue = getContext<Writable<any>>("dialogue");
 
@@ -32,15 +32,17 @@
     async function create(feature: Feature, type: string) {
         let annotationType: AnnotationType;
         if (type == "Q") {
-            annotationType = rgAnnotationType;
+            annotationType = qType;
         } else if (type == "B") {
-            annotationType = binaryAnnotationType;
+            annotationType = bType;
         } else if (type == "P") {
-            annotationType = probabilityAnnotationType;
+            annotationType = pType;
+        } else {
+            throw new Error(`Unsupported type: ${type}`);
         }
         dialogue.set(`Creating annotation...`);
-        console.log(feature, annotationType);
-        const annotation = await Annotation.createFrom(
+        
+        await Annotation.createFrom(
             image.instance,
             feature,
             creator,
@@ -90,9 +92,9 @@
     }
 
     const multiLabelAnnotationTypeFeatures =
-        createAnnotationTypeFeatures("MULTI_LABEL");
+        createAnnotationTypeFeatures("MultiLabel");
     const multiClassAnnotationTypeFeatures =
-        createAnnotationTypeFeatures("MULTI_CLASS");
+        createAnnotationTypeFeatures("MultiClass");
     let selectList = false;
 </script>
 
@@ -110,7 +112,7 @@
                 {/each}
             </select>
             <button
-                onclick={() => create(selectedFeature!, rgAnnotationType)}
+                onclick={() => create(selectedFeature!, qType)}
                 disabled={selectedFeature == undefined}
             >
                 Create
