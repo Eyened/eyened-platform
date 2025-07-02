@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
 
 import numpy as np
 from PIL import Image
-from sqlalchemy import Column, Index, event
+from sqlalchemy import Column, Index, Mapped, event, mapped_column
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
 
 from .base import Base
+from .utils.zarr.manager_annotation import AnnotationZarrStorageManager
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -51,7 +52,6 @@ class AnnotationBase(Base):
 
 
 class Annotation(AnnotationBase, table=True):
-
     __tablename__ = "Annotation"
 
     __table_args__ = (
@@ -90,6 +90,13 @@ class Annotation(AnnotationBase, table=True):
     AnnotationData: List["AnnotationData"] = Relationship(
         back_populates="Annotation", cascade_delete=True
     )
+    ZarrArrayIndex: Mapped[Optional[int]] = mapped_column(default=None)
+    ScanNr: Mapped[int] = mapped_column(primary_key=True)
+    Width: Mapped[int] = mapped_column(default=0)
+    Height: Mapped[int] = mapped_column(default=0)
+    Depth: Mapped[int] = mapped_column(default=0)
+
+    # TransformationMatrix: Mapped[Optional[]] = mapped_column(default=None)
 
     @property
     def FeatureName(self):
@@ -106,6 +113,101 @@ class Annotation(AnnotationBase, table=True):
     @property
     def ProjectName(self):
         return self.Project.ProjectName
+
+    @property
+    def numpy(self) -> Optional[np.ndarray]:
+        """
+        Read annotation data from the zarr array.
+
+        Returns:
+            numpy array containing the annotation data, or None if no zarr array index is set
+
+        Raises:
+            ValueError: If configuration is not initialized
+            FileNotFoundError: If the zarr array does not exist
+            IndexError: If the zarr array index is invalid
+        """
+        if self.ZarrArrayIndex is None:
+            return None
+
+        if not self.config:
+            raise ValueError("Configuration not initialized")
+
+        # Get the image shape from the associated ImageInstance
+        if not self.ImageInstance:
+            raise ValueError("Annotation has no associated ImageInstance")
+
+        # Determine image shape based on dimensions
+        annotation_shape = (self.Width, self.Height, self.Depth)
+
+        # Get the annotation dtype from the annotation type's data representation
+        annotation_dtype = get_annotation_dtype_from_representation(
+            self.AnnotationType.DataRepresentation
+        )
+
+        # Create storage manager and get the array
+        storage_manager = AnnotationZarrStorageManager(
+            self.config.annotations_zarr_basepath
+        )
+
+        if not storage_manager.array_exists(annotation_dtype, annotation_shape):
+            raise FileNotFoundError(
+                f"Zarr array not found for annotation dtype {annotation_dtype} and shape {annotation_shape}"
+            )
+
+        # Get the array and read the data
+        array = storage_manager.get_array(annotation_dtype, annotation_shape)
+        return array.read(self.ZarrArrayIndex)
+
+    def write_data(self, data: np.ndarray) -> int:
+        """
+        Write annotation data to the zarr array and update the ZarrArrayIndex.
+
+        Args:
+            data: numpy array containing the annotation data
+
+        Returns:
+            The zarr array index where the data was written
+
+        Raises:
+            ValueError: If configuration is not initialized or annotation has no ImageInstance
+            FileNotFoundError: If the zarr array does not exist
+            ValueError: If the data shape or dtype doesn't match the array requirements
+        """
+        if not self.config:
+            raise ValueError("Configuration not initialized")
+
+        if not self.ImageInstance:
+            raise ValueError("Annotation has no associated ImageInstance")
+
+        # Determine annotation shape based on dimensions
+        annotation_shape = (self.Width, self.Height, self.Depth)
+
+        # Get the annotation dtype from the annotation type's data representation
+        annotation_dtype = get_annotation_dtype_from_representation(
+            self.AnnotationType.DataRepresentation
+        )
+
+        # Create storage manager
+        storage_manager = AnnotationZarrStorageManager(
+            self.config.annotations_zarr_basepath
+        )
+
+        # Check if array exists, create it if it doesn't
+        if not storage_manager.array_exists(annotation_dtype, annotation_shape):
+            storage_manager.create_array(annotation_dtype, annotation_shape)
+
+        # Get the array and write the data
+        array = storage_manager.get_array(annotation_dtype, annotation_shape)
+        zarr_index = array.write(self.ZarrArrayIndex, data)
+
+        # Update the ZarrArrayIndex
+        self.ZarrArrayIndex = zarr_index
+
+        return zarr_index
+
+    def __repr__(self):
+        return f"Annotation({self.AnnotationID}, {self.FeatureName}, {self.Creator.CreatorName})"
 
     @classmethod
     def create(
@@ -170,7 +272,6 @@ class AnnotationDataBase(Base):
 
 
 class AnnotationData(AnnotationDataBase, table=True):
-
     __tablename__ = "AnnotationData"
 
     __table_args__ = (Index("fk_AnnotationData_Annotation1_idx", "AnnotationID"),)
@@ -187,9 +288,8 @@ class AnnotationData(AnnotationDataBase, table=True):
         annotation: "Annotation",
         # file_extension: str = "png",
         scan_nr: int = 0,
-        annotation_plane: str = "PRIMARY"
+        annotation_plane: str = "PRIMARY",
     ) -> "AnnotationData":
-        
         annotation_data = cls()
         annotation_data.Annotation = annotation
         annotation_data.ScanNr = scan_nr
@@ -248,7 +348,9 @@ class AnnotationData(AnnotationDataBase, table=True):
             ValueError: If the annotation type is unsupported or the mask type is invalid.
         """
         data = self.load_data()
-        if self.Annotation.AnnotationType.Interpretation == "R/G mask":
+        data_representation = self.Annotation.AnnotationType.DataRepresentation
+
+        if data_representation == DataRepresentation.RG_MASK:
             assert len(data.shape) == 3, "Expected color image"
             if mask_type == "segmentation":
                 return data[:, :, 0] > 0  # red channel
@@ -257,13 +359,11 @@ class AnnotationData(AnnotationDataBase, table=True):
             else:
                 raise ValueError(f"Unsupported mask type: {mask_type}")
 
-        elif self.Annotation.AnnotationType.Interpretation == "Binary mask":
+        elif data_representation == DataRepresentation.BINARY:
             assert len(data.shape) == 2, "Expected grayscale image"
             return data > 0
         else:
-            raise ValueError(
-                f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}"
-            )
+            raise ValueError(f"Unsupported annotation type {data_representation}")
 
     @property
     def segmentation_mask(self) -> np.ndarray:
@@ -429,7 +529,6 @@ class Feature(FeatureBase, table=True):
 
 
 class AnnotationTypeFeature(Base, table=True):
-
     __tablename__ = "AnnotationTypeFeature"
     __table_args__ = (
         Index("fk_AnnotationTypeFeature_AnnotationType1_idx", "AnnotationTypeID"),
@@ -441,3 +540,32 @@ class AnnotationTypeFeature(Base, table=True):
     )
     FeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
     FeatureIndex: int = Field(primary_key=True)
+
+
+def get_annotation_dtype_from_representation(
+    data_representation: "DataRepresentation",
+) -> np.dtype:
+    """
+    Map DataRepresentation enum to numpy dtype.
+
+    Args:
+        data_representation: The DataRepresentation enum value
+
+    Returns:
+        numpy dtype for the annotation data
+
+    Raises:
+        ValueError: If the data representation is unsupported
+    """
+    if data_representation == DataRepresentation.BINARY:
+        return np.uint8
+    elif data_representation == DataRepresentation.RG_MASK:
+        return np.uint8
+    elif data_representation == DataRepresentation.FLOAT:
+        return np.uint8  # Store as uint8, will be scaled to float when needed
+    elif data_representation == DataRepresentation.MULTI_LABEL:
+        return np.uint16
+    elif data_representation == DataRepresentation.MULTI_CLASS:
+        return np.uint8
+    else:
+        raise ValueError(f"Unsupported data representation: {data_representation}")

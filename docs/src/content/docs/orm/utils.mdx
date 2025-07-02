@@ -11,7 +11,7 @@ The ORM uses the `ThumbnailPath` column of `ImageInstance` to store thumbnail pa
 
 - *NULL* means that the image contains no thumbnail and the thumbnail generation code must be ran on this image. 
 - An empty string indicates that the thumbnail generator ran and failed for this image.
-- Any other value will be interpreted as a relative path to the image thumbnail within the `THUMBNAILS_PATH` directory. In practice, the thumbnail generator will generate multiple thumbnail sizes and a suffix must be appended to correctly locate a thumbnail file. For example, the thumbnail of 144px (side) will be stored at `<THUMBNAILS_PATH>_144.jpg`.
+- Any other value will be interpreted as a relative path to the image thumbnail within the `THUMBNAILS_PATH` directory. In practice, the thumbnail generator will generate multiple thumbnail sizes and a suffix must be appended to correctly locate a thumbnail file. For example, the thumbnail of 144px (side) will be stored at `<THUMBNAILS_PATH>/<image.ThumbnailPath>_144.jpg`.
 
 This section explains how to update thumbnails in the database, potentially after the thumbnail generation code has been updated.
 
