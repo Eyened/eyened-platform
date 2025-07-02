@@ -33,8 +33,10 @@
     // hide all on load
     const segmentations = instance.annotations.filter(globalContext.annotationsFilter);
     for (const annotation of $segmentations) {
-        // segmentationContext.hideCreators.add(annotation.creator);
+        segmentationContext.hideCreators.add(annotation.creator);
     }
+    // show own segmentations
+    segmentationContext.hideCreators.delete(creator);
 
     const creatorSegmentationsSorted: Readable<[Creator, Annotation[]][]> =
         derived(creatorSegmentations, (c) => {
