@@ -47,12 +47,12 @@ Some UI components on the top right of the viewer window.
 
 <div id="main">
 	<MainIcon onclick={showUserMenu} tooltip={creator.name}>
-		{#snippet icon()}
+		{#snippet iconSnippet()}
 			<span class="icon">{initials}</span>
 		{/snippet}
 	</MainIcon>
 	<MainIcon onclick={browse} tooltip="Browse">
-		{#snippet icon()}
+		{#snippet iconSnippet()}
 			<span class="icon">+</span>
 		{/snippet}
 	</MainIcon>

@@ -2,24 +2,28 @@ import type { Feature } from "./feature.svelte";
 import { BaseItem, BaseLinkingItem, FilterList } from "./itemList";
 import { data } from "./model";
 
-export type DataRepresentation = 'BINARY' | 'RG_MASK' | 'FLOAT' | 'MULTI_LABEL' | 'MULTI_CLASS';
+export type DataRepresentation = 'Binary' | 'DualBitMask' | 'Probability' | 'MultiLabel' | 'MultiClass';
+export type Datatype = 'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F';
 
 export interface ServerAnnotationType {
     AnnotationTypeID: number;
     AnnotationTypeName: string;
     DataRepresentation: DataRepresentation;
+    DataType: Datatype;
 }
 
 export class AnnotationType extends BaseItem {
     static mapping = {
         'AnnotationTypeName': 'name',
         'DataRepresentation': 'dataRepresentation',
+        'DataType': 'dataType',
     };
     static endpoint = 'annotation-types';
 
     id!: number;
     name: string = $state("");
     dataRepresentation!: DataRepresentation;
+    dataType!: Datatype;
 
     constructor(serverItem: ServerAnnotationType) {
         super();
@@ -30,6 +34,7 @@ export class AnnotationType extends BaseItem {
         this.id = serverItem.AnnotationTypeID;
         this.name = serverItem.AnnotationTypeName;
         this.dataRepresentation = serverItem.DataRepresentation;
+        this.dataType = serverItem.DataType;
     }
 
     get baseFeature(): Feature | undefined {

@@ -1,5 +1,5 @@
 import type { Annotation } from './annotation.svelte';
-import type { Device } from './device.svelte';
+import type { Device, DeviceModel } from './device.svelte';
 import { BaseItem, FilterList } from './itemList';
 import { data } from './model';
 import type { Patient } from './patient';
@@ -153,6 +153,10 @@ export class Instance extends BaseItem {
 
     get device(): Device {
         return data.devices.get(this.deviceId)!;
+    }
+
+    get deviceModel(): DeviceModel {
+        return data.deviceModels.get(this.device.deviceModelId)!;
     }
 
     get scan(): Scan | undefined {

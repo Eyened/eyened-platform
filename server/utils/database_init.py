@@ -6,6 +6,7 @@ from eyened_orm import (
     AnnotationType,
     Creator,
     DataRepresentation,
+    Datatype,
     ModalityTable,
     SourceInfo,
     TaskState,
@@ -172,19 +173,18 @@ def init_other_objects(session):
 
 def init_annotation_types(session):
     expected_types = [
-        ("Binary mask", DataRepresentation.BINARY),
-        ("R/G mask", DataRepresentation.RG_MASK),
-        ("Probability", DataRepresentation.FLOAT),
-        # ("Retinal layers", DataRepresentation.MULTI_LABEL),
-        # ("Retinal layers", DataRepresentation.MULTI_CLASS),
+        ("Binary", DataRepresentation.Binary, Datatype.R8UI),
+        ("Binary + Questionable", DataRepresentation.DualBitMask, Datatype.R8UI),
+        ("Probability", DataRepresentation.Probability, Datatype.R8),        
+        ("Probability", DataRepresentation.Probability, Datatype.R32F),
     ]
 
     annotation_types = AnnotationType.fetch_all(session)
     # make sure all expected types are in the database
-    for name, representation in expected_types:
+    for name, representation, datatype in expected_types:
         if name not in [a.AnnotationTypeName for a in annotation_types]:
             annotation_type = AnnotationType(
-                AnnotationTypeName=name, DataRepresentation=representation
+                AnnotationTypeName=name, DataRepresentation=representation, DataType=datatype
             )
             session.add(annotation_type)
 

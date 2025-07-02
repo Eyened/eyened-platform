@@ -369,17 +369,15 @@ def receive_after_commit(session):
 
 
 class DataRepresentation(Enum):
-    # Grayscale PNG (when stored as RGB/RGBA, the red channel is read)
     # 0 = background, >0 = foreground
-    BINARY = "BINARY"
+    Binary = "Binary"
 
-    # Two-channel binary mask stored in R and G:
-    # R = annotation, G = uncertain/questionable region
-    RG_MASK = "RG_MASK"
+    # A binary mask with two channels packed into a single byte.
+    # Bit 0 = mask; Bit 1 = questionable/uncertain.
+    DualBitMask = "DualBitMask"
 
-    # Per-pixel float mask (e.g., soft segmentation, probability map)
-    # If stored as 8-bit unsigned integers (0–255) scaled to [0.0–1.0]
-    FLOAT = "FLOAT"
+    # Per-pixel float mask (soft segmentation, probability map)
+    Probability = "Probability"
 
     # Multi-label segmentation — each bit in an integer represents a label.
     # For example:
@@ -388,7 +386,7 @@ class DataRepresentation(Enum):
     #   0x02 => 00000010 => feature 2 present
     #   0x04 => 00000100 => feature 3 present
     #   0x03 => 00000011 => feature 1 + feature 2 present
-    MULTI_LABEL = "MULTI_LABEL"
+    MultiLabel = "MultiLabel"
 
     # Multi-class segmentation — each voxel/pixel is assigned exactly one class.
     # For example:
@@ -397,12 +395,19 @@ class DataRepresentation(Enum):
     #   2 = GCL
     #   3 = IPL
     #   ...
-    MULTI_CLASS = "MULTI_CLASS"
+    MultiClass = "MultiClass"
 
+class Datatype(Enum):
+    R8 = "R8" # 8-bit unsigned integer, interpreted as [0, 1]
+    R8UI = "R8UI" # 8-bit unsigned integer
+    R16UI = "R16UI" # 16-bit unsigned integer
+    R32UI = "R32UI" # 32-bit unsigned integer
+    R32F = "R32F" # 32-bit float
 
 class AnnotationTypeBase(Base):
     AnnotationTypeName: str = Field(max_length=45)
     DataRepresentation: DataRepresentation
+    DataType: Datatype
 
 
 class AnnotationType(AnnotationTypeBase, table=True):

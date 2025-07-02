@@ -66,7 +66,7 @@ export class ETDRSGridOverlay implements Overlay {
 				image_id = `${formAnnotation.instance!.id}_proj`;
 			}
 
-			const grid = formAnnotation.value.value;
+			const grid = formAnnotation.value;
 			if (grid?.fovea && grid?.disc_edge) {
 				const fovea = this.registration.mapPosition(
 					image_id,
