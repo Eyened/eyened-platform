@@ -267,7 +267,7 @@
             {/if}
         </div>
         <div class="row">
-            {#if !(annotation.annotationType.dataRepresentation == "MULTI_LABEL" || annotation.annotationType.dataRepresentation == "MULTI_CLASS")}
+            {#if isEditable && !(annotation.annotationType.dataRepresentation == "MultiLabel" || annotation.annotationType.dataRepresentation == "MultiClass")}
                 <PanelIcon
                     onclick={setAnnotationReference}
                     tooltip="Choose reference mask"

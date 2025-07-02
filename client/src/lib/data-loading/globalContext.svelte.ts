@@ -1,5 +1,4 @@
 import type { Annotation } from '$lib/datamodel/annotation.svelte';
-import type { Creator } from '$lib/datamodel/creator.svelte';
 import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 import { UserManager } from '$lib/usermanager';
 
@@ -25,7 +24,7 @@ export class GlobalContext {
         this.userManager = new UserManager()
     }
 
-    async init(pathname: string) {        
+    async init(pathname: string) {
         await this.userManager.init(pathname);
     }
 
@@ -46,7 +45,13 @@ export class GlobalContext {
     }
 
     get annotationsFilter() {
-        return (a: { creator: Creator }) => {
+        return (a: Annotation | FormAnnotation) => {
+            
+            // if (a.id != 1962178) return false;
+            if (a.feature && ['Form', 'Registration', 'ETDRS grid', 'Arteriovenous (AV) nicking'].includes(a.feature.name)) {
+                return false;
+            }
+
             if (this.creator.name == 'test_user') {
                 // show everything for test user
                 return true;

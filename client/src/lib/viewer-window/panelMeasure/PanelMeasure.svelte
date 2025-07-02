@@ -114,7 +114,7 @@
 
 				{#each $filtered as formAnnotation (formAnnotation.id)}
 					<SetResolutionEtdrs
-						value={formAnnotation.value.value}
+						value={formAnnotation.value}
 						{measureTool}
 						name={`[${formAnnotation.id}]`}
 						{fraction}

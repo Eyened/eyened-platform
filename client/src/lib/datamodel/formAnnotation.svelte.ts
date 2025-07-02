@@ -6,13 +6,14 @@ import { data } from "./model";
 import type { Patient } from "./patient";
 import type { Study } from "./study";
 import type { SubTask } from "./subTask.svelte";
+import { apiUrl } from "$lib/config";
 
 export interface ServerFormAnnotation {
     FormAnnotationID: number,
     FormSchemaID: number,
     PatientID: number,
     StudyID: number,
-    InstanceID: number,
+    ImageInstanceID: number,
     CreatorID: number,
     SubTaskID: number,
     DateInserted: Date,
@@ -27,7 +28,7 @@ export class FormAnnotation extends BaseItem {
         'FormSchemaID': 'formSchemaId',
         'PatientID': 'patientId',
         'StudyID': 'studyId',
-        'InstanceID': 'instanceId',
+        'ImageInstanceID': 'instanceId',
         'CreatorID': 'creatorId',
         'SubTaskID': 'subTaskId',
         'DateInserted': 'created',
@@ -58,17 +59,21 @@ export class FormAnnotation extends BaseItem {
         this.formSchemaId = serverItem.FormSchemaID;
         this.patientId = serverItem.PatientID;
         this.studyId = serverItem.StudyID;
-        this.instanceId = serverItem.InstanceID;
+        this.instanceId = serverItem.ImageInstanceID;
         this.creatorId = serverItem.CreatorID;
         this.subTaskId = serverItem.SubTaskID;
-        this.created = serverItem.DateInserted;
-        this.modified = serverItem.DateModified;
+        this.created = new Date(serverItem.DateInserted);
+        this.modified = new Date(serverItem.DateModified);
         this.referenceId = serverItem.FormAnnotationReferenceID;
         this.value = serverItem.FormData;
     }
 
+    async load() {
+        const response = await fetch(`${apiUrl}/${FormAnnotation.endpoint}/${this.id}/form-data`);
+        this.value = await response.json();
+    }
 
-    static async createFrom(creator: Creator, instance: Instance, formSchema: FormSchema, subTask?: SubTask) {
+    static async createFrom(creator: Creator, instance: Instance, formSchema: FormSchema, subTask?: SubTask, reference?: FormAnnotation) {
         return FormAnnotation.create({
             creatorId: creator.id,
             instanceId: instance.id,
@@ -76,6 +81,8 @@ export class FormAnnotation extends BaseItem {
             studyId: instance.study.id,
             formSchemaId: formSchema.id,
             subTaskId: subTask?.id,
+            referenceId: reference?.id,
+            value: reference?.value,
         });
     }
 
@@ -97,5 +104,10 @@ export class FormAnnotation extends BaseItem {
 
     public get creator(): Creator {
         return data.creators.get(this.creatorId)!;
+    }
+
+    public get reference(): FormAnnotation | undefined {
+        if (!this.referenceId) return undefined;
+        return data.formAnnotations.get(this.referenceId);
     }
 }

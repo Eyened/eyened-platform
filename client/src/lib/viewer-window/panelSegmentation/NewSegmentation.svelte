@@ -22,13 +22,22 @@
     const { annotationTypes, features, annotationTypeFeatures } = data;
 
     const rgAnnotationType = annotationTypes.find((t) => t.name == "R/G mask")!;
+    const binaryAnnotationType = annotationTypes.find((t) => t.name == "Binary mask")!;
     const probabilityAnnotationType = annotationTypes.find((t) => t.name == "Probability")!;
 
-    const dialogue = getContext<Writable<DialogueType>>("dialogue");
+    const dialogue = getContext<Writable<any>>("dialogue");
 
     let selectedFeature: Feature | undefined = $state(undefined);
 
-    async function create(feature: Feature, annotationType: AnnotationType) {
+    async function create(feature: Feature, type: string) {
+        let annotationType: AnnotationType;
+        if (type == "Q") {
+            annotationType = rgAnnotationType;
+        } else if (type == "B") {
+            annotationType = binaryAnnotationType;
+        } else if (type == "P") {
+            annotationType = probabilityAnnotationType;
+        }
         dialogue.set(`Creating annotation...`);
         console.log(feature, annotationType);
         const annotation = await Annotation.createFrom(
@@ -41,23 +50,23 @@
         dialogue.set(undefined);
     }
 
-    let selectList: { [name: string]: Feature[] } = $state({});
-    function selectFeatures(featureSet: { [name: string]: string[] }) {
-        for (const [groupname, featurenames] of Object.entries(featureSet)) {
-            selectList[groupname] = [];
-            for (const name of featurenames) {
-                const feature = features.find((f) => f.name == name);
-                if (feature) {
-                    selectList[groupname].push(feature);
-                }
-            }
-        }
-    }
-    if (image.is3D) {
-        selectFeatures(featureSetOCT);
-    } else {
-        selectFeatures(featureSetColorFundus);
-    }
+    // let selectList: { [name: string]: Feature[] } = $state({});
+    // function selectFeatures(featureSet: { [name: string]: string[] }) {
+    //     for (const [groupname, featurenames] of Object.entries(featureSet)) {
+    //         selectList[groupname] = [];
+    //         for (const name of featurenames) {
+    //             const feature = features.find((f) => f.name == name);
+    //             if (feature) {
+    //                 selectList[groupname].push(feature);
+    //             }
+    //         }
+    //     }
+    // }
+    // if (image.is3D) {
+    //     selectFeatures(featureSetOCT);
+    // } else {
+    //     selectFeatures(featureSetColorFundus);
+    // }
     const availableFeatures = features.filter((f) => {
         // TODO: filter features that are not available for the current image?
         return true;
@@ -84,33 +93,37 @@
         createAnnotationTypeFeatures("MULTI_LABEL");
     const multiClassAnnotationTypeFeatures =
         createAnnotationTypeFeatures("MULTI_CLASS");
+    let selectList = false;
 </script>
 
 <div class="new">
-    <div>
-        <select bind:value={selectedFeature}>
-            <option value="" selected disabled hidden>Select feature:</option>
-            {#each Object.entries(selectList) as [groupname, features]}
-                <optgroup label={groupname}>
-                    {#each features as feature}
-                        <option value={feature}>{feature.name}</option>
-                    {/each}
-                </optgroup>
-            {/each}
-        </select>
-        <button
-            onclick={() => create(selectedFeature!, rgAnnotationType)}
-            disabled={selectedFeature == undefined}
-        >
-            Create
-        </button>
-    </div>
+    {#if selectList}
+        <div>
+            <select bind:value={selectedFeature}>
+                <option value="" selected disabled hidden>Select feature:</option>
+                {#each Object.entries(selectList) as [groupname, features]}
+                    <optgroup label={groupname}>
+                        {#each features as feature}
+                            <option value={feature}>{feature.name}</option>
+                        {/each}
+                    </optgroup>
+                {/each}
+            </select>
+            <button
+                onclick={() => create(selectedFeature!, rgAnnotationType)}
+                disabled={selectedFeature == undefined}
+            >
+                Create
+            </button>
+        </div>
+    {/if}
     <FeatureSelect
         name="Feature"
         values={availableFeatures}
-        onselect={(feature) => create(feature, rgAnnotationType)}
+        types={["Q", "B", "P"]}
+        onselect={(feature, type) => create(feature, type)}
     />
-    <FeatureSelect
+    <!-- <FeatureSelect
         name="Multi-label"
         values={multiLabelAnnotationTypeFeatures}
         onselect={(item) => create(item.feature, item.annotationType)}
@@ -124,7 +137,7 @@
         name="Probability"
         values={availableFeatures}
         onselect={(feature) => create(feature, probabilityAnnotationType)}
-    />
+    /> -->
 </div>
 
 <style>
