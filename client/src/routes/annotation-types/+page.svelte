@@ -6,12 +6,20 @@
     const { annotationTypes } = data;
 
     let name = $state("");
-    let dataRepresentation = $state("MULTI_LABEL");
+    let dataRepresentation = $state("MultiLabel");
+    let dataTypeInt = $state('8');
+
     function createAnnotationType(event: Event) {
-        event.preventDefault();
-        AnnotationType.create({ name, dataRepresentation });
+        const dataType = {
+            '8': 'R8UI',
+            '16': 'R16UI',
+            '32': 'R32UI',
+        }[dataTypeInt];
+        AnnotationType.create({ name, dataRepresentation, dataType});
         name = "";
     }
+
+    
 </script>
 
 <div class="main">
@@ -21,9 +29,37 @@
         <form onsubmit={createAnnotationType}>
             <input type="text" bind:value={name} />
             <select bind:value={dataRepresentation}>
-                <option value="MULTI_LABEL">Multi Label</option>
-                <option value="MULTI_CLASS">Multi Class</option>
+                <option value="MultiLabel">Multi Label</option>
+                <option value="MultiClass">Multi Class</option>
             </select>
+            N Features:
+            <label>
+                <input
+                    type="radio"
+                    name="dataType"
+                    value="8"
+                    bind:group={dataTypeInt}
+                />
+                {"< 8"}
+            </label>
+            <label>
+                <input
+                    type="radio"
+                    name="dataType"
+                    value="16"
+                    bind:group={dataTypeInt}
+                />
+                {"< 16"}
+            </label>
+            <label>
+                <input
+                    type="radio"
+                    name="dataType"
+                    value="32"
+                    bind:group={dataTypeInt}
+                />
+                {"< 32"}
+            </label>
             <button type="submit">Create</button>
         </form>
     </div>

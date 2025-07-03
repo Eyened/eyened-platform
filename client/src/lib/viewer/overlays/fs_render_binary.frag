@@ -76,23 +76,22 @@ bool getMask(usampler2D mask, uint bitmask, vec2 pos) {
 }
 
 void main() {
-
+    vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
+    if(u_has_mask) {
+        if (!getMask(u_mask, u_mask_bitmask, p)) {
+            discard;
+        }
+    }
     color_out = vec4(0.0f);
 
     bool drawing;
     bool questionable;
-    bool mask;
-    vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
+    
     drawing = getMask(u_binary_mask, u_bitmask, p);
     if(u_has_questionable_mask) {
         questionable = getMask(u_questionable_mask, u_questionable_bitmask, p);
     } else {
         questionable = false;
-    }
-
-    if(u_has_mask) {
-        mask = getMask(u_mask, u_mask_bitmask, p);
-        drawing = drawing && mask;
     }
 
     if(!(drawing || questionable)) {

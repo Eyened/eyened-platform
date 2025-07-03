@@ -16,8 +16,12 @@
     let { image, annotation, resolve, reject }: Props = $props();
     const segmentationAnnotations = image.instance.annotations.filter(globalContext.annotationsFilter);
     const referenceAnnotations = segmentationAnnotations.filter(
-        (a) => a.id != annotation.id,
+        (a) => {
+            if (a.annotationType.dataRepresentation == "MultiLabel" || a.annotationType.dataRepresentation == "MultiClass" || a.annotationType.dataRepresentation == "Probability") return false;
+            return true;
+        },
     );
+    
 </script>
 
 <div>

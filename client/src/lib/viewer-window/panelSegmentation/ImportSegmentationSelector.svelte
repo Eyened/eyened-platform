@@ -1,6 +1,12 @@
 <script lang="ts">
     import type { Annotation } from "$lib/datamodel/annotation.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { constructors } from "$lib/webgl/segmentationState";
+    import { converters } from "$lib/webgl/segmentationConverter";
+
+    const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
         image: AbstractImage;
@@ -10,10 +16,22 @@
     }
 
     let { image, annotation, resolve, reject }: Props = $props();
-    const segmentationAnnotations = image.instance.annotations;
-    const referenceAnnotations = segmentationAnnotations.filter(
-        (a) => a.id != annotation.id,
+    const segmentationAnnotations = image.instance.annotations.filter(
+        globalContext.annotationsFilter,
     );
+
+    const referenceAnnotations = segmentationAnnotations
+        .filter((a) => a.id != annotation.id)
+        .filter((other) => {
+            const from =
+                constructors[annotation.annotationType.dataRepresentation].name;
+            const to =
+                constructors[other.annotationType.dataRepresentation].name;
+
+            const key = `${from}->${to}`;
+            // filter out conversions that are not supported
+            return key in converters;
+        });
 </script>
 
 <div>Select annotation to import from:</div>

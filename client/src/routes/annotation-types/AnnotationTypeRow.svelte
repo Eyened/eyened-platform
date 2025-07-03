@@ -11,7 +11,7 @@
     }
 
     const { annotationType }: Props = $props();
-    const { features, annotationTypeFeatures } = data;
+    const { features } = data;
 
     function deleteAnnotationType(annotationType: AnnotationType) {
         annotationType.delete();
@@ -25,7 +25,8 @@
         annotationTypeFeature.delete();
     }
 
-    let baseFeature = $state<Feature | undefined>(annotationType.baseFeature);
+    let baseFeatureId = $state<number | undefined>(annotationType.baseFeature?.id);
+    $inspect(baseFeatureId);
     let selectedFeature = $state<Feature | undefined>(undefined);
     let selectedFeatureIndex = $state(1);
     function addFeature() {
@@ -37,8 +38,8 @@
         });
         selectedFeatureIndex++;
     }
-    function updateBaseFeature() {
-        if (!baseFeature) return;
+    async function updateBaseFeature() {
+        if (baseFeatureId == undefined) return;
         const existing = data.annotationTypeFeatures
             .filter((f) => f.annotationTypeId == annotationType.id)
             .filter((f) => f.featureIndex == -1)
@@ -46,11 +47,12 @@
         if (existing) {
             existing.delete();
         }
-        AnnotationTypeFeature.create({
+        const resp = await AnnotationTypeFeature.create({
             annotationTypeId: annotationType.id,
-            featureId: baseFeature.id,
+            featureId: baseFeatureId,
             featureIndex: -1,
         });
+        
     }
 </script>
 
@@ -70,16 +72,16 @@
             Icon={Trash}
         />
     </div>
-    {#if annotationType.dataRepresentation == "MULTI_LABEL" || annotationType.dataRepresentation == "MULTI_CLASS"}
+    {#if annotationType.dataRepresentation == "MultiLabel" || annotationType.dataRepresentation == "MultiClass"}
         <div class="features">
             <div>
                 <span>Base Feature:</span>
-                <select bind:value={baseFeature} onchange={updateBaseFeature}>
-                    <option value="" selected disabled hidden
-                        >Select main feature:</option
-                    >
+                <select bind:value={baseFeatureId} onchange={updateBaseFeature}>
+                    <option value="" selected disabled hidden>
+                        Select main feature:
+                    </option>
                     {#each $features as feature}
-                        <option value={feature}>{feature.name}</option>
+                        <option value={feature.id}>{feature.name}</option>
                     {/each}
                 </select>
             </div>

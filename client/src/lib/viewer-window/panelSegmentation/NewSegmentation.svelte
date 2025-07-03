@@ -5,10 +5,9 @@
     import FeatureSelect from "./FeatureSelect.svelte";
     import { data } from "$lib/datamodel/model";
     import type { Feature } from "$lib/datamodel/feature.svelte";
-    import { featureSetColorFundus, featureSetOCT } from "$lib/viewer-config";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
-    import type { AnnotationType } from "$lib/datamodel/annotationType.svelte";
+    import { AnnotationType } from "$lib/datamodel/annotationType.svelte";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { Annotation } from "$lib/datamodel/annotation.svelte";
 
@@ -21,27 +20,35 @@
     const segmentationContext = segmentationOverlay.segmentationContext;
     const { annotationTypes, features, annotationTypeFeatures } = data;
 
-    const qType = annotationTypes.find((t) => t.name == "Binary + Questionable")!;
+    const qType = annotationTypes.find(
+        (t) => t.name == "Binary + Questionable",
+    )!;
     const bType = annotationTypes.find((t) => t.name == "Binary")!;
-    const pType = annotationTypes.find((t) => (t.name == "Probability" && t.dataType == "R8"))!;
+    const pType = annotationTypes.find(
+        (t) => t.name == "Probability" && t.dataType == "R8",
+    )!;
 
     const dialogue = getContext<Writable<any>>("dialogue");
 
     let selectedFeature: Feature | undefined = $state(undefined);
 
-    async function create(feature: Feature, type: string) {
-        let annotationType: AnnotationType;
-        if (type == "Q") {
+    async function create(
+        feature: Feature,
+        annotationType: AnnotationType | string,
+    ) {
+        if (annotationType instanceof AnnotationType) {
+            // already an annotation type
+        } else if (annotationType == "Q") {
             annotationType = qType;
-        } else if (type == "B") {
+        } else if (annotationType == "B") {
             annotationType = bType;
-        } else if (type == "P") {
+        } else if (annotationType == "P") {
             annotationType = pType;
         } else {
-            throw new Error(`Unsupported type: ${type}`);
+            throw new Error(`Unsupported type: ${annotationType}`);
         }
         dialogue.set(`Creating annotation...`);
-        
+
         await Annotation.createFrom(
             image.instance,
             feature,
@@ -102,7 +109,9 @@
     {#if selectList}
         <div>
             <select bind:value={selectedFeature}>
-                <option value="" selected disabled hidden>Select feature:</option>
+                <option value="" selected disabled hidden
+                    >Select feature:</option
+                >
                 {#each Object.entries(selectList) as [groupname, features]}
                     <optgroup label={groupname}>
                         {#each features as feature}
@@ -125,21 +134,22 @@
         types={["Q", "B", "P"]}
         onselect={(feature, type) => create(feature, type)}
     />
-    <!-- <FeatureSelect
-        name="Multi-label"
-        values={multiLabelAnnotationTypeFeatures}
-        onselect={(item) => create(item.feature, item.annotationType)}
-    />
-    <FeatureSelect
-        name="Multi-class"
-        values={multiClassAnnotationTypeFeatures}
-        onselect={(item) => create(item.feature, item.annotationType)}
-    />
-    <FeatureSelect
-        name="Probability"
-        values={availableFeatures}
-        onselect={(feature) => create(feature, probabilityAnnotationType)}
-    /> -->
+    {#if $multiLabelAnnotationTypeFeatures.length > 0}
+        <div>
+            <ul>
+                {#each $multiLabelAnnotationTypeFeatures as item}
+                    <li>
+                        <button
+                            onclick={() =>
+                                create(item.feature, item.annotationType)}
+                        >
+                            {item.name}
+                        </button>
+                    </li>
+                {/each}
+            </ul>
+        </div>
+    {/if}
 </div>
 
 <style>

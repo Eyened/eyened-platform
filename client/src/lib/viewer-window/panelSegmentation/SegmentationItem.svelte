@@ -17,7 +17,6 @@
     import { Annotation } from "$lib/datamodel/annotation.svelte";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import {} from "./segmentationUtils";
-    import { data } from "$lib/datamodel/model";
     import ThresholdSlider from "./ThresholdSlider.svelte";
     import {
         BinarySegmentation,
@@ -29,6 +28,8 @@
     import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { AnnotationType } from "$lib/datamodel/annotationType.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -93,18 +94,28 @@
         );
     }
 
-    async function duplicate(type?: string) {
+    async function duplicate(
+        type: null | "Binary" | "DualBitMask" | "Probability",
+    ) {
         dialogueManager.showQuery(`Duplicating annotation ${annotation.id}...`);
-
-        // always duplicate as RG_MASK
-        const rgMaskAnnotationType = data.annotationTypes.find(
-            (a) => a.name == "R/G mask" && a.dataRepresentation == "RG_MASK",
-        );
-
+        let annotationType: AnnotationType;
+        if (type == "Binary") {
+            annotationType = data.annotationTypes.find(
+                (a) => a.dataRepresentation == type && a.dataType == "R8UI",
+            )!;
+        } else if (type == "DualBitMask") {
+            annotationType = data.annotationTypes.find(
+                (a) => a.dataRepresentation == type && a.dataType == "R8UI",
+            )!;
+        } else {
+            annotationType = annotation.annotationType;
+        }
         const item = {
             ...annotation,
+            annotationType,
+            // annotationReferenceId needs to be mentioned explicitly, because it's marked with $state and hence not enumerable
             annotationReferenceId: annotation.annotationReferenceId,
-            annotationTypeId: rgMaskAnnotationType!.id,
+            // overwrite creatorId to current user
             creatorId: creator.id,
         };
 
@@ -246,7 +257,7 @@
         {/if}
         <div class="row">
             <PanelIcon
-                onclick={() => duplicate("R/G mask")}
+                onclick={() => duplicate("DualBitMask")}
                 tooltip="Duplicate"
                 Icon={Duplicate}
             />
@@ -267,18 +278,18 @@
             {/if}
         </div>
         <div class="row">
-            {#if isEditable && !(annotation.annotationType.dataRepresentation == "MultiLabel" || annotation.annotationType.dataRepresentation == "MultiClass")}
+            {#if isEditable}
                 <PanelIcon
                     onclick={setAnnotationReference}
                     tooltip="Choose reference mask"
                     Icon={Intersection}
                 />
             {/if}
-
             {#if annotation.annotationReferenceId}
                 <span
                     class="reference-annotation"
-                    onclick={() => removeReference()}
+                    class:editable={isEditable}
+                    onclick={() => isEditable && removeReference()}
                 >
                     [{annotation.annotationReferenceId}]
                 </span>
@@ -308,7 +319,7 @@
                 />
             </div>
         {/if}
-        {#if annotation.annotationType.dataRepresentation == "MULTI_LABEL" || annotation.annotationType.dataRepresentation == "MULTI_CLASS"}
+        {#if annotation.annotationType.dataRepresentation == "MultiLabel" || annotation.annotationType.dataRepresentation == "MultiClass"}
             <MultiFeatureSelector {annotation} bind:activeIndex />
         {/if}
     {/if}
@@ -359,6 +370,8 @@
     span.reference-annotation {
         font-size: xx-small;
         opacity: 0.5;
+    }
+    span.reference-annotation.editable {
         cursor: pointer;
     }
     span.reference-annotation:hover {
