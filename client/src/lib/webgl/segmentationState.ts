@@ -1,10 +1,18 @@
 import type { AnnotationData } from "$lib/datamodel/annotationData.svelte";
-import type { Datatype } from "$lib/datamodel/annotationType.svelte";
 import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory";
 import { Base64Serializer } from "./imageEncoder";
 import { BinarySegmentation, MultiClassSegmentation, MultiLabelSegmentation, ProbabilitySegmentation, QuestionableSegmentation, type DrawingArray, type PaintSettings, type Segmentation } from "./segmentation";
+import { convert, type SegmentationType } from "./segmentationConverter";
+
+export const constructors = {
+    'Binary': BinarySegmentation,
+    'DualBitMask': QuestionableSegmentation,
+    'Probability': ProbabilitySegmentation,
+    'MultiClass': MultiClassSegmentation,
+    'MultiLabel': MultiLabelSegmentation,
+}
 
 export class SegmentationState {
 
@@ -20,26 +28,16 @@ export class SegmentationState {
         const annotationType = annotationData.annotation.annotationType;
 
         if ([2, 3, 4].includes(annotationType.id)) {
-            this.segmentation = new QuestionableSegmentation(image);
+            this.segmentation = new QuestionableSegmentation(image, annotationData);
         } else if ([13, 17, 24].includes(annotationType.id)) {
-            this.segmentation = new BinarySegmentation(image);
+            this.segmentation = new BinarySegmentation(image, annotationData);
         } else if ([14, 23, 25].includes(annotationType.id)) {
-            this.segmentation = new ProbabilitySegmentation(image, annotationType)
+            this.segmentation = new ProbabilitySegmentation(image, annotationData)
         }
 
         // new:
-        else if (annotationType.dataRepresentation == "Binary") {
-            this.segmentation = new BinarySegmentation(image);
-        } else if (annotationType.dataRepresentation == "DualBitMask") {
-            this.segmentation = new QuestionableSegmentation(image);
-        } else if (annotationType.dataRepresentation == "Probability") {
-            this.segmentation = new ProbabilitySegmentation(image, annotationType);
-        } else if (annotationType.dataRepresentation == "MultiClass" || annotationType.dataRepresentation == "MultiLabel") {
-            if (annotationType.dataRepresentation == "MultiClass") {
-                this.segmentation = new MultiClassSegmentation(image, annotationType);
-            } else if (annotationType.dataRepresentation == "MultiLabel") {
-                this.segmentation = new MultiLabelSegmentation(image, annotationType);
-            }
+        else if (annotationType.dataRepresentation in constructors) {
+            this.segmentation = new constructors[annotationType.dataRepresentation](image, annotationData);
         } else {
             throw new Error(`Unsupported data representation: ${annotationType.dataRepresentation}`);
         }
@@ -65,8 +63,21 @@ export class SegmentationState {
         this.isDrawing = this.checkpoint();
     }
 
-    importOther(other: Segmentation) {
-        console.warn('importOther is not implemented');
+    async importOther(other: Segmentation) {
+        await this.isDrawing; // wait for previous drawing to finish
+
+        const data = other.exportData();
+
+        const thisType = this.segmentation.constructor.name as SegmentationType;
+        const otherType = other.constructor.name as SegmentationType;
+        if (otherType instanceof ProbabilitySegmentation) {
+            const threshold = other.i;
+        }
+
+        const dataConverted = convert(data, otherType, thisType,);
+
+        this.segmentation.importData(data);
+        this.isDrawing = this.checkpoint();
     }
 
     async checkpoint() {

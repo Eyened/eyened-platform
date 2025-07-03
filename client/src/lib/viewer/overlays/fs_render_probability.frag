@@ -44,10 +44,9 @@ bool getMask(usampler2D mask, uint bitmask, vec2 pos) {
 layout(location = 0) out vec4 color_out;
 
 void main() {
+    vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
     if(u_has_mask) {
-        vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
-        bool mask = getMask(u_mask, u_mask_bitmask, p);
-        if (!mask) {
+        if (!getMask(u_mask, u_mask_bitmask, p)) {
             discard;
         }
     }

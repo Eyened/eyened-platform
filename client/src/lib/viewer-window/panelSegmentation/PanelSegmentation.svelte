@@ -6,11 +6,8 @@
     import { Hide, Show } from "../icons/icons";
     import CreatorSegmentations from "./CreatorSegmentations.svelte";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import { derived, type Readable } from "svelte/store";
-    import type { Annotation } from "$lib/datamodel/annotation.svelte";
-    import type { Creator } from "$lib/datamodel/creator.svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-	const globalContext = getContext<GlobalContext>('globalContext');
+    const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
     const {
@@ -24,38 +21,20 @@
     // The segmentation overlay is active while this panel is open
     // The overlay is removed when the panel is destroyed
     onDestroy(viewerContext.addOverlay(overlay));
-    
 
     const { segmentationContext } = overlay;
 
-    const creatorSegmentations = overlay.annotations.groupBy((a) => a.creator);
+    const creators = overlay.annotations.collectSet((a) => a.creator);
 
     // hide all on load
-    const segmentations = instance.annotations.filter(globalContext.annotationsFilter);
+    const segmentations = instance.annotations.filter(
+        globalContext.annotationsFilter,
+    );
     for (const annotation of $segmentations) {
         segmentationContext.hideCreators.add(annotation.creator);
     }
     // show own segmentations
     segmentationContext.hideCreators.delete(creator);
-
-    const creatorSegmentationsSorted: Readable<[Creator, Annotation[]][]> =
-        derived(creatorSegmentations, (c) => {
-            const result: [Creator, Annotation[]][] = [];
-            // always show own segmentations first
-            if (c.has(creator)) {
-                result.push([creator, c.get(creator)!]);
-            }
-            for (const [creator_, annotations] of [...c.entries()].sort(
-                (a, b) => a[0].name.localeCompare(b[0].name),
-            )) {
-                if (creator == creator_) continue;
-                result.push([creator_, annotations]);
-            }
-            return result.map(([creator, annotations]) => [
-                creator,
-                annotations.sort((a) => a.id),
-            ]) as [Creator, Annotation[]][];
-        });
 
     function toggleAll(toggle: boolean) {
         if (toggle) {
@@ -89,10 +68,18 @@
             </label>
         </div>
         <ul class="users">
-            {#each $creatorSegmentationsSorted as [creator, annotations] (creator.id)}
+            <!-- show own segmentations first -->
+            {#if $creators.has(creator)}
                 <li>
-                    <CreatorSegmentations {creator} {annotations} />
+                    <CreatorSegmentations {creator} />
                 </li>
+            {/if}
+            {#each $creators as creator_}
+                {#if creator_ != creator}
+                    <li>
+                        <CreatorSegmentations creator={creator_} />
+                    </li>
+                {/if}
             {/each}
         </ul>
         <NewSegmentation />

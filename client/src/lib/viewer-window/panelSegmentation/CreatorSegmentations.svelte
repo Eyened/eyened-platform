@@ -1,15 +1,13 @@
 <script lang="ts">
     import type { Creator } from "$lib/datamodel/creator.svelte";
-    import type { Annotation } from "$lib/datamodel/annotation.svelte";
     import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import SegmentationItem from "./SegmentationItem.svelte";
 
     interface Props {
         creator: Creator;
-        annotations: Annotation[];
     }
-    let { creator, annotations }: Props = $props();
+    let { creator }: Props = $props();
 
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
@@ -22,6 +20,9 @@
             hideCreators.add(creator);
         }
     }
+    let annotations = segmentationOverlay.annotations
+        .filter((a) => a.creator == creator)
+        .sort((a, b) => a.id - b.id);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -31,7 +32,7 @@
     {creator.name}
 </span>
 
-{#each annotations as annotation (annotation.id)}
+{#each $annotations as annotation (annotation.id)}
     <div class="item" class:hide={hideCreators.has(annotation.creator)}>
         <SegmentationItem {annotation} />
     </div>
