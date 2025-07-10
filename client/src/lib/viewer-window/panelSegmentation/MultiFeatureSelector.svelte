@@ -17,9 +17,9 @@
     );
 
     const groupType = {
-        MULTI_LABEL: "checkbox",
-        MULTI_CLASS: "radio",
-    }[dataRepresentation as "MULTI_LABEL" | "MULTI_CLASS"];
+        MultiLabel: "checkbox",
+        MultiClass: "radio",
+    }[dataRepresentation as "MultiLabel" | "MultiClass"];
 
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",

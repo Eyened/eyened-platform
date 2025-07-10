@@ -21,8 +21,8 @@ from eyened_orm import (
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session, aliased, defer
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, defer
 
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
@@ -31,8 +31,6 @@ from .query_utils import apply_filters, decode_params, sqlalchemy_operators
 
 router = APIRouter()
 
-AnnotationCreator = aliased(Creator, name="annotation_creator")
-FormCreator = aliased(Creator, name="form_creator")
 
 # Pydantic models for response schemas
 class DataResponse(BaseModel):
@@ -54,18 +52,48 @@ class InstanceResponse(BaseModel):
     next_cursor: Optional[str] = None
 
 
-base_query = (
+def join_tables(query):
+    return (
+        query.join(Project, Project.ProjectID == Patient.ProjectID)
+        .outerjoin(SourceInfo)
+        .outerjoin(Scan)
+        .outerjoin(DeviceInstance)
+        .outerjoin(DeviceModel)
+    )
+
+
+base_query = join_tables(
     select(ImageInstance, Series, Study, Patient)
     .select_from(ImageInstance)
     .filter(~ImageInstance.Inactive)
-    .join(Series)
-    .join(Study)
-    .join(Patient)
-    .join(Project)
-    .outerjoin(SourceInfo)
-    .outerjoin(Scan)
-    .outerjoin(DeviceInstance)
-    .outerjoin(DeviceModel)
+    .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+    .join(Study, Study.StudyID == Series.StudyID)
+    .join(Patient, Patient.PatientID == Study.PatientID)
+)
+
+annotation_sub_query = join_tables(
+    select(Annotation.ImageInstanceID)
+    .select_from(Annotation)
+    .filter(~Annotation.Inactive)
+    .join(Feature)
+    .join(AnnotationType)
+    .join(Creator)
+    .join(ImageInstance, ImageInstance.ImageInstanceID == Annotation.ImageInstanceID)
+    .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+    .join(Study, Study.StudyID == Series.StudyID)
+    .join(Patient, Patient.PatientID == Study.PatientID)
+)
+
+form_sub_query = join_tables(
+    select(FormAnnotation.PatientID)
+    .select_from(FormAnnotation)
+    .filter(~FormAnnotation.Inactive)
+    .join(FormSchema)
+    .join(Creator)
+    .join(Patient, Patient.PatientID == FormAnnotation.PatientID)
+    .outerjoin(Study, Study.PatientID == Patient.PatientID)
+    .outerjoin(Series, Series.StudyID == Study.StudyID)
+    .outerjoin(ImageInstance, ImageInstance.SeriesID == Series.SeriesID)
 )
 
 annotation_query = (
@@ -74,9 +102,10 @@ annotation_query = (
     .filter(~Annotation.Inactive)
     .join(Feature)
     .join(AnnotationType)
-    .join(AnnotationCreator)
+    .join(Creator)
     .outerjoin(AnnotationData)
 )
+
 
 # optimization: skipping FormData, viewer will load on demand
 form_query = (
@@ -85,7 +114,7 @@ form_query = (
     .filter(~FormAnnotation.Inactive)
     .join(Patient)
     .join(FormSchema)
-    .join(FormCreator)
+    .join(Creator)
     .join(Study, Patient.PatientID == Study.PatientID)
 )
 base_tables = [
@@ -99,8 +128,8 @@ base_tables = [
     SourceInfo,
     Scan,
 ]
-annotation_tables = [Annotation, Feature, AnnotationType, AnnotationCreator]
-form_tables = [FormAnnotation, FormSchema, FormCreator]
+annotation_tables = [Annotation, Feature, AnnotationType, Creator]
+form_tables = [FormAnnotation, FormSchema, Creator]
 
 
 def get_mappings(tables):
@@ -140,6 +169,7 @@ def apply_filters(query, mappings, params):
         if field not in mappings:
             continue
         column = mappings[field]
+        print("filtering", field, operator, column, value)
         query = query.where(sqlalchemy_operators[operator](column, value))
     return query
 
@@ -148,67 +178,58 @@ def run_queries(
     session, params, cursor, limit, base_query, annotation_query, form_query
 ):
     params_decoded = decode_params(params)
+    
+    query = apply_filters(base_query, base_mappings, params_decoded)
     if cursor:
         query = query.filter(Study.StudyDate <= cursor)
 
-    query = apply_filters(base_query, base_mappings, params_decoded)
+    query = query.distinct(ImageInstance.ImageInstanceID).order_by(Study.StudyDate)
 
+    filter_instance_ids = set()
+    filter_patient_ids = set()
     if any(field in annotation_mappings for field, operator in params_decoded):
-        query = (
-            query.join(
-                Annotation,
-                ImageInstance.ImageInstanceID == Annotation.ImageInstanceID,
-            )
-            .join(Feature, Annotation.FeatureID == Feature.FeatureID)
-            .join(
-                AnnotationType,
-                Annotation.AnnotationTypeID == AnnotationType.AnnotationTypeID,
-            )
-            .join(
-                AnnotationCreator,
-                Annotation.CreatorID == AnnotationCreator.CreatorID,
-            )
+        sub_query = apply_filters(
+            annotation_sub_query,
+            {**annotation_mappings, **base_mappings},
+            params_decoded,
         )
-        query = apply_filters(query, annotation_mappings, params_decoded)
-    if any(field in form_mappings for field, operator in params_decoded):
-        query = (
-            query.join(
-                FormAnnotation,
-                FormAnnotation.PatientID == Patient.PatientID,
-            )
-            .join(
-                FormSchema, FormAnnotation.FormSchemaID == FormSchema.FormSchemaID
-            )
-            .join(FormCreator, FormAnnotation.CreatorID == FormCreator.CreatorID)
-        )
-        query = apply_filters(query, form_mappings, params_decoded)
+        filter_instance_ids = set(session.execute(sub_query).scalars().all())
 
-    instance_query = (
-        query.distinct(ImageInstance.ImageInstanceID)
-        .order_by(Study.StudyDate)
-        .limit(limit + 1)
-    )
-    instances = session.execute(instance_query).all()
+    if any(field in form_mappings for field, operator in params_decoded):
+        sub_query = apply_filters(
+            form_sub_query, {**form_mappings, **base_mappings}, params_decoded
+        )
+        filter_patient_ids = set(session.execute(sub_query).scalars().all())
+
+    if filter_instance_ids or filter_patient_ids:
+        query = query.filter(
+            or_(
+                ImageInstance.ImageInstanceID.in_(filter_instance_ids),
+                Patient.PatientID.in_(filter_patient_ids),
+            )
+        )
+
+    query = query.order_by(Study.StudyDate).limit(limit + 1)
+
+    instances = session.execute(query).all()
     if len(instances) > limit:
         _, _, last_study, _ = instances[-1]
         next_cursor = last_study.StudyDate
         # run again, but with cursor for max date instead of limit
-        instance_query = (
+        query = (
             query.filter(Study.StudyDate <= next_cursor)
             .distinct(ImageInstance.ImageInstanceID)
             .order_by(Study.StudyDate)
         )
-        instances = session.execute(instance_query).all()
+        instances = session.execute(query).all()
 
     else:
         next_cursor = None
 
     image_ids = {instance.ImageInstanceID for instance, *_ in instances}
 
-    annotation_query = annotation_query.where(
-        Annotation.ImageInstanceID.in_(image_ids)
-    )
-    
+    annotation_query = annotation_query.where(Annotation.ImageInstanceID.in_(image_ids))
+
     annotations = session.execute(annotation_query).all()
 
     patient_ids = {patient.PatientID for _, _, _, patient in instances}
@@ -239,7 +260,7 @@ async def get_instances(
     patients = {patient for _, _, _, patient in i}
     annotations = {annotation for annotation, _ in a}
     annotation_datas = {annotation_data for _, annotation_data in a}
-    
+
     response = {
         "entities": {
             k: collect_rows(v)

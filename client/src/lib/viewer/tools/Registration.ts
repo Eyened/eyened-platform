@@ -10,7 +10,6 @@ export type PointList = (Position2D | undefined)[];
 
 export class RegistrationTool implements Overlay {
 
-    // public readonly points = new WritableStore<PointList | undefined>(undefined);
     private activePointIndex: number | undefined;
     private hoverPointIndex: number | undefined
 

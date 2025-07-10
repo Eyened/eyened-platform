@@ -370,3 +370,16 @@ async def get_task_subtasks_with_images(
             }.items()
         },
     }
+
+
+@router.get("/form-annotations/{form_annotation_id}/form-data")
+async def get_form_annotation_form_data(
+    form_annotation_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    annotation = FormAnnotation.by_id(db, form_annotation_id)
+    if annotation is None:
+        raise HTTPException(status_code=404, detail="FormAnnotation not found")
+
+    return annotation.FormData

@@ -60,8 +60,9 @@ export class Device extends BaseItem {
         this.serialNumber = serverItem.SerialNumber;
         this.description = serverItem.Description;
     }
+    
     get deviceModel(): DeviceModel {
-        return data.deviceModels.get(this.deviceModelId);
+        return data.deviceModels.get(this.deviceModelId)!;
     }
 }
 

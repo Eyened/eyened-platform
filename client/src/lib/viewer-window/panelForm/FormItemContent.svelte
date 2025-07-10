@@ -19,7 +19,8 @@
     let value: any = $state();
     let status = $state("loading");
     onMount(async () => {
-        value = await form.value.load();
+        await form.load();
+        value = form.value;
         status = "ready";
         if (!value) {
             value = getDefault(schema);
@@ -30,7 +31,7 @@
         if (!canEdit) return;
         if (value) {
             status = "saving";
-            await form.value.setValue(value);
+            await form.update({ value });
             status = "synced";
         }
     }
@@ -111,8 +112,8 @@
             {value}
             {onchange}
             {canEdit}
-            bind:vertical
-            bind:collapse
+            {vertical}
+            {collapse}
         />
     {/if}
 </div>

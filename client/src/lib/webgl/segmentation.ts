@@ -1,4 +1,4 @@
-import type { AnnotationType } from "$lib/datamodel/annotationType.svelte";
+import type { AnnotationData } from "$lib/datamodel/annotationData.svelte";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
 import type { Position2D } from "$lib/types";
 import { colorsFlat } from "$lib/viewer/overlays/colors";
@@ -25,10 +25,11 @@ export interface PaintSettings {
 
 export abstract class Segmentation {
     constructor(
-        protected readonly image: AbstractImage
+        protected readonly image: AbstractImage,
+        protected readonly annotationData: AnnotationData
     ) { }
 
-    abstract importData(data: ArrayBuffer): void;
+    abstract importData(data: DrawingArray): void;
     abstract exportData(): DrawingArray;
     abstract draw(drawing: ImageType, paintSettings: PaintSettings): void;
     abstract clear(): void;
@@ -36,14 +37,15 @@ export abstract class Segmentation {
     abstract render(renderTarget: RenderTarget, uniforms: any): void;
 }
 
+
 export class BinarySegmentation extends Segmentation {
 
     protected _binaryMask: BinaryMask | null = null;
     protected webgl: WebGL;
     protected shaders: Shaders;
 
-    constructor(image: AbstractImage) {
-        super(image);
+    constructor(image: AbstractImage, annotationData: AnnotationData) {
+        super(image, annotationData);
         this.webgl = this.image.webgl;
         this.shaders = this.webgl.shaders;
     }
@@ -55,9 +57,8 @@ export class BinarySegmentation extends Segmentation {
         return this._binaryMask!;
     }
 
-    importData(data: ArrayBuffer): void {
-        const typedArray = new Uint8Array(data);
-        this.binaryMask.setData(typedArray);
+    importData(data: DrawingArray): void {
+        this.binaryMask.setData(data);
         this.connectedComponentsValid = false;
     }
 
@@ -167,8 +168,8 @@ export class BinarySegmentation extends Segmentation {
 export class QuestionableSegmentation extends BinarySegmentation {
     _questionableMask: BinaryMask | null = null;
 
-    constructor(image: AbstractImage) {
-        super(image);
+    constructor(image: AbstractImage, annotationData: AnnotationData) {
+        super(image, annotationData);
     }
 
     get questionableMask(): BinaryMask {
@@ -178,13 +179,12 @@ export class QuestionableSegmentation extends BinarySegmentation {
         return this._questionableMask!;
     }
 
-    importData(data: ArrayBuffer): void {
-        const typedArray = new Uint8Array(data);
+    importData(data: DrawingArray): void {
         const b = new Uint8Array(this.image.width * this.image.height);
         const q = new Uint8Array(this.image.width * this.image.height);
         for (let i = 0; i < this.image.width * this.image.height; i++) {
-            b[i] = typedArray[i] & 1;
-            q[i] = (typedArray[i] >> 1) & 1;
+            b[i] = data[i] & 1;
+            q[i] = (data[i] >> 1) & 1;
         }
         this.binaryMask.setData(b);
         this.questionableMask.setData(q);
@@ -242,25 +242,14 @@ export class QuestionableSegmentation extends BinarySegmentation {
 }
 abstract class DataSegmentation extends Segmentation {
     textureData: TextureData;
-    constructor(image: AbstractImage, readonly dataType: 'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F') {
-        super(image);
+    constructor(image: AbstractImage, annotationData: AnnotationData) {
+        super(image, annotationData);
+        const dataType = annotationData.annotation.annotationType.dataType;
         this.textureData = new TextureData(image.webgl.gl, image.width, image.height, dataType);
     }
 
-    importData(data: ArrayBuffer): void {
-        let typedArray: TypedArray;
-        if (this.dataType == 'R8' || this.dataType == 'R8UI') {
-            typedArray = new Uint8Array(data);
-        } else if (this.dataType == 'R16UI') {
-            typedArray = new Uint16Array(data);
-        } else if (this.dataType == 'R32UI') {
-            typedArray = new Uint32Array(data);
-        } else if (this.dataType == 'R32F') {
-            typedArray = new Float32Array(data);
-        } else {
-            throw new Error("DataSegmentation: invalid data type");
-        }
-        this.textureData.uploadData(typedArray);
+    importData(data: DrawingArray): void {
+        this.textureData.uploadData(data);
     }
     exportData(): DrawingArray {
         return this.textureData.data;
@@ -276,8 +265,8 @@ abstract class DataSegmentation extends Segmentation {
 export class ProbabilitySegmentation extends DataSegmentation {
 
     u_hard: boolean = true;
-    constructor(image: AbstractImage) {
-        super(image, 'R8');
+    constructor(image: AbstractImage, annotationData: AnnotationData) {
+        super(image, annotationData);
     }
 
     drawEnhance(settings: {
@@ -330,12 +319,9 @@ export class ProbabilitySegmentation extends DataSegmentation {
 abstract class BaseMultiSegmentation extends DataSegmentation {
 
     constructor(image: AbstractImage,
-        private readonly annotationType: AnnotationType,
-        dataType: 'R8UI' | 'R16UI' | 'R32UI') {
-        super(image, dataType);
+        annotationData: AnnotationData) {
+        super(image, annotationData);
     }
-
-
 
     abstract getBitmask(activeIndex: number | number[]): number;
     abstract getRenderShader(): TextureShaderProgram;
@@ -351,7 +337,7 @@ abstract class BaseMultiSegmentation extends DataSegmentation {
             u_drawing: imageToTexture(this.image.webgl.gl, drawing),
             u_paint: paintSettings.paint,
             u_bitmask: bitmask,
-            u_mode: this.annotationType.dataRepresentation == 'MULTI_LABEL'
+            u_mode: this.annotationData.annotation.annotationType.dataRepresentation == 'MultiLabel'
         };
         if (paintSettings.dilateErode) {
             //TODO: implement erodeDilate for multi-label segmentation
@@ -379,8 +365,8 @@ abstract class BaseMultiSegmentation extends DataSegmentation {
     }
 }
 export class MultiClassSegmentation extends BaseMultiSegmentation {
-    constructor(image: AbstractImage, annotationType: AnnotationType, dataType: 'R8UI' | 'R16UI' | 'R32UI') {
-        super(image, annotationType, dataType);
+    constructor(image: AbstractImage, annotationData: AnnotationData) {
+        super(image, annotationData);
     }
     getBitmask(activeIndex: number): number {
         return activeIndex;
@@ -391,8 +377,8 @@ export class MultiClassSegmentation extends BaseMultiSegmentation {
 }
 
 export class MultiLabelSegmentation extends BaseMultiSegmentation {
-    constructor(image: AbstractImage, annotationType: AnnotationType, dataType: 'R8UI' | 'R16UI' | 'R32UI') {
-        super(image, annotationType, dataType);
+    constructor(image: AbstractImage, annotationData: AnnotationData) {
+        super(image, annotationData);
     }
     getBitmask(activeIndices: number[]): number {
         let bitmask = 0;
