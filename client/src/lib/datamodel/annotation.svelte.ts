@@ -1,5 +1,6 @@
 import type { AnnotationData } from "./annotationData.svelte";
 import type { AnnotationType } from "./annotationType.svelte";
+import { DataEndpoint } from "./api.svelte";
 import type { Creator } from "./creator.svelte";
 import type { Feature } from "./feature.svelte";
 import type { Instance } from "./instance.svelte";
@@ -47,6 +48,7 @@ export class Annotation extends BaseItem {
     featureId!: number;
     annotationTypeId!: number;
     created!: Date;
+    file!: DataEndpoint<any>;
 
     constructor(serverItem: ServerAnnotation) {
         super();
@@ -64,6 +66,8 @@ export class Annotation extends BaseItem {
         this.featureId = serverItem.FeatureID;
         this.annotationTypeId = serverItem.AnnotationTypeID;
         this.created = serverItem.DateInserted;
+        this.file = new DataEndpoint<any>(`${Annotation.endpoint}/${this.id}/file`);
+        
     }
 
     static async createFrom(instance: Instance, feature: Feature, creator: Creator, annotationType: AnnotationType) {

@@ -8,16 +8,16 @@ from typing import (
     Optional,
     Type,
     TypeVar,
-    Literal,
-    get_args,
-    Union,
 )
 
-from eyened_orm.utils.config import DatabaseSettings
 from pydantic import create_model
 from sqlalchemy import Column, select
 from sqlalchemy.orm import Session
-from sqlmodel import SQLModel, Field
+from sqlmodel import Field, SQLModel
+
+from eyened_orm.utils.config import DatabaseSettings
+
+from .utils.zarr.manager_annotation import AnnotationZarrStorageManager
 
 
 def PrivateField(**kwargs):
@@ -97,6 +97,7 @@ class Base(SQLModel):
     # Common class variables
     _name_column: ClassVar[str | None] = None
     config: ClassVar[DatabaseSettings] = None
+    annotation_storage_manager: ClassVar[AnnotationZarrStorageManager] = None
 
     class Config:
         use_enum_values = False  # This tells Pydantic NOT to convert Enum to .value
