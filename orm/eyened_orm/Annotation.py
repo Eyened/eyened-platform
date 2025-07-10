@@ -28,6 +28,13 @@ if TYPE_CHECKING:
     )
 
 
+class AnnotationPlane(Enum):
+    PRIMARY = 0  # 2D images, or B-scan
+    SECONDARY = 1  # Enface OCT
+    TERTIARY = 2  # Across B-scans
+    VOLUME = 3  # Volume OCT
+
+
 class AnnotationBase(Base):
     """
     Used for segmentation (i.e. masks)
@@ -54,6 +61,7 @@ class AnnotationBase(Base):
     Width: int | None = None
     Height: int | None = None
     Depth: int | None = None
+    AnnotationPlane: AnnotationPlane
 
 
 class Annotation(AnnotationBase, table=True):
@@ -190,13 +198,6 @@ def load_binary(filepath: Path, shape) -> np.ndarray:
         with open(filepath, "rb") as f:
             raw = np.frombuffer(f.read(), dtype=np.uint8)
     return raw.reshape(shape, order="C")
-
-
-class AnnotationPlane(Enum):
-    PRIMARY = 0  # 2D images, or B-scan
-    SECONDARY = 1  # Enface OCT
-    TERTIARY = 2  # Across B-scans
-    VOLUME = 3  # Volume OCT
 
 
 class AnnotationDataBase(Base):
