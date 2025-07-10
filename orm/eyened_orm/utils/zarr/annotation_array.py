@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional, Tuple
 
 import numpy as np
@@ -22,7 +21,7 @@ class AnnotationZarrArray:
         array = AnnotationZarrArray.create_new("path/to/new/array.zarr", "binary_mask", (512, 512))
     """
 
-    def __init__(self, zarr_path: str | Path):
+    def __init__(self, zarr_array: zarr.Array):
         """
         Initialize the AnnotationZarrArray from an existing array.
 
@@ -33,13 +32,7 @@ class AnnotationZarrArray:
             FileNotFoundError: If the zarr array does not exist on disk
             ValueError: If the array shape is invalid
         """
-        self.zarr_path = Path(zarr_path)
-
-        if not self.zarr_path.exists():
-            raise FileNotFoundError(f"Zarr array not found at {zarr_path}")
-
-        # Load existing array
-        self.array = zarr.open(str(self.zarr_path), mode="a")
+        self.array = zarr_array
 
     def write(self, zarr_index: Optional[int], annot_data: np.ndarray) -> int:
         """
@@ -47,15 +40,32 @@ class AnnotationZarrArray:
 
         Args:
             zarr_index: Index in the array where to write. If None or >= len(A), append to array.
-            annot_data: Annotation data as numpy array
+            annot_data: Annotation data as numpy array of shape (H, W, D, C) where D may be 1 for 2D images
 
         Returns:
             The zarr_index where data was written
         """
-        # Validate input data shape
-        expected_shape = self.annotation_resolution + (self.array.shape[-1],)
-        if annot_data.shape != expected_shape:
-            raise ValueError(f"Expected shape {expected_shape}, got {annot_data.shape}")
+        # Validate input data shape - annot_data should be (H, W, D, C)
+        if len(annot_data.shape) != 4:
+            raise ValueError(
+                f"Expected 4D array (H, W, D, C), got shape {annot_data.shape}"
+            )
+
+        # Check if spatial dimensions match
+        expected_spatial = self.annotation_resolution
+        actual_spatial = annot_data.shape[:3]  # H, W, D
+        if actual_spatial != expected_spatial:
+            raise ValueError(
+                f"Expected spatial dimensions {expected_spatial}, got {actual_spatial}"
+            )
+
+        # Check if channel dimension matches
+        expected_channels = self.array.shape[-1]
+        actual_channels = annot_data.shape[-1]
+        if actual_channels != expected_channels:
+            raise ValueError(
+                f"Expected {expected_channels} channels, got {actual_channels}"
+            )
 
         # Validate data type
         if annot_data.dtype != self.array.dtype:
@@ -69,8 +79,8 @@ class AnnotationZarrArray:
             return zarr_index
         else:
             # Append to array
-            self.array.append(annot_data[np.newaxis, ...])
-            return len(self.array) - 1
+            self.array.append(annot_data[None, ...])
+            return self.array.shape[0] - 1
 
     def read(self, zarr_index: int) -> np.ndarray:
         """

@@ -8,7 +8,7 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 
 from eyened_orm import (
     ImageInstance,
-    Annotation,
+    Segmentation,
     Feature, Creator)
 
 from .annotation_export import get_center_of_gravity_3d, load_segmentation_3d
@@ -40,23 +40,23 @@ def find_fovea_x_location(session, instance: ImageInstance, creatorname=None):
         raise ValueError(f"No fovea location found for {instance.ImageInstanceID}")
 
 def get_all_etrds_grids(session, instance: ImageInstance, creatorname=None):
-    query = (select(Annotation)
+    query = (select(Segmentation)
                 .join(ImageInstance)
                 .join(Feature)
                 .where(Feature.FeatureName == 'ETDRS grid',
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
-                    Annotation.Inactive == None))
+                    Segmentation.Inactive == None))
     if creatorname is not None:
         query = query.join(Creator).where(Creator.CreatorName == creatorname)
     return session.execute(query).scalars().all()
 
 def get_all_fovea_segmentations(session, instance: ImageInstance, creatorname=None):
-    query = (select(Annotation)
+    query = (select(Segmentation)
                 .join(ImageInstance)
                 .join(Feature)
                 .where(Feature.FeatureName == 'Fovea',
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
-                    Annotation.Inactive == None))
+                    Segmentation.Inactive == None))
     if creatorname is not None:
         query = query.join(Creator).where(Creator.CreatorName == creatorname)
     return session.execute(query).scalars().all()

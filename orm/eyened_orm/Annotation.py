@@ -8,13 +8,12 @@ from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
 
 import numpy as np
 from PIL import Image
-from sqlalchemy import Column, Index, Mapped, event, mapped_column
+from sqlalchemy import Column, Index, event
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
 
 from .base import Base
-from .utils.zarr.manager_annotation import AnnotationZarrStorageManager
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -49,6 +48,12 @@ class AnnotationBase(Base):
         foreign_key="Annotation.AnnotationID", default=None
     )
     Inactive: bool = False
+
+    ZarrArrayIndex: int | None = None
+    ScanNr: int | None = None
+    Width: int | None = None
+    Height: int | None = None
+    Depth: int | None = None
 
 
 class Annotation(AnnotationBase, table=True):
@@ -90,13 +95,6 @@ class Annotation(AnnotationBase, table=True):
     AnnotationData: List["AnnotationData"] = Relationship(
         back_populates="Annotation", cascade_delete=True
     )
-    ZarrArrayIndex: Mapped[Optional[int]] = mapped_column(default=None)
-    ScanNr: Mapped[int] = mapped_column(primary_key=True)
-    Width: Mapped[int] = mapped_column(default=0)
-    Height: Mapped[int] = mapped_column(default=0)
-    Depth: Mapped[int] = mapped_column(default=0)
-
-    # TransformationMatrix: Mapped[Optional[]] = mapped_column(default=None)
 
     @property
     def FeatureName(self):
@@ -116,17 +114,7 @@ class Annotation(AnnotationBase, table=True):
 
     @property
     def numpy(self) -> Optional[np.ndarray]:
-        """
-        Read annotation data from the zarr array.
-
-        Returns:
-            numpy array containing the annotation data, or None if no zarr array index is set
-
-        Raises:
-            ValueError: If configuration is not initialized
-            FileNotFoundError: If the zarr array does not exist
-            IndexError: If the zarr array index is invalid
-        """
+        """Read annotation data from the zarr array."""
         if self.ZarrArrayIndex is None:
             return None
 
@@ -137,73 +125,33 @@ class Annotation(AnnotationBase, table=True):
         if not self.ImageInstance:
             raise ValueError("Annotation has no associated ImageInstance")
 
-        # Determine image shape based on dimensions
-        annotation_shape = (self.Width, self.Height, self.Depth)
-
-        # Get the annotation dtype from the annotation type's data representation
-        annotation_dtype = get_annotation_dtype_from_representation(
-            self.AnnotationType.DataRepresentation
+        annotation_shape = (self.Height, self.Width, self.Depth)
+        return self.annotation_storage_manager.read(
+            group_name=str(self.AnnotationTypeID),
+            data_dtype=np.uint8,
+            data_shape=annotation_shape,
         )
-
-        # Create storage manager and get the array
-        storage_manager = AnnotationZarrStorageManager(
-            self.config.annotations_zarr_basepath
-        )
-
-        if not storage_manager.array_exists(annotation_dtype, annotation_shape):
-            raise FileNotFoundError(
-                f"Zarr array not found for annotation dtype {annotation_dtype} and shape {annotation_shape}"
-            )
-
-        # Get the array and read the data
-        array = storage_manager.get_array(annotation_dtype, annotation_shape)
-        return array.read(self.ZarrArrayIndex)
 
     def write_data(self, data: np.ndarray) -> int:
-        """
-        Write annotation data to the zarr array and update the ZarrArrayIndex.
-
-        Args:
-            data: numpy array containing the annotation data
-
-        Returns:
-            The zarr array index where the data was written
-
-        Raises:
-            ValueError: If configuration is not initialized or annotation has no ImageInstance
-            FileNotFoundError: If the zarr array does not exist
-            ValueError: If the data shape or dtype doesn't match the array requirements
-        """
+        """Write annotation data to the zarr array and update the ZarrArrayIndex."""
         if not self.config:
             raise ValueError("Configuration not initialized")
 
         if not self.ImageInstance:
             raise ValueError("Annotation has no associated ImageInstance")
 
-        # Determine annotation shape based on dimensions
-        annotation_shape = (self.Width, self.Height, self.Depth)
+        # check that the annotation shape matches data shape
+        annotation_shape = (self.Height, self.Width, self.Depth)
+        if annotation_shape != data.shape:
+            raise ValueError(
+                f"Data shape {data.shape} does not match annotation shape {annotation_shape}"
+            )
 
-        # Get the annotation dtype from the annotation type's data representation
-        annotation_dtype = get_annotation_dtype_from_representation(
-            self.AnnotationType.DataRepresentation
+        zarr_index = self.annotation_storage_manager.write(
+            str(self.AnnotationTypeID), data, self.ZarrArrayIndex
         )
 
-        # Create storage manager
-        storage_manager = AnnotationZarrStorageManager(
-            self.config.annotations_zarr_basepath
-        )
-
-        # Check if array exists, create it if it doesn't
-        if not storage_manager.array_exists(annotation_dtype, annotation_shape):
-            storage_manager.create_array(annotation_dtype, annotation_shape)
-
-        # Get the array and write the data
-        array = storage_manager.get_array(annotation_dtype, annotation_shape)
-        zarr_index = array.write(self.ZarrArrayIndex, data)
-
-        # Update the ZarrArrayIndex
         self.ZarrArrayIndex = zarr_index
-
         return zarr_index
 
     def __repr__(self):
@@ -316,13 +264,13 @@ class AnnotationData(AnnotationDataBase, table=True):
     def path(self) -> Path:
         if not self.config:
             raise ValueError("Configuration not initialized")
-        return self.config.annotations_path / self.DatasetIdentifier
+        return Path(self.config.annotations_path) / self.DatasetIdentifier
 
     @property
     def trash_path(self) -> Path:
         if not self.config:
             raise ValueError("Configuration not initialized")
-        return self.config.trash_path / self.DatasetIdentifier
+        return Path(self.config.trash_path) / self.DatasetIdentifier
 
     def load_data(self) -> Any:
         """Load the annotation data from the file."""
