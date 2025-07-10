@@ -43,34 +43,19 @@
         );
     }
 
-    class Activator {
-        activeID: number | undefined = $state(undefined);
-        toggle(formAnnotation: FormAnnotation) {
-            if (this.activeID === formAnnotation.id) {
-                this.activeID = undefined;
-            } else {
-                this.activeID = formAnnotation.id;
-            }
-        }
-    }
-    const activator = new Activator();
-    // let activeId: null | number = $state(null);
-    // function activate(formAnnotation: FormAnnotation) {
-    // 	if (activeId === formAnnotation.id) {
-    // 		activeId = null;
-    // 	} else {
-    // 		activeId = formAnnotation.id;
-    // 	}
-    // }
+    let activeID: number | undefined = $state(undefined);
+    
 </script>
 
 <div class="main">
     <div class="available">
         <ul>
             {#each $filtered.sort((a, b) => a.id - b.id) as formAnnotation (formAnnotation.id)}
-                {#if formAnnotation.value != undefined}
-                    <RegistrationItem {formAnnotation} {active} {activator} />
-                {/if}
+                {#await formAnnotation.load()}
+                    <div>Loading [{formAnnotation.id}]</div>
+                {:then}
+                    <RegistrationItem {formAnnotation} {active} bind:activeID={activeID} />
+                {/await}
             {/each}
         </ul>
     </div>

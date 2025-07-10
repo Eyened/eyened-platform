@@ -1,6 +1,10 @@
 <script lang="ts">
     import type { Annotation } from "$lib/datamodel/annotation.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+
+    const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
         image: AbstractImage;
@@ -10,10 +14,14 @@
     }
 
     let { image, annotation, resolve, reject }: Props = $props();
-    const segmentationAnnotations = image.instance.annotations;
+    const segmentationAnnotations = image.instance.annotations.filter(globalContext.annotationsFilter);
     const referenceAnnotations = segmentationAnnotations.filter(
-        (a) => a.id != annotation.id,
+        (a) => {
+            if (a.annotationType.dataRepresentation == "MultiLabel" || a.annotationType.dataRepresentation == "MultiClass" || a.annotationType.dataRepresentation == "Probability") return false;
+            return true;
+        },
     );
+    
 </script>
 
 <div>

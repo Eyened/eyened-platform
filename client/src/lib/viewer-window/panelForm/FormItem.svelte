@@ -2,7 +2,7 @@
     import FormItemContent from "./FormItemContent.svelte";
     import { PanelIcon, Trash } from "../icons/icons";
     import { data } from "$lib/datamodel/model";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { openNewWindow } from "$lib/newWindow";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
@@ -23,6 +23,8 @@
     let { form, theme = "dark" }: Props = $props();
     const { formAnnotations } = data;
 
+    console.log(form);
+
     const dt = new Date().getTime() - (form.created?.getTime() ?? 0);
     const daysSinceCreation = dt / (1000 * 60 * 60 * 24);
     const canEditForm = globalContext.canEdit(form);
@@ -39,20 +41,12 @@
             if (progress >= maxTime) {
                 clearInterval(removing);
                 removing = undefined;
-                formAnnotations.delete(form);
+                form.delete();
             }
         }, 10);
     }
     function duplicate() {
-        const item: any = { ...form };
-        item.creator = creator;
-        if (taskContext) {
-            item.subTask = taskContext.subTask;
-        } else {
-            item.subTask = undefined;
-        }
-        item.reference = form;
-        formAnnotations.create(item);
+        FormAnnotation.createFrom(creator, form.instance, form.formSchema, taskContext?.subTask, form);
     }
 
     let window: Window | null = null;

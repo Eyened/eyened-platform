@@ -5,10 +5,9 @@
     import { getContext, onDestroy, setContext } from "svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import Dialogue from "./Dialogue.svelte";
-    import { get_url_params } from "$lib/utils";
     import PanelRendering from "./panelRendering/PanelRendering.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import type { DialogueType, TaskContext } from "$lib/types";
+    import type { TaskContext } from "$lib/types";
     import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
     import { writable } from "svelte/store";
     import PanelForm from "./panelForm/PanelForm.svelte";
@@ -52,7 +51,7 @@
     const { activePanels } = viewerContext;
     activePanels.add("Segmentation");
 
-    const dialogue = writable<DialogueType>(undefined);
+    const dialogue = writable(undefined);
     setContext("dialogue", dialogue);
 
     const topViewer = viewerWindowContext.topViewers.get(image)!;

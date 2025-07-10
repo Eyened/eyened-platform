@@ -8,9 +8,10 @@
     interface Props<T extends Named> {
         name: string;
         values: FilterList<T>;
-        onselect: (value: T) => void;
+        types: string[];
+        onselect: (value: T, type: string) => void;
     }
-    let { name, values, onselect }: Props<any> = $props();
+    let { name, values, types, onselect }: Props<any> = $props();
     export const placeholder = "Search...";
     let filter = $state("");
     let filtered = $derived.by(() => {
@@ -23,17 +24,30 @@
             }
         });
     });
+    let selectedType = $state("Q");
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div>
-    <div>{name}:</div>
-    <input type="text" {placeholder} bind:value={filter} />
+    <div>
+        <label>
+            {name}:
+            <input type="text" {placeholder} bind:value={filter} />
+        </label>
+    </div>
+    <div>   
+        {#each types as type}
+            <label>
+                <input type="radio" name="type" value={type} bind:group={selectedType} />
+                {type}
+            </label>
+        {/each}
+    </div>
     <ul>
         {#each $filtered as feature}
-            <li class="item" onclick={() => onselect(feature)}>
+            <li class="item" onclick={() => onselect(feature, selectedType)}>
                 {feature.name}
             </li>
         {/each}

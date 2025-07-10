@@ -11,8 +11,7 @@
 	import ETDRSGridItem from './ETDRSGridItem.svelte';
 	import { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import type { TaskContext } from '$lib/types';
-	import { PanelIcon } from '../icons/icons';
-	import ShowHideToggle from '../icons/ShowHideToggle.svelte';
+	import { Hide, PanelIcon, Show } from '../icons/icons';
 	import type { FormSchema } from '$lib/datamodel/formSchema.svelte';
 
 	interface Props {
@@ -36,8 +35,10 @@
 	const { instance } = image;
 
 	const filter = (formAnnotation: FormAnnotation) => {
-		if (formAnnotation.formSchema !== etdrsSchema) return false;
-		if (formAnnotation.instance == image.instance) return true;
+		if (formAnnotation.formSchemaId !== etdrsSchema.id) return false;
+        console.log(formAnnotation.formSchemaId, etdrsSchema.id);
+        console.log(formAnnotation.instanceId, image.instance.id);
+		if (formAnnotation.instanceId == image.instance.id) return true;
 
 		// also show annotations on linked images
 		// TODO: this should be reactive?
@@ -47,6 +48,7 @@
 		return false;
 	};
 	const filtered = formAnnotations.filter(filter);
+
 
 	async function create() {
         await FormAnnotation.createFrom(creator, instance, etdrsSchema, taskContext?.subTask);
@@ -74,6 +76,13 @@
 			overlay.visible.add(autoItem);
 		}
 	}
+    let autoToggleIcon = $derived.by(() => {
+        if (overlay.visible.has(autoItem)) {
+            return Hide;
+        } else {
+            return Show;
+        }
+    });
 </script>
 
 <div class="main">
@@ -95,15 +104,18 @@
 					active={overlay.visible.has(autoItem)}
 					onclick={toggleVisisble}
 					tooltip="show/hide"
-				>
-					<ShowHideToggle show={overlay.visible.has(autoItem)} />
-				</PanelIcon>
+                    Icon={autoToggleIcon}
+				/>
 				Automatic
 			</div>
 		{/if}
 
 		{#each $filtered as formAnnotation (formAnnotation.id)}
-			<ETDRSGridItem {overlay} {tool} {formAnnotation} />
+            {#await formAnnotation.load()}
+                <div>Loading [{formAnnotation.id}]§</div>
+            {:then}
+                <ETDRSGridItem {overlay} {tool} {formAnnotation} />
+            {/await}
 		{/each}
 	</div>
 	<div class="new">

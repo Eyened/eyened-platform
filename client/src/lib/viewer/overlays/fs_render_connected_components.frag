@@ -17,7 +17,7 @@ void main() {
     if(i == 0u) {
         discard;
     }
-    vec3 color = u_colors[i - 1u];
+    vec3 color = u_colors[(i - 1u) % 256u];
     color_out = vec4(color, u_alpha);    
 
 }

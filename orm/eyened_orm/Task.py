@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import Column, Index, Text, select
+from sqlalchemy import JSON, Column, Index, Text, select
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
 
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 class TaskDefinitionBase(Base):
     TaskDefinitionName: str = Field(max_length=256)
+    TaskConfig: dict | None = Field(sa_column=Column(JSON), default=None)
 
 
 class TaskStateBase(Base):

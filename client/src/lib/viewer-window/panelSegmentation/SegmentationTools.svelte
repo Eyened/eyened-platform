@@ -103,8 +103,7 @@
         segmentationContext,
     );
     const isFloat =
-        segmentationItem.annotation.annotationType.dataRepresentation ==
-        "FLOAT";
+        segmentationItem.annotation.annotationType.dataRepresentation == "Probability";    
 
     let enhance: EnhanceTool | undefined = $state(undefined);
     if (isFloat) {

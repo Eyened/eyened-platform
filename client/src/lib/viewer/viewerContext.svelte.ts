@@ -74,9 +74,9 @@ export class ViewerContext {
         this.windowLevel = { min: 0, max: 255 };
         if (image.is3D) {
             this.index = Math.round(image.depth / 2);
-            if (image.instance.device.model == '3D OCT-1000' ||
-                image.instance.device.model == '3D OCT-1000 MARK II' ||
-                image.instance.device.model == '3D OCT-2000 FA Plus'
+            if (image.instance.deviceModel.model == '3D OCT-1000' ||
+                image.instance.deviceModel.model == '3D OCT-1000 MARK II' ||
+                image.instance.deviceModel.model == '3D OCT-2000 FA Plus'
             ) {
                 this.windowLevel = { min: 30, max: 225 };
             }

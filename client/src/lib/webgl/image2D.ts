@@ -64,9 +64,10 @@ export class Image2D extends AbstractImage {
     }
 
     static fromPixelData(instance: Instance, webgl: WebGL, image_id: string, pixelData: Uint8Array, dimensions: Dimensions, meta: any) {
+        //TODO: this can be simplified by uploading the pixel data directly to the texture
         const canvas = getCanvas(pixelData, dimensions.width, dimensions.height)
         const texture = initTexture(webgl.gl, canvas);
-        return new Image2D(instance, webgl, image_id, canvas, texture, dimensions, meta);
+        return new Image2D(instance, webgl, image_id, texture, dimensions, meta);
     }
 
     get pixels() {
