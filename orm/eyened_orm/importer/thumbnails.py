@@ -14,11 +14,13 @@ from eyened_orm import ImageInstance, Modality
 def get2Darray(im: ImageInstance):
     pixel_array = im.pixel_array
     shape = pixel_array.shape
+
     if len(shape) == 3:
-        if shape[2] <= 4:  # grayscale, RGB or RGBA
+        if shape[2] <= 4:  # grayscale, RGB, or RGBA
             return pixel_array.squeeze()
-        else:  # OCT 
-            n_scans, _, _ = pixel_array.shape
+        else:  # OCT (likely shape: [scans, height, width])
+            n_scans, _, _ = shape
+
             if n_scans == 1:
                 return pixel_array.squeeze()
             elif n_scans < 10:
@@ -28,16 +30,27 @@ def get2Darray(im: ImageInstance):
                 np_im = np_im - np.min(np_im)
                 np_im = np_im / np.max(np_im)
                 np_im = (np_im * 255).astype(np.uint8)
-                aspect_ratio = im.ResolutionHorizontal / im.ResolutionVertical
-                h, w = np_im.shape
-                if aspect_ratio > 1:
-                    target_shape = (int(w * aspect_ratio), h)
-                else:
-                    target_shape = (w, int(h / aspect_ratio))
 
-                return cv2.resize(np_im, target_shape, interpolation=cv2.INTER_LINEAR)
+                h, w = np_im.shape
+
+                # Only apply aspect ratio if resolutions are valid
+                try:
+                    res_h = float(im.ResolutionHorizontal)
+                    res_v = float(im.ResolutionVertical)
+                    if res_h > 0 and res_v > 0:
+                        aspect_ratio = res_h / res_v
+                        if aspect_ratio > 1:
+                            target_shape = (int(w * aspect_ratio), h)
+                        else:
+                            target_shape = (w, int(h / aspect_ratio))
+                        np_im = cv2.resize(np_im, target_shape, interpolation=cv2.INTER_LINEAR)
+                except (AttributeError, TypeError, ZeroDivisionError, ValueError):
+                    pass  
+
+                return np_im
     else:
         return pixel_array
+
 
 
 def generate_thumbnail_name(db_id, secret_key):
