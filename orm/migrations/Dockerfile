@@ -20,7 +20,7 @@ RUN mv /app/orm/migrations/test.env /app/orm/eyened_orm/environments/test.env &&
     mv /app/orm/migrations/source.env /app/orm/eyened_orm/environments/source.env
 
 # installs eyened_orm
-WORKDIR /app/orm
+WORKDIR /app/or
 RUN pip install .
 
 # Set working directory for running the script
