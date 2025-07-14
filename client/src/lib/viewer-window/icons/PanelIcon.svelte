@@ -110,7 +110,7 @@
         --icon-active-color: rgba(255, 255, 255, 1);
         --icon-disabled-color: rgba(255, 255, 255, 0.1);
         --icon-hover-bg: rgba(255, 255, 255, 0.1);
-        --icon-active-bg: rgba(255, 255, 255, 0.2);
+        --icon-active-bg: rgba(155, 255, 255, 0.4);
         --tooltip-bg: #555;
         --tooltip-color: #fff;
     }

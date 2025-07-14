@@ -41,13 +41,14 @@
 <style>
     span.creator-name {
         cursor: pointer;
+        background-color: rgba(255, 255, 255, 0.1);
     }
     .creator-name {
         display: flex;
     }
     .creator-name:hover {
         cursor: pointer;
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: rgba(255, 255, 255, 0.4);
     }
     div.item.hide {
         height: 0;

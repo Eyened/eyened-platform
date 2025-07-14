@@ -85,7 +85,7 @@
                     onclick={showUserMenu}
                     tooltip={creator.name}
                     theme="light"
-                    {icon}
+                    iconSnippet={icon}
                 />
             </div>
         </div>

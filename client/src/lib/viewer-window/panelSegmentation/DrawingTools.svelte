@@ -18,16 +18,12 @@
     import { BrushTool } from "$lib/viewer/tools/Brush";
     import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte";
 
-    import { SegmentationItem } from "$lib/webgl/segmentationItem";
     import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
-    import type { PaintSettings, ProbabilitySegmentation } from "$lib/webgl/segmentation";
+    import type {
+        PaintSettings,
+        ProbabilitySegmentation,
+    } from "$lib/webgl/segmentation";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    interface Props {
-        segmentationItem: SegmentationItem;
-        activeIndex?: number | number[];
-    }
-
-    let { segmentationItem, activeIndex = $bindable([]) }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const image = viewerContext.image;
@@ -59,6 +55,7 @@
         activeTool = tool;
         lock = viewerContext.lockScroll;
         viewerContext.lockScroll = true;
+        console.log("activate", tool);
         removeTool = viewerContext.addOverlay(tool);
     }
     onDestroy(() => {
@@ -77,10 +74,10 @@
                 paint: mode == "paint",
                 dilateErode: segmentationContext.erodeDilateActive,
                 questionable: segmentationContext.questionableActive,
-                activeIndex,
+                activeIndices: segmentationContext.activeIndices,
             };
             try {
-                await segmentationItem.draw(    
+                await segmentationContext.segmentationItem?.draw(
                     viewerContext.index,
                     ctx.canvas,
                     paintSettings,
@@ -91,7 +88,6 @@
             }
         },
     };
-    segmentationContext;
     const brush = new BrushTool(
         drawingExecutor,
         viewerContext,
@@ -102,39 +98,29 @@
         viewerContext,
         segmentationContext,
     );
-    const isFloat =
-        segmentationItem.annotation.annotationType.dataRepresentation == "Probability";    
-
-    let enhance: EnhanceTool | undefined = $state(undefined);
-    if (isFloat) {
-        // The enhance tool is only available for probability segmentations
-        // The segmentationState will be created before drawing starts
-        segmentationItem.getSegmentationState(viewerContext.index, true).then(state => {
-            const segmentation = state.segmentation as ProbabilitySegmentation;
-            enhance = new EnhanceTool(
-                drawingExecutor,
-                viewerContext,
-                segmentationContext,
-                segmentation,
-                segmentationItem,
-            );
-        });
-    }
-   
+    const enhance = new EnhanceTool(
+        drawingExecutor,
+        viewerContext,
+        segmentationContext,
+    );
     function toggle(key: "erodeDilateActive" | "questionableActive") {
         segmentationContext[key] = !segmentationContext[key];
     }
 
     function undo() {
-        segmentationItem.undo(viewerContext.index);
+        segmentationContext.segmentationItem?.undo(viewerContext.index);
     }
 
     function redo() {
-        segmentationItem.redo(viewerContext.index);
+        segmentationContext.segmentationItem?.redo(viewerContext.index);
     }
 
-    let canUndo = $derived(segmentationItem.canUndo(viewerContext.index));
-    let canRedo = $derived(segmentationItem.canRedo(viewerContext.index));
+    let canUndo = $derived(
+        segmentationContext.segmentationItem?.canUndo(viewerContext.index),
+    );
+    let canRedo = $derived(
+        segmentationContext.segmentationItem?.canRedo(viewerContext.index),
+    );
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -144,48 +130,51 @@
             onclick={() => activate(brush)}
             active={activeTool == brush}
             tooltip="Brush"
-        >
-            <Brush />
-        </PanelIcon>
+            Icon={Brush}
+        />
 
         <PanelIcon
             onclick={() => activate(polygon)}
             active={activeTool == polygon}
             tooltip="Polygon"
-        >
-            <Polygon />
-        </PanelIcon>
+            Icon={Polygon}
+        />
 
         {#if enhance}
             <PanelIcon
                 onclick={() => activate(enhance)}
                 active={activeTool == enhance}
                 tooltip="Enhance"
-            >
-                <Enhance />
-            </PanelIcon>
+                Icon={Enhance}
+            />
         {:else}
             <PanelIcon
                 active={segmentationContext.erodeDilateActive}
                 onclick={() => toggle("erodeDilateActive")}
                 tooltip="Dilate / Erode"
-            >
-                <ErodeDilate />
-            </PanelIcon>
+                Icon={ErodeDilate}
+            />
         {/if}
         <PanelIcon
             active={segmentationContext.questionableActive}
             onclick={() => toggle("questionableActive")}
             tooltip="Questionable"
-        >
-            <Questionable />
-        </PanelIcon>
-        <PanelIcon onclick={undo} tooltip="Undo" disabled={!$canUndo}>
-            <Undo />
-        </PanelIcon>
-        <PanelIcon onclick={redo} tooltip="Redo" disabled={!$canRedo}>
-            <Redo />
-        </PanelIcon>
+            Icon={Questionable}
+        />
+        <div class="undo-redo">
+            <PanelIcon
+                onclick={undo}
+                tooltip="Undo"
+                disabled={!$canUndo}
+                Icon={Undo}
+            />
+            <PanelIcon
+                onclick={redo}
+                tooltip="Redo"
+                disabled={!$canRedo}
+                Icon={Redo}
+            />
+        </div>
     </div>
 
     {#if activeTool && activeTool.brushRadius !== undefined}
@@ -240,9 +229,18 @@
     }
     div.main {
         font-size: small;
+        padding: 0.2em;
+        background-color: rgba(255, 255, 255, 0.1);
     }
     div.main {
         flex-direction: column;
+    }
+    div.erase {
+        flex-direction: row;
+        justify-content: center;
+    }
+    div.undo-redo {
+        border-left: 1px solid rgba(255, 255, 255, 0.5);
     }
     div.controls {
         display: flex;

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { getContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { Writable } from "svelte/store";
+    import type { Readable, Writable } from "svelte/store";
     import FeatureSelect from "./FeatureSelect.svelte";
     import { data } from "$lib/datamodel/model";
     import type { Feature } from "$lib/datamodel/feature.svelte";
@@ -10,6 +10,7 @@
     import { AnnotationType } from "$lib/datamodel/annotationType.svelte";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { Annotation } from "$lib/datamodel/annotation.svelte";
+    import { getAnnotationTypes } from "./annotationTypes";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const { image } = getContext<ViewerContext>("viewerContext");
@@ -18,15 +19,8 @@
         "segmentationOverlay",
     );
     const segmentationContext = segmentationOverlay.segmentationContext;
-    const { annotationTypes, features, annotationTypeFeatures } = data;
-
-    const qType = annotationTypes.find(
-        (t) => t.name == "Binary + Questionable",
-    )!;
-    const bType = annotationTypes.find((t) => t.name == "Binary")!;
-    const pType = annotationTypes.find(
-        (t) => t.name == "Probability" && t.dataType == "R8",
-    )!;
+    const { features, annotationTypeFeatures } = data;
+    const types = getAnnotationTypes();
 
     const dialogue = getContext<Writable<any>>("dialogue");
 
@@ -34,18 +28,12 @@
 
     async function create(
         feature: Feature,
-        annotationType: AnnotationType | string,
+        annotationType: AnnotationType | "Q" | "B" | "P",
     ) {
         if (annotationType instanceof AnnotationType) {
             // already an annotation type
-        } else if (annotationType == "Q") {
-            annotationType = qType;
-        } else if (annotationType == "B") {
-            annotationType = bType;
-        } else if (annotationType == "P") {
-            annotationType = pType;
         } else {
-            throw new Error(`Unsupported type: ${annotationType}`);
+            annotationType = types[annotationType];
         }
         dialogue.set(`Creating annotation...`);
 
@@ -81,6 +69,11 @@
         return true;
     });
 
+    type AnnotationTypeFeature = {
+        name: string;
+        feature: Feature;
+        annotationType: AnnotationType;
+    };
     function createAnnotationTypeFeatures(dataRepresentation: string) {
         return annotationTypeFeatures
             .filter((f) => {
@@ -98,9 +91,9 @@
             });
     }
 
-    const multiLabelAnnotationTypeFeatures =
+    const multiLabelAnnotationTypeFeatures: Readable<AnnotationTypeFeature[]> =
         createAnnotationTypeFeatures("MultiLabel");
-    const multiClassAnnotationTypeFeatures =
+    const multiClassAnnotationTypeFeatures: Readable<AnnotationTypeFeature[]> =
         createAnnotationTypeFeatures("MultiClass");
     let selectList = false;
 </script>
@@ -132,24 +125,29 @@
         name="Feature"
         values={availableFeatures}
         types={["Q", "B", "P"]}
-        onselect={(feature, type) => create(feature, type)}
+        onselect={(feature, type) => create(feature, type as "Q" | "B" | "P")}
     />
-    {#if $multiLabelAnnotationTypeFeatures.length > 0}
-        <div>
-            <ul>
-                {#each $multiLabelAnnotationTypeFeatures as item}
-                    <li>
-                        <button
-                            onclick={() =>
-                                create(item.feature, item.annotationType)}
-                        >
-                            {item.name}
-                        </button>
-                    </li>
-                {/each}
-            </ul>
-        </div>
-    {/if}
+
+    {#snippet multi(items: AnnotationTypeFeature[])}
+        {#if items.length > 0}
+            <div>
+                <ul>
+                    {#each items as item}
+                        <li>
+                            <button
+                                onclick={() =>
+                                    create(item.feature, item.annotationType)}
+                            >
+                                Create new [{item.name}]
+                            </button>
+                        </li>
+                    {/each}
+                </ul>
+            </div>
+        {/if}
+    {/snippet}
+    {@render multi($multiLabelAnnotationTypeFeatures)}
+    {@render multi($multiClassAnnotationTypeFeatures)}
 </div>
 
 <style>
@@ -161,5 +159,10 @@
     }
     select {
         width: 10em;
+    }
+    ul {
+        list-style-type: none;
+        padding-inline-start: 0em;
+        margin: 0;
     }
 </style>

@@ -29,8 +29,8 @@
         <form onsubmit={createAnnotationType}>
             <input type="text" bind:value={name} />
             <select bind:value={dataRepresentation}>
-                <option value="MultiLabel">Multi Label</option>
-                <option value="MultiClass">Multi Class</option>
+                <option value="MultiLabel">Multi-label</option>
+                <option value="MultiClass">Multi-class</option>
             </select>
             N Features:
             <label>
@@ -40,7 +40,7 @@
                     value="8"
                     bind:group={dataTypeInt}
                 />
-                {"< 8"}
+                {"≤ 8"}
             </label>
             <label>
                 <input
@@ -49,7 +49,7 @@
                     value="16"
                     bind:group={dataTypeInt}
                 />
-                {"< 16"}
+                {"≤ 16"}
             </label>
             <label>
                 <input
@@ -58,7 +58,7 @@
                     value="32"
                     bind:group={dataTypeInt}
                 />
-                {"< 32"}
+                {"≤ 32"}
             </label>
             <button type="submit">Create</button>
         </form>

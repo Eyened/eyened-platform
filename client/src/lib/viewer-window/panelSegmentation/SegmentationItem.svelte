@@ -1,44 +1,27 @@
 <script lang="ts">
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext, onMount } from "svelte";
-    import {
-        Duplicate,
-        Hide,
-        ImportSegmentation,
-        PanelIcon,
-        Show,
-        Trash,
-    } from "../icons/icons";
-    import FeatureColorPicker from "./FeatureColorPicker.svelte";
-    import SegmentationTools from "./SegmentationTools.svelte";
-    import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
-    import BscanLinks from "./BscanLinks.svelte";
-    import ConnectedComponents from "../icons/ConnectedComponents.svelte";
-    import { Annotation } from "$lib/datamodel/annotation.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import {} from "./segmentationUtils";
-    import ThresholdSlider from "./ThresholdSlider.svelte";
-    import {
-        BinarySegmentation,
-        ProbabilitySegmentation,
-    } from "$lib/webgl/segmentation";
-    import { SegmentationState } from "$lib/webgl/segmentationState";
-    import Intersection from "../icons/Intersection.svelte";
-    import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
-    import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
-    import { data } from "$lib/datamodel/model";
-    import { AnnotationType } from "$lib/datamodel/annotationType.svelte";
-    const globalContext = getContext<GlobalContext>("globalContext");
+    import { Annotation } from "$lib/datamodel/annotation.svelte";
+    import { dialogueManager } from "$lib/dialogue/DialogueManager";
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext } from "svelte";
+    import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
+    import ThresholdSlider from "./ThresholdSlider.svelte";
 
+    import CCPanel from "./CCPanel.svelte";
+    import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte";
+    import FeatureColorPicker from "./FeatureColorPicker.svelte";
+    import ImportPanel from "./ImportPanel.svelte";
+    import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
+    import ReferenceAnnotationPanel from "./ReferenceAnnotationPanel.svelte";
+
+    const globalContext = getContext<GlobalContext>("globalContext");
     interface Props {
         annotation: Annotation;
     }
 
     let { annotation }: Props = $props();
-    const { annotationData, feature, annotationType } = annotation;
-    const { creator } = globalContext;
+    const { feature, annotationType } = annotation;
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
@@ -50,31 +33,6 @@
 
     const segmentationItem = image.getSegmentationItem(annotation);
 
-    let segmentationState = $state<SegmentationState | undefined>(undefined);
-    let segmentation = $derived(segmentationState?.segmentation);
-
-    let activeIndex = $state<number | number[]>(0);
-
-    onMount(async () => {
-        segmentationState = await segmentationItem.getSegmentationState(
-            viewerContext.index,
-        );
-    });
-
-    const isEditable = globalContext.canEdit(annotation);
-
-    let active = $derived(
-        segmentationContext.activeAnnotationID == annotation.id,
-    );
-
-    function activate() {
-        segmentationContext.toggleActive(annotation);
-    }
-
-    function toggleShow() {
-        segmentationContext.toggleShow(annotation);
-    }
-
     async function removeAnnotation() {
         const resolve = () => {
             annotation.annotationData.forEach$((annotationData) =>
@@ -82,7 +40,7 @@
             );
             // remove from database on server
             annotation.delete();
-            segmentationContext.activeAnnotationID = undefined;
+            segmentationContext.toggleActive(undefined);
             segmentationItem?.dispose();
         };
 
@@ -94,132 +52,39 @@
         );
     }
 
-    async function duplicate(
-        type: null | "Binary" | "DualBitMask" | "Probability",
-    ) {
-        dialogueManager.showQuery(`Duplicating annotation ${annotation.id}...`);
-        let annotationType: AnnotationType;
-        if (type == "Binary") {
-            annotationType = data.annotationTypes.find(
-                (a) => a.dataRepresentation == type && a.dataType == "R8UI",
-            )!;
-        } else if (type == "DualBitMask") {
-            annotationType = data.annotationTypes.find(
-                (a) => a.dataRepresentation == type && a.dataType == "R8UI",
-            )!;
-        } else {
-            annotationType = annotation.annotationType;
-        }
-        const item = {
-            ...annotation,
-            annotationType,
-            // annotationReferenceId needs to be mentioned explicitly, because it's marked with $state and hence not enumerable
-            annotationReferenceId: annotation.annotationReferenceId,
-            // overwrite creatorId to current user
-            creatorId: creator.id,
-        };
-
-        const newAnnotation = await Annotation.create(item);
-
-        const newSegmentationItem = image.getSegmentationItem(newAnnotation);
-        const scanNr = viewerContext.index;
-        await newSegmentationItem.importOther(scanNr, segmentation!);
-
-        dialogueManager.hide();
+    function toggleShow() {
+        segmentationContext.toggleShow(annotation);
     }
 
-    function setAnnotationReference() {
-        dialogueManager.show(
-            ReferenceAnnotationSelector,
-            {
-                annotation,
-                image,
-            },
-            (other: Annotation) => {
-                annotation.update({
-                    annotationReferenceId: other.id,
-                });
-            },
-        );
+    const isEditable = globalContext.canEdit(annotation);
+    function activate() {
+        segmentationContext.toggleActive(segmentationItem);
     }
 
-    async function importFromOther() {
-        dialogueManager.show(
-            ImportSegmentationSelector,
-            {
-                annotation,
-                image,
-            },
-            (other: Annotation) => {
-                const otherSegmentation = image
-                    .getSegmentationItem(other)
-                    ?.getSegmentation(viewerContext.index);
-                if (otherSegmentation) {
-                    segmentationItem?.importOther(
-                        viewerContext.index,
-                        otherSegmentation,
-                    );
-                } else {
-                    console.warn(
-                        "Import from other: no segmentation found for annotation",
-                        other.id,
-                    );
-                }
-            },
-        );
-    }
-
-    function removeReference() {
-        annotation.update({ annotationReferenceId: null });
-    }
-
-    let notOnBscan = $derived.by(() => {
-        if (active) {
-            return false;
-        }
-        if (annotationType.name == "Segmentation OCT Volume") {
-            return false;
-        } else {
-            for (const a of $annotationData) {
-                if (a.scanNr == viewerContext.index) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    });
-
-    let connectedComponentsActive = $derived(
-        segmentationOverlay.applyConnectedComponents.has(segmentationItem),
+    let active = $derived(
+        segmentationContext.segmentationItem == segmentationItem,
     );
-    function toggleConnectedComponents() {
-        segmentationOverlay.toggleConnectedComponents(segmentationItem);
+
+    let collapsed = $state(true);
+
+    function pointerEnter() {
+        segmentationOverlay.highlightedSegmentationItem = segmentationItem;
     }
 
-    function toggleApplyMask() {
-        segmentationOverlay.toggleMasking(segmentationItem);
+    function pointerLeave() {
+        segmentationOverlay.highlightedSegmentationItem = undefined;
     }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="main"
+    class="content"
     class:active
-    class:notOnBscan
-    onmouseenter={() =>
-        (segmentationOverlay.highlightedSegmentationItem = segmentationItem)}
-    onmouseleave={() =>
-        (segmentationOverlay.highlightedSegmentationItem = undefined)}
+    onpointerenter={pointerEnter}
+    onpointerleave={pointerLeave}
 >
-    {#if active && image.is3D && annotationType.name != "Segmentation OCT Volume" && segmentation}
-        <BscanLinks {annotation} {segmentation} />
-    {/if}
     <div class="row">
-        {#if (segmentation && segmentation instanceof BinarySegmentation) || segmentation instanceof ProbabilitySegmentation}
-            <FeatureColorPicker {annotation} />
-        {/if}
-
         <div>
             {#if segmentationContext.hideAnnotations.has(annotation)}
                 <PanelIcon onclick={toggleShow} tooltip="Show" Icon={Hide} />
@@ -228,11 +93,13 @@
             {/if}
         </div>
 
+        {#if !(annotationType.dataRepresentation == "MultiLabel" || annotationType.dataRepresentation == "MultiClass")}
+            <FeatureColorPicker {annotation} />
+        {/if}
+
         <div class="expand" onclick={activate}>
             <div class="feature-name">{feature.name}</div>
-            <div class="annotationID">
-                {annotation.id}
-            </div>
+            <div class="annotationID">[{annotation.id}]</div>
         </div>
 
         {#if isEditable}
@@ -243,84 +110,60 @@
             />
         {/if}
     </div>
-
     {#if active}
-        <div class="row">
-            {#if segmentationItem && isEditable}
-                <SegmentationTools {segmentationItem} {activeIndex} />
-            {/if}
-        </div>
-        {#if segmentation instanceof ProbabilitySegmentation}
+        {#if annotationType.dataRepresentation == "Probability"}
             <div class="row">
                 <ThresholdSlider {annotation} />
             </div>
         {/if}
-        <div class="row">
-            <PanelIcon
-                onclick={() => duplicate("DualBitMask")}
-                tooltip="Duplicate"
-                Icon={Duplicate}
-            />
 
-            {#if segmentation instanceof ProbabilitySegmentation}
-                <PanelIcon
-                    onclick={() => duplicate("Probability")}
-                    tooltip="Duplicate Probability"
-                    Icon={Duplicate}
-                />
-            {/if}
-            {#if isEditable}
-                <PanelIcon
-                    onclick={importFromOther}
-                    tooltip="Import from other"
-                    Icon={ImportSegmentation}
-                />
-            {/if}
-        </div>
-        <div class="row">
-            {#if isEditable}
-                <PanelIcon
-                    onclick={setAnnotationReference}
-                    tooltip="Choose reference mask"
-                    Icon={Intersection}
-                />
-            {/if}
-            {#if annotation.annotationReferenceId}
-                <span
-                    class="reference-annotation"
-                    class:editable={isEditable}
-                    onclick={() => isEditable && removeReference()}
-                >
-                    [{annotation.annotationReferenceId}]
-                </span>
-                {#if segmentationOverlay.applyMasking.has(segmentationItem)}
-                    <PanelIcon
-                        onclick={toggleApplyMask}
-                        tooltip="Show"
-                        Icon={Hide}
-                    />
-                {:else}
-                    <PanelIcon
-                        onclick={toggleApplyMask}
-                        tooltip="Hide"
-                        Icon={Show}
-                    />
-                {/if}
-            {/if}
-        </div>
-        {#if segmentation instanceof BinarySegmentation}
-            <div class="row">
-                <PanelIcon
-                    active={connectedComponentsActive}
-                    onclick={toggleConnectedComponents}
-                    tooltip={(connectedComponentsActive ? "Hide" : "Show") +
-                        " connected components"}
-                    Icon={ConnectedComponents}
-                />
-            </div>
+        {#if annotationType.dataRepresentation == "MultiLabel" || annotationType.dataRepresentation == "MultiClass"}
+            <MultiFeatureSelector {annotation} />
         {/if}
-        {#if annotation.annotationType.dataRepresentation == "MultiLabel" || annotation.annotationType.dataRepresentation == "MultiClass"}
-            <MultiFeatureSelector {annotation} bind:activeIndex />
+
+        <div class="open" onclick={() => (collapsed = !collapsed)}>
+            {#if collapsed}
+                &#9654;
+            {:else}
+                &#9660;
+            {/if}
+        </div>
+
+        {#if !collapsed}
+            <div class="content">
+                {#if isEditable}
+                    <div class="row">
+                        <ImportPanel {annotation} {image} {segmentationItem} />
+                    </div>
+                {/if}
+                <div class="row">
+                    {#await segmentationItem.getSegmentationState(viewerContext.index) then segmentationState}
+                        {#if segmentationState}
+                            <DuplicateAnnotationPanel
+                                {annotation}
+                                {image}
+                                {segmentationItem}
+                                segmentation={segmentationState.segmentation}
+                            />
+                        {/if}
+                    {/await}
+                </div>
+
+                <div class="row">
+                    <ReferenceAnnotationPanel
+                        {annotation}
+                        {image}
+                        {isEditable}
+                        {segmentationItem}
+                    />
+                </div>
+
+                {#if annotationType.dataRepresentation == "Binary" || annotationType.dataRepresentation == "DualBitMask"}
+                    <div class="row">
+                        <CCPanel {segmentationItem} />
+                    </div>
+                {/if}
+            </div>
         {/if}
     {/if}
 </div>
@@ -328,31 +171,39 @@
 <style>
     div {
         display: flex;
-        align-items: center;
     }
-    div.notOnBscan {
-        opacity: 0.2;
-    }
-    div.main {
+    div.content {
         flex-direction: column;
-        border-left: 2px solid rgba(255, 255, 255, 0);
-    }
-    div.main.active {
+        padding: 0.2em;
         border-radius: 2px;
-        background-color: rgba(100, 255, 255, 0.3);
-        border-left: 2px solid white;
+    }
+    div.content.active {
+        /* border: 1px solid rgba(100, 255, 255, 0.3); */
     }
     div.row {
         flex-direction: row;
         flex: 1;
         width: 100%;
     }
+    div.open {
+        border-top: 1px solid rgba(100, 255, 255, 0.3);
+        flex-direction: row;
+        flex: 1;
+        cursor: pointer;
+    }
+    div.open:hover {
+        background-color: rgba(100, 255, 255, 0.3);
+    }
+
     div.expand {
         cursor: pointer;
         flex: 1;
         min-height: 2em;
         border-radius: 2px;
         transition: all 0.3s ease;
+    }
+    div.active {
+        background-color: rgba(100, 255, 255, 0.3);
     }
     div.expand:hover {
         background-color: rgba(100, 255, 255, 0.3);
@@ -361,20 +212,11 @@
         flex: 1;
         /* max-width: 12em; */
         padding-right: 0.5em;
+        align-items: center;
     }
     div.annotationID {
         font-size: x-small;
-        align-items: end;
         flex: 0;
-    }
-    span.reference-annotation {
-        font-size: xx-small;
-        opacity: 0.5;
-    }
-    span.reference-annotation.editable {
-        cursor: pointer;
-    }
-    span.reference-annotation:hover {
-        opacity: 1;
+        align-items: center;
     }
 </style>

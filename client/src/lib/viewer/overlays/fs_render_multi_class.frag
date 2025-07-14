@@ -10,6 +10,7 @@ uniform usampler2D u_boundaries;
 uniform float u_alpha;
 uniform vec3[32] u_colors;
 uniform int u_highlighted_feature_index;
+uniform uint u_active_feature_mask;
 uniform vec3 u_image_size;
 
 uniform bool u_smooth;
@@ -60,13 +61,14 @@ void main(){
     
     uint annotation = texture(u_annotation,v_uv).r;
     
-    bool has_layer=annotation>0u;
+    bool has_layer = annotation > 0u;
     
     if(has_layer){
         // &31 = mod 32
         vec3 color=u_colors[(annotation-1u)&31u];
         // highlight layer if u_highlighted_feature_index is 0 (none specified) or if this is the highlighted layer
-        float show_highlight=float(u_highlighted_feature_index==int(annotation));
+        float show_highlight=float(u_highlighted_feature_index==int(annotation) || (u_active_feature_mask == annotation));
+
         // 0.3f is the default alpha value, u_alpha is the alpha value for the highlight
         color_out=vec4(color,mix(.3f,u_alpha,show_highlight));
     }else{

@@ -1,5 +1,6 @@
 import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem";
 import { SvelteSet } from "svelte/reactivity";
 
 export class SegmentationContext {
@@ -7,12 +8,12 @@ export class SegmentationContext {
     public readonly hideCreators = new SvelteSet<Creator>();
     public readonly hideAnnotations = new SvelteSet<Annotation>();
 
-    public activeAnnotationID: number | undefined = $state();
-
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
     public questionableActive = $state(false);
     public brushRadius = $state(4);
+    public segmentationItem: SegmentationItem | undefined = $state(undefined);
+    public activeIndices: number | number[] = $state([]);
 
     constructor() { }
 
@@ -25,11 +26,11 @@ export class SegmentationContext {
         }
     }
 
-    toggleActive(annotation: Annotation) {
-        if (this.activeAnnotationID == annotation.id) {
-            this.activeAnnotationID = undefined;
+    toggleActive(segmentationItem: SegmentationItem | undefined) {
+        if (this.segmentationItem == segmentationItem) {
+            this.segmentationItem = undefined;
         } else {
-            this.activeAnnotationID = annotation.id;
+            this.segmentationItem = segmentationItem;
         }
     }
 }

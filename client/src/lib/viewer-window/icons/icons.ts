@@ -23,6 +23,7 @@ import Close from './Close.svelte';
 import Registration from './Registration.svelte';
 import Draw from './Draw.svelte';
 import Lines from './Lines.svelte';
+import Intersection from './Intersection.svelte';
 
 export {
 
@@ -36,6 +37,6 @@ export {
     ImportSegmentation, ConnectedComponents,
     Close, Rendering, Registration,
     Layers, ETDRS, Form, Info,
-    Lines
+    Lines, Intersection
 
 }

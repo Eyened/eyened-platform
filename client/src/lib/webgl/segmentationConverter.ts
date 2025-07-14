@@ -37,6 +37,9 @@ export const converters = {
     'ProbabilitySegmentation->QuestionableSegmentation': probabilityToBinary, // same as binary
 }
 export function convert(data: DrawingArray, from: SegmentationType, to: SegmentationType, threshold: number = 127) {
+    if (from == to) {
+        return data;
+    }
     const result = new Uint8Array(data.length);
     const key = `${from}->${to}`;
     if (!(key in converters)) {

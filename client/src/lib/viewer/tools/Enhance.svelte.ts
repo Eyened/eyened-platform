@@ -1,8 +1,7 @@
-import type { ProbabilitySegmentation } from "$lib/webgl/segmentation";
+import { ProbabilitySegmentation } from "$lib/webgl/segmentation";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { DrawingExecutor } from "./segmentation";
 import { BrushTool } from "./Brush";
-import type { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 
 export class EnhanceTool extends BrushTool {
@@ -16,40 +15,54 @@ export class EnhanceTool extends BrushTool {
     constructor(
         drawingExecutor: DrawingExecutor,
         viewerContext: ViewerContext,
-        segmentationContext: SegmentationContext,
-        private readonly segmentation: ProbabilitySegmentation,
-        private readonly segmentationItem: SegmentationItem
+        segmentationContext: SegmentationContext
     ) {
         super(drawingExecutor, viewerContext, segmentationContext);
     }
 
 
-    startDraw() {
+    async startDraw() {
+        const segmentationItem = this.segmentationContext.segmentationItem;
+        if (!segmentationItem) {
+            console.warn("No segmentation");
+            return;
+        }
+
+        const segmentationState = await segmentationItem.getSegmentationState(this.viewerContext.index, true)!;
+        const segmentation = segmentationState.segmentation;
+        if (!(segmentation instanceof ProbabilitySegmentation)) {
+            console.warn("No probability segmentation");
+            return;
+        }
 
         this.drawInterval = setInterval(() => {
             if (this.lastPosition) {
-
                 const settings = {
                     brushRadius: this.brushRadius,
                     hardness: this.hardness,
                     pressure: this.pressure,
                     enhance: this.enhance,
                     erase: this.mode === 'erase',
-                    point: this.lastPosition
+                    point: this.lastPosition,
+                    aspectRatio: this.viewerContext.aspectRatio
                 };
-                this.segmentation.drawEnhance(settings)
+                segmentation.drawEnhance(settings)
             }
         }, 1000 / 30); // 30 times per second
 
     }
 
     endDraw() {
-
+        const segmentationItem = this.segmentationContext.segmentationItem;
+        if (!segmentationItem) {
+            console.warn("No segmentation item");
+            return;
+        }
         if (this.drawInterval) {
             clearInterval(this.drawInterval);
             this.drawInterval = undefined;
-            const scanNr = this.viewerContext.index;            
-            this.segmentationItem.draw(scanNr, null, {});
+            const scanNr = this.viewerContext.index;
+            segmentationItem.draw(scanNr, null, {});
         }
     }
 

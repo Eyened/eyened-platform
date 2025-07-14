@@ -109,7 +109,6 @@ export function removeData(items: { [key: string]: number[] }) {
 
 }
 export function importData(itemCollections: { [key: string]: any[] }) {
-    console.log('importing data', itemCollections);
     const resp = {};
     for (const [key, items] of Object.entries(itemCollections)) {
         if (!(key in itemClassMap)) {
@@ -122,6 +121,5 @@ export function importData(itemCollections: { [key: string]: any[] }) {
         collection.importItems(newItems);
         resp[key] = newItems;
     }
-    console.log(data);
     return resp;
 }
