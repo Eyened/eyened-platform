@@ -111,10 +111,11 @@ export class Instance extends BaseItem {
     }
 
     init(item: ServerInstance) {
-
+        console.log(item);
         this.id = item.ImageInstanceID;
         this.seriesId = item.SeriesID;
         this.deviceId = item.DeviceInstanceID;
+        this.scanId = item.ScanID;
         this.datasetIdentifier = item.DatasetIdentifier;
         this.modality = item.Modality;
         this.dicomModality = item.DICOMModality;

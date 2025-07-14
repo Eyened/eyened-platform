@@ -7,9 +7,8 @@
 
     interface Props {
         annotation: Annotation;
-        activeIndex: number | number[];
     }
-    let { annotation, activeIndex = $bindable([]) }: Props = $props();
+    let { annotation }: Props = $props();
 
     const { annotatedFeatures, dataRepresentation } = annotation.annotationType;
     const sortedFeatures = annotatedFeatures.sort(
@@ -24,13 +23,22 @@
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
+
+    const { segmentationContext } = segmentationOverlay;
+    function pointerEnter(featureIndex: number) {
+        segmentationOverlay.highlightedFeatureIndex = featureIndex;
+    }
+    function pointerLeave() {
+        segmentationOverlay.highlightedFeatureIndex = undefined;
+    }
+    
 </script>
 
 {#snippet radioLabel(feature: AnnotationTypeFeature)}
     <label>
         <input
             type="radio"
-            bind:group={activeIndex}
+            bind:group={segmentationContext.activeIndices}
             value={feature.featureIndex}
         />
         {feature.feature.name}
@@ -40,7 +48,7 @@
     <label>
         <input
             type="checkbox"
-            bind:group={activeIndex}
+            bind:group={segmentationContext.activeIndices}
             value={feature.featureIndex}
         />
         {feature.feature.name}
@@ -50,11 +58,8 @@
     <ul>
         {#each $sortedFeatures as a}
             <li
-                onmouseenter={() =>
-                    (segmentationOverlay.highlightedFeatureIndex =
-                        a.featureIndex)}
-                onmouseleave={() =>
-                    (segmentationOverlay.highlightedFeatureIndex = undefined)}
+                onpointerenter={()=>pointerEnter(a.featureIndex)}
+                onpointerleave={pointerLeave}
             >
                 <div class="feature-container">
                     <div

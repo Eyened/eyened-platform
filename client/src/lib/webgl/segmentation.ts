@@ -20,13 +20,13 @@ export interface PaintSettings {
     paint?: boolean;
     dilateErode?: boolean;
     questionable?: boolean;
-    activeIndex?: number | number[];
+    activeIndices?: number | number[];
 }
 
 export abstract class Segmentation {
     constructor(
-        protected readonly image: AbstractImage,
-        protected readonly annotationData: AnnotationData
+        readonly image: AbstractImage,
+        readonly annotationData: AnnotationData
     ) { }
 
     abstract importData(data: DrawingArray): void;
@@ -275,7 +275,8 @@ export class ProbabilitySegmentation extends DataSegmentation {
         pressure: number,
         erase: boolean,
         enhance: boolean,
-        point: Position2D
+        point: Position2D,
+        aspectRatio: number
     }): void {
 
         const uniforms = {
@@ -286,6 +287,7 @@ export class ProbabilitySegmentation extends DataSegmentation {
             u_pressure: settings.pressure,
             u_hardness: settings.hardness,
             u_erase: settings.erase,
+            u_aspectRatio: settings.aspectRatio
         }
         this.u_hard = false;
         this.textureData.passShader(this.image.webgl.shaders.drawEnhance, uniforms);
@@ -327,11 +329,11 @@ abstract class BaseMultiSegmentation extends DataSegmentation {
     abstract getRenderShader(): TextureShaderProgram;
 
     draw(drawing: HTMLCanvasElement, paintSettings: PaintSettings): void {
-        if (!paintSettings.activeIndex) {
+        if (!paintSettings.activeIndices) {
             console.warn("MultiLabelSegmentation: no active indices");
             return;
         }
-        const bitmask = this.getBitmask(paintSettings.activeIndex);
+        const bitmask = this.getBitmask(paintSettings.activeIndices);
         const uniforms = {
             u_current: this.textureData.texture,
             u_drawing: imageToTexture(this.image.webgl.gl, drawing),
@@ -359,7 +361,8 @@ abstract class BaseMultiSegmentation extends DataSegmentation {
             ...uniforms,
             u_annotation: this.textureData.texture,
             u_colors: colorsFlat,
-            u_boundaries: undefined
+            u_boundaries: undefined,
+            u_active_feature_mask: this.getBitmask(uniforms.activeIndices)
         }
         this.getRenderShader().pass(renderTarget, uniforms);
     }
@@ -368,7 +371,11 @@ export class MultiClassSegmentation extends BaseMultiSegmentation {
     constructor(image: AbstractImage, annotationData: AnnotationData) {
         super(image, annotationData);
     }
-    getBitmask(activeIndex: number): number {
+    getBitmask(activeIndex: number[] | number): number {
+        if (Array.isArray(activeIndex)) {
+            // empty array when not set yet
+            return 0;
+        }
         return activeIndex;
     }
     getRenderShader() {

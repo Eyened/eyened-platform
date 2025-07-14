@@ -123,6 +123,7 @@ async function load(url: string) {
 
         // Check for the magic string "\x93NUMPY"
         const magic = [0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59]; // \x93NUMPY
+
         const isNpy = magic.every((byte, i) => bytes[i] === byte);
         if (isNpy) {
             return decodeNpy(arrayBuffer);

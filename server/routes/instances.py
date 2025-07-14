@@ -169,7 +169,6 @@ def apply_filters(query, mappings, params):
         if field not in mappings:
             continue
         column = mappings[field]
-        print("filtering", field, operator, column, value)
         query = query.where(sqlalchemy_operators[operator](column, value))
     return query
 

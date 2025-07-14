@@ -25,11 +25,8 @@
     onpointerenter={(e) => e.target.focus()}
 >
     <div class="popup-content">
-        <div class="popup-header">
-            {#snippet icon()}
-                <Close size="2em" />
-            {/snippet}
-            <MainIcon onclick={close} {icon} theme="light" />
+        <div class="popup-header">            
+            <MainIcon onclick={close} Icon={Close} theme="light" />
         </div>
         <div class="popup-body">
             <componentDef.component {...componentDef.props} />

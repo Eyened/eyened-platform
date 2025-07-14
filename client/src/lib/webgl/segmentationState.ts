@@ -26,6 +26,7 @@ export class SegmentationState {
         readonly annotationData: AnnotationData
     ) {
         const annotationType = annotationData.annotation.annotationType;
+        // TODO: Annotationtype 5: enface OCT
 
         if ([2, 3, 4].includes(annotationType.id)) {
             this.segmentation = new QuestionableSegmentation(image, annotationData);
@@ -70,13 +71,11 @@ export class SegmentationState {
 
         const thisType = this.segmentation.constructor.name as SegmentationType;
         const otherType = other.constructor.name as SegmentationType;
-        if (otherType instanceof ProbabilitySegmentation) {
-            const threshold = other.i;
-        }
+        const threshold = (255 * (other.annotationData.valueFloat ?? 0.5));
+        console.log(thisType, otherType, threshold);
+        const dataConverted = convert(data, otherType, thisType, threshold);
+        this.segmentation.importData(dataConverted);
 
-        const dataConverted = convert(data, otherType, thisType,);
-
-        this.segmentation.importData(data);
         this.isDrawing = this.checkpoint();
     }
 

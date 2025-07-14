@@ -97,7 +97,7 @@ export class Annotation extends BaseItem {
         return data.patients.get(this.patientId!)!;
     }
     get annotationData(): FilterList<AnnotationData> {
-        return data.annotationData.filter(annotationData => annotationData.annotationId == this.id);
+        return data.annotationData.filter(annotationData => annotationData.annotationId == this.id).sort((a, b) => a.scanNr - b.scanNr);
     }
     get annotationReference(): Annotation | undefined {
         if (!this.annotationReferenceId) return undefined;

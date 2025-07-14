@@ -8,6 +8,7 @@ uniform usampler2D u_annotation;
 uniform float u_alpha;
 uniform vec3[32] u_colors;
 uniform int u_highlighted_feature_index;
+uniform uint u_active_feature_mask;
 
 uniform bool u_smooth;
 uniform usampler2D u_mask;
@@ -91,7 +92,7 @@ void main() {
                 int feature_index = int(i) + 1;
 
                 vec3 layer_color = u_colors[feature_index - 1];
-                if(u_highlighted_feature_index == 0 || (u_highlighted_feature_index == feature_index)) {
+                if((u_highlighted_feature_index == feature_index) || (u_active_feature_mask & mask) > 0u) {
                     layer_alpha = 1.0f;
                 } else {
                     layer_alpha = 0.3f;

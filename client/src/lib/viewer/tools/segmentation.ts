@@ -53,7 +53,7 @@ export abstract class SegmentationTool implements Overlay {
     }
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        const { event: { repeat, key } } = e;
+        const { event: { repeat, key }, viewerContext } = e;
         if (repeat) return;
 
         const k = key.toUpperCase();
@@ -61,7 +61,7 @@ export abstract class SegmentationTool implements Overlay {
         if (k == eraseKey) this.drawingState = 'erase';
 
         if (k == paintKey || k == eraseKey) {
-            this.startDraw();
+            this.startDraw(viewerContext);
         }
     }
 
@@ -73,7 +73,7 @@ export abstract class SegmentationTool implements Overlay {
         }
     }
 
-    startDraw() {
+    startDraw(viewerContext: ViewerContext) {
         this.currentPoints = [this.lastPosition!];
     }
 

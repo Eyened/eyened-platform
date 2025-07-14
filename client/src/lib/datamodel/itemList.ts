@@ -15,7 +15,6 @@ export function formatDateTime(date: Date): string {
 }
 
 export function toServer(item: any, mapping: MappingDefinition): any {
-    console.log('toServer', item, mapping);
     const result: any = {};
     for (const [serverKey, localKey] of Object.entries(mapping)) {
         if (typeof localKey === 'function') {

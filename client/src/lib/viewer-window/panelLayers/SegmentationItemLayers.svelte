@@ -14,7 +14,7 @@
     import { LayerSegmentationOverlay } from "$lib/viewer/overlays/LayerSegmentationOverlay.svelte";
     import { type Writable } from "svelte/store";
     import BscanLinks from "../panelSegmentation/BscanLinks.svelte";
-    import SegmentationTools from "../panelSegmentation/SegmentationTools.svelte";
+    import SegmentationTools from "../panelSegmentation/DrawingTools.svelte";
     import {
         deleteAnnotation,
         macularLayers,

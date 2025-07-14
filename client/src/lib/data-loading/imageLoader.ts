@@ -28,7 +28,6 @@ export class ImageLoader {
 
     async load(instance: Instance): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
-        console.log('loading', instance);
         // Convert to lowercase for case-insensitive comparison
         const extension = instance.datasetIdentifier.toLowerCase().split('.').pop();
         const supportedFormats = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
@@ -128,7 +127,7 @@ export class ImageLoader {
             height_mm: meta.resolution[1] * meta.oct_shape[1] / 1000,
             depth_mm: meta.resolution[0] * meta.oct_shape[0] / 1000
         };
-        if (instance.scan.mode == 'Circle-Scan') {
+        if (instance.scan?.mode == 'Circle-Scan') {
             // this is not correct in the meta file
             dimensions.width_mm = instance.resolutionHorizontal * dimensions.width;
         }

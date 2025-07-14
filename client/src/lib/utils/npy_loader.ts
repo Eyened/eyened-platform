@@ -197,7 +197,17 @@ export function decodeNpy(buffer: ArrayBuffer): {
         throw new Error('Data buffer is too short');
     }
 
-    const data = new TypedArrayConstructor(buffer, byteOffset, size);
+    const bytesPerElement = TypedArrayConstructor.BYTES_PER_ELEMENT;
+    if (byteOffset % bytesPerElement === 0) {
+        // Safe to create a view directly
+        var data = new TypedArrayConstructor(buffer, byteOffset, size);
+    } else {
+        // Not aligned: copy to a new buffer
+        const src = new Uint8Array(buffer, byteOffset, byteLength);
+        const tmp = new ArrayBuffer(byteLength);
+        new Uint8Array(tmp).set(src);
+        var data = new TypedArrayConstructor(tmp, 0, size);
+    }
 
     return new NPYArray(data, shape, fortranOrder);
 }
