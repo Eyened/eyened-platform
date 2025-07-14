@@ -54,6 +54,8 @@ class AnnotationZarrStorageManager:
 
         array = group.get(array_name, None)
 
+        print(f"array_name: {array_name}")
+
         if array is None:
             array = group.create_array(
                 name=array_name,
@@ -71,17 +73,45 @@ class AnnotationZarrStorageManager:
         data_dtype: np.dtype,
         data_shape: Tuple[int],
         zarr_index: int,
+        axis: Optional[int] = None,
+        slice_index: Optional[int] = None,
     ):
         zarr_array = self.get_array(group_name, data_dtype, data_shape)
-        return zarr_array.read(zarr_index)
+        
+        # Check if only one of axis or slice_index is provided
+        if (axis is not None) != (slice_index is not None):
+            raise ValueError("Both axis and slice_index must be provided together for slice operations")
+        
+        # If both axis and slice_index are provided, read a slice
+        if axis is not None and slice_index is not None:
+            return zarr_array.read_slice(zarr_index, axis, slice_index)
+        # Otherwise, read the full annotation
+        else:
+            return zarr_array.read(zarr_index)
 
     def write(
         self,
         group_name: str,
+        data_dtype: np.dtype,
+        data_shape: Tuple[int],
         data: np.ndarray,
         zarr_index: Optional[int] = None,
+        axis: Optional[int] = None,
+        slice_index: Optional[int] = None,
     ) -> int:
         # get the array
-        zarr_array = self.get_array(group_name, data.dtype, data.shape)
+        zarr_array = self.get_array(group_name, data_dtype, data_shape)
 
-        return zarr_array.write(zarr_index, data)
+        # Check if only one of axis or slice_index is provided
+        if (axis is not None) != (slice_index is not None):
+            raise ValueError("Both axis and slice_index must be provided together for slice operations")
+
+        # If both axis and slice_index are provided, write a slice
+        if axis is not None and slice_index is not None:
+            if zarr_index is None:
+                raise ValueError("zarr_index must be provided for slice writes")
+            zarr_array.write_slice(zarr_index, axis, slice_index, data)
+            return zarr_index
+        # Otherwise, write the full annotation
+        else:
+            return zarr_array.write(zarr_index, data)

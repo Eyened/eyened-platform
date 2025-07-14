@@ -68,6 +68,11 @@ class ETDRSField(Enum):
     F6 = 6
     F7 = 7
 
+class AxisEnum(Enum):
+    WIDTH = 0
+    HEIGHT = 1
+    DEPTH = 2
+
 
 class ImageInstanceBase(Base):
     SeriesID: int | None = Field(foreign_key="Series.SeriesID", ondelete="CASCADE", default=None)
@@ -99,9 +104,10 @@ class ImageInstanceBase(Base):
     #     - Rows: height of the B-scan (vitreous <-> choroid)
     #     - Columns: width of the B-scan (lateral <-> temporal)
     #     - NrOfFrames: number of B-scans (superior <-> inferior for horizontal B-scan)
-    NrOfFrames: int | None  # Used to for number of B-scans in OCT
+    
     Rows_y: int | None  # Height of the image (in pixels)
     Columns_x: int | None  # Width of the image (in pixels)
+    NrOfFrames: int | None  # Used to for number of B-scans in OCT
 
     # resolution (all in millimeters)
     SliceThickness: float | None  # Nominal slice thickness for raster OCT scans
@@ -224,6 +230,29 @@ class ImageInstance(ImageInstanceBase, table=True):
     SubTaskImageLinks: List["SubTaskImageLink"] = Relationship(
         back_populates="ImageInstance"
     )
+
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        return (self.Rows_y, self.Columns_x, self.NrOfFrames)
+    
+    @property
+    def l1_axis(self) -> AxisEnum | None:
+        if self.Rows_y == 1:
+            return AxisEnum.HEIGHT
+        elif self.Columns_x == 1:
+            return AxisEnum.WIDTH
+        elif self.NrOfFrames == 1:
+            return AxisEnum.DEPTH
+        else:
+            return None
+    
+    @property
+    def is_3d(self) -> bool:
+        return self.NrOfFrames is not None and self.NrOfFrames > 1
+    
+    @property
+    def is_2d(self) -> bool:
+        return not self.is_3d
 
     @property
     def Study(self):
@@ -454,3 +483,5 @@ class Scan(ScanBase, table=True):
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
         return cls.by_column(session, ScanMode=ScanMode)
+
+
