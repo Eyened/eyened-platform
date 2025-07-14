@@ -133,7 +133,7 @@ def get_config(env: str | None = None) -> EyenedORMConfig:
     if env is None:
         env_file = ".env"
     else:
-        env_file = f"{env}.env"
+        env_file = f"config.{env}.env"
 
     package_root = Path(importlib.resources.files("eyened_orm"))
     env_path = package_root / "environments" / env_file

@@ -4,13 +4,15 @@ import shutil
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
+from eyened_orm.ImageInstance import AxisEnum
+from pydantic import BaseModel
 import numpy as np
 from PIL import Image
-from sqlalchemy import Column, Index, event
+from sqlalchemy import JSON, Column, Index, event
 from sqlalchemy.dialects.mysql import LONGBLOB
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, validates
 from sqlmodel import Field, Relationship
 
 from .base import Base
@@ -28,21 +30,33 @@ if TYPE_CHECKING:
     )
 
 
-class AnnotationPlane(Enum):
-    PRIMARY = 0  # 2D images, or B-scan
-    SECONDARY = 1  # Enface OCT
-    TERTIARY = 2  # Across B-scans
-    VOLUME = 3  # Volume OCT
+# Define the mixin
+class SegmentationMixin(BaseModel):
+    # index in the zarr array of the annotation
+    ZarrArrayIndex: int | None = None
 
+    # for 2D or 3Dannotations of 3D volumes:
+    #  - if 2D, index of the annotation along the volume axis with size=1
+    #  - if 3D, list of indices of the volume with valid annotations 
+    #    (the shape of the annot volume must match the image volume)
+    ScanIndices: Optional[Dict[str, Any]] = Field(sa_type=JSON)
+    Width: int
+    Height: int
+    Depth: int
 
-class AnnotationBase(Base):
+    # Matrix that projects the annotation to image space
+    ImageProjectionMatrix: Optional[Dict[str, Any]] = Field(sa_type=JSON)
+
+    SparseAxis: int | None = None
+
+class AnnotationBase(Base, SegmentationMixin):
     """
     Used for segmentation (i.e. masks)
     """
 
     # Patient is required, Study, Series and ImageInstance are optional
     # TODO: perhaps only ImageInstance is required and the others should be removed
-    PatientID: int = Field(foreign_key="Patient.PatientID")
+    PatientID: int|None = Field(foreign_key="Patient.PatientID", default=None)
     StudyID: int | None = Field(foreign_key="Study.StudyID", default=None)
     SeriesID: int | None = Field(foreign_key="Series.SeriesID", default=None)
     ImageInstanceID: int | None = Field(
@@ -56,12 +70,7 @@ class AnnotationBase(Base):
     )
     Inactive: bool = False
 
-    ZarrArrayIndex: int | None = None
-    ScanNr: int | None = None
-    Width: int | None = None
-    Height: int | None = None
-    Depth: int | None = None
-    AnnotationPlane: AnnotationPlane
+    
 
 
 class Annotation(AnnotationBase, table=True):
@@ -81,7 +90,7 @@ class Annotation(AnnotationBase, table=True):
 
     DateInserted: datetime = Field(default_factory=datetime.now)
 
-    Patient: "Patient" = Relationship(back_populates="Annotations")
+    Patient: Optional["Patient"] = Relationship(back_populates="Annotations")
     Study: Optional["Study"] = Relationship(back_populates="Annotations")
     Series: Optional["Series"] = Relationship(back_populates="Annotations")
     ImageInstance: Optional["ImageInstance"] = Relationship(
@@ -104,6 +113,57 @@ class Annotation(AnnotationBase, table=True):
         back_populates="Annotation", cascade_delete=True
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.SparseAxis is not None:
+            if not isinstance(self.ScanIndices, list):
+                raise ValueError("ScanIndices must be a list when SparseAxis is not None")
+
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        return (self.Height, self.Width, self.Depth)
+    
+    @property
+    def is_3d(self) -> bool:
+        # all axes must be > 1 in length
+        return self.Height > 1 and self.Width > 1 and self.Depth > 1
+    
+    @property
+    def is_2d(self) -> bool:
+        return not self.is_3d
+    
+    @property
+    def is_sparse(self) -> bool:
+        return self.SparseAxis is not None
+    
+    @property
+    def l1_axis(self) -> AxisEnum | None:
+        if self.Height == 1:
+            return AxisEnum.HEIGHT
+        elif self.Width == 1:
+            return AxisEnum.WIDTH
+        elif self.Depth == 1:
+            return AxisEnum.DEPTH
+        else:
+            return None
+    
+    @property
+    def projection_axis(self) -> AxisEnum | None:
+        if self.is_sparse:
+            return self.SparseAxis
+        else:
+            return self.l1_axis
+        
+    # check that the dimensions that are not the length 1 axis match
+    @property
+    def shape_matches_image_shape(self):
+        image_shape = self.ImageInstance.shape
+        annotation_shape = self.shape
+        for i, (x,y) in enumerate(zip(image_shape, annotation_shape)):
+            if i != self.l1_axis and x != y:
+                return False
+        return True
+
     @property
     def FeatureName(self):
         return self.Feature.FeatureName
@@ -122,25 +182,28 @@ class Annotation(AnnotationBase, table=True):
 
     @property
     def numpy(self) -> Optional[np.ndarray]:
-        """Read annotation data from the zarr array."""
+        return self.read_data()
+    
+    def read_data(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> np.ndarray:
         if self.ZarrArrayIndex is None:
             return None
-
+        
         if not self.config:
             raise ValueError("Configuration not initialized")
 
-        # Get the image shape from the associated ImageInstance
         if not self.ImageInstance:
             raise ValueError("Annotation has no associated ImageInstance")
-
-        annotation_shape = (self.Height, self.Width, self.Depth)
+        
         return self.annotation_storage_manager.read(
             group_name=str(self.AnnotationTypeID),
-            data_dtype=np.uint8,
-            data_shape=annotation_shape,
+            data_dtype=np.dtype(np.uint8),
+            data_shape=self.shape,
+            zarr_index=self.ZarrArrayIndex,
+            axis=axis,
+            slice_index=slice_index
         )
 
-    def write_data(self, data: np.ndarray) -> int:
+    def write_data(self, data: np.ndarray, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
         """Write annotation data to the zarr array and update the ZarrArrayIndex."""
         if not self.config:
             raise ValueError("Configuration not initialized")
@@ -148,16 +211,23 @@ class Annotation(AnnotationBase, table=True):
         if not self.ImageInstance:
             raise ValueError("Annotation has no associated ImageInstance")
 
-        # check that the annotation shape matches data shape
-        annotation_shape = (self.Height, self.Width, self.Depth)
-        if annotation_shape != data.shape:
-            raise ValueError(
-                f"Data shape {data.shape} does not match annotation shape {annotation_shape}"
-            )
-
         zarr_index = self.annotation_storage_manager.write(
-            str(self.AnnotationTypeID), data, self.ZarrArrayIndex
+            group_name=str(self.AnnotationTypeID), 
+            data_dtype=np.dtype(np.uint8),
+            data_shape=self.shape,
+            data=data, 
+            zarr_index=self.ZarrArrayIndex,
+            axis=axis,
+            slice_index=slice_index
         )
+
+        # for sparse annotations, we need to update the ScanIndices list
+        if self.is_sparse and axis == self.SparseAxis:
+            if slice_index not in self.ScanIndices:
+                # copy necessary to ensure update is picked up by the ORM
+                scan_indices = self.ScanIndices.copy()
+                scan_indices.append(slice_index)
+                self.ScanIndices = scan_indices
 
         self.ZarrArrayIndex = zarr_index
         return zarr_index
@@ -213,7 +283,7 @@ class AnnotationDataBase(Base):
     # use -1 for all scans (e.g. enface OCT)
     ScanNr: int = Field(primary_key=True)
 
-    AnnotationPlane: AnnotationPlane
+    # AnnotationPlane: AnnotationPlane
 
     ValueInt: int | None
     ValueFloat: float | None
@@ -323,99 +393,6 @@ class AnnotationData(AnnotationDataBase, table=True):
         return self.get_mask("questionable")
 
 
-def move_file_to_trash(annotation_data: AnnotationData) -> None:
-    """Moves a file to trash folder and stores metadata alongside it."""
-    source_path = annotation_data.path
-    if not source_path.exists():
-        print(f"File {source_path} does not exist, skipping trash move")
-        return
-
-    trash_path = annotation_data.trash_path
-
-    try:
-        shutil.move(str(source_path), str(trash_path))
-        print(f"File moved to trash: {trash_path}")
-
-        with open(f"{trash_path}.metadata.json", "w") as f:
-            json.dump(
-                {
-                    "annotation": annotation_data.Annotation.to_dict(),
-                    "annotation_data": annotation_data.to_dict(),
-                    "deleted_at": datetime.now().isoformat(),
-                    "source_path": str(source_path),
-                    "trash_path": str(trash_path),
-                },
-                f,
-            )
-
-    except Exception as e:
-        print(f"Error moving file {source_path} to trash: {e}")
-
-
-# Track deleted AnnotationData objects
-@event.listens_for(Session, "before_flush")
-def receive_before_flush(session, flush_context, instances):
-    """Track AnnotationData objects being deleted before they're removed from the session."""
-
-    deleted_annotation_data = [
-        obj for obj in session.deleted if isinstance(obj, AnnotationData)
-    ]
-    if not deleted_annotation_data:
-        return
-
-    try:
-        session.deleted_annotation_data_info = [
-            {
-                "path": str(obj.path),
-                "trash_path": str(obj.trash_path),
-                "annotation": obj.Annotation.to_dict(),
-                "annotation_data": obj.to_dict(),
-            }
-            for obj in deleted_annotation_data
-        ]
-    except Exception as e:
-        print(f"Error tracking deleted annotation data: {e}")
-
-
-@event.listens_for(Session, "after_commit")
-def receive_after_commit(session):
-    """Process tracked deleted annotation data after the transaction is committed."""
-
-    if not hasattr(session, "deleted_annotation_data_info"):
-        return
-    for info in session.deleted_annotation_data_info:
-        try:
-            source_path = Path(info["path"])
-            trash_path = Path(info["trash_path"])
-
-            if source_path.exists():
-                # Create trash directory if it doesn't exist
-                trash_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # Move the file to trash
-                shutil.move(str(source_path), str(trash_path))
-                print(f"File moved to trash: {trash_path}")
-
-                # Store metadata
-                with open(f"{trash_path}.metadata.json", "w") as f:
-                    json.dump(
-                        {
-                            "annotation": info["annotation"],
-                            "annotation_data": info["annotation_data"],
-                            "deleted_at": datetime.now().isoformat(),
-                            "source_path": str(source_path),
-                            "trash_path": str(trash_path),
-                        },
-                        f,
-                    )
-            else:
-                print(f"File {source_path} does not exist, skipping trash move")
-        except Exception as e:
-            print(f"Error processing deleted annotation data: {e}")
-
-    # Clear the tracked objects
-    session.deleted_annotation_data_info = []
-
 
 class DataRepresentation(Enum):
     # 0 = background, >0 = foreground
@@ -495,31 +472,3 @@ class AnnotationTypeFeature(Base, table=True):
     FeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
     FeatureIndex: int = Field(primary_key=True)
 
-
-def get_annotation_dtype_from_representation(
-    data_representation: "DataRepresentation",
-) -> np.dtype:
-    """
-    Map DataRepresentation enum to numpy dtype.
-
-    Args:
-        data_representation: The DataRepresentation enum value
-
-    Returns:
-        numpy dtype for the annotation data
-
-    Raises:
-        ValueError: If the data representation is unsupported
-    """
-    if data_representation == DataRepresentation.BINARY:
-        return np.uint8
-    elif data_representation == DataRepresentation.RG_MASK:
-        return np.uint8
-    elif data_representation == DataRepresentation.FLOAT:
-        return np.uint8  # Store as uint8, will be scaled to float when needed
-    elif data_representation == DataRepresentation.MULTI_LABEL:
-        return np.uint16
-    elif data_representation == DataRepresentation.MULTI_CLASS:
-        return np.uint8
-    else:
-        raise ValueError(f"Unsupported data representation: {data_representation}")

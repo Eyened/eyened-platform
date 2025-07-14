@@ -1,6 +1,4 @@
 from eyened_orm import (
-    Annotation,
-    AnnotationBase,
     AnnotationType,
     AnnotationTypeBase,
     AnnotationTypeFeature,
@@ -292,9 +290,6 @@ create_crud_routes(DeviceModel, DeviceModelBase, "device-models")
 create_crud_routes(DeviceInstance, DeviceInstanceBase, "device-instances")
 create_crud_routes(
     FormAnnotation, FormAnnotationBase, "form-annotations", soft_delete_field="Inactive"
-)
-create_crud_routes(
-    Annotation, AnnotationBase, "annotations", soft_delete_field="Inactive"
 )
 
 
