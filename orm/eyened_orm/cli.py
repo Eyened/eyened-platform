@@ -14,6 +14,8 @@ The following commands are available:
 - full: Create a test database for ORM testing, developing new features or running alembic migrations.
 - update-thumbnails: Update thumbnails for all images in the database.
 - run-models: Run the models on the database.
+- zarr-tree: Display the structure of the annotations zarr store, showing groups and array shapes.
+- defragment-zarr: Defragment the zarr store by copying all annotations to a new store with sequential indices.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 '''
@@ -125,6 +127,105 @@ def set_connection_string(env):
 
     with open(filename, 'w') as configfile:
         configfile.writelines(lines)
+
+
+@eorm.command()
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+def zarr_tree(env):
+    """Display the structure of the annotations zarr store, showing groups and array shapes."""
+    import zarr
+    
+    config = get_config(env)
+    
+    # Open the zarr store
+    try:
+        root = zarr.open_group(store=config.annotations_zarr_store, mode="r")
+    except Exception as e:
+        print(f"Error opening zarr store at {config.annotations_zarr_store}: {e}")
+        return
+    
+    print(f"Zarr store: {config.annotations_zarr_store}")
+    print("=" * 50)
+    
+    # Iterate through groups
+    group_names = list(root.group_keys())
+    if not group_names:
+        print("No groups found in the zarr store")
+        return
+    
+    for group_name in sorted(group_names):
+        group = root[group_name]
+        print(f"\nGroup: {group_name}")
+        print("-" * 30)
+        
+        # Get arrays in this group
+        array_names = list(group.array_keys())
+        if not array_names:
+            print("  No arrays found in this group")
+            continue
+        
+        for array_name in sorted(array_names):
+            array = group[array_name]
+            print(f"  Array: {array_name}")
+            print(f"    Shape: {array.shape}")
+            print(f"    Dtype: {array.dtype}")
+            print(f"    Chunks: {array.chunks}")
+            
+            # # Show compression info if available
+            # if hasattr(array, 'compressor') and array.compressor:
+            #     print(f"    Compressor: {array.compressor}")
+            
+            # # Calculate storage efficiency
+            # if hasattr(array, 'nbytes') and hasattr(array, 'nbytes_stored'):
+            #     ratio = array.nbytes / array.nbytes_stored if array.nbytes_stored > 0 else 0
+            #     print(f"    Storage: {array.nbytes_stored:,} bytes ({ratio:.1f}x compression)")
+
+
+@eorm.command()
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+@click.option("--new-store-path", type=click.Path(), required=True, help="Path to the new zarr store directory")
+def defragment_zarr(env, new_store_path):
+    """Defragment the zarr store by copying all annotations to a new store with sequential indices.
+    
+    This command creates a new zarr store and copies all existing annotations to it,
+    assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
+    The ZarrArrayIndex values in the database will be updated to reflect the new indices.
+    """
+    import os
+    from pathlib import Path
+    
+    from eyened_orm import DBManager
+    from eyened_orm.utils.zarr.manager_annotation import AnnotationZarrStorageManager
+    
+    config = get_config(env)
+    
+    # Initialize database manager
+    DBManager.init(config)
+    
+    # Create new store path if it doesn't exist
+    new_store_path = Path(new_store_path)
+    new_store_path.mkdir(parents=True, exist_ok=True)
+    
+    # Create annotation zarr storage manager for existing store
+    old_manager = AnnotationZarrStorageManager(config.annotations_zarr_store)
+    
+    print(f"Defragmenting zarr store from: {config.annotations_zarr_store}")
+    print(f"Creating new zarr store at: {new_store_path}")
+    print("=" * 50)
+    
+    try:
+        # Run defragmentation
+        index_mapping = old_manager.defragment_to_new_store(new_store_path)
+        
+        print("\nDefragmentation completed successfully!")
+        print(f"New zarr store created at: {new_store_path}")
+        print("Remember to update your configuration to point to the new store.")
+        
+    except Exception as e:
+        print(f"Error during defragmentation: {e}")
+        import traceback
+        traceback.print_exc()
+        return
 
 
 @eorm.command()

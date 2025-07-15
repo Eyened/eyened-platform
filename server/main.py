@@ -69,6 +69,8 @@ async def lifespan(app: FastAPI):
     # after shutdown
 
 
+
+
 app = FastAPI(lifespan=lifespan)
 
 app.mount("/api", app_api)
