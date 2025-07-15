@@ -115,3 +115,105 @@ class AnnotationZarrStorageManager:
         # Otherwise, write the full annotation
         else:
             return zarr_array.write(zarr_index, data)
+
+    def defragment_to_new_store(self, new_store_path: str | Path):
+        """
+        Defragment the zarr store by copying all annotations to a new store with sequential ZarrArrayIndex values.
+        
+        This method creates a new zarr store and copies all existing annotations to it,
+        assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
+        
+        Args:
+            new_store_path: Path to the new zarr store
+            
+        Returns:
+            dict: Mapping of old ZarrArrayIndex to new ZarrArrayIndex for each group and array
+        """
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from eyened_orm import Annotation, DBManager
+        
+        # Create new zarr store manager
+        new_manager = AnnotationZarrStorageManager(new_store_path)
+        
+        # Get database session
+        session = DBManager.get_session()
+        
+        try:
+            # Query all annotations with ZarrArrayIndex
+            annotations = session.execute(
+                select(Annotation)
+                .where(Annotation.ZarrArrayIndex.is_not(None))
+                .where(~Annotation.Inactive)
+                .order_by(Annotation.AnnotationTypeID, Annotation.ZarrArrayIndex)
+            ).scalars().all()
+            
+            print(f"Found {len(annotations)} annotations to defragment")
+            
+            # Track new indices for each group/array combination
+            new_indices = {}
+            index_mapping = {}
+            
+            # Process annotations in batches by group and array type
+            for annotation in annotations:
+                try:
+                    # Get annotation data shape and type
+                    group_name = str(annotation.AnnotationTypeID)
+                    data_dtype = np.dtype(np.uint8)  # Default dtype for annotations
+                    data_shape = annotation.shape
+                    
+                    # Create unique key for this array type
+                    array_key = (group_name, data_dtype, *data_shape)
+                    
+                    # Initialize new index counter for this array type
+                    if array_key not in new_indices:
+                        new_indices[array_key] = 0
+                        index_mapping[array_key] = {}
+                    
+                    # Read annotation data from old store
+                    old_zarr_index = annotation.ZarrArrayIndex
+                    annotation_data = self.read(
+                        group_name=group_name,
+                        data_dtype=data_dtype,
+                        data_shape=data_shape,
+                        zarr_index=old_zarr_index
+                    )
+                    
+                    # Write to new store with new index
+                    new_zarr_index = new_manager.write(
+                        group_name=group_name,
+                        data_dtype=data_dtype,
+                        data_shape=data_shape,
+                        data=annotation_data,
+                        zarr_index=None  # Let it assign new index
+                    )
+                    
+                    # Update mapping
+                    index_mapping[array_key][old_zarr_index] = new_zarr_index
+                    new_indices[array_key] = new_zarr_index + 1
+                    
+                    # Update annotation in database
+                    annotation.ZarrArrayIndex = new_zarr_index
+                    
+                    if len(index_mapping[array_key]) % 100 == 0:
+                        print(f"Processed {len(index_mapping[array_key])} annotations for array {array_key}")
+                        session.commit()
+                        
+                except Exception as e:
+                    print(f"Error processing annotation {annotation.AnnotationID}: {e}")
+                    continue
+            
+            # Final commit
+            session.commit()
+            
+            # Print summary
+            total_copied = sum(len(mapping) for mapping in index_mapping.values())
+            print(f"Successfully defragmented {total_copied} annotations")
+            
+            for array_key, mapping in index_mapping.items():
+                print(f"Array {array_key}: {len(mapping)} annotations")
+                
+            return index_mapping
+            
+        finally:
+            session.close()

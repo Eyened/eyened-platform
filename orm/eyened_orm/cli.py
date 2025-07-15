@@ -15,6 +15,7 @@ The following commands are available:
 - update-thumbnails: Update thumbnails for all images in the database.
 - run-models: Run the models on the database.
 - zarr-tree: Display the structure of the annotations zarr store, showing groups and array shapes.
+- defragment-zarr: Defragment the zarr store by copying all annotations to a new store with sequential indices.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 '''
@@ -178,6 +179,53 @@ def zarr_tree(env):
             # if hasattr(array, 'nbytes') and hasattr(array, 'nbytes_stored'):
             #     ratio = array.nbytes / array.nbytes_stored if array.nbytes_stored > 0 else 0
             #     print(f"    Storage: {array.nbytes_stored:,} bytes ({ratio:.1f}x compression)")
+
+
+@eorm.command()
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+@click.option("--new-store-path", type=click.Path(), required=True, help="Path to the new zarr store directory")
+def defragment_zarr(env, new_store_path):
+    """Defragment the zarr store by copying all annotations to a new store with sequential indices.
+    
+    This command creates a new zarr store and copies all existing annotations to it,
+    assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
+    The ZarrArrayIndex values in the database will be updated to reflect the new indices.
+    """
+    import os
+    from pathlib import Path
+    
+    from eyened_orm import DBManager
+    from eyened_orm.utils.zarr.manager_annotation import AnnotationZarrStorageManager
+    
+    config = get_config(env)
+    
+    # Initialize database manager
+    DBManager.init(config)
+    
+    # Create new store path if it doesn't exist
+    new_store_path = Path(new_store_path)
+    new_store_path.mkdir(parents=True, exist_ok=True)
+    
+    # Create annotation zarr storage manager for existing store
+    old_manager = AnnotationZarrStorageManager(config.annotations_zarr_store)
+    
+    print(f"Defragmenting zarr store from: {config.annotations_zarr_store}")
+    print(f"Creating new zarr store at: {new_store_path}")
+    print("=" * 50)
+    
+    try:
+        # Run defragmentation
+        index_mapping = old_manager.defragment_to_new_store(new_store_path)
+        
+        print("\nDefragmentation completed successfully!")
+        print(f"New zarr store created at: {new_store_path}")
+        print("Remember to update your configuration to point to the new store.")
+        
+    except Exception as e:
+        print(f"Error during defragmentation: {e}")
+        import traceback
+        traceback.print_exc()
+        return
 
 
 @eorm.command()
