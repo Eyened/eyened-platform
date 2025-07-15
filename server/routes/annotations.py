@@ -128,6 +128,20 @@ async def get_annotation(
         raise HTTPException(status_code=404, detail="Annotation not found")
     return item
 
+@router.delete("/segmentations/{segmentation_id}", status_code=204)
+async def delete_annotation(
+    segmentation_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    annotation = Annotation.by_id(db, segmentation_id)
+    if annotation is None:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    
+    db.delete(annotation)
+    db.commit()
+    return Response(status_code=204)
+
 @router.put("/segmentations/{segmentation_id}/data", status_code=204)
 async def update_annotation_data_file(
     segmentation_id: int,
