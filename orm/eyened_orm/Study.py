@@ -79,9 +79,9 @@ class Study(Base):
         cls, session: Session, patient_id, study_date
     ):
         return session.scalar(
-            select(Study)
-            .where(Study.PatientID == patient_id)
-            .where(Study.StudyDate == study_date)
+            select(cls)
+            .where(cls.PatientID == patient_id)
+            .where(cls.StudyDate == study_date)
         )
 
     @property

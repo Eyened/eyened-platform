@@ -53,34 +53,18 @@ class Project(Base):
         """
         from eyened_orm import ImageInstance, Patient, Series, Study
 
-        stmt = (
-            select(ImageInstance, Series, Study, Patient)
+        images = session.execute(
+            select(ImageInstance)
             .select_from(ImageInstance)
             .join(Series)
             .join(Study)
             .join(Patient)
             .where(Patient.ProjectID == self.ProjectID)
-        )
+        ).all()
 
-        rows = session.execute(stmt).all()
+        image_ids = [im.ImageInstanceID for im in images]
 
-        # Convert rows to a DataFrame
-        df = pd.DataFrame(
-            [
-                {
-                    "image_id": im.ImageInstanceID,
-                    "patient_id": pat.PatientID,
-                    "patient_identifier": pat.PatientIdentifier,
-                    "study_id": study.StudyID,
-                    "study_date": study.StudyDate,
-                    "series_id": series.SeriesID,
-                    "path": im.path,
-                }
-                for im, series, study, pat in rows
-            ]
-        )
-
-        return df
+        return ImageInstance.make_dataframe(session, image_ids)
 
     def get_patient_by_identifier(self, session: Session, patient_identifier: string) -> Optional[Patient]:
         """
