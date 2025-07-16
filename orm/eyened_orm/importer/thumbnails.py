@@ -13,7 +13,7 @@ from eyened_orm import ImageInstance, Modality
 
 
 def get_thumbnail_dicom(im: ImageInstance):
-    ds = pydicom.read_file(im.path)
+    ds = pydicom.dcmread(im.path)
     ds.decompress()
 
     if ds.pixel_array is None:
@@ -51,8 +51,8 @@ def get_thumbnail_binary(im: ImageInstance):
     data = open_dot_binary(im)
     im = data.mean(axis=1)
     size = np.max(im.shape)
-    im = im - np.min(im)   # Shift minimum to 0
-    im = im / np.max(im)   # Normalize maximum to 1
+    im = im - np.min(im)  # Shift minimum to 0
+    im = im / np.max(im)  # Normalize maximum to 1
     im = (im * 255).astype(np.uint8)  # Scale to [0, 255] and convert to uint8
     return cv2.resize(im, (size, size), interpolation=cv2.INTER_LINEAR)
 
@@ -129,9 +129,16 @@ def save_thumbnails(
     return thumbnail_identifier
 
 
-def update_thumbnails_for_images(session, images: list[ImageInstance], thumbnails_path: Path, secret_key: str, N=1000, print_errors=False):
+def update_thumbnails_for_images(
+    session,
+    images: list[ImageInstance],
+    thumbnails_path: Path,
+    secret_key: str,
+    N=1000,
+    print_errors=False,
+):
     for i, image in enumerate(tqdm(images)):
-        if image.path.suffix == '.json':
+        if image.path.suffix == ".json":
             image.ThumbnailPath = None
         else:
             try:
@@ -139,7 +146,9 @@ def update_thumbnails_for_images(session, images: list[ImageInstance], thumbnail
                     image, Path(thumbnails_path), secret=secret_key
                 )
             except Exception as e:
-                print(f"Error generating thumbnail for image {image.ImageInstanceID}: {e}")
+                print(
+                    f"Error generating thumbnail for image {image.ImageInstanceID}: {e}"
+                )
                 thumbnail_identifier = ""
             image.ThumbnailPath = thumbnail_identifier
 
@@ -148,19 +157,19 @@ def update_thumbnails_for_images(session, images: list[ImageInstance], thumbnail
     session.commit()
 
 
-def update_thumbnails(session, thumbnails_path, secret_key, update_failed=False, print_errors=False):
-    where = (ImageInstance.ThumbnailPath == None)
+def update_thumbnails(
+    session, thumbnails_path, secret_key, update_failed=False, print_errors=False
+):
+    where = ImageInstance.ThumbnailPath == None
     if update_failed:
-        where = (where | (ImageInstance.ThumbnailPath == ""))
+        where = where | (ImageInstance.ThumbnailPath == "")
     images = (
-        session.execute(
-            select(ImageInstance)
-            .where(where)
-            .order_by(func.random())
-        )
+        session.execute(select(ImageInstance).where(where).order_by(func.random()))
         .scalars()
         .all()
     )
     print(f"Found {len(images)} images without thumbnails")
 
-    update_thumbnails_for_images(session, images, thumbnails_path, secret_key, print_errors=print_errors)
+    update_thumbnails_for_images(
+        session, images, thumbnails_path, secret_key, print_errors=print_errors
+    )

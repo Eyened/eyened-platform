@@ -6,7 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+
 import numpy as np
+import pandas as pd
 import pydicom
 from PIL import Image
 from sqlalchemy import ForeignKey, LargeBinary, String, Text, func, select
@@ -346,6 +348,41 @@ class ImageInstance(Base):
         """
         return [a for a in self.Annotations
                 if a.CreatorID == creator.CreatorID]
+    
+    @classmethod
+    def make_dataframe(cls, session: Session, image_ids: list[int]) -> pd.DataFrame:
+        """
+        Make a dataframe from a list of ImageInstance objects
+        """
+        from eyened_orm import Patient, Series, Study
+
+        stmt = (
+            select(ImageInstance, Series, Study, Patient)
+            .select_from(ImageInstance)
+            .join(Series)
+            .join(Study)
+            .join(Patient)
+            .where(ImageInstance.ImageInstanceID.in_(image_ids))
+        )
+
+        rows = session.execute(stmt).all()
+
+        # Convert rows to a DataFrame
+        df = pd.DataFrame(
+            [
+                {
+                    "image_id": im.ImageInstanceID,
+                    "patient_id": pat.PatientID,
+                    "patient_identifier": pat.PatientIdentifier,
+                    "study_id": study.StudyID,
+                    "study_date": study.StudyDate,
+                    "series_id": series.SeriesID,
+                    "path": im.path,
+                }
+                for im, series, study, pat in rows
+            ]
+        )
+        return df
 
     def __repr__(self):
         return f"ID: {self.ImageInstanceID} @ {self.SourceInfo.SourcePath} {self.DatasetIdentifier}"
