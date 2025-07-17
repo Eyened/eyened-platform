@@ -121,7 +121,6 @@ def update_thumbnails(
         try:
             if image.path.suffix == ".json":
                 image.ThumbnailPath = None
-                print(f"Skipping {image.ImageInstanceID} because it is a JSON file")
             else:
                 image.ThumbnailPath = get_thumbnail_identifier(image)
                 save_thumbnails(image)
