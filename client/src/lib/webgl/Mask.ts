@@ -6,7 +6,7 @@ import { colorsFlat } from "$lib/viewer/overlays/colors";
 import type { AbstractImage } from "./abstractImage";
 import type { TextureShaderProgram } from "./FragmentShaderProgram";
 import type { Shaders } from "./shaders";
-import { imageToTexture, createTextureR8UI, TextureData, type BinaryMask, type ImageType, type TypedArray } from "./texture";
+import { imageToTexture, createTextureR8UI, TextureData, type ImageType, BitMaskTexture } from "./texture";
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
 
@@ -24,7 +24,7 @@ export interface PaintSettings {
     activeIndices?: number | number[];
 }
 
-export abstract class SegmentationData {
+export abstract class Mask {
     constructor(
         readonly image: AbstractImage,
         readonly segmentation: Segmentation
@@ -39,9 +39,9 @@ export abstract class SegmentationData {
 }
 
 
-export class BinarySegmentation extends SegmentationData {
+export class BinaryMask extends Mask {
 
-    protected _binaryMask: BinaryMask | null = null;
+    protected _binaryMask: BitMaskTexture | null = null;
     protected webgl: WebGL;
     protected shaders: Shaders;
 
@@ -51,7 +51,7 @@ export class BinarySegmentation extends SegmentationData {
         this.shaders = this.webgl.shaders;
     }
 
-    get binaryMask(): BinaryMask {
+    get bitMaskTexture(): BitMaskTexture {
         if (!this._binaryMask) {
             this._binaryMask = this.webgl.binaryMaskManager.allocateMask(this.image.width, this.image.height);
         }
@@ -59,7 +59,7 @@ export class BinarySegmentation extends SegmentationData {
     }
 
     importData(data: DrawingArray): void {
-        this.binaryMask.setData(data);
+        this.bitMaskTexture.setData(data);
         this.connectedComponentsValid = false;
     }
 
@@ -68,7 +68,7 @@ export class BinarySegmentation extends SegmentationData {
      * @returns a Uint8Array with 1 for foreground pixels and 0 for background pixels
      */
     exportData(): Uint8Array {
-        return this.binaryMask.getData(1);
+        return this.bitMaskTexture.getData(1);
     }
 
     /**
@@ -77,11 +77,11 @@ export class BinarySegmentation extends SegmentationData {
      * @param paintSettings: settings for the paint mode
      */
     draw(drawing: ImageType, paintSettings: PaintSettings): void {
-        this._drawMask(this.binaryMask, drawing, paintSettings);
+        this._drawMask(this.bitMaskTexture, drawing, paintSettings);
         this.connectedComponentsValid = false;
     }
 
-    protected _drawMask(mask: BinaryMask, drawing: ImageType, paintSettings: PaintSettings): void {
+    protected _drawMask(mask: BitMaskTexture, drawing: ImageType, paintSettings: PaintSettings): void {
         const uniforms = {
             u_drawing: imageToTexture(this.webgl.gl, drawing),
             u_paint: paintSettings.paint,
@@ -95,19 +95,19 @@ export class BinarySegmentation extends SegmentationData {
     }
 
     clear(): void {
-        this.binaryMask.clearData();
+        this.bitMaskTexture.clearData();
     }
 
     dispose(): void {
-        this.binaryMask.dispose();
+        this.bitMaskTexture.dispose();
     }
 
     get texture(): WebGLTexture {
-        return this.binaryMask.texture;
+        return this.bitMaskTexture.texture;
     }
 
     get bitmask(): number {
-        return this.binaryMask.bitmask;
+        return this.bitMaskTexture.bitmask;
     }
 
     protected getRenderUniforms(uniforms: any): any {
@@ -133,7 +133,7 @@ export class BinarySegmentation extends SegmentationData {
 
 
     computeConnectedComponents() {
-        const data = this.binaryMask.getData();
+        const data = this.bitMaskTexture.getData();
         const { width, height } = this.image;
         const label = BlobExtraction(data, width, height);
         // label contains the connected components (0 = background, 1 = first component, 2 = second component, ...)
@@ -166,14 +166,14 @@ export class BinarySegmentation extends SegmentationData {
     }
 }
 
-export class QuestionableSegmentation extends BinarySegmentation {
-    _questionableMask: BinaryMask | null = null;
+export class QuestionableMask extends BinaryMask {
+    _questionableMask: BitMaskTexture | null = null;
 
     constructor(image: AbstractImage, segmentation: Segmentation) {
         super(image, segmentation);
     }
 
-    get questionableMask(): BinaryMask {
+    get questionableMask(): BitMaskTexture {
         if (!this._questionableMask) {
             this._questionableMask = this.webgl.binaryMaskManager.allocateMask(this.image.width, this.image.height);
         }
@@ -187,7 +187,7 @@ export class QuestionableSegmentation extends BinarySegmentation {
             b[i] = data[i] & 1;
             q[i] = (data[i] >> 1) & 1;
         }
-        this.binaryMask.setData(b);
+        this.bitMaskTexture.setData(b);
         this.questionableMask.setData(q);
     }
 
@@ -198,7 +198,7 @@ export class QuestionableSegmentation extends BinarySegmentation {
     exportData(): Uint8Array {
         const result = new Uint8Array(this.image.width * this.image.height);
         const q = this.questionableMask.getData();
-        const b = this.binaryMask.getData();
+        const b = this.bitMaskTexture.getData();
         for (let i = 0; i < this.image.width * this.image.height; i++) {
             let bitmask = 0;
             if (b[i] > 0) {
@@ -241,7 +241,7 @@ export class QuestionableSegmentation extends BinarySegmentation {
         }
     }
 }
-abstract class DataSegmentation extends SegmentationData {
+abstract class AbstractDataMask extends Mask {
     textureData: TextureData;
     constructor(image: AbstractImage, segmentation: Segmentation) {
         super(image, segmentation);
@@ -263,7 +263,7 @@ abstract class DataSegmentation extends SegmentationData {
     }
 }
 
-export class ProbabilitySegmentation extends DataSegmentation {
+export class ProbabilityMask extends AbstractDataMask {
 
     u_hard: boolean = true;
     constructor(image: AbstractImage, segmentation: Segmentation) {
@@ -319,7 +319,7 @@ export class ProbabilitySegmentation extends DataSegmentation {
     }
 }
 
-abstract class BaseMultiSegmentation extends DataSegmentation {
+abstract class BaseMultiMask extends AbstractDataMask {
 
     constructor(image: AbstractImage, segmentation: Segmentation) {
         super(image, segmentation);
@@ -367,7 +367,7 @@ abstract class BaseMultiSegmentation extends DataSegmentation {
         this.getRenderShader().pass(renderTarget, uniforms);
     }
 }
-export class MultiClassSegmentation extends BaseMultiSegmentation {
+export class MultiClassMask extends BaseMultiMask {
     constructor(image: AbstractImage, segmentation: Segmentation) {
         super(image, segmentation);
     }
@@ -383,7 +383,7 @@ export class MultiClassSegmentation extends BaseMultiSegmentation {
     }
 }
 
-export class MultiLabelSegmentation extends BaseMultiSegmentation {
+export class MultiLabelMask extends BaseMultiMask {
     constructor(image: AbstractImage, segmentation: Segmentation) {
         super(image, segmentation);
     }

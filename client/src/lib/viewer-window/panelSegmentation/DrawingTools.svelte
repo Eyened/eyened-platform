@@ -19,10 +19,7 @@
     import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte";
 
     import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
-    import type {
-        PaintSettings,
-        ProbabilitySegmentation,
-    } from "$lib/webgl/segmentation";
+    import type { PaintSettings } from "$lib/webgl/Mask";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -31,6 +28,7 @@
         "segmentationOverlay",
     );
     const { segmentationContext } = segmentationOverlay;
+
     let activeTool: undefined | SegmentationTool = $state(undefined);
     let removeTool = () => {};
 
@@ -115,12 +113,16 @@
         segmentationContext.segmentationItem?.redo(viewerContext.index);
     }
 
-    let canUndo = $derived(
-        segmentationContext.segmentationItem?.canUndo(viewerContext.index),
-    );
-    let canRedo = $derived(
-        segmentationContext.segmentationItem?.canRedo(viewerContext.index),
-    );
+    function checkHistory(type: "canUndo" | "canRedo") {
+        const scanNr = viewerContext.index;
+        const segmentationItem = segmentationContext.segmentationItem;
+        if (!segmentationItem) return false;
+        const segmentationState = segmentationItem.getSegmentationState(scanNr);
+        return segmentationState?.[type] ?? false;
+    }
+
+    let canUndo = $derived.by(() => checkHistory("canUndo"));
+    let canRedo = $derived.by(() => checkHistory("canRedo"));
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -165,13 +167,13 @@
             <PanelIcon
                 onclick={undo}
                 tooltip="Undo"
-                disabled={!$canUndo}
+                disabled={!canUndo}
                 Icon={Undo}
             />
             <PanelIcon
                 onclick={redo}
                 tooltip="Redo"
-                disabled={!$canRedo}
+                disabled={!canRedo}
                 Icon={Redo}
             />
         </div>

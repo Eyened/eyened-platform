@@ -6,43 +6,46 @@
     import { data } from "$lib/datamodel/model";
     import type { Feature } from "$lib/datamodel/feature.svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-
-    import { AnnotationType } from "$lib/datamodel/annotationType.svelte";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import { Annotation } from "$lib/datamodel/annotation.svelte";
-    import { getAnnotationTypes } from "./annotationTypes";
+    import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte";
+    import { Segmentation, type DataRepresentation, type Datatype } from "$lib/datamodel/segmentation.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { image } = getContext<ViewerContext>("viewerContext");
+    const viewerContext = getContext<ViewerContext>("viewerContext");
+    const { image, axis } = viewerContext;
     const { creator } = globalContext;
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
     const segmentationContext = segmentationOverlay.segmentationContext;
-    const { features, annotationTypeFeatures } = data;
-    const types = getAnnotationTypes();
+    const { features } = data;
+
+    const compositeFeatures = getCompositeFeatures();
 
     const dialogue = getContext<Writable<any>>("dialogue");
 
     let selectedFeature: Feature | undefined = $state(undefined);
 
+    const dataRepresentations: { [key: string]: DataRepresentation } = {
+        "Q": "DualBitMask",
+        "B": "Binary",
+        "P": "Probability",
+        "MultiLabel": "MultiLabel",
+        "MultiClass": "MultiClass",
+    }
+    
     async function create(
         feature: Feature,
-        annotationType: AnnotationType | "Q" | "B" | "P",
+        annotationType: "Q" | "B" | "P" | "MultiLabel" | "MultiClass",
     ) {
-        if (annotationType instanceof AnnotationType) {
-            // already an annotation type
-        } else {
-            annotationType = types[annotationType];
-        }
         dialogue.set(`Creating annotation...`);
 
-        await Annotation.createFrom(
-            image.instance,
-            feature,
-            creator,
-            annotationType,
-        );
+        let dataType: Datatype = "R8UI";
+        if (annotationType == "P") {
+            dataType = "R8";
+        }
+
+        await Segmentation.createFrom(image, feature, creator, dataRepresentations[annotationType], dataType, 0.5, axis);
         segmentationContext.hideCreators.delete(creator);
         dialogue.set(undefined);
     }
@@ -69,37 +72,11 @@
         return true;
     });
 
-    type AnnotationTypeFeature = {
-        name: string;
-        feature: Feature;
-        annotationType: AnnotationType;
-    };
-    function createAnnotationTypeFeatures(dataRepresentation: string) {
-        return annotationTypeFeatures
-            .filter((f) => {
-                return (
-                    f.featureIndex == -1 &&
-                    f.annotationType.dataRepresentation == dataRepresentation
-                );
-            })
-            .map((f) => {
-                return {
-                    name: f.annotationType.name,
-                    feature: f.feature,
-                    annotationType: f.annotationType,
-                };
-            });
-    }
-
-    const multiLabelAnnotationTypeFeatures: Readable<AnnotationTypeFeature[]> =
-        createAnnotationTypeFeatures("MultiLabel");
-    const multiClassAnnotationTypeFeatures: Readable<AnnotationTypeFeature[]> =
-        createAnnotationTypeFeatures("MultiClass");
     let selectList = false;
 </script>
 
 <div class="new">
-    {#if selectList}
+    <!-- {#if selectList}
         <div>
             <select bind:value={selectedFeature}>
                 <option value="" selected disabled hidden
@@ -120,7 +97,7 @@
                 Create
             </button>
         </div>
-    {/if}
+    {/if} -->
     <FeatureSelect
         name="Feature"
         values={availableFeatures}
@@ -128,26 +105,26 @@
         onselect={(feature, type) => create(feature, type as "Q" | "B" | "P")}
     />
 
-    {#snippet multi(items: AnnotationTypeFeature[])}
-        {#if items.length > 0}
-            <div>
-                <ul>
-                    {#each items as item}
-                        <li>
-                            <button
-                                onclick={() =>
-                                    create(item.feature, item.annotationType)}
-                            >
-                                Create new [{item.name}]
-                            </button>
-                        </li>
-                    {/each}
-                </ul>
-            </div>
-        {/if}
+    {#snippet multi(dataRepresentation: "MultiLabel" | "MultiClass")}
+        <div>
+            <h3>{dataRepresentation}</h3>
+            <ul>
+                {#each $compositeFeatures.entries() as [parentFeatureId, items]}
+                    {@const parentFeature = features.get(parentFeatureId)!}
+                    <li>
+                        <button
+                            onclick={() =>
+                                create(parentFeature, dataRepresentation)}
+                        >
+                            Create new [{parentFeature.name}]
+                        </button>
+                    </li>
+                {/each}
+            </ul>
+        </div>
     {/snippet}
-    {@render multi($multiLabelAnnotationTypeFeatures)}
-    {@render multi($multiClassAnnotationTypeFeatures)}
+    {@render multi("MultiLabel")}
+    {@render multi("MultiClass")}
 </div>
 
 <style>

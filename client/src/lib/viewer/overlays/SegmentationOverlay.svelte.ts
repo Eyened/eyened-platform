@@ -8,13 +8,13 @@ import { colors } from "./colors";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-import type { Annotation } from "$lib/datamodel/annotation.svelte";
 import type { FilterList } from "$lib/datamodel/itemList";
-import { BinarySegmentation } from "$lib/webgl/segmentation";
+import { BinaryMask } from "$lib/webgl/Mask";
+import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 export class SegmentationOverlay implements Overlay {
 
-    private featureColors = new SvelteMap<Annotation, Color>();
+    private featureColors = new SvelteMap<Segmentation, Color>();
     
     public readonly applyConnectedComponents = new SvelteSet<SegmentationItem>();
     public readonly applyMasking = new SvelteSet<SegmentationItem>();
@@ -25,12 +25,17 @@ export class SegmentationOverlay implements Overlay {
     public activeFeatureMask = $state<number | undefined>(undefined);
     public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
     public readonly segmentationContext = new SegmentationContext();
-    public readonly annotations: FilterList<Annotation>;
+    public readonly segmentations: FilterList<Segmentation>;
 
     constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
         const image = viewerContext.image;
         const instance = image.instance;
-        this.annotations = instance.annotations.filter(globalContext.annotationsFilter);
+        this.segmentations = instance.segmentations.filter(globalContext.segmentationsFilter).filter(s=>{
+            if (s.sparseAxis !== null && s.sparseAxis !== viewerContext.axis) {
+                return false;
+            }
+            return true;
+        });
     }
 
     toggleMasking(segmentation: SegmentationItem) {
@@ -41,16 +46,16 @@ export class SegmentationOverlay implements Overlay {
         toggleInSet(this.applyConnectedComponents, segmentationItem);
     }
 
-    setFeatureColor(annotation: Annotation, color: Color) {
-        this.featureColors.set(annotation, color);
+    setFeatureColor(segmentation: Segmentation, color: Color) {
+        this.featureColors.set(segmentation, color);
     }
 
     private _colorIndex = 0;
-    getFeatureColor(annotation: Annotation): Color {
-        let color = this.featureColors.get(annotation);
+    getFeatureColor(segmentation: Segmentation): Color {
+        let color = this.featureColors.get(segmentation);
         if (!color) {
             color = colors[(this._colorIndex++) % colors.length];
-            this.setFeatureColor(annotation, color);
+            this.setFeatureColor(segmentation, color);
         }
         return color;
     }
@@ -65,7 +70,7 @@ export class SegmentationOverlay implements Overlay {
         }
         const {
             hideCreators,
-            hideAnnotations
+            hideSegmentations
         } = this.segmentationContext;
 
         const baseUniforms = getBaseUniforms(viewerContext);
@@ -78,21 +83,21 @@ export class SegmentationOverlay implements Overlay {
             activeIndices: this.segmentationContext.activeIndices
         };
 
-        for (const annotation of this.annotations.$) {
-            const segmentationItem = image.segmentationItems.get(annotation);
+        for (const segmentation of this.segmentations.$) {
+            const segmentationItem = image.segmentationItems.get(segmentation);
             if (!segmentationItem) continue;
-            const segmentation = segmentationItem.getSegmentation(index);
+            const segmentationData = segmentationItem.getMask(index);
 
-            if (!segmentation) continue;
-            if (hideAnnotations.has(annotation)) continue;
-            if (hideCreators.has(annotation.creator)) continue;
+            if (!segmentationData) continue;
+            if (hideSegmentations.has(segmentation)) continue;
+            if (hideCreators.has(segmentation.creator)) continue;
 
-            uniforms.u_color = this.getFeatureColor(annotation).map(c => c / 255);
+            uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
 
             
-            for (const ad of annotation.annotationData.$) {
-                uniforms.u_threshold = ad.valueFloat ?? 0.5;
-            }
+            // for (const ad of annotation.annotationData.$) {
+            //     uniforms.u_threshold = ad.valueFloat ?? 0.5;
+            // }
             if (this.highlightedSegmentationItem == segmentationItem) {
                 uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;
                 uniforms.u_active_feature_mask = this.activeFeatureMask ?? 0;
@@ -106,23 +111,23 @@ export class SegmentationOverlay implements Overlay {
             uniforms.u_mask = null;
             uniforms.u_mask_bitmask = 0;
             if (applyMask) {
-                const reference = annotation.annotationReference;
+                const reference = segmentation.reference;
                 if (reference) {
                     const referenceSegmentationItem = image.segmentationItems.get(reference);
                     if (!referenceSegmentationItem) continue;
-                    const mask = referenceSegmentationItem.getSegmentation(index);
-                    if (mask instanceof BinarySegmentation) {
+                    const mask = referenceSegmentationItem.getMask(index);
+                    if (mask instanceof BinaryMask) {
                         uniforms.u_has_mask = true;
-                        uniforms.u_mask = mask.binaryMask.texture;
-                        uniforms.u_mask_bitmask = mask.binaryMask.bitmask;
+                        uniforms.u_mask = mask.bitMaskTexture.texture;
+                        uniforms.u_mask_bitmask = mask.bitMaskTexture.bitmask;
                     }
                 }
             }
 
             if (this.applyConnectedComponents.has(segmentationItem)) {
-                (segmentation as BinarySegmentation).renderConnectedComponents(renderTarget, uniforms);
+                (segmentationData as BinaryMask).renderConnectedComponents(renderTarget, uniforms);
             } else {
-                segmentation.render(renderTarget, uniforms);
+                segmentationData.render(renderTarget, uniforms);
             }
         }
     }

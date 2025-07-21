@@ -8,9 +8,9 @@ class AnnotationZarrArray:
     """
     A wrapper class for zarr arrays used to store annotation data.
 
-    Arrays are of shape (N, H, W, D) where:
+    Arrays are of shape (N, D, H, W) where:
     - N is the size of the annotation index dimension
-    - H, W, D are spatial dimensions (any can be 1 for 2D data, all >1 for 3D data)
+    - D, H, W are spatial dimensions (any can be 1 for 2D data, all >1 for 3D data)
 
     Usage:
         # Load existing array
@@ -39,20 +39,20 @@ class AnnotationZarrArray:
 
         Args:
             zarr_index: Index in the array where to write. If None or >= len(A), append to array.
-            annot_data: Annotation data as numpy array of shape (H, W, D) where any spatial dimension can be 1 for 2D images
+            annot_data: Annotation data as numpy array of shape (D, H, W) where any spatial dimension can be 1 for 2D images
 
         Returns:
             The zarr_index where data was written
         """
-        # Validate input data shape - annot_data should be (H, W, D)
+        # Validate input data shape - annot_data should be (D, H, W)
         if len(annot_data.shape) != 3:
             raise ValueError(
-                f"Expected 3D array (H, W, D), got shape {annot_data.shape}"
+                f"Expected 3D array (D, H, W), got shape {annot_data.shape}"
             )
 
         # Check if spatial dimensions match
         expected_spatial = self.annotation_resolution
-        actual_spatial = annot_data.shape  # H, W, D
+        actual_spatial = annot_data.shape  # D, H, W
         if actual_spatial != expected_spatial:
             raise ValueError(
                 f"Expected spatial dimensions {expected_spatial}, got {actual_spatial}"
@@ -94,11 +94,12 @@ class AnnotationZarrArray:
             )
 
         if axis not in [0, 1, 2]:
-            raise ValueError(f"Invalid axis: {axis}. Must be 0 (height), 1 (width), or 2 (depth)")
+            raise ValueError(f"Invalid axis: {axis}. Must be 0 (depth), 1 (height), or 2 (width)")
 
         # Check if the array is volumetric (all spatial dimensions > 1)
         if not self.is_volume:
-            raise ValueError("write_slice is only supported for volumetric annotations (all spatial dimensions > 1)")
+            pass
+            # raise ValueError("write_slice is only supported for volumetric annotations (all spatial dimensions > 1)")
 
         # Validate slice_index
         max_slice_index = self.annotation_resolution[axis]
@@ -136,7 +137,7 @@ class AnnotationZarrArray:
 
         Args:
             zarr_index: Index in the array to read the slice from
-            axis: Axis along which to read the slice (0=height, 1=width, 2=depth)
+            axis: Axis along which to read the slice (0=depth, 1=height, 2=width)
             slice_index: Index along the specified axis
 
         Returns:
@@ -152,11 +153,12 @@ class AnnotationZarrArray:
             )
 
         if axis not in [0, 1, 2]:
-            raise ValueError(f"Invalid axis: {axis}. Must be 0 (height), 1 (width), or 2 (depth)")
+            raise ValueError(f"Invalid axis: {axis}. Must be 0 (depth), 1 (height), or 2 (width)")
 
         # Check if the array is volumetric (all spatial dimensions > 1)
         if not self.is_volume:
-            raise ValueError("read_slice is only supported for volumetric annotations (all spatial dimensions > 1)")
+            pass
+            #raise ValueError("read_slice is only supported for volumetric annotations (all spatial dimensions > 1)")
 
         # Validate slice_index
         max_slice_index = self.annotation_resolution[axis]
@@ -166,7 +168,7 @@ class AnnotationZarrArray:
             )
 
         # Create the slice index
-        slice_indices = [slice(None)] * 4  # [zarr_index, height, width, depth]
+        slice_indices = [slice(None)] * 4  # [zarr_index, depth, height, width]
         slice_indices[0] = zarr_index
         slice_indices[axis + 1] = slice_index  # +1 because zarr_index is at index 0
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Annotation } from "$lib/datamodel/annotation.svelte";
+    
     import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import { AbstractImage } from "$lib/webgl/abstractImage";
     import { Intersection, PanelIcon, Hide, Show, Trash } from "../icons/icons";
@@ -7,14 +7,14 @@
     import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem";
-
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
     interface Props {
         segmentationItem: SegmentationItem;
-        annotation: Annotation;
+        segmentation: Segmentation;
         image: AbstractImage;
         isEditable: boolean;
     }
-    let { annotation, image, isEditable, segmentationItem }: Props = $props();
+    let { segmentation, image, isEditable, segmentationItem }: Props = $props();
 
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
@@ -24,19 +24,19 @@
         dialogueManager.show(
             ReferenceAnnotationSelector,
             {
-                annotation,
+                segmentation,
                 image,
             },
-            (other: Annotation) => {
-                annotation.update({
-                    annotationReferenceId: other.id,
+            (other: Segmentation) => {
+                segmentation.update({
+                    referenceSegmentationId: other.id,
                 });
             },
         );
     }
 
     function removeReference() {
-        annotation.update({ annotationReferenceId: null });
+        segmentation.update({ referenceSegmentationId: null });
     }
     function toggleApplyMask() {
         segmentationOverlay.toggleMasking(segmentationItem);
@@ -56,11 +56,11 @@
             <span> Update reference mask</span>
         </div>
     {/if}
-    {#if annotation.annotationReferenceId}
+    {#if segmentation.referenceId}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="row">
-            Mask ID: [{annotation.annotationReferenceId}]
+            Mask ID: [{segmentation.referenceId}]
             {#if isEditable}
                 <PanelIcon
                     onclick={removeReference}

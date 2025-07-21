@@ -1,18 +1,15 @@
-import type { Annotation } from "$lib/datamodel/annotation.svelte";
-import type { AnnotationData, AnnotationPlane } from "$lib/datamodel/annotationData.svelte";
-import type { DataRepresentation } from "$lib/datamodel/annotationType.svelte";
+import type { DataRepresentation } from "$lib/datamodel/segmentation.svelte";
 import type { AbstractImage } from "./abstractImage";
 import type { Shaders } from "./shaders";
 import type { WebGL } from "./webgl";
 
 export interface Segmentation {
     id: string;
-    annotation: Annotation;
+    segmentation: Segmentation;
     image: AbstractImage;
     width: number;
     height: number;
     depth: number;
-    annotationPlane: AnnotationPlane;
     draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void;
     clear(scanNr: number): void;
     export(scanNr: number, ctx: CanvasRenderingContext2D, dataRepresentation?: DataRepresentation): void;
@@ -31,28 +28,8 @@ export abstract class BaseSegmentation implements Segmentation {
     constructor(
         public readonly id: string,
         public readonly image: AbstractImage,
-        public readonly annotation: Annotation,
-        readonly annotationPlane: AnnotationPlane
-    ) { 
-        // if (annotationPlane == 'PRIMARY') { // CFI or B-scan
-        //     this.width = image.width;
-        //     this.height = image.height;
-        //     this.depth = 1;
-        // } else if (annotationPlane == 'SECONDARY') { // enface
-        //     this.width = image.width;
-        //     this.height = image.depth;
-        //     this.depth = 1;
-        // } else if (annotationPlane == 'TERTIARY') { // across B-scans
-        //     this.width = image.height;
-        //     this.height = image.depth;
-        //     this.depth = 1;
-        // } else if (annotationPlane == 'VOLUME') {
-        //     this.width = image.width;
-        //     this.height = image.height;
-        //     this.depth = image.depth;
-        // } else {
-        //     throw new Error(`Unsupported annotation plane: ${annotationPlane}`);
-        // }
+        public readonly segmentation: Segmentation
+    ) {         
         this.width = image.width;
         this.height = image.height;
         this.depth = image.depth;
@@ -67,5 +44,5 @@ export abstract class BaseSegmentation implements Segmentation {
     abstract import(scanNr: number, canvas: HTMLCanvasElement): void;
     abstract importOther(scanNr: number, other: Segmentation): void;
     abstract dispose(): void;
-    abstract initialize(annotationData: AnnotationData, dataRaw: any): void;
+    // abstract initialize(annotationData: AnnotationData, dataRaw: any): void;
 } 

@@ -1,9 +1,20 @@
 from typing import Dict, List
 
-from eyened_orm import (AnnotationType, AnnotationTypeFeature, Contact,
-                        Creator, DeviceInstance, DeviceModel, Feature,
-                        FormSchema, Project, Scan, Task, TaskDefinition,
-                        TaskState)
+from eyened_orm import (
+    AnnotationType,
+    Contact,
+    CompositeFeature,
+    Creator,
+    DeviceInstance,
+    DeviceModel,
+    Feature,
+    FormSchema,
+    Project,
+    Scan,
+    Task,
+    TaskDefinition,
+    TaskState,
+)
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -19,8 +30,8 @@ class DataResponse(BaseModel):
     features: List[Feature]
     creators: List[Creator]
     contacts: List[Contact]
-    annotation_types: List[AnnotationType] = Field(alias="annotation-types")
-    annotation_type_features: List[AnnotationTypeFeature] = Field(alias="annotation-type-features")
+    # annotation_types: List[AnnotationType] = Field(alias="annotation-types")
+    composite_features: List[CompositeFeature] = Field(alias="composite-features")
     form_schemas: List[FormSchema] = Field(alias="form-schemas")
     task_definitions: List[TaskDefinition] = Field(alias="task-definitions")
     projects: List[Project]
@@ -43,8 +54,8 @@ async def get_data(
         "features": Feature,
         "contacts": Contact,
         "creators": Creator,
-        "annotation-types": AnnotationType,
-        "annotation-type-features": AnnotationTypeFeature,
+        # "annotation-types": AnnotationType,
+        "composite-features": CompositeFeature,
         "form-schemas": FormSchema,
         "task-definitions": TaskDefinition,
         "projects": Project,

@@ -1,5 +1,5 @@
 import type { PixelShaderProgram } from "./FragmentShaderProgram";
-import type { DrawingArray } from "./segmentation";
+import type { DrawingArray } from "./Mask";
 import type { RenderTarget } from "./types";
 
 export type TypedArray = Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
@@ -270,7 +270,7 @@ export class TextureData {
     }
 }
 
-export class BinaryMask {
+export class BitMaskTexture {
     readonly bitmask: number;
     textureData: TextureData;
 
@@ -332,17 +332,17 @@ export class BinaryMask {
 }
 
 class TextureDataAllocation {
-    private masks: (BinaryMask | null)[] = Array(8).fill(null);
+    private masks: (BitMaskTexture | null)[] = Array(8).fill(null);
 
     constructor(
         private readonly manager: BinaryMaskManager,
         public readonly textureData: TextureData
     ) { }
 
-    allocateMask(): BinaryMask | null {
+    allocateMask(): BitMaskTexture | null {
         for (let i = 0; i < this.masks.length; i++) {
             if (this.masks[i] === null) {
-                const mask = new BinaryMask(this, i);
+                const mask = new BitMaskTexture(this, i);
                 this.masks[i] = mask;
                 return mask;
             }
@@ -350,7 +350,7 @@ class TextureDataAllocation {
         return null;
     }
 
-    freeMask(mask: BinaryMask): void {
+    freeMask(mask: BitMaskTexture): void {
         this.masks[mask.index] = null;
         if (this.isEmpty()) {
             this.manager.freeAllocation(this);
@@ -380,7 +380,7 @@ export class BinaryMaskManager {
         return this.allocations.get(key) || [];
     }
 
-    allocateMask(width: number, height: number): BinaryMask {
+    allocateMask(width: number, height: number): BitMaskTexture {
         const allocations = this.getAllocations(width, height);
 
         // Try to allocate from existing TextureData instances

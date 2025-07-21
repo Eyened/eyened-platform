@@ -1,5 +1,3 @@
-import { Annotation } from "$lib/datamodel/annotation.svelte";
-import { AnnotationData } from "$lib/datamodel/annotationData.svelte";
 import type { Creator } from "$lib/datamodel/creator.svelte";
 import { data } from "$lib/datamodel/model";
 import type { DialogueType } from "$lib/types";

@@ -10,7 +10,7 @@
     import ImportSegmentationSelector from "../panelSegmentation/ImportSegmentationSelector.svelte";
     import LayerThicknessSelector from "./LayerThicknessSelector.svelte";
 
-    import type { Annotation } from "$lib/datamodel/annotation.svelte";
+    import type { Annotation } from "$lib/datamodel/_annotation.svelte";
     import { LayerSegmentationOverlay } from "$lib/viewer/overlays/LayerSegmentationOverlay.svelte";
     import { type Writable } from "svelte/store";
     import BscanLinks from "../panelSegmentation/BscanLinks.svelte";
@@ -18,7 +18,7 @@
     import {
         deleteAnnotation,
         macularLayers,
-    } from "../panelSegmentation/segmentationUtils";
+    } from "../panelSegmentation/_segmentationUtils";
 
     import { data } from "$lib/datamodel/model";
     import ImportSegmentation from "../icons/ImportSegmentation.svelte";

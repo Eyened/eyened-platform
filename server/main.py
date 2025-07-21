@@ -7,13 +7,13 @@ from fastapi.responses import FileResponse
 from server.config import settings
 from server.db import get_db
 from server.routes import (
-    annotations,
     api,
     auth,
     crud_resources,
     form_annotations,
     import_api,
     instances,
+    segmentations,
     tasks,
 )
 from server.utils.database_init import (
@@ -28,7 +28,7 @@ app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
 app_api.include_router(instances.router)
 app_api.include_router(api.router)
-app_api.include_router(annotations.router)
+app_api.include_router(segmentations.router)
 #app_api.include_router(form_annotations.router)
 #app_api.include_router(tasks.router)
 app_api.include_router(import_api.router)

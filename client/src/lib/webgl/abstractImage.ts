@@ -1,17 +1,16 @@
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 import type { Instance } from "$lib/datamodel/instance.svelte";
-import type { Annotation } from "$lib/datamodel/annotation.svelte";
-import type { FilterList } from "$lib/datamodel/itemList";
 import { Matrix } from "$lib/matrix";
 import { SegmentationItem } from "./segmentationItem";
+import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 export abstract class AbstractImage {
 
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-    public readonly segmentationItems = new Map<Annotation, SegmentationItem>();
+    public readonly segmentationItems = new Map<Segmentation, SegmentationItem>();
 
     // in micrometers / pixel
     public readonly resolution: { x: number, y: number, z: number };
@@ -37,15 +36,15 @@ export abstract class AbstractImage {
     abstract is3D: boolean;
     abstract is2D: boolean;
 
-    getSegmentationItem(annotation: Annotation): SegmentationItem {
+    getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         // If the segmentationItem is already created, return it
-        if (this.segmentationItems.has(annotation)) {
-            return this.segmentationItems.get(annotation)!;
+        if (this.segmentationItems.has(segmentation)) {
+            return this.segmentationItems.get(segmentation)!;
         }
 
         // Create new segmentation item
-        const segmentationItem = new SegmentationItem(this, annotation);
-        this.segmentationItems.set(annotation, segmentationItem);
+        const segmentationItem = new SegmentationItem(this, segmentation);
+        this.segmentationItems.set(segmentation, segmentationItem);
         return segmentationItem;
     }
 

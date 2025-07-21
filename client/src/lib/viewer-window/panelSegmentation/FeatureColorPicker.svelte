@@ -4,12 +4,12 @@
 
     import { getContext } from "svelte";
     import PanelIcon from "../icons/PanelIcon.svelte";
-    import type { Annotation } from "$lib/datamodel/annotation.svelte";
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 
     interface Props {
-        annotation: Annotation;
-    }
-    let { annotation }: Props = $props();
+        segmentation: Segmentation;
+    }   
+    let { segmentation }: Props = $props();
 
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
@@ -17,10 +17,10 @@
 
     let currentColor = $state("");
 
-    currentColor = toHex(segmentationOverlay.getFeatureColor(annotation));
+    currentColor = toHex(segmentationOverlay.getFeatureColor(segmentation));
     function handleColorChange(e) {
         const newColor = e.target.value;
-        segmentationOverlay.setFeatureColor(annotation, fromHex(newColor));
+        segmentationOverlay.setFeatureColor(segmentation, fromHex(newColor));
         currentColor = newColor;
     }
 </script>

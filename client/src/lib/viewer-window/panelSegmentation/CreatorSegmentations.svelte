@@ -20,8 +20,8 @@
             hideCreators.add(creator);
         }
     }
-    let annotations = segmentationOverlay.annotations
-        .filter((a) => a.creator == creator)
+    let segmentations = segmentationOverlay.segmentations
+        .filter((a) => a.creator.id == creator.id)
         .sort((a, b) => a.id - b.id);
 </script>
 
@@ -32,9 +32,9 @@
     {creator.name}
 </span>
 
-{#each $annotations as annotation (annotation.id)}
-    <div class="item" class:hide={hideCreators.has(annotation.creator)}>
-        <SegmentationItem {annotation} />
+{#each $segmentations as segmentation (segmentation.id)}
+    <div class="item" class:hide={hideCreators.has(segmentation.creator)}>
+        <SegmentationItem {segmentation} />
     </div>
 {/each}
 

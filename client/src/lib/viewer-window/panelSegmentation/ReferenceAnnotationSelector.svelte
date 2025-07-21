@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Annotation } from "$lib/datamodel/annotation.svelte";
+    import type { Annotation } from "$lib/datamodel/_annotation.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { getContext } from "svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";

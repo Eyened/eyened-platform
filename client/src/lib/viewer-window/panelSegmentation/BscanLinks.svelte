@@ -3,13 +3,14 @@
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
 
-    
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
     const segmentationContext = segmentationOverlay.segmentationContext;
-    let annotation = $derived(segmentationContext.segmentationItem?.annotation);
-    let annotationData = $derived(annotation?.annotationData);
+    let segmentation = $derived(
+        segmentationContext.segmentationItem?.segmentation,
+    );
+
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const image = viewerContext.image;
     const registration = viewerContext.registration;
@@ -27,15 +28,15 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="row links">
-    {#if $annotationData}
-        {#each $annotationData as a, i (a.scanNr)}
+    {#if segmentation}
+        {#each segmentation.scanIndices as scanNr, i (scanNr)}
             {#if i > 0}|{/if}
             <span
                 class="link-scan"
-                class:active={a.scanNr == viewerContext.index}
-                onclick={(e) => activateScanNr(e, a.scanNr)}
+                class:active={scanNr == viewerContext.index}
+                onclick={(e) => activateScanNr(e, scanNr)}
             >
-                {a.scanNr}
+                {scanNr}
             </span>
         {/each}
     {/if}

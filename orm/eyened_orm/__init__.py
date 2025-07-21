@@ -9,3 +9,4 @@ from .Tag import *
 from .Task import *
 from .Creator import *
 from .ModelOutput import *
+from .Segmentation import *

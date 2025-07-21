@@ -1,22 +1,22 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { Annotation } from "$lib/datamodel/annotation.svelte";
     import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { ProbabilitySegmentation } from "$lib/webgl/segmentation";
+    import { Mask } from "$lib/webgl/Mask";
     import { SegmentationItem } from "$lib/webgl/segmentationItem";
     import { getContext } from "svelte";
-    import { Duplicate, PanelIcon } from "../icons/icons";
+
     import ImportSegmentation from "../icons/ImportSegmentation.svelte";
     import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
+    import { Segmentation } from "$lib/datamodel/segmentation.svelte";
     interface Props {
-        annotation: Annotation;
+        segmentation: Segmentation;
         image: AbstractImage;
         segmentationItem: SegmentationItem;
     }
 
-    let { annotation, image, segmentationItem }: Props = $props();
+    let { segmentation, image, segmentationItem }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const { creator } = getContext<GlobalContext>("globalContext");
@@ -26,13 +26,13 @@
         dialogueManager.show(
             ImportSegmentationSelector,
             {
-                annotation,
+                segmentation,
                 image,
             },
-            (other: Annotation) => {
+            (other: Mask) => {
                 const otherSegmentation = image
                     .getSegmentationItem(other)
-                    ?.getSegmentation(viewerContext.index);
+                    ?.getMask(viewerContext.index);
                 if (otherSegmentation) {
                     segmentationItem?.importOther(
                         viewerContext.index,
@@ -40,7 +40,7 @@
                     );
                 } else {
                     console.warn(
-                        "Import from other: no segmentation found for annotation",
+                        "Import from other: no segmentation found for segmentation",
                         other.id,
                     );
                 }

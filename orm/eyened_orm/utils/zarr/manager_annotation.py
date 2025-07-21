@@ -39,7 +39,7 @@ class AnnotationZarrStorageManager:
 
         Args:
             annotation_dtype: The numpy dtype (uint8, uint16, uint32, uint64)
-            annotation_shape: Tuple of spatial dimensions (H, W, D?)
+            annotation_shape: Tuple of spatial dimensions (D, H, W)
 
         Returns:
             AnnotationZarrArray instance
@@ -101,6 +101,15 @@ class AnnotationZarrStorageManager:
     ) -> int:
         # get the array
         zarr_array = self.get_array(group_name, data_dtype, data_shape)
+
+        if len(data.shape) == 2 and slice_index is None:
+            # case for enface projections
+            if axis is None:
+                raise ValueError("axis must be provided for 2D writes")
+            
+            # write to slice 0 in the array (but in the database it is stored as NULL)
+            slice_index = 0
+            
 
         # Check if only one of axis or slice_index is provided
         if (axis is not None) != (slice_index is not None):

@@ -1,7 +1,6 @@
 from eyened_orm import (
     AnnotationType,
     AnnotationTypeBase,
-    AnnotationTypeFeature,
     Contact,
     ContactBase,
     Creator,
@@ -300,15 +299,6 @@ create_linking_routes(
     "image-links",
     ("instances", ImageInstance),
 )
-
-create_linking_routes(
-    "annotation-type-features",
-    AnnotationTypeFeature,
-    ("annotation-types", AnnotationType),
-    "features",
-    ("features", Feature),
-)
-
 
 @router.get(
     "/tasks/{task_id}/sub-task-image-links", response_model=list[SubTaskImageLink]

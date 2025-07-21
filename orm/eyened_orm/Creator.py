@@ -36,7 +36,7 @@ class Creator(CreatorBase, table=True):
 
     _name_column: ClassVar[str] = "CreatorName"
 
-    CreatorID: int | None = Field(default=None, primary_key=True)
+    CreatorID: int = Field(primary_key=True)
 
     # Authentication and authorization
     # deprecated, use PasswordHash instead
@@ -51,3 +51,4 @@ class Creator(CreatorBase, table=True):
     Annotations: List["Annotation"] = Relationship(back_populates="Creator")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Creator")
     SubTasks: List["SubTask"] = Relationship(back_populates="Creator")
+    Segmentations: List["Segmentation"] = Relationship(back_populates="Creator")
