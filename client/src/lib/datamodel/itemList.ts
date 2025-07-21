@@ -92,7 +92,7 @@ export abstract class BaseItem {
         this.updateFields(data);
     }
 
-    private updateFields(data: any) {
+    protected updateFields(data: any) {
         this.init(data);
     }
 

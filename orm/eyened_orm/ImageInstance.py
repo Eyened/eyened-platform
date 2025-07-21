@@ -223,6 +223,10 @@ class ImageInstance(ImageInstanceBase, table=True):
         back_populates="ImageInstance", cascade_delete=True
     )
 
+    Segmentations: List["Segmentation"] = Relationship(
+        back_populates="ImageInstance", cascade_delete=True
+    )
+
     FormAnnotations: List["FormAnnotation"] = Relationship(
         back_populates="ImageInstance", cascade_delete=True
     )
@@ -233,18 +237,18 @@ class ImageInstance(ImageInstanceBase, table=True):
 
     @property
     def shape(self) -> tuple[int, int, int]:
-        return (self.Rows_y, self.Columns_x, self.NrOfFrames)
+        return (self.NrOfFrames or 1, self.Rows_y, self.Columns_x)
     
-    @property
-    def l1_axis(self) -> AxisEnum | None:
-        if self.Rows_y == 1:
-            return AxisEnum.HEIGHT
-        elif self.Columns_x == 1:
-            return AxisEnum.WIDTH
-        elif self.NrOfFrames == 1:
-            return AxisEnum.DEPTH
-        else:
-            return None
+    # @property
+    # def l1_axis(self) -> AxisEnum | None:
+    #     if self.Rows_y == 1:
+    #         return AxisEnum.HEIGHT
+    #     elif self.Columns_x == 1:
+    #         return AxisEnum.WIDTH
+    #     elif self.NrOfFrames == 1:
+    #         return AxisEnum.DEPTH
+    #     else:
+    #         return None
     
     @property
     def is_3d(self) -> bool:

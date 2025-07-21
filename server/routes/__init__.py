@@ -1,4 +1,4 @@
-from . import annotations
+from . import segmentations
 from . import api
 from . import auth
 from . import form_annotations

@@ -1,78 +1,130 @@
 <script lang="ts">
-    import { Annotation } from "$lib/datamodel/annotation.svelte";
     import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { Duplicate, PanelIcon } from "../icons/icons";
+    import { Duplicate } from "../icons/icons";
     import { dialogueManager } from "$lib/dialogue/DialogueManager";
-    import { AnnotationType } from "$lib/datamodel/annotationType.svelte";
     import { getContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import {
-        ProbabilitySegmentation,
-        type Segmentation,
-    } from "$lib/webgl/segmentation";
-    import { data } from "$lib/datamodel/model";
+    import { type DrawingArray, type Mask } from "$lib/webgl/Mask";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import { SegmentationItem } from "$lib/webgl/segmentationItem";
-    import Toggle from "$lib/Toggle.svelte";
-    import { getAnnotationTypes } from "./annotationTypes";
+    import {
+        Segmentation,
+        type DataRepresentation,
+        type Datatype,
+    } from "$lib/datamodel/segmentation.svelte";
+    import { NPYArray } from "$lib/utils/npy_loader";
     interface Props {
-        annotation: Annotation;
+        segmentation: Segmentation;
         image: AbstractImage;
         segmentationItem: SegmentationItem;
-        segmentation: Segmentation;
+        mask: Mask;
     }
 
-    let { annotation, image, segmentationItem, segmentation }: Props = $props();
+    let { segmentation, image, segmentationItem, mask }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const { creator } = getContext<GlobalContext>("globalContext");
 
     let duplicateVolume = $state(false);
+
+    const types: Record<"Q" | "B" | "P", DataRepresentation> = {
+        Q: "DualBitMask",
+        B: "Binary",
+        P: "Probability",
+    };
     let type = $state<"Q" | "B" | "P">("Q");
-    if (annotation.annotationType.dataRepresentation == "DualBitMask") {
-        type = "Q";
-    } else if (annotation.annotationType.dataRepresentation == "Binary") {
-        type = "B";
-    } else if (annotation.annotationType.dataRepresentation == "Probability") {
-        type = "P";
+    type = Object.keys(types).find(
+        (t) => types[t as "Q" | "B" | "P"] == segmentation.dataRepresentation,
+    ) as "Q" | "B" | "P";
+
+
+    function createArray(shape: [number, number, number], dataType: Datatype): NPYArray {
+        const n = shape[0] * shape[1] * shape[2];
+        let a: DrawingArray;
+        if (dataType == "R8UI") {
+            a = new Uint8Array(n);
+        } else if (dataType == "R16UI") {
+            a = new Uint16Array(n);
+        } else if (dataType == "R32UI") {
+            a = new Uint32Array(n);
+        } else if (dataType == "R32F") {
+            a = new Float32Array(n);
+        } else {
+            throw new Error(`Unsupported data type: ${dataType}`);
+        }
+        return new NPYArray(a, shape, false);
     }
-    const types = getAnnotationTypes();
 
     async function duplicate() {
-        dialogueManager.showQuery(`Duplicating annotation ${annotation.id}...`);
+        dialogueManager.showQuery(
+            `Duplicating segmentation ${segmentation.id}...`,
+        );
 
-        let annotationType: AnnotationType;
-        if (annotation.annotationType.dataRepresentation == "MultiClass" || annotation.annotationType.dataRepresentation == "MultiLabel") {
+        let dataRepresentation: DataRepresentation;
+        if (
+            segmentation.dataRepresentation == "MultiClass" ||
+            segmentation.dataRepresentation == "MultiLabel"
+        ) {
             // same as original annotation type
-            annotationType = annotation.annotationType;
+            dataRepresentation = segmentation.dataRepresentation;
         } else {
             // new annotation can be of different type
-            annotationType = types[type];
+            dataRepresentation = types[type];
         }
 
         const item = {
-            ...annotation,
-            annotationTypeId: annotationType.id,
-            // annotationReferenceId needs to be mentioned explicitly, because it's marked with $state and hence not enumerable
-            annotationReferenceId: annotation.annotationReferenceId,
+            ...segmentation,
+            dataRepresentation: dataRepresentation,
+
+            // properties that need to be mentioned explicitly, because they're marked with $state and hence not enumerable
+            referenceSegmentationId: segmentation.referenceId,
+            scanIndices: segmentation.scanIndices,
+            threshold: segmentation.threshold,
+
             // overwrite creatorId to current user
             creatorId: creator.id,
         };
 
-        const newAnnotation = await Annotation.create(item);
-
-        const newSegmentationItem = image.getSegmentationItem(newAnnotation);
+        const scanNr = viewerContext.index;
+        
+        let depth = 1;
         if (duplicateVolume) {
-            for (let scanNr = 0; scanNr < image.depth; scanNr++) {
-                const segmentation = segmentationItem.getSegmentation(scanNr);
-                if (segmentation) {
-                    await newSegmentationItem.importOther(scanNr, segmentation);
+            if (segmentation.scanIndices) {
+                // only upload the data for active scan indices
+                depth = segmentation.scanIndices.length;
+            } else {
+                // upload the full volume                
+                depth = image.depth;
+            }
+        } else if (image.is3D) {
+            // only duplicate the current scan
+            item.scanIndices = [scanNr];
+        } 
+
+        const array = createArray([depth, image.height, image.width], segmentation.dataType);
+        if (image.image_id.endsWith('proj')) {
+            array.shape = [image.height, 1, image.width];
+        }
+
+        if (item.scanIndices) {
+            // sparse volume 
+            for (let i = 0; i < item.scanIndices.length; i++) {
+                const mask = segmentationItem.getMask(item.scanIndices[i]);
+                if (mask) {
+                    array.data.set(mask.exportData(), i * image.height * image.width);
                 }
             }
         } else {
-            const scanNr = viewerContext.index;
-            await newSegmentationItem.importOther(scanNr, segmentation);
-        }
+            // full volume
+            for (let i = 0; i < depth; i++) {
+                const mask = segmentationItem.getMask(i);
+                if (mask) {
+                    array.data.set(mask.exportData(), i * image.height * image.width);
+                }
+            }
+        }            
+        const newSegmentation = await Segmentation.create(item, array);
+        console.log('newSegmentation',newSegmentation);
 
         dialogueManager.hide();
     }
@@ -97,7 +149,7 @@
             </label>
         </div>
     {/if}
-    {#if annotation.annotationType.dataRepresentation == "MultiClass" || annotation.annotationType.dataRepresentation == "MultiLabel"}{:else}
+    {#if segmentation.dataRepresentation == "MultiClass" || segmentation.dataRepresentation == "MultiLabel"}{:else}
         <div>
             <label>
                 <input type="radio" bind:group={type} value="Q" />

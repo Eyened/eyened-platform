@@ -1,4 +1,4 @@
-import { ProbabilitySegmentation } from "$lib/webgl/segmentation";
+import { ProbabilityMask } from "$lib/webgl/Mask";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { DrawingExecutor } from "./segmentation";
 import { BrushTool } from "./Brush";
@@ -28,9 +28,9 @@ export class EnhanceTool extends BrushTool {
             return;
         }
 
-        const segmentationState = await segmentationItem.getSegmentationState(this.viewerContext.index, true)!;
-        const segmentation = segmentationState.segmentation;
-        if (!(segmentation instanceof ProbabilitySegmentation)) {
+        const segmentationState = segmentationItem.getSegmentationState(this.viewerContext.index, true)!;
+        const mask = segmentationState.mask;
+        if (!(mask instanceof ProbabilityMask)) {
             console.warn("No probability segmentation");
             return;
         }
@@ -46,7 +46,7 @@ export class EnhanceTool extends BrushTool {
                     point: this.lastPosition,
                     aspectRatio: this.viewerContext.aspectRatio
                 };
-                segmentation.drawEnhance(settings)
+                mask.drawEnhance(settings)
             }
         }, 1000 / 30); // 30 times per second
 

@@ -28,7 +28,7 @@ export class ViewerContext {
     cursorStyle: cursorStyle = $state('default');
     active: boolean = $state(false);
     updatePosition: boolean = $state(true);
-    viewerPlane: 'PRIMARY' | 'SECONDARY' | 'TERTIARY' = $state('PRIMARY');
+    axis: 0 | 1 | 2 = $state(0);
 
     index = $state(0);
 
@@ -62,8 +62,12 @@ export class ViewerContext {
 
     constructor(
         public readonly image: AbstractImage,
-        public readonly registration: Registration
+        public readonly registration: Registration,
     ) {
+        if (image.image_id.endsWith('proj')) {
+            // TODO: cleaner implementation of this
+            this.axis = 1;
+        }
 
         this.shaders = image.webgl.shaders;
         this.imageRenderer = new BaseImageRenderer(image);

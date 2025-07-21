@@ -16,7 +16,7 @@ class ModelBase(Base):
     Version: str = Field(max_length=45, unique=True)
     ModelType: str = Field(max_length=45)
     Description: str | None = Field(max_length=255, default=None)
-
+    FeatureID: int = Field(foreign_key="Feature.FeatureID")
 
 class Model(ModelBase, table=True):
     __tablename__ = "Model"
@@ -25,26 +25,3 @@ class Model(ModelBase, table=True):
 
     __mapper_args__ = {"polymorphic_on": "ModelType", "polymorphic_identity": "Model"}
     __table_args__ = (UniqueConstraint("ModelName", "Version"),)
-
-
-class SegmentationModel(Model):
-    __mapper_args__ = {
-        "polymorphic_identity": "segmentation",
-    }
-
-
-class SegmentationOutputBase(Base, SegmentationMixin):
-    """
-    Used for segmentation (i.e. masks)
-    """
-    ImageInstanceID: int = Field(
-        foreign_key="ImageInstance.ImageInstanceID", ondelete="CASCADE"
-    )
-    SegmentationModelID: int = Field(foreign_key="Model.ModelID")
-
-
-class SegmentationOutput(SegmentationOutputBase, table=True):
-    __tablename__ = "SegmentationOutput"
-
-    SegmentationOutputID: int | None = Field(default=None, primary_key=True)
-    DateInserted: datetime = Field(default_factory=datetime.now)

@@ -1,4 +1,4 @@
-import type { DrawingArray } from "./segmentation";
+import type { DrawingArray } from "./Mask";
 
 export type SegmentationType =
     | 'BinarySegmentation'

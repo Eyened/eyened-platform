@@ -1,87 +1,69 @@
-import type { AnnotationData } from "$lib/datamodel/annotationData.svelte";
-import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
+import { encodeNpy } from "$lib/utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
-import { DrawingHistory } from "./drawingHistory";
+import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
-import { BinarySegmentation, MultiClassSegmentation, MultiLabelSegmentation, ProbabilitySegmentation, QuestionableSegmentation, type DrawingArray, type PaintSettings, type Segmentation } from "./segmentation";
+import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type PaintSettings, type Mask } from "./Mask";
 import { convert, type SegmentationType } from "./segmentationConverter";
+import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 export const constructors = {
-    'Binary': BinarySegmentation,
-    'DualBitMask': QuestionableSegmentation,
-    'Probability': ProbabilitySegmentation,
-    'MultiClass': MultiClassSegmentation,
-    'MultiLabel': MultiLabelSegmentation,
+    'Binary': BinaryMask,
+    'DualBitMask': QuestionableMask,
+    'Probability': ProbabilityMask,
+    'MultiClass': MultiClassMask,
+    'MultiLabel': MultiLabelMask,
 }
 
+// manages the segmentation state (history, mask) for a single scan
 export class SegmentationState {
 
     protected history: DrawingHistory<string>;
-    public readonly segmentation: Segmentation;
+    public readonly mask: Mask;
 
     private isDrawing = Promise.resolve();
 
     constructor(
         readonly image: AbstractImage,
-        readonly annotationData: AnnotationData
+        readonly segmentation: Segmentation,
+        readonly scanNr: number,
     ) {
-        const annotationType = annotationData.annotation.annotationType;
-        // TODO: Annotationtype 5: enface OCT
-
-        if ([2, 3, 4].includes(annotationType.id)) {
-            this.segmentation = new QuestionableSegmentation(image, annotationData);
-        } else if ([13, 17, 24].includes(annotationType.id)) {
-            this.segmentation = new BinarySegmentation(image, annotationData);
-        } else if ([14, 23, 25].includes(annotationType.id)) {
-            this.segmentation = new ProbabilitySegmentation(image, annotationData)
-        }
-
-        // new:
-        else if (annotationType.dataRepresentation in constructors) {
-            this.segmentation = new constructors[annotationType.dataRepresentation](image, annotationData);
-        } else {
-            throw new Error(`Unsupported data representation: ${annotationType.dataRepresentation}`);
-        }
-        this.history = new DrawingHistory<string>(new Base64Serializer(annotationType.dataType, image.width, image.height));
+        this.mask = new constructors[segmentation.dataRepresentation](image, segmentation);
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.dataType, image.width, image.height));
         this.isDrawing = this.initialize();
     }
 
     private async initialize() {
-        const data = await this.annotationData.file.load();
-        if (data) {
-            if (data instanceof NPYArray) {
-                this.segmentation.importData(data.data as DrawingArray);
-            } else {
-                throw new Error('Unsupported data type', data);
-            }
-        }
-        this.history.checkpoint(this.segmentation.exportData());
+        const array = await this.segmentation.loadData(this.scanNr);
+        console.log(array);
+        this.mask.importData(array.data as DrawingArray);
+
+        this.history.checkpoint(this.mask.exportData());
     }
 
     async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
         await this.isDrawing; // wait for previous drawing to finish
-        this.segmentation.draw(drawing, settings);
+        this.mask.draw(drawing, settings);
         this.isDrawing = this.checkpoint();
     }
 
-    async importOther(other: Segmentation) {
+    async importOther(other: Mask) {
         await this.isDrawing; // wait for previous drawing to finish
 
         const data = other.exportData();
 
         const thisType = this.segmentation.constructor.name as SegmentationType;
         const otherType = other.constructor.name as SegmentationType;
-        const threshold = (255 * (other.annotationData.valueFloat ?? 0.5));
+        const threshold = (255 * (other.segmentation.threshold ?? 0.5));
         console.log(thisType, otherType, threshold);
         const dataConverted = convert(data, otherType, thisType, threshold);
-        this.segmentation.importData(dataConverted);
+        this.mask.importData(dataConverted);
 
         this.isDrawing = this.checkpoint();
     }
 
     async checkpoint() {
-        const data = this.segmentation.exportData();
-        await updateServer(this.annotationData, data, this.image);
+        const data = this.mask.exportData();
+        await this.updateServer();
         this.history.checkpoint(data);
     }
 
@@ -96,25 +78,32 @@ export class SegmentationState {
     async undo() {
         const data = await this.history.undo();
         if (data) {
-            this.segmentation.importData(data);
-            await updateServer(this.annotationData, data, this.image);
+            this.mask.importData(data);
+            await this.updateServer();
         }
     }
 
     async redo() {
         const data = await this.history.redo();
         if (data) {
-            this.segmentation.importData(data);
-            await updateServer(this.annotationData, data, this.image);
+            this.mask.importData(data);
+            await this.updateServer();
         }
     }
 
-    dispose() {
-        // Clean up resources if needed
-    }
-}
+    updateServer() {
+        const data = this.mask.exportData();
+        const buffer = encodeNpy(data, [this.image.height, this.image.width]);
+        if (this.image.image_id.endsWith('proj')) {
+            return this.segmentation.updateData(null, buffer);
+        } else {
+            return this.segmentation.updateData(this.scanNr, buffer);
+        }
 
-function updateServer(annotationData: AnnotationData, data: DrawingArray, image: AbstractImage) {
-    const npy = encodeNpy(data, [image.height, image.width]);
-    return annotationData.file.update(npy);
+    }
+
+    dispose() {
+        this.mask.dispose();
+        this.history.clear();
+    }
 }

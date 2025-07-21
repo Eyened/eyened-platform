@@ -67,11 +67,6 @@ class EyenedORMConfig(BaseSettings):
         description="Path to the zarr store containing annotations. "
         "Used by the platform for reading and writing annotations",
     )
-    # annotations_zarr_basepath: str = Field(
-    #     default="/storage/annotations_zarr",
-    #     description="Path to the folder containing annotations zarr arrays. "
-    #     "Used by the platform for reading and writing annotations",
-    # )
     annotations_path: str = Field(
         default="/storage/annotations",
         description="Path to the folder containing annotations. "
@@ -133,7 +128,7 @@ def get_config(env: str | None = None) -> EyenedORMConfig:
     if env is None:
         env_file = ".env"
     else:
-        env_file = f"config.{env}.env"
+        env_file = f"{env}.env"
 
     package_root = Path(importlib.resources.files("eyened_orm"))
     env_path = package_root / "environments" / env_file

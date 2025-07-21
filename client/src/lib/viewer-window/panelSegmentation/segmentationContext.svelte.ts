@@ -1,12 +1,13 @@
-import type { Annotation } from "$lib/datamodel/annotation.svelte";
+
 import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem";
 import { SvelteSet } from "svelte/reactivity";
 
 export class SegmentationContext {
 
     public readonly hideCreators = new SvelteSet<Creator>();
-    public readonly hideAnnotations = new SvelteSet<Annotation>();
+    public readonly hideSegmentations = new SvelteSet<Segmentation>();
 
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
@@ -18,11 +19,11 @@ export class SegmentationContext {
     constructor() { }
 
 
-    toggleShow(annotation: Annotation) {
-        if (this.hideAnnotations.has(annotation)) {
-            this.hideAnnotations.delete(annotation);
+    toggleShow(segmentation: Segmentation) {
+        if (this.hideSegmentations.has(segmentation)) {
+            this.hideSegmentations.delete(segmentation);
         } else {
-            this.hideAnnotations.add(annotation);
+            this.hideSegmentations.add(segmentation);
         }
     }
 

@@ -3,7 +3,7 @@
 	import { getContext } from 'svelte';
 	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation.svelte';
+	import type { Annotation } from '$lib/datamodel/_annotation.svelte';
 	import { FilterList } from '$lib/datamodel/itemList';
 
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');

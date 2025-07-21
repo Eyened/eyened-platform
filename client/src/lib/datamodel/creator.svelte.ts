@@ -1,6 +1,6 @@
-import type { Annotation } from "./annotation.svelte";
 import { BaseItem, type FilterList } from "./itemList";
 import { data } from "./model";
+import type { Segmentation } from "./segmentation.svelte";
 
 export interface ServerCreator {
     CreatorID: number;
@@ -46,8 +46,8 @@ export class Creator extends BaseItem {
         this.role = item.Role;
     }
 
-    get annotations(): FilterList<Annotation> {
-        return data.annotations.filter(annotation => annotation.creatorId == this.id);
+    get segmentations(): FilterList<Segmentation> {
+        return data.segmentations.filter(segmentation => segmentation.creatorId == this.id);
     }
 
     get isAdmin(): boolean {

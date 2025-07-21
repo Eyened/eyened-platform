@@ -110,17 +110,25 @@ export function encodeNpy(
 }
 export class NPYArray {
     constructor(
-        public readonly data: TypedArray,
-        public readonly shape: number[],
-        public readonly fortranOrder: boolean
+        public data: TypedArray,
+        public shape: number[],
+        public fortranOrder: boolean
     ) { }
+
+    async toBlob(gzip: boolean = false): Promise<Blob> {
+        const buffer = encodeNpy(this.data, this.shape, 1, this.fortranOrder);
+        if (gzip) {
+            const inputStream = new Response(buffer).body!;
+            const cs = new CompressionStream('gzip');
+            const compressedStream = inputStream.pipeThrough(cs);
+            const compressedResponse = new Response(compressedStream);
+            return compressedResponse.blob();
+        }
+        return new Blob([buffer], { type: 'application/octet-stream' });
+    }
 }
 // Decode .npy ArrayBuffer into { data: TypedArray, shape: number[], fortranOrder: boolean }
-export function decodeNpy(buffer: ArrayBuffer): {
-    data: TypedArray;
-    shape: number[];
-    fortranOrder: boolean;
-} {
+export function decodeNpy(buffer: ArrayBuffer): NPYArray {
     const view = new DataView(buffer);
 
     // Check magic string

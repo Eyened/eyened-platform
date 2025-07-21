@@ -394,47 +394,9 @@ class AnnotationData(AnnotationDataBase, table=True):
 
 
 
-class DataRepresentation(Enum):
-    # 0 = background, >0 = foreground
-    Binary = "Binary"
-
-    # A binary mask with two channels packed into a single byte.
-    # Bit 0 = mask; Bit 1 = questionable/uncertain.
-    DualBitMask = "DualBitMask"
-
-    # Per-pixel float mask (soft segmentation, probability map)
-    Probability = "Probability"
-
-    # Multi-label segmentation — each bit in an integer represents a label.
-    # For example:
-    #   0x00 => 00000000 => background
-    #   0x01 => 00000001 => feature 1 present
-    #   0x02 => 00000010 => feature 2 present
-    #   0x04 => 00000100 => feature 3 present
-    #   0x03 => 00000011 => feature 1 + feature 2 present
-    MultiLabel = "MultiLabel"
-
-    # Multi-class segmentation — each voxel/pixel is assigned exactly one class.
-    # For example:
-    #   0 = background
-    #   1 = ILM
-    #   2 = GCL
-    #   3 = IPL
-    #   ...
-    MultiClass = "MultiClass"
-
-class Datatype(Enum):
-    R8 = "R8" # 8-bit unsigned integer, interpreted as [0, 1]
-    R8UI = "R8UI" # 8-bit unsigned integer
-    R16UI = "R16UI" # 16-bit unsigned integer
-    R32UI = "R32UI" # 32-bit unsigned integer
-    R32F = "R32F" # 32-bit float
-
 class AnnotationTypeBase(Base):
     AnnotationTypeName: str = Field(max_length=45)
-    DataRepresentation: DataRepresentation
-    DataType: Datatype
-
+    Interpretation: str | None = Field(max_length=255, default=None)
 
 class AnnotationType(AnnotationTypeBase, table=True):
     __tablename__ = "AnnotationType"
@@ -456,19 +418,6 @@ class Feature(FeatureBase, table=True):
     FeatureID: int | None = Field(default=None, primary_key=True)
 
     Annotations: List["Annotation"] = Relationship(back_populates="Feature")
+    Segmentations: List["Segmentation"] = Relationship(back_populates="Feature")
     DateInserted: datetime = Field(default_factory=datetime.now)
-
-
-class AnnotationTypeFeature(Base, table=True):
-    __tablename__ = "AnnotationTypeFeature"
-    __table_args__ = (
-        Index("fk_AnnotationTypeFeature_AnnotationType1_idx", "AnnotationTypeID"),
-        Index("fk_AnnotationTypeFeature_Feature1_idx", "FeatureID"),
-    )
-
-    AnnotationTypeID: int = Field(
-        foreign_key="AnnotationType.AnnotationTypeID", primary_key=True
-    )
-    FeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    FeatureIndex: int = Field(primary_key=True)
 

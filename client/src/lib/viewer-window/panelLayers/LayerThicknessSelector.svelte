@@ -7,7 +7,7 @@
 		MulticlassSegmentation,
 		MultilabelSegmentation
 	} from '$lib/webgl/layerSegmentation';
-	import { layerThicknesses, macularLayers } from '../panelSegmentation/segmentationUtils';
+	import { layerThicknesses, macularLayers } from '../panelSegmentation/_segmentationUtils';
 
 	interface Props {
 		image: AbstractImage;

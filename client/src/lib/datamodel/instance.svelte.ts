@@ -1,10 +1,11 @@
-import type { Annotation } from './annotation.svelte';
+import type { Annotation } from './_annotation.svelte';
 import type { Device, DeviceModel } from './device.svelte';
 import { BaseItem, FilterList } from './itemList';
 import { data } from './model';
 import type { Patient } from './patient';
 import type { Project } from './project.svelte';
 import type { Scan } from './scan';
+import type { Segmentation } from './segmentation.svelte';
 import type { Series } from './series';
 import type { Study } from './study';
 
@@ -164,8 +165,8 @@ export class Instance extends BaseItem {
         return this.scanId == undefined ? undefined : data.scans.get(this.scanId);
     }
 
-    get annotations(): FilterList<Annotation> {
-        return data.annotations.filter(annotation => annotation.instanceId == this.id);
+    get segmentations(): FilterList<Segmentation> {
+        return data.segmentations.filter(segmentation => segmentation.instanceId == this.id);
     }
 }
 

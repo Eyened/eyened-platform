@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { Annotation } from "$lib/datamodel/annotation.svelte";
     import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -14,14 +13,14 @@
     import ImportPanel from "./ImportPanel.svelte";
     import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
     import ReferenceAnnotationPanel from "./ReferenceAnnotationPanel.svelte";
-
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
     interface Props {
-        annotation: Annotation;
+        segmentation: Segmentation;
     }
 
-    let { annotation }: Props = $props();
-    const { feature, annotationType } = annotation;
+    let { segmentation }: Props = $props();
+    const { feature, dataRepresentation } = segmentation;
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
@@ -31,21 +30,21 @@
     );
     const { segmentationContext } = segmentationOverlay;
 
-    const segmentationItem = image.getSegmentationItem(annotation);
+    const segmentationItem = image.getSegmentationItem(segmentation);
+    let segmentationState = $derived(
+        segmentationItem.getSegmentationState(viewerContext.index),
+    );
 
     async function removeAnnotation() {
         const resolve = () => {
-            annotation.annotationData.forEach$((annotationData) =>
-                annotationData.delete(false),
-            );
             // remove from database on server
-            annotation.delete();
+            segmentation.delete();
             segmentationContext.toggleActive(undefined);
-            segmentationItem?.dispose();
+            segmentationItem.dispose();
         };
 
         dialogueManager.showQuery(
-            `Delete annotation [${annotation.id}]?`,
+            `Delete segmentation [${segmentation.id}]?`,
             "Delete",
             "Cancel",
             resolve,
@@ -53,10 +52,10 @@
     }
 
     function toggleShow() {
-        segmentationContext.toggleShow(annotation);
+        segmentationContext.toggleShow(segmentation);
     }
 
-    const isEditable = globalContext.canEdit(annotation);
+    const isEditable = globalContext.canEdit(segmentation);
     function activate() {
         segmentationContext.toggleActive(segmentationItem);
     }
@@ -74,6 +73,14 @@
     function pointerLeave() {
         segmentationOverlay.highlightedSegmentationItem = undefined;
     }
+
+    const segmentationType = {
+        Binary: "Q",
+        DualBitMask: "B",
+        Probability: "P",
+        MultiClass: "MC",
+        MultiLabel: "ML",
+    }[segmentation.dataRepresentation];
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -86,20 +93,21 @@
 >
     <div class="row">
         <div>
-            {#if segmentationContext.hideAnnotations.has(annotation)}
+            {#if segmentationContext.hideSegmentations.has(segmentation)}
                 <PanelIcon onclick={toggleShow} tooltip="Show" Icon={Hide} />
             {:else}
                 <PanelIcon onclick={toggleShow} tooltip="Hide" Icon={Show} />
             {/if}
         </div>
 
-        {#if !(annotationType.dataRepresentation == "MultiLabel" || annotationType.dataRepresentation == "MultiClass")}
-            <FeatureColorPicker {annotation} />
+        {#if !(dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass")}
+            <FeatureColorPicker {segmentation} />
         {/if}
 
         <div class="expand" onclick={activate}>
             <div class="feature-name">{feature.name}</div>
-            <div class="annotationID">[{annotation.id}]</div>
+            <div class="segmentationID">[{segmentation.id}]</div>
+            <div class="segmentationType">{segmentationType}</div>
         </div>
 
         {#if isEditable}
@@ -111,14 +119,14 @@
         {/if}
     </div>
     {#if active}
-        {#if annotationType.dataRepresentation == "Probability"}
+        {#if dataRepresentation == "Probability"}
             <div class="row">
-                <ThresholdSlider {annotation} />
+                <ThresholdSlider {segmentation} />
             </div>
         {/if}
 
-        {#if annotationType.dataRepresentation == "MultiLabel" || annotationType.dataRepresentation == "MultiClass"}
-            <MultiFeatureSelector {annotation} />
+        {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
+            <MultiFeatureSelector {segmentation} />
         {/if}
 
         <div class="open" onclick={() => (collapsed = !collapsed)}>
@@ -133,32 +141,34 @@
             <div class="content">
                 {#if isEditable}
                     <div class="row">
-                        <ImportPanel {annotation} {image} {segmentationItem} />
+                        <ImportPanel
+                            {segmentation}
+                            {image}
+                            {segmentationItem}
+                        />
                     </div>
                 {/if}
                 <div class="row">
-                    {#await segmentationItem.getSegmentationState(viewerContext.index) then segmentationState}
-                        {#if segmentationState}
-                            <DuplicateAnnotationPanel
-                                {annotation}
-                                {image}
-                                {segmentationItem}
-                                segmentation={segmentationState.segmentation}
-                            />
-                        {/if}
-                    {/await}
+                    {#if segmentationState}
+                        <DuplicateAnnotationPanel
+                            {segmentation}
+                            {image}
+                            {segmentationItem}
+                            mask={segmentationState.mask}
+                        />
+                    {/if}
                 </div>
 
                 <div class="row">
                     <ReferenceAnnotationPanel
-                        {annotation}
+                        {segmentation}
                         {image}
                         {isEditable}
                         {segmentationItem}
                     />
                 </div>
 
-                {#if annotationType.dataRepresentation == "Binary" || annotationType.dataRepresentation == "DualBitMask"}
+                {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
                     <div class="row">
                         <CCPanel {segmentationItem} />
                     </div>
@@ -212,11 +222,14 @@
         flex: 1;
         /* max-width: 12em; */
         padding-right: 0.5em;
-        align-items: center;
     }
-    div.annotationID {
+    div.segmentationID {
         font-size: x-small;
         flex: 0;
+    }
+    div.feature-name,
+    div.segmentationID,
+    div.segmentationType {
         align-items: center;
     }
 </style>

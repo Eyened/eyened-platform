@@ -1,6 +1,4 @@
-import { Annotation } from "./annotation.svelte";
-import { AnnotationData } from "./annotationData.svelte";
-import { AnnotationType, AnnotationTypeFeature } from "./annotationType.svelte";
+import { CompositeFeature } from "./compositeFeature.svelte";
 import { Contact } from "./contact.svelte";
 import { Creator } from "./creator.svelte";
 import { Device, DeviceModel } from "./device.svelte";
@@ -18,6 +16,7 @@ import { SubTask, SubTaskImageLink } from "./subTask.svelte";
 import { Task } from "./task.svelte";
 import { TaskDefinition } from "./taskDefinition";
 import { TaskState } from "./taskState";
+import { Segmentation } from "./segmentation.svelte";
 
 export const itemClassMap = {
     creators: Creator,
@@ -27,10 +26,8 @@ export const itemClassMap = {
     series: Series,
     studies: Study,
     patients: Patient,
-    "annotation-data": AnnotationData,
-    annotations: Annotation,
-    "annotation-types": AnnotationType,
-    "annotation-type-features": AnnotationTypeFeature,
+    segmentations: Segmentation,
+    "composite-features": CompositeFeature,
     "form-annotations": FormAnnotation,
     "form-schemas": FormSchema,
     "device-models": DeviceModel,
@@ -50,9 +47,7 @@ type DataModel = {
 };
 
 export const data: DataModel & {
-    annotationData: ItemCollection<AnnotationData>;
-    annotationTypes: ItemCollection<AnnotationType>;
-    annotationTypeFeatures: ItemCollection<AnnotationTypeFeature>;
+    compositeFeatures: ItemCollection<CompositeFeature>;
     formAnnotations: ItemCollection<FormAnnotation>;
     formSchemas: ItemCollection<FormSchema>;
     deviceModels: ItemCollection<DeviceModel>;
@@ -67,7 +62,6 @@ export const data: DataModel & {
     // camelCase aliases
     annotationData: undefined!,
     annotationTypes: undefined!,
-    annotationTypeFeatures: undefined!,
     formAnnotations: undefined!,
     formSchemas: undefined!,
     deviceModels: undefined!,
@@ -78,9 +72,7 @@ export const data: DataModel & {
 } as any;
 
 // link aliases after creation
-data.annotationData = data["annotation-data"];
-data.annotationTypes = data["annotation-types"];
-data.annotationTypeFeatures = data["annotation-type-features"];
+data.compositeFeatures = data["composite-features"];
 data.formAnnotations = data["form-annotations"];
 data.formSchemas = data["form-schemas"];
 data.deviceModels = data["device-models"];
@@ -94,8 +86,6 @@ export function clearData() {
     data.series.clear();
     data.studies.clear();
     data.patients.clear();
-    data.annotationData.clear();
-    data.annotations.clear();
     data.formAnnotations.clear();
 }
 

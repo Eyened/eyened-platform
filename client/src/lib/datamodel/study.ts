@@ -1,9 +1,10 @@
 
-import type { Annotation } from "./annotation.svelte";
+import type { Annotation } from "./_annotation.svelte";
 import type { Instance } from "./instance.svelte";
 import { BaseItem, parseDate, type FilterList } from "./itemList";
 import { data } from "./model";
 import type { Patient } from "./patient";
+import type { Segmentation } from "./segmentation.svelte";
 import type { Series } from "./series";
 import type { Tag } from "./tag";
 
@@ -55,7 +56,7 @@ export class Study extends BaseItem {
     get tags(): FilterList<Tag> {
         return data.tags.filter(tag => tag.study_id == this.id);
     }
-    get annotations(): FilterList<Annotation> {
-        return data.annotations.filter(annotation => annotation.studyId == this.id);
+    get segmentations(): FilterList<Segmentation> {
+        return data.segmentations.filter(segmentation => segmentation.study.id == this.id);
     }
 };

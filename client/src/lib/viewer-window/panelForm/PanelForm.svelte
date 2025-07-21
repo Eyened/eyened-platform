@@ -10,7 +10,7 @@
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const { creator, annotationsFilter, formShortcut } = globalContext;
+    const { creator, formShortcut } = globalContext;
     const { formSchemas, formAnnotations } = data;
 
     const {
@@ -64,7 +64,7 @@
 
     const forms = formAnnotations
         .filter((annotation) => filters.every((filter) => filter(annotation)))
-        .filter(annotationsFilter)
+        .filter(globalContext.segmentationsFilter)
         .sort((a, b) => a.id - b.id);
 
     function addForm() {

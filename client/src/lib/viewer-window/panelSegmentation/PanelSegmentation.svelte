@@ -32,13 +32,13 @@
 
     const segmentationContext = segmentationOverlay.segmentationContext;
 
-    const creators = segmentationOverlay.annotations.collectSet(
+    const creators = segmentationOverlay.segmentations.collectSet(
         (a) => a.creator,
     );
 
     // hide all on load
-    const segmentations = instance.annotations.filter(
-        globalContext.annotationsFilter,
+    const segmentations = instance.segmentations.filter(
+        globalContext.segmentationsFilter,
     );
     for (const annotation of $segmentations) {
         segmentationContext.hideCreators.add(annotation.creator);
@@ -48,10 +48,10 @@
 
     function toggleAll(toggle: boolean) {
         if (toggle) {
-            segmentationContext.hideAnnotations.clear();
+            segmentationContext.hideSegmentations.clear();
         } else {
-            for (const a of segmentationOverlay.annotations.$) {
-                segmentationContext.hideAnnotations.add(a);
+            for (const a of segmentationOverlay.segmentations.$) {
+                segmentationContext.hideSegmentations.add(a);
             }
         }
     }

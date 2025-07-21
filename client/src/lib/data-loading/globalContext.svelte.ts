@@ -1,5 +1,5 @@
-import type { Annotation } from '$lib/datamodel/annotation.svelte';
 import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
+import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
 import { UserManager } from '$lib/usermanager';
 
 export type ComponentDef = {
@@ -36,22 +36,18 @@ export class GlobalContext {
         this.popupComponent = component;
     }
 
-    canEdit(annotation: Annotation | FormAnnotation) {
-        return annotation.creator.id == this.userManager.creator.id;
+    canEdit(segmentation: Segmentation) {
+        return segmentation.creator.id == this.userManager.creator.id;
     }
 
     updateConfig(config: any) {
         this.config = { ...this.config, ...config };
     }
 
-    get annotationsFilter() {
-        return (a: Annotation | FormAnnotation) => {
+    get segmentationsFilter() {
+        return (a: Segmentation | FormAnnotation) => {
             
-            // if (a.id != 1962178) return false;
-            if (a.feature && ['Form', 'Registration', 'ETDRS grid', 'Arteriovenous (AV) nicking'].includes(a.feature.name)) {
-                return false;
-            }
-
+            
             if (this.creator.name == 'test_user') {
                 // show everything for test user
                 return true;

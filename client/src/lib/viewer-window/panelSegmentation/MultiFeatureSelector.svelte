@@ -1,20 +1,18 @@
 <script lang="ts">
-    import type { Annotation } from "$lib/datamodel/annotation.svelte";
-    import { AnnotationTypeFeature } from "$lib/datamodel/annotationType.svelte";
+    
     import { colors } from "$lib/viewer/overlays/colors";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { getContext } from "svelte";
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import { CompositeFeature } from "$lib/datamodel/compositeFeature.svelte";
 
     interface Props {
-        annotation: Annotation;
+        segmentation: Segmentation;
     }
-    let { annotation }: Props = $props();
+    let { segmentation }: Props = $props();
 
-    const { annotatedFeatures, dataRepresentation } = annotation.annotationType;
-    const sortedFeatures = annotatedFeatures.sort(
-        (a, b) => a.featureIndex - b.featureIndex,
-    );
-
+    const { compositeFeatures, dataRepresentation } = segmentation;
+   
     const groupType = {
         MultiLabel: "checkbox",
         MultiClass: "radio",
@@ -34,29 +32,29 @@
     
 </script>
 
-{#snippet radioLabel(feature: AnnotationTypeFeature)}
+{#snippet radioLabel(feature: CompositeFeature)}
     <label>
         <input
             type="radio"
             bind:group={segmentationContext.activeIndices}
             value={feature.featureIndex}
         />
-        {feature.feature.name}
+        {feature.childFeature.name}
     </label>
 {/snippet}
-{#snippet checkboxLabel(feature: AnnotationTypeFeature)}
+{#snippet checkboxLabel(feature: CompositeFeature)}
     <label>
         <input
             type="checkbox"
             bind:group={segmentationContext.activeIndices}
             value={feature.featureIndex}
         />
-        {feature.feature.name}
+        {feature.childFeature.name}
     </label>
 {/snippet}
 <div>
     <ul>
-        {#each $sortedFeatures as a}
+        {#each $compositeFeatures as a}
             <li
                 onpointerenter={()=>pointerEnter(a.featureIndex)}
                 onpointerleave={pointerLeave}
