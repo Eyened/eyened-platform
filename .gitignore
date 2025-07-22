@@ -1,6 +1,6 @@
+orm/eyened_orm/environments/*.env
 docker/.env
 .env
-dev.env
 *.zip
 *.pyc
 notebooks/hrfav/**/*
