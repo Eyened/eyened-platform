@@ -11,7 +11,7 @@ export type DrawingMode = 'erase' | 'paint';
 
 export interface DrawingExecutor {
     getCtx(): CanvasRenderingContext2D;
-    draw(ctx: CanvasRenderingContext2D, mode: 'paint' | 'erase'): void;
+    draw(ctx: CanvasRenderingContext2D, mode: 'paint' | 'erase'): Promise<void>;
 }
 
 
@@ -25,6 +25,7 @@ export abstract class SegmentationTool implements Overlay {
     drawingState: DrawingMode = 'paint';
     currentPoints: Position2D[] | undefined;
     lastPosition: Position2D | undefined;
+    syncing: boolean = false;
 
     constructor(
         protected readonly drawingExecutor: DrawingExecutor,
@@ -34,7 +35,6 @@ export abstract class SegmentationTool implements Overlay {
     }
 
     abstract executeDraw(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void;
-    abstract repaint(viewerContext: ViewerContext, renderTarget: RenderTarget): void;
 
     get mode() {
         return ((this.drawingState === 'paint') !== this.flipDrawErase) ? 'paint' : 'erase';
@@ -53,7 +53,7 @@ export abstract class SegmentationTool implements Overlay {
     }
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        const { event: { repeat, key } } = e;
+        const { event: { repeat, key }, viewerContext } = e;
         if (repeat) return;
 
         const k = key.toUpperCase();
@@ -61,7 +61,7 @@ export abstract class SegmentationTool implements Overlay {
         if (k == eraseKey) this.drawingState = 'erase';
 
         if (k == paintKey || k == eraseKey) {
-            this.startDraw();
+            this.startDraw(viewerContext);
         }
     }
 
@@ -73,16 +73,24 @@ export abstract class SegmentationTool implements Overlay {
         }
     }
 
-    startDraw() {
+    startDraw(viewerContext: ViewerContext) {
         this.currentPoints = [this.lastPosition!];
     }
 
     endDraw(viewerContext: ViewerContext) {
         if (this.currentPoints) {
-            const ctx = this.drawingExecutor.getCtx()
+            this.syncing = true;
+
+            const ctx = this.drawingExecutor.getCtx();
             this.executeDraw(ctx, viewerContext);
-            this.drawingExecutor.draw(ctx, this.mode);
+            this.drawingExecutor.draw(ctx, this.mode).then(() => this.syncing = false);
             this.currentPoints = undefined;
+        }
+    }
+
+    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        if (this.syncing) {
+            viewerContext.cursorStyle = 'wait';            
         }
     }
 

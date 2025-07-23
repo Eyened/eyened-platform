@@ -1,10 +1,10 @@
-import tempfile
-
+import importlib
+import json
+from pathlib import Path
 import click
-from .utils.testdb import dump_database, drop_create_db, load_db, populate
-from tqdm import tqdm
-
+from .utils.testdb import DatabaseTransfer
 from .utils.config import get_config
+from tqdm import tqdm
 
 '''
 Command utilities for the eyened ORM.
@@ -14,6 +14,8 @@ The following commands are available:
 - full: Create a test database for ORM testing, developing new features or running alembic migrations.
 - update-thumbnails: Update thumbnails for all images in the database.
 - run-models: Run the models on the database.
+- zarr-tree: Display the structure of the annotations zarr store, showing groups and array shapes.
+- defragment-zarr: Defragment the zarr store by copying all annotations to a new store with sequential indices.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 '''
@@ -25,51 +27,31 @@ def eorm():
 
 
 @eorm.command()
-def test():
-    """Create a test database for ORM testing, developing new features or running alembic migrations."""
-    source_db = get_config("prod").database
-    test_db = get_config("dev").database
-
-    source_db_string = (
-        f"{source_db.host}:{source_db.port}/{source_db.database}"
-    )
-    test_db_string = f"{test_db.host}:{test_db.port}/{test_db.database}"
-
-    print(f"Creating test database {test_db_string} from {source_db_string}..")
-
-    # Create a temporary file to store the dump
-    with tempfile.NamedTemporaryFile(mode='w+t') as dump_file:
-        dump_database(source_db, dump_file, no_data=True)
-        drop_create_db(test_db)
-        dump_file.seek(0)
-        load_db(test_db, dump_file)
-
-        populate(source_db, test_db)
-
-        return True
+@click.option('-s', '--source', type=str, help='Source environment to use (e.g., "source")')
+@click.option('-t', '--target', type=str, help='Target environment to use (e.g., "test")')
+@click.option('--root-conditions', '-r', type=click.Path(exists=True), 
+              help='Path to JSON file containing root conditions for database population')
+def test(source, target, root_conditions):
+    """Create a test database for ORM testing, with selected tables populated."""
+    transfer = DatabaseTransfer(get_config(source).database, get_config(target).database)
+    transfer.create_test_db(no_data=True)
+    
+    if root_conditions:
+        with open(root_conditions, 'r') as f:
+            conditions = json.load(f)
+    else:
+        conditions = []
+    
+    transfer.populate(root_conditions=conditions)
 
 
 @eorm.command()
-def full():
-    """Create a test database for ORM testing, developing new features or running alembic migrations."""
-    source_db = get_config("eyened").database
-    test_db = get_config("dev").database
-
-    source_db_string = (
-        f"{source_db.host}:{source_db.port}/{source_db.database}"
-    )
-    test_db_string = f"{test_db.host}:{test_db.port}/{test_db.database}"
-
-    print(f"Creating test database {test_db_string} from {source_db_string}..")
-
-    # Create a temporary file to store the dump
-    with tempfile.NamedTemporaryFile(mode='w+t') as dump_file:
-        dump_database(source_db, dump_file)
-        drop_create_db(test_db)
-        dump_file.seek(0)
-        load_db(test_db, dump_file)
-
-        return True
+@click.option('-s', '--source', type=str, help='Source environment to use (e.g., "source")')
+@click.option('-t', '--target', type=str, help='Target environment to use (e.g., "test")')
+def full(source, target):
+    """Create a test database for ORM testing, mirroring the source database."""
+    transfer = DatabaseTransfer(get_config(source).database, get_config(target).database)
+    transfer.create_test_db(no_data=False)
 
 
 @eorm.command()
@@ -79,13 +61,12 @@ def update_thumbnails(env, failed):
     """Update thumbnails for all images in the database."""
 
     from eyened_orm import DBManager
-    from eyened_orm.importer.thumbnails import update_thumbnails as update_thumbnails_fn
+    from eyened_orm.importer.thumbnails import update_thumbnails, get_missing_thumbnail_images
 
-    config = get_config(env)
-    DBManager.init(config)
+    DBManager.init(env)
     session = DBManager.get_session()
-
-    update_thumbnails_fn(session, config.thumbnails_path, config.secret_key, update_failed=failed)
+    images = get_missing_thumbnail_images(session, failed)
+    update_thumbnails(session, images)
 
 
 @eorm.command()
@@ -96,11 +77,10 @@ def run_models(env):
     from eyened_orm import DBManager
     from eyened_orm.inference.inference import run_inference
 
-    config = get_config(env)
-    DBManager.init(config)
+    DBManager.init(env)
     session = DBManager.get_session()
 
-    run_inference(session, config, device=torch.device("cuda:0"))
+    run_inference(session, device=torch.device("cuda:0"))
 
 
 @eorm.command()
@@ -112,15 +92,140 @@ def validate_forms(env, print_errors):
     By default, validates both schemas and form data. Use --forms-only or --schemas-only
     to validate only one aspect.
     """
-    config = get_config(env)
-
     from .db import DBManager
     from .form_validation import validate_all
 
-    DBManager.init(config)
+    DBManager.init(env)
 
     with DBManager.yield_session() as session:
         validate_all(session, print_errors)
+
+
+@eorm.command()
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+def set_connection_string(env):
+    config = get_config(env)
+    
+    password = config.database.password
+    host = config.database.host
+    port = config.database.port
+    database = config.database.database
+
+    package_root = Path(importlib.resources.files("eyened_orm"))   
+    filename = package_root.parent / "migrations" / "alembic.ini"
+    
+    print(f'updating {filename} with settings from environment {env}')
+    
+    with open(filename, 'r') as configfile:
+        lines = configfile.readlines()
+
+    new_url = f'mysql+pymysql://root:{password}@{host}:{port}/{database}'
+    for i, line in enumerate(lines):
+        if line.strip().startswith('sqlalchemy.url'):
+            lines[i] = f'sqlalchemy.url = {new_url}\n'
+            break
+
+    with open(filename, 'w') as configfile:
+        configfile.writelines(lines)
+
+
+@eorm.command()
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+def zarr_tree(env):
+    """Display the structure of the annotations zarr store, showing groups and array shapes."""
+    import zarr
+    
+    config = get_config(env)
+    
+    # Open the zarr store
+    try:
+        root = zarr.open_group(store=config.annotations_zarr_store, mode="r")
+    except Exception as e:
+        print(f"Error opening zarr store at {config.annotations_zarr_store}: {e}")
+        return
+    
+    print(f"Zarr store: {config.annotations_zarr_store}")
+    print("=" * 50)
+    
+    # Iterate through groups
+    group_names = list(root.group_keys())
+    if not group_names:
+        print("No groups found in the zarr store")
+        return
+    
+    for group_name in sorted(group_names):
+        group = root[group_name]
+        print(f"\nGroup: {group_name}")
+        print("-" * 30)
+        
+        # Get arrays in this group
+        array_names = list(group.array_keys())
+        if not array_names:
+            print("  No arrays found in this group")
+            continue
+        
+        for array_name in sorted(array_names):
+            array = group[array_name]
+            print(f"  Array: {array_name}")
+            print(f"    Shape: {array.shape}")
+            print(f"    Dtype: {array.dtype}")
+            print(f"    Chunks: {array.chunks}")
+            
+            # # Show compression info if available
+            # if hasattr(array, 'compressor') and array.compressor:
+            #     print(f"    Compressor: {array.compressor}")
+            
+            # # Calculate storage efficiency
+            # if hasattr(array, 'nbytes') and hasattr(array, 'nbytes_stored'):
+            #     ratio = array.nbytes / array.nbytes_stored if array.nbytes_stored > 0 else 0
+            #     print(f"    Storage: {array.nbytes_stored:,} bytes ({ratio:.1f}x compression)")
+
+
+@eorm.command()
+@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+@click.option("--new-store-path", type=click.Path(), required=True, help="Path to the new zarr store directory")
+def defragment_zarr(env, new_store_path):
+    """Defragment the zarr store by copying all annotations to a new store with sequential indices.
+    
+    This command creates a new zarr store and copies all existing annotations to it,
+    assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
+    The ZarrArrayIndex values in the database will be updated to reflect the new indices.
+    """
+    import os
+    from pathlib import Path
+    
+    from eyened_orm import DBManager
+    from eyened_orm.utils.zarr.manager_annotation import AnnotationZarrStorageManager
+    
+    config = get_config(env)
+    
+    # Initialize database manager
+    DBManager.init(config)
+    
+    # Create new store path if it doesn't exist
+    new_store_path = Path(new_store_path)
+    new_store_path.mkdir(parents=True, exist_ok=True)
+    
+    # Create annotation zarr storage manager for existing store
+    old_manager = AnnotationZarrStorageManager(config.annotations_zarr_store)
+    
+    print(f"Defragmenting zarr store from: {config.annotations_zarr_store}")
+    print(f"Creating new zarr store at: {new_store_path}")
+    print("=" * 50)
+    
+    try:
+        # Run defragmentation
+        index_mapping = old_manager.defragment_to_new_store(new_store_path)
+        
+        print("\nDefragmentation completed successfully!")
+        print(f"New zarr store created at: {new_store_path}")
+        print("Remember to update your configuration to point to the new store.")
+        
+    except Exception as e:
+        print(f"Error during defragmentation: {e}")
+        import traceback
+        traceback.print_exc()
+        return
 
 
 @eorm.command()
@@ -136,8 +241,7 @@ def update_hashes(env, print_errors):
     from eyened_orm import DBManager, ImageInstance
     from sqlalchemy import or_, select
 
-    config = get_config(env)
-    DBManager.init(config)
+    DBManager.init(env)
 
     with DBManager.yield_session() as session:
         # Get all image instances with missing hashes

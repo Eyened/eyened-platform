@@ -1,6 +1,6 @@
 ---
 title: Eyened ORM configuration
-description: Learn how to use the command line utilities available in the ORM
+description: Learn how to configure the Eyened ORM for database access and file management
 sidebar:
   order: 2
 ---
@@ -9,22 +9,62 @@ sidebar:
 Claude query: In configuration.mdx, write documentation for the configuration options in config.sample.py. First show the structure of the database configuration and then make a single table with the rest of the options with columns Option, Required and Description
 */}
 
-## Configuration File
+## Configuration
 
-The Eyened ORM uses environment variables for configuration. A sample configuration file is provided at `eyened_orm/config.sample.env`. Copy this file to `config.<ENV>.env` in the same folder and modify the settings according to your environment. The configuration can be loaded into the ORM as:
+The Eyened ORM can be configured in two ways:
+
+1. Using environment variables
+2. Using a Python configuration object
+
+### Using Environment Variables
+
+A sample configuration file is provided at `orm/eyened_orm/environments/sample.env`. 
+Copy this file to `orm/eyened_orm/environments/<ENV>.env` in the same folder and modify the settings according to your environment.
+The configuration can be loaded into the ORM as:
 
 ```python
 from eyened_orm import DBManager
-from eyened_orm.utils import get_config
-
-config = get_config("test")
-DBManager.init(config)
+DBManager.init("dev")  # Loads configuration from dev.env
 session = DBManager.get_session()
+```
+You can easily switch between environments by maintaining multiple `<ENV>.env` files in `orm/eyened_orm/environments/`
+
+:::tip
+If you omit the call to DBManager.init, the DBManager will automatically apply settings from `orm/eyened_orm/environments/.env`
+:::
+
+
+### Using Python Configuration
+
+Alternatively, you can provide the configuration directly:
+
+```python
+from eyened_orm import DBManager
+from eyened_orm.utils.config import EyenedORMConfig, DatabaseSettings
+
+config = EyenedORMConfig(
+    database=DatabaseSettings(
+        user="<USER>",
+        password="<PASSWORD>",
+        host="<HOSTNAME>",
+        port="<PORT>",
+        database="<DATABASE>"
+    ),
+    secret_key="your-secret-key",  # Optional, defaults to "6f4b661212"
+    images_basepath="/PATH/TO/IMAGES",  # Optional, defaults to "/images"
+    storage_basepath="/PATH/TO/STORAGE",  # Optional, defaults to "/storage"
+    default_study_date="1970-01-01",  # Optional, defaults to 1970-01-01
+    image_server_url="http://your-image-server"  # Optional
+)
+
+DBManager.init(config)
 ```
 
 ## Configuration Options
 
-The following table describes all available configuration options. Optional variables should be omitted or commented out if not needed:
+The following table describes all available configuration options:
+
+### Database Settings
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -33,11 +73,30 @@ The following table describes all available configuration options. Optional vari
 | DB_HOST | Yes | Database host address |
 | DB_NAME | Yes | Database name |
 | DB_PORT | Yes | Database port number |
-| SECRET_KEY | No | Secret key used to generate hashes deterministically for password hashing, anonymisation and obfuscation of file names. Required when using the importer or viewer |
-| IMAGES_BASEPATH | No | The folder containing local image data. All local images linked in the eyened database should be stored in this folder (or descendants). Required when using the importer or when using the ORM to read/write images |
-| ANNOTATIONS_PATH | No | Path to the folder containing annotations. Used by the platform for reading and writing annotations. Required when using the ORM to read/write annotations |
-| THUMBNAILS_PATH | No | Folder containing the thumbnail structure. Used by the ORM to read thumbnails and by the importer to write thumbnails on insertion. Required when using the importer or when using the ORM to read/write images |
-| CFI_CACHE_PATH | No | Path of a cache for fundus images. Used by the importer to write a preprocessed version of the images. If set, preprocessed CFI images will be written to this path upon insertion |
-| DEFAULT_STUDY_DATE | No | Default date for new studies when the importer needs to create new studies without a study date. Defaults to 1970-01-01 |
-| IMAGE_SERVER_URL | No | URL of the image server endpoint. Used by the ORM to generate URLs to images as `<IMAGE_SERVER_URL>/<dataset_identifier>` |
-| TRASH_PATH | No | Folder to move deleted annotations / form_annotations to when deleted from the ORM. If not set, the annotations will not be moved to a trash folder |
+
+### Global Settings
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| secret_key | No | "6f4b661212" | Secret key used for password hashing and file name obfuscation |
+| images_basepath | No | "/images" | Base path for image storage. When running in Docker, this should be set to the host machine's path to the images |
+| storage_basepath | No | "/storage" | Base path for storage of annotations, thumbnails and trash |
+| default_study_date | No | "1970-01-01" | Default date for new studies when no date is provided |
+| image_server_url | No | None | URL of the image server endpoint for generating image URLs |
+
+### Computed Paths
+
+The following paths are automatically computed based on the `storage_basepath`:
+
+- `annotations_path`: `<storage_basepath>/annotations`
+- `thumbnails_path`: `<storage_basepath>/thumbnails`
+- `trash_path`: `<storage_basepath>/trash`
+
+## Environment File Priority
+
+The configuration system prioritizes settings in the following order:
+1. `.env` file
+2. Environment variables
+3. Default values
+
+This means that settings in your `.env` file will override any environment variables or default values.

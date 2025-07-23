@@ -1,22 +1,52 @@
-import { ItemConstructor } from "./itemContructor";
-import type { Item } from "./itemList";
-import { DateMapping, FKMapping } from "./mapping";
-import type { Project } from "./project";
+import { BaseItem, type FilterList } from "./itemList";
+import type { Study } from "./study";
+import { data } from "./model";
+import type { Instance } from "./instance.svelte";
 
-export interface Patient extends Item {
-    id: number,
-    identifier: string,
-    project: Project,
-    birthDate?: Date,
-    sex?: 'M' | 'F',
-    isHuman: boolean
+export interface ServerPatient {
+    PatientID: number,
+    PatientIdentifier: string,
+    ProjectID: number,
+    BirthDate?: Date,
+    Sex?: 'M' | 'F',
+    IsHuman: boolean,
 }
+export class Patient extends BaseItem {
+    static endpoint = 'patients';
+    static mapping = {
+        'PatientIdentifier': 'identifier',
+        'ProjectID': 'projectId',
+        'BirthDate': 'birthDate',
+        'Sex': 'sex',
+        'IsHuman': 'isHuman',
+    };
 
-export const PatientConstructor = new ItemConstructor<Patient>(
-    'PatientID', {
-    identifier: 'PatientIdentifier',
-    project: FKMapping('ProjectID', 'projects'),
-    birthDate: DateMapping('BirthDate'),
-    sex: 'Sex',
-    isHuman: 'isHuman'
-});
+    id!: number;
+    identifier!: string;
+    projectId!: number;
+    birthDate?: Date;
+    sex?: 'M' | 'F';
+    isHuman!: boolean;
+
+    constructor(item: ServerPatient) {
+        super();
+        this.init(item);
+    }
+
+    init(item: ServerPatient) {
+        this.id = item.PatientID;
+        this.identifier = item.PatientIdentifier;
+        this.projectId = item.ProjectID;
+        this.birthDate = item.BirthDate;
+        this.sex = item.Sex;
+        this.isHuman = item.IsHuman;
+    }
+
+    get studies(): FilterList<Study> {
+        return data.studies.filter(study => study.patientId == this.id);
+    }
+
+    get instances(): FilterList<Instance> {
+        return data.instances.filter(instance => instance.patient.id == this.id);
+    }
+}

@@ -1,7 +1,7 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { loadInstances } from "$lib/datamodel/api";
-import type { Creator } from "$lib/datamodel/creator";
-import type { Instance } from "$lib/datamodel/instance";
+import { loadInstances } from "$lib/datamodel/api.svelte";
+import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import { data } from "$lib/datamodel/model";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
@@ -18,6 +18,7 @@ export type MainPanelType = {
 }
 
 export class ViewerWindowContext {
+    
     // show/hide the browser overlay
     browserOverlay: boolean = $state(false);
 
@@ -70,6 +71,10 @@ export class ViewerWindowContext {
         this.setInstanceIDs(instanceIDs);
     }
 
+    closeBrowserOverlay() {
+        this.browserOverlay = false;
+    }
+    
     addViewer(viewer: ViewerContext) {
         this.viewers.add(viewer);
         return () => this.viewers.delete(viewer);
@@ -131,7 +136,7 @@ export class ViewerWindowContext {
 
         for (const locator of photoLocators) {
             for (const key of ['enfaceImageId', 'octImageId']) {
-                const image_id = locator[key];
+                const image_id = locator[key as keyof PhotoLocator];
                 if (!this.photoLocators.has(image_id)) {
                     this.photoLocators.set(image_id, []);
                 }

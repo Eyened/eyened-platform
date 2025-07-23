@@ -1,191 +1,254 @@
-from datetime import timedelta
-from typing import Optional
-
-from fastapi import APIRouter, Cookie, Depends, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+import os
+import uuid
+from datetime import datetime, timedelta
+from hashlib import pbkdf2_hmac
 
 from eyened_orm import Creator
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from passlib.context import CryptContext
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from typing_extensions import deprecated
 
 from ..config import settings
 from ..db import get_db
-from .login_manager import LoginManager
-from .utils import password_hash
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(password: str, stored_hash: str):
+    return pwd_context.verify(password, stored_hash)
+
+
+@deprecated("Use hash_password() instead")
+def password_hash(password: str, secret_key: str):
+    return pbkdf2_hmac("sha256", password.encode(), secret_key.encode(), 10000)
+
+
+secure = False  # TODO: set to True when deploying (set up https)
 
 router = APIRouter()
-
-# Initialize LoginManager
-manager = LoginManager(
-    secret=settings.secret_key,
-    token_url="/auth/token",
-    use_cookie=True,
-    use_header=False,
-    access_cookie_name="access_token_cookie",
-    refresh_cookie_name="refresh_token_cookie",
-    access_token_expiry=timedelta(seconds=settings.access_token_duration),
-    refresh_token_expiry=timedelta(seconds=settings.refresh_token_duration),
-)
+SESSION_COOKIE_NAME = "session_id"
 
 
-# Pydantic models
 class UserLogin(BaseModel):
     username: str
     password: str
+    remember_me: bool = False
 
 
 class UserResponse(BaseModel):
     id: int
     username: str
-    role: str | None
+    role: int | None
+
+
+class SessionData(BaseModel):
+    user_id: int
 
 
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
-# User loader callback
+
+session_store = {}
 
 
-@manager.user_loader()
-def load_user(id: int, session: Session):
-    return session.query(Creator).get(id)
+class CurrentUser:
+    def __init__(self, creator_id: int, username: str, role: str | None = None):
+        self.id = creator_id
+        self.username = username
+        self.role = role
 
+    def get_creator(self, session: Session) -> Creator:
+        return session.query(Creator).where(Creator.CreatorID == self.id).first()
 
-@router.post("/auth/login-password", response_model=UserResponse)
-async def login_password(user_data: UserLogin, session: Session = Depends(get_db)):
-    """Login with username and password"""
-    # Placeholder: Replace with your user authentication logic
-    # Example:
-    # user = db.query(User).filter(User.username == user_data.username).first()
-    # if not user or not verify_password(user_data.password, user.hashed_password):
-    #     raise HTTPException(status_code=401, detail="Invalid credentials")
+debug = True
 
-    user = (
-        session.query(Creator).where(
-            Creator.CreatorName == user_data.username).first()
+async def get_current_user(session_id: str = Cookie(None)) -> CurrentUser:
+    """Get the current authenticated user."""
+    if not session_id or session_id not in session_store:
+        if debug:
+            session_id, expiry = create_session(
+                1, "test_user", 1, True
+            )
+            return CurrentUser(
+                creator_id=1,
+                username="test_user",
+                role="admin",
+            )
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    user_session = session_store[session_id]
+
+    if datetime.now() > user_session["expires"]:
+        del session_store[session_id]
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    return CurrentUser(
+        creator_id=user_session["user_id"],
+        username=user_session["username"],
+        role=user_session["role"],
     )
-    if user is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if user.Password != password_hash(user_data.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+def create_session(user_id: int, username: str, role: str, remember_me: bool):
+    session_id = str(uuid.uuid4())
+    now = datetime.now()
+    expiry = now + (timedelta(days=30) if remember_me else timedelta(hours=1))
+    session_store[session_id] = {
+        "user_id": user_id,
+        "expires": expiry,
+        "username": username,
+        "role": role,
+    }
+    return session_id, expiry
 
-    # Create tokens
-    sub = str(user.CreatorID)
-    access_token = manager.create_access_token(data={"sub": sub})
-    refresh_token = manager.create_refresh_token(data={"sub": sub})
 
-    # Create response
-    response = JSONResponse(
-        content={
-            "id": user.CreatorID,
-            "username": user.CreatorName,
-            "role": user.Role,
-        }
+def creator_to_response(creator: Creator) -> UserResponse:
+    """Convert a Creator object to a UserResponse."""
+    return UserResponse(
+        id=creator.CreatorID,
+        username=creator.CreatorName,
+        role=creator.Role
     )
 
-    # Set cookies
-    manager.set_access_cookie(response, access_token)
-    manager.set_refresh_cookie(response, refresh_token)
 
-    return response
-
-
-@router.post("/auth/refresh", response_model=UserResponse)
-async def refresh(
+@router.get("/auth/me", response_model=UserResponse)
+async def me(
+    current_user: CurrentUser = Depends(get_current_user),
     session: Session = Depends(get_db),
-    refresh_token: Optional[str] = Cookie(None, alias="refresh_token_cookie"),
 ):
-    """Refresh access token using refresh token
-    This endpoint may be called when the access token has expired
-    """
-    if not refresh_token:
-        raise HTTPException(
-            status_code=401, detail="No refresh token provided")
+    return creator_to_response(current_user.get_creator(session))
 
-    # Verify refresh token
-    user_identifier = manager._get_userid(refresh_token)
-    # Get user data from database
-    user = session.query(Creator).get(user_identifier)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
 
-    sub = str(user.CreatorID)
-    # Create new access token
-    access_token = manager.create_access_token(data={"sub": sub})
 
-    # Create response
-    response = JSONResponse(
-        content={
-            "id": user.CreatorID,
-            "username": user.CreatorName,
-            "role": user.Role,
-        }
+def check_login(username: str, password: str, db: Session) -> Creator:
+    creator = (
+        db.query(Creator).where(Creator.CreatorName == username).first()
+    )
+    if creator is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # First try the new Argon2 hash
+    if creator.PasswordHash and verify_password(password, creator.PasswordHash):
+        return creator
+
+    # If no new hash or verification failed, try old hash
+    if creator.Password and password_hash(password, settings.secret_key) == creator.Password:
+        # Migrate to new hash
+        new_hash = hash_password(password)
+        creator.PasswordHash = new_hash
+        creator.Password = None  # Clear old hash
+        db.commit()
+        db.refresh(creator)
+        return creator
+
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+@router.post("/auth/login-password", response_model=UserResponse)
+async def login_password(
+    user_data: UserLogin, response: Response, session: Session = Depends(get_db)
+):
+    creator = check_login(user_data.username, user_data.password, session)
+
+    session_id, expiry = create_session(
+        creator.CreatorID, creator.CreatorName, creator.Role, user_data.remember_me
     )
 
-    # Set new access token
-    manager.set_access_cookie(response, access_token)
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_id,
+        httponly=True,
+        max_age=int((expiry - datetime.now()).total_seconds()),
+        secure=secure,
+        samesite="strict",
+        path="/",
+    )
 
-    return response
+    return creator_to_response(creator)
 
 
 @router.post("/auth/logout")
-async def logout():
-    """Log out user by clearing tokens"""
-    response = JSONResponse(content={"message": "Logged out successfully"})
-
-    # Clear cookies
-    response.delete_cookie(manager.access_cookie_name)
-    response.delete_cookie(manager.refresh_cookie_name)
-
-    return response
+async def logout(response: Response, session_id: str = Cookie(None)):
+    if session_id in session_store:
+        del session_store[session_id]
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return {"message": "Logged out successfully"}
 
 
 @router.post("/auth/change-password", response_model=UserResponse)
 async def change_password(
     change_password_data: ChangePasswordRequest,
+    response: Response,
     session: Session = Depends(get_db),
-    user_id: int = Depends(manager)
+    current_user: CurrentUser = Depends(get_current_user),
+    session_id: str = Cookie(None),
 ):
-    """Change user password"""
+    creator = check_login(current_user.username, change_password_data.old_password, session)
 
-    user = session.query(Creator).get(user_id)
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Verify old password
-    if user.Password != password_hash(change_password_data.old_password):
-        raise HTTPException(status_code=401, detail="Invalid old password")
-
-    # Update password
-    user.Password = password_hash(change_password_data.new_password)
+    # Set new password using Argon2
+    creator.PasswordHash = hash_password(change_password_data.new_password)
+    creator.Password = None  # Clear old hash if it exists
     session.commit()
 
-    return UserResponse(id=user_id, username=user.CreatorName, role=user.Role)
+    # Log out the user after password change
+    # if session_id in session_store:
+    #     del session_store[session_id]
+    # response.delete_cookie(SESSION_COOKIE_NAME)
+
+    return creator_to_response(creator)
 
 
-@router.post('/auth/register', response_model=UserResponse)
-async def register_user(
-        user_data: UserLogin,
-        session: Session = Depends(get_db),
-        user_id: int = Depends(manager)):
-
-    exisiting_user = (
-        session.query(Creator).where(
-            Creator.CreatorName == user_data.username).first()
+def create_user(
+    session: Session,
+    username: str,
+    password: str,
+    is_human: bool = True,
+    description: str | None = None,
+) -> Creator:
+    """Create a new user with the given credentials.
+    
+    Args:
+        session: Database session
+        username: Username for the new user
+        password: Password for the new user
+        is_human: Whether the user is a human (default: True)
+        description: Optional description of the user
+        
+    Returns:
+        Creator: The newly created user
+        
+    Raises:
+        HTTPException: If username already exists
+    """
+    # Check if username already exists
+    existing_user = (
+        session.query(Creator).where(Creator.CreatorName == username).first()
     )
-    if exisiting_user is not None:
-        raise HTTPException(status_code=400, detail="User already exists")
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists")
 
-    new_user = Creator()
-    new_user.CreatorName = user_data.username
-    new_user.Password = password_hash(user_data.password)
-    # TODO: MSN? email?
-    new_user.IsHuman = 1
-
+    # Create new user
+    new_user = Creator(
+        CreatorName=username,
+        PasswordHash=hash_password(password),
+        IsHuman=is_human,
+        Description=description,
+    )
     session.add(new_user)
     session.commit()
+    session.refresh(new_user)
+    
+    return new_user
 
-    return UserResponse(id=new_user.CreatorID, username=new_user.CreatorName, role=new_user.Role)
+
+@router.post("/auth/register", response_model=UserResponse)
+async def register_user(
+    user_data: UserLogin, response: Response, session: Session = Depends(get_db)
+):
+    new_user = create_user(session, user_data.username, user_data.password)
+    return creator_to_response(new_user)

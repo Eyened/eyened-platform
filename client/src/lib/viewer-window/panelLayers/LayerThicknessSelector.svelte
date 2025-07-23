@@ -4,14 +4,14 @@
 	import type { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import { LayerThicknessEnfaceOverlay } from '$lib/viewer/overlays/LayerThicknessEnface';
 	import type {
-		LabelNumbersSegmentation,
-		LayerBitsSegmentation
+		MulticlassSegmentation,
+		MultilabelSegmentation
 	} from '$lib/webgl/layerSegmentation';
-	import { layerThicknesses, macularLayers } from '../panelSegmentation/segmentationUtils';
+	import { layerThicknesses, macularLayers } from '../panelSegmentation/_segmentationUtils';
 
 	interface Props {
 		image: AbstractImage;
-		segmentation: LabelNumbersSegmentation | LayerBitsSegmentation;
+		segmentation: MulticlassSegmentation | MultilabelSegmentation;
 	}
 
 	let { image, segmentation }: Props = $props();

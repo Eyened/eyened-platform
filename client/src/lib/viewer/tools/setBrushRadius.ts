@@ -106,7 +106,9 @@ export class SetBrushRadiusTool implements Overlay {
 
         }
 
-        viewerContext.cursorStyle = 'none';
+        if (viewerContext.cursorStyle !== 'wait') {
+            viewerContext.cursorStyle = 'none';
+        }
 
     }
 }

@@ -1,4 +1,3 @@
-import type { Creator } from '$lib/datamodel/creator';
 import type { AbstractImage } from '$lib/webgl/abstractImage';
 import type { Shaders } from '$lib/webgl/shaders';
 import type { MeasureTool } from './tools/Measure.svelte.js';
@@ -29,6 +28,7 @@ export class ViewerContext {
     cursorStyle: cursorStyle = $state('default');
     active: boolean = $state(false);
     updatePosition: boolean = $state(true);
+    axis: 0 | 1 | 2 = $state(0);
 
     index = $state(0);
 
@@ -62,8 +62,12 @@ export class ViewerContext {
 
     constructor(
         public readonly image: AbstractImage,
-        public readonly registration: Registration
+        public readonly registration: Registration,
     ) {
+        if (image.image_id.endsWith('proj')) {
+            // TODO: cleaner implementation of this
+            this.axis = 1;
+        }
 
         this.shaders = image.webgl.shaders;
         this.imageRenderer = new BaseImageRenderer(image);
@@ -74,14 +78,16 @@ export class ViewerContext {
         this.windowLevel = { min: 0, max: 255 };
         if (image.is3D) {
             this.index = Math.round(image.depth / 2);
-            if (image.instance.device.model == '3D OCT-1000' ||
-                image.instance.device.model == '3D OCT-1000 MARK II' ||
-                image.instance.device.model == '3D OCT-2000 FA Plus'
+            if (image.instance.deviceModel.model == '3D OCT-1000' ||
+                image.instance.deviceModel.model == '3D OCT-1000 MARK II' ||
+                image.instance.deviceModel.model == '3D OCT-2000 FA Plus'
             ) {
                 this.windowLevel = { min: 30, max: 225 };
             }
             // aspect ratio for OCT
-            this.stretch = 8 * image.resolution.y / image.resolution.x;
+            if (image.resolution.z) {
+                this.stretch = 8 * image.resolution.y / image.resolution.x;
+            }
         }
         this.transform = this.getInitTransform();
         this.imageTransform = image.transform;

@@ -1,3 +1,4 @@
+import importlib.resources
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -44,7 +45,7 @@ class EyenedORMConfig(BaseSettings):
     database: Optional[DatabaseSettings] = None
 
     secret_key: str = Field(
-        "CHANGE_ME",
+        default="6f4b661212",
         description="Secret key used to generate hashes deterministically for password hashing and anonymisation and obfuscation of file names. "
         "If not set, the db_id will be used as the filename",
     )
@@ -61,9 +62,9 @@ class EyenedORMConfig(BaseSettings):
         None,
         description="The host machine's images_basepath. This is different from images_basepath in that images_basepath is always local (/images in the container) and images_basepath_host is the path in the host machine. They may be the same if running outside of Docker.",
     )
-    annotations_zarr_basepath: str = Field(
-        default="/storage/annotations_zarr",
-        description="Path to the folder containing annotations zarr arrays. "
+    annotations_zarr_store: str = Field(
+        default="/storage/annotations_store.zarr",
+        description="Path to the zarr store containing annotations. "
         "Used by the platform for reading and writing annotations",
     )
     annotations_path: str = Field(
@@ -114,7 +115,7 @@ class EyenedORMConfig(BaseSettings):
         return dotenv_settings, env_settings, init_settings, file_secret_settings
 
 
-def get_config(env="dev") -> EyenedORMConfig:
+def get_config(env: str | None = None) -> EyenedORMConfig:
     """
     Load configuration from the appropriate environment file.
 
@@ -124,9 +125,13 @@ def get_config(env="dev") -> EyenedORMConfig:
     Returns:
         EyenedConfig: Configuration object
     """
-    env_file = f"config.{env}.env"
-    dir_path = Path(__file__).parent.parent
-    env_path = dir_path / env_file
+    if env is None:
+        env_file = ".env"
+    else:
+        env_file = f"{env}.env"
+
+    package_root = Path(importlib.resources.files("eyened_orm"))
+    env_path = package_root / "environments" / env_file
 
     if not env_path.exists():
         raise FileNotFoundError(

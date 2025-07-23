@@ -1,297 +1,268 @@
 <script lang="ts">
-	import Viewer from '$lib/viewer/Viewer.svelte';
-	import PanelETDRS from './panelETRDS/PanelETDRS.svelte';
-	import PanelRegistration from './panelRegistration/PanelRegistration.svelte';
+    import Viewer from "$lib/viewer/Viewer.svelte";
+    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
+    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
+    import { getContext, onDestroy, setContext, type Component } from "svelte";
+    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import Dialogue from "./Dialogue.svelte";
+    import PanelRendering from "./panelRendering/PanelRendering.svelte";
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import type { TaskContext } from "$lib/types";
+    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
+    import { writable } from "svelte/store";
+    import PanelForm from "./panelForm/PanelForm.svelte";
+    import type { ViewerEvent, PanelName } from "$lib/viewer/viewer-utils";
+    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
+    import MainIcon from "./icons/MainIcon.svelte";
+    import PanelHeader from "./PanelHeader.svelte";
 
-	import { getContext, onDestroy, setContext } from 'svelte';
-	import { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import Dialogue from './Dialogue.svelte';
-	import { get_url_params } from '$lib/utils';
-	import PanelRendering from './panelRendering/PanelRendering.svelte';
-	import type { AbstractImage } from '$lib/webgl/abstractImage';
-	import type { DialogueType, TaskContext } from '$lib/types';
-	import PanelMeasure from './panelMeasure/PanelMeasure.svelte';
-	import { writable } from 'svelte/store';
-	import PanelForm from './panelForm/PanelForm.svelte';
-	import PanelLayers from './panelLayers/PanelLayers.svelte';
-	import type { ViewerEvent } from '$lib/viewer/viewer-utils';
-	import { ViewerWindowContext } from './viewerWindowContext.svelte';
-	import MainIcon from './icons/MainIcon.svelte';
+    import {
+        Close,
+        Info,
+        Rendering,
+        ETDRS,
+        Registration,
+        Form,
+        Draw,
+    } from "./icons/icons";
+    import Measure from "./icons/Measure.svelte";
+    import PanelInfo from "./panelInfo/panelInfo.svelte";
+    import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    interface Props {
+        image: AbstractImage;
+    }
 
-	import PanelHeader from './PanelHeader.svelte';
-	import { Close, Info, Rendering, ETDRS, Registration, Form, Draw } from './icons/icons';
+    let { image }: Props = $props();
 
-	import Measure from './icons/Measure.svelte';
-	import PanelInfo from './panelInfo/panelInfo.svelte';
-	import PanelSegmentation from './panelSegmentation/PanelSegmentation.svelte';
-	import Layers from './icons/Layers.svelte';
-	import { data } from '$lib/datamodel/model';
+    const taskContext = getContext<TaskContext>("taskContext");
+    const viewerWindowContext = getContext<ViewerWindowContext>(
+        "viewerWindowContext",
+    );
+    const { registration } = viewerWindowContext;
+    const closePanel = getContext<() => {}>("closePanel");
 
-	interface Props {
-		image: AbstractImage;
-	}
+    const viewerContext = new ViewerContext(image, registration);
+    setContext("viewerContext", viewerContext);
 
-	let { image }: Props = $props();
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const segmentationOverlay = new SegmentationOverlay(viewerContext, globalContext);
+    setContext("segmentationOverlay", segmentationOverlay);    
+    onDestroy(viewerContext.addOverlay(segmentationOverlay));
 
-	const taskContext = getContext<TaskContext>('taskContext');
+    const { activePanels } = viewerContext;
+    activePanels.add("Segmentation");
 
-	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
-	const { registration } = viewerWindowContext;
-	const closePanel = getContext<() => {}>('closePanel');
+    const dialogue = writable(undefined);
+    setContext("dialogue", dialogue);
 
-	const viewerContext = new ViewerContext(image, registration);
-	setContext('viewerContext', viewerContext);
+    const topViewer = viewerWindowContext.topViewers.get(image)!;
 
-	const { activePanels } = viewerContext;
+    const overlay = {
+        pointermove(e: ViewerEvent<PointerEvent>) {
+            const { viewerContext } = e;
+            const { x, y } = e.cursor;
+            const { viewerSize } = viewerContext;
+            const p = viewerContext.viewerToImageCoordinates({ x, y });
+            const scaleH = viewerSize.height / image.height;
+            const scaleW = viewerSize.width / image.width;
+            const baseFactor = Math.min(scaleH, scaleW);
+            const factor = image.is3D
+                ? 0.4
+                : image.image_id.endsWith("_proj")
+                  ? 0.5
+                  : 5;
+            topViewer.focusPoint(p.x, p.y, factor * baseFactor);
+        },
+        pointerleave() {
+            topViewer.initTransform();
+        },
+    };
 
-	const params = get_url_params();
+    onDestroy(viewerContext.addOverlay(overlay));
+    onDestroy(() => {
+        topViewer.initTransform();
+    });
 
-	if (params['panel']) {
-		activePanels.add(params['panel']);
-	}
+    let minimize = $state(viewerWindowContext.mainPanels.length > 1);
 
-	if (taskContext) {
-		// const taskDefinitionName = taskContext.task.definition.name;
-		// if (['ETDRS-grid placement', 'Naevi', 'Glaucoma grading'].includes(taskDefinitionName)) {
-		// 	activePanels.add('Form');
-		// }
-		// if (['Consensus segmentation'].includes(taskDefinitionName)) {
-		// 	activePanels.add('Segmentation');
-		// }
-	}
-	const dialogue = writable<DialogueType>(undefined);
-	setContext('dialogue', dialogue);
+    const { formSchemas } = data;
+    const etdrsSchema = formSchemas.find(
+        (schema) => schema.name === "ETDRS-grid coordinates",
+    )!;
+    if (!etdrsSchema) {
+        console.warn("ETDRS schema not found");
+    }
+    const registrationSchema = formSchemas.find(
+        (schema) => schema.name === "Pointset registration",
+    )!;
 
-	// const miniViewerContext: Writable<ViewerContext | undefined> = writable(undefined);
-	// setContext('miniViewerContext', miniViewerContext);
+    const panels: { name: PanelName, component: Component, Icon: Component, props?: any }[] = [
+        { name: "Info", component: PanelInfo, Icon: Info },
+        {
+            name: "Rendering",
+            component: PanelRendering,
+            Icon: Rendering,
+        },
+    ];
 
-	// zoom in on top viewer for this image
-	const topViewer = viewerWindowContext.topViewers.get(image)!;
+    if (image.is2D && etdrsSchema) {
+        panels.push({
+            name: "ETDRS",
+            component: PanelETDRS,
+            Icon: ETDRS,
+            props: { etdrsSchema, active: false },
+        });
+    }
 
-	const overlay = {
-		pointermove(e: ViewerEvent<PointerEvent>) {
-			const { viewerContext } = e;
-			const { x, y } = e.cursor;
-			const { viewerSize } = viewerContext;
-			const p = viewerContext.viewerToImageCoordinates({ x, y });
-			const scaleH = viewerSize.height / image.height;
-			const scaleW = viewerSize.width / image.width;
-			const baseFactor = Math.min(scaleH, scaleW);
-			// TODO: let user choose factor
-			let factor = image.is3D ? 0.4 : 5;
-			if (image.image_id.endsWith('_proj')) {
-				factor = 0.5;
-			}
-			topViewer.focusPoint(p.x, p.y, factor * baseFactor);
-		},
-		pointerleave() {
-			topViewer.initTransform();
-		}
-	};
-	onDestroy(viewerContext.addOverlay(overlay));
-	onDestroy(() => {
-		topViewer.initTransform();
-	});
+    if (image.is2D && registrationSchema) {
+        panels.push({
+            name: "Registration",
+            component: PanelRegistration,
+            Icon: Registration,
+            props: { registrationSchema, active: false },
+        });
+    }
 
-	let minimize = $state(viewerWindowContext.mainPanels.length > 1);
-
-	const { formSchemas } = data;
-	const etdrsSchema = formSchemas.find((schema) => schema.name === 'ETDRS-grid coordinates')!;
-	if (!etdrsSchema) {
-		console.warn('ETDRS schema not found');
-	}
-	const registrationSchema = formSchemas.find((schema) => schema.name === 'Pointset registration')!;
-	if (!registrationSchema) {
-		console.warn('Registration schema not found');
-	}
+    panels.push(
+        {
+            name: "Measure",
+            component: PanelMeasure,
+            Icon: Measure,
+            props: { active: false },
+        },
+        { name: "Form", component: PanelForm, Icon: Form },
+        {
+            name: "Segmentation",
+            component: PanelSegmentation,
+            Icon: Draw,
+        },
+    );
 </script>
 
 <Dialogue />
 
 <div class="main">
-	<div id="viewer">
-		<Viewer />
-	</div>
-	<div id="right">
-		<div id="close" class:vertical={minimize}>
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<span class="image-id" onclick={() => (minimize = !minimize)} class:minimize>
-				&#9660; [{image.image_id}]
-			</span>
+    <div id="viewer">
+        <Viewer />
+    </div>
+    <div id="right">
+        <div id="close" class:vertical={minimize}>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span
+                class="image-id"
+                onclick={() => (minimize = !minimize)}
+                class:minimize
+            >
+                &#9660; [{image.image_id}]
+            </span>
 
-			<MainIcon onclick={closePanel} tooltip="Close">
-				{#snippet icon()}
-					<Close />
-				{/snippet}
-			</MainIcon>
+            <MainIcon onclick={closePanel} tooltip="Close" Icon={Close} />
 
-			{#if minimize}
-				<MainIcon onclick={() => (minimize = false)} tooltip="Close">
-					{#snippet icon()}
-						<span class="dots">&#8942;</span>
-					{/snippet}
-				</MainIcon>
-			{/if}
-		</div>
-
-		<div id="panels" class:minimize>
-			<PanelHeader text="Info" panelName="Info">
-				{#snippet icon()}
-					<Info />
-				{/snippet}
-			</PanelHeader>
-			<div class="panel {activePanels.has('Info') ? 'expanded' : 'collapsed'}">
-				<PanelInfo />
-			</div>
-
-			<PanelHeader text="Rendering" panelName="Rendering">
-				{#snippet icon()}
-					<Rendering />
-				{/snippet}
-			</PanelHeader>
-			<div class="panel {activePanels.has('Rendering') ? 'expanded' : 'collapsed'}">
-				<PanelRendering />
-			</div>
-
-			{#if image.is2D && etdrsSchema}
-				<PanelHeader text="ETDRS" panelName="ETDRS">
-					{#snippet icon()}
-						<ETDRS />
-					{/snippet}
-				</PanelHeader>
-				<div class="panel {activePanels.has('ETDRS') ? 'expanded' : 'collapsed'}">
-					<PanelETDRS {etdrsSchema} active={activePanels.has('ETDRS')} />
-				</div>
-			{/if}
-
-            {#if image.is2D && registrationSchema}
-                <PanelHeader text="Registration" panelName="Registration">
-                    {#snippet icon()}
-                        <Registration />
+            {#if minimize}
+                <MainIcon onclick={() => (minimize = false)} tooltip="minimize">
+                    {#snippet iconSnippet()}
+                        <span class="dots">&#8942;</span>
                     {/snippet}
-                </PanelHeader>
-                <div class="panel {activePanels.has('Registration') ? 'expanded' : 'collapsed'}">
-                    <PanelRegistration {registrationSchema} active={activePanels.has('Registration')} />
-                </div>
+                </MainIcon>
             {/if}
-			<PanelHeader text="Measure" panelName="Measure">
-				{#snippet icon()}
-					<Measure />
-				{/snippet}
-			</PanelHeader>
-			<div class="panel {activePanels.has('Measure') ? 'expanded' : 'collapsed'}">
-				<PanelMeasure active={activePanels.has('Measure')} />
-			</div>
+        </div>
 
-			<PanelHeader text="Form" panelName="Form">
-				{#snippet icon()}
-					<Form />
-				{/snippet}
-			</PanelHeader>
-			<div class="panel {activePanels.has('Form') ? 'expanded' : 'collapsed'}">
-				<PanelForm />
-			</div>
-
-			<PanelHeader text="Segmentation" panelName="Segmentation">
-				{#snippet icon()}
-					<Draw />
-				{/snippet}
-			</PanelHeader>
-			<div class="panel {activePanels.has('Segmentation') ? 'expanded' : 'collapsed'}">
-				<PanelSegmentation />
-			</div>
-
-			{#if image.is3D}
-				<PanelHeader text="Layers" panelName="LayerSegmentation">
-					{#snippet icon()}
-						<Layers />
-					{/snippet}
-				</PanelHeader>
-				<div class="panel {activePanels.has('LayerSegmentation') ? 'expanded' : 'collapsed'}">
-					<PanelLayers />
-				</div>
-			{/if}
-		</div>
-		<!-- 
-		{#if $activePanels.has('LayerSegmentation')}
-			<div class="segmentation-panels">
-				<PanelLayerSegmentation {viewerContext} />
-			</div>
-		{/if}
-	 	-->
-	</div>
+        <div id="panels" class:minimize>
+            {#each panels as { name, component: Component, Icon, props = { } }}
+                <PanelHeader text={name} panelName={name} {Icon} />
+                <div
+                    class="panel {activePanels.has(name)
+                        ? 'expanded'
+                        : 'collapsed'}"
+                >
+                    <Component {...props} active={activePanels.has(name)} />
+                </div>
+            {/each}
+        </div>
+    </div>
 </div>
 
 <style>
-	div {
-		display: flex;
-		flex: 1;
-		user-select: none;
-		color: rgba(255, 255, 255, 0.8);
-	}
-	div.vertical {
-		flex-direction: column;
-	}
-	.minimize {
-		display: none;
-	}
-	div.main {
-		flex-direction: row;
-	}
-	div#viewer {
-		flex: 1;
-	}
-	div#panels {
-		flex-direction: column;
-		flex: 1;
+    div {
+        display: flex;
+        flex: 1;
+        user-select: none;
+        color: rgba(255, 255, 255, 0.8);
+    }
 
-		overflow-y: auto;
-		overflow-x: hidden;
-		padding-bottom: 4em;
-	}
-	div#right {
-		flex-direction: column;
-		flex: 0;
-		background-color: black;
-		/* border-left: 1px solid rgba(255, 255, 255, 0.4); */
-		border-right: 1px solid rgba(255, 255, 255, 0.4);
-	}
+    div.vertical {
+        flex-direction: column;
+    }
 
-	div#close,
-	div.panel {
-		height: auto;
-		flex: 0;
-	}
-	span.image-id {
-		display: flex;
-		flex: 1;
-		cursor: pointer;
-		margin: auto;
-		font-size: 0.8em;
-	}
-	span.image-id.minimize {
-		display: none;
-	}
-	.panel.collapsed {
-		height: 0;
-		overflow: hidden;
-	}
-	.panel.expanded {
-		background-color: rgba(255, 255, 255, 0.1);
-		height: auto;
-	}
-	span.dots {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.2em;
-		width: 1.5em;
-		height: 1.5em;
-		margin: auto;
-		/* font-size: large; */
-		border: 1px solid rgba(255, 255, 255, 0.5);
-		border-radius: 50%;
-		font-weight: bold;
-	}
+    .minimize {
+        display: none;
+    }
+
+    div.main {
+        flex-direction: row;
+    }
+
+    div#viewer {
+        flex: 1;
+    }
+
+    div#panels {
+        flex-direction: column;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-bottom: 4em;
+    }
+
+    div#right {
+        flex-direction: column;
+        flex: 0;
+        background-color: black;
+        border-right: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    div#close,
+    div.panel {
+        height: auto;
+        flex: 0;
+    }
+
+    span.image-id {
+        display: flex;
+        flex: 1;
+        cursor: pointer;
+        margin: auto;
+        font-size: 0.8em;
+    }
+
+    span.image-id.minimize {
+        display: none;
+    }
+
+    .panel.collapsed {
+        height: 0;
+        overflow: hidden;
+    }
+
+    .panel.expanded {
+        background-color: rgba(255, 255, 255, 0.1);
+        height: auto;
+    }
+
+    span.dots {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.2em;
+        width: 1.5em;
+        height: 1.5em;
+        margin: auto;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        font-weight: bold;
+    }
 </style>

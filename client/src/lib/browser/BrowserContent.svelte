@@ -1,44 +1,35 @@
 <script lang="ts">
-    import { browserExtensions } from "$lib/extensions";
-    
-    import { data } from "$lib/datamodel/model";
-    import { derived } from "svelte/store";
     import InstancesTable from "./InstancesTable.svelte";
-    import StudyBlock from "./StudyBlock.svelte";
+    import type { Instance } from "$lib/datamodel/instance.svelte.ts";
+    import type { Patient } from "$lib/datamodel/patient.ts";
+    import PatientComponent from "./PatientComponent.svelte";
 
     interface Props {
-        renderMode?: "studies" | "instances";
+        instances: Instance[];
+        patients: Patient[];
+        renderMode?: "studies" | "images";
         mode?: "full" | "overlay";
     }
 
-    let { renderMode = "studies", mode = "full" }: Props = $props();
-
-    const { instances, studies } = data;
-
-    // getting studies from instances rather than from model directly
-    const sorted_studies = derived(studies, (studies) => {
-        // const studies = new Set<Study>($instances.map((i) => i.study));
-        return [...studies].sort((a, b) => b.date - a.date);
-    });
-
-    // TODO implement pagination
+    let {
+        instances,
+        patients,
+        renderMode = "studies",
+        mode = "full",
+    }: Props = $props();
+    
 </script>
 
-{#if renderMode == "instances"}
-    {#if $instances.length}
-        <InstancesTable instances={$instances} />
+{#if renderMode == "images"}
+    {#if instances.length}
+        <InstancesTable {instances} />
     {:else}
         <div class="no-content">No images found</div>
     {/if}
-{:else if $sorted_studies.length}
-    {#each $sorted_studies as study (study)}
-        <StudyBlock {study} {mode} />
+{:else if patients.length}
+    {#each patients as patient}
+        <PatientComponent {patient} {mode} />
     {/each}
-    {#if mode == "full"}
-        {#each browserExtensions as extension}
-            <extension.component {...extension.props} />
-        {/each}
-    {/if}
 {:else}
     <div class="no-content">No studies found</div>
 {/if}

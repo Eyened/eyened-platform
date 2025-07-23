@@ -1,4 +1,4 @@
-import { getInstanceBySOPInstanceUID, } from "$lib/datamodel/instance";
+import { getInstanceBySOPInstanceUID, } from "$lib/datamodel/instance.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 

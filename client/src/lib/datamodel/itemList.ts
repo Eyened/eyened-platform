@@ -1,44 +1,268 @@
 import { apiUrl } from '$lib/config';
-import { derived, get, writable, type Invalidator, type Readable, type Subscriber, type Unsubscriber } from 'svelte/store';
-import type { ItemConstructor } from './itemContructor';
-import { constructors, importItem } from './model';
+import { derived, get, writable, type Readable, type Subscriber, type Unsubscriber } from 'svelte/store';
 
+import { importData, removeData } from './model';
+export type MappingDefinition = Record<string, string | Function>;
+
+export function parseDate(date: string): Date {
+    return new Date(date);
+}
+export function formatDate(date: Date): string {
+    return date.toISOString().slice(0, 10);
+}
+export function formatDateTime(date: Date): string {
+    return date.toISOString();
+}
+
+export function toServer(item: any, mapping: MappingDefinition): any {
+    const result: any = {};
+    for (const [serverKey, localKey] of Object.entries(mapping)) {
+        if (typeof localKey === 'function') {
+            result[serverKey] = localKey(item);
+        } else {
+            result[serverKey] = item[localKey];
+        }
+    }
+    return result;
+}
+
+
+function isStateProperty(obj: any, key: string): boolean {
+    const desc = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(obj),
+        key
+    );
+    return !!(desc && typeof desc.get === 'function' && typeof desc.set === 'function');
+}
+interface BaseItemConstructor {
+    new(serverItem: any): BaseItem;
+    mapping: MappingDefinition;
+    endpoint: string;
+}
 export interface Item {
     id: number | string;
 }
+export abstract class BaseItem {
+    abstract id: number | string;
+    static endpoint: string;
+    static mapping: MappingDefinition;
+
+    get mapping(): MappingDefinition {
+        return (this.constructor as BaseItemConstructor).mapping;
+    }
+    get endpoint(): string {
+        return (this.constructor as BaseItemConstructor).endpoint;
+    }
+    abstract init(serverItem: any): void;
+
+    async update(item: any) {
+        const updateParams: any = {};
+        for (const key in item) {            
+            if (key in this) {
+                if (isStateProperty(this, key)) {
+                    updateParams[key] = item[key];
+                } else {
+                    console.warn(`property ${key} is not a state property and will not be updated`);
+                }
+            } else {
+                console.warn(`property ${key} not found`);
+            }
+        }
+        const serverParams = toServer(updateParams, this.mapping);
+
+        // check if serverParams has any properties
+        if (Object.keys(serverParams).length === 0) {
+            console.warn('no properties to update');
+            return;
+        }
+        const url = `${apiUrl}/${this.endpoint}/${this.id}`
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(serverParams)
+        });
+        if (!response.ok) {
+            console.error(`failed to update ${this.endpoint} ${this.id}: ${response.statusText}`);
+            return;
+        }
+        const data = await response.json();
+        this.updateFields(data);
+    }
+
+    protected updateFields(data: any) {
+        this.init(data);
+    }
+
+    static async create(item: any) {
+        const serverParams = toServer(item, this.mapping);
+        const url = `${apiUrl}/${this.endpoint}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(serverParams)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to create ${this.endpoint}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const imported = importData({ [this.endpoint]: [data] })
+        return imported[this.endpoint][0];
+    }
+
+    async delete(fromServer: boolean = true) {
+        if (fromServer) {
+            const url = `${apiUrl}/${this.endpoint}/${this.id}`;
+            const response = await fetch(url, { method: 'DELETE' });
+            if (!response.ok) {
+                throw new Error(`Failed to delete ${this.endpoint} ${this.id}: ${response.statusText}`);
+            }
+        }
+        removeData({ [this.endpoint]: [this.id] });
+    }
+}
+interface BaseLinkingItemConstructor {
+    new(parentId: number, childId: number): BaseLinkingItem;
+    parentResource: string;
+    childResource: string;
+    parentIdField: string;
+    childIdField: string;
+    endpoint: string;
+    mapping: MappingDefinition;
+}
+export abstract class BaseLinkingItem implements Item {
+    abstract id: string;
+
+    static endpoint: string;
+    static parentResource: string;
+    static childResource: string;
+    static parentIdField: string;
+    static childIdField: string;
+    static mapping: MappingDefinition;
+
+    get endpoint(): string {
+        return (this.constructor as BaseLinkingItemConstructor).endpoint;
+    }
+    get parentResource(): string {
+        return (this.constructor as BaseLinkingItemConstructor).parentResource;
+    }
+    get childResource(): string {
+        return (this.constructor as BaseLinkingItemConstructor).childResource;
+    }
+    get parentIdField(): string {
+        return (this.constructor as BaseLinkingItemConstructor).parentIdField;
+    }
+    get childIdField(): string {
+        return (this.constructor as BaseLinkingItemConstructor).childIdField;
+    }
+    get mapping(): MappingDefinition {
+        return (this.constructor as BaseLinkingItemConstructor).mapping;
+    }
+    constructor(
+        public readonly parentId: number,
+        public readonly childId: number) {
+    }
+
+    static async create(item: any) {
+        const serverParams = toServer(item, this.mapping);
+        const parentId = item[this.parentIdField];
+        const childId = item[this.childIdField];
+        const url = `${apiUrl}/${this.parentResource}/${parentId}/${this.childResource}/${childId}`;
+        const response = await fetch(url,
+            {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(serverParams)
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to create ${url}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        const imported = importData(data);
+        return imported[this.endpoint][0];
+
+    }
+
+    async delete(fromServer: boolean = true) {
+        if (fromServer) {
+            const url = `${apiUrl}/${this.parentResource}/${this.parentId}/${this.childResource}/${this.childId}`;
+            const response = await fetch(url, { method: 'DELETE' });
+            if (!response.ok) {
+                throw new Error(`Failed to delete ${this.endpoint} ${this.id}: ${response.statusText}`);
+            }
+        }
+        removeData({ [this.endpoint]: [this.id] });
+    }
+
+}
+
+
 
 export class FilterList<T> implements Readable<T[]> {
 
     constructor(public readonly items: Readable<T[]>) { }
 
+    private derive<S>(fn: (items: T[]) => S[]): FilterList<S> {
+        return new FilterList(derived(this.items, fn));
+    }
+
     first(): T | undefined {
         return this.$[0];
     }
 
-    subscribe(run: Subscriber<T[]>, invalidate?: Invalidator<T[]> | undefined): Unsubscriber {
+    subscribe(run: Subscriber<T[]>, invalidate?: () => void): Unsubscriber {
         return this.items.subscribe(run, invalidate);
     }
 
-    find(predicate: (value: T) => boolean): T | undefined {
+    get(index: number): Readable<T | undefined> {
+        return derived(this.items, lst => lst[index]);
+    }
+
+    get$(index: number): T | undefined {
+        return this.$[index];
+    }
+
+    find$(predicate: (value: T) => boolean): T | undefined {
         const items = get(this.items);
         return items.find(predicate);
     }
 
     filter(predicate: (value: T) => boolean): FilterList<T> {
-        return new FilterList(derived(this.items, lst => lst.filter(predicate)));
+        return this.derive(lst => lst.filter(predicate));
     }
 
     sort(compareFn: (a: T, b: T) => number): FilterList<T> {
-        return new FilterList(derived(this.items, lst => lst.slice().sort(compareFn)));
+        return this.derive(lst => lst.slice().sort(compareFn));
+    }
+
+    forEach$(callback: (value: T) => void): void {
+        this.$.forEach(callback);
     }
 
     map<S>(mapFn: (value: T) => S): FilterList<S> {
-        return new FilterList(derived(this.items, lst => lst.map(mapFn)));
+        return this.derive(lst => lst.map(mapFn));
     }
 
-    forEach(callback: (value: T) => void): void {
-        get(this.items).forEach(callback);
+    map$<S>(mapFn: (value: T) => S): S[] {
+        return this.$.map(mapFn);
     }
+
+    flatMap<S>(mapFn: (value: T) => S[]): FilterList<S> {
+        return this.derive(lst => lst.flatMap(mapFn));
+    }
+
 
     reduce<S>(reducer: (accumulator: S, currentValue: T) => S, initialValue: S): Readable<S> {
         return derived(this.items, lst => lst.reduce(reducer, initialValue));
@@ -95,9 +319,29 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
     protected readonly items: Map<number | string, T> = new Map();
     protected readonly store = writable(0);
 
+
+    constructor() {
+    }
+
+    private emit() {
+        this.store.update(n => n + 1);
+    }
+
+    importItems(items: T[]) {
+        for (const item of items) {
+            this.items.set(item.id, item);
+        }
+        this.emit();
+    }
+
     clear() {
         this.items.clear();
-        this.store.update(n => n + 1);
+        this.emit();
+    }
+
+    delete(id: number | string) {
+        this.items.delete(id);
+        this.emit();
     }
 
     get(id: number | string): T | undefined {
@@ -112,69 +356,38 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
         return this.values()[0];
     }
 
-    importItems(items: T[]) {
-        for (const item of items) {
-            this.items.set(item.id, item);
-        }
-        this.store.update(n => n + 1);
-    }
-
     subscribe(run: Subscriber<T[]>): Unsubscriber {
-        return this.store.subscribe(_ => run(Array.from(this.items.values())));
-    }
-
-    filter(predicate: (value: T) => boolean): FilterList<T> {
-        return new FilterList(this).filter(predicate);
+        return this.store.subscribe(_ => run(this.values()));
     }
 
     get filterlist() {
         return new FilterList(this);
     }
 
+    filter(predicate: (value: T) => boolean): FilterList<T> {
+        return this.filterlist.filter(predicate);
+    }
+
+    filter$(predicate: (value: T) => boolean): T[] {
+        return this.values().filter(predicate);
+    }
+
+
     values(): T[] {
         return Array.from(this.items.values());
     }
 
     find(predicate: (value: T) => boolean): T | undefined {
-        const items = Array.from(this.items.values());
-        return items.find(predicate);
+        return this.values().find(predicate);
     }
 
     map<S>(predicate: (value: T) => S): FilterList<S> {
-        return new FilterList(this).map(predicate);
-    }
-}
-export class MutableItemCollection<T extends Item> extends ItemCollection<T> {
-
-    constructor(private readonly endpoint: string) {
-        super();
+        return this.filterlist.map(predicate);
     }
 
-    async create(item: Omit<T, 'id'>): Promise<T> {
-        const itemConstructor = constructors[this.endpoint] as ItemConstructor<T>;
-        const apiParams = itemConstructor.toParams(item);
-
-        const resp = await fetch(`${apiUrl}/${this.endpoint}/new`, {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(apiParams)
-        });
-        const params = await resp.json();
-        return importItem(this.endpoint, params) as T;
+    flatMap<S>(predicate: (value: T) => S[]): FilterList<S> {
+        return this.filterlist.flatMap(predicate);
     }
 
-    async delete(item: T, fromServer = true): Promise<void> {
-        if (fromServer) {
-            const url = `${apiUrl}/${this.endpoint}/${item.id}`;
-            const resp = await fetch(url, { method: 'DELETE' });
-            if (resp.status != 204) {
-                throw new Error('Failed to delete');
-            }
-        }
-        this.items.delete(item.id);
-        this.store.update(n => n + 1);
-    }
+
 }

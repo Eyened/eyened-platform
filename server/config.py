@@ -12,22 +12,6 @@ class Settings(EyenedORMConfig):
     
     # Server-specific configuration with non-redundant fields
     model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
-    viewer_env: str = "production"
-
-    # Authentication
-    secret_key: str
-    access_token_duration: int = Field(
-        validation_alias="PUBLIC_AUTH_TOKEN_DURATION",
-        default=259200,  # 3 days in seconds
-    )
-    refresh_token_duration: int = Field(
-        validation_alias="AUTH_REFRESH_TOKEN_DURATION",
-        default=2592000,  # 30 days in seconds
-    )
-
-    running_in_docker: bool = Field(
-        default=False,
-    )
 
     # Default username and password for the admin user
     admin_username: str

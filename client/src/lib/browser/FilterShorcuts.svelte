@@ -14,7 +14,9 @@
 
     const browserContext = getContext<BrowserContext>("browserContext");
 
-    let patientIdentifier: string | null = $state(params.get("PatientIdentifier"));
+    let patientIdentifier: string | null = $state(
+        params.get("PatientIdentifier"),
+    );
     let date: string | null = $state(params.get("StudyDate"));
     let projectName: string | null = $state(params.get("ProjectName"));
 
@@ -55,7 +57,7 @@
 <!-- svelte-ignore a11y_label_has_associated_control -->
 <div>
     <form onsubmit={submitPatientIdentifier}>
-        <label> PatientIdentifier </label>
+        <label> PatientIdentifier: </label>
         <input
             type="text"
             bind:this={patientIdentifierInput}
@@ -66,7 +68,8 @@
     </form>
 
     <form onsubmit={submitDate}>
-        <label> Study date: </label> <input type="date" bind:value={date} />
+        <label> Study date: </label>
+        <input type="date" bind:value={date} />
         <button type="submit" disabled={!date}>Search</button>
     </form>
 
@@ -84,12 +87,19 @@
 
 <style>
     div {
+        display: grid;
+        grid-template-columns: 0fr 16em 0fr;
+    }
+    label {
         display: flex;
-        flex-direction: column;
+        padding-right: 1em;
+        align-items: center;
+    }
+    input, select {
+        margin-right: 1em;
     }
     form {
-        display: grid;
-        gap: 1em;
-        grid-template-columns: 10em 12em 10em;
+        display: contents;
     }
+    
 </style>

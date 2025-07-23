@@ -1,0 +1,14 @@
+version: "3.1"
+
+services:
+  fileserver:
+    env_file: .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
+    network_mode: "host"
+    volumes:
+      - ${IMAGES_BASEPATH}:/images
+      - ${STORAGE_BASEPATH}/thumbnails:/thumbnails

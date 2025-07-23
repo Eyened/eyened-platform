@@ -1,5 +1,5 @@
 import { fsHost } from '$lib/config';
-import type { Instance } from '$lib/datamodel/instance';
+import type { Instance } from '$lib/datamodel/instance.svelte';
 import { Image2D } from '$lib/webgl/image2D';
 import { Image3D } from '$lib/webgl/image3D';
 import type { Dimensions } from '$lib/webgl/types';
@@ -28,13 +28,15 @@ export class ImageLoader {
 
     async load(instance: Instance): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
+        // Convert to lowercase for case-insensitive comparison
+        const extension = instance.datasetIdentifier.toLowerCase().split('.').pop();
+        const supportedFormats = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 
-        if (instance.datasetIdentifier.endsWith('.png') || instance.datasetIdentifier.endsWith('.jpg') || instance.datasetIdentifier.endsWith('.jpeg')) {
+        if (extension && supportedFormats.includes(extension)) {
             return [await this.loadImage2D(instance, img_id)];
 
         } else if (instance.datasetIdentifier.endsWith('.binary')) {
             const url = `${fsHost}/${instance.datasetIdentifier}`;
-            // const url = `${fsHost}/instance/${instance.sourceID}/${instance.datasetIdentifier}`;
             const meta = await this.loadMeta(url);
             const image = await this.loadBinary3D(instance, url, meta, img_id);
             return this.returnImage3D(image);
@@ -46,7 +48,6 @@ export class ImageLoader {
             const [pre, base_url] = instance.datasetIdentifier.split(']');
             const [folder, source_id] = splitTail(base_url, '/');
             const meta_url = `${fsHost}/${folder}/metadata.json`;
-            // const meta_url = `${fsHost}/instance/${instance.sourceID}/${folder}/metadata.json`;
             const response = await fetch(meta_url);
             const meta = await response.json();
             return this.loadPngSeries(instance, meta, img_id, pre, base_url, source_id);
@@ -74,17 +75,17 @@ export class ImageLoader {
                 height_mm: image.dimensions_mm.height,
                 depth_mm: image.dimensions_mm.depth
             };
-
+            console.log('dimensions', dimensions);
             const img3d = new Image3D(instance, this.webgl, img_id, getArrayFromImages(js_images), dimensions!, meta)
-            return this.returnImage3D(img3d);
+            return await this.returnImage3D(img3d);
         }
 
         throw 'no images found?'
     }
 
-    returnImage3D(img3d: Image3D): LoadedImages {
+    async returnImage3D(img3d: Image3D): Promise<LoadedImages> {
         if (img3d.depth > this.minBscansForEnface) {
-            return [img3d.createEnfaceProjection(), img3d];
+            return [await img3d.createEnfaceProjection(), img3d];
         } else {
             return [img3d];
         }
@@ -93,17 +94,17 @@ export class ImageLoader {
     async loadImage2D(instance: Instance, img_id: string): Promise<Image2D> {
 
         const url = `${fsHost}/${instance.datasetIdentifier}`;
-        const canvas = await getImage(url);
+        const bitmap = await getImage(url);
         const dimensions = {
-            width: canvas.width,
-            height: canvas.height,
+            width: bitmap.width,
+            height: bitmap.height,
             depth: 1,
-            width_mm: instance.resolutionHorizontal ? instance.resolutionHorizontal * canvas.width : -1,
-            height_mm: instance.resolutionVertical ? instance.resolutionVertical * canvas.height : -1,
+            width_mm: instance.resolutionHorizontal ? instance.resolutionHorizontal * bitmap.width : -1,
+            height_mm: instance.resolutionVertical ? instance.resolutionVertical * bitmap.height : -1,
             depth_mm: -1
         };
         const meta = undefined;
-        return Image2D.fromCanvas(instance, this.webgl, img_id, canvas, dimensions, meta);
+        return Image2D.fromBitmap(instance, this.webgl, img_id, bitmap, dimensions, meta);
     }
 
     async loadMeta(url: string): Promise<any> {
@@ -126,6 +127,10 @@ export class ImageLoader {
             height_mm: meta.resolution[1] * meta.oct_shape[1] / 1000,
             depth_mm: meta.resolution[0] * meta.oct_shape[0] / 1000
         };
+        if (instance.scan?.mode == 'Circle-Scan') {
+            // this is not correct in the meta file
+            dimensions.width_mm = instance.resolutionHorizontal * dimensions.width;
+        }
         return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, meta);
     }
 
@@ -197,7 +202,13 @@ export class ImageLoader {
             depth_mm: depth * res_d,
         };
     }
+}
 
+async function getImage(url: string): Promise<ImageBitmap> {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    const bitmap = await createImageBitmap(blob);
+    return bitmap;
 }
 
 
@@ -210,15 +221,17 @@ function toCanvas(img: HTMLImageElement) {
     return canvas;
 }
 
-export async function getImage(url: string): Promise<HTMLCanvasElement> {
-    return new Promise((resolve, reject) => {
-        const image = new Image();
-        image.crossOrigin = 'Anonymous';
-        image.onload = () => resolve(toCanvas(image));
-        image.onerror = () => reject(new Error('could not load image'));
-        image.src = url;
-    });
-}
+
+
+// export async function getImage(url: string): Promise<HTMLCanvasElement> {
+//     return new Promise((resolve, reject) => {
+//         const image = new Image();
+//         image.crossOrigin = 'Anonymous';
+//         image.onload = () => resolve(toCanvas(image));
+//         image.onerror = () => reject(new Error('could not load image'));
+//         image.src = url;
+//     });
+// }
 
 
 function getArrayFromImages(js_images: HTMLCanvasElement[]): Uint8Array {

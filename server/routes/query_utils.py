@@ -1,12 +1,12 @@
 from collections import defaultdict
 
 sqlalchemy_operators = {
-    "==": lambda column, value: column == value,
-    "!=": lambda column, value: column != value,
-    ">": lambda column, value: column > value,
-    "<": lambda column, value: column < value,
-    ">=": lambda column, value: column >= value,
-    "<=": lambda column, value: column <= value,
+    "eq": lambda column, value: column == value,
+    "ne": lambda column, value: column != value,
+    "gt": lambda column, value: column > value,
+    "lt": lambda column, value: column < value,
+    "gte": lambda column, value: column >= value,
+    "lte": lambda column, value: column <= value,
     "in": lambda column, value: column.in_(value if isinstance(value, list) else [value]),
     "not_in": lambda column, value: ~column.in_(value if isinstance(value, list) else [value]),
     "like": lambda column, value: column.like(f"%{value}%"),
@@ -46,13 +46,13 @@ def decode_params(params_multi_items):
         else:
             # default operator
             if len(values) == 1:
-                operator = "=="
+                operator = "eq"
                 value = values[0]
             else:
                 operator = "in"
                 value = values
 
-        result[field] = operator, value
+        result[field, operator] = value
 
     return result
 

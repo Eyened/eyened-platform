@@ -1,6 +1,10 @@
-import * as env from '$env/static/public';
+// Get the base URL from the current window location
+const getBaseUrl = () => {
+    if (typeof window === 'undefined') return ''; // SSR case
+    const { protocol, hostname, port } = window.location;
+    return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+};
 
-export const authTokenDuration = parseInt(env.PUBLIC_AUTH_TOKEN_DURATION)
-export const apiUrl = env.PUBLIC_API_URL;
-export const fsHost = env.PUBLIC_FILESERVER_URL;
-export const thumbnailHost = env.PUBLIC_THUMBNAIL_SERVER_URL;
+export const apiUrl = `${getBaseUrl()}/api`;
+export const fsHost = `${getBaseUrl()}/api/instances/images`;
+export const thumbnailHost = `${getBaseUrl()}/api/instances/thumbnails`;

@@ -1,5 +1,5 @@
 import { thumbnailHost } from '$lib/config.js';
-import type { Instance } from '$lib/datamodel/instance';
+import type { Instance } from '$lib/datamodel/instance.svelte';
 
 export class DefaultDict<T, Q> extends Map<T, Q> {
     defaultFactory: () => Q;

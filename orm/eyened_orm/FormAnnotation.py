@@ -1,147 +1,125 @@
-from __future__ import annotations
+import json
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List
 
 from pandas import DataFrame, json_normalize
-from sqlalchemy import ForeignKey, String, func, select, event
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
-import json
+from sqlalchemy import Column, DateTime, event, func
+from sqlalchemy.dialects.mysql import JSON
+from sqlalchemy.orm import Session
+from sqlmodel import Field, Relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
-    from .Annotation import Creator
-    from .FormAnnotation import FormAnnotation
-    from .ImageInstance import ImageInstance
-    from .Patient import Patient
-    from .Study import Study
-    from .Task import SubTask
+    from eyened_orm import (Creator, FormSchema, ImageInstance, Patient, Study,
+                            SubTask)
 
 
-class FormSchema(Base):
+class FormSchemaBase(Base):
+    SchemaName: str = Field(max_length=45, unique=True)
+    Schema: Dict[str, Any] | None = Field(sa_column=Column(JSON), default=None)
+
+class FormSchema(FormSchemaBase, table=True):
     __tablename__ = "FormSchema"
+    _name_column: ClassVar[str] = "SchemaName"
 
-    FormSchemaID: Mapped[int] = mapped_column(primary_key=True)
-    SchemaName: Mapped[Optional[str]] = mapped_column(String(45), unique=True)
-    Schema: Mapped[Optional[Dict[str, Any]]]
+    FormSchemaID: int = Field(primary_key=True)
 
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
-        back_populates="FormSchema"
-    )
-
-    def __repr__(self):
-        return f"FormSchema({self.FormSchemaID}, {self.SchemaName})"
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional[FormSchema]:
-        """Find a FormSchema by name (SchemaName)."""
-        return session.scalar(select(cls).where(cls.SchemaName == name))
+    FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="FormSchema")
 
 
-class FormAnnotation(Base):
+class FormAnnotationBase(Base):
+    FormSchemaID: int = Field(foreign_key="FormSchema.FormSchemaID")
+    PatientID: int = Field(foreign_key="Patient.PatientID")
+    StudyID: int | None = Field(foreign_key="Study.StudyID", default=None)
+    ImageInstanceID: int | None = Field(foreign_key="ImageInstance.ImageInstanceID", default=None)
+    CreatorID: int = Field(foreign_key="Creator.CreatorID")
+    SubTaskID: int | None = Field(foreign_key="SubTask.SubTaskID", default=None)
+    FormData: Dict[str, Any] | None = Field(sa_column=Column(JSON), default=None)
+    FormAnnotationReferenceID: int | None = Field(foreign_key="FormAnnotation.FormAnnotationID", default=None)
+    Inactive: bool = False
+    
+class FormAnnotation(FormAnnotationBase, table=True):
     __tablename__ = "FormAnnotation"
 
-    FormAnnotationID: Mapped[int] = mapped_column(primary_key=True)
-
-    FormSchemaID: Mapped[int] = mapped_column(
-        ForeignKey("FormSchema.FormSchemaID"), index=True
-    )
-    FormSchema: Mapped["FormSchema"] = relationship(
-        back_populates="FormAnnotations")
-
-    PatientID: Mapped[int] = mapped_column(
-        ForeignKey("Patient.PatientID"), index=True)
-    Patient: Mapped[Optional["Patient"]] = relationship(
-        back_populates="FormAnnotations"
+    FormAnnotationID: int = Field(primary_key=True)
+    DateInserted: datetime = Field(default_factory=datetime.now)
+    DateModified: datetime | None = Field(
+        sa_column=Column(
+            DateTime, server_default=func.now(), server_onupdate=func.now()
+        )
     )
 
-    StudyID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Study.StudyID"), nullable=True, index=True
-    )
-    Study: Mapped[Optional["Study"]] = relationship(
-        back_populates="FormAnnotations")
+    FormSchema: "FormSchema" = Relationship(back_populates="FormAnnotations")
+    Patient: "Patient" = Relationship(back_populates="FormAnnotations")
+    Study: "Study" = Relationship(back_populates="FormAnnotations")
+    ImageInstance: "ImageInstance" = Relationship(back_populates="FormAnnotations")
+    Creator: "Creator" = Relationship(back_populates="FormAnnotations")
+    SubTask: "SubTask" = Relationship(back_populates="FormAnnotations")
 
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
-        back_populates="FormAnnotations"
-    )
-
-    CreatorID: Mapped[int] = mapped_column(
-        ForeignKey("Creator.CreatorID"), index=True)
-    Creator: Mapped["Creator"] = relationship(back_populates="FormAnnotations")
-
-    SubTaskID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("SubTask.SubTaskID"), nullable=True, index=True
-    )
-    SubTask: Mapped[Optional["SubTask"]] = relationship(
-        back_populates="FormAnnotations"
-    )
-
-    # actual data
-    FormData: Mapped[Optional[Dict[str, Any]]] = mapped_column(nullable=True)
-
-    # datetimes
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
-    FormAnnotationReferenceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("FormAnnotation.FormAnnotationID"), nullable=True
-    )
-
-    Inactive: Mapped[bool] = mapped_column(default=False)
-
-    def __repr__(self):
-        return f"{self.FormAnnotationID}"
 
     @classmethod
     def by_schema_and_creator(
-        session: Session, schema_name: str, creator_name: str = None
+        cls,
+        session: Session,
+        schema_name: str,
+        creator_name: str = None,
+        filterInactive: bool = True,
+        **kwargs
     ) -> List["FormAnnotation"]:
-        '''
+        """
         Get all FormAnnotations for a given schema and optionally filter by creator.
-        '''
+        Additional filters can be passed as keyword arguments.
+        """
+        from eyened_orm import Creator, FormSchema
         schema = FormSchema.by_name(session, schema_name)
 
         if schema is None:
             return []
 
-        q = (
-            select(FormAnnotation)
-            .where(FormAnnotation.FormSchemaID == schema.FormSchemaID)
-            .where(~FormAnnotation.Inactive)
-        )
+        # Build filter conditions
+        filter_kwargs = {
+            "FormSchemaID": schema.FormSchemaID,
+            **kwargs
+        }
+        if filterInactive:
+            filter_kwargs["Inactive"] = False
+
+        # Add creator filter if provided
         if creator_name is not None:
             creator = Creator.by_name(session, creator_name)
-            q = q.where(FormAnnotation.CreatorID == creator.CreatorID)
+            filter_kwargs["CreatorID"] = creator.CreatorID
 
-        return session.execute(q).scalars().all()
+        return FormAnnotation.by_columns(session, **filter_kwargs)
 
     @classmethod
     def export_formannotations_by_schema(
-        cls, schema_name: str, creator_name: str = None
+        cls, session: Session, schema_name: str, creator_name: str = None
     ) -> DataFrame:
-        form_annotations = cls.by_schema_and_creator(schema_name, creator_name)
-        data = [form_annotation.get_flat_data()
-                for form_annotation in form_annotations]
+        form_annotations = cls.by_schema_and_creator(session, schema_name, creator_name)
+        data = [form_annotation.flat_data for form_annotation in form_annotations]
         return json_normalize(data)
 
     @property
-    def trash_path(self) -> str:
+    def trash_path(self) -> Path:
         """Return the path to the trash file for this FormAnnotation."""
-        return f"{self.config.trash_path}/FormAnnotations/{self.FormAnnotationID}.json"
+        return (
+            self.config.trash_path / "FormAnnotations" / f"{self.FormAnnotationID}.json"
+        )
 
-    def get_flat_data(self):
+    @property
+    def flat_data(self):
         metadata = {
             "Creator": self.Creator.CreatorName,
             "Created": self.DateInserted,
             "PatientIdentifier": self.Patient.PatientIdentifier,
             "ImageInstance": self.ImageInstanceID,
-            "Laterality": str(self.ImageInstance.Laterality.name),
+            "Laterality": (
+                str(self.ImageInstance.Laterality.name)
+                if self.ImageInstance and self.ImageInstance.Laterality
+                else None
+            ),
         }
         return metadata | flatten_json(self.FormData)
 
@@ -150,23 +128,25 @@ class FormAnnotation(Base):
 def move_to_trash(mapper, connection, target: FormAnnotation):
     """Move a serialized version of the FormAnnotation to the trash."""
     try:
-        import os
-        os.makedirs(os.path.dirname(target.trash_path), exist_ok=True)
-        with open(target.trash_path, "w") as trash_file:
+        trash_path = target.trash_path
+        trash_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(trash_path, "w") as trash_file:
             json.dump(target.to_dict(), trash_file, indent=4, default=str)
-        print(
-            f"FormAnnotation {target.FormAnnotationID} moved to trash: {target.trash_path}")
+        print(f"FormAnnotation {target.FormAnnotationID} moved to trash: {trash_path}")
     except Exception as e:
-        print(
-            f"Failed to move FormAnnotation {target.FormAnnotationID} to trash: {e}")
+        print(f"Failed to move FormAnnotation {target.FormAnnotationID} to trash: {e}")
 
 
-def flatten_json(data: dict | list | str | int | float | bool, parent_key: str = "") -> dict:
+def flatten_json(
+    data: dict | list | str | int | float | bool, parent_key: str = ""
+) -> dict:
     if isinstance(data, dict):
         return {
             k: v
             for key, value in data.items()
-            for k, v in flatten_json(value, f"{parent_key}.{key}" if parent_key else key).items()
+            for k, v in flatten_json(
+                value, f"{parent_key}.{key}" if parent_key else key
+            ).items()
         }
     elif isinstance(data, list):
         return {

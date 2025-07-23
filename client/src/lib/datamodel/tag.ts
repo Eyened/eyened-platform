@@ -1,45 +1,95 @@
-import type { Annotation } from "./annotation";
-import type { Instance } from "./instance";
-import { ItemConstructor } from "./itemContructor";
-import type { Item } from "./itemList";
-import { FKMapping } from "./mapping";
-import type { Study } from "./study";
+import { BaseItem } from "./itemList";
 
-export interface Tag extends Item {
-    id: number,
-    name: string,
+export interface ServerTag {
+    TagID: number;
+    TagName: string;
 }
-export const TagConstructor = new ItemConstructor<Tag>('TagID', { name: 'TagName' });
+export interface ServerInstanceTag {
+    ImageInstanceID: number;
+    TagID: number;
+}
+export interface ServerStudyTag {
+    StudyID: number;
+    TagID: number;
+}
+export interface ServerAnnotationTag {
+    AnnotationID: number;
+    TagID: number;
+}
 
-export interface InstanceTag extends Item {
-    id: string,
-    instance: Instance,
-    tag: Tag,
+export class Tag extends BaseItem {
+    static endpoint = 'tags';
+    static mapping = {
+        'TagName': 'name',
+    };
+    id!: number;
+    name!: string;
+    constructor(item: ServerTag) {
+        super();
+        this.init(item);
+    }
+    init(item: ServerTag) {
+        this.id = item.TagID;
+        this.name = item.TagName;
+    }
 }
-export const InstanceTagConstructor = new ItemConstructor<InstanceTag>(
-    params => `${params.ImageInstanceID}_${params.TagID}`, {
-    instance: FKMapping('ImageInstanceID', 'instances'),
-    tag: FKMapping('TagID', 'tags')
-});
 
-export interface StudyTag extends Item {
-    id: string,
-    study: Study,
-    tag: Tag,
+export class InstanceTag extends BaseItem {
+    static endpoint = 'instanceTags';
+    static mapping = {
+        'ImageInstanceID': 'instanceId',
+        'TagID': 'tagId',
+    };
+    id!: string;
+    instanceId!: number;
+    tagId!: number;
+    constructor(item: ServerInstanceTag) {
+        super();
+        this.init(item);
+    }
+    init(item: ServerInstanceTag) {
+        this.id = `${item.ImageInstanceID}_${item.TagID}`;
+        this.instanceId = item.ImageInstanceID;
+        this.tagId = item.TagID;
+    }
 }
-export const StudyTagConstructor = new ItemConstructor<StudyTag>(
-    params => `${params.StudyID}_${params.TagID}`, {
-    study: FKMapping('StudyID', 'studies'),
-    tag: FKMapping('TagID', 'tags')
-});
 
-export interface AnnotationTag extends Item {
-    id: string
-    annotation: Annotation,
-    tag: Tag,
+export class StudyTag extends BaseItem {
+    static endpoint = 'studyTags';
+    static mapping = {
+        'StudyID': 'studyId',
+        'TagID': 'tagId',
+    };
+    id!: string;
+    studyId!: number;
+    tagId!: number;
+    constructor(item: ServerStudyTag) {
+        super();
+        this.init(item);
+    }
+    init(item: ServerStudyTag) {
+        this.id = `${item.StudyID}_${item.TagID}`;
+        this.studyId = item.StudyID;
+        this.tagId = item.TagID;
+    }
 }
-export const AnnotationTagConstructor = new ItemConstructor<AnnotationTag>(
-    params => `${params.AnnotationID}_${params.TagID}`, {
-    annotation: FKMapping('AnnotationID', 'annotations'),
-    tag: FKMapping('TagID', 'tags')
-});
+
+export class AnnotationTag extends BaseItem {
+    static endpoint = 'annotationTags';
+    static mapping = {
+        'AnnotationID': 'annotationId',
+        'TagID': 'tagId',
+    };
+    id!: string;
+    annotationId!: number;
+    tagId!: number;
+    constructor(item: ServerAnnotationTag) {
+        super();
+        this.init(item);
+    }
+    init(item: ServerAnnotationTag) {
+        this.id = `${item.AnnotationID}_${item.TagID}`;
+        this.annotationId = item.AnnotationID;
+        this.tagId = item.TagID;
+    }
+}

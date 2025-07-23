@@ -1,16 +1,22 @@
 #version 300 es
 precision highp float;
 precision highp sampler3D;
+precision highp usampler2D;
 
-uniform sampler3D u_volumeTexture;
-uniform int u_height;  
+uniform sampler3D u_volume;
+uniform usampler2D u_top;
+uniform usampler2D u_bottom;
 
 out uint sum;
 
 void main() {
     sum = 0u;
-    for (int z = 0; z < u_height; z++) {
-        ivec3 loc = ivec3(int(gl_FragCoord.x), z, int(gl_FragCoord.y));
-        sum += uint(texelFetch(u_volumeTexture, loc, 0).r * 255.0);
+    ivec2 loc = ivec2(gl_FragCoord.xy);
+    int top = int(texelFetch(u_top, loc, 0).r);
+    int bottom = int(texelFetch(u_bottom, loc, 0).r);
+    for(int z = top; z < bottom; z++) {
+        ivec3 loc3 = ivec3(gl_FragCoord.x, z, gl_FragCoord.y);
+        float val = texelFetch(u_volume, loc3, 0).r;
+        sum += uint(val * 255.0f);
     }
 }

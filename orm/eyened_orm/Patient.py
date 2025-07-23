@@ -1,60 +1,53 @@
-from __future__ import annotations
-
 import enum
 from datetime import date, datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import ForeignKey, String, func, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy import Index, select
+from sqlalchemy.orm import Session
+from sqlmodel import Field, Relationship
 
-from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
-from .ImageInstance import ImageInstance
-from .Project import Project
-from .Series import Series
-from .Study import Study
+from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation
+    from eyened_orm import (Annotation, FormAnnotation, ImageInstance, Project,
+                            Study)
 
-
-class SexEnum(int, enum.Enum):
+class SexEnum(enum.Enum):
     M = 1
     F = 2
 
+class PatientBase(Base):
+    PatientIdentifier: str = Field(max_length=45)
+    BirthDate: date | None
+    Sex: SexEnum | None 
+    ProjectID: int = Field(foreign_key="Project.ProjectID")
 
-class Patient(Base):
+class Patient(PatientBase, table=True):
     __tablename__ = "Patient"
     __table_args__ = (
-        # PatientIdentifier is UNIQUE per ProjectID
-        CompositeUniqueConstraint("ProjectID", "PatientIdentifier"),
-        ForeignKeyIndex(__tablename__, "Project", "ProjectID"),
+        Index(
+            "ProjectIDPatientIdentifier_UNIQUE",
+            "PatientIdentifier",
+            "ProjectID",
+            unique=True,
+        ),
+        Index("fk_Patient_Project1_idx", "ProjectID"),
     )
 
-    PatientID: Mapped[int] = mapped_column(primary_key=True)
-    BirthDate: Mapped[Optional[date]] = mapped_column()
-    Sex: Mapped[Optional[SexEnum]] = mapped_column()
-    PatientIdentifier: Mapped[Optional[str]] = mapped_column(String(45))
+    _name_column: ClassVar[str] = "PatientIdentifier"
 
-    ProjectID: Mapped[int] = mapped_column(ForeignKey("Project.ProjectID"))
-    Project: Mapped[Project] = relationship(back_populates="Patients")
-
-    Studies: Mapped[List[Study]] = relationship(
-        back_populates="Patient", cascade="all,delete-orphan"
-    )
-
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-
-    # relationships
-    Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="Patient")
-    FormAnnotations: Mapped[List[FormAnnotation]] = relationship(
-        back_populates="Patient"
-    )
+    PatientID: int = Field(primary_key=True)
+    DateInserted: datetime = Field(default_factory=datetime.now)
+    
+    Project: "Project" = Relationship(back_populates="Patients")
+    Studies: List["Study"] = Relationship(back_populates="Patient", cascade_delete=True)
+    Annotations: List["Annotation"] = Relationship(back_populates="Patient")
+    FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Patient")
 
     @classmethod
     def by_project_and_identifier(
-        cls, session, project_id: int, patient_identifier: str | int | None
-    ) -> Patient:
+        cls, session: Session, project_id: int, patient_identifier: str | int | None
+    ) -> Optional["Patient"]:
         """
         Returns a patient with the given project ID and identifier.
         If no patient is found, raises an exception.
@@ -62,44 +55,39 @@ class Patient(Base):
         return session.scalar(
             select(Patient).where(
                 Patient.ProjectID == project_id,
-                Patient.PatientIdentifier == patient_identifier
+                Patient.PatientIdentifier == patient_identifier,
             )
         ).one()
 
     @classmethod
-    def by_identifier(cls, session, patient_identifier: str | int | None) -> List[Patient]:
+    def by_identifier(
+        cls, session: Session, patient_identifier: str | int | None
+    ) -> List["Patient"]:
         """
-        Returns a list of patients with the given identifier 
+        Returns a list of patients with the given identifier
         """
-        return session.scalars(
-            select(Patient).where(
-                Patient.PatientIdentifier == patient_identifier
-            )
-        ).all()
+        return cls.by_column(session, "PatientIdentifier", patient_identifier)
 
-    def get_study_by_date(self, study_date: date) -> Study:
+    def get_study_by_date(self, study_date: date) -> Optional["Study"]:
         """
         Returns the study for this patient with the given study date.
         """
         return next(
-            (study for study in self.Studies if study.StudyDate == study_date),
-            None
+            (study for study in self.Studies if study.StudyDate == study_date), None
         )
 
-    def get_images(self, where=None, include_inactive=False) -> List[ImageInstance]:
+    def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
+        from eyened_orm import ImageInstance, Series, Study
+
         session = Session.object_session(self)
         q = (
             select(ImageInstance)
-            .join_from(ImageInstance, Series)
-            .join_from(Series, Study)
-            .join_from(Study, Patient)
-            .where(Patient.PatientID == self.PatientID)
+            .join(Series)
+            .join(Study)
+            .where(Study.PatientID == self.PatientID)
         )
         if not include_inactive:
             q = q.where(~ImageInstance.Inactive)
         if where is not None:
             q = q.where(where)
-        return session.scalars(q)
-
-    def __repr__(self):
-        return f"Patient({self.PatientID}, {self.PatientIdentifier}, {self.BirthDate}, {self.Sex})"
+        return session.scalars(q).all()

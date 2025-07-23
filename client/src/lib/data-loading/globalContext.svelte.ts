@@ -1,7 +1,6 @@
-import type { Annotation } from '$lib/datamodel/annotation';
-import type { Creator } from '$lib/datamodel/creator';
-import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
-import type { UserManager } from '$lib/usermanager';
+import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
+import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
+import { UserManager } from '$lib/usermanager';
 
 export type ComponentDef = {
     component: any,
@@ -11,6 +10,8 @@ export type ComponentDef = {
 
 export class GlobalContext {
 
+    public userManager: UserManager;
+
     public popupComponent: ComponentDef | null = $state(null);
 
     public formShortcut: string | null = $state('WARMGS');
@@ -19,22 +20,34 @@ export class GlobalContext {
         showOtherAnnotationsMachine: true,
     });
 
-    constructor(readonly userManager: UserManager, readonly creator: Creator) { }
+    constructor() {
+        this.userManager = new UserManager()
+    }
+
+    async init(pathname: string) {
+        await this.userManager.init(pathname);
+    }
+
+    get creator() {
+        return this.userManager.creator;
+    }
 
     setPopup(component: ComponentDef | null) {
         this.popupComponent = component;
     }
 
-    canEdit(annotation: Annotation | FormAnnotation) {
-        return annotation.creator.id == this.userManager.CreatorID;
+    canEdit(segmentation: Segmentation) {
+        return segmentation.creator.id == this.userManager.creator.id;
     }
 
     updateConfig(config: any) {
         this.config = { ...this.config, ...config };
     }
 
-    get annotationsFilter() {
-        return (a: { creator: Creator }) => {
+    get segmentationsFilter() {
+        return (a: Segmentation | FormAnnotation) => {
+            
+            
             if (this.creator.name == 'test_user') {
                 // show everything for test user
                 return true;

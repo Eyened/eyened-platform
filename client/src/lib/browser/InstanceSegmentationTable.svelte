@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Instance } from '$lib/datamodel/instance';
+	import type { Instance } from '$lib/datamodel/instance.svelte';
 
 	interface Props {
 		instance: Instance;
@@ -42,17 +42,16 @@
 <style>
 	table {
 		background-color: white;
-		border: 1px solid #ddd;
+
 		font-size: small;
 	}
 	td,
 	th {
-		padding: 8px;
+		padding: 0.2em;
 		text-align: left;
-		border-bottom: 1px solid #ddd;
-
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+    
 </style>

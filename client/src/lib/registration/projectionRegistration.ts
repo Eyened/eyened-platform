@@ -1,4 +1,4 @@
-import type { Instance } from "$lib/datamodel/instance";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import type { Position } from "$lib/types";
 import type { RegistrationItem } from "./registrationItem";
 

@@ -24,13 +24,15 @@ Keeps track of the main panels and the top row of images.
     const taskContext = getContext<TaskContext>("taskContext");
 
     // open first image
-    let openInstance = false;
-
-    if (openInstance) {
+    const { instanceIds } = viewerWindowContext;
+    if ($instanceIds.length) {
+        const openInstance = $instanceIds[0];
         viewerWindowContext.getImages(openInstance).then((images) => {
+            // images is normally a single image
+            // for OCT it is an array: enface projection + oct image
             const panel = {
                 component: MainViewer,
-                props: { image: images[images.length - 1] },
+                props: { image: images[images.length - 1] }, // last image (in case of OCT)
             };
             viewerWindowContext.setPanel(panel);
         });
