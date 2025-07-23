@@ -5,38 +5,7 @@ description: Conventions and database migration setup for Eyened ORM
 
 {/* Claude query: In cli.mdx, document the command line utilities in cli.py. Include a section for each utility and explain what they do. ie. that full will create a full copy of the production database for development reasons and update thumbnails will update all thumbnails in the database. Do not include the specific options for each command as these might change, but do indicate that they can be checked with --help */}
 
-## ORM credential files
-
-We do not recommend to hardcode credentials every time the ORM is used to connect to the database as this could lead to leaks. To avoid explicitly passing credentials every time, create a file called `config.dev.py` in the eyened_orm folder containing the ORM Python files. The file should look like:
-
-```python
-config = {
-    'database': {
-        'user': 'USERNAME',
-        'password': 'PASSWORD',
-        'host': 'DBHOST',
-        'database': 'DBNAME',
-        'port': 'PORT',
-        'raise_on_warnings': True
-    },
-    'annotations_path': '/path/to/annotations',
-    'viewer_url': 'viewer_baseurl'
-}
-```
-
-Now use the following to connect to the database:
-
-```python
-from eyened_orm.utils import get_config
-from eyened_orm import get_session_local, init_orm
-
-config = get_config('dev')
-session = get_session_local(config)
-session = session()
-init_orm(session)
-```
-
-You can create multiple files with the naming `config.<ENVIRONMENT>.py` with different database credentials. `get_config(<ENVIRONMENT>)` will load these files.
+This document is meant for developers of the Eyened database and ORM. It explains how to develop changes and how to create and test database migrations.
 
 ## ORM conventions
 - We use [Annotated Declarative Syntax](https://docs.sqlalchemy.org/en/20/orm/declarative_tables.html#using-annotated-declarative-table-type-annotated-forms-for-mapped-column) to specify columns. This has the advantages that the resulting ORM objects have type annotations and everything is very readable. This means:

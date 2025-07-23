@@ -74,8 +74,8 @@ def full():
 
 @eorm.command()
 @click.option("-e", "--env", type=str)
-@click.option("--sample", is_flag=True, default=False)
-def update_thumbnails(env, sample):
+@click.option("--failed", is_flag=True, default=False)
+def update_thumbnails(env, failed):
     """Update thumbnails for all images in the database."""
 
     from eyened_orm import DBManager
@@ -85,7 +85,7 @@ def update_thumbnails(env, sample):
     DBManager.init(config)
     session = DBManager.get_session()
 
-    update_thumbnails_fn(session, config.thumbnails_path, config.secret_key)
+    update_thumbnails_fn(session, config.thumbnails_path, config.secret_key, update_failed=failed)
 
 
 @eorm.command()
