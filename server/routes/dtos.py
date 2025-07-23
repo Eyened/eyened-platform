@@ -7,8 +7,8 @@ This file contains DTOs that represent:
 2. Frontend object representations (with property names as used in TypeScript)
 """
 
-from datetime import datetime
-from typing import Any, Dict, Literal, Optional, get_origin
+from datetime import date, datetime
+from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel, create_model
 
@@ -125,17 +125,17 @@ class ProjectBase(BaseModel):
     description: Optional[str] = None
 
 
-class ProjectOutput(BaseModel):
+class ProjectOutput(ProjectBase):
     id: int
 
 
 class PatientBase(BaseModel):
     identifier: str
-    birth_date: Optional[datetime] = None
+    birth_date: Optional[date] = None
     sex: Optional[Sex] = None
 
 
-class PatientOutput(BaseModel):
+class PatientOutput(PatientBase):
     id: int
 
 
@@ -145,7 +145,7 @@ class StudyBase(BaseModel):
     study_instance_uid: Optional[str] = None
 
 
-class StudyOutput(BaseModel):
+class StudyOutput(StudyBase):
     id: int
 
 
@@ -154,7 +154,7 @@ class SeriesBase(BaseModel):
     series_instance_uid: str
 
 
-class SeriesOutput(BaseModel):
+class SeriesOutput(SeriesBase):
     id: int
 
 
@@ -239,7 +239,6 @@ class InstanceInput(InstanceBase):
 
 class InstanceOutput(InstanceBase):
     id: int
-
     project: ProjectOutput
     patient: PatientOutput
     study: StudyOutput
@@ -252,39 +251,246 @@ class InstanceOutput(InstanceBase):
     date_preprocessed: Optional[datetime] = None
 
 
-# === FORM ANNOTATION ===
-class FormAnnotationBase(BaseModel):
-    id: int
-    form_schema_id: int
-    patient_id: int
-    study_id: Optional[int] = None
-    image_id: Optional[int] = None
-
-    form_data: Optional[Dict[str, Any]] = None
+# === TAG ===
+class TagBase(BaseModel):
+    name: str
 
 
-class InputFormAnnotation(FormAnnotationBase):
+class TagInput(TagBase):
     pass
 
 
-class OutputFormAnnotation(FormAnnotationBase):
-    creator: CreatorMetadata
+class TagOutput(TagBase):
+    id: int
+
+
+# === ANNOTATION TYPE ===
+class AnnotationTypeBase(BaseModel):
+    name: str
+    interpretation: str
+
+
+class AnnotationTypeInput(AnnotationTypeBase):
+    pass
+
+
+class AnnotationTypeOutput(AnnotationTypeBase):
+    id: int
+
+
+# === FEATURE ===
+class FeatureBase(BaseModel):
+    name: str
+    modality: Optional[str] = None
+
+
+class FeatureInput(FeatureBase):
+    pass
+
+
+class FeatureOutput(FeatureBase):
+    id: int
+    date_inserted: datetime
+
+
+# === ANNOTATION ===
+class AnnotationBase(BaseModel):
+    patient_id: int
+    study_id: Optional[int] = None
+    series_id: Optional[int] = None
+    image_instance_id: Optional[int] = None
+    creator_id: int
+    feature_id: int
+    annotation_type_id: int
+    annotation_reference_id: Optional[int] = None
+    inactive: bool = False
+
+
+class AnnotationInput(AnnotationBase):
+    pass
+
+
+class AnnotationOutput(AnnotationBase):
+    id: int
+    date_inserted: datetime
+
+
+# === ANNOTATION DATA ===
+class AnnotationDataBase(BaseModel):
+    annotation_id: int
+    scan_nr: int
+    dataset_identifier: str
+    media_type: str
+    value_int: Optional[int] = None
+    value_float: Optional[float] = None
+
+
+class AnnotationDataInput(AnnotationDataBase):
+    pass
+
+
+class AnnotationDataOutput(AnnotationDataBase):
+    date_modified: Optional[datetime] = None
+
+
+# === FORM SCHEMA ===
+class FormSchemaBase(BaseModel):
+    name: Optional[str] = None
+    schema: Optional[Dict[str, Any]] = None
+
+
+class FormSchemaInput(FormSchemaBase):
+    pass
+
+
+class FormSchemaOutput(FormSchemaBase):
+    id: int
+
+
+# === FORM ANNOTATION ===
+class FormAnnotationBase(BaseModel):
+    form_schema_id: int
+    patient_id: int
+    study_id: Optional[int] = None
+    image_instance_id: Optional[int] = None
+    creator_id: int
+    sub_task_id: Optional[int] = None
+    form_data: Optional[Dict[str, Any]] = None
+    form_annotation_reference_id: Optional[int] = None
+    inactive: bool = False
+
+
+class FormAnnotationInput(FormAnnotationBase):
+    pass
+
+
+class FormAnnotationOutput(FormAnnotationBase):
+    id: int
     date_inserted: datetime
     date_modified: Optional[datetime] = None
 
 
-# === SEGMENTATION ===
-class Feature(BaseModel):
-    """Feature frontend object"""
-
-    id: int
+# === TASK DEFINITION ===
+class TaskDefinitionBase(BaseModel):
     name: str
 
 
+class TaskDefinitionInput(TaskDefinitionBase):
+    pass
+
+
+class TaskDefinitionOutput(TaskDefinitionBase):
+    id: int
+    date_inserted: datetime
+
+
+# === TASK STATE ===
+class TaskStateBase(BaseModel):
+    name: str
+
+
+class TaskStateInput(TaskStateBase):
+    pass
+
+
+class TaskStateOutput(TaskStateBase):
+    id: int
+
+
+# === TASK ===
+class TaskBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    contact_id: Optional[int] = None
+    task_definition_id: int
+    task_state_id: int
+
+
+class TaskInput(TaskBase):
+    pass
+
+
+class TaskOutput(TaskBase):
+    id: int
+    date_inserted: datetime
+
+
+# === SUB TASK ===
+class SubTaskBase(BaseModel):
+    task_id: int
+    task_state_id: int
+    creator_id: Optional[int] = None
+
+
+class SubTaskInput(SubTaskBase):
+    pass
+
+
+class SubTaskOutput(SubTaskBase):
+    id: int
+
+
+# === SUB TASK IMAGE LINK ===
+class SubTaskImageLinkBase(BaseModel):
+    sub_task_id: int
+    image_instance_id: int
+
+
+class SubTaskImageLinkInput(SubTaskImageLinkBase):
+    pass
+
+
+class SubTaskImageLinkOutput(SubTaskImageLinkBase):
+    id: int
+
+
+# === CONTACT ===
+class ContactBase(BaseModel):
+    name: str
+    email: str
+    institute: Optional[str] = None
+
+
+class ContactInput(ContactBase):
+    pass
+
+
+class ContactOutput(ContactBase):
+    id: int
+
+
+# === SOURCE INFO ===
+class SourceInfoBase(BaseModel):
+    name: str
+    source_path: str
+    thumbnail_path: str
+
+
+class SourceInfoInput(SourceInfoBase):
+    pass
+
+
+class SourceInfoOutput(SourceInfoBase):
+    id: int
+
+
+# === MODALITY TABLE ===
+class ModalityTableBase(BaseModel):
+    tag: str
+
+
+class ModalityTableInput(ModalityTableBase):
+    pass
+
+
+class ModalityTableOutput(ModalityTableBase):
+    id: int
+
+
+# === SEGMENTATION (LEGACY) ===
 class SegmentationBase(BaseModel):
     id: int
     image_id: int
-
     feature_id: int
     reference_id: Optional[int] = None
 
@@ -294,5 +500,14 @@ class SegmentationInput(SegmentationBase):
 
 
 class SegmentationOutput(SegmentationBase):
-    creator: CreatorMetadata
+    creator_id: int
     date_inserted: datetime
+
+
+### BROWSER DTOs
+class SeriesBrowser(SeriesOutput):
+    instances: List[InstanceOutput]
+
+class StudyBrowser(StudyOutput):
+    patient: PatientOutput
+    series: List[SeriesOutput]
