@@ -1,85 +1,54 @@
-from __future__ import annotations
-
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, ClassVar, List
 
-from sqlalchemy import BINARY, CHAR, String, func, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlmodel import Field, Relationship
+from sqlalchemy import Column, select, BINARY
+from sqlalchemy.orm import Session
 
-from .base import Base
+from .base import Base, PrivateField
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, FormAnnotation, SubTask
 
 
-class Creator(Base):
+class CreatorBase(Base):
+    CreatorName: str = Field(max_length=45, unique=True)
+    EmployeeIdentifier: str | None = Field(max_length=255, default=None)
+    # differentiates between AI models and human users
+    IsHuman: bool
+    # paths where the model can be found
+    Path: str | None = Field(max_length=80, default=None)
+    # the model's version
+    Version: int | None
+    # model/user description
+    Description: str | None = Field(max_length=1000, default=None)
+    # not used currently
+    Role: int | None
+
+
+class Creator(CreatorBase, table=True):
     """
     Represents a creator entity in the system, which can be either a human user or an AI model.
     Creators can perform annotations, form annotations, and subtasks.
     """
+
     __tablename__ = "Creator"
 
-    # Primary identifiers
-    CreatorID: Mapped[int] = mapped_column(primary_key=True)
-    CreatorName: Mapped[str] = mapped_column(
-        String(45), unique=True)  # username in the application
+    _name_column: ClassVar[str] = "CreatorName"
 
-    # User/Model attributes
-
-    # to be removed/renamed (employee number/code)
-    MSN: Mapped[Optional[str]] = mapped_column(CHAR(6))
-
-    # differentiates between AI models and human users
-    IsHuman: Mapped[bool]
-
-    # paths where the model can be found
-    Path: Mapped[Optional[str]] = mapped_column(String(80))
-
-    # model/user description
-    Description: Mapped[Optional[str]] = mapped_column(String(1000))
-
-    # the model's version
-    Version: Mapped[Optional[int]]
+    CreatorID: int = Field(primary_key=True)
 
     # Authentication and authorization
+    # deprecated, use PasswordHash instead
+    Password: bytes | None = PrivateField(sa_column=Column(BINARY(32)))
     # user's password
-    Password: Mapped[Optional[bytes]] = mapped_column(BINARY(32))
-    # not used currently
-    Role: Mapped[Optional[int]]
+    PasswordHash: str | None = PrivateField(max_length=255)
 
     # creation timestamp
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: datetime = Field(default_factory=datetime.now)
 
     # Relationships
-    Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="Creator")
-    FormAnnotations: Mapped[List[FormAnnotation]] = relationship(
-        back_populates="Creator")
-    SubTasks: Mapped[List[SubTask]] = relationship(
-        back_populates="Creator")
-
-    def __repr__(self) -> str:
-        return f"{self.CreatorID}: {self.CreatorName}"
-
-    @classmethod
-    def get_columns(cls):
-        """
-        Get all columns except for sensitive ones (Password).
-
-        This overrides the method in Base and ensures that to_dict() and 
-        to_list() do not include the password.
-        """
-        return [c for c in super().get_columns() if c.name not in ["Password"]]
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional[Creator]:
-        """Find a creator by their name (CreatorName)."""
-        return session.scalar(select(cls).where(cls.CreatorName == name))
-
-    @classmethod
-    def name_to_id(cls, session: Session) -> dict[str, int]:
-        """Get a mapping of creator names to their IDs."""
-        return {
-            creator.CreatorName: creator.CreatorID
-            for creator in cls.fetch_all(session)
-        }
+    Annotations: List["Annotation"] = Relationship(back_populates="Creator")
+    FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Creator")
+    SubTasks: List["SubTask"] = Relationship(back_populates="Creator")
+    Segmentations: List["Segmentation"] = Relationship(back_populates="Creator")

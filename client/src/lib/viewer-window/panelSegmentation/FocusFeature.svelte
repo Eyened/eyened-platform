@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { Feature } from '$lib/datamodel/feature';
+	import type { Feature } from '$lib/datamodel/feature.svelte';
 	import { getContext } from 'svelte';
 	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Annotation } from '$lib/datamodel/_annotation.svelte';
 	import { FilterList } from '$lib/datamodel/itemList';
 
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');

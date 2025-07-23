@@ -22,11 +22,6 @@ services:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.server
-      args:
-        - PUBLIC_API_URL=http://${HOSTNAME}:${PORT}/api
-        - PUBLIC_AUTH_TOKEN_DURATION=${PUBLIC_AUTH_TOKEN_DURATION}
-        - PUBLIC_FILESERVER_URL=http://${HOSTNAME}:${PORT}/api/instances/images
-        - PUBLIC_THUMBNAIL_SERVER_URL=http://${HOSTNAME}:${PORT}/api/instances/thumbnails
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 2s
@@ -36,18 +31,17 @@ services:
       database:
         condition: service_healthy
     environment:
-      - SECRET_KEY=${SECRET_KEY}
-      - IMAGES_BASEPATH_HOST=${IMAGES_BASEPATH}
+      - IMAGES_BASEPATH=/images
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DB_HOST=database
-      - DB_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DB_USER=root
+      - DB_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
+      - DB_USER=${DATABASE_USER}
+      - DB_PASSWORD=${DATABASE_PASSWORD}
       - DB_PORT=3306
       - DB_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - RUNNING_IN_DOCKER=true
     restart: always
     volumes:
       - ${IMAGES_BASEPATH}:/images
@@ -67,19 +61,17 @@ services:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.worker
-    environment: # the workers need the ORM config to connect to the database and store data
-      - SECRET_KEY=${SECRET_KEY}
-      - IMAGES_BASEPATH_HOST=${IMAGES_BASEPATH}
+    environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DB_HOST=database
-      - DB_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DB_USER=root
+      - DB_USER=${DATABASE_USER}
+      - DB_PASSWORD=${DATABASE_PASSWORD}
       - DB_PORT=3306
       - DB_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - RUNNING_IN_DOCKER=true
+      - IMAGES_BASEPATH=/images
     depends_on:
       redis:
         condition: service_healthy

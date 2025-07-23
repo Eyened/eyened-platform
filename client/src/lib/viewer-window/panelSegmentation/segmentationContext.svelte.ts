@@ -1,21 +1,20 @@
-import type { Annotation } from "$lib/datamodel/annotation";
-import type { Creator } from "$lib/datamodel/creator";
-import type { Feature } from "$lib/datamodel/feature";
-import type { Segmentation } from "$lib/webgl/SegmentationController";
+
+import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem";
 import { SvelteSet } from "svelte/reactivity";
 
 export class SegmentationContext {
-    public readonly hideCreators = new SvelteSet<Creator>();
-    public readonly hideFeatures = new SvelteSet<Feature>();
-    public readonly hideAnnotations = new SvelteSet<Annotation>();
-    public readonly hideSegmentations = new SvelteSet<Segmentation>();
-    public activeSegmentation: Segmentation | undefined = $state();
 
+    public readonly hideCreators = new SvelteSet<Creator>();
+    public readonly hideSegmentations = new SvelteSet<Segmentation>();
 
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
     public questionableActive = $state(false);
     public brushRadius = $state(4);
+    public segmentationItem: SegmentationItem | undefined = $state(undefined);
+    public activeIndices: number | number[] = $state([]);
 
     constructor() { }
 
@@ -28,11 +27,11 @@ export class SegmentationContext {
         }
     }
 
-    toggleActive(segmentation: Segmentation) {
-        if (this.activeSegmentation == segmentation) {
-            this.activeSegmentation = undefined;
+    toggleActive(segmentationItem: SegmentationItem | undefined) {
+        if (this.segmentationItem == segmentationItem) {
+            this.segmentationItem = undefined;
         } else {
-            this.activeSegmentation = segmentation;
+            this.segmentationItem = segmentationItem;
         }
     }
 }

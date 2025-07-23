@@ -8,14 +8,14 @@
 	const { taskStates } = data;
 	const stateNames = ['Not started', 'Busy', 'Ready'];
 	const states = stateNames.map((name) => taskStates.find((state) => state.name === name)!);
-
+    console.log(states);
 	const { task, subTask, subTaskIndex } = getContext<TaskContext>('taskContext');
-	const currentstate = subTask.taskState;
+
 	const subtasks = task.subTasks;
 
 	function setState(state: TaskState) {
 		console.log('Setting state to', state);
-		subTask.taskStateID.setValue(state.id);
+		subTask.update({ taskStateId: state.id });
 	}
 
 	async function handleViewTask() {
@@ -56,7 +56,7 @@
 	<div class="controls">
 		Set status:
 		{#each states as state}
-			{#if $currentstate == state}
+			{#if subTask.state == state}
 				<button class="set">{state.name}</button>
 			{:else}
 				<button onclick={() => setState(state)}>{state.name}</button>

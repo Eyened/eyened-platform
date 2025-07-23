@@ -1,18 +1,17 @@
-from __future__ import annotations
-
 import enum
 import string
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, ClassVar, List, Optional
 
 import pandas as pd
-from sqlalchemy import ForeignKey, String, Text, func, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy import Column, Index, Text, select
+from sqlalchemy.orm import Session
+from sqlmodel import Field, Relationship
 
-from .base import Base, CompositeUniqueConstraintMulti
+from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Patient, Task
+    from eyened_orm import Contact, Patient, Task
 
 
 class ExternalEnum(int, enum.Enum):
@@ -21,31 +20,27 @@ class ExternalEnum(int, enum.Enum):
     M = 3
 
 
-class Project(Base):
+class ProjectBase(Base):
+
+    ProjectName: str = Field(max_length=45, unique=True)
+    External: ExternalEnum
+    Description: str | None = Field(sa_column=Column(Text), default=None)
+    ContactID: int | None = Field(foreign_key="Contact.ContactID")
+    DOI: str | None = Field(max_length=256, default=None)
+
+
+class Project(ProjectBase, table=True):
+
     __tablename__ = "Project"
-    ProjectID: Mapped[int] = mapped_column(primary_key=True)
-    ProjectName: Mapped[str] = mapped_column(String(45), unique=True)
-    External: Mapped[ExternalEnum] = mapped_column()
-    Description: Mapped[Optional[str]] = mapped_column(Text)
+    _name_column: ClassVar[str] = "ProjectName"
+    ProjectID: int = Field(primary_key=True)
+    DateInserted: datetime = Field(default_factory=datetime.now)
 
-    ContactID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Contact.ContactID"))
-    Contact: Mapped[Optional[Contact]] = relationship(
-        back_populates="Projects")
+    Contact: Optional["Contact"] = Relationship(back_populates="Projects")
 
-    Patients: Mapped[List[Patient]] = relationship(
-        back_populates="Project", cascade="all,delete-orphan"
+    Patients: List["Patient"] = Relationship(
+        back_populates="Project", cascade_delete=True
     )
-
-    # datetimes
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Project:
-        return session.scalar(select(Project).where((Project.ProjectName == name)))
-
-    def __repr__(self):
-        return f"Project({self.ProjectID}, {self.ProjectName}, {self.External})"
 
     def make_dataframe(self, session: Session) -> pd.DataFrame:
         """
@@ -66,27 +61,35 @@ class Project(Base):
 
         return ImageInstance.make_dataframe(session, image_ids)
 
-    def get_patient_by_identifier(self, session: Session, patient_identifier: string) -> Optional[Patient]:
+    def get_patient_by_identifier(
+        self, session: Session, patient_identifier: string
+    ) -> Optional["Patient"]:
         """
         Returns a patient with the specified ID that belongs to this project.
         """
         from eyened_orm import Patient
+
         return session.scalar(
             select(Patient).where(
                 Patient.PatientIdentifier == patient_identifier,
-                Patient.ProjectID == self.ProjectID
+                Patient.ProjectID == self.ProjectID,
             )
         )
 
+class ContactBase(Base):
+    Name: str = Field(max_length=256)
+    Email: str = Field(max_length=256)
+    Institute: str | None = Field(max_length=256, default=None)
+    Orcid: str | None = Field(max_length=256, default=None)
 
-class Contact(Base):
+class Contact(ContactBase, table=True):
     __tablename__ = "Contact"
-    __table_args__ = (CompositeUniqueConstraintMulti(
-        ("Name", "Email", "Institute")),)
+    __table_args__ = (
+        Index("NameEmailInstitute_UNIQUE", "Name", "Email", "Institute", unique=True),
+    )
+    _name_column: ClassVar[str] = "Name"
 
-    ContactID: Mapped[int] = mapped_column(primary_key=True)
-    Name = mapped_column(String(256), unique=False, nullable=False)
-    Email = mapped_column(String(256), unique=False, nullable=False)
-    Institute = mapped_column(String(256), unique=False)
-    Projects: Mapped[List[Project]] = relationship(back_populates="Contact")
-    Tasks: Mapped[List[Task]] = relationship(back_populates="Contact")
+    ContactID: int = Field(primary_key=True)
+    
+    Projects: List["Project"] = Relationship(back_populates="Contact")
+    Tasks: List["Task"] = Relationship(back_populates="Contact")

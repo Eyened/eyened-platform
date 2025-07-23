@@ -4,7 +4,7 @@ import type { Registration } from "$lib/registration/registration";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteSet } from "svelte/reactivity";
-import type { Instance } from "$lib/datamodel/instance";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 
 const [C, I, O] = [1, 3, 6];
 const additionalCircles = {
@@ -66,7 +66,7 @@ export class ETDRSGridOverlay implements Overlay {
 				image_id = `${formAnnotation.instance!.id}_proj`;
 			}
 
-			const grid = formAnnotation.value.value;
+			const grid = formAnnotation.value;
 			if (grid?.fovea && grid?.disc_edge) {
 				const fovea = this.registration.mapPosition(
 					image_id,

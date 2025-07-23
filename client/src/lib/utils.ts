@@ -1,3 +1,6 @@
+import type { SvelteSet } from 'svelte/reactivity';
+import { readable, type Readable, type Unsubscriber } from 'svelte/store';
+
 export function groupBy(xs: { [key: string | number]: any }[], key: string | number) {
     return xs.reduce(function (rv, x) {
         (rv[x[key]] = rv[x[key]] || []).push(x);
@@ -60,5 +63,30 @@ export class Deferred<T> {
             this.resolve = res;
             this.reject = rej;
         });
+    }
+}
+
+
+export function asyncReadable<T>(
+    promise: Promise<Readable<T>>,
+    initialValue: T
+): Readable<T> {
+    return readable<T>(initialValue, (set) => {
+        let unsub: Unsubscriber | undefined;
+
+        promise.then(store => {
+            unsub = store.subscribe(set);
+        });
+
+        return () => {
+            unsub?.();
+        };
+    });
+}
+export function toggleInSet<T>(set: { has: (item: T) => boolean, delete: (item: T) => void, add: (item: T) => void }, item: T) {
+    if (set.has(item)) {
+        set.delete(item);
+    } else {
+        set.add(item);
     }
 }

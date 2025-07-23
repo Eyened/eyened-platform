@@ -1,98 +1,145 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
-	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import type { DialogueType } from '$lib/types';
-	import type { Writable } from 'svelte/store';
-	import FeatureSelect from './FeatureSelect.svelte';
-	import { data } from '$lib/datamodel/model';
-	import type { Feature } from '$lib/datamodel/feature';
-	import { createAnnotation } from '$lib/datamodel/annotation';
-	import { featureSetColorFundus, featureSetOCT } from '$lib/viewer-config';
-	import { SegmentationContext } from './segmentationContext.svelte';
+    import { getContext } from "svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { Readable, Writable } from "svelte/store";
+    import FeatureSelect from "./FeatureSelect.svelte";
+    import { data } from "$lib/datamodel/model";
+    import type { Feature } from "$lib/datamodel/feature.svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte";
+    import { Segmentation, type DataRepresentation, type Datatype } from "$lib/datamodel/segmentation.svelte";
 
-	const { creator } = getContext<GlobalContext>('globalContext');
-	const { image } = getContext<ViewerContext>('viewerContext');
-	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
-	const { annotationTypes, features } = data;
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const viewerContext = getContext<ViewerContext>("viewerContext");
+    const { image, axis } = viewerContext;
+    const { creator } = globalContext;
+    const segmentationOverlay = getContext<SegmentationOverlay>(
+        "segmentationOverlay",
+    );
+    const segmentationContext = segmentationOverlay.segmentationContext;
+    const { features } = data;
 
-	function getAnnotationType() {
-		let annotationTypeName: string;
-		if (image.is3D) annotationTypeName = 'Segmentation OCT B-scan';
-		else if (image.image_id.endsWith('proj')) annotationTypeName = 'Segmentation OCT Enface';
-		else annotationTypeName = 'Segmentation 2D';
+    const compositeFeatures = getCompositeFeatures();
 
-		return annotationTypes.find(
-			(t) => t.name == annotationTypeName && t.interpretation == 'R/G mask'
-		)!;
-	}
+    const dialogue = getContext<Writable<any>>("dialogue");
 
-	const dialogue = getContext<Writable<DialogueType>>('dialogue');
+    let selectedFeature: Feature | undefined = $state(undefined);
 
-	let selectedFeature: Feature | undefined = $state(undefined);
+    const dataRepresentations: { [key: string]: DataRepresentation } = {
+        "Q": "DualBitMask",
+        "B": "Binary",
+        "P": "Probability",
+        "MultiLabel": "MultiLabel",
+        "MultiClass": "MultiClass",
+    }
+    
+    async function create(
+        feature: Feature,
+        annotationType: "Q" | "B" | "P" | "MultiLabel" | "MultiClass",
+    ) {
+        dialogue.set(`Creating annotation...`);
 
-	async function create(feature: Feature) {
-		dialogue.set(`Creating annotation...`);
-		const annotation = await createAnnotation(
-			image.instance,
-			feature,
-			creator,
-			getAnnotationType()
-		);
-		segmentationContext.hideCreators.delete(creator);
-		dialogue.set(undefined);
-	}
+        let dataType: Datatype = "R8UI";
+        if (annotationType == "P") {
+            dataType = "R8";
+        }
 
-	let selectList: { [name: string]: Feature[] } = $state({});
-	function selectFeatures(featureSet: { [name: string]: string[] }) {
-		for (const [groupname, featurenames] of Object.entries(featureSet)) {
-			selectList[groupname] = [];
-			for (const name of featurenames) {
-				const feature = features.find((f) => f.name == name);
-				if (feature) {
-					selectList[groupname].push(feature);
-				}
-			}
-		}
-	}
-	if (image.is3D) {
-		selectFeatures(featureSetOCT);
-	} else {
-		selectFeatures(featureSetColorFundus);
-	}
-	const availableFeatures = features.filter((f) => {
-		// TODO: filter features that are not available for the current image?
-		return true;
-	}).$;
+        await Segmentation.createFrom(image, feature, creator, dataRepresentations[annotationType], dataType, 0.5, axis);
+        segmentationContext.hideCreators.delete(creator);
+        dialogue.set(undefined);
+    }
+
+    // let selectList: { [name: string]: Feature[] } = $state({});
+    // function selectFeatures(featureSet: { [name: string]: string[] }) {
+    //     for (const [groupname, featurenames] of Object.entries(featureSet)) {
+    //         selectList[groupname] = [];
+    //         for (const name of featurenames) {
+    //             const feature = features.find((f) => f.name == name);
+    //             if (feature) {
+    //                 selectList[groupname].push(feature);
+    //             }
+    //         }
+    //     }
+    // }
+    // if (image.is3D) {
+    //     selectFeatures(featureSetOCT);
+    // } else {
+    //     selectFeatures(featureSetColorFundus);
+    // }
+    const availableFeatures = features.filter((f) => {
+        // TODO: filter features that are not available for the current image?
+        return true;
+    });
+
+    let selectList = false;
 </script>
 
 <div class="new">
-	<div>
-		<select bind:value={selectedFeature}>
-			<option value="" selected disabled hidden>Select feature:</option>
-			{#each Object.entries(selectList) as [groupname, features]}
-				<optgroup label={groupname}>
-					{#each features as feature}
-						<option value={feature}>{feature.name}</option>
-					{/each}
-				</optgroup>
-			{/each}
-		</select>
-		<button onclick={() => create(selectedFeature!)} disabled={selectedFeature == undefined}>
-			Create
-		</button>
-	</div>
-	<FeatureSelect values={availableFeatures} onselect={(feature) => create(feature)} />
+    <!-- {#if selectList}
+        <div>
+            <select bind:value={selectedFeature}>
+                <option value="" selected disabled hidden
+                    >Select feature:</option
+                >
+                {#each Object.entries(selectList) as [groupname, features]}
+                    <optgroup label={groupname}>
+                        {#each features as feature}
+                            <option value={feature}>{feature.name}</option>
+                        {/each}
+                    </optgroup>
+                {/each}
+            </select>
+            <button
+                onclick={() => create(selectedFeature!, qType)}
+                disabled={selectedFeature == undefined}
+            >
+                Create
+            </button>
+        </div>
+    {/if} -->
+    <FeatureSelect
+        name="Feature"
+        values={availableFeatures}
+        types={["Q", "B", "P"]}
+        onselect={(feature, type) => create(feature, type as "Q" | "B" | "P")}
+    />
+
+    {#snippet multi(dataRepresentation: "MultiLabel" | "MultiClass")}
+        <div>
+            <h3>{dataRepresentation}</h3>
+            <ul>
+                {#each $compositeFeatures.entries() as [parentFeatureId, items]}
+                    {@const parentFeature = features.get(parentFeatureId)!}
+                    <li>
+                        <button
+                            onclick={() =>
+                                create(parentFeature, dataRepresentation)}
+                        >
+                            Create new [{parentFeature.name}]
+                        </button>
+                    </li>
+                {/each}
+            </ul>
+        </div>
+    {/snippet}
+    {@render multi("MultiLabel")}
+    {@render multi("MultiClass")}
 </div>
 
 <style>
-	div {
-		display: flex;
-	}
-	div.new {
-		flex-direction: column;
-	}
-	select {
-		width: 10em;
-	}
+    div {
+        display: flex;
+    }
+    div.new {
+        flex-direction: column;
+    }
+    select {
+        width: 10em;
+    }
+    ul {
+        list-style-type: none;
+        padding-inline-start: 0em;
+        margin: 0;
+    }
 </style>

@@ -66,6 +66,14 @@ Creates a test database for ORM testing, developing new features, or running ale
 eorm test
 ```
 
+### set_connection_string
+
+Updates alembic.ini with the correct database connection string from the supplied environment
+
+```bash
+eorm set_connection_string
+```
+
 ### full
 
 Creates a complete test database with all data from the production database. This is useful when you need a full copy of the database for development or testing purposes.
@@ -73,3 +81,5 @@ Creates a complete test database with all data from the production database. Thi
 ```bash
 eorm full
 ```
+
+

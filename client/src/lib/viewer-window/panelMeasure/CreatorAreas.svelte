@@ -1,11 +1,11 @@
 <script lang="ts">
-	import type { Creator } from '$lib/datamodel/creator';
+	import type { Creator } from '$lib/datamodel/creator.svelte';
 	import SegmentationArea from './SegmentationArea.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
+	import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
 
 	interface Props {
 		creator: Creator;
-		rows: [Annotation, number, number | undefined][];
+		rows: [Segmentation, number, number | undefined][];
 	}
 	let { creator, rows }: Props = $props();
 

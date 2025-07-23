@@ -1,81 +1,86 @@
 <script lang="ts">
-	import type { DialogueType } from '$lib/types';
-	import type { Segmentation } from '$lib/webgl/SegmentationController';
-	
-	interface Props {
-		availableSegmentations: Segmentation[];
-		segmentation: Segmentation;
-		dialogue: DialogueType;
-	}
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { constructors } from "$lib/webgl/segmentationState";
+    import { converters } from "$lib/webgl/segmentationConverter";
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    const globalContext = getContext<GlobalContext>("globalContext");
 
-	let { availableSegmentations, segmentation, dialogue }: Props = $props();
+    interface Props {
+        image: AbstractImage;
+        segmentation: Segmentation;
+        resolve: (segmentation: Segmentation) => void;
+        reject: () => void;
+    }
 
-	let selected: Segmentation | null = $state(null);
-	let hover: Segmentation | undefined = $state(undefined);
-	function selectRow(segmentation: Segmentation) {
-		selected = segmentation;
-	}
+    let { image, segmentation, resolve, reject }: Props = $props();
+    const segmentationAnnotations = image.instance.segmentations.filter(
+        globalContext.segmentationsFilter,
+    );
+
+    const referenceSegmentations = segmentationAnnotations
+        .filter((s) => s.id != segmentation.id)
+        .filter((other) => {
+            const from = constructors[segmentation.dataRepresentation].name;
+            const to = constructors[other.dataRepresentation].name;
+
+            const key = `${from}->${to}`;
+            // filter out conversions that are not supported
+            return key in converters;
+        });
 </script>
 
-<div>Select annotation to import from:</div>
-<ul>
-	{#each availableSegmentations as currentSegmentation (currentSegmentation.annotation.id)}
-		{#if currentSegmentation != segmentation}
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-			<li
-				onclick={() => selectRow(currentSegmentation)}
-				class:selected={currentSegmentation === selected}
-				class:hover={currentSegmentation === hover}
-				onpointerenter={() => (hover = currentSegmentation)}
-				onpointerleave={() => (hover = undefined)}
-			>
-				<div class="annotation-id">[{currentSegmentation.annotation.id}]</div>
-				<div>{currentSegmentation.annotation.creator.name}</div>
-				<div>{currentSegmentation.annotation.feature.name}</div>
-			</li>
-		{/if}
-	{/each}
-</ul>
-<div>
-	<button class="approve" onclick={() => dialogue.resolve(selected)} disabled={selected === null}>
-		{dialogue.approve}
-	</button>
-	<button class="decline" onclick={dialogue.reject}>
-		{dialogue.decline}
-	</button>
-</div>
+{#if $referenceSegmentations.length > 0}
+    <div>Select segmentation to import from:</div>
+    <ul>
+        {#each $referenceSegmentations as segmentation}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <li onclick={() => resolve(segmentation)}>
+                <div class="annotation-id">
+                    [{segmentation.id}]
+                </div>
+                <div>{segmentation.creator.name}</div>
+                <div>{segmentation.feature.name}</div>
+            </li>
+        {/each}
+    </ul>
+{:else}
+    <div>No segmentations found to import from</div>
+{/if}
+<button onclick={reject}>Cancel</button>
 
 <style>
-	ul {
-		display: grid;
-		grid-template-columns: 0fr 1fr 1fr;
+    ul {
+        display: grid;
+        grid-template-columns: 0fr 1fr 1fr;
 
-		list-style-type: none;
-		padding: 0;
-		max-height: 20em;
-		overflow: auto;
-	}
+        list-style-type: none;
+        padding: 0;
+        max-height: 20em;
+        overflow: auto;
+    }
 
-	li {
-		display: contents;
-		cursor: pointer;
-	}
+    li {
+        display: contents;
+        cursor: pointer;
+    }
 
-	div.annotation-id {
-		font-size: x-small;
-		color: gray;
-	}
-	li > div {
-		padding: 0.5em;
-		align-items: center;
-		display: flex;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-	}
-	li.hover > div {
-		background-color: #e6fdff;
-	}
-	li.selected > div {
-		background-color: #43ff46;
-	}
+    div.annotation-id {
+        font-size: x-small;
+        color: gray;
+    }
+    li > div {
+        padding: 0.5em;
+        align-items: center;
+        display: flex;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    li.hover > div {
+        background-color: #e6fdff;
+    }
+    li.selected > div {
+        background-color: #43ff46;
+    }
 </style>

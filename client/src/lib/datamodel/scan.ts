@@ -1,11 +1,26 @@
-import { ItemConstructor } from "./itemContructor";
-import type { Item } from "./itemList";
+import { BaseItem } from "./itemList";
 
-export interface Scan extends Item {
-    mode: string
+export interface ServerScan {
+    ScanID: number,
+    ScanMode: string,
 }
 
-export const ScanConstructor = new ItemConstructor<Scan>(
-    'ScanID', {
-    mode: 'ScanMode',
-});
+export class Scan extends BaseItem {
+    static endpoint = 'scans';
+    static mapping = {
+        'ScanMode': 'mode',
+    };
+
+    id!: number;
+    mode!: string;
+
+    constructor(item: ServerScan) {
+        super();
+        this.init(item);
+    }
+
+    init(item: ServerScan) {
+        this.id = item.ScanID;
+        this.mode = item.ScanMode;
+    }
+}

@@ -1,46 +1,57 @@
 from contextlib import contextmanager
 
-from eyened_orm.utils.config import EyenedORMConfig, DatabaseSettings
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlmodel import create_engine
+
+from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig
 
 from .base import Base
+from .utils.zarr.manager_annotation import AnnotationZarrStorageManager
+
 
 def create_connection_string(config: DatabaseSettings):
-    dbstring = f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}"
+    dbstring = (
+        f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}"
+    )
     if config.database is not None:
         dbstring += f"/{config.database}"
     return dbstring
 
+
 class DBManager:
     _engine = None
     _SessionLocal = None
+    _config = None
 
     @classmethod
-    def init(cls, config: str | EyenedORMConfig):
+    def init(cls, config: None | str | EyenedORMConfig = None):
         """Initialize the database session factory with the given config."""
-        
-        if isinstance(config, str):
+        if config is None or isinstance(config, str):
             from eyened_orm.utils.config import get_config
-            config = get_config(config)
 
-        conn_string = create_connection_string(config.database)
+            config = get_config(config)
+        cls._config = config
+        Base.set_config(config)
+
+        # Create Zarr storage managers
+        Base.annotation_storage_manager = AnnotationZarrStorageManager(
+            config.annotations_zarr_store
+        )
+
+        conn_string = create_connection_string(cls._config.database)
         if cls._engine is None:
             cls._engine = create_engine(conn_string, pool_pre_ping=True)
             cls._SessionLocal = sessionmaker(
                 autocommit=False, autoflush=False, bind=cls._engine
             )
 
-        Base.config = config
-
     @classmethod
     @contextmanager
     def yield_session(cls):
         """Context manager for session management."""
         if cls._SessionLocal is None:
-            raise RuntimeError(
-                "DBManager is not initialized. Call DBManager.init(config) first."
-            )
+            print("DBManager not initialized, using default config ('.env')")
+            cls.init()
 
         session = cls._SessionLocal()
         try:
@@ -52,9 +63,8 @@ class DBManager:
     def get_session(cls):
         """Returns a new session for manual control (useful for interactive shells)."""
         if cls._SessionLocal is None:
-            raise RuntimeError(
-                "DBManager is not initialized. Call DBManager.init(config) first."
-            )
+            print("DBManager not initialized, using default config ('.env')")
+            cls.init()
         session = cls._SessionLocal()  # User is responsible for closing it
         return session
 
@@ -62,7 +72,6 @@ class DBManager:
     def get_engine(cls):
         """Returns the engine instance."""
         if cls._engine is None:
-            raise RuntimeError(
-                "DBManager is not initialized. Call DBManager.init(config) first."
-            )
+            print("DBManager not initialized, using default config ('.env')")
+            cls.init()
         return cls._engine

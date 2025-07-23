@@ -10,6 +10,7 @@ uniform float u_hardness;     // Brush hardness (controls falloff)
 uniform float u_pressure;     // Brush pressure (strength of the effect)
 uniform float u_radius;       // Brush radius
 uniform bool u_enhance;       // Whether we are enhancing (increasing value)
+uniform float u_aspectRatio;  // Aspect ratio of the viewer
 
 layout(location = 0) out vec4 color_out;
 
@@ -18,7 +19,7 @@ void main() {
     float current = texelFetch(u_current, ivec2(gl_FragCoord.xy), 0).r;
 
     // Calculate distance from brush center
-    vec2 diff = u_position - gl_FragCoord.xy;
+    vec2 diff = (u_position - gl_FragCoord.xy) / vec2(1.0f, u_aspectRatio);
     float dist = length(diff);
 
     // Normalize the distance with the radius

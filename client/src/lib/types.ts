@@ -1,11 +1,9 @@
-import type { Component } from 'svelte';
-import type { SubTask } from './datamodel/subTask';
-import type { Task } from './datamodel/task';
+import type { SubTask } from './datamodel/subTask.svelte';
+import type { Task } from './datamodel/task.svelte';
 import type { Color } from './utils';
 
 export type int = number;
 export type img_id = string;
-export type Laterality = 'L' | 'R';
 
 export type FilterFieldSpec =
     | 'VARCHAR'
@@ -16,43 +14,6 @@ export type FilterFieldSpec =
     | number[]
     | string[];
 
-
-
-export type DialogueType = undefined | string | {
-    query: string | Component,
-    props?: any,
-    approve: string,
-    decline: string,
-    resolve: () => any,
-    reject: () => any
-}
-
-export type AnnotationTypeName =
-    | 'Segmentation 2D'
-    | 'Segmentation OCT B-scan'
-    | 'Segmentation OCT Volume'
-    | 'Segmentation OCT Enface'
-    | 'ETDRS grid coordinates'
-    | 'Registration point set'
-    | 'Registration'
-    | 'Grading form'
-    | 'Grading coordinate'
-    | 'Segmentation 2D masked'
-    | 'Bounding Box';
-
-export type AnnotationTypeInterpretation = '' | 'R/G mask' | 'Binary mask' | 'Label numbers' | 'Probability' | 'Layer bits';
-export type AnnotationType = {
-    AnnotationTypeID: number;
-    AnnotationTypeName: AnnotationTypeName;
-    Interpretation: AnnotationTypeInterpretation;
-};
-export interface Patient {
-    PatientID: int;
-    PatientIdentifier: string;
-    BirthDate: Date;
-    Sex: 'M' | 'F' | null;
-    ProjectName: string;
-}
 export type Keypoints = {
     fovea_xy: [number, number],
     disc_edge_xy: [number, number],
@@ -65,17 +26,6 @@ export interface TaskContext {
     subTask: SubTask;
     subTaskIndex: number;
     taskConfig: any;
-}
-export interface ROI {
-    cx: number;
-    cy: number;
-    radius: number;
-    min_x: number;
-    max_x: number;
-    min_y: number;
-    max_y: number;
-    w: number;
-    h: number;
 }
 
 export interface Position2D {
@@ -99,3 +49,4 @@ export type Branch = {
     vesselType: 'Artery' | 'Vein' | 'Vessel';
     color?: Color;
 };
+

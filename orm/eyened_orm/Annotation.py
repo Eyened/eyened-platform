@@ -1,32 +1,25 @@
-from __future__ import annotations
-
-import enum
 import gzip
 import json
-import os
 import shutil
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional
+from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
+from eyened_orm.ImageInstance import AxisEnum
+from pydantic import BaseModel
 import numpy as np
 from PIL import Image
-from sqlalchemy import (
-    ForeignKey,
-    LargeBinary,
-    String,
-    UniqueConstraint,
-    event,
-    func,
-    select,
-)
+from sqlalchemy import JSON, Column, Index, event
 from sqlalchemy.dialects.mysql import LONGBLOB
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.orm import Session, validates
+from sqlmodel import Field, Relationship
 
-from .base import Base, ForeignKeyIndex
-from .utils.zarr.manager_annotation import AnnotationZarrStorageManager
+from .base import Base
 
 if TYPE_CHECKING:
     from eyened_orm import (
+        AnnotationData,
         AnnotationType,
         Creator,
         Feature,
@@ -37,86 +30,139 @@ if TYPE_CHECKING:
     )
 
 
-class Annotation(Base):
+# Define the mixin
+class SegmentationMixin(BaseModel):
+    # index in the zarr array of the annotation
+    ZarrArrayIndex: int | None = None
+
+    # for 2D or 3Dannotations of 3D volumes:
+    #  - if 2D, index of the annotation along the volume axis with size=1
+    #  - if 3D, list of indices of the volume with valid annotations 
+    #    (the shape of the annot volume must match the image volume)
+    ScanIndices: Optional[Dict[str, Any]] = Field(sa_type=JSON)
+    Width: int
+    Height: int
+    Depth: int
+
+    # Matrix that projects the annotation to image space
+    ImageProjectionMatrix: Optional[Dict[str, Any]] = Field(sa_type=JSON)
+
+    SparseAxis: int | None = None
+
+class AnnotationBase(Base, SegmentationMixin):
     """
-    This is used for segmentation (i.e. masks)
-     - made by creator
-     - representing a feature
-
+    Used for segmentation (i.e. masks)
     """
-
-    __tablename__ = "Annotation"
-
-    __table_args__ = (
-        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
-        ForeignKeyIndex(__tablename__, "Feature", "FeatureID"),
-        ForeignKeyIndex(__tablename__, "Study", "StudyID"),
-        ForeignKeyIndex(__tablename__, "ImageInstance", "ImageInstanceID"),
-        ForeignKeyIndex(__tablename__, "AnnotationType", "AnnotationTypeID"),
-        ForeignKeyIndex(__tablename__, "Patient", "PatientID"),
-        ForeignKeyIndex(__tablename__, "Series", "SeriesID"),
-    )
-
-    AnnotationID: Mapped[int] = mapped_column("AnnotationID", primary_key=True)
 
     # Patient is required, Study, Series and ImageInstance are optional
     # TODO: perhaps only ImageInstance is required and the others should be removed
-    PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
-    Patient: Mapped[Patient] = relationship(back_populates="Annotations")
-
-    StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
-    Study: Mapped[Optional[Study]] = relationship(back_populates="Annotations")
-
-    SeriesID: Mapped[Optional[int]] = mapped_column(ForeignKey("Series.SeriesID"))
-    Series: Mapped[Optional[Series]] = relationship(back_populates="Annotations")
-
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE")
+    PatientID: int|None = Field(foreign_key="Patient.PatientID", default=None)
+    StudyID: int | None = Field(foreign_key="Study.StudyID", default=None)
+    SeriesID: int | None = Field(foreign_key="Series.SeriesID", default=None)
+    ImageInstanceID: int | None = Field(
+        foreign_key="ImageInstance.ImageInstanceID", ondelete="CASCADE", default=None
     )
-    ImageInstance: Mapped[Optional[ImageInstance]] = relationship(
+    CreatorID: int = Field(foreign_key="Creator.CreatorID")
+    FeatureID: int = Field(foreign_key="Feature.FeatureID")
+    AnnotationTypeID: int = Field(foreign_key="AnnotationType.AnnotationTypeID")
+    AnnotationReferenceID: int | None = Field(
+        foreign_key="Annotation.AnnotationID", default=None
+    )
+    Inactive: bool = False
+
+    
+
+
+class Annotation(AnnotationBase, table=True):
+    __tablename__ = "Annotation"
+
+    __table_args__ = (
+        Index("fk_Annotation_Creator1_idx", "CreatorID"),
+        Index("fk_Annotation_Feature1_idx", "FeatureID"),
+        Index("fk_Annotation_Study1_idx", "StudyID"),
+        Index("fk_Annotation_ImageInstance1_idx", "ImageInstanceID"),
+        Index("fk_Annotation_AnnotationType1_idx", "AnnotationTypeID"),
+        Index("fk_Annotation_Patient1_idx", "PatientID"),
+        Index("fk_Annotation_Series1_idx", "SeriesID"),
+    )
+
+    AnnotationID: int | None = Field(default=None, primary_key=True)
+
+    DateInserted: datetime = Field(default_factory=datetime.now)
+
+    Patient: Optional["Patient"] = Relationship(back_populates="Annotations")
+    Study: Optional["Study"] = Relationship(back_populates="Annotations")
+    Series: Optional["Series"] = Relationship(back_populates="Annotations")
+    ImageInstance: Optional["ImageInstance"] = Relationship(
         back_populates="Annotations"
     )
-
-    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    Creator: Mapped[Creator] = relationship(back_populates="Annotations")
-
-    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
-    Feature: Mapped[Feature] = relationship(back_populates="Annotations")
-
-    AnnotationTypeID: Mapped[int] = mapped_column(
-        ForeignKey("AnnotationType.AnnotationTypeID")
-    )
-    AnnotationType: Mapped[AnnotationType] = relationship(back_populates="Annotations")
-
-    # Not used currently, but could be used to define 'masked' segmentations
-    AnnotationReferenceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Annotation.AnnotationID")
-    )
-    AnnotationReference: Mapped[Optional[Annotation]] = relationship(
-        "Annotation",
+    Creator: "Creator" = Relationship(back_populates="Annotations")
+    Feature: "Feature" = Relationship(back_populates="Annotations")
+    AnnotationType: "AnnotationType" = Relationship(back_populates="Annotations")
+    AnnotationReference: Optional["Annotation"] = Relationship(
         back_populates="ChildAnnotations",
-        remote_side="Annotation.AnnotationID",
-    )
-    ChildAnnotations: Mapped[List[Annotation]] = relationship(
-        "Annotation", back_populates="AnnotationReference", cascade="all, delete-orphan"
+        sa_relationship_kwargs={"remote_side": "Annotation.AnnotationID"},
     )
 
+    ChildAnnotations: List["Annotation"] = Relationship(
+        back_populates="AnnotationReference",
+        cascade_delete=True,
+    )
     # Actual data is stored in AnnotationData
-    AnnotationData: Mapped[List[AnnotationData]] = relationship(
-        back_populates="Annotation", cascade="all,delete-orphan"
+    AnnotationData: List["AnnotationData"] = Relationship(
+        back_populates="Annotation", cascade_delete=True
     )
-    ZarrArrayIndex: Mapped[Optional[int]] = mapped_column(default=None)
-    ScanNr: Mapped[int] = mapped_column(primary_key=True)
-    Width: Mapped[int] = mapped_column(default=0)
-    Height: Mapped[int] = mapped_column(default=0)
-    Depth: Mapped[int] = mapped_column(default=0)
 
-    # TransformationMatrix: Mapped[Optional[]] = mapped_column(default=None)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.SparseAxis is not None:
+            if not isinstance(self.ScanIndices, list):
+                raise ValueError("ScanIndices must be a list when SparseAxis is not None")
 
-    # soft delete
-    Inactive: Mapped[bool] = mapped_column(default=False)
-
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        return (self.Height, self.Width, self.Depth)
+    
+    @property
+    def is_3d(self) -> bool:
+        # all axes must be > 1 in length
+        return self.Height > 1 and self.Width > 1 and self.Depth > 1
+    
+    @property
+    def is_2d(self) -> bool:
+        return not self.is_3d
+    
+    @property
+    def is_sparse(self) -> bool:
+        return self.SparseAxis is not None
+    
+    @property
+    def l1_axis(self) -> AxisEnum | None:
+        if self.Height == 1:
+            return AxisEnum.HEIGHT
+        elif self.Width == 1:
+            return AxisEnum.WIDTH
+        elif self.Depth == 1:
+            return AxisEnum.DEPTH
+        else:
+            return None
+    
+    @property
+    def projection_axis(self) -> AxisEnum | None:
+        if self.is_sparse:
+            return self.SparseAxis
+        else:
+            return self.l1_axis
+        
+    # check that the dimensions that are not the length 1 axis match
+    @property
+    def shape_matches_image_shape(self):
+        image_shape = self.ImageInstance.shape
+        annotation_shape = self.shape
+        for i, (x,y) in enumerate(zip(image_shape, annotation_shape)):
+            if i != self.l1_axis and x != y:
+                return False
+        return True
 
     @property
     def FeatureName(self):
@@ -136,84 +182,54 @@ class Annotation(Base):
 
     @property
     def numpy(self) -> Optional[np.ndarray]:
-        """
-        Read annotation data from the zarr array.
-
-        Returns:
-            numpy array containing the annotation data, or None if no zarr array index is set
-
-        Raises:
-            ValueError: If configuration is not initialized
-            FileNotFoundError: If the zarr array does not exist
-            IndexError: If the zarr array index is invalid
-        """
+        return self.read_data()
+    
+    def read_data(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> np.ndarray:
         if self.ZarrArrayIndex is None:
             return None
-
+        
         if not self.config:
             raise ValueError("Configuration not initialized")
 
-        # Get the image shape from the associated ImageInstance
         if not self.ImageInstance:
             raise ValueError("Annotation has no associated ImageInstance")
-
-        # Determine image shape based on dimensions
-        annotation_shape = (self.Width, self.Height, self.Depth)
-
-        # Create storage manager and get the array
-        storage_manager = AnnotationZarrStorageManager(
-            self.config.annotations_zarr_basepath
+        
+        return self.annotation_storage_manager.read(
+            group_name=str(self.AnnotationTypeID),
+            data_dtype=np.dtype(np.uint8),
+            data_shape=self.shape,
+            zarr_index=self.ZarrArrayIndex,
+            axis=axis,
+            slice_index=slice_index
         )
 
-        if not storage_manager.array_exists(self.AnnotationType, annotation_shape):
-            raise FileNotFoundError(
-                f"Zarr array not found for annotation type {self.AnnotationType.AnnotationTypeName} and shape {annotation_shape}"
-            )
-
-        # Get the array and read the data
-        array = storage_manager.get_array(self.AnnotationType, annotation_shape)
-        return array.read(self.ZarrArrayIndex)
-
-    def write_data(self, data: np.ndarray) -> int:
-        """
-        Write annotation data to the zarr array and update the ZarrArrayIndex.
-
-        Args:
-            data: numpy array containing the annotation data
-
-        Returns:
-            The zarr array index where the data was written
-
-        Raises:
-            ValueError: If configuration is not initialized or annotation has no ImageInstance
-            FileNotFoundError: If the zarr array does not exist
-            ValueError: If the data shape or dtype doesn't match the array requirements
-        """
+    def write_data(self, data: np.ndarray, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
+        """Write annotation data to the zarr array and update the ZarrArrayIndex."""
         if not self.config:
             raise ValueError("Configuration not initialized")
 
         if not self.ImageInstance:
             raise ValueError("Annotation has no associated ImageInstance")
 
-        # Determine annotation shape based on dimensions
-        annotation_shape = (self.Width, self.Height, self.Depth)
-
-        # Create storage manager
-        storage_manager = AnnotationZarrStorageManager(
-            self.config.annotations_zarr_basepath
+        zarr_index = self.annotation_storage_manager.write(
+            group_name=str(self.AnnotationTypeID), 
+            data_dtype=np.dtype(np.uint8),
+            data_shape=self.shape,
+            data=data, 
+            zarr_index=self.ZarrArrayIndex,
+            axis=axis,
+            slice_index=slice_index
         )
 
-        # Check if array exists, create it if it doesn't
-        if not storage_manager.array_exists(self.AnnotationType, annotation_shape):
-            storage_manager.create_array(self.AnnotationType, annotation_shape)
+        # for sparse annotations, we need to update the ScanIndices list
+        if self.is_sparse and axis == self.SparseAxis:
+            if slice_index not in self.ScanIndices:
+                # copy necessary to ensure update is picked up by the ORM
+                scan_indices = self.ScanIndices.copy()
+                scan_indices.append(slice_index)
+                self.ScanIndices = scan_indices
 
-        # Get the array and write the data
-        array = storage_manager.get_array(self.AnnotationType, annotation_shape)
-        zarr_index = array.write(self.ZarrArrayIndex, data)
-
-        # Update the ZarrArrayIndex
         self.ZarrArrayIndex = zarr_index
-
         return zarr_index
 
     def __repr__(self):
@@ -222,11 +238,11 @@ class Annotation(Base):
     @classmethod
     def create(
         cls,
-        instance: ImageInstance,
-        feature: Feature,
-        creator: Creator,
-        annotationType: AnnotationType,
-    ) -> Annotation:
+        instance: "ImageInstance",
+        feature: "Feature",
+        creator: "Creator",
+        annotationType: "AnnotationType",
+    ) -> "Annotation":
         a = cls()
         a.ImageInstanceID = instance.ImageInstanceID
         a.Patient = instance.Patient
@@ -239,13 +255,13 @@ class Annotation(Base):
         return a
 
 
-def load_png(filepath) -> np.ndarray:
+def load_png(filepath: Path) -> np.ndarray:
     return np.array(Image.open(filepath))
 
 
-def load_binary(filepath, shape) -> np.ndarray:
-    _, ext = os.path.splitext(filepath)
-    if ext.lower() in [".gz"]:
+def load_binary(filepath: Path, shape) -> np.ndarray:
+    ext = filepath.suffix.lower()
+    if ext == ".gz":
         with gzip.open(filepath, "rb") as f:
             raw = np.frombuffer(f.read(), dtype=np.uint8)
     else:
@@ -254,78 +270,78 @@ def load_binary(filepath, shape) -> np.ndarray:
     return raw.reshape(shape, order="C")
 
 
-class AnnotationData(Base):
+class AnnotationDataBase(Base):
     """
     This is used for storing the actual data of the annotation
     """
 
+    AnnotationID: int = Field(
+        foreign_key="Annotation.AnnotationID",
+        ondelete="CASCADE",
+        primary_key=True,
+    )
+    # use -1 for all scans (e.g. enface OCT)
+    ScanNr: int = Field(primary_key=True)
+
+    # AnnotationPlane: AnnotationPlane
+
+    ValueInt: int | None
+    ValueFloat: float | None
+    ValueBlob: bytes | None = Field(sa_column=Column(LONGBLOB))
+
+
+class AnnotationData(AnnotationDataBase, table=True):
     __tablename__ = "AnnotationData"
-    __table_args__ = (ForeignKeyIndex(__tablename__, "Annotation", "AnnotationID"),)
 
-    AnnotationID: Mapped[int] = mapped_column(
-        ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True
-    )
-    Annotation: Mapped[Annotation] = relationship(back_populates="AnnotationData")
+    __table_args__ = (Index("fk_AnnotationData_Annotation1_idx", "AnnotationID"),)
+    Annotation: "Annotation" = Relationship(back_populates="AnnotationData")
 
-    ScanNr: Mapped[int] = mapped_column(primary_key=True)
-    DatasetIdentifier: Mapped[str] = mapped_column(String(45), unique=True)
-    MediaType: Mapped[str] = mapped_column(String(45))
-
-    ValueInt: Mapped[Optional[int]] = mapped_column()
-    ValueFloat: Mapped[Optional[float]] = mapped_column()
-
-    # Different sql DBs have different size specification for blobs.
-    # This maps to BLOB by default (up to 1GB in sqlite) and to LONGBLOB in MySQL.
-    # see: https://docs.sqlalchemy.org/en/20/core/type_basics.html#using-uppercase-and-backend-specific-types-for-multiple-backends
-    ValueBlob: Mapped[Optional[bytes]] = mapped_column(
-        LargeBinary().with_variant(LONGBLOB, "mysql")
-    )
-
-    DateModified: Mapped[Optional[datetime]] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
+    DatasetIdentifier: str | None = Field(max_length=45, unique=True, nullable=True)
+    DateModified: datetime | None = Field(
+        default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now}
     )
 
     @classmethod
     def create(
         cls,
-        annotation: Annotation,
-        file_extension: str = "png",
+        annotation: "Annotation",
+        # file_extension: str = "png",
         scan_nr: int = 0,
-    ) -> AnnotationData:
+        annotation_plane: str = "PRIMARY",
+    ) -> "AnnotationData":
         annotation_data = cls()
         annotation_data.Annotation = annotation
         annotation_data.ScanNr = scan_nr
-        annotation_data.DatasetIdentifier = annotation_data.default_path(file_extension)
+        annotation_data.AnnotationPlane = AnnotationPlane[annotation_plane]
 
-        annotation_data.MediaType = (
-            "image/png"
-            if file_extension.lower() == "png"
-            else "application/octet-stream"
-        )
         return annotation_data
 
-    def default_path(self, ext: str) -> str:
-        a = self.Annotation
-        return f"{a.Patient.PatientIdentifier}/{a.AnnotationID}_{self.ScanNr}.{ext}"
-
-    @property
-    def path(self) -> str:
-        if not self.config:
-            raise ValueError("Configuration not initialized")
-        return f"{self.config.annotations_path}/{self.DatasetIdentifier}"
-
-    @property
-    def trash_path(self) -> str:
-        if not self.config:
-            raise ValueError("Configuration not initialized")
-        return f"{self.config.trash_path}/{self.DatasetIdentifier}"
-
-    def __repr__(self):
-        return f"AnnotationData({self.AnnotationID}, {self.ScanNr}, {self.DatasetIdentifier}, {self.MediaType})"
-
     @classmethod
-    def get_columns(cls):
-        return cls.__table__.columns
+    def by_composite_id(
+        cls, session: Session, annotation_data_id: str
+    ) -> "AnnotationData":
+        """
+        Get an AnnotationData object from a composite ID string separated by an underscore.
+        (AnnotationID_ScanNr)
+        """
+        annotation_id, scan_nr = map(int, annotation_data_id.split("_"))
+        return cls.by_pk(session, (annotation_id, scan_nr))
+
+    def get_default_path(self, ext: str) -> str:
+        a = self.Annotation
+        return f"{a.Patient.PatientID}/{a.AnnotationID}_{self.ScanNr}.{ext}"
+
+    @property
+    def path(self) -> Path:
+        if not self.config:
+            raise ValueError("Configuration not initialized")
+        return Path(self.config.annotations_path) / self.DatasetIdentifier
+
+    @property
+    def trash_path(self) -> Path:
+        if not self.config:
+            raise ValueError("Configuration not initialized")
+        return Path(self.config.trash_path) / self.DatasetIdentifier
 
     def load_data(self) -> Any:
         """Load the annotation data from the file."""
@@ -335,10 +351,9 @@ class AnnotationData(Base):
             instance = self.Annotation.ImageInstance
             return load_binary(self.path, (instance.Rows_y, instance.Columns_x))
         else:
-            raise ValueError(f"Unsupported media type {self.media_type}")
+            raise ValueError(f"Unsupported media type {self.MediaType}")
 
-    @property
-    def mask(self, mask_type: str = "segmentation") -> np.ndarray:
+    def get_mask(self, mask_type: str = "segmentation") -> np.ndarray:
         """
         Returns a mask based on the specified type ('segmentation' or 'questionable').
 
@@ -352,192 +367,57 @@ class AnnotationData(Base):
             ValueError: If the annotation type is unsupported or the mask type is invalid.
         """
         data = self.load_data()
-        if self.Annotation.AnnotationType.Interpretation == "R/G mask":
+        data_representation = self.Annotation.AnnotationType.DataRepresentation
+
+        if data_representation == DataRepresentation.RG_MASK:
             assert len(data.shape) == 3, "Expected color image"
-            data2D = data[:, :, 0]
-        elif self.Annotation.AnnotationType.Interpretation == "Binary mask":
-            assert len(data.shape) == 2, "Expected grayscale image"
-            data2D = data
-        else:
-            raise ValueError(
-                f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}"
-            )
-
-        if mask_type == "segmentation":
-            return data2D > 0
-        elif mask_type == "questionable":
-            return data2D > 0  # Placeholder for different logic if needed
-        else:
-            raise ValueError(f"Unsupported mask type: {mask_type}")
-
-    @property
-    def segmentation_mask(self):
-        data = self.load_data()
-        if self.Annotation.AnnotationType.Interpretation == "R/G mask":
-            assert len(data.shape) == 3, "Expected color image"
-            data2D = data[:, :, 0]
-        elif self.Annotation.AnnotationType.Interpretation == "Binary mask":
-            assert len(data.shape) == 2, "Expected grayscale image"
-            data2D = data
-        else:
-            raise ValueError(
-                f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}"
-            )
-        return data2D > 0
-
-    @property
-    def questionable_mask(self, data):
-        data = self.load_data()
-        if self.Annotation.AnnotationType.Interpretation == "R/G mask":
-            assert len(data.shape) == 3, "Expected color image"
-            data2D = data[:, :, 0]
-        elif self.Annotation.AnnotationType.Interpretation == "Binary mask":
-            assert len(data.shape) == 2, "Expected grayscale image"
-            data2D = data
-        else:
-            raise ValueError(
-                f"Unsupported annotation type {self.Annotation.AnnotationType.Interpretation}"
-            )
-        return data2D > 0
-
-
-def move_file_to_trash(annotation_data: AnnotationData) -> None:
-    """Moves a file to trash folder and stores metadata alongside it."""
-    source_path = annotation_data.path
-    if not os.path.exists(source_path):
-        print(f"File {source_path} does not exist, skipping trash move")
-        return
-
-    trash_path = annotation_data.trash_path
-
-    try:
-        shutil.move(source_path, trash_path)
-        print(f"File moved to trash: {trash_path}")
-
-        with open(f"{trash_path}.metadata.json", "w") as f:
-            json.dump(
-                {
-                    "annotation": annotation_data.Annotation.to_dict(),
-                    "annotation_data": annotation_data.to_dict(),
-                    "deleted_at": datetime.now().isoformat(),
-                },
-                f,
-            )
-
-    except Exception as e:
-        print(f"Error moving file {source_path} to trash: {e}")
-
-
-# Track deleted AnnotationData objects
-@event.listens_for(Session, "before_flush")
-def receive_before_flush(session, flush_context, instances):
-    """Track AnnotationData objects being deleted before they're removed from the session."""
-    if Base.config.trash_path is None:  # only run if trash_path is set
-        return
-    session.deleted_annotation_data_info = [
-        {
-            "path": obj.path,
-            "trash_path": obj.trash_path,
-            "annotation": obj.Annotation.to_dict(),
-            "annotation_data": obj.to_dict(),
-        }
-        for obj in session.deleted
-        if isinstance(obj, AnnotationData)
-    ]
-
-
-@event.listens_for(Session, "after_commit")
-def receive_after_commit(session):
-    """Process tracked deleted annotation data after the transaction is committed."""
-
-    if not hasattr(session, "deleted_annotation_data_info"):
-        return
-    for info in session.deleted_annotation_data_info:
-        try:
-            source_path = info["path"]
-            trash_path = info["trash_path"]
-
-            if os.path.exists(source_path):
-                # Create trash directory if it doesn't exist
-                os.makedirs(os.path.dirname(trash_path), exist_ok=True)
-
-                # Move the file to trash
-                shutil.move(source_path, trash_path)
-                print(f"File moved to trash: {trash_path}")
-
-                # Store metadata
-                with open(f"{trash_path}.metadata.json", "w") as f:
-                    json.dump(
-                        {
-                            "annotation": info["annotation"],
-                            "annotation_data": info["annotation_data"],
-                            "deleted_at": datetime.now().isoformat(),
-                        },
-                        f,
-                    )
+            if mask_type == "segmentation":
+                return data[:, :, 0] > 0  # red channel
+            elif mask_type == "questionable":
+                return data[:, :, 1] > 0  # green channel
             else:
-                print(f"File {source_path} does not exist, skipping trash move")
-        except Exception as e:
-            print(f"Error processing deleted annotation data: {e}")
+                raise ValueError(f"Unsupported mask type: {mask_type}")
 
-    # Clear the tracked objects
-    session.deleted_annotation_data_info = []
+        elif data_representation == DataRepresentation.BINARY:
+            assert len(data.shape) == 2, "Expected grayscale image"
+            return data > 0
+        else:
+            raise ValueError(f"Unsupported annotation type {data_representation}")
+
+    @property
+    def segmentation_mask(self) -> np.ndarray:
+        return self.get_mask("segmentation")
+
+    @property
+    def questionable_mask(self) -> np.ndarray:
+        return self.get_mask("questionable")
 
 
-class AnnotationType(Base):
+
+class AnnotationTypeBase(Base):
+    AnnotationTypeName: str = Field(max_length=45)
+    Interpretation: str | None = Field(max_length=255, default=None)
+
+class AnnotationType(AnnotationTypeBase, table=True):
     __tablename__ = "AnnotationType"
+    _name_column: ClassVar[str] = "AnnotationTypeName"
 
-    __table_args__ = (
-        UniqueConstraint(
-            "AnnotationTypeName",
-            "Interpretation",
-            name="AnnotationTypeNameInterpretation_UNIQUE",
-        ),
-    )
-    AnnotationTypeID: Mapped[int] = mapped_column(primary_key=True)
-    AnnotationTypeName: Mapped[str] = mapped_column(String(45))
-    Interpretation: Mapped[str] = mapped_column(String(45))
+    AnnotationTypeID: int = Field(primary_key=True)
 
-    Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="AnnotationType"
-    )
-
-    @classmethod
-    def name_interpretation_to_id(cls, session: Session):
-        return {
-            (a.AnnotationTypeName, a.Interpretation): a.AnnotationTypeID
-            for a in cls.fetch_all(session)
-        }
-
-    def __repr__(self) -> str:
-        return f"AnnotationType({self.AnnotationTypeID}, {self.AnnotationTypeName}, {self.Interpretation})"
+    Annotations: List["Annotation"] = Relationship(back_populates="AnnotationType")
 
 
-class FeatureModalityEnum(enum.Enum):
-    OCT = 1
-    CF = 2
+class FeatureBase(Base):
+    FeatureName: str = Field(max_length=60, unique=True)
 
 
-class Feature(Base):
+class Feature(FeatureBase, table=True):
     __tablename__ = "Feature"
-    FeatureID: Mapped[int] = mapped_column(primary_key=True)
-    FeatureName: Mapped[str] = mapped_column(String(60), unique=True)
+    _name_column: ClassVar[str] = "FeatureName"
 
-    Annotations: Mapped[List[Annotation]] = relationship(back_populates="Feature")
-    Modality: Mapped[Optional[FeatureModalityEnum]]
+    FeatureID: int | None = Field(default=None, primary_key=True)
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    Annotations: List["Annotation"] = Relationship(back_populates="Feature")
+    Segmentations: List["Segmentation"] = Relationship(back_populates="Feature")
+    DateInserted: datetime = Field(default_factory=datetime.now)
 
-    @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional[Feature]:
-        """Find a feature by name (FeatureName)."""
-        return session.scalar(select(cls).where(cls.FeatureName == name))
-
-    @classmethod
-    def name_to_id(cls, session: Session) -> dict[str, int]:
-        return {
-            feature.FeatureName: feature.FeatureID for feature in cls.fetch_all(session)
-        }
-
-    def __repr__(self) -> str:
-        return f"Feature({self.FeatureID}, {self.FeatureName})"

@@ -2,43 +2,35 @@
 precision highp usampler2D;
 precision highp float;
 
-uniform sampler2D u_drawing;
 uniform usampler2D u_current;
 uniform uint u_bitmask;
-uniform bool u_questionable;
+
+uniform sampler2D u_drawing;
 uniform bool u_paint;
 
-layout(location = 0) out uvec2 color_out;
+layout(location = 0) out uint out_value;
 
-ivec2 offsets[4] = ivec2[4](ivec2(1, 0),   // Right neighbor
-ivec2(0, 1),   // Bottom neighbor
-ivec2(-1, 0),  // Left neighbor
-ivec2(0, -1)   // Top neighbor
+ivec2 offsets[4] = ivec2[4](ivec2(1, 0),// Right neighbor
+ivec2(0, 1),// Bottom neighbor
+ivec2(-1, 0),// Left neighbor
+ivec2(0, -1)// Top neighbor
 );
 
 bool withinBounds(ivec2 pos) {
     ivec2 size = textureSize(u_current, 0).xy;
     return pos.x >= 0 && pos.x < size.x && pos.y >= 0 && pos.y < size.y;
 }
+
 uint getPixel(ivec2 pos) {
-    if(u_questionable)
-        return texelFetch(u_current, pos, 0).g;
-    else
-        return texelFetch(u_current, pos, 0).r;
+    return texelFetch(u_current, pos, 0).r;
 }
 
 void erase() {
-    if(u_questionable)
-        color_out.g &= ~u_bitmask;
-    else
-        color_out.r &= ~u_bitmask;
+    out_value &= ~u_bitmask;
 }
 
 void draw() {
-    if(u_questionable)
-        color_out.g |= u_bitmask;
-    else
-        color_out.r |= u_bitmask;
+    out_value |= u_bitmask;
 }
 
 void erode(ivec2 pos) {
@@ -66,29 +58,17 @@ void dilate(ivec2 pos) {
         }
     }
 }
+
 void main() {
-    ivec2 pos = ivec2(gl_FragCoord.xy);
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    out_value = texelFetch(u_current, coord, 0).r;
+    bool value = texelFetch(u_drawing, coord, 0).r > 0.f;
 
-    color_out = texelFetch(u_current, pos, 0).rg;
-
-    bool hasDrawing;
-    if(u_questionable)
-        hasDrawing = (color_out.g & u_bitmask) > 0u;
-    else
-        hasDrawing = (color_out.r & u_bitmask) > 0u;
-
-    bool drawing = texelFetch(u_drawing, ivec2(gl_FragCoord.xy), 0).r > 0.0f;
-
-    if(drawing) {
+    if(value) {
         if(u_paint) {
-            if(!hasDrawing) {
-                dilate(pos);
-            }
+            dilate(coord);
         } else {
-            if(hasDrawing) {
-                erode(pos);
-            }
+            erode(coord);
         }
     }
-
 }

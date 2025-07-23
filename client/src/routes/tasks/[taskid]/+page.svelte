@@ -2,12 +2,12 @@
 	import TaskTableView from '$lib/tasks/TaskTableView.svelte';
 	import { goto } from '$app/navigation';
 	import { data as modelData } from '$lib/datamodel/model.js';
-	import { loadSubtasks } from '$lib/datamodel/api';
+	import { loadSubtasks } from '$lib/datamodel/api.svelte.js';
 	import { page } from '$app/state';
 
 	let { data } = $props();
 
-	const task = modelData.tasks.find((t) => t.id === data.taskid);
+	const task = modelData.tasks.get(data.taskid);
 
 	if (task) {
 		loadSubtasks(task);
@@ -32,7 +32,7 @@
 	{:else}
 		<h1>{task.name}</h1>
 		{#if task.state}
-			<h3>Status: {task.state}</h3>
+			<h3>Status: {task.state.name}</h3>
 		{/if}
 		<TaskTableView {task} />
 	{/if}

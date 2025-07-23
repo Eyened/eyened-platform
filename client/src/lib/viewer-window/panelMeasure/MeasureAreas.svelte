@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import SegmentationArea from './SegmentationArea.svelte';
-	import type { Annotation } from '$lib/datamodel/annotation';
 	import type { MeasureTool } from '$lib/viewer/tools/Measure.svelte';
-	import { BinarySegmentation } from '$lib/webgl/binarySegmentation.svelte';
-	import { ProbabilitySegmentation } from '$lib/webgl/probabilitySegmentation.svelte';
-	import type { Creator } from '$lib/datamodel/creator';
+	import type { Creator } from '$lib/datamodel/creator.svelte';
 	import CreatorAreas from './CreatorAreas.svelte';
+    import { BinaryMask, ProbabilityMask } from '$lib/webgl/Mask';
+    import { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+    import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
 
 	interface Props {
 		measureTool: MeasureTool;
@@ -17,34 +16,38 @@
 
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const { image } = viewerContext;
-	const { segmentationAnnotations } = image;
+	const globalContext = getContext<GlobalContext>('globalContext');
+	const segmentations = image.instance.segmentations.filter(globalContext.segmentationsFilter);
 
-	type row = [Annotation, number, number | undefined];
+	type row = [Segmentation, number, number | undefined];
 	let all_areas: Map<Creator, row[]> = $derived.by(() => {
 		const areas = new Map<Creator, row[]>();
-		for (const annotation of $segmentationAnnotations) {
-			if (annotation.annotationType.name !== 'Segmentation 2D') {
+		for (const segmentation of $segmentations) {
+			if (segmentation.feature.name !== 'Segmentation 2D') {
 				continue;
 			}
-			const segmentationItem = image.segmentationController.getSegmentationItem(annotation);
-			const segmentation = segmentationItem.segmentation;
+			
+            const segmentationItem = image.getSegmentationItem(segmentation);
+			const segmentationData = segmentationItem.getMask(viewerContext.index);
 
 			if (
-				segmentation instanceof BinarySegmentation ||
-				segmentation instanceof ProbabilitySegmentation
+				segmentationData instanceof BinaryMask ||
+				segmentationData instanceof ProbabilityMask
 			) {
 				const scanNr = viewerContext.index;
-				const area = segmentation.pixelArea.get(scanNr);
+				// const area = segmentation.pixelArea.get(scanNr);
+                // TODO: implement pixelArea
+                const area = 0;
 				const areamm2 =
 					area == undefined
 						? undefined
 						: (area * measureTool.imageResX * measureTool.imageResY) / 1e6;
 
-				const creator = annotation.creator;
+				const creator = segmentation.creator;
 				if (!areas.has(creator)) {
 					areas.set(creator, []);
 				}
-				areas.get(creator)!.push([annotation, scanNr, areamm2]);
+				areas.get(creator)!.push([segmentation, scanNr, areamm2]);
 			}
 		}
 		return areas;

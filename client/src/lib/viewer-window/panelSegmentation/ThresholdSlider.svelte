@@ -1,47 +1,53 @@
 <script lang="ts">
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
-	import type { ProbabilitySegmentation } from '$lib/webgl/probabilitySegmentation.svelte';
-	import { getContext } from 'svelte';
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { getContext } from "svelte";
+    const globalContext = getContext<GlobalContext>("globalContext");
 
-	interface Props {
-		segmentation: ProbabilitySegmentation;
-	}
-	let { segmentation }: Props = $props();
+    interface Props {
+        segmentation: Segmentation;
+    }
+    let { segmentation }: Props = $props();
 
-	const globalContext = getContext<GlobalContext>('globalContext');
+    let threshold = $state(0.5);
+    // for (const ad of segmentation.annotationData.$) {
+    //     threshold = ad.valueFloat || 0.5;
+    // }
+    const canEdit = globalContext.canEdit(segmentation);
 
-	const annotation = segmentation.annotation;
-	const canEdit = globalContext?.canEdit(annotation);
+    $effect(() => {
+        // for (const ad of annotation.annotationData.$) {
+        //     ad.valueFloat = threshold;
+        // }
+    });
 
-	function onUpdateThreshold() {
-		if (canEdit) {
-			const th = segmentation.threshold;
-
-			// updates the threshold value in the annotation data on server
-			for (const ad of annotation.annotationDatas.$) {
-				const current = ad.parameters.value || {};
-				current.valuefloat = th;
-				ad.parameters.setValue(current);
-			}
-		}
-	}
+    function onUpdateThreshold() {
+        // for (const ad of annotation.annotationData.$) {
+        //     ad.valueFloat = threshold;
+        //     if (canEdit) {
+        //         // updates the threshold value in the annotation data on server
+        //         ad.update({ valueFloat: threshold });
+        //     }
+        // }
+        segmentation.update({ threshold: threshold });
+    }
 </script>
 
 <label>
-	<span>Threshold: {segmentation.threshold}</span>
-	<input
-		type="range"
-		min="0"
-		max="1"
-		step="0.01"
-		bind:value={segmentation.threshold}
-		onchange={onUpdateThreshold}
-	/>
+    <span>Threshold: {threshold}</span>
+    <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        bind:value={threshold}
+        onchange={onUpdateThreshold}
+    />
 </label>
 
 <style>
-	label {
-		display: flex;
-		flex-direction: column;
-	}
+    label {
+        display: flex;
+        flex-direction: column;
+    }
 </style>

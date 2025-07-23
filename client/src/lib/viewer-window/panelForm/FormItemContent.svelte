@@ -3,7 +3,7 @@
     import { getDefault, resolveRefs } from "$lib/forms/schemaType";
     import { onMount, setContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation";
+    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { browser } from "$app/environment";
 
     interface Props {
@@ -19,7 +19,8 @@
     let value: any = $state();
     let status = $state("loading");
     onMount(async () => {
-        value = await form.value.load();
+        await form.load();
+        value = form.value;
         status = "ready";
         if (!value) {
             value = getDefault(schema);
@@ -30,7 +31,7 @@
         if (!canEdit) return;
         if (value) {
             status = "saving";
-            await form.value.setValue(value);
+            await form.update({ value });
             status = "synced";
         }
     }
@@ -111,8 +112,8 @@
             {value}
             {onchange}
             {canEdit}
-            bind:vertical
-            bind:collapse
+            {vertical}
+            {collapse}
         />
     {/if}
 </div>
