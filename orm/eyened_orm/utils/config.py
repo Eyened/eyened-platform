@@ -61,6 +61,11 @@ class EyenedORMConfig(BaseSettings):
         None,
         description="The host machine's images_basepath. This is different from images_basepath in that images_basepath is always local (/images in the container) and images_basepath_host is the path in the host machine. They may be the same if running outside of Docker.",
     )
+    annotations_zarr_basepath: str = Field(
+        default="/storage/annotations_zarr",
+        description="Path to the folder containing annotations zarr arrays. "
+        "Used by the platform for reading and writing annotations",
+    )
     annotations_path: str = Field(
         default="/storage/annotations",
         description="Path to the folder containing annotations. "
