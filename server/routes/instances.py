@@ -1,9 +1,9 @@
 from typing import Dict, List, Optional
 
 from eyened_orm import (
-    Annotation,
-    AnnotationData,
-    AnnotationType,
+    # Annotation,
+    # AnnotationData,
+    # AnnotationType,
     Creator,
     DeviceInstance,
     DeviceModel,
@@ -17,6 +17,7 @@ from eyened_orm import (
     Series,
     SourceInfo,
     Study,
+    Segmentation,
 )
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
@@ -39,8 +40,9 @@ class DataResponse(BaseModel):
     series: List[Series]
     studies: List[Study]
     patients: List[Patient]
-    annotations: List[Annotation]
-    annotation_data: List[AnnotationData] = Field(alias="annotation-data")
+    # annotations: List[Annotation]
+    # annotation_data: List[AnnotationData] = Field(alias="annotation-data")
+    segmentations: List[Segmentation]
     form_annotations: List[FormAnnotation] = Field(alias="form-annotations")
 
     class Config:
@@ -71,14 +73,14 @@ base_query = join_tables(
     .join(Patient, Patient.PatientID == Study.PatientID)
 )
 
-annotation_sub_query = join_tables(
-    select(Annotation.ImageInstanceID)
-    .select_from(Annotation)
-    .filter(~Annotation.Inactive)
+segmentation_sub_query = join_tables(
+    select(Segmentation.ImageInstanceID)
+    .select_from(Segmentation)
+    .filter(~Segmentation.Inactive)
     .join(Feature)
-    .join(AnnotationType)
+    # .join(AnnotationType)
     .join(Creator)
-    .join(ImageInstance, ImageInstance.ImageInstanceID == Annotation.ImageInstanceID)
+    .join(ImageInstance, ImageInstance.ImageInstanceID == Segmentation.ImageInstanceID)
     .join(Series, Series.SeriesID == ImageInstance.SeriesID)
     .join(Study, Study.StudyID == Series.StudyID)
     .join(Patient, Patient.PatientID == Study.PatientID)
@@ -96,14 +98,13 @@ form_sub_query = join_tables(
     .outerjoin(ImageInstance, ImageInstance.SeriesID == Series.SeriesID)
 )
 
-annotation_query = (
-    select(Annotation, AnnotationData)
-    .select_from(Annotation)
-    .filter(~Annotation.Inactive)
+segmentation_query = (
+    select(Segmentation)
+    .select_from(Segmentation)
+    .filter(~Segmentation.Inactive)
     .join(Feature)
-    .join(AnnotationType)
+    # .join(AnnotationType)
     .join(Creator)
-    .outerjoin(AnnotationData)
 )
 
 
@@ -128,7 +129,7 @@ base_tables = [
     SourceInfo,
     Scan,
 ]
-annotation_tables = [Annotation, Feature, AnnotationType, Creator]
+segmentation_tables = [Segmentation, Feature, Creator]
 form_tables = [FormAnnotation, FormSchema, Creator]
 
 
@@ -160,7 +161,7 @@ def get_mappings(tables):
 
 
 base_mappings = get_mappings(base_tables)
-annotation_mappings = get_mappings(annotation_tables)
+segmentation_mappings = get_mappings(segmentation_tables)
 form_mappings = get_mappings(form_tables)
 
 
@@ -174,7 +175,7 @@ def apply_filters(query, mappings, params):
 
 
 def run_queries(
-    session, params, cursor, limit, base_query, annotation_query, form_query
+    session, params, cursor, limit, base_query, segmentation_query, form_query
 ):
     params_decoded = decode_params(params)
     
@@ -186,10 +187,10 @@ def run_queries(
 
     filter_instance_ids = set()
     filter_patient_ids = set()
-    if any(field in annotation_mappings for field, operator in params_decoded):
+    if any(field in segmentation_mappings for field, operator in params_decoded):
         sub_query = apply_filters(
-            annotation_sub_query,
-            {**annotation_mappings, **base_mappings},
+            segmentation_sub_query,
+            {**segmentation_mappings, **base_mappings},
             params_decoded,
         )
         filter_instance_ids = set(session.execute(sub_query).scalars().all())
@@ -227,15 +228,15 @@ def run_queries(
 
     image_ids = {instance.ImageInstanceID for instance, *_ in instances}
 
-    annotation_query = annotation_query.where(Annotation.ImageInstanceID.in_(image_ids))
+    segmentation_query = segmentation_query.where(Segmentation.ImageInstanceID.in_(image_ids))
 
-    annotations = session.execute(annotation_query).all()
+    segmentations = session.scalars(segmentation_query).all()
 
     patient_ids = {patient.PatientID for _, _, _, patient in instances}
     form_query = form_query.where(FormAnnotation.PatientID.in_(patient_ids))
     form_annotations = session.scalars(form_query).all()
 
-    return next_cursor, instances, annotations, form_annotations
+    return next_cursor, instances, segmentations, form_annotations
 
 
 @router.get("/instances", response_model=InstanceResponse)
@@ -250,26 +251,26 @@ async def get_instances(
 
     multiparams = request.query_params.multi_items()
 
-    next_cursor, i, a, form_annotations = run_queries(
-        session, multiparams, cursor, limit, base_query, annotation_query, form_query
+    next_cursor, i, segmentations, form_annotations = run_queries(
+        session, multiparams, cursor, limit, base_query, segmentation_query, form_query
     )
     instances = {instance for instance, _, _, _ in i}
     series = {series for _, series, _, _ in i}
     studies = {study for _, _, study, _ in i}
     patients = {patient for _, _, _, patient in i}
-    annotations = {annotation for annotation, _ in a}
-    annotation_datas = {annotation_data for _, annotation_data in a}
+
+    print(instances)
+    print(segmentations)
 
     response = {
         "entities": {
             k: collect_rows(v)
             for k, v in {
                 "instances": instances,
-                "series": series,
+                "series": series,   
                 "studies": studies,
                 "patients": patients,
-                "annotations": annotations,
-                "annotation-data": annotation_datas,
+                "segmentations": segmentations,
                 "form-annotations": form_annotations,
             }.items()
         }

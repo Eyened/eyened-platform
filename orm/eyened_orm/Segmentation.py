@@ -190,13 +190,14 @@ class SegmentationModel(SegmentationBase, table=True):
     DateInserted: datetime = Field(default_factory=datetime.now)
 
 
-class CompositeFeature(Base, table=True):
+class CompositeFeatureBase(Base):
+    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    FeatureIndex: int = Field(primary_key=True)
+
+class CompositeFeature(CompositeFeatureBase, table=True):
     __tablename__ = "CompositeFeature"
     __table_args__ = (
         Index("fk_CompositeFeature_ParentFeature1_idx", "ParentFeatureID"),
         Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
     )
-
-    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    FeatureIndex: int = Field(primary_key=True)
