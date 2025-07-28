@@ -1,62 +1,30 @@
 import gzip
-import json
-import shutil
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
 
-from eyened_orm.ImageInstance import AxisEnum
-from pydantic import BaseModel
 import numpy as np
 from PIL import Image
-from sqlalchemy import JSON, Column, Index, event
+from sqlalchemy import Column, Index, UniqueConstraint
 from sqlalchemy.dialects.mysql import LONGBLOB
-from sqlalchemy.orm import Session, validates
+from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import (
-        AnnotationData,
-        AnnotationType,
-        Creator,
-        Feature,
-        ImageInstance,
-        Patient,
-        Series,
-        Study,
-    )
+    from eyened_orm import (AnnotationData, AnnotationType, Creator, Feature,
+                            ImageInstance, Patient, Series, Study)
 
-
-# Define the mixin
-class SegmentationMixin(BaseModel):
-    # index in the zarr array of the annotation
-    ZarrArrayIndex: int | None = None
-
-    # for 2D or 3Dannotations of 3D volumes:
-    #  - if 2D, index of the annotation along the volume axis with size=1
-    #  - if 3D, list of indices of the volume with valid annotations 
-    #    (the shape of the annot volume must match the image volume)
-    ScanIndices: Optional[Dict[str, Any]] = Field(sa_type=JSON)
-    Width: int
-    Height: int
-    Depth: int
-
-    # Matrix that projects the annotation to image space
-    ImageProjectionMatrix: Optional[Dict[str, Any]] = Field(sa_type=JSON)
-
-    SparseAxis: int | None = None
-
-class AnnotationBase(Base, SegmentationMixin):
+class AnnotationBase(Base):
     """
     Used for segmentation (i.e. masks)
     """
 
     # Patient is required, Study, Series and ImageInstance are optional
     # TODO: perhaps only ImageInstance is required and the others should be removed
-    PatientID: int|None = Field(foreign_key="Patient.PatientID", default=None)
+    PatientID: int = Field(foreign_key="Patient.PatientID")
+
     StudyID: int | None = Field(foreign_key="Study.StudyID", default=None)
     SeriesID: int | None = Field(foreign_key="Series.SeriesID", default=None)
     ImageInstanceID: int | None = Field(
@@ -70,7 +38,6 @@ class AnnotationBase(Base, SegmentationMixin):
     )
     Inactive: bool = False
 
-    
 
 
 class Annotation(AnnotationBase, table=True):
@@ -97,7 +64,7 @@ class Annotation(AnnotationBase, table=True):
         back_populates="Annotations"
     )
     Creator: "Creator" = Relationship(back_populates="Annotations")
-    Feature: "Feature" = Relationship(back_populates="Annotations")
+    
     AnnotationType: "AnnotationType" = Relationship(back_populates="Annotations")
     AnnotationReference: Optional["Annotation"] = Relationship(
         back_populates="ChildAnnotations",
@@ -130,30 +97,8 @@ class Annotation(AnnotationBase, table=True):
     
     @property
     def is_2d(self) -> bool:
-        return not self.is_3d
-    
-    @property
-    def is_sparse(self) -> bool:
-        return self.SparseAxis is not None
-    
-    @property
-    def l1_axis(self) -> AxisEnum | None:
-        if self.Height == 1:
-            return AxisEnum.HEIGHT
-        elif self.Width == 1:
-            return AxisEnum.WIDTH
-        elif self.Depth == 1:
-            return AxisEnum.DEPTH
-        else:
-            return None
-    
-    @property
-    def projection_axis(self) -> AxisEnum | None:
-        if self.is_sparse:
-            return self.SparseAxis
-        else:
-            return self.l1_axis
-        
+        return not self.is_3d    
+      
     # check that the dimensions that are not the length 1 axis match
     @property
     def shape_matches_image_shape(self):
@@ -283,7 +228,6 @@ class AnnotationDataBase(Base):
     # use -1 for all scans (e.g. enface OCT)
     ScanNr: int = Field(primary_key=True)
 
-    # AnnotationPlane: AnnotationPlane
 
     ValueInt: int | None
     ValueFloat: float | None
@@ -296,10 +240,11 @@ class AnnotationData(AnnotationDataBase, table=True):
     __table_args__ = (Index("fk_AnnotationData_Annotation1_idx", "AnnotationID"),)
     Annotation: "Annotation" = Relationship(back_populates="AnnotationData")
 
-    DatasetIdentifier: str | None = Field(max_length=45, unique=True, nullable=True)
+    DatasetIdentifier: str = Field(max_length=45, unique=True)
     DateModified: datetime | None = Field(
         default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now}
     )
+    MediaType: str = Field(max_length=45)
 
     @classmethod
     def create(
@@ -312,7 +257,6 @@ class AnnotationData(AnnotationDataBase, table=True):
         annotation_data = cls()
         annotation_data.Annotation = annotation
         annotation_data.ScanNr = scan_nr
-        annotation_data.AnnotationPlane = AnnotationPlane[annotation_plane]
 
         return annotation_data
 
@@ -367,9 +311,9 @@ class AnnotationData(AnnotationDataBase, table=True):
             ValueError: If the annotation type is unsupported or the mask type is invalid.
         """
         data = self.load_data()
-        data_representation = self.Annotation.AnnotationType.DataRepresentation
+        interpretation = self.Annotation.AnnotationType.Interpretation
 
-        if data_representation == DataRepresentation.RG_MASK:
+        if interpretation == "R/G mask":
             assert len(data.shape) == 3, "Expected color image"
             if mask_type == "segmentation":
                 return data[:, :, 0] > 0  # red channel
@@ -378,11 +322,11 @@ class AnnotationData(AnnotationDataBase, table=True):
             else:
                 raise ValueError(f"Unsupported mask type: {mask_type}")
 
-        elif data_representation == DataRepresentation.BINARY:
+        elif interpretation == "Binary mask":
             assert len(data.shape) == 2, "Expected grayscale image"
             return data > 0
         else:
-            raise ValueError(f"Unsupported annotation type {data_representation}")
+            raise ValueError(f"Unsupported annotation type {interpretation}")
 
     @property
     def segmentation_mask(self) -> np.ndarray:
@@ -396,28 +340,22 @@ class AnnotationData(AnnotationDataBase, table=True):
 
 class AnnotationTypeBase(Base):
     AnnotationTypeName: str = Field(max_length=45)
-    Interpretation: str | None = Field(max_length=255, default=None)
+    Interpretation: str = Field(max_length=45)
 
 class AnnotationType(AnnotationTypeBase, table=True):
     __tablename__ = "AnnotationType"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "AnnotationTypeName",
+            "Interpretation",
+            name="AnnotationTypeNameInterpretation_UNIQUE",
+        ),
+    )
+
     _name_column: ClassVar[str] = "AnnotationTypeName"
 
     AnnotationTypeID: int = Field(primary_key=True)
 
     Annotations: List["Annotation"] = Relationship(back_populates="AnnotationType")
-
-
-class FeatureBase(Base):
-    FeatureName: str = Field(max_length=60, unique=True)
-
-
-class Feature(FeatureBase, table=True):
-    __tablename__ = "Feature"
-    _name_column: ClassVar[str] = "FeatureName"
-
-    FeatureID: int | None = Field(default=None, primary_key=True)
-
-    Annotations: List["Annotation"] = Relationship(back_populates="Feature")
-    Segmentations: List["Segmentation"] = Relationship(back_populates="Feature")
-    DateInserted: datetime = Field(default_factory=datetime.now)
 

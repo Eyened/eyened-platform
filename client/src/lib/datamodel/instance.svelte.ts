@@ -1,7 +1,7 @@
-import type { Annotation } from './_annotation.svelte';
 import type { Device, DeviceModel } from './device.svelte';
-import { BaseItem, FilterList } from './itemList';
-import { data } from './model';
+import { BaseItem } from './baseItem';
+import { FilterList } from './itemList';
+import { data, registerConstructor } from './model';
 import type { Patient } from './patient';
 import type { Project } from './project.svelte';
 import type { Scan } from './scan';
@@ -112,7 +112,7 @@ export class Instance extends BaseItem {
     }
 
     init(item: ServerInstance) {
-        console.log(item);
+
         this.id = item.ImageInstanceID;
         this.seriesId = item.SeriesID;
         this.deviceId = item.DeviceInstanceID;
@@ -169,6 +169,7 @@ export class Instance extends BaseItem {
         return data.segmentations.filter(segmentation => segmentation.instanceId == this.id);
     }
 }
+registerConstructor('instances', Instance);
 
 export function getInstanceByDataSetIdentifier(datasetIdentifier: string): Instance | undefined {
     return data.instances.find(instance => instance.datasetIdentifier == datasetIdentifier);

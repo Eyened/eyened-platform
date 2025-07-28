@@ -296,7 +296,6 @@ def create_linking_routes(model_resource, model_class, parent, child_route, chil
             model_resource: [db_item],
         }
 
-    print("delete", f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}")
 
     @router.delete(
         f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}",

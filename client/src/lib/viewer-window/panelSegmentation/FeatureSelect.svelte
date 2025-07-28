@@ -6,13 +6,11 @@
     }
 
     interface Props<T extends Named> {
-        name: string;
         values: FilterList<T>;
-        types: string[];
-        onselect: (value: T, type: string) => void;
+        onselect: (value: T) => void;
     }
-    let { name, values, types, onselect }: Props<any> = $props();
-    export const placeholder = "Search...";
+    let { values, onselect }: Props<any> = $props();
+    const placeholder = "Search feature...";
     let filter = $state("");
     let filtered = $derived.by(() => {
         const lowerFilter = filter.toLowerCase();
@@ -24,7 +22,6 @@
             }
         });
     });
-    let selectedType = $state("Q");
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -32,22 +29,12 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div>
     <div>
-        <label>
-            {name}:
-            <input type="text" {placeholder} bind:value={filter} />
-        </label>
+        <input type="text" {placeholder} bind:value={filter} />
     </div>
-    <div>   
-        {#each types as type}
-            <label>
-                <input type="radio" name="type" value={type} bind:group={selectedType} />
-                {type}
-            </label>
-        {/each}
-    </div>
+
     <ul>
         {#each $filtered as feature}
-            <li class="item" onclick={() => onselect(feature, selectedType)}>
+            <li class="item" onclick={() => onselect(feature)}>
                 {feature.name}
             </li>
         {/each}

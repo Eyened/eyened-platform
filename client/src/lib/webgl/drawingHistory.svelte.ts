@@ -1,4 +1,4 @@
-import type { DrawingArray } from "./Mask";
+import type { DrawingArray } from "./mask.svelte";
 
 export interface Serializer<T> {
     serialize: (drawing: DrawingArray) => T;

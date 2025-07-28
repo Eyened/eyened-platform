@@ -69,7 +69,6 @@ export async function loadSearchParams(searchParams: URLSearchParams) {
 
 export async function loadParams(params: Record<string, string | number | Array<string | number>>) {
     const { count, entities } = await fetchData('instances', params);
-    console.log('loading params', params, entities);
     importData(entities);
 }
 export async function loadPatient(PatientIdentifier: string) {

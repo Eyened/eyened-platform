@@ -1,6 +1,6 @@
 import type { Contact } from "./contact.svelte";
-import { BaseItem } from "./itemList";
-import { data } from "./model";
+import { BaseItem } from "./baseItem";
+import { data, registerConstructor } from "./model";
 
 export interface ServerProject {
     ProjectID: number,
@@ -38,3 +38,4 @@ export class Project extends BaseItem {
         return this.contact_id !== undefined ? data.contacts.get(this.contact_id) : undefined;
     }
 }
+registerConstructor('projects', Project);

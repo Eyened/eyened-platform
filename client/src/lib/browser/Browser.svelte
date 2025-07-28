@@ -173,7 +173,7 @@
         flex: 0;
     }
     div#container > div#content {
-        padding: 1em;
+        margin-top: 0.5em;
         overflow-y: auto;
         flex: 1;
     }

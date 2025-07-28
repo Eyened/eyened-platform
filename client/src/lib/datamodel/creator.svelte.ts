@@ -1,6 +1,7 @@
-import { BaseItem, type FilterList } from "./itemList";
-import { data } from "./model";
+import { BaseItem } from "./baseItem";
+import { data, registerConstructor } from "./model";
 import type { Segmentation } from "./segmentation.svelte";
+import { FilterList } from "./itemList";
 
 export interface ServerCreator {
     CreatorID: number;
@@ -56,4 +57,5 @@ export class Creator extends BaseItem {
         }
         return (this.role & 1) === 1;
     }
-}
+}   
+registerConstructor('creators', Creator);

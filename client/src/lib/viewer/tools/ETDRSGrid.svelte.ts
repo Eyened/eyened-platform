@@ -23,8 +23,6 @@ export class ETDRSGridTool implements Overlay {
 		if (!this.annotation) return;
 
 		const updateLandmark = async (name: 'fovea' | 'disc_edge') => {
-			// const value = this.annotation!.value;
-			// const data = await value.load() || {};
             const data = this.annotation!.value || {};
 			data[name] = viewerContext.viewerToImageCoordinates(cursor);
 			this.annotation!.update({ value: data });

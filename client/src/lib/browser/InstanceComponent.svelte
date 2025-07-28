@@ -25,7 +25,7 @@
 
     let size = $derived(browserContext.thumbnailSize + "em");
 
-    const segmentations = instance.annotations;
+    const segmentations = instance.segmentations;
     const creatorCounts = segmentations.reduce(
         (acc, seg) => {
             acc[seg.creator.name] = (acc[seg.creator.name] || 0) + 1;

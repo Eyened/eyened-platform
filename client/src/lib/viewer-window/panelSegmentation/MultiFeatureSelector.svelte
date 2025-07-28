@@ -1,18 +1,17 @@
 <script lang="ts">
-    
     import { colors } from "$lib/viewer/overlays/colors";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { getContext } from "svelte";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import { CompositeFeature } from "$lib/datamodel/compositeFeature.svelte";
 
     interface Props {
         segmentation: Segmentation;
+        active: boolean;
     }
-    let { segmentation }: Props = $props();
+    let { segmentation, active }: Props = $props();
 
     const { compositeFeatures, dataRepresentation } = segmentation;
-   
+
     const groupType = {
         MultiLabel: "checkbox",
         MultiClass: "radio",
@@ -29,49 +28,49 @@
     function pointerLeave() {
         segmentationOverlay.highlightedFeatureIndex = undefined;
     }
-    
+
+    let activeIndices = $state(0);
+    $effect(() => {
+        if (active) {
+            segmentationContext.activeIndices = activeIndices;
+        }
+    });
 </script>
 
-{#snippet radioLabel(feature: CompositeFeature)}
-    <label>
-        <input
-            type="radio"
-            bind:group={segmentationContext.activeIndices}
-            value={feature.featureIndex}
-        />
-        {feature.childFeature.name}
-    </label>
-{/snippet}
-{#snippet checkboxLabel(feature: CompositeFeature)}
-    <label>
-        <input
-            type="checkbox"
-            bind:group={segmentationContext.activeIndices}
-            value={feature.featureIndex}
-        />
-        {feature.childFeature.name}
-    </label>
-{/snippet}
-<div>
+<div class:hidden={!active}>
     <ul>
         {#each $compositeFeatures as a}
             <li
-                onpointerenter={()=>pointerEnter(a.featureIndex)}
+                onpointerenter={() => pointerEnter(a.featureIndex)}
                 onpointerleave={pointerLeave}
             >
                 <div class="feature-container">
                     <div
                         class="color-box"
-                        style="background-color: rgb({colors[a.featureIndex - 1]});"
+                        style="background-color: rgb({colors[
+                            a.featureIndex - 1
+                        ]});"
                     >
                         {a.featureIndex}
                     </div>
 
-                    {#if groupType == "radio"}
-                        {@render radioLabel(a)}
-                    {:else}
-                        {@render checkboxLabel(a)}
-                    {/if}
+                    <label>
+                        {#if groupType == "radio"}
+                            <input
+                                type="radio"
+                                bind:group={activeIndices}
+                                value={a.featureIndex}
+                            />
+                            {a.childFeature.name}
+                        {:else}
+                            <input
+                                type="checkbox"
+                                bind:group={activeIndices}
+                                value={a.featureIndex}
+                            />
+                            {a.childFeature.name}
+                        {/if}
+                    </label>
                 </div>
             </li>
         {/each}
@@ -103,9 +102,12 @@
         border: 1px solid rgba(0, 0, 0, 0.1);
         text-align: center;
         justify-content: center;
-    }    
+    }
     label {
         display: flex;
-        flex:1
+        flex: 1;
+    }
+    div.hidden {
+        display: none;
     }
 </style>

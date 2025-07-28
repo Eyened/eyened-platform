@@ -1,7 +1,7 @@
 import type { Readable } from "svelte/store";
 import type { Feature } from "./feature.svelte";
-import { BaseItem } from "./itemList";
-import { data } from "./model";
+import { BaseItem } from "./baseItem";
+import { data, registerConstructor } from "./model";
 
 export interface ServerCompositeFeature {
     ParentFeatureID: number,
@@ -19,9 +19,10 @@ export class CompositeFeature extends BaseItem {
     };
 
     id!: string;
+    primaryKey: [number, number, number] = [0, 0, 0];
     parentFeatureId: number = 0;
     childFeatureId: number = 0;
-    featureIndex: number = 0;
+    featureIndex: number = $state(0);
 
     constructor(item: ServerCompositeFeature) {
         super();
@@ -33,6 +34,7 @@ export class CompositeFeature extends BaseItem {
         this.childFeatureId = serverItem.ChildFeatureID;
         this.featureIndex = serverItem.FeatureIndex;
         this.id = `${this.parentFeatureId}_${this.childFeatureId}_${this.featureIndex}`;
+        this.primaryKey = [this.parentFeatureId, this.childFeatureId, this.featureIndex];
     }
 
     get parentFeature(): Feature {
@@ -43,6 +45,7 @@ export class CompositeFeature extends BaseItem {
         return data.features.get(this.childFeatureId)!;
     }
 }
+registerConstructor('composite-features', CompositeFeature);
 
 export function getCompositeFeatures(): Readable<Map<number, CompositeFeature[]>> {
     return data.compositeFeatures.filter(_ => true).groupBy(f => f.parentFeatureId);

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         SubTask,
         TaskDefinition,
         TaskState,
+        Segmentation,
     )
 
 
@@ -153,6 +154,7 @@ class SubTask(SubTaskBase, table=True):
     Creator: Optional["Creator"] = Relationship(back_populates="SubTasks")
     SubTaskImageLinks: List["SubTaskImageLink"] = Relationship(back_populates="SubTask")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="SubTask")
+    Segmentations: List["Segmentation"] = Relationship(back_populates="SubTask")
 
     @classmethod
     def create_from_image_ids(

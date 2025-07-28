@@ -4,7 +4,6 @@ import { LinePhotoLocator } from "$lib/registration/photoLocators";
 import { getPrivateEyeRegistrationHeidelberg } from "$lib/registration/privateEyeRegistrationHeidelberg";
 import { AbstractImage } from "./abstractImage";
 import { Image2D } from "./image2D";
-import { RenderTexture } from "./renderTexture";
 import { TextureData } from "./texture";
 import type { Dimensions } from "./types";
 import type { WebGL } from "./webgl";
@@ -12,26 +11,30 @@ import type { WebGL } from "./webgl";
 export class Image3D extends AbstractImage {
     is3D = true;
     is2D = false;
+    texture: WebGLTexture;
 
     constructor(instance: Instance,
         webgl: WebGL,
         img_id: string,
-
         public readonly data: Uint8Array,
         dimensions: Dimensions,
         meta: any
     ) {
-        super(instance, webgl, img_id, dimensions, meta, initTexture(webgl.gl, dimensions, data));
+        super(instance, webgl, img_id, dimensions, meta);
+        this.texture = initTexture3D(webgl.gl, dimensions, data);
     }
 
     async createEnfaceProjection(): Promise<Image2D> {
-        const textureData = new TextureData(this.webgl.gl, this.width, this.depth, 'R32UI');
+        const { webgl, width, depth, height } = this;
 
-        const top = new TextureData(this.webgl.gl, this.width, this.depth, 'R16UI');
-        const bottom = new TextureData(this.webgl.gl, this.width, this.depth, 'R16UI');
+        const textureData = new TextureData(webgl.gl, width, depth, 'R32UI');
 
-        top.uploadData(new Uint16Array(this.width * this.depth).fill(0));
-        bottom.uploadData(new Uint16Array(this.width * this.depth).fill(this.height));
+        // top and bottom are the top and bottom of the slab (entire volume)
+        const top = new TextureData(webgl.gl, width, depth, 'R16UI');
+        const bottom = new TextureData(webgl.gl, width, depth, 'R16UI');
+
+        top.uploadData(new Uint16Array(width * depth).fill(0));
+        bottom.uploadData(new Uint16Array(width * depth).fill(height));
 
         const uniforms = {
             u_volume: this.texture,
@@ -40,9 +43,7 @@ export class Image3D extends AbstractImage {
         };
         textureData.passShader(this.webgl.shaders.enfaceProjection, uniforms);
 
-        const bitmap = await this.normalize(textureData);
-
-        const webgl = this.webgl;
+        const normalized = this.normalize(textureData);
         const proj_img_id = `${this.image_id}_proj`;
         const proj_dimensions = {
             width: this.dimensions.width,
@@ -55,9 +56,13 @@ export class Image3D extends AbstractImage {
         };
         const meta = this.meta;
 
-        const result = Image2D.fromBitmap(this.instance, webgl, proj_img_id, bitmap, proj_dimensions, meta);
-
+        const result = Image2D.fromPixelData(this.instance, this.webgl, proj_img_id, normalized, proj_dimensions, meta);
         this.setOrientation(result);
+
+        textureData.dispose();
+        top.dispose();
+        bottom.dispose();
+
         return result;
     }
 
@@ -92,7 +97,7 @@ export class Image3D extends AbstractImage {
         }
     }
 
-    private async normalize(textureData: TextureData): Promise<ImageBitmap> {
+    private normalize(textureData: TextureData): Uint8Array {
         const sumValues = textureData.data as Uint32Array;
 
         const { min, max } = sumValues.reduce(
@@ -103,21 +108,18 @@ export class Image3D extends AbstractImage {
             { min: Infinity, max: -Infinity }
         );
         const f = 255 / (max - min);
-        const imageData = new ImageData(this.width, this.depth);
-        const img_data = imageData.data;
+        const data = new Uint8Array(4 * sumValues.length);
         for (let i = 0; i < sumValues.length; i++) {
-            const g = f * (sumValues[i] - min);
-            img_data[4 * i] = g;
-            img_data[4 * i + 1] = g;
-            img_data[4 * i + 2] = g;
-            img_data[4 * i + 3] = 255;
+            data[4 * i] = f * (sumValues[i] - min);
+            data[4 * i + 1] = f * (sumValues[i] - min);
+            data[4 * i + 2] = f * (sumValues[i] - min);
+            data[4 * i + 3] = 255;
         }
-        const bitmap = await createImageBitmap(imageData);
-        return bitmap;
+        return data;
     }
 }
 
-function initTexture(gl: WebGL2RenderingContext, dimensions: Dimensions, data: Uint8Array): WebGLTexture {
+function initTexture3D(gl: WebGL2RenderingContext, dimensions: Dimensions, data: Uint8Array): WebGLTexture {
 
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_3D, texture);

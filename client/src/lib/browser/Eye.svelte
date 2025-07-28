@@ -6,12 +6,12 @@
 
     interface Props {
         study: Study;
-        laterality: "L" | "R";
+        laterality: "L" | "R" | null;
     }
 
     let { study, laterality }: Props = $props();
 
-    const eye = { L: "OS", R: "OD" }[laterality];
+    const eye = laterality ? { L: "OS", R: "OD" }[laterality] : "OD/OS?";
 
     const filtered = study.instances.filter(
         (instance) => instance.laterality == laterality,
@@ -21,29 +21,34 @@
 
     function open() {
         const numbers = [...$bySeries]
+        
             .sort((a, b) => a.id - b.id)
             .flatMap((series) =>
                 series.instances
-                    .map((instance) => instance.id).$
-                    .sort(),
+                .filter((instance) => instance.laterality == laterality)
+                .map((instance) => instance.id).$.sort(),
             );
         browserContext.openTab(numbers);
     }
 </script>
 
-<div class="outer">
-    <h3>
-        {eye}
-        {#if $bySeries.size > 0}
-            <button class="link" onclick={open}> Open all {eye} images</button>
-        {/if}
-    </h3>
-    <div class="series-container">
-        {#each [...$bySeries].sort((a, b) => a.id - b.id) as series (series.id)}
-            <SeriesComponent {series} {laterality} />
-        {/each}
+{#if $filtered.length}
+    <div class="outer">
+        <h3>
+            {eye}
+            {#if $bySeries.size > 0}
+                <button class="link" onclick={open}>
+                    Open all {eye} images</button
+                >
+            {/if}
+        </h3>
+        <div class="series-container">
+            {#each [...$bySeries].sort((a, b) => a.id - b.id) as series (series.id)}
+                <SeriesComponent {series} {laterality} />
+            {/each}
+        </div>
     </div>
-</div>
+{/if}
 
 <style>
     div {

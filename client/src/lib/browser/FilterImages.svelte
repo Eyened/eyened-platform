@@ -35,12 +35,17 @@
             title: "Features",
         },
         {
-            variable: "CreatorName",
+            variable: "Segmentation.CreatorName",
             name: "name",
             values: data["creators"].values(),
-            title: "Creators",
+            title: "Creator (segmentations)",
         },
-        // TODO: Fix. Broken after database update
+        {
+            variable: "Form.CreatorName",
+            name: "name",
+            values: data["creators"].values(),
+            title: "Creator (forms)",
+        },
         {
             variable: "Modality",
             name: "modality",

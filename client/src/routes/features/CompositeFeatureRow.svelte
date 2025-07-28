@@ -2,7 +2,6 @@
     import { CompositeFeature } from "$lib/datamodel/compositeFeature.svelte";
     import type { Feature } from "$lib/datamodel/feature.svelte";
     import { data } from "$lib/datamodel/model";
-    import { compositionDependencies } from "mathjs";
     import { derived } from "svelte/store";
 
     export interface Props {
@@ -21,13 +20,12 @@
     let featureIndex: number = $state(0);
     linkedFeatures.subscribe((cfs) => {
         if (cfs.length == 0) {
-            featureIndex = 0;
+            featureIndex = 1;
             return;
         }
         // set featureIndex to lowest unused index
         const usedIndices = new Set(cfs.map((cf) => cf.featureIndex));
-        console.log(usedIndices);
-        let i = 0;
+        let i = 1;
         while (true) {
             if (!usedIndices.has(i)) {
                 featureIndex = i;
@@ -71,7 +69,7 @@
                 {cf.childFeature.name}
                 <input
                     type="number"
-                    min={0}
+                    min={1}
                     value={cf.featureIndex}
                     oninput={(e) => {
                         cf.update({

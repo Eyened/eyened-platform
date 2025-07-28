@@ -1,5 +1,5 @@
 import type { Serializer } from "./drawingHistory.svelte";
-import type { DrawingArray } from "./Mask";
+import type { DrawingArray } from "./mask.svelte";
 
 
 /**
