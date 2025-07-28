@@ -23,6 +23,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
@@ -52,7 +53,7 @@ def load_params(metadata: str):
     # remove ZarrArrayIndex from params (a new index needs to be assigned)
     if "ZarrArrayIndex" in params:
         del params["ZarrArrayIndex"]
-    print("params", params)
+
     return params
 
 
@@ -301,3 +302,26 @@ async def get_segmentation_data(
     np.save(buf, arr)
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/octet-stream")
+
+
+class SegmentationPatch(BaseModel):
+    ReferenceSegmentationID: Optional[int] = None
+    FeatureID: Optional[int] = None
+    Threshold: Optional[float] = None
+    # TODO: should we allow to patch other fields?
+
+@router.patch("/segmentations/{segmentation_id}")
+async def patch_segmentation(
+    segmentation_id: int,
+    params: SegmentationPatch,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    segmentation = Segmentation.by_id(db, segmentation_id)
+    if segmentation is None:
+        raise HTTPException(status_code=404, detail="Segmentation not found")
+    for key, value in params.model_dump(exclude_unset=True).items():
+        setattr(segmentation, key, value)
+    db.commit()
+    db.refresh(segmentation)
+    return segmentation

@@ -1,7 +1,9 @@
-import { BaseItem, type FilterList } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { FilterList } from "./itemList";
 import type { Study } from "./study";
-import { data } from "./model";
+import { data, registerConstructor } from "./model";
 import type { Instance } from "./instance.svelte";
+import type { Project } from "./project.svelte";
 
 export interface ServerPatient {
     PatientID: number,
@@ -37,7 +39,7 @@ export class Patient extends BaseItem {
         this.id = item.PatientID;
         this.identifier = item.PatientIdentifier;
         this.projectId = item.ProjectID;
-        this.birthDate = item.BirthDate;
+        this.birthDate = item.BirthDate ? new Date(item.BirthDate) : undefined;
         this.sex = item.Sex;
         this.isHuman = item.IsHuman;
     }
@@ -46,7 +48,12 @@ export class Patient extends BaseItem {
         return data.studies.filter(study => study.patientId == this.id);
     }
 
+    get project(): Project {
+        return data.projects.get(this.projectId)!;
+    }
+
     get instances(): FilterList<Instance> {
         return data.instances.filter(instance => instance.patient.id == this.id);
     }
-}
+}       
+registerConstructor('patients', Patient);

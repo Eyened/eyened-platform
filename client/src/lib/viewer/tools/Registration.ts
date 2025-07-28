@@ -1,3 +1,5 @@
+import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
@@ -17,14 +19,25 @@ export class RegistrationTool implements Overlay {
     name: string = 'Registration';
 
     constructor(
-        private points: PointList,
-        private updateCallback: (points: PointList) => void,
+        private formAnnotation: FormAnnotation,
+        private instance: Instance,
         private pointStyle: 'rect' | 'cross' = 'cross',
         private radius: number = 16
-    ) { }
+    ) {         
+    }
 
-    private update() {
-        this.updateCallback(this.points);
+    private update() {        
+        this.formAnnotation.update({ value: this.formAnnotation.value });
+    }
+
+    get points(): PointList {
+        if (!this.formAnnotation.value) {
+            this.formAnnotation.value = {};
+            if (!this.formAnnotation.value[this.instance.id]) {
+                this.formAnnotation.value[this.instance.id] = [];
+            }
+        }
+        return this.formAnnotation.value[this.instance.id];
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {

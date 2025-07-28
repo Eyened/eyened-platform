@@ -1,10 +1,10 @@
-import { apiUrl } from "$lib/config";
 import type { Creator } from "./creator.svelte";
 import type { Instance } from "./instance.svelte";
-import { BaseItem, BaseLinkingItem, FilterList } from "./itemList";
-import { data, removeData } from "./model";
+import { FilterList } from "./itemList";
+import { data, registerConstructor } from "./model";
 import type { Task } from "./task.svelte";
 import type { TaskState } from "./taskState";
+import { BaseItem, BaseLinkingItem } from "./baseItem";
 
 export interface ServerSubTask {
     SubTaskID: number;
@@ -55,6 +55,7 @@ export class SubTask extends BaseItem {
             .map(link => data.instances.get(link.instanceId)!);
     }
 }
+registerConstructor('sub-tasks', SubTask);
 export interface ServerSubTaskImageLink {
     SubTaskID: number;
     ImageInstanceID: number;
@@ -87,3 +88,4 @@ export class SubTaskImageLink extends BaseLinkingItem {
         this.id = `${item.SubTaskID}_${item.ImageInstanceID}`;
     }
 }
+registerConstructor('sub-task-image-links', SubTaskImageLink);

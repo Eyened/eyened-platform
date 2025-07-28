@@ -8,7 +8,7 @@
     import { getContext, onDestroy } from "svelte";
     import { Duplicate, Hide, PanelIcon, Show, Trash } from "../icons/icons";
     import ImportSegmentationSelector from "../panelSegmentation/ImportSegmentationSelector.svelte";
-    import LayerThicknessSelector from "./LayerThicknessSelector.svelte";
+    import LayerThicknessSelector from "./_LayerThicknessSelector.svelte";
 
     import type { Annotation } from "$lib/datamodel/_annotation.svelte";
     import { LayerSegmentationOverlay } from "$lib/viewer/overlays/LayerSegmentationOverlay.svelte";
@@ -178,7 +178,7 @@
 
     <div class="row">
         <div>
-            {#if segmentationContext.hideSegmentations.has(segmentation)}
+            {#if segmentationContext.visibleSegmentations.has(segmentation)}
                 <PanelIcon onclick={toggleShow} tooltip="Hide"
                     ><Hide /></PanelIcon
                 >

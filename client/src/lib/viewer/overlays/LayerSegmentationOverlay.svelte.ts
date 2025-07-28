@@ -35,7 +35,7 @@ export class LayerSegmentationOverlay implements Overlay {
 		const {
 			hideCreators,
 			hideFeatures,
-			hideSegmentations,
+			visibleSegmentations: hideSegmentations,
 			hideAnnotations
 		} = this.segmentationContext;
 

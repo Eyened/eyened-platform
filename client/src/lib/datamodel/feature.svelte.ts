@@ -1,4 +1,5 @@
-import { BaseItem } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { registerConstructor } from "./model";
 
 export interface ServerFeature {
     FeatureID: number,
@@ -24,3 +25,4 @@ export class Feature extends BaseItem {
         this.name = serverItem.FeatureName;
     }
 }
+registerConstructor('features', Feature);

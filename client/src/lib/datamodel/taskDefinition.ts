@@ -1,4 +1,5 @@
-import { BaseItem } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { registerConstructor } from "./model";
 
 export interface ServerTaskDefinition {
     TaskDefinitionID: number;
@@ -28,3 +29,4 @@ export class TaskDefinition extends BaseItem {
         this.config = item.TaskConfig;
     }
 }
+registerConstructor('task-definitions', TaskDefinition);

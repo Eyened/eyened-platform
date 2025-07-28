@@ -1,8 +1,7 @@
-
-import type { Annotation } from "./_annotation.svelte";
 import type { Instance } from "./instance.svelte";
-import { BaseItem, parseDate, type FilterList } from "./itemList";
-import { data } from "./model";
+import { BaseItem, parseDate } from "./baseItem";
+import { FilterList } from "./itemList";
+import { data, registerConstructor } from "./model";
 import type { Patient } from "./patient";
 import type { Segmentation } from "./segmentation.svelte";
 import type { Series } from "./series";
@@ -60,3 +59,4 @@ export class Study extends BaseItem {
         return data.segmentations.filter(segmentation => segmentation.study.id == this.id);
     }
 };
+registerConstructor('studies', Study);

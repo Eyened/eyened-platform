@@ -22,10 +22,8 @@ type CircleName = 'C0' | 'C1' | 'C2' | 'I1' | 'I2' | 'O1' | 'O2';
 export interface etdrsFormAnnotationType {
 	instance?: Instance;
 	value: {
-		value: {
-			fovea: Position2D;
-			disc_edge: Position2D;
-		};
+		fovea: Position2D;
+		disc_edge: Position2D;
 	};
 }
 export class ETDRSGridOverlay implements Overlay {
@@ -58,15 +56,16 @@ export class ETDRSGridOverlay implements Overlay {
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
 		const { image, context2D } = viewerContext;
 
-		for (const formAnnotation of this.visible) {
+        
+		for (const gridAnnotation of this.visible) {
 
-			let image_id = `${formAnnotation.instance!.id}`;
-			if (formAnnotation.instance!.nrOfFrames > 1) {
+			let image_id = `${gridAnnotation.instance!.id}`;
+			if (gridAnnotation.instance!.nrOfFrames > 1) {
 				// this is a hack to identify that it's a projection of a 3D image
-				image_id = `${formAnnotation.instance!.id}_proj`;
+				image_id = `${gridAnnotation.instance!.id}_proj`;
 			}
 
-			const grid = formAnnotation.value;
+			const grid = gridAnnotation.value;
 			if (grid?.fovea && grid?.disc_edge) {
 				const fovea = this.registration.mapPosition(
 					image_id,

@@ -1,8 +1,8 @@
 import type { Creator } from "./creator.svelte";
 import type { FormSchema } from "./formSchema.svelte";
-import type { Instance } from "./instance.svelte";
-import { BaseItem } from "./itemList";
-import { data } from "./model";
+import type { Instance } from "./instance.svelte";  
+import { BaseItem } from "./baseItem";
+import { data, registerConstructor } from "./model";
 import type { Patient } from "./patient";
 import type { Study } from "./study";
 import type { SubTask } from "./subTask.svelte";
@@ -110,4 +110,5 @@ export class FormAnnotation extends BaseItem {
         if (!this.referenceId) return undefined;
         return data.formAnnotations.get(this.referenceId);
     }
-}
+}   
+registerConstructor('form-annotations', FormAnnotation);

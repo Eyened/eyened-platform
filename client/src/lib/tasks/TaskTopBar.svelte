@@ -8,13 +8,11 @@
 	const { taskStates } = data;
 	const stateNames = ['Not started', 'Busy', 'Ready'];
 	const states = stateNames.map((name) => taskStates.find((state) => state.name === name)!);
-    console.log(states);
 	const { task, subTask, subTaskIndex } = getContext<TaskContext>('taskContext');
 
 	const subtasks = task.subTasks;
 
 	function setState(state: TaskState) {
-		console.log('Setting state to', state);
 		subTask.update({ taskStateId: state.id });
 	}
 

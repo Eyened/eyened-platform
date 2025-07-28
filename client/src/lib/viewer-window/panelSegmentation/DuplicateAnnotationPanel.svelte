@@ -1,33 +1,34 @@
 <script lang="ts">
     import { AbstractImage } from "$lib/webgl/abstractImage";
     import { Duplicate } from "../icons/icons";
-    import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import { getContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { type DrawingArray, type Mask } from "$lib/webgl/Mask";
+    import { type DrawingArray, type Mask } from "$lib/webgl/mask.svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import { SegmentationItem } from "$lib/webgl/segmentationItem";
     import {
         Segmentation,
         type DataRepresentation,
         type Datatype,
+        type SimpleDataRepresentation,
     } from "$lib/datamodel/segmentation.svelte";
     import { NPYArray } from "$lib/utils/npy_loader";
     interface Props {
         segmentation: Segmentation;
         image: AbstractImage;
         segmentationItem: SegmentationItem;
-        mask: Mask;
     }
+    import { convert } from "$lib/webgl/segmentationConverter";
 
-    let { segmentation, image, segmentationItem, mask }: Props = $props();
+    let { segmentation, image, segmentationItem }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const { creator } = getContext<GlobalContext>("globalContext");
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const { creator } = globalContext;
 
     let duplicateVolume = $state(false);
 
-    const types: Record<"Q" | "B" | "P", DataRepresentation> = {
+    const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
         Q: "DualBitMask",
         B: "Binary",
         P: "Probability",
@@ -37,11 +38,13 @@
         (t) => types[t as "Q" | "B" | "P"] == segmentation.dataRepresentation,
     ) as "Q" | "B" | "P";
 
-
-    function createArray(shape: [number, number, number], dataType: Datatype): NPYArray {
+    function createArray(
+        shape: [number, number, number],
+        dataType: Datatype,
+    ): NPYArray {
         const n = shape[0] * shape[1] * shape[2];
         let a: DrawingArray;
-        if (dataType == "R8UI") {
+        if (dataType == "R8UI" || dataType == "R8") {
             a = new Uint8Array(n);
         } else if (dataType == "R16UI") {
             a = new Uint16Array(n);
@@ -55,10 +58,35 @@
         return new NPYArray(a, shape, false);
     }
 
+    function copyMaskData(
+        indices: number[],
+        segmentationItem: SegmentationItem,
+        segmentation: Segmentation,
+        dataRepresentation: DataRepresentation,
+        array: NPYArray,
+        image: AbstractImage
+    ) {
+        for (let i = 0; i < indices.length; i++) {
+            const mask = segmentationItem.getMask(indices[i]);
+            if (mask) {
+                const data = mask.exportData();
+                const threshold = 255 * (segmentation.threshold ?? 0.5);
+                const dataConverted = convert(
+                    data,
+                    segmentation.dataRepresentation as SimpleDataRepresentation,
+                    dataRepresentation as SimpleDataRepresentation,
+                    threshold,
+                );
+                array.data.set(
+                    dataConverted,
+                    i * image.height * image.width,
+                );
+            }
+        }
+    }
+
     async function duplicate() {
-        dialogueManager.showQuery(
-            `Duplicating segmentation ${segmentation.id}...`,
-        );
+        globalContext.dialogue = `Duplicating segmentation ${segmentation.id}...`;
 
         let dataRepresentation: DataRepresentation;
         if (
@@ -72,12 +100,16 @@
             dataRepresentation = types[type];
         }
 
+        let dataType = segmentation.dataType;
+        if (dataRepresentation == "Probability") {
+            dataType = "R8";
+        }
         const item = {
             ...segmentation,
-            dataRepresentation: dataRepresentation,
-
+            dataRepresentation,
+            dataType,
             // properties that need to be mentioned explicitly, because they're marked with $state and hence not enumerable
-            referenceSegmentationId: segmentation.referenceId,
+            referenceId: segmentation.referenceId,
             scanIndices: segmentation.scanIndices,
             threshold: segmentation.threshold,
 
@@ -86,47 +118,55 @@
         };
 
         const scanNr = viewerContext.index;
-        
+
         let depth = 1;
         if (duplicateVolume) {
             if (segmentation.scanIndices) {
                 // only upload the data for active scan indices
                 depth = segmentation.scanIndices.length;
             } else {
-                // upload the full volume                
+                // upload the full volume
                 depth = image.depth;
             }
         } else if (image.is3D) {
             // only duplicate the current scan
             item.scanIndices = [scanNr];
-        } 
+        }
 
-        const array = createArray([depth, image.height, image.width], segmentation.dataType);
-        if (image.image_id.endsWith('proj')) {
+        const array = createArray(
+            [depth, image.height, image.width],
+            segmentation.dataType,
+        );
+        if (image.image_id.endsWith("proj")) {
             array.shape = [image.height, 1, image.width];
         }
 
         if (item.scanIndices) {
-            // sparse volume 
-            for (let i = 0; i < item.scanIndices.length; i++) {
-                const mask = segmentationItem.getMask(item.scanIndices[i]);
-                if (mask) {
-                    array.data.set(mask.exportData(), i * image.height * image.width);
-                }
-            }
+            // sparse volume
+            copyMaskData(
+                item.scanIndices,
+                segmentationItem,
+                segmentation,
+                dataRepresentation,
+                array,
+                image
+            );
         } else {
             // full volume
-            for (let i = 0; i < depth; i++) {
-                const mask = segmentationItem.getMask(i);
-                if (mask) {
-                    array.data.set(mask.exportData(), i * image.height * image.width);
-                }
-            }
-        }            
+            const indices = Array.from({ length: depth }, (_, i) => i);
+            copyMaskData(
+                indices,
+                segmentationItem,
+                segmentation,
+                dataRepresentation,
+                array,
+                image
+            );
+        }
         const newSegmentation = await Segmentation.create(item, array);
-        console.log('newSegmentation',newSegmentation);
+        console.log("newSegmentation", newSegmentation);
 
-        dialogueManager.hide();
+        globalContext.dialogue = null;
     }
 </script>
 

@@ -44,5 +44,4 @@ export abstract class BaseSegmentation implements Segmentation {
     abstract import(scanNr: number, canvas: HTMLCanvasElement): void;
     abstract importOther(scanNr: number, other: Segmentation): void;
     abstract dispose(): void;
-    // abstract initialize(annotationData: AnnotationData, dataRaw: any): void;
 } 

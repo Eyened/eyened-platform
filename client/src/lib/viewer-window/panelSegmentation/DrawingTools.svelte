@@ -19,10 +19,13 @@
     import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte";
 
     import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
-    import type { PaintSettings } from "$lib/webgl/Mask";
+    import type { PaintSettings } from "$lib/webgl/mask.svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
+    const globalContext = getContext<GlobalContext>("globalContext");
     const image = viewerContext.image;
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
@@ -53,7 +56,6 @@
         activeTool = tool;
         lock = viewerContext.lockScroll;
         viewerContext.lockScroll = true;
-        console.log("activate", tool);
         removeTool = viewerContext.addOverlay(tool);
     }
     onDestroy(() => {
@@ -61,6 +63,7 @@
         segmentationContext.questionableActive = false;
         removeTool();
     });
+
 
     const drawingExecutor = {
         getCtx: () => image.getDrawingCtx(),
@@ -75,11 +78,15 @@
                 activeIndices: segmentationContext.activeIndices,
             };
             try {
-                await segmentationContext.segmentationItem?.draw(
-                    viewerContext.index,
-                    ctx.canvas,
-                    paintSettings,
-                );
+                if (segmentationContext.segmentationItem) {
+                    await segmentationContext.segmentationItem.draw(
+                        viewerContext.index,
+                        ctx.canvas,
+                        paintSettings,
+                    );
+                } else {
+                    globalContext.dialogue = "No segmentation Selected";
+                }
             } catch (e) {
                 console.error(e);
                 console.error("Cannot draw on segmentation");
@@ -100,6 +107,7 @@
         drawingExecutor,
         viewerContext,
         segmentationContext,
+        globalContext,
     );
     function toggle(key: "erodeDilateActive" | "questionableActive") {
         segmentationContext[key] = !segmentationContext[key];

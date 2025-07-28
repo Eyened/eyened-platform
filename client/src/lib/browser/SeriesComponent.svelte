@@ -4,7 +4,7 @@
 
 	interface Props {
 		series: Series;
-		laterality: 'L' | 'R';
+		laterality: 'L' | 'R' | null;
 		showSegmentationInfo?: boolean;
 	}
 

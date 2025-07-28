@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class FormSchemaBase(Base):
-    SchemaName: str = Field(max_length=45, unique=True)
+    SchemaName: str = Field(max_length=255, unique=True)
     Schema: Dict[str, Any] | None = Field(sa_column=Column(JSON), default=None)
 
 class FormSchema(FormSchemaBase, table=True):

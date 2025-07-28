@@ -1,9 +1,6 @@
 from typing import Dict, List, Optional
 
 from eyened_orm import (
-    # Annotation,
-    # AnnotationData,
-    # AnnotationType,
     Creator,
     DeviceInstance,
     DeviceModel,
@@ -28,7 +25,7 @@ from sqlalchemy.orm import Session, defer
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
 from .utils import collect_rows
-from .query_utils import apply_filters, decode_params, sqlalchemy_operators
+from .query_utils import decode_params, sqlalchemy_operators
 
 router = APIRouter()
 
@@ -40,8 +37,6 @@ class DataResponse(BaseModel):
     series: List[Series]
     studies: List[Study]
     patients: List[Patient]
-    # annotations: List[Annotation]
-    # annotation_data: List[AnnotationData] = Field(alias="annotation-data")
     segmentations: List[Segmentation]
     form_annotations: List[FormAnnotation] = Field(alias="form-annotations")
 
@@ -78,7 +73,6 @@ segmentation_sub_query = join_tables(
     .select_from(Segmentation)
     .filter(~Segmentation.Inactive)
     .join(Feature)
-    # .join(AnnotationType)
     .join(Creator)
     .join(ImageInstance, ImageInstance.ImageInstanceID == Segmentation.ImageInstanceID)
     .join(Series, Series.SeriesID == ImageInstance.SeriesID)
@@ -103,7 +97,6 @@ segmentation_query = (
     .select_from(Segmentation)
     .filter(~Segmentation.Inactive)
     .join(Feature)
-    # .join(AnnotationType)
     .join(Creator)
 )
 
@@ -133,37 +126,34 @@ segmentation_tables = [Segmentation, Feature, Creator]
 form_tables = [FormAnnotation, FormSchema, Creator]
 
 
-def get_mappings(tables):
+def get_mappings(tables, base_name):
     all_mappings = {}
 
     for table in tables:
-        # Use the original table name, not the alias
-        original_table_name = table.__table__.name
+        
+        table_name = table.__table__.name
 
         for column in table.__table__.columns:
-            if column.name == "Password":
+            if column.name == "Password" or column.name == "DateInserted":
                 continue
             # Skip foreign keys
             if column.foreign_keys:
                 continue
-            # Modality is defined on ImageInstance and Feature, but we want to use the value from ImageInstance
-            if column.name == "Modality" and original_table_name == "Feature":
-                continue
-
+            
             col = getattr(table, column.key)
 
-            # Use the original table name in the mapping
-            all_mappings[f"{original_table_name}.{column.name}"] = col
+            all_mappings[f"{table_name}.{column.name}"] = col
+            all_mappings[f"{base_name}.{column.name}"] = col
             if column.name not in all_mappings:
-                # First encounter only
                 all_mappings[column.name] = col
+            else:
+                print(f"Duplicate column {column.name} in {table_name}")
     return all_mappings
 
 
-base_mappings = get_mappings(base_tables)
-segmentation_mappings = get_mappings(segmentation_tables)
-form_mappings = get_mappings(form_tables)
-
+base_mappings = get_mappings(base_tables, "base")
+segmentation_mappings = get_mappings(segmentation_tables, "Segmentation")
+form_mappings = get_mappings(form_tables, "Form")
 
 def apply_filters(query, mappings, params):
     for (field, operator), value in params.items():
@@ -187,6 +177,7 @@ def run_queries(
 
     filter_instance_ids = set()
     filter_patient_ids = set()
+    filter_applied = False
     if any(field in segmentation_mappings for field, operator in params_decoded):
         sub_query = apply_filters(
             segmentation_sub_query,
@@ -194,14 +185,16 @@ def run_queries(
             params_decoded,
         )
         filter_instance_ids = set(session.execute(sub_query).scalars().all())
+        filter_applied = True
 
     if any(field in form_mappings for field, operator in params_decoded):
         sub_query = apply_filters(
             form_sub_query, {**form_mappings, **base_mappings}, params_decoded
         )
         filter_patient_ids = set(session.execute(sub_query).scalars().all())
+        filter_applied = True
 
-    if filter_instance_ids or filter_patient_ids:
+    if filter_applied:
         query = query.filter(
             or_(
                 ImageInstance.ImageInstanceID.in_(filter_instance_ids),
@@ -258,9 +251,6 @@ async def get_instances(
     series = {series for _, series, _, _ in i}
     studies = {study for _, _, study, _ in i}
     patients = {patient for _, _, _, patient in i}
-
-    print(instances)
-    print(segmentations)
 
     response = {
         "entities": {

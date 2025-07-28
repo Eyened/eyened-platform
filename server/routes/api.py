@@ -1,7 +1,6 @@
 from typing import Dict, List
 
 from eyened_orm import (
-    AnnotationType,
     Contact,
     CompositeFeature,
     Creator,
@@ -30,7 +29,6 @@ class DataResponse(BaseModel):
     features: List[Feature]
     creators: List[Creator]
     contacts: List[Contact]
-    # annotation_types: List[AnnotationType] = Field(alias="annotation-types")
     composite_features: List[CompositeFeature] = Field(alias="composite-features")
     form_schemas: List[FormSchema] = Field(alias="form-schemas")
     task_definitions: List[TaskDefinition] = Field(alias="task-definitions")
@@ -54,7 +52,6 @@ async def get_data(
         "features": Feature,
         "contacts": Contact,
         "creators": Creator,
-        # "annotation-types": AnnotationType,
         "composite-features": CompositeFeature,
         "form-schemas": FormSchema,
         "task-definitions": TaskDefinition,

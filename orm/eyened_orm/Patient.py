@@ -17,7 +17,7 @@ class SexEnum(enum.Enum):
     F = 2
 
 class PatientBase(Base):
-    PatientIdentifier: str = Field(max_length=45)
+    PatientIdentifier: str = Field(max_length=255)
     BirthDate: date | None
     Sex: SexEnum | None 
     ProjectID: int = Field(foreign_key="Project.ProjectID")

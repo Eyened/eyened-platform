@@ -10,11 +10,11 @@
     interface Props {
         image: AbstractImage;
         segmentation: Segmentation;
+        close: () => void;
         resolve: (segmentation: Segmentation) => void;
-        reject: () => void;
     }
 
-    let { image, segmentation, resolve, reject }: Props = $props();
+    let { image, segmentation, resolve, close }: Props = $props();
     const segmentationAnnotations = image.instance.segmentations.filter(
         globalContext.segmentationsFilter,
     );
@@ -22,13 +22,18 @@
     const referenceSegmentations = segmentationAnnotations
         .filter((s) => s.id != segmentation.id)
         .filter((other) => {
-            const from = constructors[segmentation.dataRepresentation].name;
-            const to = constructors[other.dataRepresentation].name;
+            const from = segmentation.dataRepresentation;
+            const to = other.dataRepresentation;
 
             const key = `${from}->${to}`;
             // filter out conversions that are not supported
-            return key in converters;
+            return from == to || key in converters;
         });
+
+    function _resolve(segmentation: Segmentation) {
+        resolve(segmentation);
+        close();
+    }
 </script>
 
 {#if $referenceSegmentations.length > 0}
@@ -37,7 +42,7 @@
         {#each $referenceSegmentations as segmentation}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li onclick={() => resolve(segmentation)}>
+            <li onclick={() => _resolve(segmentation)}>
                 <div class="annotation-id">
                     [{segmentation.id}]
                 </div>
@@ -49,7 +54,7 @@
 {:else}
     <div>No segmentations found to import from</div>
 {/if}
-<button onclick={reject}>Cancel</button>
+<button onclick={close}>Cancel</button>
 
 <style>
     ul {

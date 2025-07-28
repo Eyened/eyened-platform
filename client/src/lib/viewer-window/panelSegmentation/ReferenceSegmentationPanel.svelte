@@ -1,6 +1,4 @@
 <script lang="ts">
-    
-    import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import { AbstractImage } from "$lib/webgl/abstractImage";
     import { Intersection, PanelIcon, Hide, Show, Trash } from "../icons/icons";
     import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
@@ -8,6 +6,7 @@
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     interface Props {
         segmentationItem: SegmentationItem;
         segmentation: Segmentation;
@@ -19,24 +18,24 @@
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
-
+    const globalContext = getContext<GlobalContext>("globalContext");
     function setAnnotationReference() {
-        dialogueManager.show(
-            ReferenceAnnotationSelector,
-            {
+        globalContext.dialogue = {
+            component: ReferenceAnnotationSelector,
+            props: {
                 segmentation,
                 image,
+                resolve: (other: Segmentation) => {
+                    segmentation.update({
+                        referenceId: other.id,
+                    });
+                },
             },
-            (other: Segmentation) => {
-                segmentation.update({
-                    referenceSegmentationId: other.id,
-                });
-            },
-        );
+        };
     }
 
     function removeReference() {
-        segmentation.update({ referenceSegmentationId: null });
+        segmentation.update({ referenceId: null });
     }
     function toggleApplyMask() {
         segmentationOverlay.toggleMasking(segmentationItem);

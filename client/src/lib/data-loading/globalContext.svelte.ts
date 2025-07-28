@@ -7,12 +7,12 @@ export type ComponentDef = {
     props?: any
 }
 
-
 export class GlobalContext {
 
     public userManager: UserManager;
 
     public popupComponent: ComponentDef | null = $state(null);
+    public dialogue: ComponentDef | string | null = $state(null);
 
     public formShortcut: string | null = $state('WARMGS');
     public config: any = $state({
@@ -36,8 +36,8 @@ export class GlobalContext {
         this.popupComponent = component;
     }
 
-    canEdit(segmentation: Segmentation) {
-        return segmentation.creator.id == this.userManager.creator.id;
+    canEdit(annotation: Segmentation | FormAnnotation) {
+        return annotation.creator.id == this.userManager.creator.id;
     }
 
     updateConfig(config: any) {

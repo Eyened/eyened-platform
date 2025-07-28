@@ -1,4 +1,5 @@
-import { BaseItem } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { registerConstructor } from "./model";
 
 export interface ServerTag {
     TagID: number;
@@ -33,6 +34,7 @@ export class Tag extends BaseItem {
         this.name = item.TagName;
     }
 }
+registerConstructor('tags', Tag);
 
 export class InstanceTag extends BaseItem {
     static endpoint = 'instanceTags';
@@ -53,7 +55,7 @@ export class InstanceTag extends BaseItem {
         this.tagId = item.TagID;
     }
 }
-
+registerConstructor('instanceTags', InstanceTag);
 export class StudyTag extends BaseItem {
     static endpoint = 'studyTags';
     static mapping = {
@@ -73,7 +75,7 @@ export class StudyTag extends BaseItem {
         this.tagId = item.TagID;
     }
 }
-
+registerConstructor('studyTags', StudyTag);
 export class AnnotationTag extends BaseItem {
     static endpoint = 'annotationTags';
     static mapping = {
@@ -93,3 +95,4 @@ export class AnnotationTag extends BaseItem {
         this.tagId = item.TagID;
     }
 }
+registerConstructor('annotationTags', AnnotationTag);

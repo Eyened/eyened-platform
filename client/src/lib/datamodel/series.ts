@@ -1,6 +1,7 @@
 import type { Instance } from "./instance.svelte";
-import { BaseItem, type FilterList } from "./itemList";
-import { data } from "./model";
+import { BaseItem } from "./baseItem";
+import { FilterList } from "./itemList";
+import { data, registerConstructor } from "./model";
 import type { Study } from "./study";
 
 export interface ServerSeries {
@@ -47,3 +48,4 @@ export class Series extends BaseItem {
         return data.studies.get(this.studyId)!;
     }
 }
+registerConstructor('series', Series);

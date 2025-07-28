@@ -7,7 +7,7 @@ import { SvelteSet } from "svelte/reactivity";
 export class SegmentationContext {
 
     public readonly hideCreators = new SvelteSet<Creator>();
-    public readonly hideSegmentations = new SvelteSet<Segmentation>();
+    public readonly visibleSegmentations = new SvelteSet<Segmentation>();
 
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
@@ -18,13 +18,25 @@ export class SegmentationContext {
 
     constructor() { }
 
-
-    toggleShow(segmentation: Segmentation) {
-        if (this.hideSegmentations.has(segmentation)) {
-            this.hideSegmentations.delete(segmentation);
+    toggleShowCreator(creator: Creator) {
+        if (this.hideCreators.has(creator)) {
+            this.hideCreators.delete(creator);
         } else {
-            this.hideSegmentations.add(segmentation);
+            this.hideCreators.add(creator);
         }
+    }
+        
+    toggleShow(segmentation: Segmentation) {
+        if (this.visibleSegmentations.has(segmentation)) {
+            this.visibleSegmentations.delete(segmentation);
+        } else {
+            this.visibleSegmentations.add(segmentation);
+        }
+    }
+
+    showOnly(segmentation: Segmentation) {
+        this.visibleSegmentations.clear();
+        this.visibleSegmentations.add(segmentation);
     }
 
     toggleActive(segmentationItem: SegmentationItem | undefined) {

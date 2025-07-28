@@ -1,5 +1,6 @@
-import { BaseItem, FilterList } from "./itemList";
-import { data } from "./model";
+import { BaseItem } from "./baseItem";
+import { FilterList } from "./itemList";
+import { data, registerConstructor } from "./model";
 import type { SubTask } from "./subTask.svelte";
 import type { TaskDefinition } from "./taskDefinition";
 import type { TaskState } from "./taskState";
@@ -54,3 +55,4 @@ export class Task extends BaseItem {
         return data.taskDefinitions.get(this.definitionId)!;
     }
 }
+registerConstructor('tasks', Task);
