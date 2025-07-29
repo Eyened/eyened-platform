@@ -53,7 +53,7 @@ export class Study extends BaseItem {
         return data.series.filter(series => series.studyId == this.id);
     }
     get tags(): FilterList<Tag> {
-        return data.tags.filter(tag => tag.study_id == this.id);
+        return data.studyTags.filter(st => st.studyId == this.id).map(st => st.tag);
     }
     get segmentations(): FilterList<Segmentation> {
         return data.segmentations.filter(segmentation => segmentation.study.id == this.id);

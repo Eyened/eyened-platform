@@ -4,7 +4,7 @@
 
     import { data } from "$lib/datamodel/model";
     import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { getContext } from "svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import type { TaskContext } from "$lib/types";
@@ -49,7 +49,7 @@
     const left = forms.filter((form) => form.instance?.laterality === "L");
     const right = forms.filter((form) => form.instance?.laterality === "R");
 
-    async function add(instance: Instance) {
+    async function create(instance: Instance) {
         const item: any = {
             formSchema,
             patient: instance.patient,
@@ -60,7 +60,12 @@
         if (taskContext) {
             item.subTask = taskContext.subTask;
         }
-        formAnnotations.create(item);
+        FormAnnotation.createFrom(
+            creator,
+            instance,
+            formSchema!,
+            taskContext?.subTask,
+        );
     }
 </script>
 
@@ -71,7 +76,7 @@
 )}
     {#if instance && create_new}
         <div>
-            <button onclick={() => add(instance)}>
+            <button onclick={() => create(instance)}>
                 Create {schema_name}
                 {post_fix}
             </button>
@@ -86,22 +91,23 @@
         </div>
     {/each}
 {/snippet}
-
-<div id="main">
-    <h4>{title}</h4>
-    {#if split_laterality}
-        <div id="eyes">
-            <div>
-                {@render form_item(right_instance, $right, "OD")}
+{#if formSchema}
+    <div id="main">
+        <h4>{title}</h4>
+        {#if split_laterality}
+            <div id="eyes">
+                <div>
+                    {@render form_item(right_instance, $right, "OD")}
+                </div>
+                <div>
+                    {@render form_item(left_instance, $left, "OS")}
+                </div>
             </div>
-            <div>
-                {@render form_item(left_instance, $left, "OS")}
-            </div>
-        </div>
-    {:else}
-        {@render form_item(first_instance, $forms)}
-    {/if}
-</div>
+        {:else}
+            {@render form_item(first_instance, $forms)}
+        {/if}
+    </div>
+{/if}
 
 <style>
     div {

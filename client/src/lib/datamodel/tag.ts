@@ -1,5 +1,7 @@
 import { BaseItem } from "./baseItem";
-import { registerConstructor } from "./model";
+import type { Instance } from "./instance.svelte";
+import { data, registerConstructor } from "./model";
+import type { Study } from "./study";
 
 export interface ServerTag {
     TagID: number;
@@ -37,7 +39,7 @@ export class Tag extends BaseItem {
 registerConstructor('tags', Tag);
 
 export class InstanceTag extends BaseItem {
-    static endpoint = 'instanceTags';
+    static endpoint = 'instance-tags';
     static mapping = {
         'ImageInstanceID': 'instanceId',
         'TagID': 'tagId',
@@ -54,10 +56,14 @@ export class InstanceTag extends BaseItem {
         this.instanceId = item.ImageInstanceID;
         this.tagId = item.TagID;
     }
+    get instance(): Instance {  
+        return data.instances.get(this.instanceId)!;
+    }
 }
-registerConstructor('instanceTags', InstanceTag);
+registerConstructor('instance-tags', InstanceTag);
+
 export class StudyTag extends BaseItem {
-    static endpoint = 'studyTags';
+    static endpoint = 'study-tags';
     static mapping = {
         'StudyID': 'studyId',
         'TagID': 'tagId',
@@ -74,10 +80,17 @@ export class StudyTag extends BaseItem {
         this.studyId = item.StudyID;
         this.tagId = item.TagID;
     }
+    get study(): Study {
+        return data.studies.get(this.studyId)!;
+    }
+    get tag(): Tag {
+        return data.tags.get(this.tagId)!;
+    }
 }
-registerConstructor('studyTags', StudyTag);
+registerConstructor('study-tags', StudyTag);
+
 export class AnnotationTag extends BaseItem {
-    static endpoint = 'annotationTags';
+    static endpoint = 'annotation-tags';
     static mapping = {
         'AnnotationID': 'annotationId',
         'TagID': 'tagId',
@@ -94,5 +107,6 @@ export class AnnotationTag extends BaseItem {
         this.annotationId = item.AnnotationID;
         this.tagId = item.TagID;
     }
+
 }
-registerConstructor('annotationTags', AnnotationTag);
+registerConstructor('annotation-tags', AnnotationTag);

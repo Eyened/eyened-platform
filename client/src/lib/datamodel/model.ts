@@ -15,7 +15,7 @@ import type { Segmentation } from "./segmentation.svelte";
 import type { Series } from "./series";
 import type { Study } from "./study";
 import type { SubTask, SubTaskImageLink } from "./subTask.svelte";
-import type { AnnotationTag, InstanceTag, Tag } from "./tag";
+import type { AnnotationTag, InstanceTag, StudyTag, Tag } from "./tag";
 import type { Task } from "./task.svelte";
 import type { TaskDefinition } from "./taskDefinition";
 import type { TaskState } from "./taskState";
@@ -51,7 +51,11 @@ export const data: {
     tasks: ItemCollection<Task>;
     tags: ItemCollection<Tag>;
     annotationTags: ItemCollection<AnnotationTag>;
+    'annotation-tags': ItemCollection<AnnotationTag>;
     instanceTags: ItemCollection<InstanceTag>;
+    'instance-tags': ItemCollection<InstanceTag>;
+    studyTags: ItemCollection<StudyTag>;
+    'study-tags': ItemCollection<StudyTag>;
 } = { } as any;
 
 const constructors: { [key: string]: (new (item: any) => BaseItem) } = {};

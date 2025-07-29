@@ -50,8 +50,8 @@
         await submitFilter("ProjectName", projectName);
     }
 
-    let patientIdentifierInput: HTMLInputElement = $state();
-    onMount(() => patientIdentifierInput.focus());
+    let patientIdentifierInput: HTMLInputElement | undefined = $state(undefined );
+    onMount(() => patientIdentifierInput?.focus());
 </script>
 
 <!-- svelte-ignore a11y_label_has_associated_control -->

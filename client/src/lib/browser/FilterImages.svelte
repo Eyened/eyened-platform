@@ -7,9 +7,11 @@
     type FilterItem = {
         variable: string;
         name: string;
-        values: any[]; //keyof typeof data;
+        values: any[];
         title: string;
     };
+
+    // TODO: these should be loaded from the server via API call?
     const modalities = [
         "AdaptiveOptics",
         "ColorFundus",
@@ -27,6 +29,7 @@
         "OCT",
         "OCTA",
     ];
+
     const filterBlocks: FilterItem[] = [
         {
             variable: "FeatureName",
@@ -80,7 +83,3 @@
         <DateRangePicker />
     </FilterBlock>
 </div>
-
-<style>
-
-</style>
