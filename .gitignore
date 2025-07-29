@@ -6,3 +6,10 @@ notebooks/hrfav/**/*
 node_modules/**/*
 extensions.ts
 client/src/lib/extensions.ts
+storage/**/*
+images/**/*
+dev/docker-compose.yml
+cookies.txt
+.vscode/settings.json
+client/package-lock.json
+client/src/lib/extensions.ts
