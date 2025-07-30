@@ -22,11 +22,11 @@ class ExternalEnum(int, enum.Enum):
 
 class ProjectBase(Base):
 
-    ProjectName: str = Field(max_length=45, unique=True)
+    ProjectName: str = Field(max_length=255, unique=True)
     External: ExternalEnum
     Description: str | None = Field(sa_column=Column(Text), default=None)
     ContactID: int | None = Field(foreign_key="Contact.ContactID")
-    DOI: str | None = Field(max_length=256, default=None)
+    DOI: str | None = Field(max_length=255, default=None)
 
 
 class Project(ProjectBase, table=True):
@@ -77,10 +77,10 @@ class Project(ProjectBase, table=True):
         )
 
 class ContactBase(Base):
-    Name: str = Field(max_length=256)
-    Email: str = Field(max_length=256)
-    Institute: str | None = Field(max_length=256, default=None)
-    Orcid: str | None = Field(max_length=256, default=None)
+    Name: str = Field(max_length=255)
+    Email: str = Field(max_length=255)
+    Institute: str | None = Field(max_length=255, default=None)
+    Orcid: str | None = Field(max_length=255, default=None)
 
 class Contact(ContactBase, table=True):
     __tablename__ = "Contact"

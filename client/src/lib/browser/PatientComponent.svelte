@@ -5,7 +5,7 @@
     import StudyBlock from "./StudyBlock.svelte";
     import Icon from "$lib/gui/Icon.svelte";
     import extensions from "$lib/extensions";
-    
+
     interface Props {
         patient: Patient;
         mode?: "full" | "overlay";
@@ -33,12 +33,14 @@
             </div>
         {/if}
     </div>
-    {#each $sorted_studies as study (study)}
-        <StudyBlock {study} {mode} />
-    {/each}
-    {#if mode == "full"}
-        <AdditionalDataSources {context} {additional_data_sources} />
-    {/if}
+    <div class="content">
+        {#each $sorted_studies as study (study)}
+            <StudyBlock {study} {mode} />
+        {/each}
+        {#if mode == "full"}
+            <AdditionalDataSources {context} {additional_data_sources} />
+        {/if}
+    </div>
 </div>
 
 <style>
@@ -48,19 +50,17 @@
     .patient-info {
         font-size: large;
         flex-direction: column;
-
-        box-shadow: rgba(149, 157, 165, 0.2) 0px 6px 12px;
-        margin-bottom: 1em;
-        padding-bottom: 1em;
-    }
-    .header {
-        border-top: 1px solid rgb(181, 188, 206);
-        border-left: 1px solid rgb(181, 188, 206);
-        border-right: 1px solid rgb(181, 188, 206);
-        
+        margin: 0.5em;
+        border: 1px solid rgb(181, 188, 206);
         border-top-left-radius: 2px;
         border-top-right-radius: 2px;
+    }
+    .header {
         padding: 0.3em;
         background-color: var(--browser-background);
+    }
+    div.content {
+        flex-direction: column;
+        margin: 0.5em;
     }
 </style>

@@ -1,16 +1,18 @@
 import { apiUrl } from "$lib/config";
 import { decodeNpy, type NPYArray } from "$lib/utils/npy_loader";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
+import { BaseItem, toServer } from "./baseItem";
 import type { CompositeFeature } from "./compositeFeature.svelte";
 import type { Creator } from "./creator.svelte";
 import type { Feature } from "./feature.svelte";
 import type { Instance } from "./instance.svelte";
-import { BaseItem, FilterList, toServer } from "./itemList";
-import { data, importData } from "./model";
+import { FilterList } from "./itemList";
+import { data, importData, registerConstructor } from "./model";
 import type { Study } from "./study";
 
 
-export type DataRepresentation = 'Binary' | 'DualBitMask' | 'Probability' | 'MultiLabel' | 'MultiClass';
+export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
+export type DataRepresentation = SimpleDataRepresentation | 'MultiLabel' | 'MultiClass';
 export type Datatype = 'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F';
 
 export interface ServerSegmentation {
@@ -113,7 +115,7 @@ export class Segmentation extends BaseItem {
     ) {
 
         const instance = image.instance;
-        const scanIndices = image.is3D ? []: null;
+        const scanIndices = image.is3D ? [] : null;
         let shape = {
             depth: image.depth,
             height: image.height,
@@ -126,18 +128,16 @@ export class Segmentation extends BaseItem {
             shape.width = image.width;
         }
 
-        const imageProjectionMatrix = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-        const referenceId = null;
         const item = {
             instanceId: instance.id,
             ...shape,
             sparseAxis,
-            imageProjectionMatrix,
+            imageProjectionMatrix: null,
             scanIndices,
             dataRepresentation,
             dataType,
             threshold,
-            referenceId,
+            referenceId: null,
             creatorId: creator.id,
             featureId: feature.id,
         };
@@ -146,7 +146,6 @@ export class Segmentation extends BaseItem {
     }
 
     static async create(item: any, np_array?: NPYArray): Promise<Segmentation> {
-        console.log('create', item, np_array);
         const formData = new FormData();
         const serverParams = toServer(item, Segmentation.mapping);
 
@@ -198,7 +197,6 @@ export class Segmentation extends BaseItem {
             params.append('scan_nr', scanNr.toString());
         }
         const url = `${apiUrl}/${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
-        console.log('updateData', url);
 
         const response = await fetch(url, {
             method: 'PUT',
@@ -208,7 +206,6 @@ export class Segmentation extends BaseItem {
             },
         });
         const updatedSegmentation = await response.json();
-        console.log('updatedSegmentation', updatedSegmentation);
         this.updateFields(updatedSegmentation);
     }
 
@@ -221,3 +218,4 @@ export class Segmentation extends BaseItem {
         return decodeNpy(await response.arrayBuffer());
     }
 }
+registerConstructor('segmentations', Segmentation);

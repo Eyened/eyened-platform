@@ -29,26 +29,27 @@
         browserContext.loadDataFromServer();
     });
 
-
-
+    // true = studies, false = images
     let renderMode = $state(true);
 
     function showUserMenu() {
         globalContext.popupComponent = { component: UserMenu };
+    }
+    
+    function showFilterImages() {
+        globalContext.popupComponent = { component: FilterImages };
     }
 
     function search() {
         browserContext.loadDataFromServer();
     }
 
-    async function loadMore(event) {
+    async function loadMore() {
         await setParam("StudyDate~~gte", browserContext.next_cursor!);
         browserContext.loadDataFromServer();
     }
 
-    function showFilterImages() {
-        globalContext.popupComponent = { component: FilterImages };
-    }
+
 </script>
 
 {#if browserContext.loading}
@@ -68,7 +69,6 @@
             </div>
             <div id="browser-header-right">
                 <button onclick={showFilterImages}>Advanced search</button>
-
                 <FilterConditions />
                 <button
                     onclick={search}
@@ -173,7 +173,7 @@
         flex: 0;
     }
     div#container > div#content {
-        padding: 1em;
+        margin-top: 0.5em;
         overflow-y: auto;
         flex: 1;
     }

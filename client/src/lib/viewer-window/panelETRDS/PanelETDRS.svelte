@@ -20,10 +20,16 @@
 	}
 	let { active, etdrsSchema }: Props = $props();
 
+    let firstOpen = true;
 	$effect(() => {
 		if (!active) {
 			tool.annotation = undefined;
-		}
+		} else {
+            if (autoItem && firstOpen) {
+                overlay.visible.add(autoItem);
+                firstOpen = false;
+            }
+        }
 	});
 
 	const { creator, registration } = getContext<ViewerWindowContext>('viewerWindowContext');
@@ -36,8 +42,7 @@
 
 	const filter = (formAnnotation: FormAnnotation) => {
 		if (formAnnotation.formSchemaId !== etdrsSchema.id) return false;
-        console.log(formAnnotation.formSchemaId, etdrsSchema.id);
-        console.log(formAnnotation.instanceId, image.instance.id);
+        
 		if (formAnnotation.instanceId == image.instance.id) return true;
 
 		// also show annotations on linked images
@@ -65,9 +70,11 @@
 		const [odx, ody] = instance.cfKeypoints.disc_edge_xy;
 		autoItem = {
 			instance,
-			value: { value: { fovea: { x: fx, y: fy }, disc_edge: { x: odx, y: ody } } }
-		};
-		// overlay.visible.add(autoItem);
+			value: {
+				fovea: { x: fx, y: fy },
+				disc_edge: { x: odx, y: ody }
+			}
+		};        
 	}
 	function toggleVisisble() {
 		if (overlay.visible.has(autoItem)) {
@@ -78,9 +85,9 @@
 	}
     let autoToggleIcon = $derived.by(() => {
         if (overlay.visible.has(autoItem)) {
-            return Hide;
-        } else {
             return Show;
+        } else {
+            return Hide;
         }
     });
 </script>

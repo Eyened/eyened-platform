@@ -1,4 +1,5 @@
-import { BaseItem } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { registerConstructor } from "./model";
 
 export interface ServerTaskState {
     TaskStateID: number;
@@ -24,3 +25,4 @@ export class TaskState extends BaseItem {
         this.name = item.TaskStateName;
     }
 }
+registerConstructor('task-states', TaskState);

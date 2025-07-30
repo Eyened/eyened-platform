@@ -1,10 +1,10 @@
+import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { encodeNpy } from "$lib/utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
-import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type PaintSettings, type Mask } from "./Mask";
-import { convert, type SegmentationType } from "./segmentationConverter";
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
+import { convert } from "./segmentationConverter";
 
 export const constructors = {
     'Binary': BinaryMask,
@@ -34,9 +34,7 @@ export class SegmentationState {
 
     private async initialize() {
         const array = await this.segmentation.loadData(this.scanNr);
-        console.log(array);
         this.mask.importData(array.data as DrawingArray);
-
         this.history.checkpoint(this.mask.exportData());
     }
 
@@ -51,10 +49,10 @@ export class SegmentationState {
 
         const data = other.exportData();
 
-        const thisType = this.segmentation.constructor.name as SegmentationType;
-        const otherType = other.constructor.name as SegmentationType;
+        const thisType = this.segmentation.dataRepresentation;
+        const otherType = other.segmentation.dataRepresentation;
         const threshold = (255 * (other.segmentation.threshold ?? 0.5));
-        console.log(thisType, otherType, threshold);
+
         const dataConverted = convert(data, otherType, thisType, threshold);
         this.mask.importData(dataConverted);
 

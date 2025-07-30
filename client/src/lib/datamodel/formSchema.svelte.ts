@@ -1,5 +1,6 @@
 import type { JSONSchema } from "$lib/forms/schemaType";
-import { BaseItem } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { registerConstructor } from "./model";
 
 export interface ServerFormSchema {
     FormSchemaID: number,
@@ -29,3 +30,4 @@ export class FormSchema extends BaseItem {
         this.schema = serverItem.Schema;
     }
 }
+registerConstructor('form-schemas', FormSchema);

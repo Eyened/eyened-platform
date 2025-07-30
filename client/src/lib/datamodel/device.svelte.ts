@@ -1,5 +1,5 @@
-import { BaseItem } from "./itemList";
-import { data } from "./model";
+import { BaseItem } from "./baseItem";
+import { data, registerConstructor } from "./model";
 
 export interface ServerDeviceModel {
     DeviceModelID: number,
@@ -12,7 +12,7 @@ export class DeviceModel extends BaseItem {
         'Manufacturer': 'manufacturer',
         'ManufacturerModelName': 'model',
     };
-    static endpoint = 'deviceModels';
+    static endpoint = 'device-models';
 
     id: number = 0;
     manufacturer: string = $state('');
@@ -29,7 +29,7 @@ export class DeviceModel extends BaseItem {
         this.model = serverItem.ManufacturerModelName;
     }
 }
-
+registerConstructor('device-models', DeviceModel);
 export interface ServerDevice {
     DeviceInstanceID: number,
     DeviceModelID: number,
@@ -65,4 +65,4 @@ export class Device extends BaseItem {
         return data.deviceModels.get(this.deviceModelId)!;
     }
 }
-
+registerConstructor('devices', Device);

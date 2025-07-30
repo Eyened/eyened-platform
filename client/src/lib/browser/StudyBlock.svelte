@@ -49,6 +49,7 @@
             <Eye laterality="R" {study} />
             <Eye laterality="L" {study} />
         </div>
+        <Eye laterality={null} {study} />
 
         {#if mode == "full"}
             <StudyBlockForms {study} />

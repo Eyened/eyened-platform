@@ -6,9 +6,7 @@
 	}
 
 	let { instance }: Props = $props();
-	const segmentations = instance.annotations.filter((a) =>
-		a.annotationType.name.includes('Segmentation')
-	);
+	const segmentations = instance.segmentations;
 </script>
 
 <div id="main">

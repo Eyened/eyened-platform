@@ -29,18 +29,18 @@
         //         ad.update({ valueFloat: threshold });
         //     }
         // }
-        segmentation.update({ threshold: threshold });
+        segmentation.update({ threshold: segmentation.threshold });
     }
 </script>
 
 <label>
-    <span>Threshold: {threshold}</span>
+    <span>Threshold: {segmentation.threshold}</span>
     <input
         type="range"
         min="0"
         max="1"
         step="0.01"
-        bind:value={threshold}
+        bind:value={segmentation.threshold}        
         onchange={onUpdateThreshold}
     />
 </label>

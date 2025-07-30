@@ -10,7 +10,7 @@ from eyened_orm import (
     ModalityTable,
     SourceInfo,
     TaskState,
-    base,
+    Base,
     db,
 )
 from sqlalchemy import create_engine, text
@@ -30,7 +30,7 @@ def create_database():
         database=None,  # Don't specify database initially
     )
 
-    temp_engine = create_engine(create_connection_string(root_config))
+    temp_engine = create_engine(db.create_connection_string(root_config))
 
     # First check if database exists
     try:
@@ -66,7 +66,7 @@ def create_database():
         )
     # Now create tables using the correct database
     root_config.database = settings.database.database
-    temp_engine = create_engine(create_connection_string(root_config))
+    temp_engine = create_engine(db.create_connection_string(root_config))
     Base.metadata.create_all(temp_engine)
 
 
@@ -171,25 +171,7 @@ def init_other_objects(session):
     session.commit()
 
 
-def init_annotation_types(session):
-    expected_types = [
-        ("Binary", DataRepresentation.Binary, Datatype.R8UI),
-        ("Binary + Questionable", DataRepresentation.DualBitMask, Datatype.R8UI),
-        ("Probability", DataRepresentation.Probability, Datatype.R8),        
-        ("Probability", DataRepresentation.Probability, Datatype.R32F),
-    ]
-
-    annotation_types = AnnotationType.fetch_all(session)
-    # make sure all expected types are in the database
-    for name, representation, datatype in expected_types:
-        if name not in [a.AnnotationTypeName for a in annotation_types]:
-            annotation_type = AnnotationType(
-                AnnotationTypeName=name, DataRepresentation=representation, DataType=datatype
-            )
-            session.add(annotation_type)
-
-    session.commit()
-
+   
 
 def init_task_states(session):
     expected_states = [

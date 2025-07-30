@@ -122,10 +122,15 @@ Make sure to set up regular back ups for both the MySQL database and storage fol
 :::tip
 **Using eyened_orm python package**
 
+The eyened_orm python package can be installed by running:
+```bash
+pip install orm
+```
+
 To use the eyened_orm package for database access, copy the `.env` file from the docker folder to the eyened_orm/environments folder:
 
 ```bash
-cp docker/.env eyened_orm/environments
+cp docker/.env orm/eyened_orm/environments
 ```
 
 **Multiple Database Environments**
@@ -134,7 +139,7 @@ You can create different environment files to connect to different databases or 
 
 1. Copy the existing environment file:
 ```bash
-cp eyened_orm/environments/.env eyened_orm/environments/read-only.env
+cp orm/eyened_orm/environments/.env orm/eyened_orm/environments/read-only.env
 ```
 
 2. Update the database credentials in `read-only.env`:

@@ -95,8 +95,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if docker-compose is installed
-if ! command -v docker-compose &> /dev/null; then
+# Check if docker compose is installed
+if ! command -v docker compose &> /dev/null; then
     print_error "Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
@@ -127,15 +127,10 @@ echo "Setting up database configuration. This is used to connect to the database
 EXISTING_DB_PORT=$(read_env_value "DATABASE_PORT")
 get_input "Enter the database port" "${EXISTING_DB_PORT:-3306}" DATABASE_PORT validate_port
 
-# Check if database exists and handle credentials accordingly
-if [ -s "$DATABASE_PATH" ]; then
-    echo "Database path exists and is not empty. Please enter the database credentials."
-else
-    echo "Database path does not exist or is empty. Creating new database."
-    DEFAULT_ROOT_PASSWORD=$(openssl rand -base64 16)
-    EXISTING_ROOT_PASSWORD=$(read_env_value "DATABASE_ROOT_PASSWORD")
-    get_input "Enter the database root password (or press Enter for a random one)" "${EXISTING_ROOT_PASSWORD:-$DEFAULT_ROOT_PASSWORD}" DATABASE_ROOT_PASSWORD validate_path    
-fi
+# Always prompt for database root password
+DEFAULT_ROOT_PASSWORD=$(openssl rand -base64 16)
+EXISTING_ROOT_PASSWORD=$(read_env_value "DATABASE_ROOT_PASSWORD")
+get_input "Enter the database root password (or press Enter for a random one)" "${EXISTING_ROOT_PASSWORD:-$DEFAULT_ROOT_PASSWORD}" DATABASE_ROOT_PASSWORD validate_path
 
 EXISTING_DB_USER=$(read_env_value "DATABASE_USER")
 get_input "Enter the database username" "${EXISTING_DB_USER:-eyened}" DATABASE_USER validate_path
@@ -183,12 +178,10 @@ then
     exit 1
 fi
 
-# Add root password only if it was supplied
-if [ -n "$DATABASE_ROOT_PASSWORD" ]; then
-    if ! echo "DATABASE_ROOT_PASSWORD=\"${DATABASE_ROOT_PASSWORD}\"" >> "$ENV_FILE"; then
-        print_error "Failed to append root password to .env file"
-        exit 1
-    fi
+# Always add root password
+if ! echo "DATABASE_ROOT_PASSWORD=\"${DATABASE_ROOT_PASSWORD}\"" >> "$ENV_FILE"; then
+    print_error "Failed to append root password to .env file"
+    exit 1
 fi
 
 print_status ".env file created successfully!"
@@ -218,13 +211,13 @@ done
 
 # Build and start containers
 print_status "Building containers..."
-if ! docker-compose build; then
+if ! docker compose build; then
     print_error "Failed to build containers"
     exit 1
 fi
 
 print_status "Starting containers..."
-if ! USERID=$(id -u) GROUPID=$(id -g) docker-compose up -d; then
+if ! USERID=$(id -u) GROUPID=$(id -g) docker compose up -d; then
     print_error "Failed to start containers"
     exit 1
 fi
@@ -235,12 +228,12 @@ echo -e "\nYour Eyened platform should now be available at:"
 echo -e "  Viewer: ${GREEN}http://${HOSTNAME}:${PORT}${NC}"
 echo -e "  Adminer: ${GREEN}http://${HOSTNAME}:8080${NC}"
 echo -e "\nTo check container status, run:"
-echo -e "  ${YELLOW}docker-compose ps${NC}"
+echo -e "  ${YELLOW}docker compose ps${NC}"
 echo -e "\nTo view logs, run:"
-echo -e "  ${YELLOW}docker-compose logs -f${NC}"
+echo -e "  ${YELLOW}docker compose logs -f${NC}"
 echo -e "\nTo stop the platform, run:"
-echo -e "  ${YELLOW}docker-compose down${NC}"
+echo -e "  ${YELLOW}docker compose down${NC}"
 echo -e "\nNext time you want to start the platform, run:"
-echo -e "  ${YELLOW}USERID=$(id -u) GROUPID=$(id -g) docker-compose up -d${NC}"
+echo -e "  ${YELLOW}USERID=$(id -u) GROUPID=$(id -g) docker compose up -d${NC}"
 
 unset ADMIN_PASSWORD DATABASE_ROOT_PASSWORD DATABASE_PASSWORD DEFAULT_DB_PASSWORD DEFAULT_ADMIN_PASSWORD 

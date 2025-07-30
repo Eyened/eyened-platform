@@ -1,7 +1,7 @@
 import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import type { AbstractImage } from "./abstractImage";
 import { SegmentationState } from "./segmentationState";
-import type { Mask, PaintSettings } from "./Mask";
+import type { Mask, PaintSettings } from "./mask.svelte";
 import { SvelteMap } from "svelte/reactivity";
 
 // manages the segmentation states (one per scan) for a single segmentation

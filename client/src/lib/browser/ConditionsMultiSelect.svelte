@@ -1,6 +1,5 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { derived } from "svelte/store";
     import { toggleParam } from "./browserContext.svelte";
 
     interface Props {

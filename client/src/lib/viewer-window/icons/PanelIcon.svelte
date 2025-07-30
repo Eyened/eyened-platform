@@ -9,6 +9,7 @@
         children?: Snippet;
         Icon?: Component;
         onclick?: () => void;
+        onrightclick?: () => void;
         color?: string;
         backgroundColor?: string;
         theme?: "light" | "dark";
@@ -25,6 +26,7 @@
         children,
         Icon = undefined,
         onclick = () => {},
+        onrightclick = () => {},
         color,
         backgroundColor,
         theme = "dark",
@@ -64,6 +66,11 @@
         if (disabled) return;
         onclick();
     }
+    function rightclick(e: MouseEvent) {
+        e.preventDefault();
+        if (disabled) return;
+        onrightclick();
+    }
 </script>
 
 <div class="tooltip {theme}" bind:this={tooltipElem}>
@@ -75,6 +82,7 @@
         class:active
         class:disabled
         onclick={click}
+        oncontextmenu={rightclick}
         style:color
         style:background-color={backgroundColor}
         style:width="{width}em"
