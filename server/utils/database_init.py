@@ -10,7 +10,7 @@ from eyened_orm import (
     ModalityTable,
     SourceInfo,
     TaskState,
-    base,
+    Base,
     db,
 )
 from sqlalchemy import create_engine, text

@@ -12,3 +12,4 @@ redis==5.*
 pydantic-settings==2.7.1
 zarr>=2.18.0
 python-multipart==0.0.20
+passlib==1.7.4
