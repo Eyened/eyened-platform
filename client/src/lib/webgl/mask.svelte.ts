@@ -1,4 +1,3 @@
-
 import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
 import type { Position2D } from "$lib/types";
@@ -44,6 +43,7 @@ export class BinaryMask extends Mask {
     protected _binaryMask: BitMaskTexture | null = null;
     protected webgl: WebGL;
     protected shaders: Shaders;
+    public pixelArea: number = $state(0);
 
     constructor(image: AbstractImage, segmentation: Segmentation) {
         super(image, segmentation);
@@ -58,9 +58,15 @@ export class BinaryMask extends Mask {
         return this._binaryMask!;
     }
 
+    protected afterUpdate() {
+        this.connectedComponentsValid = false;
+        const d = this.bitMaskTexture.getData();
+        this.pixelArea = d.reduce((acc, curr) => acc + curr, 0);
+    }
+
     importData(data: DrawingArray): void {
         this.bitMaskTexture.setData(data);
-        this.connectedComponentsValid = false;
+        this.afterUpdate();
     }
 
     /**
@@ -78,7 +84,6 @@ export class BinaryMask extends Mask {
      */
     draw(drawing: ImageType, paintSettings: PaintSettings): void {
         this._drawMask(this.bitMaskTexture, drawing, paintSettings);
-        this.connectedComponentsValid = false;
     }
 
     protected _drawMask(mask: BitMaskTexture, drawing: ImageType, paintSettings: PaintSettings): void {
@@ -92,10 +97,12 @@ export class BinaryMask extends Mask {
         } else {
             mask.passShader(this.shaders.draw, uniforms);
         }
+        this.afterUpdate();
     }
 
     clear(): void {
         this.bitMaskTexture.clearData();
+        this.afterUpdate();
     }
 
     dispose(): void {
@@ -189,6 +196,7 @@ export class QuestionableMask extends BinaryMask {
         }
         this.bitMaskTexture.setData(b);
         this.questionableMask.setData(q);
+        this.afterUpdate();
     }
 
     /**
@@ -216,19 +224,21 @@ export class QuestionableMask extends BinaryMask {
     draw(drawing: HTMLCanvasElement, paintSettings: PaintSettings): void {
         if (paintSettings.questionable) {
             this._drawMask(this.questionableMask, drawing, paintSettings);
+
         } else {
             super.draw(drawing, paintSettings);
         }
+
     }
 
     clear(): void {
-        super.clear();
         this.questionableMask.clearData();
+        super.clear();
     }
 
     dispose(): void {
-        super.dispose();
         this.questionableMask.dispose();
+        super.dispose();
     }
 
 
@@ -252,18 +262,22 @@ abstract class AbstractDataMask extends Mask {
     importData(data: DrawingArray): void {
         this.textureData.uploadData(data);
     }
+
     exportData(): DrawingArray {
         return this.textureData.data;
     }
+
     clear(): void {
         this.textureData.clearData();
     }
+
     dispose(): void {
         this.textureData.dispose();
     }
 }
 
 export class ProbabilityMask extends AbstractDataMask {
+    public pixelArea: number = $state(0);
 
     u_hard: boolean = true;
     constructor(image: AbstractImage, segmentation: Segmentation) {
@@ -387,12 +401,16 @@ export class MultiLabelMask extends BaseMultiMask {
     constructor(image: AbstractImage, segmentation: Segmentation) {
         super(image, segmentation);
     }
-    getBitmask(activeIndices: number[]): number {
+    getBitmask(activeIndices: number[] | number): number {
         let bitmask = 0;
-        for (const i of activeIndices) {
-            bitmask |= 1 << (i - 1);
+        if (Array.isArray(activeIndices)) {
+            for (const i of activeIndices) {
+                bitmask |= 1 << (i - 1);
+            }
+            return bitmask;
+        } else {
+            return 1 << (activeIndices - 1);
         }
-        return bitmask;
     }
 
     getRenderShader() {

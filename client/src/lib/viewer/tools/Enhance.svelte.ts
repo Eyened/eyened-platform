@@ -1,8 +1,9 @@
-import { ProbabilityMask } from "$lib/webgl/Mask";
+import { ProbabilityMask } from "$lib/webgl/mask.svelte";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { DrawingExecutor } from "./segmentation";
 import { BrushTool } from "./Brush";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
 export class EnhanceTool extends BrushTool {
 
@@ -15,7 +16,8 @@ export class EnhanceTool extends BrushTool {
     constructor(
         drawingExecutor: DrawingExecutor,
         viewerContext: ViewerContext,
-        segmentationContext: SegmentationContext
+        segmentationContext: SegmentationContext,
+        private readonly globalContext: GlobalContext
     ) {
         super(drawingExecutor, viewerContext, segmentationContext);
     }
@@ -25,6 +27,7 @@ export class EnhanceTool extends BrushTool {
         const segmentationItem = this.segmentationContext.segmentationItem;
         if (!segmentationItem) {
             console.warn("No segmentation");
+            this.globalContext.dialogue = "No segmentation selected";
             return;
         }
 
@@ -32,6 +35,7 @@ export class EnhanceTool extends BrushTool {
         const mask = segmentationState.mask;
         if (!(mask instanceof ProbabilityMask)) {
             console.warn("No probability segmentation");
+            this.globalContext.dialogue = "Enhance tool requires a probability segmentation";
             return;
         }
 

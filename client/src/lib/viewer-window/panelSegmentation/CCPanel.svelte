@@ -23,7 +23,7 @@
 <div class="main">
     <h3><ConnectedComponents size="1.5em" />Connected components</h3>
     <label>
-        <input type="checkbox" bind:checked={connectedComponentsActive} />
+        <input type="checkbox" checked={connectedComponentsActive} onchange={toggleConnectedComponents} />
         Show connected components
     </label>
 </div>

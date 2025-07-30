@@ -9,7 +9,7 @@ import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 import type { FilterList } from "$lib/datamodel/itemList";
-import { BinaryMask } from "$lib/webgl/Mask";
+import { BinaryMask } from "$lib/webgl/mask.svelte";
 import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 export class SegmentationOverlay implements Overlay {
@@ -25,17 +25,13 @@ export class SegmentationOverlay implements Overlay {
     public activeFeatureMask = $state<number | undefined>(undefined);
     public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
     public readonly segmentationContext = new SegmentationContext();
-    public readonly segmentations: FilterList<Segmentation>;
+    public readonly allSegmentations: FilterList<Segmentation>;
 
     constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
-        const image = viewerContext.image;
-        const instance = image.instance;
-        this.segmentations = instance.segmentations.filter(globalContext.segmentationsFilter).filter(s=>{
-            if (s.sparseAxis !== null && s.sparseAxis !== viewerContext.axis) {
-                return false;
-            }
-            return true;
-        });
+        const instance = viewerContext.image.instance;
+        this.allSegmentations = instance.segmentations
+        .filter(globalContext.segmentationsFilter)
+        .filter((s) => s.sparseAxis == viewerContext.axis);
     }
 
     toggleMasking(segmentation: SegmentationItem) {
@@ -61,6 +57,7 @@ export class SegmentationOverlay implements Overlay {
     }
 
     repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        
         if (!this.active) {
             return;
         }
@@ -69,8 +66,7 @@ export class SegmentationOverlay implements Overlay {
             return;
         }
         const {
-            hideCreators,
-            hideSegmentations
+            hideCreators
         } = this.segmentationContext;
 
         const baseUniforms = getBaseUniforms(viewerContext);
@@ -83,21 +79,21 @@ export class SegmentationOverlay implements Overlay {
             activeIndices: this.segmentationContext.activeIndices
         };
 
-        for (const segmentation of this.segmentations.$) {
+        // for (const segmentation of this.segmentations.$) {
+        for (const segmentation of this.segmentationContext.visibleSegmentations) {
+            
+            // console.log('segmentation', segmentation);
+
             const segmentationItem = image.segmentationItems.get(segmentation);
             if (!segmentationItem) continue;
-            const segmentationData = segmentationItem.getMask(index);
+            const mask = segmentationItem.getMask(index);
 
-            if (!segmentationData) continue;
-            if (hideSegmentations.has(segmentation)) continue;
+            if (!mask) continue;
             if (hideCreators.has(segmentation.creator)) continue;
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-
+            uniforms.u_threshold = segmentation.threshold;
             
-            // for (const ad of annotation.annotationData.$) {
-            //     uniforms.u_threshold = ad.valueFloat ?? 0.5;
-            // }
             if (this.highlightedSegmentationItem == segmentationItem) {
                 uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;
                 uniforms.u_active_feature_mask = this.activeFeatureMask ?? 0;
@@ -124,10 +120,11 @@ export class SegmentationOverlay implements Overlay {
                 }
             }
 
+
             if (this.applyConnectedComponents.has(segmentationItem)) {
-                (segmentationData as BinaryMask).renderConnectedComponents(renderTarget, uniforms);
+                (mask as BinaryMask).renderConnectedComponents(renderTarget, uniforms);
             } else {
-                segmentationData.render(renderTarget, uniforms);
+                mask.render(renderTarget, uniforms);
             }
         }
     }

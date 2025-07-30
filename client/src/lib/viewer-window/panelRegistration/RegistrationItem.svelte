@@ -27,14 +27,8 @@
 
 
     const tool = new RegistrationTool(
-        formAnnotation.value?.[instance.id] || [],
-        (p) => {
-            if (!formAnnotation.value) {
-                formAnnotation.value = {};
-            }
-            formAnnotation.value[instance.id] = p;
-            formAnnotation.update({ value: formAnnotation.value });
-        },
+        formAnnotation,
+        instance,
     );
 
     let removeTool = () => {};
@@ -87,11 +81,6 @@
             {/if}
         {/each}
     {/if}
-    <div class="linked-images">
-        <!-- {#each $annotationData as annotationData}
-			<RegistrationItemImageIds {annotationData} />
-		{/each} -->
-    </div>
 </li>
 
 <style>
@@ -124,7 +113,5 @@
     li.outer.active {
         background-color: rgb(57, 158, 165);
         color: white;
-    }
-    li.point {
     }
 </style>

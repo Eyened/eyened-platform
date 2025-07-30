@@ -41,10 +41,10 @@
 <style>
     h3 {
         display: flex;
-        align-items: center;
+        align-items: center;        
         border-bottom: 1px solid rgb(45, 45, 45);
         margin: 0;
-        font-size: 12px;
+        font-size: small;
     }
     span#chev {
         width: 1em;

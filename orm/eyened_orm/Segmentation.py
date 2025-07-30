@@ -1,12 +1,15 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, ClassVar, List, Optional
 
 import numpy as np
-from sqlalchemy import JSON, Index
+from sqlalchemy import JSON, Index, UniqueConstraint
 from sqlmodel import Field, Relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from eyened_orm import Creator, Feature, ImageInstance, SubTask
 
 
 class DataRepresentation(Enum):
@@ -165,8 +168,9 @@ class Segmentation(SegmentationBase, table=True):
     SegmentationID: int = Field(primary_key=True)
 
     CreatorID: int = Field(foreign_key="Creator.CreatorID")
-    # feature that the segmentation represents
     FeatureID: int = Field(foreign_key="Feature.FeatureID")
+    SubTaskID: int | None = Field(foreign_key="SubTask.SubTaskID", default=None)
+
 
     DateInserted: datetime = Field(default_factory=datetime.now)
     DateModified: datetime | None = Field(default=None)
@@ -179,7 +183,49 @@ class Segmentation(SegmentationBase, table=True):
     )
     Creator: "Creator" = Relationship(back_populates="Segmentations")
     Feature: "Feature" = Relationship(back_populates="Segmentations")
+    SubTask: "SubTask" = Relationship(back_populates="Segmentations")
 
+
+class FeatureBase(Base):
+    FeatureName: str = Field(max_length=60, unique=True)
+
+
+class Feature(FeatureBase, table=True):
+    __tablename__ = "Feature"
+    _name_column: ClassVar[str] = "FeatureName"
+
+    FeatureID: int | None = Field(default=None, primary_key=True)
+
+    Segmentations: List["Segmentation"] = Relationship(back_populates="Feature")
+    DateInserted: datetime = Field(default_factory=datetime.now)
+
+
+class CompositeFeatureBase(Base):
+    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    FeatureIndex: int = Field(primary_key=True)
+
+class CompositeFeature(CompositeFeatureBase, table=True):
+    __tablename__ = "CompositeFeature"
+    __table_args__ = (
+        Index("fk_CompositeFeature_ParentFeature1_idx", "ParentFeatureID"),
+        Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
+    )
+
+
+class ModelBase(Base):
+    ModelName: str = Field(max_length=255, unique=True)
+    Version: str = Field(max_length=255, unique=True)
+    ModelType: str = Field(max_length=255)
+    Description: str | None = Field(max_length=255, default=None)
+    FeatureID: int = Field(foreign_key="Feature.FeatureID")
+
+class Model(ModelBase, table=True):
+    __tablename__ = "Model"
+    ModelID: int | None = Field(default=None, primary_key=True)
+    DateInserted: datetime = Field(default_factory=datetime.now)
+
+    __table_args__ = (UniqueConstraint("ModelName", "Version"),)
 
 class SegmentationModel(SegmentationBase, table=True):
     __tablename__ = "SegmentationModel"    
@@ -188,15 +234,3 @@ class SegmentationModel(SegmentationBase, table=True):
     ModelID: int = Field(foreign_key="Model.ModelID")
 
     DateInserted: datetime = Field(default_factory=datetime.now)
-
-
-class CompositeFeature(Base, table=True):
-    __tablename__ = "CompositeFeature"
-    __table_args__ = (
-        Index("fk_CompositeFeature_ParentFeature1_idx", "ParentFeatureID"),
-        Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
-    )
-
-    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    FeatureIndex: int = Field(primary_key=True)

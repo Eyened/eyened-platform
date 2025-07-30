@@ -1,13 +1,9 @@
-import type { DrawingArray } from "./Mask";
-
-export type SegmentationType =
-    | 'BinarySegmentation'
-    | 'QuestionableSegmentation'
-    | 'ProbabilitySegmentation'
+import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
+import type { DrawingArray } from "./mask.svelte";
 
 export interface ConversionRule {
-    from: SegmentationType;
-    to: SegmentationType;
+    from: SimpleDataRepresentation;
+    to: SimpleDataRepresentation;
     convert: (data: DrawingArray) => DrawingArray;
 }
 
@@ -29,14 +25,14 @@ function probabilityToBinary(i: number, threshold: number) {
     return i > threshold ? 1 : 0;
 }
 export const converters = {
-    'BinarySegmentation->QuestionableSegmentation': binaryToQuestionable,
-    'BinarySegmentation->ProbabilitySegmentation': binaryToProbability,
-    'QuestionableSegmentation->BinarySegmentation': questionableToBinary,
-    'QuestionableSegmentation->ProbabilitySegmentation': questionableToProbability,
-    'ProbabilitySegmentation->BinarySegmentation': probabilityToBinary,
-    'ProbabilitySegmentation->QuestionableSegmentation': probabilityToBinary, // same as binary
+    'Binary->Questionable': binaryToQuestionable,
+    'Binary->Probability': binaryToProbability,
+    'Questionable->Binary': questionableToBinary,
+    'Questionable->Probability': questionableToProbability,
+    'Probability->Binary': probabilityToBinary,
+    'Probability->Questionable': probabilityToBinary, // same as binary
 }
-export function convert(data: DrawingArray, from: SegmentationType, to: SegmentationType, threshold: number = 127) {
+export function convert(data: DrawingArray, from: SimpleDataRepresentation, to: SimpleDataRepresentation, threshold: number = 127) {
     if (from == to) {
         return data;
     }

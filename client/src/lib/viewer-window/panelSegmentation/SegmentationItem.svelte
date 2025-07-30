@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { dialogueManager } from "$lib/dialogue/DialogueManager";
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
@@ -12,9 +11,12 @@
     import FeatureColorPicker from "./FeatureColorPicker.svelte";
     import ImportPanel from "./ImportPanel.svelte";
     import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
-    import ReferenceAnnotationPanel from "./ReferenceAnnotationPanel.svelte";
+    import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import StringDialogue from "$lib/StringDialogue.svelte";
+
     const globalContext = getContext<GlobalContext>("globalContext");
+
     interface Props {
         segmentation: Segmentation;
     }
@@ -28,7 +30,9 @@
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
+
     const { segmentationContext } = segmentationOverlay;
+    segmentationContext.visibleSegmentations.add(segmentation);
 
     const segmentationItem = image.getSegmentationItem(segmentation);
     let segmentationState = $derived(
@@ -43,16 +47,23 @@
             segmentationItem.dispose();
         };
 
-        dialogueManager.showQuery(
-            `Delete segmentation [${segmentation.id}]?`,
-            "Delete",
-            "Cancel",
-            resolve,
-        );
+        globalContext.dialogue = {
+            component: StringDialogue,
+            props: {
+                query: `Delete segmentation [${segmentation.id}]?`,
+                approve: "Delete",
+                decline: "Cancel",
+                resolve,
+            },
+        };
     }
 
     function toggleShow() {
         segmentationContext.toggleShow(segmentation);
+    }
+
+    function showOnly() {
+        segmentationContext.showOnly(segmentation);
     }
 
     const isEditable = globalContext.canEdit(segmentation);
@@ -75,8 +86,8 @@
     }
 
     const segmentationType = {
-        Binary: "Q",
-        DualBitMask: "B",
+        Binary: "B",
+        DualBitMask: "Q",
         Probability: "P",
         MultiClass: "MC",
         MultiLabel: "ML",
@@ -93,10 +104,20 @@
 >
     <div class="row">
         <div>
-            {#if segmentationContext.hideSegmentations.has(segmentation)}
-                <PanelIcon onclick={toggleShow} tooltip="Show" Icon={Hide} />
+            {#if segmentationContext.visibleSegmentations.has(segmentation)}
+                <PanelIcon
+                    onclick={toggleShow}
+                    onrightclick={showOnly}
+                    tooltip="Hide"
+                    Icon={Show}
+                />
             {:else}
-                <PanelIcon onclick={toggleShow} tooltip="Hide" Icon={Show} />
+                <PanelIcon
+                    onclick={toggleShow}
+                    onrightclick={showOnly}
+                    tooltip="Show"
+                    Icon={Hide}
+                />
             {/if}
         </div>
 
@@ -107,7 +128,7 @@
         <div class="expand" onclick={activate}>
             <div class="feature-name">{feature.name}</div>
             <div class="segmentationID">[{segmentation.id}]</div>
-            <div class="segmentationType">{segmentationType}</div>
+            <div class="segmentationType">[{segmentationType}]</div>
         </div>
 
         {#if isEditable}
@@ -118,17 +139,19 @@
             />
         {/if}
     </div>
-    {#if active}
-        {#if dataRepresentation == "Probability"}
+
+    {#if dataRepresentation == "Probability"}
+        {#if active}
             <div class="row">
                 <ThresholdSlider {segmentation} />
             </div>
         {/if}
+    {/if}
 
-        {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
-            <MultiFeatureSelector {segmentation} />
-        {/if}
-
+    {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
+        <MultiFeatureSelector {segmentation} {active} />
+    {/if}
+    {#if active}
         <div class="open" onclick={() => (collapsed = !collapsed)}>
             {#if collapsed}
                 &#9654;
@@ -154,13 +177,12 @@
                             {segmentation}
                             {image}
                             {segmentationItem}
-                            mask={segmentationState.mask}
                         />
                     {/if}
                 </div>
 
                 <div class="row">
-                    <ReferenceAnnotationPanel
+                    <ReferenceSegmentationPanel
                         {segmentation}
                         {image}
                         {isEditable}

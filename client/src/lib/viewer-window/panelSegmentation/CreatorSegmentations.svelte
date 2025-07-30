@@ -12,7 +12,7 @@
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
-    const { hideCreators } = segmentationOverlay.segmentationContext;
+    const hideCreators = segmentationOverlay.segmentationContext.hideCreators;
     function toggle() {
         if (hideCreators.has(creator)) {
             hideCreators.delete(creator);
@@ -20,7 +20,7 @@
             hideCreators.add(creator);
         }
     }
-    let segmentations = segmentationOverlay.segmentations
+    let segmentations = segmentationOverlay.allSegmentations
         .filter((a) => a.creator.id == creator.id)
         .sort((a, b) => a.id - b.id);
 </script>

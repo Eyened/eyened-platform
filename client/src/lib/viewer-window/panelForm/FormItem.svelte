@@ -1,7 +1,6 @@
 <script lang="ts">
     import FormItemContent from "./FormItemContent.svelte";
     import { PanelIcon, Trash } from "../icons/icons";
-    import { data } from "$lib/datamodel/model";
     import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { openNewWindow } from "$lib/newWindow";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -21,9 +20,6 @@
     }
 
     let { form, theme = "dark" }: Props = $props();
-    const { formAnnotations } = data;
-
-    console.log(form);
 
     const dt = new Date().getTime() - (form.created?.getTime() ?? 0);
     const daysSinceCreation = dt / (1000 * 60 * 60 * 24);

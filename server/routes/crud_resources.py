@@ -1,6 +1,8 @@
 from eyened_orm import (
     AnnotationType,
     AnnotationTypeBase,
+    CompositeFeature,
+    CompositeFeatureBase,
     Contact,
     ContactBase,
     Creator,
@@ -40,9 +42,10 @@ from eyened_orm import (
     TaskStateBase,
 )
 from eyened_orm.base import create_patch_model
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm import Session
+import inspect
 
 from server.routes.utils import collect_rows
 
@@ -58,6 +61,21 @@ def get_item_or_404(
     pk = model_class.__table__.primary_key.columns[0]
     print("pk", pk, "item_id", item_id)
     query = db.query(model_class).filter(pk == item_id)
+    if soft_delete_field:
+        query = query.filter(getattr(model_class, soft_delete_field) == False)
+    item = query.first()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"{model_class.__name__} not found")
+    return item
+
+
+def get_pk_columns(model_class):
+    return [col.name for col in model_class.__table__.primary_key.columns]
+
+def get_item_by_pk(db, model_class, pk_values: dict, soft_delete_field: str | None):
+    query = db.query(model_class)
+    for col, val in pk_values.items():
+        query = query.filter(getattr(model_class, col) == val)
     if soft_delete_field:
         query = query.filter(getattr(model_class, soft_delete_field) == False)
     item = query.first()
@@ -85,9 +103,7 @@ def create_crud_routes(
     # PatchModel is a Pydantic model with all fields optional
     # useful for filtering on columns and for patching (partial updates)
     PatchModel = create_patch_model(f"{model_class.__name__}Patch", base_model)
-
-    # assuming single column primary key
-    pk = model_class.__table__.primary_key.columns[0]
+    pk_columns = get_pk_columns(model_class)
 
     @router.get(f"/{route_prefix}", response_model=list[model_class])
     async def list_items(
@@ -112,15 +128,6 @@ def create_crud_routes(
 
         return query.all()
 
-    @router.get(f"/{route_prefix}/{{item_id}}", response_model=model_class)
-    async def get_item(
-        item_id: int,
-        db: Session = Depends(get_db),
-        current_user: CurrentUser = Depends(get_current_user),
-    ):
-        """Get a specific item by ID."""
-        return get_item_or_404(db, model_class, item_id, soft_delete_field)
-
     @router.post(f"/{route_prefix}", response_model=model_class, status_code=201)
     async def create_item(
         item: base_model,
@@ -134,43 +141,102 @@ def create_crud_routes(
         db.refresh(db_item)
         return db_item
 
-    @router.patch(f"/{route_prefix}/{{item_id}}", response_model=model_class)
-    async def patch_item(
-        item_id: int,
-        params: PatchModel,
-        db: Session = Depends(get_db),
-        current_user: CurrentUser = Depends(get_current_user),
-    ):
-        print("[params]", params.model_dump(exclude_unset=True))
-        item = get_item_or_404(db, model_class, item_id, soft_delete_field)
-        for key, value in params.model_dump(exclude_unset=True).items():
-            print("patching item", key, value)
-            setattr(item, key, value)
+    # --- PK-based routes (merged for single and composite PKs) ---
+    pk_path = "/".join([f"{{{col}}}" for col in pk_columns])
 
+    def make_handler(
+        pk_columns, method, PatchModel, model_class, soft_delete_field,
+        get_item_by_pk, get_db, get_current_user, CurrentUser
+    ):
+        from fastapi import Depends, Path, HTTPException
+        from sqlalchemy.orm import Session
+
+        # Build the argument string for the function definition
+        arg_str = ", ".join([f"{col}: int = Path(...)" for col in pk_columns])
+        # Add dependencies
+        if method == "patch":
+            arg_str += ", params: PatchModel = None"
+        arg_str += ", db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)"
+
+        # Build the pk_values dict
+        pk_dict_str = "{" + ", ".join([f"'{col}': {col}" for col in pk_columns]) + "}"
+
+        # Handler logic as a string
+        if method == "get":
+            body = f"""
+def handler({arg_str}):
+    pk_values = {pk_dict_str}
+    return get_item_by_pk(db, model_class, pk_values, soft_delete_field)
+"""
+        elif method == "patch":
+            body = f"""
+def handler({arg_str}):
+    pk_values = {pk_dict_str}
+    item = get_item_by_pk(db, model_class, pk_values, soft_delete_field)
+    for key, value in params.model_dump(exclude_unset=True).items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return item
+"""
+        elif method == "delete":
+            body = f"""
+def handler({arg_str}):
+    pk_values = {pk_dict_str}
+    query = db.query(model_class)
+    for col, val in pk_values.items():
+        query = query.filter(getattr(model_class, col) == val)
+    item = query.first()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"{{model_class.__name__}} not found")
+    if soft_delete_field:
+        setattr(item, soft_delete_field, True)
         db.commit()
-        db.refresh(item)
-        return item
+    else:
+        db.delete(item)
+        db.commit()
+    return None
+"""
+        # Define the function in a local namespace, passing all required objects
+        local_vars = {}
+        exec(
+            body,
+            {
+                "PatchModel": PatchModel,
+                "model_class": model_class,
+                "soft_delete_field": soft_delete_field,
+                "get_item_by_pk": get_item_by_pk,
+                "Depends": Depends,
+                "Path": Path,
+                "Session": Session,
+                "CurrentUser": CurrentUser,
+                "HTTPException": HTTPException,
+                "get_db": get_db,
+                "get_current_user": get_current_user,
+            },
+            local_vars,
+        )
+        return local_vars["handler"]
 
-    @router.delete(f"/{route_prefix}/{{item_id}}", status_code=204)
-    async def delete_item(
-        item_id: int,
-        db: Session = Depends(get_db),
-        current_user: CurrentUser = Depends(get_current_user),
-    ):
-        """Delete an item by ID."""
-        item = db.get(model_class, item_id)
-        if not item:
-            raise HTTPException(
-                status_code=404, detail=f"{model_class.__name__} not found"
-            )
-
-        if soft_delete_field:
-            setattr(item, soft_delete_field, True)
-            db.commit()
-        else:
-            db.delete(item)
-            db.commit()
-        return None
+    # Register the routes
+    router.add_api_route(
+        f"/{route_prefix}/" + pk_path,
+        make_handler(pk_columns, "get", PatchModel, model_class, soft_delete_field, get_item_by_pk, get_db, get_current_user, CurrentUser),
+        response_model=model_class,
+        methods=["GET"],
+    )
+    router.add_api_route(
+        f"/{route_prefix}/" + pk_path,
+        make_handler(pk_columns, "patch", PatchModel, model_class, soft_delete_field, get_item_by_pk, get_db, get_current_user, CurrentUser),
+        response_model=model_class,
+        methods=["PATCH"],
+    )
+    router.add_api_route(
+        f"/{route_prefix}/" + pk_path,
+        make_handler(pk_columns, "delete", PatchModel, model_class, soft_delete_field, get_item_by_pk, get_db, get_current_user, CurrentUser),
+        status_code=204,
+        methods=["DELETE"],
+    )
 
     return router
 
@@ -230,7 +296,6 @@ def create_linking_routes(model_resource, model_class, parent, child_route, chil
             model_resource: [db_item],
         }
 
-    print("delete", f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}")
 
     @router.delete(
         f"/{parent_resource}/{{parent_id}}/{child_route}/{{child_id}}",
@@ -275,6 +340,8 @@ create_crud_routes(Project, ProjectBase, "projects")
 create_crud_routes(Contact, ContactBase, "contacts")
 
 create_crud_routes(Feature, FeatureBase, "features")
+create_crud_routes(CompositeFeature, CompositeFeatureBase, "composite-features")
+
 create_crud_routes(Creator, CreatorBase, "creators")
 create_crud_routes(Tag, TagBase, "tags")
 create_crud_routes(Scan, ScanBase, "scans")
@@ -299,6 +366,7 @@ create_linking_routes(
     "image-links",
     ("instances", ImageInstance),
 )
+
 
 @router.get(
     "/tasks/{task_id}/sub-task-image-links", response_model=list[SubTaskImageLink]

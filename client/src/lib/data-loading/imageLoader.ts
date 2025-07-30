@@ -211,29 +211,6 @@ async function getImage(url: string): Promise<ImageBitmap> {
     return bitmap;
 }
 
-
-function toCanvas(img: HTMLImageElement) {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(img, 0, 0);
-    return canvas;
-}
-
-
-
-// export async function getImage(url: string): Promise<HTMLCanvasElement> {
-//     return new Promise((resolve, reject) => {
-//         const image = new Image();
-//         image.crossOrigin = 'Anonymous';
-//         image.onload = () => resolve(toCanvas(image));
-//         image.onerror = () => reject(new Error('could not load image'));
-//         image.src = url;
-//     });
-// }
-
-
 function getArrayFromImages(js_images: HTMLCanvasElement[]): Uint8Array {
     const w = js_images[0].width;
     const h = js_images[0].height;

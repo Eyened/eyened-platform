@@ -7,9 +7,11 @@
     type FilterItem = {
         variable: string;
         name: string;
-        values: any[]; //keyof typeof data;
+        values: any[];
         title: string;
     };
+
+    // TODO: these should be loaded from the server via API call?
     const modalities = [
         "AdaptiveOptics",
         "ColorFundus",
@@ -27,6 +29,7 @@
         "OCT",
         "OCTA",
     ];
+
     const filterBlocks: FilterItem[] = [
         {
             variable: "FeatureName",
@@ -35,12 +38,17 @@
             title: "Features",
         },
         {
-            variable: "CreatorName",
+            variable: "Segmentation.CreatorName",
             name: "name",
             values: data["creators"].values(),
-            title: "Creators",
+            title: "Creator (segmentations)",
         },
-        // TODO: Fix. Broken after database update
+        {
+            variable: "Form.CreatorName",
+            name: "name",
+            values: data["creators"].values(),
+            title: "Creator (forms)",
+        },
         {
             variable: "Modality",
             name: "modality",
@@ -75,7 +83,3 @@
         <DateRangePicker />
     </FilterBlock>
 </div>
-
-<style>
-
-</style>

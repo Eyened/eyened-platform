@@ -3,16 +3,16 @@
     import ExternalData from "./ExternalData.svelte";
 
     interface Props {
-        context:any,
-        additional_data_sources: AdditionalDataSource[],
+        context: any;
+        additional_data_sources: AdditionalDataSource[];
     }
     let { context, additional_data_sources }: Props = $props();
-
-
+    
     type AdditionalDataSource = {
         name: string;
         url: string;
         conditions: { parameter: string; value: string | string[] }[];
+        collapse?: boolean;
     };
 
     function condition_applies(
@@ -25,7 +25,7 @@
         return condition.value === value;
     }
     async function loadAdditionalData(source: AdditionalDataSource) {
-        const url = resolveURL(source.url, context);        
+        const url = resolveURL(source.url, context);
         const response = await fetch(url);
         const data = await response.json();
         return data;
@@ -39,7 +39,11 @@
                 {#await loadAdditionalData(source)}
                     <div>Loading...</div>
                 {:then data}
-                    <ExternalData {data} name={source.name} collapse={source.collapse}/>
+                    <ExternalData
+                        {data}
+                        name={source.name}
+                        collapse={source.collapse}
+                    />
                 {:catch error}
                     <div>Error: {error}</div>
                 {/await}

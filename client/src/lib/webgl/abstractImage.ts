@@ -4,14 +4,16 @@ import type { Instance } from "$lib/datamodel/instance.svelte";
 import { Matrix } from "$lib/matrix";
 import { SegmentationItem } from "./segmentationItem";
 import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import { SvelteMap } from "svelte/reactivity";
 
 export abstract class AbstractImage {
 
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-    public readonly segmentationItems = new Map<Segmentation, SegmentationItem>();
-
+    public readonly segmentationItems = new SvelteMap<Segmentation, SegmentationItem>();
+    abstract texture: WebGLTexture;
+    
     // in micrometers / pixel
     public readonly resolution: { x: number, y: number, z: number };
     transform: Matrix = Matrix.identity;
@@ -21,8 +23,7 @@ export abstract class AbstractImage {
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
-        public readonly meta: any,
-        public readonly texture: WebGLTexture) {
+        public readonly meta: any) {
         const { width, height, depth, width_mm, height_mm, depth_mm } = this.dimensions;
         this.width = width;
         this.height = height;

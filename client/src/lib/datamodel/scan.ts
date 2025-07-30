@@ -1,4 +1,5 @@
-import { BaseItem } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { registerConstructor } from "./model";
 
 export interface ServerScan {
     ScanID: number,
@@ -24,3 +25,4 @@ export class Scan extends BaseItem {
         this.mode = item.ScanMode;
     }
 }
+registerConstructor('scans', Scan);

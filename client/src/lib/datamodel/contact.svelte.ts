@@ -1,4 +1,5 @@
-import { BaseItem } from "./itemList";
+import { BaseItem } from "./baseItem";
+import { registerConstructor } from "./model";
 
 export interface ServerContact {
     ContactID: number,
@@ -37,3 +38,4 @@ export class Contact extends BaseItem {
         this.orcid = serverItem.Orcid;
     }
 }
+registerConstructor('contacts', Contact);
