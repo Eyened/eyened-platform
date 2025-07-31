@@ -85,7 +85,7 @@ export class ViewerContext {
                 this.windowLevel = { min: 30, max: 225 };
             }
             // aspect ratio for OCT
-            if (image.resolution.z) {
+            if (image.resolution.z && image.resolution.x > 0) {
                 this.stretch = 8 * image.resolution.y / image.resolution.x;
             }
         }

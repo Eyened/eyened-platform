@@ -13,7 +13,7 @@ export abstract class AbstractImage {
     public readonly depth: number;
     public readonly segmentationItems = new SvelteMap<Segmentation, SegmentationItem>();
     abstract texture: WebGLTexture;
-    
+
     // in micrometers / pixel
     public readonly resolution: { x: number, y: number, z: number };
     transform: Matrix = Matrix.identity;
@@ -30,7 +30,11 @@ export abstract class AbstractImage {
         this.depth = depth;
 
 
-        this.resolution = { x: 1000 * width_mm / width, y: 1000 * height_mm / height, z: 1000 * depth_mm / depth };
+        this.resolution = {
+            x: 1000 * width_mm / width,
+            y: 1000 * height_mm / height,
+            z: 1000 * depth_mm / depth
+        };
         this.initTransform();
     }
 
@@ -51,7 +55,7 @@ export abstract class AbstractImage {
 
     getAspectRatio() {
         const { width, height, width_mm, height_mm } = this.dimensions;
-        if (width_mm == -1) {
+        if (width_mm <= 0 || height_mm <= 0) {
             return 1;
         }
         return (height * width_mm) / (height_mm * width);
