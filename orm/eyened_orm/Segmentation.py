@@ -116,13 +116,11 @@ class SegmentationBase(Base):
     
     def write_data(self, data: np.ndarray, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
         """Write annotation data to the zarr array and update the ZarrArrayIndex."""
-        if not self.config:
-            raise ValueError("Configuration not initialized")
-
+        
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
 
-        zarr_index = self.annotation_storage_manager.write(
+        zarr_index = self.storage_manager.write(
             group_name=str(self.DataRepresentation),  
             data_dtype=self.dtype,
             data_shape=self.shape,
@@ -146,14 +144,11 @@ class SegmentationBase(Base):
     def read_data(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> np.ndarray:
         if self.ZarrArrayIndex is None:
             return None
-        
-        if not self.config:
-            raise ValueError("Configuration not initialized")
 
         if not self.ImageInstance:
-            raise ValueError("Annotation has no associated ImageInstance")
+            raise ValueError("Segmentation has no associated ImageInstance")
         
-        return self.annotation_storage_manager.read(
+        return self.storage_manager.read(
             group_name=str(self.DataRepresentation),
             data_dtype=self.dtype,
             data_shape=self.shape,

@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List
@@ -101,12 +100,6 @@ class FormAnnotation(FormAnnotationBase, table=True):
         data = [form_annotation.flat_data for form_annotation in form_annotations]
         return json_normalize(data)
 
-    @property
-    def trash_path(self) -> Path:
-        """Return the path to the trash file for this FormAnnotation."""
-        return (
-            self.config.trash_path / "FormAnnotations" / f"{self.FormAnnotationID}.json"
-        )
 
     @property
     def flat_data(self):
@@ -122,20 +115,6 @@ class FormAnnotation(FormAnnotationBase, table=True):
             ),
         }
         return metadata | flatten_json(self.FormData)
-
-
-@event.listens_for(FormAnnotation, "after_delete")
-def move_to_trash(mapper, connection, target: FormAnnotation):
-    """Move a serialized version of the FormAnnotation to the trash."""
-    try:
-        trash_path = target.trash_path
-        trash_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(trash_path, "w") as trash_file:
-            json.dump(target.to_dict(), trash_file, indent=4, default=str)
-        print(f"FormAnnotation {target.FormAnnotationID} moved to trash: {trash_path}")
-    except Exception as e:
-        print(f"Failed to move FormAnnotation {target.FormAnnotationID} to trash: {e}")
-
 
 def flatten_json(
     data: dict | list | str | int | float | bool, parent_key: str = ""

@@ -15,20 +15,21 @@ from eyened_orm import (
     Study,
 )
 from eyened_orm.importer.thumbnails import update_thumbnails
-from eyened_orm.utils.config import EyenedORMConfig, get_config
+from eyened_orm.utils.config import EyenedORMConfig
 
 
 class Importer:
     def __init__(
         self,
         session,
+        config: EyenedORMConfig,
         create_patients: bool = False,
         create_studies: bool = False,
         create_series: bool = True,
         create_projects: bool = False,
         run_ai_models: bool = False,
-        generate_thumbnails: bool = True,
-        config: str | EyenedORMConfig = "test",
+        generate_thumbnails: bool = True
+        
     ):
         """
         Initialize the Importer with database session and data to import.
@@ -37,6 +38,8 @@ class Importer:
         -----------
         session : SQLAlchemy session
             Database session to use for the import
+        config : EyenedORMConfig
+            Configuration to use for the import
         create_patients : bool, default=False
             If True, create patients when they don't exist
         create_studies : bool, default=False
@@ -49,11 +52,10 @@ class Importer:
             If True, run AI models on the images after import
         generate_thumbnails : bool, default=True
             If True, generate thumbnails for the images after import
-        config : str, default="test"
-            config object (see config.sample.py) or environment to load for configuration (e.g., "test", "production").
+       
         """
         self.session = session
-
+        self.config = config
         self.create_patients = create_patients
         self.create_studies = create_studies
         self.create_series = create_series
@@ -61,12 +63,8 @@ class Importer:
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
 
-        if isinstance(config, str):
-            self.config = get_config(config)
-        elif isinstance(config, EyenedORMConfig):
-            self.config = config
-        else:
-            raise ValueError(f"Invalid config type: {type(config)}")
+
+        
 
         assert self.config.images_basepath is not None, "images_basepath must be set when using the importer"
 
