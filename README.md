@@ -7,55 +7,25 @@ A modern web platform for visualization and annotation of ophthalmic images with
 - Task system for managing grading tasks.
 - Drawing tools for 2D image segmentation of enface images and OCT B-scans
 - Images and annotations are rendered in the browser, making it very responsive and easy to set up.
-- Image enhancements such as CLAHE can be applied on the fly.
+- Image enhancements such as contrast enhancement and CLAHE can be applied on the fly.
 - Integrated tools for registration of enface images.
-- Automated ETDRS grid placement via AI-based bounds detection and landmark detection (fovea, optic disc) upon insertion of - CFI images.
+- Automated ETDRS grid placement via AI-based bounds detection and landmark detection (fovea, optic disc) upon insertion of CFI images.
 - Python-based import script for loading images and associated metadata.
-- Authentication system can secure the viewer, images, thumbnails and annotations.
 - For advanced use cases, our ORM allows data scientists to more easily work with the database.
 
 
 See our [Documentation](https://eyened.github.io/eyened-platform/).
 
-## Development setup
+## Repository overview
 
-Our development setup will run hot-reloading development servers for the api and frontend. To avoid exposing image files, it also requires a reverse proxy nginx server set up. A [docker-compose] is provided for this server.
+***client:*** SvelteKit-based frontend application with DICOM image viewing capabilities using Cornerstone.js. Features include image annotation tools, drawing tools for 2D segmentation, and real-time image enhancements.
 
-### Setup
+***dev:*** Development environment setup with Docker Compose configuration, environment variables, and scripts for starting development servers. Includes database mirroring tools and migration management.
 
-0. [Install npm and node](https://nodejs.org/en/download) if necessary.
+***docker:*** Production Docker configuration with multi-stage builds for server, worker, and fileserver components. Includes nginx configuration and deployment scripts.
 
-1. Create an environment, clone the repo, and install Python and Node dependencies:
-    ```
-    conda create --name viewer python=3.11
-    git clone https://github.com/Eyened/eyened-platform.git eyened_platform
-    cd eyened_platform/orm
-    pip install -e .
-    cd ../server
-    pip install -r requirements.txt
-    cd ../client
-    npm install
-    ```
+***docs:*** Astro-based documentation. Contains project documentation, API references, and user guides.
 
+***orm:*** SQLAlchemy-based Object-Relational Mapping library for database interactions. Includes migration management with Alembic, data models, and utilities for data scientists to work with the database.
 
-2. Copy `sample.dev.env` into `dev.env` and configure the variables documented in it.
-
-3. Build and run the development nginx:
-    ```
-    cd ../docker/development_nginx
-    docker-compose build
-    docker-compose up -d
-    ```
-
-### Regular usage
-
-- Keep the development nginx docker running
-- When working on eyened platform run:
-    ```
-    ./start_client_dev.sh
-    ```
-    and:
-    ```
-    ./start_server_dev.sh
-    ```
-    on separate terminals.
+***server:*** FastAPI-based backend server providing REST API endpoints for image management, user authentication, task management, and database operations.

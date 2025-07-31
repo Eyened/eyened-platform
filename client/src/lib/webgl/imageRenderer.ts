@@ -28,6 +28,7 @@ export class BaseImageRenderer implements ImageRenderer {
         const { image } = viewerContext;
 
         const uniforms = getBaseUniforms(viewerContext);
+        // console.log(uniforms);
         if (image.is3D) {
             this.shader3D.pass(renderTarget, uniforms);
             return;
