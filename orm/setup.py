@@ -39,6 +39,7 @@ setup(
         "sqlmodel==0.0.24",
         "retinalysis-fundusprep==0.4.0",
         "zarr==3.1.0",
+        "pyyaml==6.*",
     ],
     python_requires=">=3.10",
 )
