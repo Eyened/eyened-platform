@@ -1,14 +1,41 @@
 version: "3.1"
 
+name: eyened-platform-dev
+
 services:
   fileserver:
     env_file: .env
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.fileserver
     environment:
       NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
+      NGINX_ENVSUBST_TEMPLATE_DIR: /etc/nginx/templates
     network_mode: "host"
     volumes:
       - ${IMAGES_BASEPATH}:/images
-      - ${STORAGE_BASEPATH}/thumbnails:/thumbnails
+      - ${THUMBNAILS_PATH}:/thumbnails
+
+  database:
+    image: mysql:8.0.27
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+    ports:
+      - "${DATABASE_PORT}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ptest"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+ 
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - "${DEV_ADMINER_PORT}:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
+

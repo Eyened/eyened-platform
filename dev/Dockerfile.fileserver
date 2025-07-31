@@ -1,0 +1,9 @@
+FROM nginx:latest
+
+# Copy custom nginx.conf as template
+COPY nginx.conf /etc/nginx/templates/nginx.conf.template
+
+EXPOSE ${DEV_NGINX_PORT}
+
+# Start NGINX
+CMD ["nginx", "-g", "daemon off;"]
