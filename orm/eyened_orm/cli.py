@@ -2,6 +2,7 @@ import importlib
 import json
 from pathlib import Path
 import click
+from .inference.utils import auto_device
 from .utils.testdb import DatabaseTransfer
 from .utils.config import get_config
 from tqdm import tqdm
@@ -69,16 +70,36 @@ def update_thumbnails(env, failed):
 
 @eorm.command()
 @click.option("-e", "--env", type=str)
-def run_models(env):
+@click.option("-d", "--device", type=str, default=None)
+def run_models(env, device):
     import torch
+    import tempfile
 
     from eyened_orm import DBManager
     from eyened_orm.inference.inference import run_inference
 
+    config = get_config(env)
     DBManager.init(env)
     session = DBManager.get_session()
 
-    run_inference(session, device=torch.device("cuda:0"))
+    if device is None:
+        device = auto_device()
+    else:
+        device = torch.device(device)
+
+    cfi_cache_path = config.cfi_cache_path
+    if cfi_cache_path is None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cfi_cache_path = Path(temp_dir)
+            config.cfi_cache_path = cfi_cache_path
+
+            print(f'Using temporary cfi_cache_path: {cfi_cache_path}')
+            run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
+
+    else:
+        print(f'Running inference with cfi_cache_path: {cfi_cache_path}')
+        run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
+    
 
 
 @eorm.command()
@@ -93,6 +114,7 @@ def validate_forms(env, print_errors):
     from .db import DBManager
     from .form_validation import validate_all
 
+    
     DBManager.init(env)
 
     with DBManager.yield_session() as session:
