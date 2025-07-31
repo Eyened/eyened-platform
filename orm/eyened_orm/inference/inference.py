@@ -19,7 +19,7 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
     ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface('Eyened/vascx:fovea/fovea_july24.pt').to(
         device
     )
-    ensemble_discedge = KeypointsEnsemble.from_huggingface('Eyened/vascx:discedge/discedge.pt').to(device)
+    ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface('Eyened/vascx:discedge/discedge_july24.pt').to(device)
 
     dataloader = ensemble_fovea._make_inference_dataloader(
         fpaths,
@@ -35,30 +35,24 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
             if len(batch) == 0:
                 continue
 
+
             im = batch["image"].to(device)
-            im_rgb = im[..., :3, :, :]  # only rgb part
+            # im_rgb = im[..., :3, :, :]  # only rgb part
 
             # FOVEA DETECTION
             with torch.autocast(device_type=device.type):
                 heatmap = ensemble_fovea.forward(im)
+
             keypoints = extract_keypoints_from_heatmaps(heatmap)
 
             kp_fovea = torch.mean(keypoints, dim=1)  # average over models
 
-            # DISC EDGE
-            keypoints = ensemble_discedge.forward(im_rgb)
+            # DISCEDGE DETECTION
+            with torch.autocast(device_type=device.type):
+                heatmap = ensemble_discedge.forward(im)
+            keypoints = extract_keypoints_from_heatmaps(heatmap)
 
-            keypoints = keypoints[
-                :, :, None, :
-            ]  # MNC2 (models, batch_size, num_keypoints, 2)
-
-            if ensemble_discedge.config["datamodule"].get("normalize_keypoints", True):
-                n, c, h, w = batch["image"].shape
-                keypoints[..., 0] = (keypoints[..., 0]) * w
-                keypoints[..., 1] = (keypoints[..., 1]) * h
-
-            kp_discedge = torch.mean(keypoints, dim=0)  # average over models
-            # we make a pseudo-batch with the outputs and everything needed for undoing transforms
+            kp_discedge = torch.mean(keypoints, dim=1)  # average over models
 
             # join keypoints
             keypoints = torch.cat([kp_fovea, kp_discedge], dim=1)
@@ -88,7 +82,7 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
 def run_quality_model(fpaths, ids, device: torch.device = None):
     if device is None:
         device = auto_device()
-    ensemble_quality = ClassificationEnsemble.from_release('Eyened/vascx:quality/quality.pt').to(device)
+    ensemble_quality = ClassificationEnsemble.from_huggingface('Eyened/vascx:quality/quality.pt').to(device)
     dataloader = ensemble_quality._make_inference_dataloader(
         fpaths,
         ids=ids,
