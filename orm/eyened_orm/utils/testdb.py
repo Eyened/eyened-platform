@@ -18,7 +18,7 @@ def build_command(command, db_config, args=[], include_database=True):
     ]
     if include_database:
         result.append(db_config.database)
-    return result
+    return [str(arg) for arg in result]
 
 
 def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=[]):
@@ -97,9 +97,9 @@ class DatabaseTransfer:
             dump_file.seek(0)
             load_db(self.test_db, dump_file)
 
-    def populate(self, root_conditions: dict):
+    def populate(self, copy_objects: list):
         
-        dumper = DatabaseDumper(self.source_db, paths, root_conditions)        
+        dumper = DatabaseDumper(self.source_db, paths, copy_objects)        
         sql_statements = dumper.dump()
 
         conn = mysql.connector.connect(**self.source_db.model_dump())
