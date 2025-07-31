@@ -1,5 +1,5 @@
 from .Annotation import *
-from .db import DBManager
+from .db import Database, create_connection_string
 from .FormAnnotation import *
 from .ImageInstance import *
 from .Patient import *

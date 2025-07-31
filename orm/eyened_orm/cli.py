@@ -1,10 +1,10 @@
 import importlib
-import json
+import yaml
 from pathlib import Path
 import click
 from .utils.testdb import DatabaseTransfer
-from .utils.config import get_config
 from tqdm import tqdm
+from .utils.config import DatabaseSettings
 
 '''
 Command utilities for the eyened ORM.
@@ -14,8 +14,8 @@ The following commands are available:
 - full: Create a test database for ORM testing, developing new features or running alembic migrations.
 - update-thumbnails: Update thumbnails for all images in the database.
 - run-models: Run the models on the database.
-- zarr-tree: Display the structure of the annotations zarr store, showing groups and array shapes.
-- defragment-zarr: Defragment the zarr store by copying all annotations to a new store with sequential indices.
+- zarr-tree: Display the structure of the zarr store, showing groups and array shapes.
+- defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 '''
@@ -26,33 +26,37 @@ def eorm():
     pass
 
 
+def transfer_db(config_file):
+
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    source = DatabaseSettings(**config['source'])
+    target = DatabaseSettings(**config['target'])
+    
+    print('Transferring from:')
+    print(f'{source.host}:{source.port}/{source.database} ({source.user})')
+    print('to:')
+    print(f'{target.host}:{target.port}/{target.database} ({target.user})')
+
+    transfer = DatabaseTransfer(source, target)
+    return transfer, config
+    
+    
 @eorm.command()
-@click.option('-s', '--source', type=str, help='Source environment to use (e.g., "source")')
-@click.option('-t', '--target', type=str, help='Target environment to use (e.g., "test")')
-@click.option('--root-conditions', '-r', type=click.Path(exists=True), 
-              help='Path to JSON file containing root conditions for database population')
-def test(source, target, root_conditions):
+@click.option('--config-file', '-c', type=click.Path(exists=True), help='Path to YAML file containing database configuration')
+def database_mirror_test(config_file):
     """Create a test database for ORM testing, with selected tables populated."""
-    transfer = DatabaseTransfer(get_config(source).database, get_config(target).database)
+    transfer, config = transfer_db(config_file)
     transfer.create_test_db(no_data=True)
-    
-    if root_conditions:
-        with open(root_conditions, 'r') as f:
-            conditions = json.load(f)
-    else:
-        conditions = []
-    
-    transfer.populate(root_conditions=conditions)
-
+    transfer.populate(copy_objects=config['copy_objects'])
 
 @eorm.command()
-@click.option('-s', '--source', type=str, help='Source environment to use (e.g., "source")')
-@click.option('-t', '--target', type=str, help='Target environment to use (e.g., "test")')
-def full(source, target):
-    """Create a test database for ORM testing, mirroring the source database."""
-    transfer = DatabaseTransfer(get_config(source).database, get_config(target).database)
+@click.option('--config-file', '-c', type=click.Path(exists=True), help='Path to YAML file containing database configuration')
+def database_mirror_full(config_file):
+    transfer, config = transfer_db(config_file)
     transfer.create_test_db(no_data=False)
-
+    
 
 @eorm.command()
 @click.option("-e", "--env", type=str)
@@ -101,50 +105,23 @@ def validate_forms(env, print_errors):
         validate_all(session, print_errors)
 
 
-@eorm.command()
-@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
-def set_connection_string(env):
-    config = get_config(env)
-    
-    password = config.database.password
-    host = config.database.host
-    port = config.database.port
-    database = config.database.database
-
-    package_root = Path(importlib.resources.files("eyened_orm"))   
-    filename = package_root.parent / "migrations" / "alembic.ini"
-    
-    print(f'updating {filename} with settings from environment {env}')
-    
-    with open(filename, 'r') as configfile:
-        lines = configfile.readlines()
-
-    new_url = f'mysql+pymysql://root:{password}@{host}:{port}/{database}'
-    for i, line in enumerate(lines):
-        if line.strip().startswith('sqlalchemy.url'):
-            lines[i] = f'sqlalchemy.url = {new_url}\n'
-            break
-
-    with open(filename, 'w') as configfile:
-        configfile.writelines(lines)
-
 
 @eorm.command()
 @click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
 def zarr_tree(env):
-    """Display the structure of the annotations zarr store, showing groups and array shapes."""
+    """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
     
     config = get_config(env)
     
     # Open the zarr store
     try:
-        root = zarr.open_group(store=config.annotations_zarr_store, mode="r")
+        root = zarr.open_group(store=config.segmentations_zarr_store, mode="r")
     except Exception as e:
-        print(f"Error opening zarr store at {config.annotations_zarr_store}: {e}")
+        print(f"Error opening zarr store at {config.segmentations_zarr_store}: {e}")
         return
     
-    print(f"Zarr store: {config.annotations_zarr_store}")
+    print(f"Zarr store: {config.segmentations_zarr_store}")
     print("=" * 50)
     
     # Iterate through groups
@@ -185,9 +162,9 @@ def zarr_tree(env):
 @click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
 @click.option("--new-store-path", type=click.Path(), required=True, help="Path to the new zarr store directory")
 def defragment_zarr(env, new_store_path):
-    """Defragment the zarr store by copying all annotations to a new store with sequential indices.
+    """Defragment the zarr store by copying all segmentations to a new store with sequential indices.
     
-    This command creates a new zarr store and copies all existing annotations to it,
+    This command creates a new zarr store and copies all existing segmentations to it,
     assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
     The ZarrArrayIndex values in the database will be updated to reflect the new indices.
     """
@@ -195,7 +172,7 @@ def defragment_zarr(env, new_store_path):
     from pathlib import Path
     
     from eyened_orm import DBManager
-    from eyened_orm.utils.zarr.manager_annotation import AnnotationZarrStorageManager
+    from orm.eyened_orm.utils.zarr.manager import ZarrStorageManager
     
     config = get_config(env)
     
@@ -206,10 +183,10 @@ def defragment_zarr(env, new_store_path):
     new_store_path = Path(new_store_path)
     new_store_path.mkdir(parents=True, exist_ok=True)
     
-    # Create annotation zarr storage manager for existing store
-    old_manager = AnnotationZarrStorageManager(config.annotations_zarr_store)
+    # Create annotation zarr storage manager for existing store 
+    old_manager = ZarrStorageManager(config.segmentations_zarr_store)
     
-    print(f"Defragmenting zarr store from: {config.annotations_zarr_store}")
+    print(f"Defragmenting zarr store from: {config.segmentations_zarr_store}")
     print(f"Creating new zarr store at: {new_store_path}")
     print("=" * 50)
     
