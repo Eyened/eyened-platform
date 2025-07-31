@@ -4,52 +4,52 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import zarr
 
-from .annotation_array import AnnotationZarrArray
+from .zarr_array import ZarrArray
 
 
-class AnnotationZarrStorageManager:
+class ZarrStorageManager:
     """
-    A singleton manager class for creating and managing zarr arrays for annotation data.
+    A singleton manager class for creating and managing zarr arrays for segmentation data.
 
     This class handles the creation, existence checking, and retrieval of zarr arrays
-    based on annotation dtypes and image shapes. Arrays are stored with names that
-    encode the annotation dtype and image dimensions.
+    based on segmentation dtypes and image shapes. Arrays are stored with names that
+    encode the segmentation dtype and image dimensions.
     """
 
     def __init__(self, store_path: str | Path):
         self.root = zarr.open_group(store=store_path, mode="a")
-        self._open_arrays: Dict[Tuple, AnnotationZarrArray] = {}
+        self._open_arrays: Dict[Tuple, ZarrArray] = {}
 
     def _get_array_name(
-        self, annotation_dtype: np.dtype, annotation_shape: Tuple
+        self, dtype: np.dtype, shape: Tuple
     ) -> str:
-        shape_str = "_".join(str(dim) for dim in annotation_shape)
-        return f"{str(annotation_dtype)}_{shape_str}.zarr"
+        shape_str = "_".join(str(dim) for dim in shape)
+        return f"{str(dtype)}_{shape_str}.zarr"
 
     def _get_array_key(
-        self, group_name: str, annotation_dtype: np.dtype, annotation_shape: Tuple
+        self, group_name: str, dtype: np.dtype, shape: Tuple
     ) -> Tuple:
-        return (group_name, annotation_dtype, *annotation_shape)
+        return (group_name, dtype, *shape)
 
     def get_array(
-        self, group_name: str, annotation_dtype: np.dtype, annotation_shape: Tuple
-    ) -> AnnotationZarrArray:
+        self, group_name: str, dtype: np.dtype, shape: Tuple
+    ) -> ZarrArray:
         """
-        Get the array for the given image resolution and annotation dtype.
+        Get the array for the given image resolution and segmentation dtype.
 
         Args:
-            annotation_dtype: The numpy dtype (uint8, uint16, uint32, uint64)
-            annotation_shape: Tuple of spatial dimensions (D, H, W)
+            dtype: The numpy dtype (uint8, uint16, uint32, uint64)
+            shape: Tuple of spatial dimensions (D, H, W)
 
         Returns:
-            AnnotationZarrArray instance
+            ZarrArray instance
 
         Raises:
             FileNotFoundError: If the array does not exist
         """
-        array_name = self._get_array_name(annotation_dtype, annotation_shape)
+        array_name = self._get_array_name(dtype, shape)
 
-        array_shape = (0,) + annotation_shape
+        array_shape = (0,) + shape
         group = self.root.require_group(group_name)
 
         array = group.get(array_name, None)
@@ -60,12 +60,12 @@ class AnnotationZarrStorageManager:
             array = group.create_array(
                 name=array_name,
                 shape=array_shape,
-                chunks=(1, *annotation_shape),
-                dtype=annotation_dtype,
+                chunks=(1, *shape),
+                dtype=dtype,
                 overwrite=False,
             )
 
-        return AnnotationZarrArray(array)
+        return ZarrArray(array)
 
     def read(
         self,
@@ -85,7 +85,7 @@ class AnnotationZarrStorageManager:
         # If both axis and slice_index are provided, read a slice
         if axis is not None and slice_index is not None:
             return zarr_array.read_slice(zarr_index, axis, slice_index)
-        # Otherwise, read the full annotation
+        # Otherwise, read the full segmentation
         else:
             return zarr_array.read(zarr_index)
 
@@ -121,15 +121,15 @@ class AnnotationZarrStorageManager:
                 raise ValueError("zarr_index must be provided for slice writes")
             zarr_array.write_slice(zarr_index, axis, slice_index, data)
             return zarr_index
-        # Otherwise, write the full annotation
+        # Otherwise, write the full segmentation
         else:
             return zarr_array.write(zarr_index, data)
 
     def defragment_to_new_store(self, new_store_path: str | Path):
         """
-        Defragment the zarr store by copying all annotations to a new store with sequential ZarrArrayIndex values.
+        Defragment the zarr store by copying all segmentations to a new store with sequential ZarrArrayIndex values.
         
-        This method creates a new zarr store and copies all existing annotations to it,
+        This method creates a new zarr store and copies all existing segmentations to it,
         assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
         
         Args:
@@ -139,37 +139,36 @@ class AnnotationZarrStorageManager:
             dict: Mapping of old ZarrArrayIndex to new ZarrArrayIndex for each group and array
         """
         from sqlalchemy import select
-        from sqlalchemy.orm import Session
-        from eyened_orm import Annotation, DBManager
+        from eyened_orm import Segmentation, DBManager
         
         # Create new zarr store manager
-        new_manager = AnnotationZarrStorageManager(new_store_path)
+        new_manager = ZarrStorageManager(new_store_path)
         
         # Get database session
         session = DBManager.get_session()
         
         try:
-            # Query all annotations with ZarrArrayIndex
-            annotations = session.execute(
-                select(Annotation)
-                .where(Annotation.ZarrArrayIndex.is_not(None))
-                .where(~Annotation.Inactive)
-                .order_by(Annotation.AnnotationTypeID, Annotation.ZarrArrayIndex)
+            # Query all segmentations with ZarrArrayIndex
+            segmentations = session.execute(
+                select(Segmentation)
+                .where(Segmentation.ZarrArrayIndex.is_not(None))
+                .where(~Segmentation.Inactive) # TODO: why filter out Inactive segmentations?
+                .order_by(Segmentation.SegmentationTypeID, Segmentation.ZarrArrayIndex)
             ).scalars().all()
             
-            print(f"Found {len(annotations)} annotations to defragment")
+            print(f"Found {len(segmentations)} segmentations to defragment")
             
             # Track new indices for each group/array combination
             new_indices = {}
             index_mapping = {}
             
-            # Process annotations in batches by group and array type
-            for annotation in annotations:
+            # Process segmentations in batches by group and array type
+            for segmentation in segmentations:
                 try:
-                    # Get annotation data shape and type
-                    group_name = str(annotation.AnnotationTypeID)
-                    data_dtype = np.dtype(np.uint8)  # Default dtype for annotations
-                    data_shape = annotation.shape
+                    # Get segmentation data shape and type
+                    group_name = str(segmentation.SegmentationTypeID)
+                    data_dtype = segmentation.dtype
+                    data_shape = segmentation.shape
                     
                     # Create unique key for this array type
                     array_key = (group_name, data_dtype, *data_shape)
@@ -179,9 +178,9 @@ class AnnotationZarrStorageManager:
                         new_indices[array_key] = 0
                         index_mapping[array_key] = {}
                     
-                    # Read annotation data from old store
-                    old_zarr_index = annotation.ZarrArrayIndex
-                    annotation_data = self.read(
+                    # Read segmentation data from old store
+                    old_zarr_index = segmentation.ZarrArrayIndex
+                    segmentation_data = self.read(
                         group_name=group_name,
                         data_dtype=data_dtype,
                         data_shape=data_shape,
@@ -193,7 +192,7 @@ class AnnotationZarrStorageManager:
                         group_name=group_name,
                         data_dtype=data_dtype,
                         data_shape=data_shape,
-                        data=annotation_data,
+                        data=segmentation_data,
                         zarr_index=None  # Let it assign new index
                     )
                     
@@ -201,15 +200,15 @@ class AnnotationZarrStorageManager:
                     index_mapping[array_key][old_zarr_index] = new_zarr_index
                     new_indices[array_key] = new_zarr_index + 1
                     
-                    # Update annotation in database
-                    annotation.ZarrArrayIndex = new_zarr_index
+                    # Update segmentation in database
+                    segmentation.ZarrArrayIndex = new_zarr_index
                     
                     if len(index_mapping[array_key]) % 100 == 0:
-                        print(f"Processed {len(index_mapping[array_key])} annotations for array {array_key}")
+                        print(f"Processed {len(index_mapping[array_key])} segmentations for array {array_key}")
                         session.commit()
                         
                 except Exception as e:
-                    print(f"Error processing annotation {annotation.AnnotationID}: {e}")
+                    print(f"Error processing segmentation {segmentation.SegmentationID}: {e}")
                     continue
             
             # Final commit
@@ -217,10 +216,10 @@ class AnnotationZarrStorageManager:
             
             # Print summary
             total_copied = sum(len(mapping) for mapping in index_mapping.values())
-            print(f"Successfully defragmented {total_copied} annotations")
+            print(f"Successfully defragmented {total_copied} segmentations")
             
             for array_key, mapping in index_mapping.items():
-                print(f"Array {array_key}: {len(mapping)} annotations")
+                print(f"Array {array_key}: {len(mapping)} segmentations")
                 
             return index_mapping
             
