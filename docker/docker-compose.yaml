@@ -1,10 +1,11 @@
 version: "3.1"
 
+name: eyened-platform
+
 services:
 
   database:
     image: mysql:8.0.27
-    # user: "${USERID:-1000}:${GROUPID:-1000}"
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
     volumes:
@@ -32,20 +33,23 @@ services:
         condition: service_healthy
     environment:
       - IMAGES_BASEPATH=/images
+      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
+      - THUMBNAILS_PATH=/storage/thumbnails
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - DB_HOST=database
-      - DB_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DB_USER=${DATABASE_USER}
-      - DB_PASSWORD=${DATABASE_PASSWORD}
-      - DB_PORT=3306
-      - DB_NAME=eyened_database
+      - DATABASE_HOST=database
+      - DATABASE_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     restart: always
     volumes:
       - ${IMAGES_BASEPATH}:/images
-      - ${STORAGE_BASEPATH}:/storage
+      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
+      - ${THUMBNAILS_PATH}:/storage/thumbnails
 
   redis:
     user: "${USERID:-1000}:${GROUPID:-1000}"
@@ -64,14 +68,16 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - DB_HOST=database
-      - DB_USER=${DATABASE_USER}
-      - DB_PASSWORD=${DATABASE_PASSWORD}
-      - DB_PORT=3306
-      - DB_NAME=eyened_database
+      - DATABASE_HOST=database
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - IMAGES_BASEPATH=/images
+      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
+      - THUMBNAILS_PATH=/storage/thumbnails
     depends_on:
       redis:
         condition: service_healthy
@@ -79,7 +85,8 @@ services:
         condition: service_healthy
     volumes:
       - ${IMAGES_BASEPATH}:/images
-      - ${STORAGE_BASEPATH}:/storage
+      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
+      - ${THUMBNAILS_PATH}:/storage/thumbnails
     restart: always
 
   fileserver:
@@ -91,7 +98,7 @@ services:
         condition: service_healthy
     volumes:
       - ${IMAGES_BASEPATH}:/images
-      - ${STORAGE_BASEPATH}/thumbnails:/thumbnails
+      - ${THUMBNAILS_PATH}:/thumbnails
     ports:
       - ${PORT}:80
 
@@ -99,7 +106,7 @@ services:
     image: adminer:latest
     restart: always
     ports:
-      - "8080:8080"
+      - "18080:8080"
     depends_on:
       database:
         condition: service_healthy

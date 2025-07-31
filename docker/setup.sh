@@ -10,7 +10,6 @@ NC='\033[0m' # No Color
 readonly SCRIPT_NAME=$(basename "$0")
 readonly DEFAULT_PORT=80
 readonly DEFAULT_BASE_DIR="$HOME/eyened-platform"
-readonly CREDS_FILE=".platform_credentials"
 readonly ENV_FILE=".env"
 
 # Function to read value from .env file
@@ -62,6 +61,15 @@ get_input() {
     local var_name="$3"
     local validate_func="$4"
     
+    # Check if the variable exists in .env file
+    local env_file_value=$(read_env_value "$var_name")
+    if [ -n "$env_file_value" ]; then
+        print_status "Found existing $var_name in .env: $env_file_value"
+        eval "$var_name='$env_file_value'"
+        return 0
+    fi
+    
+    # Only prompt if not found in .env file
     while true; do
         if [ -n "$default" ]; then
             read -p "$prompt [$default]: " input
@@ -83,23 +91,39 @@ get_input() {
     eval "$var_name='$input'"
 }
 
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then
-    print_error "Please do not run this script as root"
-    exit 1
-fi
+# Function to create directory if it doesn't exist
+create_directory() {
+    local dir_path="$1"
+    local description="$2"
+    
+    if [ ! -d "$dir_path" ]; then
+        print_status "Creating $description directory: $dir_path"
+        if mkdir -p "$dir_path"; then
+            print_status "Successfully created directory: $dir_path"
+        else
+            print_error "Failed to create directory: $dir_path"
+            return 1
+        fi
+    else
+        print_status "$description directory already exists: $dir_path"
+    fi
+}
 
-# Check if docker is installed
-if ! command -v docker &> /dev/null; then
-    print_error "Docker is not installed. Please install Docker first."
-    exit 1
-fi
+# Function to determine docker compose command
+get_docker_compose_cmd() {
+    # Test if 'docker compose' works by trying to run it
+    if docker compose version &> /dev/null; then
+        echo "docker compose"
+    elif command -v docker-compose &> /dev/null; then
+        echo "docker-compose"
+    else
+        print_error "Neither 'docker compose' nor 'docker-compose' is available. Please install Docker Compose first."
+        exit 1
+    fi
+}
 
-# Check if docker compose is installed
-if ! command -v docker compose &> /dev/null; then
-    print_error "Docker Compose is not installed. Please install Docker Compose first."
-    exit 1
-fi
+
+DOCKER_COMPOSE_CMD=$(get_docker_compose_cmd)
 
 print_status "Welcome to the Eyened Platform setup!"
 echo "This script will help you configure your environment variables."
@@ -112,13 +136,15 @@ EXISTING_PORT=$(read_env_value "PORT")
 get_input "Enter the port number for the platform" "${EXISTING_PORT:-$DEFAULT_PORT}" PORT validate_port
 
 # Get paths with validation
-echo "Setting up paths. These are the directories on your host system that will store the images, annotations, thumbnails and the database."
+echo "Setting up paths. These are the directories on your host system that will store the images, segmentations, thumbnails and the database."
 EXISTING_IMAGES_PATH=$(read_env_value "IMAGES_BASEPATH")
-EXISTING_STORAGE_PATH=$(read_env_value "STORAGE_BASEPATH")
+EXISTING_SEGMENTATIONS_PATH=$(read_env_value "SEGMENTATIONS_ZARR_STORE")
+EXISTING_THUMBNAILS_PATH=$(read_env_value "THUMBNAILS_PATH")
 EXISTING_DB_PATH=$(read_env_value "DATABASE_PATH")
 
 get_input "Enter the path to your images directory" "${EXISTING_IMAGES_PATH:-$DEFAULT_BASE_DIR/images}" IMAGES_BASEPATH validate_path
-get_input "Enter the path to store annotations and thumbnails" "${EXISTING_STORAGE_PATH:-$DEFAULT_BASE_DIR/storage}" STORAGE_BASEPATH validate_path
+get_input "Enter the path to store segmentations" "${EXISTING_SEGMENTATIONS_PATH:-$DEFAULT_BASE_DIR/storage/segmentations.zarr}" SEGMENTATIONS_ZARR_STORE validate_path
+get_input "Enter the path to store thumbnails" "${EXISTING_THUMBNAILS_PATH:-$DEFAULT_BASE_DIR/storage/thumbnails}" THUMBNAILS_PATH validate_path
 get_input "Enter the path to store the database" "${EXISTING_DB_PATH:-$DEFAULT_BASE_DIR/database}" DATABASE_PATH validate_path
 
 # Get database configuration
@@ -160,8 +186,11 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD}"
 # local folder to serve images from (possibly read-only)
 IMAGES_BASEPATH="${IMAGES_BASEPATH}"
 
-# local path to store annotations, thumbnails and other files
-STORAGE_BASEPATH="${STORAGE_BASEPATH}"
+# local path to store segmentations
+SEGMENTATIONS_ZARR_STORE="${SEGMENTATIONS_ZARR_STORE}"
+
+# local path to store thumbnails
+THUMBNAILS_PATH="${THUMBNAILS_PATH}"
 
 # path to the database files
 DATABASE_PATH="${DATABASE_PATH}"
@@ -186,38 +215,37 @@ fi
 
 print_status ".env file created successfully!"
 
-# Verify paths exist and create them if needed
-print_status "Checking paths..."
+# Create required directories
+print_status "Creating required directories..."
+if ! create_directory "$IMAGES_BASEPATH" "Images"; then
+    print_error "Failed to create images directory"
+    exit 1
+fi
 
-# Define all required paths
-REQUIRED_PATHS=(
-    "$IMAGES_BASEPATH"
-    "$STORAGE_BASEPATH"
-    "$STORAGE_BASEPATH/thumbnails"
-    "$STORAGE_BASEPATH/annotations"
-    "$STORAGE_BASEPATH/trash"
-    "$DATABASE_PATH"
-)
+if ! create_directory "$SEGMENTATIONS_ZARR_STORE" "Segmentations"; then
+    print_error "Failed to create segmentations directory"
+    exit 1
+fi
 
-for path in "${REQUIRED_PATHS[@]}"; do
-    if [ ! -d "$path" ]; then
-        print_warning "Directory $path does not exist. Creating it..."
-        if ! mkdir -p "$path"; then
-            print_error "Failed to create directory: $path"
-            exit 1
-        fi
-    fi
-done
+if ! create_directory "$THUMBNAILS_PATH" "Thumbnails"; then
+    print_error "Failed to create thumbnails directory"
+    exit 1
+fi
+
+if ! create_directory "$DATABASE_PATH" "Database"; then
+    print_error "Failed to create database directory"
+    exit 1
+fi
 
 # Build and start containers
 print_status "Building containers..."
-if ! docker compose build; then
+if ! $DOCKER_COMPOSE_CMD build; then
     print_error "Failed to build containers"
     exit 1
 fi
 
 print_status "Starting containers..."
-if ! USERID=$(id -u) GROUPID=$(id -g) docker compose up -d; then
+if ! USERID=$(id -u) GROUPID=$(id -g) $DOCKER_COMPOSE_CMD up -d; then
     print_error "Failed to start containers"
     exit 1
 fi
@@ -228,12 +256,12 @@ echo -e "\nYour Eyened platform should now be available at:"
 echo -e "  Viewer: ${GREEN}http://${HOSTNAME}:${PORT}${NC}"
 echo -e "  Adminer: ${GREEN}http://${HOSTNAME}:8080${NC}"
 echo -e "\nTo check container status, run:"
-echo -e "  ${YELLOW}docker compose ps${NC}"
+echo -e "  ${YELLOW}$DOCKER_COMPOSE_CMD ps${NC}"
 echo -e "\nTo view logs, run:"
-echo -e "  ${YELLOW}docker compose logs -f${NC}"
+echo -e "  ${YELLOW}$DOCKER_COMPOSE_CMD logs -f${NC}"
 echo -e "\nTo stop the platform, run:"
-echo -e "  ${YELLOW}docker compose down${NC}"
+echo -e "  ${YELLOW}$DOCKER_COMPOSE_CMD down${NC}"
 echo -e "\nNext time you want to start the platform, run:"
-echo -e "  ${YELLOW}USERID=$(id -u) GROUPID=$(id -g) docker compose up -d${NC}"
+echo -e "  ${YELLOW}USERID=$(id -u) GROUPID=$(id -g) $DOCKER_COMPOSE_CMD up -d${NC}"
 
 unset ADMIN_PASSWORD DATABASE_ROOT_PASSWORD DATABASE_PASSWORD DEFAULT_DB_PASSWORD DEFAULT_ADMIN_PASSWORD 
