@@ -1,10 +1,11 @@
-import importlib
+from typing import Optional
+from dotenv import load_dotenv
 import yaml
 from pathlib import Path
 import click
 from .utils.testdb import DatabaseTransfer
 from tqdm import tqdm
-from .utils.config import DatabaseSettings
+from .utils.config import DatabaseSettings, EyenedORMConfig
 
 '''
 Command utilities for the eyened ORM.
@@ -20,6 +21,11 @@ The following commands are available:
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 '''
 
+def load_orm_config(env: Optional[str] = None) -> EyenedORMConfig:
+    if env is not None:
+        load_dotenv(env)
+
+    return EyenedORMConfig()
 
 @click.group(name="eorm")
 def eorm():
@@ -42,7 +48,6 @@ def transfer_db(config_file):
     transfer = DatabaseTransfer(source, target)
     return transfer, config
     
-    
 @eorm.command()
 @click.option('--config-file', '-c', type=click.Path(exists=True), help='Path to YAML file containing database configuration')
 def database_mirror_test(config_file):
@@ -59,36 +64,38 @@ def database_mirror_full(config_file):
     
 
 @eorm.command()
-@click.option("-e", "--env", type=str)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option("--failed", is_flag=True, default=False)
 def update_thumbnails(env, failed):
     """Update thumbnails for all images in the database."""
 
-    from eyened_orm import DBManager
+    from eyened_orm import Database
     from eyened_orm.importer.thumbnails import update_thumbnails, get_missing_thumbnail_images
 
-    DBManager.init(env)
-    session = DBManager.get_session()
-    images = get_missing_thumbnail_images(session, failed)
-    update_thumbnails(session, images)
+    config = load_orm_config(env)
+    database = Database(config)
+    
+    with database.get_session() as session:
+        images = get_missing_thumbnail_images(session, failed)
+        update_thumbnails(session, images)
 
 
 @eorm.command()
-@click.option("-e", "--env", type=str)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 def run_models(env):
     import torch
 
-    from eyened_orm import DBManager
+    from eyened_orm import Database
     from eyened_orm.inference.inference import run_inference
 
-    DBManager.init(env)
-    session = DBManager.get_session()
-
-    run_inference(session, device=torch.device("cuda:0"))
+    config = load_orm_config(env)
+    database = Database(config)
+    with database.get_session() as session:
+        run_inference(session, device=torch.device("cuda:0"))
 
 
 @eorm.command()
-@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option("--print-errors", is_flag=True, default=False, help="Print validation errors")
 def validate_forms(env, print_errors):
     """Validate form annotations and schemas in the database.
@@ -96,23 +103,27 @@ def validate_forms(env, print_errors):
     By default, validates both schemas and form data. Use --forms-only or --schemas-only
     to validate only one aspect.
     """
-    from .db import DBManager
+    from eyened_orm import Database
     from .form_validation import validate_all
 
-    DBManager.init(env)
+    config = load_orm_config(env)
+    database = Database(config)
 
-    with DBManager.yield_session() as session:
+    with database.get_session() as session:
         validate_all(session, print_errors)
 
 
 
 @eorm.command()
-@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 def zarr_tree(env):
     """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
     
-    config = get_config(env)
+    from eyened_orm import Database
+    
+    config = load_orm_config(env)
+    database = Database(config)
     
     # Open the zarr store
     try:
@@ -159,7 +170,7 @@ def zarr_tree(env):
 
 
 @eorm.command()
-@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option("--new-store-path", type=click.Path(), required=True, help="Path to the new zarr store directory")
 def defragment_zarr(env, new_store_path):
     """Defragment the zarr store by copying all segmentations to a new store with sequential indices.
@@ -168,16 +179,12 @@ def defragment_zarr(env, new_store_path):
     assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
     The ZarrArrayIndex values in the database will be updated to reflect the new indices.
     """
-    import os
     from pathlib import Path
     
-    from eyened_orm import DBManager
     from orm.eyened_orm.utils.zarr.manager import ZarrStorageManager
     
-    config = get_config(env)
+    config = load_orm_config(env)
     
-    # Initialize database manager
-    DBManager.init(config)
     
     # Create new store path if it doesn't exist
     new_store_path = Path(new_store_path)
@@ -206,7 +213,7 @@ def defragment_zarr(env, new_store_path):
 
 
 @eorm.command()
-@click.option("-e", "--env", type=str, help="Environment to use (e.g., 'dev', 'prod')")
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option("--print-errors", is_flag=True, default=False, help="Print errors for failed hash calculations")
 def update_hashes(env, print_errors):
     """Update FileChecksum and DataHash for all ImageInstances in the database where they are NULL.
@@ -215,12 +222,13 @@ def update_hashes(env, print_errors):
     or DataHash == None and populate them with the outputs of im.calc_file_checksum() and 
     im.calc_data_hash() respectively.
     """
-    from eyened_orm import DBManager, ImageInstance
-    from sqlalchemy import or_, select
+    from eyened_orm import Database, ImageInstance
+    from sqlalchemy import select
 
-    DBManager.init(env)
+    config = load_orm_config(env)
+    database = Database(config)
 
-    with DBManager.yield_session() as session:
+    with database.get_session() as session:
         # Get all image instances with missing hashes
         query = select(ImageInstance).filter(
             (ImageInstance.FileChecksum == None) |
