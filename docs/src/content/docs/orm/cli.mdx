@@ -24,6 +24,22 @@ eorm [COMMAND] --help
 ## Available Commands
 
 
+### database-mirror-test
+
+Creates a test database for ORM testing, developing new features, or running alembic migrations. This command creates a database with the schema but only a subset of the data from the production database.
+
+```bash
+eorm database-mirror-test [OPTIONS]
+```
+
+### database-mirror-full
+
+Creates a complete test database with all data from the production database. This is useful when you need a full copy of the database for development or testing purposes.
+
+```bash
+eorm database-mirror-full [OPTIONS]
+```
+
 ### update-thumbnails
 
 Updates thumbnails for all images in the database. This is useful when the thumbnail generation logic has changed or when thumbnails are missing.
@@ -48,38 +64,28 @@ Validates form annotations and schemas in the database. This helps ensure that a
 eorm validate-forms [OPTIONS]
 ```
 
+### zarr-tree
+
+Displays the structure of the zarr store, showing groups and array shapes. This is useful for understanding the organization of segmentation data stored in zarr format.
+
+```bash
+eorm zarr-tree [OPTIONS]
+```
+
+### defragment-zarr
+
+Defragments the zarr store by copying all segmentations to a new store with sequential indices. This command creates a new zarr store and copies all existing segmentations to it, assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
+
+```bash
+eorm defragment-zarr [OPTIONS]
+```
+
 ### update-hashes
 
 Updates FileChecksum and DataHash for all ImageInstances in the database where they are NULL. This maintains data integrity by ensuring all images have proper hash values.
 
 ```bash
 eorm update-hashes [OPTIONS]
-```
-
-
-
-### test
-
-Creates a test database for ORM testing, developing new features, or running alembic migrations. This command creates a database with the schema but only a subset of the data from the production database.
-
-```bash
-eorm test
-```
-
-### set-connection-string
-
-Updates alembic.ini with the correct database connection string from the supplied environment
-
-```bash
-eorm set-connection-string
-```
-
-### full
-
-Creates a complete test database with all data from the production database. This is useful when you need a full copy of the database for development or testing purposes.
-
-```bash
-eorm full
 ```
 
 

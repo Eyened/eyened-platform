@@ -24,8 +24,12 @@ class EyenedSession(Session):
     def __init__(self, config: EyenedORMConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config = config
-        self.storage_manager = ZarrStorageManager(config.segmentations_zarr_store)
-
+        
+    @property
+    def storage_manager(self):
+        if not hasattr(self, '_storage_manager'):
+            self._storage_manager = ZarrStorageManager(self.config.segmentations_zarr_store)
+        return self._storage_manager
 
 class Database:
     """Database connection manager with built-in session and storage management"""
