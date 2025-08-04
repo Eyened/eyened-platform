@@ -1,8 +1,8 @@
-"""segmentation-update
+"""segmentation_update
 
-Revision ID: 9b7fb6c7ead4
+Revision ID: e69c5e4002ed
 Revises: 832ed384515f
-Create Date: 2025-07-25 18:29:58.899555
+Create Date: 2025-08-01 16:56:19.787930
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
-revision: str = '9b7fb6c7ead4'
+revision: str = 'e69c5e4002ed'
 down_revision: Union[str, None] = '832ed384515f'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -31,7 +31,7 @@ def upgrade() -> None:
     )
     op.create_index('fk_CompositeFeature_ChildFeature1_idx', 'CompositeFeature', ['ChildFeatureID'], unique=False)
     op.create_index('fk_CompositeFeature_ParentFeature1_idx', 'CompositeFeature', ['ParentFeatureID'], unique=False)
-
+    
     # Model table: new table for model metadata
     op.create_table('Model',
         sa.Column('ModelName', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
@@ -60,7 +60,7 @@ def upgrade() -> None:
         sa.Column('ScanIndices', sa.JSON(), nullable=True),
         sa.Column('DataRepresentation', sa.Enum('Binary', 'DualBitMask', 'Probability', 'MultiLabel', 'MultiClass', name='datarepresentation'), nullable=False),
         sa.Column('DataType', sa.Enum('R8', 'R8UI', 'R16UI', 'R32UI', 'R32F', name='datatype'), nullable=False),
-        sa.Column('Threshold', sa.Float(), nullable=False),
+        sa.Column('Threshold', sa.Float(), nullable=True),
         sa.Column('ReferenceSegmentationID', sa.Integer(), nullable=True),
         sa.Column('SegmentationID', sa.Integer(), nullable=False),
         sa.Column('CreatorID', sa.Integer(), nullable=False),
@@ -77,8 +77,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('SegmentationID')
     )
 
-    # SegmentationModel table: new table for model-generated segmentations
-    op.create_table('SegmentationModel',
+    # ModelSegmentation table: new table for model-generated segmentations
+    op.create_table('ModelSegmentation',
         sa.Column('ZarrArrayIndex', sa.Integer(), nullable=True),
         sa.Column('ImageInstanceID', sa.Integer(), nullable=True),
         sa.Column('Depth', sa.Integer(), nullable=False),
@@ -89,7 +89,7 @@ def upgrade() -> None:
         sa.Column('ScanIndices', sa.JSON(), nullable=True),
         sa.Column('DataRepresentation', sa.Enum('Binary', 'DualBitMask', 'Probability', 'MultiLabel', 'MultiClass', name='datarepresentation'), nullable=False),
         sa.Column('DataType', sa.Enum('R8', 'R8UI', 'R16UI', 'R32UI', 'R32F', name='datatype'), nullable=False),
-        sa.Column('Threshold', sa.Float(), nullable=False),
+        sa.Column('Threshold', sa.Float(), nullable=True),
         sa.Column('ReferenceSegmentationID', sa.Integer(), nullable=True),
         sa.Column('SegmentationID', sa.Integer(), nullable=False),
         sa.Column('ModelID', sa.Integer(), nullable=False),
@@ -100,6 +100,31 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('SegmentationID')
     )
 
+    # SegmentationTag: new table for linking tags to segmentations
+    op.create_table('SegmentationTag',
+        sa.Column('TagID', sa.Integer(), nullable=False),
+        sa.Column('SegmentationID', sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(['SegmentationID'], ['Segmentation.SegmentationID'], ),
+        sa.ForeignKeyConstraint(['TagID'], ['Tag.TagID'], ),
+        sa.PrimaryKeyConstraint('TagID', 'SegmentationID')
+    )
+    op.create_index('fk_SegmentationTag_Segmentation1_idx', 'SegmentationTag', ['SegmentationID'], unique=False)
+    op.create_index('fk_SegmentationTag_Tag1_idx', 'SegmentationTag', ['TagID'], unique=False)
+    
+    # FormAnnotationTag: new table for linking tags to form annotations
+    op.create_table('FormAnnotationTag',
+        sa.Column('TagID', sa.Integer(), nullable=False),
+        sa.Column('FormAnnotationID', sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(['FormAnnotationID'], ['FormAnnotation.FormAnnotationID'], ),
+        sa.ForeignKeyConstraint(['TagID'], ['Tag.TagID'], ),
+        sa.PrimaryKeyConstraint('TagID', 'FormAnnotationID')
+    )
+    op.create_index('fk_FormAnnotationTag_FormAnnotation1_idx', 'FormAnnotationTag', ['FormAnnotationID'], unique=False)
+    op.create_index('fk_FormAnnotationTag_Tag1_idx', 'FormAnnotationTag', ['TagID'], unique=False)
+    
+    # Drop AnnotationTag table
+    op.drop_table('AnnotationTag')
+    
     # Annotation: add self-referencing foreign key
     op.create_foreign_key(None, 'Annotation', 'Annotation', ['AnnotationReferenceID'], ['AnnotationID'])
 
@@ -121,6 +146,7 @@ def upgrade() -> None:
     # Creator: rename MSN to EmployeeIdentifier, add PasswordHash
     op.alter_column('Creator', 'MSN', new_column_name='EmployeeIdentifier', existing_type=mysql.CHAR(length=6), type_=sqlmodel.sql.sqltypes.AutoString(length=255), existing_nullable=True)
     op.add_column('Creator', sa.Column('PasswordHash', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True))
+
 
     # Feature: drop Modality
     op.drop_column('Feature', 'Modality')
@@ -172,6 +198,7 @@ def upgrade() -> None:
 
     # TaskState: add unique constraint to TaskStateName
     op.create_unique_constraint(None, 'TaskState', ['TaskStateName'])
+
     # ### end Alembic commands ###
 
 
@@ -204,6 +231,7 @@ def downgrade() -> None:
     op.drop_constraint(None, 'FormAnnotation', type_='foreignkey')
     op.create_foreign_key('fk_FormAnnotation_ImageInstance1', 'FormAnnotation', 'ImageInstance', ['ImageInstanceID'], ['ImageInstanceID'], ondelete='CASCADE')
     op.add_column('Feature', sa.Column('Modality', mysql.ENUM('OCT', 'CF'), nullable=True))
+    # Creator: rename EmployeeIdentifier back to MSN, drop PasswordHash
     op.alter_column('Creator', 'EmployeeIdentifier', new_column_name='MSN', existing_type=sqlmodel.sql.sqltypes.AutoString(length=255), type_=mysql.CHAR(length=6), existing_nullable=True)
     op.drop_column('Creator', 'PasswordHash')
     op.alter_column('Contact', 'Institute',
@@ -220,7 +248,24 @@ def downgrade() -> None:
                existing_nullable=False)
     op.drop_column('Contact', 'Orcid')
     op.drop_constraint(None, 'Annotation', type_='foreignkey')
-    op.drop_table('SegmentationModel')
+    op.create_table('AnnotationTag',
+    sa.Column('TagID', mysql.INTEGER(), autoincrement=False, nullable=False),
+    sa.Column('AnnotationID', mysql.INTEGER(), autoincrement=False, nullable=False),
+    sa.ForeignKeyConstraint(['AnnotationID'], ['Annotation.AnnotationID'], name='fk_AnnotationTag_Annotation1'),
+    sa.ForeignKeyConstraint(['TagID'], ['Tag.TagID'], name='fk_AnnotationTag_Tag1'),
+    sa.PrimaryKeyConstraint('TagID', 'AnnotationID'),
+    mysql_default_charset='utf8mb3',
+    mysql_engine='InnoDB'
+    )
+    op.create_index('fk_AnnotationTag_Tag1_idx', 'AnnotationTag', ['TagID'], unique=False)
+    op.create_index('fk_AnnotationTag_Annotation1_idx', 'AnnotationTag', ['AnnotationID'], unique=False)
+    op.drop_index('fk_SegmentationTag_Tag1_idx', table_name='SegmentationTag')
+    op.drop_index('fk_SegmentationTag_Segmentation1_idx', table_name='SegmentationTag')
+    op.drop_table('SegmentationTag')
+    op.drop_table('ModelSegmentation')
+    op.drop_index('fk_FormAnnotationTag_Tag1_idx', table_name='FormAnnotationTag')
+    op.drop_index('fk_FormAnnotationTag_FormAnnotation1_idx', table_name='FormAnnotationTag')
+    op.drop_table('FormAnnotationTag')
     op.drop_table('Segmentation')
     op.drop_table('Model')
     op.drop_index('fk_CompositeFeature_ParentFeature1_idx', table_name='CompositeFeature')

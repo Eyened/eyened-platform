@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # Check if path argument is provided
     if len(sys.argv) < 2:
         print("Usage: python set_connection_string.py <path_to_env_file>")
-        print("Example: python set_connection_string.py ../dev/.env")
+        print("Example: python set_connection_string.py ../../dev/.env")
         sys.exit(1)
     
     env_path = Path(sys.argv[1]).resolve()
