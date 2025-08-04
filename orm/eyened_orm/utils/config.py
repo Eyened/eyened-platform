@@ -52,8 +52,8 @@ class EyenedORMConfig(MyBaseSettings):
     # Database configuration
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
 
-    # Secret key used to generate hashes deterministically for obfuscation of file names.
-    secret_key: str = "6f4b661212"
+    # Secret key used to create JWT tokens
+    secret_key: str = Field(description="Secret key used to create JWT tokens")
 
     # File system configuration
     images_basepath: str = Field(
