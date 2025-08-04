@@ -1,36 +1,26 @@
 import os
-from types import SimpleNamespace
 
 from eyened_orm import (
-    Annotation,
-    AnnotationType,
     Creator,
-    DataRepresentation,
-    Datatype,
-    ModalityTable,
-    SourceInfo,
     TaskState,
     Base,
-    db,
+    Database,
 )
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlmodel import create_engine
 
-from ..db import settings
+from ..config import settings
 from ..routes.auth import create_user
-
+from eyened_orm.utils.config import EyenedORMConfig
 
 def create_database():
     # create generic engine for database creation
-    root_config = SimpleNamespace(
-        user="root",
-        password=os.environ.get("DB_ROOT_PASSWORD"),
-        host=settings.database.host,
-        port=settings.database.port,
-        database=None,  # Don't specify database initially
-    )
-
-    temp_engine = create_engine(db.create_connection_string(root_config))
+    root_password = os.environ.get("DATABASE_ROOT_PASSWORD")
+    dbstring = (
+        f"mysql+pymysql://root:{root_password}@{settings.database.host}:{settings.database.port}"
+    )    
+    temp_engine = create_engine(dbstring)
 
     # First check if database exists
     try:
@@ -64,10 +54,12 @@ def create_database():
         raise RuntimeError(
             f"Could not create database user for {settings.database.database}. Error: {str(e)}"
         )
+    
     # Now create tables using the correct database
-    root_config.database = settings.database.database
-    temp_engine = create_engine(db.create_connection_string(root_config))
-    Base.metadata.create_all(temp_engine)
+    print(settings)
+    database = Database(EyenedORMConfig(database=settings.database))
+    
+    Base.metadata.create_all(database.engine)
 
 
 def create_database_user(engine):
@@ -123,21 +115,19 @@ def create_database_user(engine):
 
 def init_admin(session: Session) -> None:
     """
-    Initialize an admin user if ADMIN_USERNAME environment variable is set.
+    Initialize an admin user if ADMIN_USERNAME and ADMIN_PASSWORD are set in the config.
 
     Args:
         session: SQLAlchemy session to use for database operations
     """
-    admin_username = os.environ.get("ADMIN_USERNAME")
-    admin_password = os.environ.get("ADMIN_PASSWORD")
+    admin_username = settings.admin_username
+    admin_password = settings.admin_password
 
     if admin_username is None or admin_password is None:
-        raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be set")
+        raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be set in the config")
 
     # Check if admin already exists
-    existing_admin = (
-        session.query(Creator).filter(Creator.CreatorName == admin_username).first()
-    )
+    existing_admin = Creator.by_name(session, admin_username)
 
     if existing_admin:
         print("Admin user already exists, skipping creation")
@@ -150,30 +140,12 @@ def init_admin(session: Session) -> None:
             password=admin_password,
             description="Default admin user created during initialization",
         )
+        print(f"Created admin user: {admin_username}")
     except Exception as e:
         raise RuntimeError(f"Failed to create admin user: {str(e)}")
-
-
-def init_other_objects(session):
-    # add SourceInfo 37 and Modality 14 if they don't exist
-    source_info = session.get(SourceInfo, 37)
-    if source_info is None:
-        source_info = SourceInfo(
-            SourceInfoID=37, SourceName="Default", SourcePath="", ThumbnailPath=""
-        )
-        session.add(source_info)
-
-    modality = session.get(ModalityTable, 14)
-    if modality is None:
-        modality = ModalityTable(ModalityID=14, ModalityTag="Default")
-        session.add(modality)
-
-    session.commit()
-
-
    
 
-def init_task_states(session):
+def init_task_states(session: Session):
     expected_states = [
         "Not started",
         "Busy",
@@ -184,6 +156,7 @@ def init_task_states(session):
     for name in expected_states:
         if name not in [t.TaskStateName for t in task_states]:
             task_state = TaskState(TaskStateName=name)
+            print(f"Adding task state: {task_state}")
             session.add(task_state)
 
     session.commit()

@@ -5,98 +5,61 @@ sidebar:
   order: 2
 ---
 
-{/* 
-Claude query: In configuration.mdx, write documentation for the configuration options in config.sample.py. First show the structure of the database configuration and then make a single table with the rest of the options with columns Option, Required and Description
-*/}
-
-## Configuration
-
-The Eyened ORM can be configured in two ways:
-
-1. Using environment variables
-2. Using a Python configuration object
-
-### Using Environment Variables
-
-A sample configuration file is provided at `orm/eyened_orm/environments/sample.env`. 
-Copy this file to `orm/eyened_orm/environments/<ENV>.env` in the same folder and modify the settings according to your environment.
-The configuration can be loaded into the ORM as:
-
-```python
-from eyened_orm import DBManager
-DBManager.init("dev")  # Loads configuration from dev.env
-session = DBManager.get_session()
-```
-You can easily switch between environments by maintaining multiple `<ENV>.env` files in `orm/eyened_orm/environments/`
-
-:::tip
-If you omit the call to DBManager.init, the DBManager will automatically apply settings from `orm/eyened_orm/environments/.env`
-:::
-
-
-### Using Python Configuration
-
-Alternatively, you can provide the configuration directly:
-
-```python
-from eyened_orm import DBManager
-from eyened_orm.utils.config import EyenedORMConfig, DatabaseSettings
-
-config = EyenedORMConfig(
-    database=DatabaseSettings(
-        user="<USER>",
-        password="<PASSWORD>",
-        host="<HOSTNAME>",
-        port="<PORT>",
-        database="<DATABASE>"
-    ),
-    secret_key="your-secret-key",  # Optional, defaults to "6f4b661212"
-    images_basepath="/PATH/TO/IMAGES",  # Optional, defaults to "/images"
-    storage_basepath="/PATH/TO/STORAGE",  # Optional, defaults to "/storage"
-    default_study_date="1970-01-01",  # Optional, defaults to 1970-01-01
-    image_server_url="http://your-image-server"  # Optional
-)
-
-DBManager.init(config)
-```
-
 ## Configuration Options
 
-The following table describes all available configuration options:
+The Eyened ORM can be configured through environment variables or by passing configuration parameters directly. The following sections describe all available configuration options:
 
 ### Database Settings
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| DB_USER | Yes | Database username |
-| DB_PASSWORD | Yes | Database password |
-| DB_HOST | Yes | Database host address |
-| DB_NAME | Yes | Database name |
-| DB_PORT | Yes | Database port number |
+| DATABASE_USER | Yes | Database username |
+| DATABASE_PASSWORD | Yes | Database password |
+| DATABASE_HOST | Yes | Database host address |
+| DATABASE_NAME | Yes | Database name |
+| DATABASE_PORT | Yes | Database port number |
 
 ### Global Settings
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | secret_key | No | "6f4b661212" | Secret key used for password hashing and file name obfuscation |
-| images_basepath | No | "/images" | Base path for image storage. When running in Docker, this should be set to the host machine's path to the images |
-| storage_basepath | No | "/storage" | Base path for storage of annotations, thumbnails and trash |
+| images_basepath | No | "/images" | Base path for image storage (in docker deployment by default mapped to "/images") |
+| segmentations_zarr_store | No | "/storage/segmentations.zarr" | Path to the zarr store containing segmentations. Used by the platform for reading and writing segmentations |
+| thumbnails_path | No | "/storage/thumbnails" | Folder containing the thumbnail structure. Used by the ORM to read thumbnails and by the importer to write thumbnails on insertion |
 | default_study_date | No | "1970-01-01" | Default date for new studies when no date is provided |
+| cfi_cache_path | No | None | Path of a cache for fundus images. Used by the importer to write a preprocessed version of the images |
 | image_server_url | No | None | URL of the image server endpoint for generating image URLs |
 
-### Computed Paths
+## Initialization
 
-The following paths are automatically computed based on the `storage_basepath`:
+The Eyened ORM can be initialized in several ways:
 
-- `annotations_path`: `<storage_basepath>/annotations`
-- `thumbnails_path`: `<storage_basepath>/thumbnails`
-- `trash_path`: `<storage_basepath>/trash`
+1. **Passing configuration as keyword arguments**
+2. **Passing a string/path to an environment file**
+3. **Passing None (will read from environment variables)**
 
-## Environment File Priority
+## Usage
 
-The configuration system prioritizes settings in the following order:
-1. `.env` file
-2. Environment variables
-3. Default values
+```python
+from eyened_orm import Database
 
-This means that settings in your `.env` file will override any environment variables or default values.
+# Initialize database
+database = Database()
+
+# Manual session management (must be closed manually)
+session = database.create_session()
+try:
+    # Use session for database operations
+    pass
+finally:
+    session.close()
+
+# Context managed session (automatically closed)
+with database.get_session() as session:
+    # Use session for database operations
+    pass
+```
+
+You can easily switch between environments by maintaining multiple environment files (e.g., `development.env`, `production.env`).
+
