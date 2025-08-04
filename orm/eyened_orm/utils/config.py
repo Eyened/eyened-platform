@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import Optional, Callable, Tuple
 
 from pydantic import Field
 from pydantic_settings import (
@@ -7,8 +7,32 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-class DatabaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore", populate_by_name=True)
+# just adding the from_dict method to BaseSettings to allow for creating settings from a dict
+# without using env variables
+class MyBaseSettings(BaseSettings):
+    @classmethod
+    def from_dict(cls, values: dict) -> "MyBaseSettings":
+        class NoEnvSettings(cls):
+            @classmethod
+            def settings_customise_sources(
+                inner_cls,
+                __cls,
+                *,
+                init_settings: Callable[..., dict],
+                env_settings: Callable[..., dict],
+                dotenv_settings: Callable[..., dict],
+                file_secret_settings: Callable[..., dict],
+            ) -> Tuple[Callable[..., dict], ...]:
+                # Only use values passed to constructor
+                return (init_settings,)
+
+        return NoEnvSettings(**values)
+
+
+class DatabaseSettings(MyBaseSettings):
+    model_config = SettingsConfigDict(
+        case_sensitive=False, extra="ignore", populate_by_name=True
+    )
 
     """Database configuration settings"""
     user: str = Field(description="Database username", validation_alias="DATABASE_USER")
@@ -21,7 +45,7 @@ class DatabaseSettings(BaseSettings):
     raise_on_warnings: bool = True
 
 
-class EyenedORMConfig(BaseSettings):
+class EyenedORMConfig(MyBaseSettings):
     model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
 
     """Global configuration for Eyened platform"""
