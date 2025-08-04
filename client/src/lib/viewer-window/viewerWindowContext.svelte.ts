@@ -1,5 +1,5 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { loadInstances } from "$lib/datamodel/api.svelte";
+import { loadInstances } from "$lib/utils/api";
 import type { Creator } from "$lib/datamodel/creator.svelte";
 import type { Instance } from "$lib/datamodel/instance.svelte";
 import { data } from "$lib/datamodel/model";

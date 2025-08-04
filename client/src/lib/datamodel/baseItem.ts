@@ -1,6 +1,7 @@
 import { apiUrl } from '$lib/config';
 import type { Item } from './itemList';
 import { importData, removeData } from './model';
+import { api } from '../utils/api';
 
 export type MappingDefinition = Record<string, string | Function>;
 
@@ -58,14 +59,7 @@ export abstract class BaseItem {
             return;
         }
         const url = `${apiUrl}/${this.idRoute}`
-        const response = await fetch(url, {
-            method: 'PATCH',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(serverParams)
-        });
+        const response = await api.patch(url, serverParams);
         if (!response.ok) {
             console.error(`failed to update ${this.endpoint} ${this.id}: ${response.statusText}`);
             return;
@@ -81,14 +75,7 @@ export abstract class BaseItem {
     static async create(item: any) {
         const serverParams = toServer(item, this.mapping);
         const url = `${apiUrl}/${this.endpoint}`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(serverParams)
-        });
+        const response = await api.post(url, serverParams);
 
         if (!response.ok) {
             throw new Error(`Failed to create ${this.endpoint}: ${response.statusText}`);
@@ -102,7 +89,7 @@ export abstract class BaseItem {
     async delete(fromServer: boolean = true) {
         if (fromServer) {
             const url = `${apiUrl}/${this.idRoute}`;
-            const response = await fetch(url, { method: 'DELETE' });
+            const response = await api.delete(url);
             if (!response.ok) {
                 throw new Error(`Failed to delete ${this.endpoint} ${this.id}: ${response.statusText}`);
             }
@@ -158,16 +145,7 @@ export abstract class BaseLinkingItem implements Item {
         const parentId = item[this.parentIdField];
         const childId = item[this.childIdField];
         const url = `${apiUrl}/${this.parentResource}/${parentId}/${this.childResource}/${childId}`;
-        const response = await fetch(url,
-            {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(serverParams)
-            }
-        );
+        const response = await api.post(url, serverParams);
 
         if (!response.ok) {
             throw new Error(`Failed to create ${url}: ${response.statusText}`);
@@ -181,7 +159,7 @@ export abstract class BaseLinkingItem implements Item {
     async delete(fromServer: boolean = true) {
         if (fromServer) {
             const url = `${apiUrl}/${this.parentResource}/${this.parentId}/${this.childResource}/${this.childId}`;
-            const response = await fetch(url, { method: 'DELETE' });
+            const response = await api.delete(url);
             if (!response.ok) {
                 throw new Error(`Failed to delete ${this.endpoint} ${this.id}: ${response.statusText}`);
             }

@@ -1,12 +1,11 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import { authClient } from "../auth";
-import { loadBase } from "./datamodel/api.svelte";
+import { loadBase } from "./utils/api";
 import { type Creator } from "./datamodel/creator.svelte";
 import { data } from "./datamodel/model";
 
 export class UserManager {
-
     private _creator: Creator | null = null;
 
     constructor() {
@@ -55,7 +54,8 @@ export class UserManager {
 
     async changePassword(oldPassword: string, newPassword: string) {
         const resp = await authClient.changePassword(oldPassword, newPassword);
-
+        // Optionally refresh user data after password change
+        await this.setCreator(resp.id);
     }
 
     private async setCreator(id: number) {
@@ -74,5 +74,4 @@ export class UserManager {
     async signup(username: string, password: string) {
         await authClient.register(username, password);
     }
-
 }

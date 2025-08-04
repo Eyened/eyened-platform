@@ -1,7 +1,7 @@
 <script lang="ts">
     import TaskMain from "$lib/tasks/TaskMain.svelte";
     import { data as modelData } from "$lib/datamodel/model.js";
-    import { loadInstances, loadSubtasks } from "$lib/datamodel/api.svelte.js";
+    import { loadInstances, loadSubtasks } from "$lib/utils/api";
     import { Deferred } from "$lib/utils.js";
     import { onMount } from "svelte";
     import type { SubTask } from "$lib/datamodel/subTask.svelte.js";
