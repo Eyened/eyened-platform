@@ -36,7 +36,7 @@ target:
   host: 
   port: 
   user: root
-  password: test
+  password: 
   database: eyened_database
 
 copy_objects:
@@ -47,11 +47,15 @@ copy_objects:
     clause:
       PatientIdentifier: '2'
 ```
-
-**Note:** The `source` is the source database (e.g. production), `target` is the development database (use `port=DATABASE_PORT` from the `.env`, user `root` and password `test` are hardcoded currently).
+**Note:** 
+- You can fill out the list of object to copy (`copy_objects`). Linked objects from other tables (via foreign keys) are also automatically included.
+- The `source` is the source database (e.g. production), `target` is the development database (use `port=DATABASE_PORT` from the `.env`).
 
 ### Apply Pending Migrations (if needed)
-Working from `orm/migrations` (`cd ../orm/migrations`):
+Working from `orm/migrations`:
+```
+cd ../orm/migrations
+```
 
 Assuming the migration you want to run is found in `orm/migrations/alembic/versions`:
 
@@ -71,7 +75,10 @@ Assuming the migration you want to run is found in `orm/migrations/alembic/versi
    ```
 
 ## 4. Start the Development Server & Client
-Working from `dev` (`cd ../../dev`):
+Working from `dev` 
+```
+cd ../../dev
+```
 
 ### Start the Server
 - Run:

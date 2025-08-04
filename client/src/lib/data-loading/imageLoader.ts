@@ -75,7 +75,9 @@ export class ImageLoader {
                 height_mm: image.dimensions_mm.height,
                 depth_mm: image.dimensions_mm.depth
             };
-            console.log('dimensions', dimensions);
+            if (js_images.length == 1) {
+                return [Image2D.fromBitmap(instance, this.webgl, img_id, js_images[0], dimensions, meta)];
+            }
             const img3d = new Image3D(instance, this.webgl, img_id, getArrayFromImages(js_images), dimensions!, meta)
             return await this.returnImage3D(img3d);
         }

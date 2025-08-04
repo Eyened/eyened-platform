@@ -10,6 +10,7 @@ import { FilterList } from "./itemList";
 import { data, importData, registerConstructor } from "./model";
 import type { Study } from "./study";
 import type { SubTask } from "./subTask.svelte";
+import { api } from '../utils/api';
 
 
 export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
@@ -162,10 +163,7 @@ export class Segmentation extends BaseItem {
             formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
         }
 
-        const response = await fetch(`${apiUrl}/${Segmentation.endpoint}`, {
-            method: 'POST',
-            body: formData,
-        });
+        const response = await api.postForm(`${apiUrl}/${Segmentation.endpoint}`, formData);
         const segmentation = await response.json();
         const imported = importData({ [Segmentation.endpoint]: [segmentation] });
 
@@ -205,9 +203,7 @@ export class Segmentation extends BaseItem {
         }
         const url = `${apiUrl}/${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
 
-        const response = await fetch(url, {
-            method: 'PUT',
-            body: data,
+        const response = await api.put(url, data, {
             headers: {
                 'Content-Type': 'application/octet-stream',
             },
@@ -221,7 +217,7 @@ export class Segmentation extends BaseItem {
         params.append('axis', (this.sparseAxis ?? 0).toString());
         params.append('scan_nr', scanNr.toString());
         const url = `${apiUrl}/${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
-        const response = await fetch(url);
+        const response = await api.get(url);
         return decodeNpy(await response.arrayBuffer());
     }
 }
