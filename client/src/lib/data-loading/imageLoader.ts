@@ -211,17 +211,19 @@ async function getImage(url: string): Promise<ImageBitmap> {
     return bitmap;
 }
 
-function getArrayFromImages(js_images: HTMLCanvasElement[]): Uint8Array {
+// TODO: perhaps this can be optimized (or better: convert [png_series] images to DICOM)
+function getArrayFromImages(js_images: ImageBitmap[]): Uint8Array {
     const w = js_images[0].width;
     const h = js_images[0].height;
     const pixelData = new Uint8Array(js_images.length * w * h);
     for (let i = 0; i < js_images.length; i++) {
         const img = js_images[i];
-        const ctx = img.getContext('2d')!;
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const img_data = imageData.data;
-        for (let j = 0; j < img_data.length; j += 4) {
-            pixelData[i * w * h + j / 4] = img_data[j];
+        
+        const ctx = new OffscreenCanvas(img.width, img.height).getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, img.width, img.height);
+        for (let j = 0; j < imageData.data.length; j += 4) {
+            pixelData[i * w * h + j / 4] = imageData.data[j];
         }
     }
     return pixelData;
