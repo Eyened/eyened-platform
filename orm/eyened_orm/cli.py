@@ -37,8 +37,8 @@ def transfer_db(config_file):
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)
     
-    source = DatabaseSettings(**config['source'])
-    target = DatabaseSettings(**config['target'])
+    source = DatabaseSettings.from_dict(config['source'])
+    target = DatabaseSettings.from_dict(config['target'])
     
     print('Transferring from:')
     print(f'{source.host}:{source.port}/{source.database} ({source.user})')
