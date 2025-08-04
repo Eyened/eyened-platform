@@ -2,14 +2,19 @@ from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List
 
 from sqlmodel import Field, Relationship
-from sqlalchemy import Column, select, BINARY
-from sqlalchemy.orm import Session
+from sqlalchemy import Column, BINARY
 
-from .base import Base, PrivateField
+from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, SubTask
+    from eyened_orm import Annotation, FormAnnotation, SubTask, Segmentation
 
+def PrivateField(**kwargs):
+    field_info = Field(**kwargs)
+    json_schema_extra = field_info.json_schema_extra or {}
+    json_schema_extra["private"] = True
+    field_info.json_schema_extra = json_schema_extra
+    return field_info
 
 class CreatorBase(Base):
     CreatorName: str = Field(max_length=45, unique=True)

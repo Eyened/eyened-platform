@@ -4,25 +4,25 @@ import numpy as np
 import zarr
 
 
-class AnnotationZarrArray:
+class ZarrArray:
     """
-    A wrapper class for zarr arrays used to store annotation data.
+    A wrapper class for zarr arrays used to store segmentation data.
 
     Arrays are of shape (N, D, H, W) where:
-    - N is the size of the annotation index dimension
+    - N is the size of the segmentation index dimension
     - D, H, W are spatial dimensions (any can be 1 for 2D data, all >1 for 3D data)
 
     Usage:
         # Load existing array
-        array = AnnotationZarrArray("path/to/existing/array.zarr")
+        array = ZarrArray("path/to/existing/array.zarr")
 
         # Create new array
-        array = AnnotationZarrArray.create_new("path/to/new/array.zarr", "binary_mask", (512, 512))
+        array = ZarrArray.create_new("path/to/new/array.zarr", "binary_mask", (512, 512))
     """
 
     def __init__(self, zarr_array: zarr.Array):
         """
-        Initialize the AnnotationZarrArray from an existing array.
+        Initialize the ZarrArray from an existing array.
 
         Args:
             zarr_path: Path to the zarr array on disk
@@ -33,50 +33,50 @@ class AnnotationZarrArray:
         """
         self.array = zarr_array
 
-    def write(self, zarr_index: Optional[int], annot_data: np.ndarray) -> int:
+    def write(self, zarr_index: Optional[int], segmentation_data: np.ndarray) -> int:
         """
-        Write annotation data to the zarr array.
+        Write segmentation data to the zarr array.
 
         Args:
             zarr_index: Index in the array where to write. If None or >= len(A), append to array.
-            annot_data: Annotation data as numpy array of shape (D, H, W) where any spatial dimension can be 1 for 2D images
+            segmentation_data: Segmentation data as numpy array of shape (D, H, W) where any spatial dimension can be 1 for 2D images
 
         Returns:
             The zarr_index where data was written
         """
-        # Validate input data shape - annot_data should be (D, H, W)
-        if len(annot_data.shape) != 3:
+        # Validate input data shape - segmentation_data should be (D, H, W)
+        if len(segmentation_data.shape) != 3:
             raise ValueError(
-                f"Expected 3D array (D, H, W), got shape {annot_data.shape}"
+                f"Expected 3D array (D, H, W), got shape {segmentation_data.shape}"
             )
 
         # Check if spatial dimensions match
-        expected_spatial = self.annotation_resolution
-        actual_spatial = annot_data.shape  # D, H, W
+        expected_spatial = self.segmentation_shape
+        actual_spatial = segmentation_data.shape  # D, H, W
         if actual_spatial != expected_spatial:
             raise ValueError(
                 f"Expected spatial dimensions {expected_spatial}, got {actual_spatial}"
             )
 
         # Validate data type
-        if annot_data.dtype != self.array.dtype:
+        if segmentation_data.dtype != self.array.dtype:
             raise ValueError(
-                f"Expected dtype {self.array.dtype}, got {annot_data.dtype}"
+                f"Expected dtype {self.array.dtype}, got {segmentation_data.dtype}"
             )
 
         if zarr_index is not None and zarr_index < self.array.shape[0]:
             
             # Write to existing index
-            self.array[zarr_index, ...] = annot_data
+            self.array[zarr_index, ...] = segmentation_data
             return zarr_index
         else:
             # Append to array
-            self.array.append(annot_data[None, ...])
+            self.array.append(segmentation_data[None, ...])
             return self.array.shape[0] - 1
 
     def write_slice(self, zarr_index: int, axis: int, slice_index: int, slice_data: np.ndarray) -> None:
         """
-        Write a slice of annotation data to the zarr array.
+        Write a slice of segmentation data to the zarr array.
 
         Args:
             zarr_index: Index in the array where to write the slice
@@ -97,19 +97,20 @@ class AnnotationZarrArray:
             raise ValueError(f"Invalid axis: {axis}. Must be 0 (depth), 1 (height), or 2 (width)")
 
         # Check if the array is volumetric (all spatial dimensions > 1)
+        # TODO: I think this check is not needed, should be removed?
         if not self.is_volume:
             pass
-            # raise ValueError("write_slice is only supported for volumetric annotations (all spatial dimensions > 1)")
+            # raise ValueError("write_slice is only supported for volumetric segmentations (all spatial dimensions > 1)")
 
         # Validate slice_index
-        max_slice_index = self.annotation_resolution[axis]
+        max_slice_index = self.segmentation_shape[axis]
         if slice_index < 0 or slice_index >= max_slice_index:
             raise IndexError(
                 f"Invalid slice_index: {slice_index}. Must be in range [0, {max_slice_index})"
             )
 
         # Validate slice_data shape
-        expected_shape = list(self.annotation_resolution)
+        expected_shape = list(self.segmentation_shape)
         expected_shape.pop(axis)  # Remove the axis dimension
         
         if slice_data.shape != tuple(expected_shape):
@@ -133,7 +134,7 @@ class AnnotationZarrArray:
 
     def read_slice(self, zarr_index: int, axis: int, slice_index: int) -> np.ndarray:
         """
-        Read a slice of annotation data from the zarr array.
+        Read a slice of segmentation data from the zarr array.
 
         Args:
             zarr_index: Index in the array to read the slice from
@@ -158,10 +159,10 @@ class AnnotationZarrArray:
         # Check if the array is volumetric (all spatial dimensions > 1)
         if not self.is_volume:
             pass
-            #raise ValueError("read_slice is only supported for volumetric annotations (all spatial dimensions > 1)")
+            #raise ValueError("read_slice is only supported for volumetric segmentations (all spatial dimensions > 1)")
 
         # Validate slice_index
-        max_slice_index = self.annotation_resolution[axis]
+        max_slice_index = self.segmentation_shape[axis]
         if slice_index < 0 or slice_index >= max_slice_index:
             raise IndexError(
                 f"Invalid slice_index: {slice_index}. Must be in range [0, {max_slice_index})"
@@ -177,13 +178,13 @@ class AnnotationZarrArray:
 
     def read(self, zarr_index: int) -> np.ndarray:
         """
-        Read annotation data from the zarr array.
+        Read segmentation data from the zarr array.
 
         Args:
             zarr_index: Index in the array to read from
 
         Returns:
-            Annotation data as numpy array
+            Segmentation data as numpy array
 
         Raises:
             IndexError: If zarr_index is invalid
@@ -197,7 +198,7 @@ class AnnotationZarrArray:
 
     def delete(self, zarr_index: int) -> None:
         """
-        Delete annotation data from the zarr array by clearing the specified index.
+        Delete segmentation data from the zarr array by clearing the specified index.
 
         Args:
             zarr_index: Index in the array to delete
@@ -223,7 +224,7 @@ class AnnotationZarrArray:
         return self.array.shape
 
     @property
-    def annotation_resolution(self) -> Tuple[int, ...]:
+    def segmentation_shape(self) -> Tuple[int, ...]:
         """Get the spatial resolution of the zarr array."""
         return self.array.shape[1:]
 
@@ -234,13 +235,13 @@ class AnnotationZarrArray:
 
     @property
     def is_volume(self) -> bool:
-        """Check if the annotation is volumetric (all spatial dimensions > 1)."""
-        return all(dim > 1 for dim in self.annotation_resolution)
+        """Check if the segmentation is volumetric (all spatial dimensions > 1)."""
+        return all(dim > 1 for dim in self.segmentation_shape)
 
     @property
     def metadata(self) -> dict:
         pass
 
     def __len__(self) -> int:
-        """Get the number of annotations in the array."""
+        """Get the number of segmentations in the array."""
         return self.array.shape[0]

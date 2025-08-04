@@ -1,9 +1,6 @@
 import yaml
-from typing import Dict, Optional
-
-from pydantic import Field
 from pydantic_settings import SettingsConfigDict
-from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig
+from eyened_orm.utils.config import EyenedORMConfig
 
 class Settings(EyenedORMConfig):
     # IMPORTANT: the base fields in this file must match environment variable names exactly (with the exception of case) unless otherwise specified with validation_alias
@@ -26,4 +23,3 @@ class Settings(EyenedORMConfig):
         return yaml.dump(settings_dict, default_flow_style=False)
 
 settings = Settings()
-settings.database = DatabaseSettings()

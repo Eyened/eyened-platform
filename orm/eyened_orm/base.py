@@ -15,17 +15,7 @@ from sqlalchemy import Column, select
 from sqlalchemy.orm import Session
 from sqlmodel import Field, SQLModel
 
-from eyened_orm.utils.config import DatabaseSettings
 
-from .utils.zarr.manager_annotation import AnnotationZarrStorageManager
-
-
-def PrivateField(**kwargs):
-    field_info = Field(**kwargs)
-    json_schema_extra = field_info.json_schema_extra or {}
-    json_schema_extra["private"] = True
-    field_info.json_schema_extra = json_schema_extra
-    return field_info
 
 
 def create_patch_model(name: str, base_model: type[SQLModel]) -> type[SQLModel]:
@@ -96,16 +86,33 @@ class Base(SQLModel):
 
     # Common class variables
     _name_column: ClassVar[str | None] = None
-    config: ClassVar[DatabaseSettings] = None
-    annotation_storage_manager: ClassVar[AnnotationZarrStorageManager] = None
 
     class Config:
         use_enum_values = False  # This tells Pydantic NOT to convert Enum to .value
         json_encoders = {enum.Enum: lambda x: x.name if isinstance(x, enum.Enum) else x}
 
-    @classmethod
-    def set_config(cls, config: DatabaseSettings):
-        cls.config = config
+    @property
+    def session(self):
+        """Get the session this object is attached to"""
+        from sqlalchemy.orm import object_session
+        session = object_session(self)
+        if not session:
+            raise ValueError("Object not attached to a session")
+        return session
+
+    @property
+    def config(self):
+        """Get config from session"""
+        if not hasattr(self.session, 'config'):
+            raise ValueError("Session not properly configured")
+        return self.session.config
+
+    @property
+    def storage_manager(self):
+        """Get storage manager from session"""
+        if not hasattr(self.session, 'storage_manager'):
+            raise ValueError("Session not properly configured")
+        return self.session.storage_manager
 
     def __getattr__(self, name: str) -> Any:
         """Override attribute access to handle property name conversion.

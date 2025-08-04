@@ -189,8 +189,8 @@ class DatabaseDumper:
 
     def dump(self) -> Set[Tuple[str, Tuple]]:
         queue = [
-            ((table,), build_where_clause(condition))
-            for table, condition in self.root_conditions
+            ((entry['table'],), build_where_clause(entry['clause']))
+            for entry in self.root_conditions
         ]
 
         visited = set()

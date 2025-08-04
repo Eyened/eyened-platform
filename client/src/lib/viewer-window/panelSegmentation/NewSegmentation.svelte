@@ -57,6 +57,7 @@
             dataType,
             0.5,
             axis,
+            taskContext?.subTask
         );
         segmentationContext.hideCreators.delete(creator);
         globalContext.dialogue = null;

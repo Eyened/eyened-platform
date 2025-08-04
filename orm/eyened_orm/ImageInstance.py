@@ -241,17 +241,6 @@ class ImageInstance(ImageInstanceBase, table=True):
     def shape(self) -> tuple[int, int, int]:
         return (self.NrOfFrames or 1, self.Rows_y, self.Columns_x)
     
-    # @property
-    # def l1_axis(self) -> AxisEnum | None:
-    #     if self.Rows_y == 1:
-    #         return AxisEnum.HEIGHT
-    #     elif self.Columns_x == 1:
-    #         return AxisEnum.WIDTH
-    #     elif self.NrOfFrames == 1:
-    #         return AxisEnum.DEPTH
-    #     else:
-    #         return None
-    
     @property
     def is_3d(self) -> bool:
         return self.NrOfFrames is not None and self.NrOfFrames > 1

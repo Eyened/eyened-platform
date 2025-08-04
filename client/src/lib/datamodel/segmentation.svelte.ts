@@ -9,6 +9,7 @@ import type { Instance } from "./instance.svelte";
 import { FilterList } from "./itemList";
 import { data, importData, registerConstructor } from "./model";
 import type { Study } from "./study";
+import type { SubTask } from "./subTask.svelte";
 
 
 export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
@@ -25,6 +26,7 @@ export interface ServerSegmentation {
     Threshold: number,
     ReferenceSegmentationID: number | null,
     ZarrArrayIndex: number,
+    SubTaskID: number | null,
     Depth: number,
     Height: number,
     Width: number,
@@ -53,6 +55,7 @@ export class Segmentation extends BaseItem {
         'ScanIndices': 'scanIndices',
         'ReferenceSegmentationID': 'referenceId',
         'Threshold': 'threshold',
+        'SubTaskID': 'subTaskId',
         'ZarrArrayIndex': 'zarrArrayIndex',
         'DateInserted': 'dateInserted',
         'DateModified': 'dateModified',
@@ -70,6 +73,7 @@ export class Segmentation extends BaseItem {
     depth: number = 0;
     height: number = 0;
     width: number = 0;
+    subTaskId: number | null = null;
     sparseAxis: number | null = null;
     imageProjectionMatrix: number[][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
     scanIndices: number[] | null = $state(null);
@@ -95,6 +99,7 @@ export class Segmentation extends BaseItem {
         this.depth = serverItem.Depth;
         this.height = serverItem.Height;
         this.width = serverItem.Width;
+        this.subTaskId = serverItem.SubTaskID;
         this.sparseAxis = serverItem.SparseAxis;
         this.imageProjectionMatrix = serverItem.ImageProjectionMatrix;
         this.scanIndices = serverItem.ScanIndices?.sort();
@@ -112,6 +117,7 @@ export class Segmentation extends BaseItem {
         dataType: Datatype,
         threshold?: number,
         sparseAxis?: number,
+        subTask?: SubTask,
     ) {
 
         const instance = image.instance;
@@ -140,6 +146,7 @@ export class Segmentation extends BaseItem {
             referenceId: null,
             creatorId: creator.id,
             featureId: feature.id,
+            subTaskId: subTask?.id ?? null,
         };
 
         return await Segmentation.create(item);

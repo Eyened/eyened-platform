@@ -1,11 +1,6 @@
-from eyened_orm import DBManager
+from eyened_orm import Database
 
-from .config import settings
-
-
-DBManager.init(settings)
-
-
+database = Database()
 def get_db():
-    with DBManager.yield_session() as db:
-        yield db
+    with database.get_session() as session:
+        yield session
