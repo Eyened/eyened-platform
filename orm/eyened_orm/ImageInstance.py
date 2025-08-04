@@ -346,19 +346,10 @@ class ImageInstance(ImageInstanceBase, table=True):
         return md5_hash.digest()
 
     @classmethod
-    def where(cls, clause, include_inactive=False):
-        """
-        return a query with some useful joins
-        usage example:
-
-            q = ImageInstance.where(DeviceModel.ManufacturerModelName == 'HRA')
-            session.scalar(q.limit(1))
-        """
+    def _base_joins(cls, statement):
+        """Add useful joins for ImageInstance queries."""
         from eyened_orm import Patient, Project, Series, Study
-
-        statement = select(ImageInstance)
-        if not include_inactive:
-            statement = statement.where(~ImageInstance.Inactive)
+        
         return (
             statement.join(Series)
             .join(Study)
@@ -367,7 +358,6 @@ class ImageInstance(ImageInstanceBase, table=True):
             .outerjoin(Scan)
             .outerjoin(DeviceInstance)
             .outerjoin(DeviceModel)
-            .where(clause)
         )
 
     def get_annotations_for_creator(self, creator: "Creator") -> List["Annotation"]:

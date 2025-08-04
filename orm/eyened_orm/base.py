@@ -212,6 +212,38 @@ class Base(SQLModel):
         """Return columns that are not foreign keys."""
         return [c for c in cls.columns() if not c.foreign_keys]
 
+    @classmethod
+    def _base_joins(cls, statement):
+        """Override this method to add custom joins to queries. """
+        return statement
+    
+    @classmethod
+    def where(cls: Type[T], session: Session, condition, include_inactive=False, **kwargs) -> List[T]:
+        """Query objects with a custom condition and optional joins.
+        
+        Args:
+            session: SQLAlchemy session
+            condition: SQLAlchemy condition
+            include_inactive: Whether to include inactive records (if model has Inactive column)
+            **kwargs: Additional keyword arguments to pass to session.scalars()
+        
+        Returns:
+            List of objects matching the condition
+        """
+        statement = select(cls)
+        
+        # Add inactive filter if model has Inactive column and include_inactive is False
+        if not include_inactive and hasattr(cls, 'Inactive'):
+            statement = statement.where(~cls.Inactive)
+        
+        # Apply custom joins
+        statement = cls._base_joins(statement)
+        
+        # Add the main condition
+        statement = statement.where(condition)
+        
+        return session.scalars(statement, **kwargs).all()
+
     def get_value(self, column: Column):
         val = getattr(self, column.name)
         if isinstance(val, enum.Enum):

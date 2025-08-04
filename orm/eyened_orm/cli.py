@@ -139,10 +139,7 @@ def zarr_tree(env):
     """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
     
-    from eyened_orm import Database
-    
     config = load_orm_config(env)
-    database = Database(config)
     
     # Open the zarr store
     try:
