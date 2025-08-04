@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import yaml
 from pathlib import Path
 import click
+from .inference.utils import auto_device
 from .utils.testdb import DatabaseTransfer
 from tqdm import tqdm
 from .utils.config import DatabaseSettings, EyenedORMConfig
@@ -37,8 +38,8 @@ def transfer_db(config_file):
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)
     
-    source = DatabaseSettings(**config['source'])
-    target = DatabaseSettings(**config['target'])
+    source = DatabaseSettings.from_dict(config['source'])
+    target = DatabaseSettings.from_dict(config['target'])
     
     print('Transferring from:')
     print(f'{source.host}:{source.port}/{source.database} ({source.user})')
@@ -82,8 +83,10 @@ def update_thumbnails(env, failed):
 
 @eorm.command()
 @click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
-def run_models(env):
+@click.option("-d", "--device", type=str, default=None)
+def run_models(env, device):
     import torch
+    import tempfile
 
     from eyened_orm import Database
     from eyened_orm.inference.inference import run_inference
@@ -91,7 +94,23 @@ def run_models(env):
     config = load_orm_config(env)
     database = Database(config)
     with database.get_session() as session:
-        run_inference(session, device=torch.device("cuda:0"))
+        if device is None:
+            device = auto_device()
+        else:
+            device = torch.device(device)
+
+        cfi_cache_path = config.cfi_cache_path
+        if cfi_cache_path is None:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                cfi_cache_path = Path(temp_dir)
+                config.cfi_cache_path = cfi_cache_path
+
+                print(f'Using temporary cfi_cache_path: {cfi_cache_path}')
+
+        else:
+            print(f'Running inference with cfi_cache_path: {cfi_cache_path}')
+        run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
+    
 
 
 @eorm.command()
@@ -120,10 +139,7 @@ def zarr_tree(env):
     """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
     
-    from eyened_orm import Database
-    
     config = load_orm_config(env)
-    database = Database(config)
     
     # Open the zarr store
     try:

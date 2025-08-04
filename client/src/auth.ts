@@ -28,7 +28,12 @@ class AuthClient {
             credentials: 'include'
         });
         if (response.status === 401) {
-            return null;
+            // Try to refresh the token
+            try {
+                return await this.refresh();
+            } catch {
+                return null;
+            }
         }
         if (!response.ok) {
             throw new Error('Failed to get profile');
@@ -38,12 +43,12 @@ class AuthClient {
     }
 
     async login(username: string, password: string, rememberMe: boolean = false): Promise<UserResponse> {
-        const response = await fetch(`${this.baseUrl}/login-password`, {
+        const response = await fetch(`${this.baseUrl}/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            credentials: 'include', // Important for cookies
+            credentials: 'include',
             body: JSON.stringify({
                 username,
                 password,
@@ -55,7 +60,7 @@ class AuthClient {
             throw new Error('Login failed');
         }
 
-        return response.json();
+        return response.json(); // Direct user response, no token handling
     }
 
     async logout(): Promise<void> {
@@ -105,6 +110,19 @@ class AuthClient {
 
         if (!response.ok) {
             throw new Error('Registration failed');
+        }
+
+        return response.json();
+    }
+
+    async refresh(): Promise<UserResponse> {
+        const response = await fetch(`${this.baseUrl}/refresh`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Token refresh failed');
         }
 
         return response.json();
