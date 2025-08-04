@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import JSON, Index, UniqueConstraint
@@ -59,6 +59,8 @@ class SegmentationBase(Base):
         foreign_key="ImageInstance.ImageInstanceID", ondelete="CASCADE", default=None
     )
 
+    DataRepresentation: DataRepresentation
+
     # shape of the segmentation
     Depth: int
     Height: int
@@ -76,7 +78,7 @@ class SegmentationBase(Base):
     # If None, the segmentation is dense (i.e valid for all ScanIndices)
     ScanIndices: List[int] | None = Field(sa_type=JSON, default=None)
 
-    DataRepresentation: DataRepresentation
+    
     DataType: Datatype
 
     Threshold: float = Field(default=0.5)
@@ -185,6 +187,36 @@ class Segmentation(SegmentationBase, table=True):
     Feature: "Feature" = Relationship(back_populates="Segmentations")
     SubTask: "SubTask" = Relationship(back_populates="Segmentations")
 
+    @property
+    def shape_matches_image_shape(self):
+        image_shape = self.ImageInstance.shape
+        annotation_shape = self.shape
+        for i, (x,y) in enumerate(zip(image_shape, annotation_shape)):
+            if i != self.l1_axis and x != y:
+                return False
+        return True
+
+
+class FeatureFeatureLinkBase(Base):
+    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    FeatureIndex: int = Field(primary_key=True)
+
+class FeatureFeatureLink(FeatureFeatureLinkBase, table=True):
+    __tablename__ = "CompositeFeature"
+    __table_args__ = (
+        Index("fk_CompositeFeature_ParentFeature1_idx", "ParentFeatureID"),
+        Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
+    )
+
+    Feature: "Feature" = Relationship(
+        back_populates="FeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ChildFeatureID"}
+    )
+
+    Child: "Feature" = Relationship(
+        back_populates="ChildFeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ParentFeatureID"}
+    )
+    
 
 class FeatureBase(Base):
     FeatureName: str = Field(max_length=60, unique=True)
@@ -199,18 +231,40 @@ class Feature(FeatureBase, table=True):
     Segmentations: List["Segmentation"] = Relationship(back_populates="Feature")
     DateInserted: datetime = Field(default_factory=datetime.now)
 
-
-class CompositeFeatureBase(Base):
-    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    FeatureIndex: int = Field(primary_key=True)
-
-class CompositeFeature(CompositeFeatureBase, table=True):
-    __tablename__ = "CompositeFeature"
-    __table_args__ = (
-        Index("fk_CompositeFeature_ParentFeature1_idx", "ParentFeatureID"),
-        Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
+    # Relationships for parent-child feature hierarchy
+    FeatureAssociations: List["FeatureFeatureLink"] = Relationship(
+        back_populates="Feature", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ParentFeatureID"}
     )
+    
+    ChildFeatureAssociations: List["FeatureFeatureLink"] = Relationship(
+        back_populates="Child", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ChildFeatureID"}
+    )
+
+    @classmethod
+    def from_json(cls, feature_name: str, sub_features: List[str] | Dict[str, str] | None = None) -> "Feature":
+        feature = cls(FeatureName=feature_name)
+
+        if sub_features is None:
+            return feature
+        
+        if isinstance(sub_features, list):
+            for sub_feature in sub_features:
+                feature.SubFeatures.append(cls.from_name_dict(sub_feature))
+        elif isinstance(sub_features, dict):
+            for sub_feature_name, sub_feature_type in sub_features.items():
+                feature.SubFeatures.append(cls.from_name_dict(sub_feature_name, sub_feature_type))
+        
+        return feature
+    
+    @property
+    def json(self) -> Dict[str, Any]:
+        return {
+            "FeatureName": self.FeatureName,
+            "SubFeatures": [sub_feature.json for sub_feature in self.SubFeatures]
+        }
+
+
+
 
 
 class ModelBase(Base):
