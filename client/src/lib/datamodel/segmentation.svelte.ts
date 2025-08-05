@@ -1,4 +1,3 @@
-import { apiUrl } from "$lib/config";
 import { decodeNpy, type NPYArray } from "$lib/utils/npy_loader";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { BaseItem, toServer } from "./baseItem";
@@ -163,7 +162,7 @@ export class Segmentation extends BaseItem {
             formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
         }
 
-        const response = await api.postForm(`${apiUrl}/${Segmentation.endpoint}`, formData);
+        const response = await api.post(Segmentation.endpoint, formData, 'form');
         const segmentation = await response.json();
         const imported = importData({ [Segmentation.endpoint]: [segmentation] });
 
@@ -201,13 +200,9 @@ export class Segmentation extends BaseItem {
         if (scanNr != null) {
             params.append('scan_nr', scanNr.toString());
         }
-        const url = `${apiUrl}/${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
+        const url = `${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
 
-        const response = await api.put(url, data, {
-            headers: {
-                'Content-Type': 'application/octet-stream',
-            },
-        });
+        const response = await api.put(url, data, 'binary');
         const updatedSegmentation = await response.json();
         this.updateFields(updatedSegmentation);
     }
@@ -216,7 +211,7 @@ export class Segmentation extends BaseItem {
         const params = new URLSearchParams();
         params.append('axis', (this.sparseAxis ?? 0).toString());
         params.append('scan_nr', scanNr.toString());
-        const url = `${apiUrl}/${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
+        const url = `${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
         const response = await api.get(url);
         return decodeNpy(await response.arrayBuffer());
     }

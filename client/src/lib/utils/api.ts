@@ -1,67 +1,112 @@
 import { apiUrl } from '$lib/config';
+import { authClient, type UserResponse } from '../../auth';
 import { importData } from '../datamodel/model';
 import type { Task } from '../datamodel/task.svelte';
 
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type DataType = 'json' | 'binary' | 'form';
 
-interface ApiRequestOptions extends RequestInit {
-    body?: any;
-    json?: boolean;
-}
+// Token refresh state
+let isRefreshing = false;
+let refreshPromise: Promise<UserResponse> | null = null;
 
-const createRequest = (method: HttpMethod, url: string, options: ApiRequestOptions = {}): RequestInit => {
-    const { body, json = true, ...restOptions } = options;
-    
+const createRequest = (method: HttpMethod, body: any, dataType: DataType): RequestInit => {
     const requestInit: RequestInit = {
         method,
         credentials: 'include',
-        ...restOptions,
     };
 
     if (body) {
-        if (json && !(body instanceof FormData)) {
-            requestInit.headers = {
-                'Content-Type': 'application/json',
-                ...restOptions.headers,
-            };
-            requestInit.body = JSON.stringify(body);
-        } else {
-            requestInit.body = body;
+        switch (dataType) {
+            case 'json':
+                requestInit.headers = {
+                    'Content-Type': 'application/json',
+                };
+                requestInit.body = JSON.stringify(body);
+                break;
+
+            case 'binary':
+                requestInit.headers = {
+                    'Content-Type': 'application/octet-stream',
+                };
+                requestInit.body = body;
+                break;
+
+            case 'form':
+                requestInit.body = body;
+                break;
         }
     }
 
     return requestInit;
 };
 
+// Handle token refresh with deduplication
+async function handleTokenRefresh(): Promise<UserResponse> {
+    console.log('handleTokenRefresh');
+    if (isRefreshing) {
+        // If already refreshing, wait for the existing promise
+        return refreshPromise!;
+    }
+
+    isRefreshing = true;
+    refreshPromise = authClient.refresh();
+    
+    try {
+        const result = await refreshPromise;
+        return result;
+    } finally {
+        isRefreshing = false;
+        refreshPromise = null;
+    }
+}
+
 export const api = {
-    async request(method: HttpMethod, url: string, options: ApiRequestOptions = {}): Promise<Response> {
-        return fetch(url, createRequest(method, url, options));
+    async request(method: HttpMethod, base_url: string, body: any, dataType: DataType): Promise<Response> {
+        const url = `${apiUrl}/${base_url}`;
+        const makeRequest = async (): Promise<Response> => {
+            return fetch(url, createRequest(method, body, dataType));
+        };
+
+        // First attempt
+        let response = await makeRequest();
+
+        // If we get 401, try to refresh token and retry once
+        if (response.status === 401) {
+            try {
+                await handleTokenRefresh();
+                // Retry the original request with the new token
+                response = await makeRequest();
+            } catch (error) {
+                // If refresh fails, redirect to login
+                window.location.href = '/login';
+                throw error;
+            }
+        }
+
+        return response;
     },
 
-    async get(url: string, options: RequestInit = {}): Promise<Response> {
-        return this.request('GET', url, options);
+    async get(url: string): Promise<Response> {
+        return this.request('GET', url, null, 'json');
     },
 
-    async post(url: string, body?: any, options: RequestInit = {}): Promise<Response> {
-        return this.request('POST', url, { ...options, body });
+    async post(url: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
+        return this.request('POST', url, body, dataType);
     },
 
-    async put(url: string, body?: any, options: RequestInit = {}): Promise<Response> {
-        return this.request('PUT', url, { ...options, body });
+    async put(url: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
+        return this.request('PUT', url, body, dataType);
     },
 
-    async patch(url: string, body?: any, options: RequestInit = {}): Promise<Response> {
-        return this.request('PATCH', url, { ...options, body });
+    async patch(url: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
+        return this.request('PATCH', url, body, dataType);
     },
 
-    async delete(url: string, options: RequestInit = {}): Promise<Response> {
-        return this.request('DELETE', url, options);
-    },
-
-    // For FormData requests (like file uploads)
-    async postForm(url: string, formData: FormData, options: RequestInit = {}): Promise<Response> {
-        return this.request('POST', url, { ...options, body: formData, json: false });
-    },
+    async delete(url: string): Promise<Response> {
+        return this.request('DELETE', url, null, 'json');
+    }
 };
 
 // Unified data fetching utility
@@ -91,7 +136,7 @@ function createSearchParams(params: Record<string, string | number | Array<strin
 async function loadData(endpoint: string, params?: Record<string, string | number | Array<string | number>>, searchParams?: URLSearchParams) {
     const finalSearchParams = searchParams || (params ? createSearchParams(params) : undefined);
     const data = await fetchFromApi(endpoint, finalSearchParams);
-    
+
     if (data.entities) {
         importData(data.entities);
         return data.next_cursor;

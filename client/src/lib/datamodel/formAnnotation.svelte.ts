@@ -70,7 +70,7 @@ export class FormAnnotation extends BaseItem {
     }
 
     async load() {
-        const response = await api.get(`${apiUrl}/${FormAnnotation.endpoint}/${this.id}/form-data`);
+        const response = await api.get(`${FormAnnotation.endpoint}/${this.id}/form-data`);
         this.value = await response.json();
     }
 
