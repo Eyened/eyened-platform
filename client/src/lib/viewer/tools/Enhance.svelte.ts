@@ -10,7 +10,6 @@ export class EnhanceTool extends BrushTool {
     private drawInterval: ReturnType<typeof setInterval> | undefined;
     public readonly hardness = $state(0.5); // higher hardness means sharper edge near brush border
     public readonly pressure = $state(0.25); // higher pressure means more effect
-    public readonly enhance = $state(true); // enhance existing value, vs paint/erase to a fixed value
 
 
     constructor(
@@ -45,7 +44,6 @@ export class EnhanceTool extends BrushTool {
                     brushRadius: this.brushRadius,
                     hardness: this.hardness,
                     pressure: this.pressure,
-                    enhance: this.enhance,
                     erase: this.mode === 'erase',
                     point: this.lastPosition,
                     aspectRatio: this.viewerContext.aspectRatio
