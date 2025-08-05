@@ -1,4 +1,3 @@
-import { apiUrl } from '$lib/config';
 import type { Item } from './itemList';
 import { importData, removeData } from './model';
 import { api } from '../utils/api';
@@ -58,7 +57,7 @@ export abstract class BaseItem {
             console.warn('no properties to update');
             return;
         }
-        const url = `${apiUrl}/${this.idRoute}`
+        const url = this.idRoute
         const response = await api.patch(url, serverParams);
         if (!response.ok) {
             console.error(`failed to update ${this.endpoint} ${this.id}: ${response.statusText}`);
@@ -74,7 +73,7 @@ export abstract class BaseItem {
 
     static async create(item: any) {
         const serverParams = toServer(item, this.mapping);
-        const url = `${apiUrl}/${this.endpoint}`;
+        const url = this.endpoint;
         const response = await api.post(url, serverParams);
 
         if (!response.ok) {
@@ -88,7 +87,7 @@ export abstract class BaseItem {
 
     async delete(fromServer: boolean = true) {
         if (fromServer) {
-            const url = `${apiUrl}/${this.idRoute}`;
+            const url = this.idRoute;
             const response = await api.delete(url);
             if (!response.ok) {
                 throw new Error(`Failed to delete ${this.endpoint} ${this.id}: ${response.statusText}`);
@@ -144,7 +143,7 @@ export abstract class BaseLinkingItem implements Item {
         const serverParams = toServer(item, this.mapping);
         const parentId = item[this.parentIdField];
         const childId = item[this.childIdField];
-        const url = `${apiUrl}/${this.parentResource}/${parentId}/${this.childResource}/${childId}`;
+        const url = `${this.parentResource}/${parentId}/${this.childResource}/${childId}`;
         const response = await api.post(url, serverParams);
 
         if (!response.ok) {
@@ -158,7 +157,7 @@ export abstract class BaseLinkingItem implements Item {
 
     async delete(fromServer: boolean = true) {
         if (fromServer) {
-            const url = `${apiUrl}/${this.parentResource}/${this.parentId}/${this.childResource}/${this.childId}`;
+            const url = `${this.parentResource}/${this.parentId}/${this.childResource}/${this.childId}`;
             const response = await api.delete(url);
             if (!response.ok) {
                 throw new Error(`Failed to delete ${this.endpoint} ${this.id}: ${response.statusText}`);
