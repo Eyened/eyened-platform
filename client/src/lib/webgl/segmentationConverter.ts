@@ -25,12 +25,12 @@ function probabilityToBinary(i: number, threshold: number) {
     return i > threshold ? 1 : 0;
 }
 export const converters = {
-    'Binary->Questionable': binaryToQuestionable,
+    'Binary->DualBitMask': binaryToQuestionable,
     'Binary->Probability': binaryToProbability,
-    'Questionable->Binary': questionableToBinary,
-    'Questionable->Probability': questionableToProbability,
+    'DualBitMask->Binary': questionableToBinary,
+    'DualBitMask->Probability': questionableToProbability,
     'Probability->Binary': probabilityToBinary,
-    'Probability->Questionable': probabilityToBinary, // same as binary
+    'Probability->DualBitMask': probabilityToBinary, // same as binary
 }
 export function convert(data: DrawingArray, from: SimpleDataRepresentation, to: SimpleDataRepresentation, threshold: number = 127) {
     if (from == to) {
