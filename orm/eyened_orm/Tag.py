@@ -13,15 +13,26 @@ class Tag(TagBase, table=True):
     TagID: int = Field(primary_key=True)
 
 
-class AnnotationTag(Base, table=True):
-    __tablename__ = "AnnotationTag"
+class SegmentationTag(Base, table=True):
+    __tablename__ = "SegmentationTag"
     __table_args__ = (
-        Index("fk_AnnotationTag_Tag1_idx", "TagID"),
-        Index("fk_AnnotationTag_Annotation1_idx", "AnnotationID"),
+        Index("fk_SegmentationTag_Tag1_idx", "TagID"),
+        Index("fk_SegmentationTag_Segmentation1_idx", "SegmentationID"),
+    )
+    
+    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
+    SegmentationID: int = Field(foreign_key="Segmentation.SegmentationID", primary_key=True)   
+
+
+class FormAnnotationTag(Base, table=True):
+    __tablename__ = "FormAnnotationTag"
+    __table_args__ = (
+        Index("fk_FormAnnotationTag_Tag1_idx", "TagID"),
+        Index("fk_FormAnnotationTag_FormAnnotation1_idx", "FormAnnotationID"),
     )
 
     TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
-    AnnotationID: int = Field(foreign_key="Annotation.AnnotationID", primary_key=True)
+    FormAnnotationID: int = Field(foreign_key="FormAnnotation.FormAnnotationID", primary_key=True)
 
 
 class StudyTag(Base, table=True):

@@ -80,7 +80,7 @@ class SegmentationBase(Base):
     DataRepresentation: DataRepresentation
     DataType: Datatype
 
-    Threshold: float = Field(default=0.5)
+    Threshold: float | None = Field(default=None)
     ReferenceSegmentationID: int | None = Field(foreign_key="Segmentation.SegmentationID", default=None)
 
     @property
@@ -223,8 +223,8 @@ class Model(ModelBase, table=True):
 
     __table_args__ = (UniqueConstraint("ModelName", "Version"),)
 
-class SegmentationModel(SegmentationBase, table=True):
-    __tablename__ = "SegmentationModel"    
+class ModelSegmentation(SegmentationBase, table=True):
+    __tablename__ = "ModelSegmentation"    
     SegmentationID: int = Field(primary_key=True)
 
     ModelID: int = Field(foreign_key="Model.ModelID")
