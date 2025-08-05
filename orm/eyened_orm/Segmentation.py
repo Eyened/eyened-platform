@@ -18,6 +18,7 @@ class DataRepresentation(Enum):
 
     # A binary mask with two channels packed into a single byte.
     # Bit 0 = mask; Bit 1 = questionable/uncertain.
+    # 0 = background, 1 is drawing, 2 = questionable/uncertain, 3 = drawing + questionable/uncertain
     DualBitMask = "DualBitMask"
 
     # Per-pixel float mask (soft segmentation, probability map)
