@@ -6,7 +6,6 @@ import { data, registerConstructor } from "./model";
 import type { Patient } from "./patient";
 import type { Study } from "./study";
 import type { SubTask } from "./subTask.svelte";
-import { apiUrl } from "$lib/config";
 import { api } from '../utils/api';
 
 export interface ServerFormAnnotation {

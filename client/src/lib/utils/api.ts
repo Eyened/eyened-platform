@@ -63,8 +63,11 @@ async function handleTokenRefresh(): Promise<UserResponse> {
 }
 
 export const api = {
-    async request(method: HttpMethod, base_url: string, body: any, dataType: DataType): Promise<Response> {
-        const url = `${apiUrl}/${base_url}`;
+    async request(method: HttpMethod, endpoint: string, body: any, dataType: DataType, searchParams?: URLSearchParams): Promise<Response> {
+        const url = new URL(`${apiUrl}/${endpoint}`);
+        if (searchParams) {
+            url.search = searchParams.toString();
+        }
         const makeRequest = async (): Promise<Response> => {
             return fetch(url, createRequest(method, body, dataType));
         };
@@ -88,34 +91,29 @@ export const api = {
         return response;
     },
 
-    async get(url: string): Promise<Response> {
-        return this.request('GET', url, null, 'json');
+    async get(endpoint: string, searchParams?: URLSearchParams): Promise<Response> {
+        return this.request('GET', endpoint, null, 'json', searchParams);
     },
 
-    async post(url: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
-        return this.request('POST', url, body, dataType);
+    async post(endpoint: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
+        return this.request('POST', endpoint, body, dataType);
     },
 
-    async put(url: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
-        return this.request('PUT', url, body, dataType);
+    async put(endpoint: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
+        return this.request('PUT', endpoint, body, dataType);
     },
 
-    async patch(url: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
-        return this.request('PATCH', url, body, dataType);
+    async patch(endpoint: string, body?: any, dataType: DataType = 'json'): Promise<Response> {
+        return this.request('PATCH', endpoint, body, dataType);
     },
 
-    async delete(url: string): Promise<Response> {
-        return this.request('DELETE', url, null, 'json');
+    async delete(endpoint: string): Promise<Response> {
+        return this.request('DELETE', endpoint, null, 'json');
     }
 };
 
-// Unified data fetching utility
-async function fetchFromApi(endpoint: string, searchParams?: URLSearchParams): Promise<any> {
-    const url = new URL(`${apiUrl}/${endpoint}`);
-    if (searchParams) {
-        url.search = searchParams.toString();
-    }
-    const response = await api.get(url.toString());
+async function fetchJson(endpoint: string, searchParams?: URLSearchParams): Promise<any> {
+    const response = await api.get(endpoint, searchParams);
     return response.json();
 }
 
@@ -135,7 +133,7 @@ function createSearchParams(params: Record<string, string | number | Array<strin
 // Unified data loading with optional parameter processing
 async function loadData(endpoint: string, params?: Record<string, string | number | Array<string | number>>, searchParams?: URLSearchParams) {
     const finalSearchParams = searchParams || (params ? createSearchParams(params) : undefined);
-    const data = await fetchFromApi(endpoint, finalSearchParams);
+    const data = await fetchJson(endpoint, finalSearchParams);
 
     if (data.entities) {
         importData(data.entities);
