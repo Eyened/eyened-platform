@@ -10,6 +10,7 @@ from typing import (
     TypeVar,
 )
 
+from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from pydantic import create_model
 from sqlalchemy import Column, select
 from sqlalchemy.orm import Session
@@ -108,7 +109,7 @@ class Base(SQLModel):
         return self.session.config
 
     @property
-    def storage_manager(self):
+    def storage_manager(self) -> ZarrStorageManager:
         """Get storage manager from session"""
         if not hasattr(self.session, 'storage_manager'):
             raise ValueError("Session not properly configured")
