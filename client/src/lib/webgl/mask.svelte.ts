@@ -289,7 +289,6 @@ export class ProbabilityMask extends AbstractDataMask {
         hardness: number,
         pressure: number,
         erase: boolean,
-        enhance: boolean,
         point: Position2D,
         aspectRatio: number
     }): void {
@@ -297,7 +296,6 @@ export class ProbabilityMask extends AbstractDataMask {
         const uniforms = {
             u_current: this.textureData.texture,
             u_position: [settings.point.x, settings.point.y],
-            u_enhance: settings.enhance,
             u_radius: settings.brushRadius,
             u_pressure: settings.pressure,
             u_hardness: settings.hardness,

@@ -215,13 +215,6 @@
                     step="0.01"
                 />
             </label>
-            <div>
-                <Toggle
-                    textOff="Enhance"
-                    textOn="Paint"
-                    bind:control={enhance.enhance}
-                />
-            </div>
         </div>
     {/if}
     <div class="erase">

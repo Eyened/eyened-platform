@@ -173,6 +173,16 @@ echo "Setting up admin credentials. You will use these to login to the platform 
 get_input "Enter the admin username (or press Enter for 'admin')" "${EXISTING_ADMIN_USERNAME:-admin}" ADMIN_USERNAME validate_path
 get_input "Enter the admin password (or press Enter for a random one)" "${EXISTING_ADMIN_PASSWORD:-$DEFAULT_ADMIN_PASSWORD}" ADMIN_PASSWORD validate_path
 
+# Generate SECRET_KEY
+EXISTING_SECRET_KEY=$(read_env_value "SECRET_KEY")
+if [ -z "$EXISTING_SECRET_KEY" ]; then
+    SECRET_KEY=$(openssl rand -base64 32)
+    print_status "Generated random SECRET_KEY"
+else
+    SECRET_KEY="$EXISTING_SECRET_KEY"
+    print_status "Using existing SECRET_KEY from .env"
+fi
+
 # Create .env file
 print_status "Creating .env file..."
 if ! cat > "$ENV_FILE" << EOF
@@ -182,6 +192,9 @@ PORT=${PORT}
 # credentials of the default user (for first-time login)
 ADMIN_USERNAME="${ADMIN_USERNAME}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD}"
+
+# secret key for the application
+SECRET_KEY="${SECRET_KEY}"
 
 # local folder to serve images from (possibly read-only)
 IMAGES_BASEPATH="${IMAGES_BASEPATH}"
