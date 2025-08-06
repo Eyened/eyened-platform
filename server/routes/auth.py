@@ -1,5 +1,5 @@
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from eyened_orm import Creator
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
@@ -90,8 +90,8 @@ def create_access_token(user_id: int, username: str, role: str | None = None) ->
         "username": username,
         "role": role,
         "type": "access",
-        "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-        "iat": datetime.utcnow()
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        "iat": datetime.now(timezone.utc)
     }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
@@ -101,8 +101,8 @@ def create_refresh_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),  # Convert to string
         "type": "refresh",
-        "exp": datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-        "iat": datetime.utcnow()
+        "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        "iat": datetime.now(timezone.utc)
     }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
@@ -372,33 +372,27 @@ async def refresh_token(
     refresh_token: str = Cookie(None),
     session: Session = Depends(get_db)
 ):
-    """Refresh access token using refresh token from cookie."""
+    """Refresh access token and extend refresh token for active users."""
     if not refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token required"
-        )
+        raise HTTPException(status_code=401, detail="Refresh token required")
     
     try:
         payload = verify_token(refresh_token)
         if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type"
-            )
+            raise HTTPException(status_code=401, detail="Invalid token type")
         
         # Get user from database
         creator = session.query(Creator).where(Creator.CreatorID == payload["sub"]).first()
         if not creator:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
+            raise HTTPException(status_code=401, detail="User not found")
         
         # Create new access token
         new_access_token = create_access_token(
             creator.CreatorID, creator.CreatorName, creator.Role
         )
+        
+        # Create NEW refresh token (extends session for active users)
+        new_refresh_token = create_refresh_token(creator.CreatorID)
         
         # Update access token cookie
         response.set_cookie(
@@ -411,15 +405,23 @@ async def refresh_token(
             path="/",
         )
         
+        # Update refresh token cookie (extends session)
+        response.set_cookie(
+            key=REFRESH_COOKIE_NAME,
+            value=new_refresh_token,
+            httponly=True,
+            max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+            secure=False,
+            samesite="strict",
+            path="/",
+        )
+        
         return creator_to_response(creator)
         
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
-        )
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 # Update logout to clear both cookies
 @router.post("/auth/logout")

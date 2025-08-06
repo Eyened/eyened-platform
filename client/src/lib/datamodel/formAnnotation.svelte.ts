@@ -6,7 +6,6 @@ import { data, registerConstructor } from "./model";
 import type { Patient } from "./patient";
 import type { Study } from "./study";
 import type { SubTask } from "./subTask.svelte";
-import { apiUrl } from "$lib/config";
 import { api } from '../utils/api';
 
 export interface ServerFormAnnotation {
@@ -70,7 +69,7 @@ export class FormAnnotation extends BaseItem {
     }
 
     async load() {
-        const response = await api.get(`${apiUrl}/${FormAnnotation.endpoint}/${this.id}/form-data`);
+        const response = await api.get(`${FormAnnotation.endpoint}/${this.id}/form-data`);
         this.value = await response.json();
     }
 

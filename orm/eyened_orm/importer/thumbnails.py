@@ -19,10 +19,13 @@ def get_thumbnail(im: ImageInstance):
         else:  # OCT 
             n_scans, _, _ = pixel_array.shape
             if n_scans == 1:
+                # single B-scan
                 return pixel_array.squeeze()
             elif n_scans < 10:
+                # few B-scans (take the middle one)
                 return pixel_array[n_scans // 2]
             else:
+                # many B-scans (create enface projection)
                 np_im = pixel_array.mean(axis=1)
                 try:
                     np_im = np_im - np.min(np_im)
@@ -115,7 +118,7 @@ def update_thumbnails(
         try:
             if image.path.suffix == ".json":
                 image.ThumbnailPath = None
-                print(f"Skipping {image.ImageInstanceID} because it is a JSON file")
+                # print(f"Skipping {image.ImageInstanceID} because it is a JSON file")
             else:
                 image.ThumbnailPath = get_thumbnail_identifier(image)
                 save_thumbnails(image)
