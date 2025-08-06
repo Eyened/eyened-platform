@@ -205,11 +205,11 @@ class FeatureFeatureLink(FeatureFeatureLinkBase, table=True):
     )
 
     Feature: "Feature" = Relationship(
-        back_populates="FeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ChildFeatureID"}
+        back_populates="FeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ParentFeatureID"}
     )
 
     Child: "Feature" = Relationship(
-        back_populates="ChildFeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ParentFeatureID"}
+        back_populates="ChildFeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ChildFeatureID"}
     )
     
 
@@ -236,26 +236,45 @@ class Feature(FeatureBase, table=True):
     )
 
     @classmethod
-    def from_json(cls, feature_name: str, sub_features: List[str] | Dict[str, str] | None = None) -> "Feature":
+    def from_list(cls, session, feature_name: str, sub_features: List[str] | None = None) -> "Feature":
+        '''
+        Create a feature hierarchy from a list of feature names.
+        If a feature does not exist, it will be created.
+        If a feature already exists, it will be appended to the parent.
+        '''
         feature = cls(FeatureName=feature_name)
+        session.add(feature)
+        session.flush()
 
         if sub_features is None:
             return feature
         
         if isinstance(sub_features, list):
+            # first create the sub-features that don't exist
             for sub_feature in sub_features:
-                feature.SubFeatures.append(cls.from_name_dict(sub_feature))
-        elif isinstance(sub_features, dict):
-            for sub_feature_name, sub_feature_type in sub_features.items():
-                feature.SubFeatures.append(cls.from_name_dict(sub_feature_name, sub_feature_type))
+                if Feature.by_name(session, sub_feature) is None:
+                    session.add(Feature(FeatureName=sub_feature))
+            session.flush()
+            
+            # then create the feature associations
+            for i, sub_feature in enumerate(sub_features):
+                feature.FeatureAssociations.append(FeatureFeatureLink(
+                    ParentFeatureID=feature.FeatureID,
+                    ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
+                    FeatureIndex=i
+                ))
+        else:
+            raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
         
         return feature
     
     @property
     def json(self) -> Dict[str, Any]:
+        assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
+        subfeatures = [assoc.Child for assoc in assocs]
         return {
             "FeatureName": self.FeatureName,
-            "SubFeatures": [sub_feature.json for sub_feature in self.SubFeatures]
+            "SubFeatures": [subfeature.FeatureName for subfeature in subfeatures]
         }
 
 

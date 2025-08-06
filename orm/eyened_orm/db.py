@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import os
 from pathlib import Path
 from typing import Generator, Optional
 
@@ -42,6 +43,8 @@ class Database:
         """
         if isinstance(config, (Path, str)):
             # load from .env file
+            if not Path(config).exists():
+                raise FileNotFoundError(f"File not found: {str(config)}")
             load_dotenv(dotenv_path=config)
             config = EyenedORMConfig()
         elif config is None:

@@ -14,3 +14,4 @@ cookies.txt
 .vscode/settings.json
 client/package-lock.json
 client/src/lib/extensions.ts
+TODO.md

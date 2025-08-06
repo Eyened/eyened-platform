@@ -117,10 +117,7 @@ class ZarrStorageManager:
 
         # If both axis and slice_index are provided, write a slice
         if axis is not None and slice_index is not None:
-            if zarr_index is None:
-                raise ValueError("zarr_index must be provided for slice writes")
-            zarr_array.write_slice(zarr_index, axis, slice_index, data)
-            return zarr_index
+            return zarr_array.write_slice(zarr_index, axis, slice_index, data)
         # Otherwise, write the full segmentation
         else:
             return zarr_array.write(zarr_index, data)
