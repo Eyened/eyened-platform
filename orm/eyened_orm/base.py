@@ -60,6 +60,7 @@ class BaseMeta(type(DeclarativeBase)):
         return _get_attribute_with_conversion(cls, name)
 
 class Base(DeclarativeBase, metaclass=BaseMeta):
+    __allow_unmapped__ = True
     metadata = metadata  # Attach the metadata with the naming convention
     type_annotation_map = {Dict[str, Any]: JSON}
     config: EyenedORMConfig = None

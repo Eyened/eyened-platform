@@ -52,11 +52,11 @@ class Creator(Base):
 
     # Relationships
     Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="Creator")
+        "eyened_orm.annotation.Annotation", back_populates="Creator")
     FormAnnotations: Mapped[List[FormAnnotation]] = relationship(
-        back_populates="Creator")
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="Creator")
     SubTasks: Mapped[List[SubTask]] = relationship(
-        back_populates="Creator")
+        "eyened_orm.task.SubTask", back_populates="Creator")
 
     def __repr__(self) -> str:
         return f"{self.CreatorID}: {self.CreatorName}"

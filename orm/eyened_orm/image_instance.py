@@ -14,10 +14,11 @@ from sqlalchemy import ForeignKey, LargeBinary, String, Text, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from functools import cached_property
 
+
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
 
 if TYPE_CHECKING:
-    from eyened_orm import (Annotation, Creator, FormAnnotation, Series,
+    from eyened_orm import (Annotation, FormAnnotation, Series,
                             SubTaskImageLink)
 
 
@@ -85,28 +86,28 @@ class ImageInstance(Base):
     SeriesID: Mapped[int] = mapped_column(
         ForeignKey("Series.SeriesID", ondelete="CASCADE")
     )
-    Series: Mapped[Series] = relationship(back_populates="ImageInstances")
+    Series: Series = relationship("eyened_orm.series.Series", back_populates="ImageInstances")
 
     # TODO: not needed anymore?
     SourceInfoID: Mapped[int] = mapped_column(
         ForeignKey("SourceInfo.SourceInfoID"))
     SourceInfo: Mapped[SourceInfo] = relationship(
-        back_populates="ImageInstances")
+        "eyened_orm.image_instance.SourceInfo", back_populates="ImageInstances")
 
     DeviceInstanceID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("DeviceInstance.DeviceInstanceID")
     )
     DeviceInstance: Mapped[DeviceInstance] = relationship(
-        back_populates="ImageInstances"
+        "eyened_orm.image_instance.DeviceInstance", back_populates="ImageInstances"
     )
 
     # TODO: redundant with Modality enum
     ModalityID: Mapped[int] = mapped_column(ForeignKey("Modality.ModalityID"))
     _Modality: Mapped[ModalityTable] = relationship(
-        back_populates="ImageInstances")
+        "eyened_orm.image_instance.ModalityTable", back_populates="ImageInstances")
 
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
-    Scan: Mapped[Scan] = relationship(back_populates="ImageInstances")
+    Scan: Mapped[Scan] = relationship("eyened_orm.image_instance.Scan", back_populates="ImageInstances")
 
     # Image modality
     Modality: Mapped[Optional[Modality]]
@@ -215,15 +216,15 @@ class ImageInstance(Base):
 
     # relationships:
     Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="ImageInstance", cascade="all,delete-orphan"
+        "eyened_orm.annotation.Annotation", back_populates="ImageInstance", cascade="all,delete-orphan"
     )
 
     FormAnnotations: Mapped[List[FormAnnotation]] = relationship(
-        back_populates="ImageInstance", cascade="all,delete-orphan"
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="ImageInstance", cascade="all,delete-orphan"
     )
 
     SubTaskImageLinks: Mapped[List[SubTaskImageLink]] = relationship(
-        back_populates="ImageInstance"
+        "eyened_orm.task.SubTaskImageLink", back_populates="ImageInstance"
     )
 
     @property
@@ -343,7 +344,7 @@ class ImageInstance(Base):
             .where(clause)
         )
 
-    def get_annotations_for_creator(self, creator: Creator) -> List[Annotation]:
+    def get_annotations_for_creator(self, creator: creator) -> List[Annotation]:
         """
         Get all annotations for this image instance for a specific creator
         :param creator_id: ID of the creator
@@ -369,8 +370,8 @@ class DeviceModel(Base):
         String(45), nullable=False
     )
 
-    DeviceInstances: Mapped[List["DeviceInstance"]] = relationship(
-        back_populates="DeviceModel"
+    DeviceInstances: Mapped[List[DeviceInstance]] = relationship(
+        "eyened_orm.image_instance.DeviceInstance", back_populates="DeviceModel"
     )
 
     def __init__(self, Manufacturer="", ManufacturerModelName=""):
@@ -406,11 +407,11 @@ class DeviceInstance(Base):
     Description: Mapped[Optional[str]] = mapped_column(
         String(256), nullable=False)
 
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
-        back_populates="DeviceInstance"
+    ImageInstances: Mapped[List[ImageInstance]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="DeviceInstance"
     )
-    DeviceModel: Mapped["DeviceModel"] = relationship(
-        back_populates="DeviceInstances")
+    DeviceModel: Mapped[DeviceModel] = relationship(
+        "eyened_orm.image_instance.DeviceModel", back_populates="DeviceInstances")
 
     def __init__(
         self, DeviceModelID: int, SerialNumber: str, Description: Optional[str] = None
@@ -429,7 +430,7 @@ class SourceInfo(Base):
     ThumbnailPath: Mapped[str] = mapped_column(String(250), unique=True)
 
     ImageInstances: Mapped[List[ImageInstance]] = relationship(
-        back_populates="SourceInfo"
+        "eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo"
     )
 
     def __repr__(self) -> str:
@@ -447,7 +448,7 @@ class ModalityTable(Base):
 
     # one modality -> many images
     ImageInstances: Mapped[List[ImageInstance]] = relationship(
-        back_populates="_Modality"
+        "eyened_orm.image_instance.ImageInstance", back_populates="_Modality"
     )
 
     @classmethod
@@ -463,7 +464,7 @@ class Scan(Base):
     ScanMode: Mapped[str] = mapped_column(String(40), unique=True)
 
     ImageInstances: Mapped[List[ImageInstance]
-                           ] = relationship(back_populates="Scan")
+                           ] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="Scan")
 
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Scan:

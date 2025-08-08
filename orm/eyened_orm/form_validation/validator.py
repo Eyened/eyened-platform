@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from jsonschema import validate, ValidationError, Draft7Validator, SchemaError
 
-from ..FormAnnotation import FormAnnotation, FormSchema
+from ..form_annotation import FormAnnotation, FormSchema
 from ..db import DBManager
 
 

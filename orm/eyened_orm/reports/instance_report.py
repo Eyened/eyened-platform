@@ -4,7 +4,7 @@ import numpy as np
 import pydicom
 from PIL import Image
 
-from eyened_orm.ImageInstance import ImageInstance
+from eyened_platform.orm.eyened_orm.image_instance import ImageInstance
 from eyened_orm.reports import Report
 
 

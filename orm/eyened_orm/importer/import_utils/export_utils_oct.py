@@ -9,7 +9,8 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 from eyened_orm import (
     ImageInstance,
     Annotation,
-    Feature, Creator)
+    Feature)
+from eyened_platform.orm.eyened_orm import creator
 
 from .annotation_export import get_center_of_gravity_3d, load_segmentation_3d
 
@@ -47,7 +48,7 @@ def get_all_etrds_grids(session, instance: ImageInstance, creatorname=None):
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
                     Annotation.Inactive == None))
     if creatorname is not None:
-        query = query.join(Creator).where(Creator.CreatorName == creatorname)
+        query = query.join(creator).where(creator.CreatorName == creatorname)
     return session.execute(query).scalars().all()
 
 def get_all_fovea_segmentations(session, instance: ImageInstance, creatorname=None):
@@ -58,7 +59,7 @@ def get_all_fovea_segmentations(session, instance: ImageInstance, creatorname=No
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
                     Annotation.Inactive == None))
     if creatorname is not None:
-        query = query.join(Creator).where(Creator.CreatorName == creatorname)
+        query = query.join(creator).where(creator.CreatorName == creatorname)
     return session.execute(query).scalars().all()
 
 def fovea_x_from_segmentation(annotation):
