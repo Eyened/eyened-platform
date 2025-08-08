@@ -1,8 +1,7 @@
 from datetime import datetime
 
-import GPUtil
-import torch
-import torch.nn.functional as F
+
+
 from sqlalchemy import update
 from tqdm import tqdm
 
@@ -26,6 +25,8 @@ def transform_kps(colname):
 
 
 def logits_to_continuous_score(logits, temperature=3.0):
+    import torch
+    import torch.nn.functional as F
     logits = torch.tensor(logits, dtype=torch.float32) / temperature
     probs = F.softmax(logits, dim=-1)
     num_classes = len(logits)
@@ -93,6 +94,7 @@ def clear_unsuccessfull(session, df, commit=True):
 
 
 def auto_device():
+    import GPUtil
     # Attempt to select a free GPU
     try:
         deviceID = GPUtil.getFirstAvailable(order="memory")[
