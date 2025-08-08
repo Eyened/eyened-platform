@@ -24,7 +24,7 @@ Important: import packages that are not dependencies of the ORM within the funct
 
 def load_orm_config(env: Optional[str] = None) -> EyenedORMConfig:
     if env is not None:
-        load_dotenv(env)
+        load_dotenv(env, override=True)
 
     return EyenedORMConfig()
 
