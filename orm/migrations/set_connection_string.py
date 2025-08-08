@@ -27,7 +27,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     print(f"Loading environment from: {env_path}")
-    load_dotenv(dotenv_path=env_path)
+    load_dotenv(dotenv_path=env_path, override=True)
 
     settings = DatabaseSettings()
     

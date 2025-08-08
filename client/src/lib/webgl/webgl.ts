@@ -21,6 +21,8 @@ export class WebGL {
             premultipliedAlpha: false
         })!;
         this.gl = gl;
+        // needed for odd width textures
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
         gl.enable(gl.SCISSOR_TEST);
         const ext0 = gl.getExtension('OES_texture_float_linear');
         const ext1 = gl.getExtension('EXT_color_buffer_float');

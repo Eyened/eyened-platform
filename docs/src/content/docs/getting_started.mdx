@@ -82,8 +82,10 @@ If you prefer to set up manually:
     | PORT | Port the app will be served on |
     | ADMIN_USERNAME | Username for the default admin user |
     | ADMIN_PASSWORD | Password for the default admin user |
+    | SECRET_KEY | Secret key for JWT token generation |
     | IMAGES_BASEPATH | Local folder to serve images from (may be read-only) |
-    | STORAGE_BASEPATH | Local path to store annotations, thumbnails and other generated files |
+    | SEGMENTATIONS_ZARR_STORE | Local path to store segmentations (zarr format) |
+    | THUMBNAILS_PATH | Local path to store generated thumbnails |
     | DATABASE_PATH | Path to the database files |
     | DATABASE_PORT | Port to access the database from outside |
     | DATABASE_ROOT_PASSWORD | Root password for external database access |

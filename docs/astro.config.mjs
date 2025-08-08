@@ -1,6 +1,10 @@
 // @ts-check
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 // https://astro.build/config
 export default defineConfig({
@@ -15,6 +19,7 @@ export default defineConfig({
                 { slug: 'importer' },
                 { slug: 'entities' },
                 { slug: 'platform_design' },
+                { slug: 'development_setup' },
                 {
                     label: 'Eyened ORM',
                     // Autogenerate a group of links for the 'orm' directory.
