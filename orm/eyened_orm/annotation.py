@@ -19,8 +19,8 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from .base import Base, ForeignKeyIndex
 
 if TYPE_CHECKING:
-    from eyened_orm import (AnnotationType, Creator, Feature, ImageInstance,
-                            Patient, Series, Study)
+    from eyened_orm import (AnnotationType, Feature, ImageInstance,
+                            Patient, Series, Study, Creator)
 
 
 class Annotation(Base):
@@ -47,49 +47,49 @@ class Annotation(Base):
     # Patient is required, Study, Series and ImageInstance are optional
     # TODO: perhaps only ImageInstance is required and the others should be removed
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
-    Patient: Mapped[Patient] = relationship(back_populates="Annotations")
+    Patient: Mapped[Patient] = relationship("eyened_orm.patient.Patient", back_populates="Annotations")
 
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
-    Study: Mapped[Optional[Study]] = relationship(back_populates="Annotations")
+    Study: Mapped[Optional[Study]] = relationship("eyened_orm.study.Study", back_populates="Annotations")
 
     SeriesID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("Series.SeriesID"))
     Series: Mapped[Optional[Series]] = relationship(
-        back_populates="Annotations")
+        "eyened_orm.series.Series", back_populates="Annotations")
 
     ImageInstanceID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE")
     )
     ImageInstance: Mapped[Optional[ImageInstance]] = relationship(
-        back_populates="Annotations"
+        "eyened_orm.image_instance.ImageInstance", back_populates="Annotations"
     )
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    Creator: Mapped[Creator] = relationship(back_populates="Annotations")
+    Creator: Mapped[creator] = relationship("eyened_orm.creator.Creator", back_populates="Annotations")
 
     FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
-    Feature: Mapped[Feature] = relationship(back_populates="Annotations")
+    Feature: Mapped[Feature] = relationship("eyened_orm.annotation.Feature", back_populates="Annotations")
 
     AnnotationTypeID: Mapped[int] = mapped_column(
         ForeignKey("AnnotationType.AnnotationTypeID")
     )
     AnnotationType: Mapped[AnnotationType] = relationship(
-        back_populates="Annotations")
+        "eyened_orm.annotation.AnnotationType", back_populates="Annotations")
 
     # Not used currently, but could be used to define 'masked' segmentations
     AnnotationReferenceID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("Annotation.AnnotationID")
     )
     AnnotationReference: Mapped[Optional[Annotation]] = relationship(
-        "Annotation", back_populates="ChildAnnotations", remote_side="Annotation.AnnotationID"
+        "eyened_orm.annotation.Annotation", back_populates="ChildAnnotations", remote_side="Annotation.AnnotationID"
     )
     ChildAnnotations: Mapped[List[Annotation]] = relationship(
-        "Annotation", back_populates="AnnotationReference", cascade="all, delete-orphan"
+        "eyened_orm.annotation.Annotation", back_populates="AnnotationReference", cascade="all, delete-orphan"
     )
 
     # Actual data is stored in AnnotationData
     AnnotationData: Mapped[List[AnnotationData]] = relationship(
-        back_populates="Annotation", cascade="all,delete-orphan"
+        "eyened_orm.annotation.AnnotationData", back_populates="Annotation", cascade="all,delete-orphan"
     )
 
     # soft delete
@@ -121,7 +121,7 @@ class Annotation(Base):
         cls,
         instance: ImageInstance,
         feature: Feature,
-        creator: Creator,
+        creator: creator,
         annotationType: AnnotationType,
     ) -> Annotation:
         a = cls()
@@ -163,7 +163,7 @@ class AnnotationData(Base):
         ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True
     )
     Annotation: Mapped[Annotation] = relationship(
-        back_populates="AnnotationData")
+        "eyened_orm.annotation.Annotation", back_populates="AnnotationData")
 
     ScanNr: Mapped[int] = mapped_column(primary_key=True)
     DatasetIdentifier: Mapped[str] = mapped_column(String(45), unique=True)
@@ -361,7 +361,7 @@ class AnnotationType(Base):
     Interpretation: Mapped[str] = mapped_column(String(45))
 
     Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="AnnotationType"
+        "eyened_orm.annotation.Annotation", back_populates="AnnotationType"
     )
 
     @classmethod
@@ -386,7 +386,7 @@ class Feature(Base):
     FeatureName: Mapped[str] = mapped_column(String(60), unique=True)
 
     Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="Feature")
+        "eyened_orm.annotation.Annotation", back_populates="Feature")
     Modality: Mapped[Optional[FeatureModalityEnum]]
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())

@@ -55,25 +55,52 @@ class EyenedORMConfig(BaseSettings):
                     "File references in the database will be relative to this folder. "
                     "This folder should be served if used with the eyened-viewer"
     )
-    storage_basepath: str = Field(
-        default="/storage",
-        description="Base path for storage of annotations, thumbnails and trash. "
-                    "Annotations will be stored in <storage_basepath>/annotations "
-                    "thumbnails in <storage_basepath>/thumbnails "
-                    "and trash in <storage_basepath>/trash"
+    # # Basic configuration
+    # images_basepath: str = Field(
+    #     default="/images",
+    #     description="The folder containing local image data. "
+    #     "All local images linked in the eyened database should be stored in this folder (or descendants). "
+    #     "File references in the database will be relative to this folder. "
+    #     "This folder should be served if used with the eyened-viewer",
+    # )
+    images_basepath_host: Optional[str] = Field(
+        None,
+        description="The host machine's images_basepath. This is different from images_basepath in that images_basepath is always local (/images in the container) and images_basepath_host is the path in the host machine. They may be the same if running outside of Docker.",
     )
+    annotations_zarr_store: str = Field(
+        default="/storage/annotations_store.zarr",
+        description="Path to the zarr store containing annotations. "
+        "Used by the platform for reading and writing annotations",
+    )
+    annotations_path: str = Field(
+        default="/storage/annotations",
+        description="Path to the folder containing annotations. "
+        "Used by the platform for reading and writing annotations",
+    )
+    thumbnails_path: str = Field(
+        default="/storage/thumbnails",
+        description="Folder containing the thumbnail structure. "
+        "Used by the ORM to read thumbnails and by the importer to write thumbnails on insertion",
+    )
+    cfi_cache_path: Path = Field(
+        default=Path("/storage/cfi_cache"),
+        description="Path of a cache for fundus images. "
+        "Used by the importer to write a preprocessed version of the images.",
+    )
+    trash_path: Path = Field(
+        default=Path("/storage/trash"),
+        description="Path of a trash folder. "
+        "Used by the ORM to store deleted annotations and thumbnails.",
+    )
+    # storage_basepath: str = Field(
+    #     default="/storage",
+    #     description="Base path for storage of annotations, thumbnails and trash. "
+    #                 "Annotations will be stored in <storage_basepath>/annotations "
+    #                 "thumbnails in <storage_basepath>/thumbnails "
+    #                 "and trash in <storage_basepath>/trash"
+    # )
     
-    @property
-    def annotations_path(self) -> Path:
-        return Path(self.storage_basepath) / "annotations"
-    
-    @property
-    def thumbnails_path(self) -> Path:
-        return Path(self.storage_basepath) / "thumbnails"
-    
-    @property
-    def trash_path(self) -> Path:
-        return Path(self.storage_basepath) / "trash"
+   
     
     default_study_date: Optional[date] = Field(
         date(1970, 1, 1),

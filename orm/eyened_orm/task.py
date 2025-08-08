@@ -8,12 +8,12 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from eyened_orm.base import Base, ForeignKeyIndex
 
-from .FormAnnotation import FormAnnotation
+from .form_annotation import FormAnnotation
 
 if TYPE_CHECKING:
-    from .ImageInstance import ImageInstance    
-    from .Project import Contact
-    from .Annotation import Creator
+    from .image_instance import ImageInstance    
+    from .project import Contact
+    from .annotation import Creator
 
 
 class TaskDefinition(Base):
@@ -22,7 +22,7 @@ class TaskDefinition(Base):
 
     TaskDefinitionName: Mapped[str] = mapped_column(String(256))
 
-    Tasks: Mapped[List[Task]] = relationship(back_populates="TaskDefinition")
+    Tasks: Mapped[List[Task]] = relationship("eyened_orm.task.Task", back_populates="TaskDefinition")
 
     # datetimes
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -43,8 +43,8 @@ class TaskState(Base):
 
     TaskStateName: Mapped[str] = mapped_column(String(256))
 
-    Tasks: Mapped[List[Task]] = relationship(back_populates="TaskState")
-    SubTasks: Mapped[List[SubTask]] = relationship(back_populates="TaskState")
+    Tasks: Mapped[List[Task]] = relationship("eyened_orm.task.Task", back_populates="TaskState")
+    SubTasks: Mapped[List[SubTask]] = relationship("eyened_orm.task.SubTask", back_populates="TaskState")
 
     @classmethod
     def by_name(cls, session: Session, name: str):
@@ -67,19 +67,19 @@ class Task(Base):
 
     ## Contact
     ContactID: Mapped[Optional[int]] = mapped_column(ForeignKey("Contact.ContactID"))
-    Contact: Mapped[Optional[Contact]] = relationship(back_populates="Tasks")
+    Contact: Mapped[Optional[Contact]] = relationship("eyened_orm.project.Contact", back_populates="Tasks")
 
     TaskDefinitionID: Mapped[int] = mapped_column(
         ForeignKey(TaskDefinition.TaskDefinitionID)
     )
-    TaskDefinition: Mapped[TaskDefinition] = relationship(back_populates="Tasks")
+    TaskDefinition: Mapped[TaskDefinition] = relationship("eyened_orm.task.TaskDefinition", back_populates="Tasks")
 
     TaskStateID: Mapped[int] = mapped_column(ForeignKey(TaskState.TaskStateID), 
                                              nullable=True)
-    TaskState: Mapped[TaskState] = relationship(back_populates="Tasks")
+    TaskState: Mapped[TaskState] = relationship("eyened_orm.task.TaskState", back_populates="Tasks")
 
-    SubTasks: Mapped[List[SubTask]] = relationship(back_populates="Task")
-
+    SubTasks: Mapped[List[SubTask]] = relationship("eyened_orm.task.SubTask", back_populates="Task")
+    
     # datetimes
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -96,7 +96,7 @@ class Task(Base):
         imagesets: List[List[int]],
         creator_name=None,
     ) -> Task:
-        from .Annotation import Creator
+        from .annotation import Creator
 
         subtasks = [SubTask.create_from_image_ids(session, imset) for imset in imagesets]
         state = TaskState.by_name(session, "Not Started")
@@ -138,12 +138,12 @@ class SubTaskImageLink(Base):
 
     SubTaskImageLinkID: Mapped[int] = mapped_column(primary_key=True)
     SubTaskID: Mapped[int] = mapped_column(ForeignKey("SubTask.SubTaskID"))
-    SubTask: Mapped[SubTask] = relationship(back_populates="SubTaskImageLinks")
+    SubTask: Mapped[SubTask] = relationship("eyened_orm.task.SubTask", back_populates="SubTaskImageLinks")
     ImageInstanceID: Mapped[int] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID")
     )
     ImageInstance: Mapped[ImageInstance] = relationship(
-        back_populates="SubTaskImageLinks"
+        "eyened_orm.image_instance.ImageInstance", back_populates="SubTaskImageLinks"
     )
 
 
@@ -158,20 +158,20 @@ class SubTask(Base):
     SubTaskID: Mapped[int] = mapped_column(primary_key=True)
 
     TaskID: Mapped[int] = mapped_column(ForeignKey(Task.TaskID))
-    Task: Mapped[Task] = relationship(back_populates="SubTasks")
+    Task: Mapped[Task] = relationship("eyened_orm.task.Task", back_populates="SubTasks")
 
     TaskStateID: Mapped[int] = mapped_column(ForeignKey(TaskState.TaskStateID))
-    TaskState: Mapped[TaskState] = relationship(back_populates="SubTasks")
+    TaskState: Mapped[TaskState] = relationship("eyened_orm.task.TaskState", back_populates="SubTasks")
 
     CreatorID: Mapped[Optional[int]] = mapped_column(ForeignKey("Creator.CreatorID"))
-    Creator: Mapped[Optional["Creator"]] = relationship(back_populates="SubTasks")
+    Creator: Mapped[Optional[Creator]] = relationship("eyened_orm.creator.Creator", back_populates="SubTasks")
 
-    SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(
-        back_populates="SubTask"
+    SubTaskImageLinks: Mapped[List[SubTaskImageLink]] = relationship(
+        "eyened_orm.task.SubTaskImageLink", back_populates="SubTask"
     )
 
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
-        back_populates="SubTask"
+    FormAnnotations: Mapped[List[FormAnnotation]] = relationship(
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="SubTask"
     )
 
     @classmethod

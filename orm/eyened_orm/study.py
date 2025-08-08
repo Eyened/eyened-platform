@@ -7,12 +7,10 @@ from sqlalchemy import ForeignKey, String, func, select, Index
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
-from .ImageInstance import ImageInstance
-
-from .Series import Series
+from .image_instance import DeviceInstance, ImageInstance
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, Patient
+    from eyened_orm import Annotation, FormAnnotation, Patient, Series
 
 
 class Study(Base):
@@ -31,24 +29,11 @@ class Study(Base):
     )
 
     StudyID: Mapped[int] = mapped_column(primary_key=True)
-
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
-    Patient: Mapped[Patient] = relationship(back_populates="Studies")
-
-    Series: Mapped[List[Series]] = relationship(
-        back_populates="Study", cascade="all,delete-orphan"
-    )
-
-    Annotations: Mapped[List[Annotation]] = relationship(back_populates="Study")
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
-        back_populates="Study"
-    )
-
     StudyRound: Mapped[Optional[int]] = mapped_column(
         index=True
     ) 
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))
-    
     StudyInstanceUid: Mapped[Optional[str]] = mapped_column(
         "StudyInstanceUid", String(64), unique=True
     )
@@ -56,9 +41,17 @@ class Study(Base):
 
     # datetimes
     DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
-
     patient_date_to_id_map = None
 
+    Patient: Patient = relationship("eyened_orm.patient.Patient", back_populates="Studies")
+    Series: List[Series] = relationship(
+        "eyened_orm.series.Series",
+        back_populates="Study", cascade="all,delete-orphan"
+    )
+    Annotations: List[Annotation] = relationship("eyened_orm.annotation.Annotation", back_populates="Study")
+    FormAnnotations: List[FormAnnotation] = relationship(
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="Study"
+    )
 
 
     @classmethod
@@ -92,13 +85,15 @@ class Study(Base):
     
 
     def get_images(self, where=None, include_inactive=False) -> List[ImageInstance]:
-        from eyened_orm import Series, Study, Patient
+        from eyened_orm import Series, Study, Patient, DeviceInstance, DeviceModel
         session = Session.object_session(self)
         q = (
             select(ImageInstance)
             .join_from(ImageInstance, Series)
             .join_from(Series, Study)
-            .join_from(Study, Patient)    
+            .join_from(Study, Patient)
+            .join_from(ImageInstance, DeviceInstance)
+            .join_from(DeviceInstance, DeviceModel)
             .where(Study.StudyID == self.StudyID)
         )
         if not include_inactive:

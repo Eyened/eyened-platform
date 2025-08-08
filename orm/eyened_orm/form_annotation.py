@@ -11,12 +11,12 @@ import json
 from .base import Base
 
 if TYPE_CHECKING:
-    from .Annotation import Creator
-    from .FormAnnotation import FormAnnotation
-    from .ImageInstance import ImageInstance
-    from .Patient import Patient
-    from .Study import Study
-    from .Task import SubTask
+    from .annotation import Creator
+    from .form_annotation import FormAnnotation
+    from .image_instance import ImageInstance
+    from .patient import Patient
+    from .study import Study
+    from .task import SubTask
 
 
 class FormSchema(Base):
@@ -26,8 +26,8 @@ class FormSchema(Base):
     SchemaName: Mapped[Optional[str]] = mapped_column(String(45), unique=True)
     Schema: Mapped[Optional[Dict[str, Any]]]
 
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
-        back_populates="FormSchema"
+    FormAnnotations: Mapped[List[FormAnnotation]] = relationship(
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="FormSchema"
     )
 
     def __repr__(self):
@@ -47,35 +47,35 @@ class FormAnnotation(Base):
     FormSchemaID: Mapped[int] = mapped_column(
         ForeignKey("FormSchema.FormSchemaID"), index=True
     )
-    FormSchema: Mapped["FormSchema"] = relationship(back_populates="FormAnnotations")
+    FormSchema: Mapped[FormSchema] = relationship("eyened_orm.form_annotation.FormSchema", back_populates="FormAnnotations")
 
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"), index=True)
-    Patient: Mapped[Optional["Patient"]] = relationship(
-        back_populates="FormAnnotations"
+    Patient: Mapped[Optional[Patient]] = relationship(
+        "eyened_orm.patient.Patient", back_populates="FormAnnotations"
     )
 
     StudyID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("Study.StudyID"), nullable=True, index=True
     )
-    Study: Mapped[Optional["Study"]] = relationship(back_populates="FormAnnotations")
+    Study: Mapped[Optional[Study]] = relationship("eyened_orm.study.Study", back_populates="FormAnnotations")
 
     ImageInstanceID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
-        back_populates="FormAnnotations"
+    ImageInstance: Mapped[Optional[ImageInstance]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="FormAnnotations"
     )
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"), index=True)
-    Creator: Mapped["Creator"] = relationship(back_populates="FormAnnotations")
+    Creator: Mapped[Creator] = relationship("eyened_orm.creator.Creator", back_populates="FormAnnotations")
 
     SubTaskID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("SubTask.SubTaskID"), nullable=True, index=True
     )
-    SubTask: Mapped[Optional["SubTask"]] = relationship(
-        back_populates="FormAnnotations"
+    SubTask: Mapped[Optional[SubTask]] = relationship(
+        "eyened_orm.task.SubTask", back_populates="FormAnnotations"
     )
 
     # actual data

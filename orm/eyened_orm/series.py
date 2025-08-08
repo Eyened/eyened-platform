@@ -20,16 +20,18 @@ class Series(Base):
     StudyID: Mapped[int] = mapped_column(
         ForeignKey("Study.StudyID", ondelete="CASCADE")
     )
-    Study: Mapped[Study] = relationship(back_populates="Series")
+    
 
     SeriesNumber: Mapped[Optional[int]] = mapped_column()
     SeriesInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
-    
-    ImageInstances: Mapped[List[ImageInstance]] = relationship(
+
+
+    Study: Study = relationship("eyened_orm.study.Study", back_populates="Series")
+    ImageInstances: List[ImageInstance] = relationship(
+        "eyened_orm.image_instance.ImageInstance",
         back_populates="Series", cascade="all,delete-orphan"
     )
-
-    Annotations: Mapped[List[Annotation]] = relationship(back_populates="Series")
+    Annotations: List[Annotation] = relationship("eyened_orm.annotation.Annotation", back_populates="Series")
 
     def __repr__(self):
         return f"Series({self.SeriesID}, {self.SeriesNumber}, {self.SeriesInstanceUid})"

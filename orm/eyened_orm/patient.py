@@ -8,10 +8,10 @@ from sqlalchemy import ForeignKey, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base, CompositeUniqueConstraint, ForeignKeyIndex
-from .ImageInstance import ImageInstance
-from .Project import Project
-from .Series import Series
-from .Study import Study
+from .image_instance import ImageInstance
+from .project import Project
+from .series import Series
+from .study import Study
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, FormAnnotation
@@ -36,19 +36,20 @@ class Patient(Base):
     PatientIdentifier: Mapped[Optional[str]] = mapped_column(String(45))
 
     ProjectID: Mapped[int] = mapped_column(ForeignKey("Project.ProjectID"))
-    Project: Mapped[Project] = relationship(back_populates="Patients")
-
-    Studies: Mapped[List[Study]] = relationship(
-        back_populates="Patient", cascade="all,delete-orphan"
-    )
+    
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # relationships
-    Annotations: Mapped[List[Annotation]] = relationship(
-        back_populates="Patient")
-    FormAnnotations: Mapped[List[FormAnnotation]] = relationship(
-        back_populates="Patient"
+    Project = relationship("eyened_orm.project.Project", back_populates="Patients")
+
+    Studies: List[Study] = relationship(
+        "eyened_orm.study.Study", back_populates="Patient", cascade="all,delete-orphan"
+    )
+    Annotations: List[Annotation] = relationship(
+        "eyened_orm.annotation.Annotation", back_populates="Patient")
+    FormAnnotations: List[FormAnnotation] = relationship(
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="Patient"
     )
 
     @classmethod
