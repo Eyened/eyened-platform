@@ -16,6 +16,30 @@ Before you begin, ensure you have the following installed:
 
 ## Quick Start
 
+To start the development environment:
+
+```bash
+cd dev
+docker-compose up -d
+```
+To start a database and fileserver 
+
+And in separate terminals:
+```bash
+./start_client_dev.sh
+./start_server_dev.sh
+```
+
+Now you can make edits to the client or server code, the application should update automatically.
+
+:::tip
+Check the README in the `dev` folder for  more details.
+:::
+
+:::note
+If this is your first time running the development environment, you may need to:
+
+
 1. Clone the repository:
 
     ```bash
@@ -23,49 +47,38 @@ Before you begin, ensure you have the following installed:
     cd eyened-platform
     ```
 
-2. Start the development environment:
-
-    ```bash
-    cd dev
-    docker-compose up -d
-    ./start_client_dev.sh
-    ./start_server_dev.sh
-    ```
-
-Now you can make edits to the client or server code, they should update automatically in the browser.
-
-:::note
-If this is your first time running the development environment, you may need to:
-
-1. Create a `.env` file:
-    ```bash
-    cp sample.env .env
-    ```
-
-2. Run `docker-compose build` before `docker-compose up -d`
-
-3. Make the start scripts executable:
-    ```bash
-    chmod +x start_client_dev.sh start_server_dev.sh
-    ```
-
-4. Install client dependencies:
-    ```bash
-    cd client
-    npm install
-    ```
-
-5. Install server dependencies:
+2. Install server dependencies:
     ```bash
     cd ../server
     python -m venv venv
     source venv/bin/activate
     pip install -r requirements.txt
     ```
+
+3. Create a `.env` file:
+    ```bash
+    cp sample.env .env
+    ```
+
+4. Install client dependencies:
+    ```bash
+    cd ../client
+    npm install
+    ```
+
+5. Make the start scripts executable:
+    ```bash
+    chmod +x start_client_dev.sh start_server_dev.sh
+    ```
+
 :::
 
 :::caution
-The FastAPI server doesn't always restart automatically after code edits (likely due to in-memory session management). You may need to manually restart the server in some cases.
+The browser updates automatically when editing code, but sometimes the webgl context is outdated and you may need to refresh the page manually.
+:::
+
+:::caution
+The FastAPI server doesn't always restart automatically after code edits. You may need to manually restart the server in some cases.
 :::
 
 ## Development Workflow
