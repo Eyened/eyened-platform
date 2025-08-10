@@ -54,7 +54,6 @@ class ZarrStorageManager:
 
         array = group.get(array_name, None)
 
-        print(f"array_name: {array_name}")
 
         if array is None:
             array = group.create_array(
