@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import yaml
 from pathlib import Path
 import click
-from .inference.utils import auto_device
+
 from .utils.testdb import DatabaseTransfer
 from tqdm import tqdm
 from .utils.config import DatabaseSettings, EyenedORMConfig
@@ -90,6 +90,7 @@ def run_models(env, device):
 
     from eyened_orm import Database
     from eyened_orm.inference.inference import run_inference
+    from eyened_orm.inference.utils import auto_device
 
     config = load_orm_config(env)
     database = Database(config)

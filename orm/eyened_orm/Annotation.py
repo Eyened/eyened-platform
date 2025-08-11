@@ -13,8 +13,17 @@ from sqlmodel import Field, Relationship
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import (AnnotationData, AnnotationType, Creator, Feature,
-                            ImageInstance, Patient, Series, Study)
+    from eyened_orm import (
+        AnnotationData,
+        AnnotationType,
+        Creator,
+        Feature,
+        ImageInstance,
+        Patient,
+        Series,
+        Study,
+    )
+
 
 class AnnotationBase(Base):
     """
@@ -37,7 +46,6 @@ class AnnotationBase(Base):
         foreign_key="Annotation.AnnotationID", default=None
     )
     Inactive: bool = False
-
 
 
 class Annotation(AnnotationBase, table=True):
@@ -64,7 +72,7 @@ class Annotation(AnnotationBase, table=True):
         back_populates="Annotations"
     )
     Creator: "Creator" = Relationship(back_populates="Annotations")
-    
+
     AnnotationType: "AnnotationType" = Relationship(back_populates="Annotations")
     AnnotationReference: Optional["Annotation"] = Relationship(
         back_populates="ChildAnnotations",
@@ -79,22 +87,6 @@ class Annotation(AnnotationBase, table=True):
     AnnotationData: List["AnnotationData"] = Relationship(
         back_populates="Annotation", cascade_delete=True
     )
-
-    @property
-    def FeatureName(self):
-        return self.Feature.FeatureName
-
-    @property
-    def PatientIdentifier(self):
-        return self.Patient.PatientIdentifier
-
-    @property
-    def Project(self):
-        return self.Patient.Project
-
-    @property
-    def ProjectName(self):
-        return self.Project.ProjectName
 
     def __repr__(self):
         return f"Annotation({self.AnnotationID}, {self.FeatureName}, {self.Creator.CreatorName})"
@@ -146,7 +138,6 @@ class AnnotationDataBase(Base):
     )
     # use -1 for all scans (e.g. enface OCT)
     ScanNr: int = Field(primary_key=True)
-
 
     ValueInt: int | None
     ValueFloat: float | None
@@ -200,7 +191,6 @@ class AnnotationData(AnnotationDataBase, table=True):
             raise ValueError("Configuration not initialized")
         return Path(self.config.annotations_path) / self.DatasetIdentifier
 
-
     def load_data(self) -> Any:
         """Load the annotation data from the file."""
         if self.MediaType == "image/png":
@@ -251,10 +241,10 @@ class AnnotationData(AnnotationDataBase, table=True):
         return self.get_mask("questionable")
 
 
-
 class AnnotationTypeBase(Base):
     AnnotationTypeName: str = Field(max_length=45)
     Interpretation: str = Field(max_length=45)
+
 
 class AnnotationType(AnnotationTypeBase, table=True):
     __tablename__ = "AnnotationType"
@@ -272,4 +262,3 @@ class AnnotationType(AnnotationTypeBase, table=True):
     AnnotationTypeID: int = Field(primary_key=True)
 
     Annotations: List["Annotation"] = Relationship(back_populates="AnnotationType")
-

@@ -71,24 +71,40 @@ class ZarrArray:
             return zarr_index
         else:
             # Append to array
-            self.array.append(segmentation_data[None, ...])
-            return self.array.shape[0] - 1
+            return self._append_to_array(segmentation_data)
 
-    def write_slice(self, zarr_index: int, axis: int, slice_index: int, slice_data: np.ndarray) -> None:
+    def _append_to_array(self, segmentation_data: np.ndarray) -> int:
+        """Append segmentation data to the zarr array and return the new index."""
+        self.array.append(segmentation_data[None, ...])
+        return self.array.shape[0] - 1
+        
+    def _append_zeroed_element(self) -> int:
+        """Append a zeroed-out element to the zarr array and return the new index."""
+        # Create a zeroed array with the correct shape and dtype
+        zero_data = np.zeros(self.segmentation_shape, dtype=self.array.dtype)
+        return self._append_to_array(zero_data)
+
+    def write_slice(self, zarr_index: Optional[int], axis: int, slice_index: int, slice_data: np.ndarray) -> int:
         """
         Write a slice of segmentation data to the zarr array.
 
         Args:
-            zarr_index: Index in the array where to write the slice
+            zarr_index: Index in the array where to write the slice. If None, append a zeroed element first.
             axis: Axis along which to write the slice (0=height, 1=width, 2=depth)
             slice_index: Index along the specified axis
             slice_data: Slice data as numpy array of shape (H', W') where H' and W' depend on the axis
+
+        Returns:
+            The zarr_index where the slice was written
 
         Raises:
             IndexError: If zarr_index or slice_index is invalid
             ValueError: If axis is invalid or slice_data dimensions don't match
         """
-        if zarr_index is None or zarr_index >= self.array.shape[0]:
+        # Handle the case where zarr_index is None - append a zeroed element
+        if zarr_index is None:
+            zarr_index = self._append_zeroed_element()
+        elif zarr_index >= self.array.shape[0]:
             raise IndexError(
                 f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}"
             )
@@ -131,6 +147,8 @@ class ZarrArray:
 
         # Write the slice
         self.array[tuple(slice_indices)] = slice_data
+        
+        return zarr_index
 
     def read_slice(self, zarr_index: int, axis: int, slice_index: int) -> np.ndarray:
         """
