@@ -73,6 +73,11 @@ class EyenedORMConfig(MyBaseSettings):
         description="Folder containing the thumbnail structure. "
         "Used by the ORM to read thumbnails and by the importer to write thumbnails on insertion",
     )
+    annotations_path: str = Field(
+        default="/storage/annotations",
+        description="Folder containing the annotations. "
+        "Used by the ORM to read annotations and by the importer to write annotations on insertion",
+    )
 
     default_study_date: Optional[date] = Field(
         date(1970, 1, 1),

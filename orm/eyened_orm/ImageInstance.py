@@ -6,7 +6,9 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
+
 import numpy as np
+import pandas as pd
 import pydicom
 from PIL import Image
 from sqlalchemy import Column, Index, select
