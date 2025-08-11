@@ -44,8 +44,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['FeatureID'], ['Feature.FeatureID'], ),
         sa.PrimaryKeyConstraint('ModelID'),
         sa.UniqueConstraint('ModelName'),
-        sa.UniqueConstraint('ModelName', 'Version'),
-        sa.UniqueConstraint('Version')
+        sa.UniqueConstraint('ModelName', 'Version')
     )
 
     # Segmentation table: new table for segmentation data
