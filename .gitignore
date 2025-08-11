@@ -17,3 +17,5 @@ client/src/lib/extensions.ts
 TODO.md
 orm/migrations/transfer-config.yml
 orm/migrations/transfer-config.*.yml
+database/
+segmentations.zarr/
