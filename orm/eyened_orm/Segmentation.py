@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import JSON, Index, UniqueConstraint
@@ -60,6 +60,8 @@ class SegmentationBase(Base):
         foreign_key="ImageInstance.ImageInstanceID", ondelete="CASCADE", default=None
     )
 
+    DataRepresentation: DataRepresentation
+
     # shape of the segmentation
     Depth: int
     Height: int
@@ -77,7 +79,7 @@ class SegmentationBase(Base):
     # If None, the segmentation is dense (i.e valid for all ScanIndices)
     ScanIndices: List[int] | None = Field(sa_type=JSON, default=None)
 
-    DataRepresentation: DataRepresentation
+    
     DataType: Datatype
 
     Threshold: float | None = Field(default=None)
@@ -181,6 +183,36 @@ class Segmentation(SegmentationBase, table=True):
     Feature: "Feature" = Relationship(back_populates="Segmentations")
     SubTask: "SubTask" = Relationship(back_populates="Segmentations")
 
+    @property
+    def shape_matches_image_shape(self):
+        image_shape = self.ImageInstance.shape
+        annotation_shape = self.shape
+        for i, (x,y) in enumerate(zip(image_shape, annotation_shape)):
+            if i != self.l1_axis and x != y:
+                return False
+        return True
+
+
+class FeatureFeatureLinkBase(Base):
+    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
+    FeatureIndex: int = Field(primary_key=True)
+
+class FeatureFeatureLink(FeatureFeatureLinkBase, table=True):
+    __tablename__ = "CompositeFeature"
+    __table_args__ = (
+        Index("fk_CompositeFeature_ParentFeature1_idx", "ParentFeatureID"),
+        Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
+    )
+
+    Feature: "Feature" = Relationship(
+        back_populates="FeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ParentFeatureID"}
+    )
+
+    Child: "Feature" = Relationship(
+        back_populates="ChildFeatureAssociations", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ChildFeatureID"}
+    )
+    
 
 class FeatureBase(Base):
     FeatureName: str = Field(max_length=60, unique=True)
@@ -195,18 +227,59 @@ class Feature(FeatureBase, table=True):
     Segmentations: List["Segmentation"] = Relationship(back_populates="Feature")
     DateInserted: datetime = Field(default_factory=datetime.now)
 
-
-class CompositeFeatureBase(Base):
-    ParentFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    ChildFeatureID: int = Field(foreign_key="Feature.FeatureID", primary_key=True)
-    FeatureIndex: int = Field(primary_key=True)
-
-class CompositeFeature(CompositeFeatureBase, table=True):
-    __tablename__ = "CompositeFeature"
-    __table_args__ = (
-        Index("fk_CompositeFeature_ParentFeature1_idx", "ParentFeatureID"),
-        Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
+    # Relationships for parent-child feature hierarchy
+    FeatureAssociations: List["FeatureFeatureLink"] = Relationship(
+        back_populates="Feature", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ParentFeatureID"}
     )
+    
+    ChildFeatureAssociations: List["FeatureFeatureLink"] = Relationship(
+        back_populates="Child", sa_relationship_kwargs={'foreign_keys':"FeatureFeatureLink.ChildFeatureID"}
+    )
+
+    @classmethod
+    def from_list(cls, session, feature_name: str, sub_features: List[str] | None = None) -> "Feature":
+        '''
+        Create a feature hierarchy from a list of feature names.
+        If a feature does not exist, it will be created.
+        If a feature already exists, it will be appended to the parent.
+        '''
+        feature = cls(FeatureName=feature_name)
+        session.add(feature)
+        session.flush()
+
+        if sub_features is None:
+            return feature
+        
+        if isinstance(sub_features, list):
+            # first create the sub-features that don't exist
+            for sub_feature in sub_features:
+                if Feature.by_name(session, sub_feature) is None:
+                    session.add(Feature(FeatureName=sub_feature))
+            session.flush()
+            
+            # then create the feature associations
+            for i, sub_feature in enumerate(sub_features):
+                feature.FeatureAssociations.append(FeatureFeatureLink(
+                    ParentFeatureID=feature.FeatureID,
+                    ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
+                    FeatureIndex=i
+                ))
+        else:
+            raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
+        
+        return feature
+    
+    @property
+    def json(self) -> Dict[str, Any]:
+        assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
+        subfeatures = [assoc.Child for assoc in assocs]
+        return {
+            "FeatureName": self.FeatureName,
+            "SubFeatures": [subfeature.FeatureName for subfeature in subfeatures]
+        }
+
+
+
 
 
 class ModelBase(Base):

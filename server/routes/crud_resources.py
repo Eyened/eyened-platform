@@ -1,8 +1,8 @@
 from eyened_orm import (
     AnnotationType,
     AnnotationTypeBase,
-    CompositeFeature,
-    CompositeFeatureBase,
+    FeatureFeatureLink,
+    FeatureFeatureLinkBase,
     Contact,
     ContactBase,
     Creator,
@@ -340,7 +340,7 @@ create_crud_routes(Project, ProjectBase, "projects")
 create_crud_routes(Contact, ContactBase, "contacts")
 
 create_crud_routes(Feature, FeatureBase, "features")
-create_crud_routes(CompositeFeature, CompositeFeatureBase, "composite-features")
+create_crud_routes(FeatureFeatureLink, FeatureFeatureLinkBase, "composite-features")
 
 create_crud_routes(Creator, CreatorBase, "creators")
 create_crud_routes(Tag, TagBase, "tags")
