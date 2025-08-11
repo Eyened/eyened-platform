@@ -211,7 +211,7 @@ class CompositeFeature(CompositeFeatureBase, table=True):
 
 class ModelBase(Base):
     ModelName: str = Field(max_length=255, unique=True)
-    Version: str = Field(max_length=255, unique=True)
+    Version: str = Field(max_length=255)
     ModelType: str = Field(max_length=255)
     Description: str | None = Field(max_length=255, default=None)
     FeatureID: int = Field(foreign_key="Feature.FeatureID")
