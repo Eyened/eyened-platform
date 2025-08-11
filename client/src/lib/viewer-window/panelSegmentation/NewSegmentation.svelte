@@ -1,7 +1,6 @@
 <script lang="ts">
     import { getContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { Writable } from "svelte/store";
     import FeatureSelect from "./FeatureSelect.svelte";
     import { data } from "$lib/datamodel/model";
     import type { Feature } from "$lib/datamodel/feature.svelte";

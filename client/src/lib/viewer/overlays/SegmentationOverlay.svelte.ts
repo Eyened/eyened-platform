@@ -10,7 +10,7 @@ import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 import type { FilterList } from "$lib/datamodel/itemList";
 import { BinaryMask } from "$lib/webgl/mask.svelte";
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 export class SegmentationOverlay implements Overlay {
 
@@ -26,11 +26,15 @@ export class SegmentationOverlay implements Overlay {
     public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
     public readonly segmentationContext = new SegmentationContext();
     public readonly allSegmentations: FilterList<Segmentation>;
+    public readonly allModelSegmentations: FilterList<ModelSegmentation>;
 
     constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
         const instance = viewerContext.image.instance;
         this.allSegmentations = instance.segmentations
         .filter(globalContext.segmentationsFilter)
+        .filter((s) => s.sparseAxis == viewerContext.axis);
+
+        this.allModelSegmentations = instance.modelSegmentations
         .filter((s) => s.sparseAxis == viewerContext.axis);
     }
 

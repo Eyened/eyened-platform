@@ -15,6 +15,7 @@ from eyened_orm import (
     SourceInfo,
     Study,
     Segmentation,
+    ModelSegmentation,
 )
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
@@ -93,24 +94,17 @@ form_sub_query = join_tables(
 )
 
 segmentation_query = (
-    select(Segmentation)
-    .select_from(Segmentation)
-    .filter(~Segmentation.Inactive)
-    .join(Feature)
-    .join(Creator)
+    select(Segmentation).select_from(Segmentation).filter(~Segmentation.Inactive)
 )
-
 
 # optimization: skipping FormData, viewer will load on demand
 form_query = (
     select(FormAnnotation)
     .options(defer(FormAnnotation.FormData))
     .filter(~FormAnnotation.Inactive)
-    .join(Patient)
-    .join(FormSchema)
-    .join(Creator)
-    .join(Study, Patient.PatientID == Study.PatientID)
 )
+
+
 base_tables = [
     ImageInstance,
     Series,
@@ -130,7 +124,7 @@ def get_mappings(tables, base_name):
     all_mappings = {}
 
     for table in tables:
-        
+
         table_name = table.__table__.name
 
         for column in table.__table__.columns:
@@ -139,7 +133,7 @@ def get_mappings(tables, base_name):
             # Skip foreign keys
             if column.foreign_keys:
                 continue
-            
+
             col = getattr(table, column.key)
 
             all_mappings[f"{table_name}.{column.name}"] = col
@@ -155,6 +149,7 @@ base_mappings = get_mappings(base_tables, "base")
 segmentation_mappings = get_mappings(segmentation_tables, "Segmentation")
 form_mappings = get_mappings(form_tables, "Form")
 
+
 def apply_filters(query, mappings, params):
     for (field, operator), value in params.items():
         if field not in mappings:
@@ -164,11 +159,9 @@ def apply_filters(query, mappings, params):
     return query
 
 
-def run_queries(
-    session, params, cursor, limit, base_query, segmentation_query, form_query
-):
+def run_queries(session, params, cursor, limit):
     params_decoded = decode_params(params)
-    
+
     query = apply_filters(base_query, base_mappings, params_decoded)
     if cursor:
         query = query.filter(Study.StudyDate <= cursor)
@@ -221,15 +214,20 @@ def run_queries(
 
     image_ids = {instance.ImageInstanceID for instance, *_ in instances}
 
-    segmentation_query = segmentation_query.where(Segmentation.ImageInstanceID.in_(image_ids))
+    segmentations = session.scalars(
+        segmentation_query.where(Segmentation.ImageInstanceID.in_(image_ids))
+    ).all()
 
-    segmentations = session.scalars(segmentation_query).all()
+    patient_ids = {patient.PatientID for _, _, _, patient in instances}    
+    form_annotations = session.scalars(form_query.where(FormAnnotation.PatientID.in_(patient_ids))).all()
 
-    patient_ids = {patient.PatientID for _, _, _, patient in instances}
-    form_query = form_query.where(FormAnnotation.PatientID.in_(patient_ids))
-    form_annotations = session.scalars(form_query).all()
+    model_segmentations = session.scalars(
+        select(ModelSegmentation).where(
+            ModelSegmentation.ImageInstanceID.in_(image_ids)
+        )
+    ).all()
 
-    return next_cursor, instances, segmentations, form_annotations
+    return next_cursor, instances, segmentations, form_annotations, model_segmentations
 
 
 @router.get("/instances", response_model=InstanceResponse)
@@ -244,8 +242,8 @@ async def get_instances(
 
     multiparams = request.query_params.multi_items()
 
-    next_cursor, i, segmentations, form_annotations = run_queries(
-        session, multiparams, cursor, limit, base_query, segmentation_query, form_query
+    next_cursor, i, segmentations, form_annotations, model_segmentations = run_queries(
+        session, multiparams, cursor, limit
     )
     instances = {instance for instance, _, _, _ in i}
     series = {series for _, series, _, _ in i}
@@ -257,11 +255,12 @@ async def get_instances(
             k: collect_rows(v)
             for k, v in {
                 "instances": instances,
-                "series": series,   
+                "series": series,
                 "studies": studies,
                 "patients": patients,
                 "segmentations": segmentations,
                 "form-annotations": form_annotations,
+                "model-segmentations": model_segmentations,
             }.items()
         }
     }

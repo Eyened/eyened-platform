@@ -1,12 +1,12 @@
 
 import type { Creator } from "$lib/datamodel/creator.svelte";
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import type { Model, Segmentation } from "$lib/datamodel/segmentation.svelte";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem";
 import { SvelteSet } from "svelte/reactivity";
 
 export class SegmentationContext {
 
-    public readonly hideCreators = new SvelteSet<Creator>();
+    public readonly hideCreators = new SvelteSet<Creator | Model>();
     public readonly visibleSegmentations = new SvelteSet<Segmentation>();
 
     public flipDrawErase = $state(false);
@@ -18,7 +18,7 @@ export class SegmentationContext {
 
     constructor() { }
 
-    toggleShowCreator(creator: Creator) {
+    toggleShowCreator(creator: Creator | Model) {
         if (this.hideCreators.has(creator)) {
             this.hideCreators.delete(creator);
         } else {

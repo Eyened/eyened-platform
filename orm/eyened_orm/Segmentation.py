@@ -51,7 +51,7 @@ class Datatype(Enum):
     R32F = "R32F"  # 32-bit float
 
 
-class SegmentationBase(Base):
+class SegmentationBase(Base, abstract=True):
     # index in the zarr array of the segmentation
     ZarrArrayIndex: int | None = None
 
@@ -115,6 +115,11 @@ class SegmentationBase(Base):
     def is_sparse(self) -> bool:
         return self.SparseAxis is not None
     
+    @property
+    def groupname(self) -> str:
+        return str(self.DataRepresentation)
+
+
     def write_data(self, data: np.ndarray, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
         """Write annotation data to the zarr array and update the ZarrArrayIndex."""
         
@@ -122,7 +127,7 @@ class SegmentationBase(Base):
             raise ValueError("Segmentation has no associated ImageInstance")
 
         zarr_index = self.storage_manager.write(
-            group_name=str(self.DataRepresentation),  
+            group_name=self.groupname,  
             data_dtype=self.dtype,
             data_shape=self.shape,
             data=data, 
@@ -150,7 +155,7 @@ class SegmentationBase(Base):
             raise ValueError("Segmentation has no associated ImageInstance")
         
         return self.storage_manager.read(
-            group_name=str(self.DataRepresentation),
+            group_name=self.groupname,
             data_dtype=self.dtype,
             data_shape=self.shape,
             zarr_index=self.ZarrArrayIndex,
@@ -230,3 +235,9 @@ class ModelSegmentation(SegmentationBase, table=True):
     ModelID: int = Field(foreign_key="Model.ModelID")
 
     DateInserted: datetime = Field(default_factory=datetime.now)
+
+    Model: "Model" = Relationship(back_populates="Segmentations")
+
+    @property
+    def groupname(self) -> str:
+        return f"model_{self.Model.ModelName}_{self.Model.Version}"
