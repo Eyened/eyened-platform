@@ -2,7 +2,7 @@
 Services package for the EyeNed Platform API.
 """
 
-from .dto_converter import (
+from ..dtos.dto_converter import (
     DTOConverter,
     to_study_dto,
     to_patient_dto,
@@ -10,13 +10,20 @@ from .dto_converter import (
     to_image_instance_dto,
     to_project_dto,
     to_creator_dto,
-    to_device_model_dto,
-    to_device_instance_dto,
     to_scan_dto,
     to_studies_dtos,
     to_patients_dtos,
     to_series_dtos,
     to_image_instances_dtos,
+    to_feature_dto,
+    to_segmentation_dto,
+    to_form_schema_dto,
+    to_form_annotation_dto,
+    to_tag_dto,
+    to_task_definition_dto,
+    to_task_state_dto,
+    to_task_dto,
+    to_sub_task_dto,
 )
 
 __all__ = [
@@ -27,11 +34,18 @@ __all__ = [
     'to_image_instance_dto',
     'to_project_dto',
     'to_creator_dto',
-    'to_device_model_dto',
-    'to_device_instance_dto',
     'to_scan_dto',
     'to_studies_dtos',
     'to_patients_dtos',
     'to_series_dtos',
     'to_image_instances_dtos',
+    'to_feature_dto',
+    'to_segmentation_dto',
+    'to_form_schema_dto',
+    'to_form_annotation_dto',
+    'to_tag_dto',
+    'to_task_definition_dto',
+    'to_task_state_dto',
+    'to_task_dto',
+    'to_sub_task_dto',
 ] 
