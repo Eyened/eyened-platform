@@ -45,6 +45,7 @@ services:
       - DATABASE_NAME=eyened_database
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
     restart: always
     volumes:
       - ${IMAGES_BASEPATH}:/images
@@ -78,6 +79,7 @@ services:
       - IMAGES_BASEPATH=/images
       - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
       - THUMBNAILS_PATH=/storage/thumbnails
+      - SECRET_KEY=${SECRET_KEY}
     depends_on:
       redis:
         condition: service_healthy
