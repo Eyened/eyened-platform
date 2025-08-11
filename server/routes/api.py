@@ -13,6 +13,7 @@ from eyened_orm import (
     Task,
     TaskDefinition,
     TaskState,
+    Model,
 )
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -38,6 +39,7 @@ class DataResponse(BaseModel):
     device_models: List[DeviceModel] = Field(alias="device-models")
     tasks: List[Task]
     task_states: List[TaskState] = Field(alias="task-states")
+    models: List[Model] = Field(alias="models")
 
     class Config:
         arbitrary_types_allowed = True
@@ -61,6 +63,7 @@ async def get_data(
         "device-models": DeviceModel,
         "tasks": Task,
         "task-states": TaskState,
+        "models": Model,
     }
 
     return {

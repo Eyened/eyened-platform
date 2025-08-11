@@ -5,7 +5,7 @@ import { data, registerConstructor } from './model';
 import type { Patient } from './patient';
 import type { Project } from './project.svelte';
 import type { Scan } from './scan';
-import type { Segmentation } from './segmentation.svelte';
+import type { ModelSegmentation, Segmentation } from './segmentation.svelte';
 import type { Series } from './series';
 import type { Study } from './study';
 
@@ -167,6 +167,10 @@ export class Instance extends BaseItem {
 
     get segmentations(): FilterList<Segmentation> {
         return data.segmentations.filter(segmentation => segmentation.instanceId == this.id);
+    }
+
+    get modelSegmentations(): FilterList<ModelSegmentation> {
+        return data.modelSegmentations.filter(modelSegmentation => modelSegmentation.instanceId == this.id);
     }
 }
 registerConstructor('instances', Instance);

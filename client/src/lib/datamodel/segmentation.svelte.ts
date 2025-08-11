@@ -217,3 +217,89 @@ export class Segmentation extends BaseItem {
     }
 }
 registerConstructor('segmentations', Segmentation);
+
+
+
+export interface ServerModel {
+    ModelName: string;
+    Version: string;
+    ModelType: string;
+    Description: string;
+    FeatureID: number;
+    ModelID: number;
+}
+
+export class Model extends BaseItem {
+    static endpoint = 'models';
+    static mapping = {
+        'ModelName': 'name',
+        'Version': 'version',
+        'ModelType': 'type',
+        'Description': 'description',
+        'FeatureID': 'featureId',
+        'ModelID': 'modelId',
+    };
+
+    id!: number;
+    name: string = '';
+    version: string = '';
+    type: string = '';
+    description: string = '';
+    featureId: number = 0;
+    modelId: number = 0;
+
+    constructor(item: ServerModel) {
+        super();
+        this.init(item);
+    }
+
+    init(serverItem: ServerModel) {
+        this.id = serverItem.ModelID;
+        this.name = serverItem.ModelName;
+        this.version = serverItem.Version;
+        this.type = serverItem.ModelType;
+        this.description = serverItem.Description;
+        this.featureId = serverItem.FeatureID;
+        this.modelId = serverItem.ModelID;
+    }
+
+    get feature(): Feature {
+        return data.features.get(this.featureId)!;
+    }
+}
+registerConstructor('models', Model);
+
+
+interface ServerModelSegmentation extends ServerSegmentation {
+    ModelSegmentationID: number;
+    ModelID: number;
+}
+
+export class ModelSegmentation extends Segmentation {
+    static endpoint = 'model-segmentations';
+   
+    modelId: number = 0;
+    constructor(item: ServerModelSegmentation) {
+        super(item);
+    }
+
+    init(serverItem: ServerModelSegmentation) {
+        super.init(serverItem);
+        this.modelId = serverItem.ModelID;
+    }
+
+    get model(): Model {
+        return data.models.get(this.modelId)!;
+    }
+
+
+    async loadData(scanNr: number): Promise<NPYArray> {
+        const params = new URLSearchParams();
+        params.append('axis', (this.sparseAxis ?? 0).toString());
+        params.append('scan_nr', scanNr.toString());
+        const url = `${ModelSegmentation.endpoint}/${this.id}/data?${params.toString()}`;
+        const response = await api.get(url);
+        return decodeNpy(await response.arrayBuffer());
+    }
+}
+registerConstructor('model-segmentations', ModelSegmentation);

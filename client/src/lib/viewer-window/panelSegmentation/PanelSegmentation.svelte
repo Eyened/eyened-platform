@@ -27,16 +27,17 @@
     const { segmentationContext, allSegmentations } = segmentationOverlay;
 
     const creators = segmentationOverlay.allSegmentations.collectSet(
-        (a) => a.creator,
+        (s) => s.creator,
     );
-
+    const models = segmentationOverlay.allModelSegmentations.collectSet(
+        (s) => s.model,
+    );
     // hide all on load
     for (const segmentation of $allSegmentations) {
         segmentationContext.hideCreators.add(segmentation.creator);
     }
     // show own segmentations
     segmentationContext.hideCreators.delete(creator);
-
 </script>
 
 <div class="main">
@@ -53,6 +54,14 @@
             />
         </label>
     </div>
+
+    <ul class="users">
+        {#each $models as model}
+            <li>
+                <CreatorSegmentations {model} />
+            </li>
+        {/each}
+    </ul>
 
     <ul class="users">
         <!-- show own segmentations first -->
