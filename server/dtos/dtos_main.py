@@ -94,7 +94,6 @@ class FormAnnotationBase(BaseModel):
     sub_task_id: Optional[int] = None
     form_data: Optional[Dict[str, Any]] = None
     form_annotation_reference_id: Optional[int] = None
-    inactive: bool = False
 
 
 class FormAnnotationPUT(FormAnnotationBase):
@@ -103,6 +102,7 @@ class FormAnnotationPUT(FormAnnotationBase):
 
 class FormAnnotationGET(FormAnnotationBase):
     id: int
+
 
     object_type: Literal['patient', 'study', 'image_instance']
     patient: Optional[PatientGET] = None
