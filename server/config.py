@@ -1,4 +1,7 @@
+import os
+from typing import Optional
 import yaml
+from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 from eyened_orm.utils.config import EyenedORMConfig
 
@@ -14,6 +17,8 @@ class Settings(EyenedORMConfig):
     admin_username: str
     admin_password: str
 
+    database_root_password: Optional[str] = Field(description="Database root password", validation_alias="DATABASE_ROOT_PASSWORD", default=None)
+
     # Print settings for debugging purposes - hide password and secret key
     def __str__(self):
         settings_dict = self.model_dump()
@@ -22,4 +27,8 @@ class Settings(EyenedORMConfig):
         settings_dict['database']['password'] = '***HIDDEN***'
         return yaml.dump(settings_dict, default_flow_style=False)
 
+
 settings = Settings()
+if settings.database.user == '' or settings.database.password == '':
+    settings.database.user = "root"
+    settings.database.password = settings.database_root_password

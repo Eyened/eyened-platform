@@ -30,15 +30,17 @@ def task_run_inference():
     """
     from eyened_orm.utils.config import EyenedORMConfig
     from eyened_orm.inference.inference import run_inference
-    from eyened_orm.db import DBManager
     logger.info(f"Starting inference task")
 
-    config = EyenedORMConfig()
-    DBManager.init(config)
-    session = DBManager.get_session()
-    
-    run_inference(session, device=None, cfi_cache_path=None)
-    session.close()
+    from eyened_orm import Database
+
+    # Initialize database
+    database = Database()
+
+    with database.get_session() as session:
+        # Use session for database operations
+
+        run_inference(session, device=None, cfi_cache_path=None)
     logger.info("Inference task completed successfully")
     return True
 
@@ -53,19 +55,19 @@ def task_update_thumbnails(print_errors=False):
     """
     from eyened_orm.utils.config import EyenedORMConfig
     from eyened_orm.importer.thumbnails import update_thumbnails
-    from eyened_orm.db import DBManager
+    from eyened_orm import Database
     logger.info(f"Starting thumbnail update task")
 
-    config = EyenedORMConfig()
-    DBManager.init(config)
-    session = DBManager.get_session()
+    # Initialize database
+    database = Database()
     
-    update_thumbnails(
-        session, 
-        thumbnails_path='/storage/thumbnails', 
-        secret_key= config.secret_key,
-        print_errors=True
-    )
+    with database.get_session() as session:
+        update_thumbnails(
+            session, 
+            thumbnails_path='/storage/thumbnails', 
+            secret_key= config.secret_key,
+            print_errors=True
+        )
     session.close()
     logger.info("Thumbnail update task completed successfully")
     return True
