@@ -37,7 +37,6 @@ def upgrade() -> None:
         sa.Column('ModelID', sa.Integer(), nullable=False),
         sa.Column('ModelName', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
         sa.Column('Version', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
-        sa.Column('ModelType', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
         sa.Column('Description', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
         sa.Column('FeatureID', sa.Integer(), nullable=False),        
         sa.Column('DateInserted', sa.DateTime(), nullable=False),
