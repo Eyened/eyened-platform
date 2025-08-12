@@ -85,54 +85,6 @@ def create_empty_array(segmentation: Segmentation, image: ImageInstance) -> np.n
     return np.zeros(shape, dtype=dtypes[segmentation.DataType])
 
 
-#### CONSISTENCY CHECKS ####
-"""
-if image.is_2d and annotation.is_2d:
-    # one one-dimension should match
-    if image.l1_axis != annotation.l1_axis:
-        raise HTTPException(status_code=400, detail=f"Image length 1 axis {image.length_1_axis} does not match annotation length 1 axis {annotation.l1_axis}")
-    
-    if image.shape != annotation.shape and annotation.ImageProjectionMatrix is None:
-        raise HTTPException(status_code=400, detail=f"Image shape {image.shape} does not match annotation shape {annotation.shape} and ImageProjectionMatrix is not provided")
-    
-    annotation.ScanIndices = None
-    annotation.SparseAxis = None
-    
-elif image.is_3d and annotation.is_2d:
-    if annotation.ScanIndices is None or not isinstance(annotation.ScanIndices, int):
-        raise HTTPException(status_code=400, detail=f"ScanIndices must be an int for 2D annotations on 3D images")
-    
-    # scan index must be within the image shape
-    if annotation.ScanIndices >= image.shape[annotation.l1_axis]:
-        raise HTTPException(status_code=400, detail=f"ScanIndices {annotation.ScanIndices} is out of bounds for image shape {image.shape} along dimension {annotation.l1_axis}")
-    
-    # check if image and annotation match along dimensions other than the length 1 axis
-    if not annotation.shape_matches_image_shape and annotation.ImageProjectionMatrix is None:
-        raise HTTPException(status_code=400, detail=f"Annotation shape {annotation.shape} does not match image shape {image.shape} and ImageProjectionMatrix is not provided")
-    annotation.SparseAxis = None
-    
-elif image.is_3d and annotation.is_3d:
-    if image.shape != annotation.shape:
-        raise HTTPException(status_code=400, detail=f"3D annotation shape {annotation.shape} does not match image shape {image.shape}")
-    
-    # SparseAxis and ScanIndices can either be both present or both absent
-    if annotation.SparseAxis is not None and annotation.ScanIndices is None:
-        raise HTTPException(status_code=400, detail=f"SparseAxis is provided but ScanIndices is not")
-    if annotation.SparseAxis is None and annotation.ScanIndices is not None:
-        raise HTTPException(status_code=400, detail=f"ScanIndices is provided but SparseAxis is not")
-    
-    if annotation.ScanIndices is not None:
-        if not isinstance(annotation.ScanIndices, list):
-            raise HTTPException(status_code=400, detail=f"ScanIndices must be a list for sparse annotations")
-        
-        # scan indices must be unique and within the image bounds
-        for i in annotation.ScanIndices:
-            if i >= image.shape[annotation.SparseAxis]:
-                raise HTTPException(status_code=400, detail=f"Scan index {i} is out of bounds for image shape {image.shape} along dimension {annotation.SparseAxis}")
-        
-else:
-    raise HTTPException(status_code=400, detail=f"Image and annotation shapes are not compatible")
-"""
 
 
 # this endpoint uses multipart/form-data
@@ -325,3 +277,53 @@ async def patch_segmentation(
     db.commit()
     db.refresh(segmentation)
     return segmentation
+
+
+#### CONSISTENCY CHECKS ####
+"""
+if image.is_2d and annotation.is_2d:
+    # one one-dimension should match
+    if image.l1_axis != annotation.l1_axis:
+        raise HTTPException(status_code=400, detail=f"Image length 1 axis {image.length_1_axis} does not match annotation length 1 axis {annotation.l1_axis}")
+    
+    if image.shape != annotation.shape and annotation.ImageProjectionMatrix is None:
+        raise HTTPException(status_code=400, detail=f"Image shape {image.shape} does not match annotation shape {annotation.shape} and ImageProjectionMatrix is not provided")
+    
+    annotation.ScanIndices = None
+    annotation.SparseAxis = None
+    
+elif image.is_3d and annotation.is_2d:
+    if annotation.ScanIndices is None or not isinstance(annotation.ScanIndices, int):
+        raise HTTPException(status_code=400, detail=f"ScanIndices must be an int for 2D annotations on 3D images")
+    
+    # scan index must be within the image shape
+    if annotation.ScanIndices >= image.shape[annotation.l1_axis]:
+        raise HTTPException(status_code=400, detail=f"ScanIndices {annotation.ScanIndices} is out of bounds for image shape {image.shape} along dimension {annotation.l1_axis}")
+    
+    # check if image and annotation match along dimensions other than the length 1 axis
+    if not annotation.shape_matches_image_shape and annotation.ImageProjectionMatrix is None:
+        raise HTTPException(status_code=400, detail=f"Annotation shape {annotation.shape} does not match image shape {image.shape} and ImageProjectionMatrix is not provided")
+    annotation.SparseAxis = None
+    
+elif image.is_3d and annotation.is_3d:
+    if image.shape != annotation.shape:
+        raise HTTPException(status_code=400, detail=f"3D annotation shape {annotation.shape} does not match image shape {image.shape}")
+    
+    # SparseAxis and ScanIndices can either be both present or both absent
+    if annotation.SparseAxis is not None and annotation.ScanIndices is None:
+        raise HTTPException(status_code=400, detail=f"SparseAxis is provided but ScanIndices is not")
+    if annotation.SparseAxis is None and annotation.ScanIndices is not None:
+        raise HTTPException(status_code=400, detail=f"ScanIndices is provided but SparseAxis is not")
+    
+    if annotation.ScanIndices is not None:
+        if not isinstance(annotation.ScanIndices, list):
+            raise HTTPException(status_code=400, detail=f"ScanIndices must be a list for sparse annotations")
+        
+        # scan indices must be unique and within the image bounds
+        for i in annotation.ScanIndices:
+            if i >= image.shape[annotation.SparseAxis]:
+                raise HTTPException(status_code=400, detail=f"Scan index {i} is out of bounds for image shape {image.shape} along dimension {annotation.SparseAxis}")
+        
+else:
+    raise HTTPException(status_code=400, detail=f"Image and annotation shapes are not compatible")
+"""

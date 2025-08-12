@@ -6,7 +6,6 @@ from fastapi.responses import FileResponse
 
 from server.config import settings
 from server.routes import (
-    api,
     auth,
     crud_resources,
     import_api,
@@ -23,7 +22,6 @@ from eyened_orm import Database
 app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
 app_api.include_router(instances.router)
-app_api.include_router(api.router)
 app_api.include_router(segmentations.router)
 app_api.include_router(import_api.router)
 
