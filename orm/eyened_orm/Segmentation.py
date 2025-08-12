@@ -148,6 +148,10 @@ class SegmentationBase(Base, abstract=True):
 
         self.ZarrArrayIndex = zarr_index
         return zarr_index
+    
+    def write_empty(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
+        """Write an empty segmentation to the zarr array and update the ZarrArrayIndex."""
+        return self.write_data(np.zeros(self.shape, dtype=self.dtype), axis, slice_index)
 
     def read_data(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> np.ndarray:
         if self.ZarrArrayIndex is None:
