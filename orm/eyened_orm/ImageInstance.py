@@ -228,6 +228,10 @@ class ImageInstance(ImageInstanceBase, table=True):
     Segmentations: List["Segmentation"] = Relationship(
         back_populates="ImageInstance", cascade_delete=True
     )
+    
+    ModelSegmentations: List["ModelSegmentation"] = Relationship(
+        back_populates="ImageInstance", cascade_delete=True
+    )
 
     FormAnnotations: List["FormAnnotation"] = Relationship(
         back_populates="ImageInstance", cascade_delete=True

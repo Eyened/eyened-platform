@@ -56,8 +56,8 @@ class SegmentationBase(Base, abstract=True):
     ZarrArrayIndex: int | None = None
 
     # image instance that the segmentation is associated with
-    ImageInstanceID: int | None = Field(
-        foreign_key="ImageInstance.ImageInstanceID", ondelete="CASCADE", default=None
+    ImageInstanceID: int = Field(
+        foreign_key="ImageInstance.ImageInstanceID", ondelete="CASCADE"
     )
 
     DataRepresentation: DataRepresentation
@@ -298,22 +298,32 @@ class ModelBase(Base):
     Description: str | None = Field(max_length=255, default=None)
     FeatureID: int = Field(foreign_key="Feature.FeatureID")
 
+    
+
 class Model(ModelBase, table=True):
     __tablename__ = "Model"
+    _name_column: ClassVar[str] = "ModelName"
+
     ModelID: int | None = Field(default=None, primary_key=True)
     DateInserted: datetime = Field(default_factory=datetime.now)
 
     __table_args__ = (UniqueConstraint("ModelName", "Version"),)
 
+    Segmentations: List["ModelSegmentation"] = Relationship(back_populates="Model")
+    
 class ModelSegmentation(SegmentationBase, table=True):
     __tablename__ = "ModelSegmentation"    
-    SegmentationID: int = Field(primary_key=True)
+    ModelSegmentationID: int = Field(primary_key=True)
 
     ModelID: int = Field(foreign_key="Model.ModelID")
 
     DateInserted: datetime = Field(default_factory=datetime.now)
 
-    Model: "Model" = Relationship(back_populates="Segmentations")
+
+    Model: "Model" = Relationship(back_populates="Segmentations")    
+    ImageInstance: Optional["ImageInstance"] = Relationship(
+        back_populates="ModelSegmentations"
+    )
 
     @property
     def groupname(self) -> str:
