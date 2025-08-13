@@ -2,9 +2,9 @@
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { getContext } from "svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { constructors } from "$lib/webgl/segmentationState";
     import { converters } from "$lib/webgl/segmentationConverter";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -15,12 +15,12 @@
     }
 
     let { image, segmentation, resolve, close }: Props = $props();
-    const segmentationAnnotations = image.instance.segmentations.filter(
-        globalContext.segmentationsFilter,
-    );
+    const segmentationAnnotations = image.instance.segmentations
+        .concat(image.instance.modelSegmentations)
+        .filter(globalContext.segmentationsFilter);
 
     const referenceSegmentations = segmentationAnnotations
-        .filter((s) => s.id != segmentation.id)
+        .filter((s) => s != segmentation)
         .filter((other) => {
             const from = segmentation.dataRepresentation;
             const to = other.dataRepresentation;
@@ -38,54 +38,64 @@
 
 {#if $referenceSegmentations.length > 0}
     <div>Select segmentation to import from:</div>
-    <ul>
-        {#each $referenceSegmentations as segmentation}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li onclick={() => _resolve(segmentation)}>
-                <div class="annotation-id">
-                    [{segmentation.id}]
-                </div>
-                <div>{segmentation.creator.name}</div>
-                <div>{segmentation.feature.name}</div>
-            </li>
-        {/each}
-    </ul>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Created By</th>
+                <th>Feature</th>
+            </tr>
+        </thead>
+        <tbody>
+            {#each $referenceSegmentations as segmentation}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <tr onclick={() => _resolve(segmentation)}>
+                    <td class="annotation-id">[{segmentation.id}]</td>
+                    <td>{segmentation.createdBy.name}</td>
+                    <td>{segmentation.feature.name}</td>
+                </tr>
+            {/each}
+        </tbody>
+    </table>
 {:else}
     <div>No segmentations found to import from</div>
 {/if}
 <button onclick={close}>Cancel</button>
 
 <style>
-    ul {
-        display: grid;
-        grid-template-columns: 0fr 1fr 1fr;
-
-        list-style-type: none;
-        padding: 0;
+    table {
+        width: 100%;
+        border-collapse: collapse;
         max-height: 20em;
         overflow: auto;
     }
 
-    li {
-        display: contents;
+    th {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+        font-weight: bold;
+        background-color: #f5f5f5;
+    }
+
+    td {
+        padding: 8px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+
+    tr {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    tr:hover {
+        background-color: #e6fdff;
         cursor: pointer;
     }
 
-    div.annotation-id {
+    .annotation-id {
         font-size: x-small;
         color: gray;
-    }
-    li > div {
-        padding: 0.5em;
-        align-items: center;
-        display: flex;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-    }
-    li.hover > div {
-        background-color: #e6fdff;
-    }
-    li.selected > div {
-        background-color: #43ff46;
     }
 </style>

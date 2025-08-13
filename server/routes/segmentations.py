@@ -10,6 +10,7 @@ from eyened_orm import (
     Segmentation,
     Datatype,
     DataRepresentation,
+    ModelSegmentation
 )
 from fastapi import (
     APIRouter,
@@ -325,3 +326,27 @@ async def patch_segmentation(
     db.commit()
     db.refresh(segmentation)
     return segmentation
+
+
+
+@router.get("/model-segmentations/{model_segmentation_id}/data")
+async def get_model_segmentation_data(
+    model_segmentation_id: int,
+    axis: Optional[int] = None,
+    scan_nr: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    model_segmentation = ModelSegmentation.by_id(db, model_segmentation_id)
+    if model_segmentation is None:
+        raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
+
+    try:
+        arr = model_segmentation.read_data(axis=axis, slice_index=scan_nr)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    buf = io.BytesIO()
+    np.save(buf, arr)
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="application/octet-stream")

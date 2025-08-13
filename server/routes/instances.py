@@ -40,6 +40,7 @@ class DataResponse(BaseModel):
     patients: List[Patient]
     segmentations: List[Segmentation]
     form_annotations: List[FormAnnotation] = Field(alias="form-annotations")
+    model_segmentations: List[ModelSegmentation] = Field(alias="model-segmentations")
 
     class Config:
         arbitrary_types_allowed = True
@@ -245,6 +246,7 @@ async def get_instances(
     next_cursor, i, segmentations, form_annotations, model_segmentations = run_queries(
         session, multiparams, cursor, limit
     )
+
     instances = {instance for instance, _, _, _ in i}
     series = {series for _, series, _, _ in i}
     studies = {study for _, _, study, _ in i}
@@ -264,6 +266,7 @@ async def get_instances(
             }.items()
         }
     }
+    
     if next_cursor:
         response["next_cursor"] = next_cursor.isoformat()
     return response
