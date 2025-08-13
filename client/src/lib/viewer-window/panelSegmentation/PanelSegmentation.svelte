@@ -5,6 +5,7 @@
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import CreatorSegmentations from "./CreatorSegmentations.svelte";
     import DrawingTools from "./DrawingTools.svelte";
+    import ModelSegmentations from "./ModelSegmentations.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -41,6 +42,15 @@
 </script>
 
 <div class="main">
+    <div class="models">
+        <ul class="users">
+            {#each $models as model}
+                <li>
+                    <ModelSegmentations {model} />
+                </li>
+            {/each}
+        </ul>
+    </div>
     <DrawingTools />
     <div class="opacity">
         <label>
@@ -54,14 +64,6 @@
             />
         </label>
     </div>
-
-    <ul class="users">
-        {#each $models as model}
-            <li>
-                <CreatorSegmentations {model} />
-            </li>
-        {/each}
-    </ul>
 
     <ul class="users">
         <!-- show own segmentations first -->
@@ -84,6 +86,12 @@
 <style>
     div {
         display: flex;
+    }
+    div.models {
+        flex: 1;
+        flex-direction: column;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 0.5em;
     }
     ul {
         list-style-type: none;

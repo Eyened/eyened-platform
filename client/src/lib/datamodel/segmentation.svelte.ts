@@ -173,6 +173,10 @@ export class Segmentation extends BaseItem {
         return data.creators.get(this.creatorId)!;
     }
 
+    get createdBy(): Creator | Model {
+        return this.creator;
+    }
+
     get feature(): Feature {
         return data.features.get(this.featureId)!;
     }
@@ -277,21 +281,33 @@ interface ServerModelSegmentation extends ServerSegmentation {
 
 export class ModelSegmentation extends Segmentation {
     static endpoint = 'model-segmentations';
-   
+
     modelId: number = 0;
     constructor(item: ServerModelSegmentation) {
         super(item);
+        this.init(item);
     }
 
     init(serverItem: ServerModelSegmentation) {
         super.init(serverItem);
+        this.id = serverItem.ModelSegmentationID;
         this.modelId = serverItem.ModelID;
+        this.featureId = this.model.featureId;
     }
+
+
 
     get model(): Model {
         return data.models.get(this.modelId)!;
     }
 
+    get createdBy(): Model {
+        return this.model;
+    }
+
+    get feature(): Feature {
+        return this.model.feature;
+    }
 
     async loadData(scanNr: number): Promise<NPYArray> {
         const params = new URLSearchParams();

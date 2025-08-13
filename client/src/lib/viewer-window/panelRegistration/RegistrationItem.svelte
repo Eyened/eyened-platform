@@ -25,17 +25,11 @@
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const instance = viewerContext.image.instance;
 
-
-    const tool = new RegistrationTool(
-        formAnnotation,
-        instance,
-    );
+    const tool = new RegistrationTool(formAnnotation, instance);
 
     let removeTool = () => {};
     onDestroy(() => removeTool());
-    let active = $derived(
-        panelActive && activeID === formAnnotation.id,
-    );
+    let active = $derived(panelActive && activeID === formAnnotation.id);
     $effect(() => {
         if (active) {
             removeTool = viewerContext.addOverlay(tool);

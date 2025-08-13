@@ -10,26 +10,14 @@
     let { segmentation }: Props = $props();
 
     let threshold = $state(0.5);
-    // for (const ad of segmentation.annotationData.$) {
-    //     threshold = ad.valueFloat || 0.5;
-    // }
+    threshold = segmentation.threshold;
     const canEdit = globalContext.canEdit(segmentation);
 
-    $effect(() => {
-        // for (const ad of annotation.annotationData.$) {
-        //     ad.valueFloat = threshold;
-        // }
-    });
 
     function onUpdateThreshold() {
-        // for (const ad of annotation.annotationData.$) {
-        //     ad.valueFloat = threshold;
-        //     if (canEdit) {
-        //         // updates the threshold value in the annotation data on server
-        //         ad.update({ valueFloat: threshold });
-        //     }
-        // }
-        segmentation.update({ threshold: segmentation.threshold });
+        if (canEdit) {
+            segmentation.update({ threshold: segmentation.threshold });
+        }
     }
 </script>
 

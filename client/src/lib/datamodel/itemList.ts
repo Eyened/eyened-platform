@@ -37,6 +37,10 @@ export class FilterList<T> implements Readable<T[]> {
         return derived(this.items, lst => lst.find(predicate));
     }
 
+    concat<S>(other: FilterList<S>): FilterList<T | S> {
+        return new FilterList(derived([this.items, other.items], ([a, b]) => [...a, ...b]));
+    }
+
     filter(predicate: (value: T) => boolean): FilterList<T> {
         return this.derive(lst => lst.filter(predicate));
     }
