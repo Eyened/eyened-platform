@@ -23,19 +23,19 @@ export class RegistrationTool implements Overlay {
         private instance: Instance,
         private pointStyle: 'rect' | 'cross' = 'cross',
         private radius: number = 16
-    ) {         
+    ) {
     }
 
-    private update() {        
+    private update() {
         this.formAnnotation.update({ value: this.formAnnotation.value });
     }
 
     get points(): PointList {
         if (!this.formAnnotation.value) {
             this.formAnnotation.value = {};
-            if (!this.formAnnotation.value[this.instance.id]) {
-                this.formAnnotation.value[this.instance.id] = [];
-            }
+        }
+        if (!this.formAnnotation.value[this.instance.id]) {
+            this.formAnnotation.value[this.instance.id] = [];
         }
         return this.formAnnotation.value[this.instance.id];
     }
@@ -91,6 +91,7 @@ export class RegistrationTool implements Overlay {
     }
 
     private addPoint(position: Position2D) {
+
         if (!this.points)
             return
         for (let i = 0; i <= this.points.length; i++) {
