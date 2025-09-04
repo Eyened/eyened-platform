@@ -20,7 +20,7 @@ from .dtos_instances import (
 )
 from .dtos_aux import CreatorGET, TagGET
 from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET
-from .dtos_tasks import TaskDefinitionGET, TaskStateGET, TaskGET, SubTaskGET
+from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -158,6 +158,7 @@ class DTOConverter:
             series=series_meta,
             device=device_meta,
             scan=scan_meta,
+            tags=DTOConverter._tags_from_image_instance(image_instance),
         )
 
     # -------------------- Auxiliary entities --------------------
@@ -180,6 +181,24 @@ class DTOConverter:
         """Convert Tag ORM object to TagGET."""
         return TagGET(id=tag.TagID, name=tag.TagName)
 
+    @staticmethod
+    def _tags_from_form_annotation(annotation: "FormAnnotationORM") -> List[TagGET]:
+        """Extract tags from FormAnnotation using relationship."""
+        links = getattr(annotation, "FormAnnotationTagLinks", None) or []
+        return [DTOConverter.tag_to_get(link.Tag) for link in links if getattr(link, "Tag", None)]
+
+    @staticmethod
+    def _tags_from_image_instance(image_instance: "ImageInstance") -> List[TagGET]:
+        """Extract tags from ImageInstance using relationship."""
+        links = getattr(image_instance, "ImageInstanceTagLinks", None) or []
+        return [DTOConverter.tag_to_get(link.Tag) for link in links if getattr(link, "Tag", None)]
+
+    @staticmethod
+    def _tags_from_segmentation(segmentation: "Segmentation") -> List[TagGET]:
+        """Extract tags from Segmentation using relationship."""
+        links = getattr(segmentation, "SegmentationTagLinks", None) or []
+        return [DTOConverter.tag_to_get(link.Tag) for link in links if getattr(link, "Tag", None)]
+
     # -------------------- Feature/Segmentation --------------------
     @staticmethod
     def feature_to_get(feature: "Feature") -> FeatureGET:
@@ -187,14 +206,13 @@ class DTOConverter:
         return FeatureGET(
             id=feature.FeatureID,
             name=feature.FeatureName,
+            subfeatures=feature.subfeatures_list,
             date_inserted=feature.DateInserted,
         )
 
     @staticmethod
     def segmentation_to_get(seg: "Segmentation") -> SegmentationGET:
         """Convert Segmentation ORM object to SegmentationGET."""
-        # Tags relationship may not be present directly; default to empty list
-        tags: List[TagGET] = []
         return SegmentationGET(
             id=seg.SegmentationID,
             depth=seg.Depth,
@@ -209,7 +227,7 @@ class DTOConverter:
             data_representation=seg.DataRepresentation,
             feature=DTOConverter.feature_to_get(seg.Feature) if getattr(seg, "Feature", None) else None,  # type: ignore[arg-type]
             creator=DTOConverter.creator_to_get(seg.Creator) if getattr(seg, "Creator", None) else None,  # type: ignore[arg-type]
-            tags=tags,
+            tags=DTOConverter._tags_from_segmentation(seg),
             date_inserted=seg.DateInserted,
             date_modified=seg.DateModified,
         )
@@ -245,6 +263,7 @@ class DTOConverter:
             patient=(DTOConverter.patient_to_get(annotation.Patient) if getattr(annotation, "Patient", None) else None),
             study=(DTOConverter.study_to_get(annotation.Study) if getattr(annotation, "Study", None) else None),
             image_instance=(DTOConverter.image_instance_to_get(annotation.ImageInstance) if getattr(annotation, "ImageInstance", None) else None),
+            tags=DTOConverter._tags_from_form_annotation(annotation),
             date_inserted=annotation.DateInserted,
             date_modified=annotation.DateModified,
         )
@@ -258,11 +277,6 @@ class DTOConverter:
             name=taskdef.TaskDefinitionName,
             date_inserted=taskdef.DateInserted,
         )
-
-    @staticmethod
-    def task_state_to_get(state: "TaskStateORM") -> TaskStateGET:
-        """Convert TaskState ORM object to TaskStateGET."""
-        return TaskStateGET(id=state.TaskStateID, name=state.TaskStateName)
 
     @staticmethod
     def task_to_get(task: "TaskORM") -> TaskGET:

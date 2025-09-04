@@ -1,59 +1,42 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, ClassVar, List
+from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlmodel import Field, Relationship
-from sqlalchemy import Column, BINARY
+from sqlalchemy import BINARY, ForeignKey, String, Boolean, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, FormAnnotation, SubTask, Segmentation
 
-def PrivateField(**kwargs):
-    field_info = Field(**kwargs)
-    json_schema_extra = field_info.json_schema_extra or {}
-    json_schema_extra["private"] = True
-    field_info.json_schema_extra = json_schema_extra
-    return field_info
 
-class CreatorBase(Base):
-    CreatorName: str = Field(max_length=45, unique=True)
-    EmployeeIdentifier: str | None = Field(max_length=255, default=None)
-    # differentiates between AI models and human users
-    IsHuman: bool
-    # paths where the model can be found
-    Path: str | None = Field(max_length=80, default=None)
-    # the model's version
-    Version: int | None
-    # model/user description
-    Description: str | None = Field(max_length=1000, default=None)
-    # not used currently
-    Role: int | None
-
-
-class Creator(CreatorBase, table=True):
-    """
-    Represents a creator entity in the system, which can be either a human user or an AI model.
-    Creators can perform annotations, form annotations, and subtasks.
-    """
+class Creator(Base):
+    """Represents a creator entity (human or AI model)."""
 
     __tablename__ = "Creator"
 
     _name_column: ClassVar[str] = "CreatorName"
 
-    CreatorID: int = Field(primary_key=True)
+    CreatorID: Mapped[int] = mapped_column(primary_key=True)
 
-    # Authentication and authorization
-    # deprecated, use PasswordHash instead
-    Password: bytes | None = PrivateField(sa_column=Column(BINARY(32)))
-    # user's password
-    PasswordHash: str | None = PrivateField(max_length=255)
+    # Identity and metadata
+    CreatorName: Mapped[str] = mapped_column(String(45), unique=True)
+    EmployeeIdentifier: Mapped[Optional[str]] = mapped_column(String(255))
+    IsHuman: Mapped[bool] = mapped_column(Boolean)
+    Path: Mapped[Optional[str]] = mapped_column(String(80))
+    Version: Mapped[Optional[int]]
+    Description: Mapped[Optional[str]] = mapped_column(String(1000))
+    Role: Mapped[Optional[int]]
 
-    # creation timestamp
-    DateInserted: datetime = Field(default_factory=datetime.now)
+    # Authentication (private)
+    Password: Mapped[Optional[bytes]] = mapped_column(BINARY(32), info={"private": True})
+    PasswordHash: Mapped[Optional[str]] = mapped_column(String(255), info={"private": True})
+
+    # Timestamps
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # Relationships
-    Annotations: List["Annotation"] = Relationship(back_populates="Creator")
-    FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Creator")
-    SubTasks: List["SubTask"] = Relationship(back_populates="Creator")
-    Segmentations: List["Segmentation"] = Relationship(back_populates="Creator")
+    Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Creator")
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Creator")
+    SubTasks: Mapped[List["SubTask"]] = relationship(back_populates="Creator")
+    Segmentations: Mapped[List["Segmentation"]] = relationship(back_populates="Creator")

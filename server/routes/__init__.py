@@ -4,3 +4,8 @@ from . import form_annotations
 from . import instances
 from . import tasks
 from . import import_api
+from . import feature
+from . import tag
+from . import form_schema
+from . import instance
+from . import task

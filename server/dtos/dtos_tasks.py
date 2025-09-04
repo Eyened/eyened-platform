@@ -22,19 +22,6 @@ class TaskDefinitionGET(TaskDefinitionBase):
     date_inserted: datetime
 
 
-# === TASK STATE ===
-class TaskStateBase(BaseModel):
-    name: str
-
-
-class TaskStatePUT(TaskStateBase):
-    pass
-
-
-class TaskStateGET(TaskStateBase):
-    id: int
-
-
 # === TASK ===
 class TaskBase(BaseModel):
     name: str
@@ -45,6 +32,11 @@ class TaskBase(BaseModel):
 
 
 class TaskPUT(TaskBase):
+    pass
+
+
+class TaskPATCH(TaskPUT):
+    """Partial update for Task (same fields as PUT for now)."""
     pass
 
 
