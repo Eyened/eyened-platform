@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from sqlalchemy.orm import Session, sessionmaker
-from sqlmodel import create_engine
+from sqlalchemy import create_engine
 
 
 def create_connection_string(config: DatabaseSettings):

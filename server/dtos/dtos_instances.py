@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel, create_model
 
-from .dtos_aux import ROI, Keypoints
+from .dtos_aux import ROI, Keypoints, TagGET
 
 # Type aliases matching TypeScript types
 Laterality = Literal["L", "R"]
@@ -23,9 +23,6 @@ AnatomicRegion = str  # Based on database field
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= PROJECT, PATIENT, STUDY, SERIES =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
 class ProjectGET(BaseModel):
     id: int
     name: str
@@ -120,6 +117,7 @@ class InstanceGET(InstanceBase):
     series: SeriesMeta
     device: DeviceMeta
     scan: ScanMeta
+    tags: List[TagGET]
 
     date_inserted: datetime
     date_modified: Optional[datetime] = None

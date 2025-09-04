@@ -1,9 +1,8 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import JSON, Column, Index, Text, select
-from sqlalchemy.orm import Session
-from sqlmodel import Field, Relationship
+from sqlalchemy import JSON, Column, ForeignKey, Index, Text, String, select, func
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
 
@@ -20,45 +19,31 @@ if TYPE_CHECKING:
     )
 
 
-class TaskDefinitionBase(Base):
-    TaskDefinitionName: str = Field(max_length=256)
-    TaskConfig: dict | None = Field(sa_column=Column(JSON), default=None)
-
-
-class TaskStateBase(Base):
-    TaskStateName: str = Field(max_length=256, unique=True)
-
-
-class TaskDefinition(TaskDefinitionBase, table=True):
+class TaskDefinition(Base):
     __tablename__ = "TaskDefinition"
     _name_column: ClassVar[str] = "TaskDefinitionName"
 
-    TaskDefinitionID: int = Field(primary_key=True)
+    TaskDefinitionID: Mapped[int] = mapped_column(primary_key=True)
+    TaskDefinitionName: Mapped[str] = mapped_column(String(256))
+    TaskConfig: Mapped[dict | None] = mapped_column(JSON)
 
-    Tasks: List["Task"] = Relationship(back_populates="TaskDefinition")
-    DateInserted: datetime = Field(default_factory=datetime.now)
+    Tasks: Mapped[List["Task"]] = relationship(back_populates="TaskDefinition")
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
-class TaskState(TaskStateBase, table=True):
+class TaskState(Base):
     __tablename__ = "TaskState"
 
     _name_column: ClassVar[str] = "TaskStateName"
 
-    TaskStateID: int = Field(primary_key=True)
+    TaskStateID: Mapped[int] = mapped_column(primary_key=True)
+    TaskStateName: Mapped[str] = mapped_column(String(256), unique=True)
 
-    Tasks: List["Task"] = Relationship(back_populates="TaskState")
-    SubTasks: List["SubTask"] = Relationship(back_populates="TaskState")
-
-
-class TaskBase(Base):
-    TaskName: str = Field(max_length=256)
-    Description: str | None = Field(sa_column=Column(Text))
-    ContactID: int | None = Field(foreign_key="Contact.ContactID", default=None)
-    TaskDefinitionID: int = Field(foreign_key="TaskDefinition.TaskDefinitionID")
-    TaskStateID: int | None = Field(foreign_key="TaskState.TaskStateID", default=None)
+    Tasks: Mapped[List["Task"]] = relationship(back_populates="TaskState")
+    SubTasks: Mapped[List["SubTask"]] = relationship(back_populates="TaskState")
 
 
-class Task(TaskBase, table=True):
+class Task(Base):
     __tablename__ = "Task"
     __table_args__ = (
         Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),
@@ -66,13 +51,19 @@ class Task(TaskBase, table=True):
     )
     _name_column: ClassVar[str] = "TaskName"
 
-    TaskID: int = Field(primary_key=True)
-    DateInserted: datetime = Field(default_factory=datetime.now)
+    TaskID: Mapped[int] = mapped_column(primary_key=True)
+    TaskName: Mapped[str] = mapped_column(String(256))
+    Description: Mapped[Optional[str]] = mapped_column(Text)
+    ContactID: Mapped[Optional[int]] = mapped_column(ForeignKey("Contact.ContactID"))
+    TaskDefinitionID: Mapped[int] = mapped_column(ForeignKey("TaskDefinition.TaskDefinitionID"))
+    TaskStateID: Mapped[Optional[int]] = mapped_column(ForeignKey("TaskState.TaskStateID"))
 
-    Contact: Optional["Contact"] = Relationship(back_populates="Tasks")
-    TaskDefinition: "TaskDefinition" = Relationship(back_populates="Tasks")
-    TaskState: "TaskState" = Relationship(back_populates="Tasks")
-    SubTasks: List["SubTask"] = Relationship(back_populates="Task")
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Contact: Mapped[Optional["Contact"]] = relationship(back_populates="Tasks")
+    TaskDefinition: Mapped["TaskDefinition"] = relationship(back_populates="Tasks")
+    TaskState: Mapped["TaskState"] = relationship(back_populates="Tasks")
+    SubTasks: Mapped[List["SubTask"]] = relationship(back_populates="Task")
 
     @classmethod
     def create_from_imagesets(
@@ -106,10 +97,8 @@ class Task(TaskBase, table=True):
     def get_form_annotations(
         self, session: Session, schema_id: Optional[int] = None
     ) -> List["FormAnnotation"]:
-        """
-        Returns all FormAnnotations for this task.
-        If schema_id is provided, only returns FormAnnotations for that schema.
-        """
+        """Return all FormAnnotations for this task; filter by schema if provided."""
+        from eyened_orm import FormAnnotation, SubTask
         q = select(FormAnnotation).join(SubTask).where(SubTask.TaskID == self.TaskID)
         if schema_id is not None:
             q = q.where(FormAnnotation.FormSchemaID == schema_id)
@@ -117,29 +106,22 @@ class Task(TaskBase, table=True):
         return session.scalars(q).all()
 
 
-class SubTaskImageLink(Base, table=True):
+class SubTaskImageLink(Base):
     __tablename__ = "SubTaskImageLink"
     __table_args__ = (
         Index("fk_SubTaskImageLink_SubTask1_idx", "SubTaskID"),
         Index("fk_SubTaskImageLink_ImageInstance1_idx", "ImageInstanceID"),
     )
-    SubTaskID: int = Field(foreign_key="SubTask.SubTaskID", primary_key=True)
-    ImageInstanceID: int = Field(
-        foreign_key="ImageInstance.ImageInstanceID", primary_key=True
+    SubTaskID: Mapped[int] = mapped_column(ForeignKey("SubTask.SubTaskID"), primary_key=True)
+    ImageInstanceID: Mapped[int] = mapped_column(
+        ForeignKey("ImageInstance.ImageInstanceID"), primary_key=True
     )
 
-    SubTask: "SubTask" = Relationship(back_populates="SubTaskImageLinks")
-    ImageInstance: "ImageInstance" = Relationship(back_populates="SubTaskImageLinks")
+    SubTask: Mapped["SubTask"] = relationship(back_populates="SubTaskImageLinks")
+    ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="SubTaskImageLinks")
 
 
-class SubTaskBase(Base):
-    TaskID: int = Field(foreign_key="Task.TaskID")
-    TaskStateID: int = Field(foreign_key="TaskState.TaskStateID")
-    CreatorID: int | None = Field(foreign_key="Creator.CreatorID", default=None)
-    Comments: str | None = Field(sa_column=Column(Text), default=None)
-
-
-class SubTask(SubTaskBase, table=True):
+class SubTask(Base):
     __tablename__ = "SubTask"
     __table_args__ = (
         Index("fk_SubTask_Creator1_idx", "CreatorID"),
@@ -147,14 +129,18 @@ class SubTask(SubTaskBase, table=True):
         Index("fk_SubTask_TaskState1_idx", "TaskStateID"),
     )
 
-    SubTaskID: int = Field(primary_key=True)
+    SubTaskID: Mapped[int] = mapped_column(primary_key=True)
+    TaskID: Mapped[int] = mapped_column(ForeignKey("Task.TaskID"))
+    TaskStateID: Mapped[int] = mapped_column(ForeignKey("TaskState.TaskStateID"))
+    CreatorID: Mapped[Optional[int]] = mapped_column(ForeignKey("Creator.CreatorID"))
+    Comments: Mapped[Optional[str]] = mapped_column(Text)
 
-    Task: "Task" = Relationship(back_populates="SubTasks")
-    TaskState: "TaskState" = Relationship(back_populates="SubTasks")
-    Creator: Optional["Creator"] = Relationship(back_populates="SubTasks")
-    SubTaskImageLinks: List["SubTaskImageLink"] = Relationship(back_populates="SubTask")
-    FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="SubTask")
-    Segmentations: List["Segmentation"] = Relationship(back_populates="SubTask")
+    Task: Mapped["Task"] = relationship(back_populates="SubTasks")
+    TaskState: Mapped["TaskState"] = relationship(back_populates="SubTasks")
+    Creator: Mapped[Optional["Creator"]] = relationship(back_populates="SubTasks")
+    SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(back_populates="SubTask")
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="SubTask")
+    Segmentations: Mapped[List["Segmentation"]] = relationship(back_populates="SubTask")
 
     @classmethod
     def create_from_image_ids(

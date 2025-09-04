@@ -23,11 +23,17 @@ class FeatureBase(BaseModel):
 
 
 class FeaturePUT(FeatureBase):
+    subfeature_ids: List[int]
+
+
+class FeaturePATCH(FeaturePUT):
+    """Partial update for Feature (same fields as PUT for now)."""
     pass
 
 
 class FeatureGET(FeatureBase):
     id: int
+    subfeatures: List[str]
     date_inserted: datetime
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -103,11 +109,11 @@ class FormAnnotationPUT(FormAnnotationBase):
 class FormAnnotationGET(FormAnnotationBase):
     id: int
 
-
     object_type: Literal['patient', 'study', 'image_instance']
     patient: Optional[PatientGET] = None
     study: Optional[StudyGET] = None
     image_instance: Optional[InstanceGET] = None
+    tags: List[TagGET]
 
     date_inserted: datetime
     date_modified: Optional[datetime] = None

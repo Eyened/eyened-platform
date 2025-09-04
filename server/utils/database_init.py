@@ -8,7 +8,7 @@ from eyened_orm import (
 )
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from sqlmodel import create_engine
+from sqlalchemy import create_engine
 
 from ..config import settings
 from ..routes.auth import create_user

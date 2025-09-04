@@ -11,6 +11,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel, create_model
+from eyened_orm.Tag import TagType
 
 # Type aliases matching TypeScript types
 Laterality = Literal["L", "R"]
@@ -83,29 +84,17 @@ class TagBase(BaseModel):
 
 
 class TagPUT(TagBase):
+    description: str
+    tag_type: TagType
+    creator_id: int
+
+
+class TagPATCH(TagPUT):
+    """Partial update for Tag (same as PUT for now)."""
     pass
 
 
 class TagGET(TagBase):
-    id: int
-
-
-
-
-
-
-
-
-class FormSchemaBase(BaseModel):
-    name: Optional[str] = None
-    schema: Optional[Dict[str, Any]] = None
-
-
-class FormSchemaPUT(FormSchemaBase):
-    pass
-
-
-class FormSchemaGET(FormSchemaBase):
     id: int
 
 

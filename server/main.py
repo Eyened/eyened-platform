@@ -7,10 +7,13 @@ from fastapi.responses import FileResponse
 from server.config import settings
 from server.routes import (
     auth,
-    crud_resources,
     import_api,
     instances,
     segmentations,
+    form_schema,
+    feature,
+    tag,
+    task,
 )
 from server.utils.database_init import (
     create_database,
@@ -24,8 +27,11 @@ app_api.include_router(auth.router)
 app_api.include_router(instances.router)
 app_api.include_router(segmentations.router)
 app_api.include_router(import_api.router)
+app_api.include_router(form_schema.router)
+app_api.include_router(feature.router)
+app_api.include_router(tag.router)
+app_api.include_router(task.router)
 
-app_api.include_router(crud_resources.router)
 
 
 @asynccontextmanager
