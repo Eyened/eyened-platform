@@ -22,52 +22,52 @@ if TYPE_CHECKING:
 
 
 class Laterality(Enum):
-    L = 1
-    R = 2
+    L = "L"
+    R = "R"
 
 
 class ModalityType(Enum):
     # thus far only encountered OP, OPT, SC
     # should perhaps be extended (https://dicom.nema.org/medical/Dicom/2024d/output/chtml/part16/chapter_D.html)
     # Ophthalmic Photography
-    OP = 1
+    OP = "OP"
     # Ophthalmic Photography Tomography (used for OCT)
-    OPT = 2
+    OPT = "OPT"
     # Secondary Capture
-    SC = 3
+    SC = "SC"
 
 
 class Modality(Enum):
     # custom selection of commonly used ophthalmic modalities
 
-    AdaptiveOptics = 1
-    ColorFundus = 2
-    ColorFundusStereo = 3
-    RedFreeFundus = 4
-    ExternalEye = 5
-    LensPhotograph = 6
-    Ophthalmoscope = 7
+    AdaptiveOptics = "AdaptiveOptics"
+    ColorFundus = "ColorFundus"
+    ColorFundusStereo = "ColorFundusStereo"
+    RedFreeFundus = "RedFreeFundus"
+    ExternalEye = "ExternalEye"
+    LensPhotograph = "LensPhotograph"
+    Ophthalmoscope = "Ophthalmoscope"
 
-    Autofluorescence = 8
-    FluoresceinAngiography = 9
-    ICGA = 10
+    Autofluorescence = "Autofluorescence"
+    FluoresceinAngiography = "FluoresceinAngiography"
+    ICGA = "ICGA"
 
-    InfraredReflectance = 11
-    BlueReflectance = 12
-    GreenReflectance = 13
+    InfraredReflectance = "InfraredReflectance"
+    BlueReflectance = "BlueReflectance"
+    GreenReflectance = "GreenReflectance"
 
-    OCT = 14
-    OCTA = 15
+    OCT = "OCT"
+    OCTA = "OCTA"
 
 
 class ETDRSField(Enum):
-    F1 = 1
-    F2 = 2
-    F3 = 3
-    F4 = 4
-    F5 = 5
-    F6 = 6
-    F7 = 7
+    F1 = "F1"
+    F2 = "F2"
+    F3 = "F3"
+    F4 = "F4"
+    F5 = "F5"
+    F6 = "F6"
+    F7 = "F7"
 
 
 class ImageInstance(Base):
@@ -96,7 +96,7 @@ class ImageInstance(Base):
     # repeating field, but non-nullable
     SeriesID: Mapped[int] = mapped_column(ForeignKey("Series.SeriesID", ondelete="CASCADE"))
     SourceInfoID: Mapped[int] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"))
-    DeviceInstanceID: Mapped[int] = mapped_column(ForeignKey("DeviceInstance.DeviceInstanceID"))
+    DeviceInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("DeviceInstance.DeviceInstanceID"))
     # TODO: redundant with Modality enum
     ModalityID: Mapped[int] = mapped_column(ForeignKey("Modality.ModalityID"))
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
@@ -191,8 +191,8 @@ class ImageInstance(Base):
         back_populates="ImageInstance", cascade="all, delete"
     )
     
-    ModelSegmentations: List["ModelSegmentation"] = Relationship(
-        back_populates="ImageInstance", cascade_delete=True
+    ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(
+        back_populates="ImageInstance", cascade="all, delete"
     )
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(

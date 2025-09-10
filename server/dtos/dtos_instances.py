@@ -12,11 +12,11 @@ from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel, create_model
 
+from eyened_orm.ImageInstance import Laterality, ModalityType, Modality, ETDRSField
+from eyened_orm.Patient import SexEnum as Sex
 from .dtos_aux import ROI, Keypoints, TagGET
 
 # Type aliases matching TypeScript types
-Laterality = Literal["L", "R"]
-Sex = Literal["M", "F"]
 AnatomicRegion = str  # Based on database field
 
 
@@ -89,11 +89,11 @@ class InstanceBase(BaseModel):
     dataset_identifier: str
     thumbnail_identifier: str
     thumbnail_path: str
-    modality: str
-    dicom_modality: str
-    etdrs_field: str
+    modality: Optional[Modality] = None
+    dicom_modality: Optional[ModalityType] = None
+    etdrs_field: Optional[ETDRSField] = None
     angio_graphy: str
-    laterality: Laterality
+    laterality: Optional[Laterality] = None
     anatomic_region: AnatomicRegion
     rows: int
     columns: int
@@ -101,8 +101,8 @@ class InstanceBase(BaseModel):
     resolution_horizontal: float
     resolution_vertical: float
     resolution_axial: float
-    cf_roi: Optional[ROI] = None
-    cf_keypoints: Optional[Keypoints] = None
+    cf_roi: Optional[Dict[str, Any]] = None
+    cf_keypoints: Optional[Dict[str, Any]] = None
     cf_quality: Optional[float] = None
     date_inserted: datetime
     date_modified: Optional[datetime] = None

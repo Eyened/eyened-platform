@@ -209,7 +209,7 @@ class Base(DeclarativeBase):
     def get_value(self, column: Column):
         val = getattr(self, column.name)
         if isinstance(val, enum.Enum):
-            return val.name
+            return val.value
         return val
 
     def to_dict(self) -> Dict[str, Any]:

@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
 
 class SexEnum(enum.Enum):
-    M = 1
-    F = 2
+    M = "M"
+    F = "F"
 
 
 class Patient(Base):

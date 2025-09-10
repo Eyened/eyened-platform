@@ -13,11 +13,11 @@ if TYPE_CHECKING:
     from eyened_orm import Study, ImageInstance, Annotation, Segmentation, FormAnnotation
 
 class TagType(enum.Enum):
-    Study = 1
-    ImageInstance = 2
-    Annotation = 3
-    Segmentation = 4
-    FormAnnotation = 5
+    Study = "Study"
+    ImageInstance = "ImageInstance"
+    Annotation = "Annotation"
+    Segmentation = "Segmentation"
+    FormAnnotation = "FormAnnotation"
 
 
 class Tag(Base):
@@ -34,23 +34,33 @@ class Tag(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(back_populates="Tag")
-    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(back_populates="Tag")
-    AnnotationTagLinks: Mapped[List["AnnotationTagLink"]] = relationship(back_populates="Tag")
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(back_populates="Tag")
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(back_populates="Tag")
-
-    
-class CreatorTagLink(Base):
-    __tablename__ = "CreatorTag"
-    __table_args__ = (
-        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
-        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
+        back_populates="Tag",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
-    CreatorID: Mapped[int] = mapped_column(primary_key=True)
-    TagID: Mapped[int] = mapped_column(primary_key=True)
-    
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
+        back_populates="Tag",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    AnnotationTagLinks: Mapped[List["AnnotationTagLink"]] = relationship(
+        back_populates="Tag",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+        back_populates="Tag",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(
+        back_populates="Tag",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    Creator: Mapped["Creator"] = relationship(back_populates="Tags")
 
 
 class StudyTagLink(Base):

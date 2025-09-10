@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel
 
+from .dtos_instances import InstanceGET
+
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= TASK SYSTEM=========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -49,7 +51,7 @@ class TaskGET(TaskBase):
 class SubTaskBase(BaseModel):
     task_id: int
     task_state_id: int
-    creator_id: Optional[int] = None
+    comments: Optional[str] = None
 
 
 class SubTaskPUT(SubTaskBase):
@@ -58,3 +60,25 @@ class SubTaskPUT(SubTaskBase):
 
 class SubTaskGET(SubTaskBase):
     id: int
+    creator_id: Optional[int] = None
+
+
+class SubTaskWithImagesGET(SubTaskGET):
+    """SubTask with associated images included."""
+    images: List[InstanceGET]
+
+
+class SubTasksResponse(BaseModel):
+    """Response envelope for paginated SubTasks without images."""
+    subtasks: List[SubTaskGET]
+    limit: int
+    page: int
+    count: int
+
+
+class SubTasksWithImagesResponse(BaseModel):
+    """Response envelope for paginated SubTasks with images."""
+    subtasks: List[SubTaskWithImagesGET]
+    limit: int
+    page: int
+    count: int

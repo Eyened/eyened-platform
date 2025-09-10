@@ -13,10 +13,10 @@ if TYPE_CHECKING:
     from eyened_orm import Contact, Patient, Task
 
 
-class ExternalEnum(int, enum.Enum):
-    Y = 1
-    N = 2
-    M = 3
+class ExternalEnum(enum.Enum):
+    Y = "Y"
+    N = "N"
+    M = "M"
 
 
 class Project(Base):

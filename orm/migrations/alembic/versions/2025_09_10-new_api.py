@@ -1,8 +1,8 @@
 """New api
 
-Revision ID: 2c0c9957767d
+Revision ID: b5d7958b7e13
 Revises: e69c5e4002ed
-Create Date: 2025-09-10 10:15:22.699330
+Create Date: 2025-09-10 10:41:52.425566
 
 """
 from typing import Sequence, Union
@@ -10,10 +10,10 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 import sqlmodel
-from sqlalchemy.dialects import mysql
+
 
 # revision identifiers, used by Alembic.
-revision: str = '2c0c9957767d'
+revision: str = 'b5d7958b7e13'
 down_revision: Union[str, None] = 'e69c5e4002ed'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -47,26 +47,11 @@ def upgrade() -> None:
     op.add_column('FormAnnotationTag', sa.Column('DateInserted', sa.DateTime(), server_default=sa.text('now()'), nullable=False))
     op.create_index('fk_FormAnnotationTag_Creator1_idx', 'FormAnnotationTag', ['CreatorID'], unique=False)
     op.create_foreign_key(None, 'FormAnnotationTag', 'Creator', ['CreatorID'], ['CreatorID'])
-    op.alter_column('ImageInstance', 'DeviceInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=False)
     op.add_column('ImageInstanceTag', sa.Column('CreatorID', sa.Integer(), nullable=False))
     op.add_column('ImageInstanceTag', sa.Column('DateInserted', sa.DateTime(), server_default=sa.text('now()'), nullable=False))
     op.create_index('fk_ImageInstanceTag_Creator1_idx', 'ImageInstanceTag', ['CreatorID'], unique=False)
     op.create_foreign_key(None, 'ImageInstanceTag', 'Creator', ['CreatorID'], ['CreatorID'])
-    op.add_column('Model', sa.Column('ModelType', sa.String(length=255), nullable=False))
-    op.create_unique_constraint(None, 'Model', ['Version'])
-    op.add_column('ModelSegmentation', sa.Column('SegmentationID', sa.Integer(), nullable=False))
-    op.alter_column('ModelSegmentation', 'ImageInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=True)
-    op.drop_constraint('ModelSegmentation_ibfk_3', 'ModelSegmentation', type_='foreignkey')
-    op.drop_column('ModelSegmentation', 'ModelSegmentationID')
-    op.drop_column('ModelSegmentation', 'ReferenceSegmentationID')
     op.create_index('fk_Project_Contact1_idx', 'Project', ['ContactID'], unique=False)
-    op.alter_column('Segmentation', 'ImageInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=True)
     op.add_column('SegmentationTag', sa.Column('CreatorID', sa.Integer(), nullable=False))
     op.add_column('SegmentationTag', sa.Column('DateInserted', sa.DateTime(), server_default=sa.text('now()'), nullable=False))
     op.create_index('fk_SegmentationTag_Creator1_idx', 'SegmentationTag', ['CreatorID'], unique=False)
@@ -100,26 +85,11 @@ def downgrade() -> None:
     op.drop_index('fk_SegmentationTag_Creator1_idx', table_name='SegmentationTag')
     op.drop_column('SegmentationTag', 'DateInserted')
     op.drop_column('SegmentationTag', 'CreatorID')
-    op.alter_column('Segmentation', 'ImageInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=False)
     op.drop_index('fk_Project_Contact1_idx', table_name='Project')
-    op.add_column('ModelSegmentation', sa.Column('ReferenceSegmentationID', mysql.INTEGER(), autoincrement=False, nullable=True))
-    op.add_column('ModelSegmentation', sa.Column('ModelSegmentationID', mysql.INTEGER(), autoincrement=True, nullable=False))
-    op.create_foreign_key('ModelSegmentation_ibfk_3', 'ModelSegmentation', 'Segmentation', ['ReferenceSegmentationID'], ['SegmentationID'])
-    op.alter_column('ModelSegmentation', 'ImageInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=False)
-    op.drop_column('ModelSegmentation', 'SegmentationID')
-    op.drop_constraint(None, 'Model', type_='unique')
-    op.drop_column('Model', 'ModelType')
     op.drop_constraint(None, 'ImageInstanceTag', type_='foreignkey')
     op.drop_index('fk_ImageInstanceTag_Creator1_idx', table_name='ImageInstanceTag')
     op.drop_column('ImageInstanceTag', 'DateInserted')
     op.drop_column('ImageInstanceTag', 'CreatorID')
-    op.alter_column('ImageInstance', 'DeviceInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=True)
     op.drop_constraint(None, 'FormAnnotationTag', type_='foreignkey')
     op.drop_index('fk_FormAnnotationTag_Creator1_idx', table_name='FormAnnotationTag')
     op.drop_column('FormAnnotationTag', 'DateInserted')

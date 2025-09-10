@@ -1,9 +1,15 @@
+from typing import Union, List
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy.orm import Session
-from eyened_orm import Task
+from sqlalchemy import select, func
+from sqlalchemy.orm import Session, selectinload
+from eyened_orm import Task, SubTask, SubTaskImageLink, ImageInstance
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
-from ..dtos.dtos_tasks import TaskPUT, TaskPATCH, TaskGET
+from ..dtos.dtos_tasks import (
+    TaskPUT, TaskPATCH, TaskGET,
+    SubTasksResponse, SubTasksWithImagesResponse,
+    SubTaskGET, SubTaskWithImagesGET,
+)
 from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
@@ -48,3 +54,78 @@ async def delete_task(task_id: int, db: Session = Depends(get_db), current_user:
         raise HTTPException(404, "Task not found")
     db.delete(task); db.commit()
     return Response(status_code=204)
+
+
+@router.get("/task", response_model=List[TaskGET])
+async def list_tasks(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """List all tasks (no pagination)."""
+    rows = db.execute(select(Task).order_by(Task.TaskID)).scalars().all()
+    return [DTOConverter.task_to_get(t) for t in rows]
+
+
+@router.get(
+    "/task/{task_id}/subtasks",
+    response_model=Union[SubTasksResponse, SubTasksWithImagesResponse],
+)
+async def list_subtasks(
+    task_id: int,
+    with_images: bool = False,
+    limit: int = 200,
+    page: int = 0,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """List subtasks of a task with optional pagination and image inclusion."""
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+
+    offset = limit * page
+    q = (
+        select(SubTask)
+        .where(SubTask.TaskID == task_id)
+        .order_by(SubTask.SubTaskID)
+    )
+    if with_images:
+        q = q.options(
+            selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance)
+        )
+
+    rows = db.execute(q.limit(limit).offset(offset)).scalars().all()
+    count = db.scalar(select(func.count()).select_from(SubTask).where(SubTask.TaskID == task_id)) or 0
+
+    if with_images:
+        subtasks = [DTOConverter.subtask_with_images_to_get(st) for st in rows]
+        return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
+
+    subtasks = [DTOConverter.subtask_to_get(st) for st in rows]
+    return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
+
+
+@router.get(
+    "/task/{task_id}/subtask/{subtaskid}",
+    response_model=Union[SubTaskGET, SubTaskWithImagesGET],
+)
+async def get_subtask(
+    task_id: int,
+    subtaskid: int,
+    with_images: bool = False,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Get a single subtask with optional image inclusion."""
+    q = select(SubTask).where(SubTask.SubTaskID == subtaskid, SubTask.TaskID == task_id)
+    if with_images:
+        q = q.options(
+            selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance)
+        )
+    subtask = db.execute(q).scalars().first()
+    if not subtask:
+        raise HTTPException(404, "SubTask not found")
+
+    if with_images:
+        return DTOConverter.subtask_with_images_to_get(subtask)
+    return DTOConverter.subtask_to_get(subtask)

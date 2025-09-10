@@ -23,7 +23,7 @@ class FeatureBase(BaseModel):
 
 
 class FeaturePUT(FeatureBase):
-    subfeature_ids: List[int]
+    subfeature_ids: List[int] | None = None
 
 
 class FeaturePATCH(FeaturePUT):
