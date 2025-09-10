@@ -37,11 +37,12 @@ app_api.include_router(task.router)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up with settings:")
+    
     print(settings)
     if settings.auth_disabled:
         print("WARNING: AUTH_DISABLED is enabled; authentication is bypassed")
 
-    if os.environ.get("DATABASE_ROOT_PASSWORD"):
+    if settings.database_root_password is not None:
         try:
             # create database tables and user if they don't exist
             create_database()
@@ -51,7 +52,12 @@ async def lifespan(app: FastAPI):
         print("DATABASE_ROOT_PASSWORD is not set, skipping database creation")
 
     # before startup
-    db = Database()
+    
+    
+    db = Database(settings)
+
+    
+
     with db.get_session() as session:
         init_admin(session)
         init_task_states(session)

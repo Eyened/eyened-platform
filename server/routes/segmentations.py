@@ -10,6 +10,7 @@ from eyened_orm import (
     Segmentation,
     Datatype,
     DataRepresentation,
+    ModelSegmentation
 )
 from fastapi import (
     APIRouter,

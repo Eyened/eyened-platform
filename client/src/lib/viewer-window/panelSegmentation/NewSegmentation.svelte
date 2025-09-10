@@ -1,7 +1,6 @@
 <script lang="ts">
     import { getContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { Writable } from "svelte/store";
     import FeatureSelect from "./FeatureSelect.svelte";
     import { data } from "$lib/datamodel/model";
     import type { Feature } from "$lib/datamodel/feature.svelte";
@@ -49,7 +48,7 @@
             dataType = "R8";
         }
 
-        await Segmentation.createFrom(
+        const segmentation = await Segmentation.createFrom(
             image,
             feature,
             creator,
@@ -59,7 +58,12 @@
             axis,
             taskContext?.subTask
         );
+        // show segmentations for this creator
         segmentationContext.hideCreators.delete(creator);
+        const segmentationItem = image.getSegmentationItem(segmentation);
+
+        segmentationContext.segmentationItem = segmentationItem
+
         globalContext.dialogue = null;
     }
 

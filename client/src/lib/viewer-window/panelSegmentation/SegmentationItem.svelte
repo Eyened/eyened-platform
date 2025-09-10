@@ -14,14 +14,17 @@
     import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
     import StringDialogue from "$lib/StringDialogue.svelte";
+    import AI from "../icons/AI.svelte";
+    import { duplicate } from "./duplicate_utils";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
         segmentation: Segmentation;
+        style?: "AI" | "normal";
     }
 
-    let { segmentation }: Props = $props();
+    let { segmentation, style = "normal" }: Props = $props();
     const { feature, dataRepresentation } = segmentation;
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -92,12 +95,27 @@
         MultiClass: "MC",
         MultiLabel: "ML",
     }[segmentation.dataRepresentation];
+
+    function applyDuplicate() {
+        duplicate(
+            globalContext,
+            segmentation,
+            segmentationItem,
+            image,
+            viewerContext,
+            false,
+            "Q",
+            globalContext.creator,
+        );
+    }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="content"
+    class:compact={style == "AI"}
+    class:normal={style == "normal"}
     class:active
     onpointerenter={pointerEnter}
     onpointerleave={pointerLeave}
@@ -126,6 +144,9 @@
         {/if}
 
         <div class="expand" onclick={activate}>
+            {#if style == "AI"}
+                <div class="ai"><AI size="1.2em" /></div>
+            {/if}
             <div class="feature-name">{feature.name}</div>
             <div class="segmentationID">[{segmentation.id}]</div>
             <div class="segmentationType">[{segmentationType}]</div>
@@ -146,6 +167,11 @@
                 <ThresholdSlider {segmentation} />
             </div>
         {/if}
+    {/if}
+    {#if active && style == "AI"}
+        <div class="row">
+            <button onclick={applyDuplicate}>Duplicate</button>
+        </div>
     {/if}
 
     {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
@@ -204,10 +230,19 @@
     div {
         display: flex;
     }
-    div.content {
-        flex-direction: column;
+    div.content.compact {
+        padding: 0em;
+    }
+    div.ai {
+        align-items: center;
+        padding-right: 0.2em;
+    }
+    div.content.normal {
         padding: 0.2em;
         border-radius: 2px;
+    }
+    div.content {
+        flex-direction: column;
     }
     div.content.active {
         /* border: 1px solid rgba(100, 255, 255, 0.3); */

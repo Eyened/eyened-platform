@@ -49,26 +49,29 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="main" onclick={importFromOther}>
-    <h3><ImportSegmentation size="1.5em" />Import</h3>
+    <ImportSegmentation size="1.5em" />
+    Import
 </div>
 
 <style>
     div.main {
-        flex-direction: column;
+        flex-direction: row;
         background-color: rgba(255, 255, 255, 0.1);
         flex: 1;
         padding: 0.2em;
         margin-bottom: 0.2em;
         margin-top: 0.2em;
-        cursor: pointer;
-    }
-    h3 {
+
         font-size: small;
         font-weight: bold;
-        margin: 0;
-        padding: 0;
+        
         display: flex;
         align-items: center;
         gap: 0.5em;
+        cursor: pointer !important;
+    }
+    div.main:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+        
     }
 </style>
