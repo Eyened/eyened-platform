@@ -36,6 +36,8 @@ class Study(Base):
     Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Study")
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Study")
 
+    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(back_populates="Study")
+
     @classmethod
     def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
         return cls.by_column(session, StudyInstanceUid=StudyInstanceUid)

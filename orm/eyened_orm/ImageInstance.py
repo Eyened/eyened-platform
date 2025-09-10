@@ -91,7 +91,7 @@ class ImageInstance(Base):
         ),
     )
 
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(primary_key=True)
+    ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
 
     # repeating field, but non-nullable
     SeriesID: Mapped[int] = mapped_column(ForeignKey("Series.SeriesID", ondelete="CASCADE"))

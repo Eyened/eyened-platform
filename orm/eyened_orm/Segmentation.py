@@ -214,7 +214,7 @@ class Feature(Base):
     __tablename__ = "Feature"
     _name_column: ClassVar[str] = "FeatureName"
 
-    FeatureID: Mapped[Optional[int]] = mapped_column(primary_key=True)
+    FeatureID: Mapped[int] = mapped_column(primary_key=True)
     FeatureName: Mapped[str] = mapped_column(String(60), unique=True)
 
     Segmentations: Mapped[List["Segmentation"]] = relationship(back_populates="Feature")
@@ -282,7 +282,7 @@ class Model(Base):
 
     __table_args__ = (UniqueConstraint("ModelName", "Version"),)
 
-    ModelID: Mapped[Optional[int]] = mapped_column(primary_key=True)
+    ModelID: Mapped[int] = mapped_column(primary_key=True)
     ModelName: Mapped[str] = mapped_column(String(255), unique=True)
     Version: Mapped[str] = mapped_column(String(255), unique=True)
     ModelType: Mapped[str] = mapped_column(String(255))

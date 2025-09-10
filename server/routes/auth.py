@@ -132,9 +132,22 @@ def verify_token(token: str) -> dict:
 async def get_current_user(
     authorization: str = Header(None),
     jwt_token: str = Cookie(None),
-    refresh_token: str = Cookie(None)
+    refresh_token: str = Cookie(None),
+    session: Session = Depends(get_db),
 ) -> CurrentUser:
     """Get the current authenticated user from either Authorization header or cookies."""
+    
+    # Bypass authentication if disabled (development mode)
+    if settings.auth_disabled:
+        creator = session.query(Creator).where(Creator.CreatorName == settings.admin_username).first()
+        if not creator:
+            # Should not happen if init_admin ran; ensure dev usability
+            creator = create_user(session, settings.admin_username, settings.admin_password)
+        return CurrentUser(
+            creator_id=creator.CreatorID,
+            username=creator.CreatorName,
+            role=creator.Role
+        )
     
     # Try Authorization header first (for API clients)
     if authorization and authorization.startswith("Bearer "):
