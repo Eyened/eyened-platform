@@ -13,6 +13,9 @@ class Settings(EyenedORMConfig):
     # Default username and password for the admin user
     admin_username: str
     admin_password: str
+    
+    # Authentication bypass for development (reads from AUTH_DISABLED env var)
+    auth_disabled: bool = False
 
     # Print settings for debugging purposes - hide password and secret key
     def __str__(self):

@@ -38,6 +38,8 @@ app_api.include_router(task.router)
 async def lifespan(app: FastAPI):
     print("Starting up with settings:")
     print(settings)
+    if settings.auth_disabled:
+        print("WARNING: AUTH_DISABLED is enabled; authentication is bypassed")
 
     if os.environ.get("DATABASE_ROOT_PASSWORD"):
         try:
