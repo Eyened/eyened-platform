@@ -11,7 +11,7 @@ import { ItemCollection } from "./itemList";
 import type { Patient } from "./patient";
 import type { Project } from "./project.svelte";
 import type { Scan } from "./scan";
-import type { Segmentation } from "./segmentation.svelte";
+import type { Model, ModelSegmentation, Segmentation } from "./segmentation.svelte";
 import type { Series } from "./series";
 import type { Study } from "./study";
 import type { SubTask, SubTaskImageLink } from "./subTask.svelte";
@@ -56,6 +56,9 @@ export const data: {
     'instance-tags': ItemCollection<InstanceTag>;
     studyTags: ItemCollection<StudyTag>;
     'study-tags': ItemCollection<StudyTag>;
+    models: ItemCollection<Model>;
+    modelSegmentations: ItemCollection<ModelSegmentation>;
+    'model-segmentations': ItemCollection<ModelSegmentation>;
 } = { } as any;
 
 const constructors: { [key: string]: (new (item: any) => BaseItem) } = {};

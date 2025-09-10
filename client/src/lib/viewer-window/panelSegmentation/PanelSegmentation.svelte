@@ -5,6 +5,7 @@
     import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import CreatorSegmentations from "./CreatorSegmentations.svelte";
     import DrawingTools from "./DrawingTools.svelte";
+    import ModelSegmentations from "./ModelSegmentations.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -27,19 +28,29 @@
     const { segmentationContext, allSegmentations } = segmentationOverlay;
 
     const creators = segmentationOverlay.allSegmentations.collectSet(
-        (a) => a.creator,
+        (s) => s.creator,
     );
-
+    const models = segmentationOverlay.allModelSegmentations.collectSet(
+        (s) => s.model,
+    );
     // hide all on load
     for (const segmentation of $allSegmentations) {
         segmentationContext.hideCreators.add(segmentation.creator);
     }
     // show own segmentations
     segmentationContext.hideCreators.delete(creator);
-
 </script>
 
 <div class="main">
+    <div class="models">
+        <ul class="users">
+            {#each $models as model}
+                <li>
+                    <ModelSegmentations {model} />
+                </li>
+            {/each}
+        </ul>
+    </div>
     <DrawingTools />
     <div class="opacity">
         <label>
@@ -75,6 +86,12 @@
 <style>
     div {
         display: flex;
+    }
+    div.models {
+        flex: 1;
+        flex-direction: column;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 0.5em;
     }
     ul {
         list-style-type: none;

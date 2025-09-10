@@ -34,44 +34,42 @@ def upgrade() -> None:
     
     # Model table: new table for model metadata
     op.create_table('Model',
+        sa.Column('ModelID', sa.Integer(), nullable=False),
         sa.Column('ModelName', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
         sa.Column('Version', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
-        sa.Column('ModelType', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
         sa.Column('Description', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
-        sa.Column('FeatureID', sa.Integer(), nullable=False),
-        sa.Column('ModelID', sa.Integer(), nullable=False),
+        sa.Column('FeatureID', sa.Integer(), nullable=False),        
         sa.Column('DateInserted', sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(['FeatureID'], ['Feature.FeatureID'], ),
         sa.PrimaryKeyConstraint('ModelID'),
         sa.UniqueConstraint('ModelName'),
-        sa.UniqueConstraint('ModelName', 'Version'),
-        sa.UniqueConstraint('Version')
+        sa.UniqueConstraint('ModelName', 'Version')
     )
 
     # Segmentation table: new table for segmentation data
     op.create_table('Segmentation',
+        sa.Column('SegmentationID', sa.Integer(), nullable=False),        
+        sa.Column('ImageInstanceID', sa.Integer(), nullable=False),
         sa.Column('ZarrArrayIndex', sa.Integer(), nullable=True),
-        sa.Column('ImageInstanceID', sa.Integer(), nullable=True),
-        sa.Column('Depth', sa.Integer(), nullable=False),
-        sa.Column('Height', sa.Integer(), nullable=False),
-        sa.Column('Width', sa.Integer(), nullable=False),
-        sa.Column('SparseAxis', sa.Integer(), nullable=True),
-        sa.Column('ImageProjectionMatrix', sa.JSON(), nullable=True),
-        sa.Column('ScanIndices', sa.JSON(), nullable=True),
-        sa.Column('DataRepresentation', sa.Enum('Binary', 'DualBitMask', 'Probability', 'MultiLabel', 'MultiClass', name='datarepresentation'), nullable=False),
-        sa.Column('DataType', sa.Enum('R8', 'R8UI', 'R16UI', 'R32UI', 'R32F', name='datatype'), nullable=False),
-        sa.Column('Threshold', sa.Float(), nullable=True),
-        sa.Column('ReferenceSegmentationID', sa.Integer(), nullable=True),
-        sa.Column('SegmentationID', sa.Integer(), nullable=False),
         sa.Column('CreatorID', sa.Integer(), nullable=False),
         sa.Column('FeatureID', sa.Integer(), nullable=False),
         sa.Column('SubTaskID', sa.Integer(), nullable=True),
+        sa.Column('DataRepresentation', sa.Enum('Binary', 'DualBitMask', 'Probability', 'MultiLabel', 'MultiClass', name='datarepresentation'), nullable=False),
+        sa.Column('DataType', sa.Enum('R8', 'R8UI', 'R16UI', 'R32UI', 'R32F', name='datatype'), nullable=False),
+        sa.Column('ScanIndices', sa.JSON(), nullable=True),        
+        sa.Column('SparseAxis', sa.Integer(), nullable=True),
+        sa.Column('Depth', sa.Integer(), nullable=False),
+        sa.Column('Height', sa.Integer(), nullable=False),
+        sa.Column('Width', sa.Integer(), nullable=False),        
+        sa.Column('ImageProjectionMatrix', sa.JSON(), nullable=True),        
+        sa.Column('Threshold', sa.Float(), nullable=True),
+        sa.Column('ReferenceSegmentationID', sa.Integer(), nullable=True),                
         sa.Column('DateInserted', sa.DateTime(), nullable=False),
         sa.Column('DateModified', sa.DateTime(), nullable=True),
         sa.Column('Inactive', sa.Boolean(), nullable=False),
-        sa.ForeignKeyConstraint(['CreatorID'], ['Creator.CreatorID'], ),
-        sa.ForeignKeyConstraint(['FeatureID'], ['Feature.FeatureID'], ),
         sa.ForeignKeyConstraint(['ImageInstanceID'], ['ImageInstance.ImageInstanceID'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['CreatorID'], ['Creator.CreatorID'], ),
+        sa.ForeignKeyConstraint(['FeatureID'], ['Feature.FeatureID'], ),        
         sa.ForeignKeyConstraint(['ReferenceSegmentationID'], ['Segmentation.SegmentationID'], ),
         sa.ForeignKeyConstraint(['SubTaskID'], ['SubTask.SubTaskID'], ),
         sa.PrimaryKeyConstraint('SegmentationID')
@@ -79,25 +77,25 @@ def upgrade() -> None:
 
     # ModelSegmentation table: new table for model-generated segmentations
     op.create_table('ModelSegmentation',
+        sa.Column('ModelSegmentationID', sa.Integer(), nullable=False),
+        sa.Column('ImageInstanceID', sa.Integer(), nullable=False),
         sa.Column('ZarrArrayIndex', sa.Integer(), nullable=True),
-        sa.Column('ImageInstanceID', sa.Integer(), nullable=True),
-        sa.Column('Depth', sa.Integer(), nullable=False),
-        sa.Column('Height', sa.Integer(), nullable=False),
-        sa.Column('Width', sa.Integer(), nullable=False),
-        sa.Column('SparseAxis', sa.Integer(), nullable=True),
-        sa.Column('ImageProjectionMatrix', sa.JSON(), nullable=True),
-        sa.Column('ScanIndices', sa.JSON(), nullable=True),
+        sa.Column('ModelID', sa.Integer(), nullable=False),
         sa.Column('DataRepresentation', sa.Enum('Binary', 'DualBitMask', 'Probability', 'MultiLabel', 'MultiClass', name='datarepresentation'), nullable=False),
         sa.Column('DataType', sa.Enum('R8', 'R8UI', 'R16UI', 'R32UI', 'R32F', name='datatype'), nullable=False),
+        sa.Column('ScanIndices', sa.JSON(), nullable=True),
+        sa.Column('SparseAxis', sa.Integer(), nullable=True),
+        sa.Column('Depth', sa.Integer(), nullable=False),
+        sa.Column('Height', sa.Integer(), nullable=False),
+        sa.Column('Width', sa.Integer(), nullable=False),        
+        sa.Column('ImageProjectionMatrix', sa.JSON(), nullable=True),        
         sa.Column('Threshold', sa.Float(), nullable=True),
-        sa.Column('ReferenceSegmentationID', sa.Integer(), nullable=True),
-        sa.Column('SegmentationID', sa.Integer(), nullable=False),
-        sa.Column('ModelID', sa.Integer(), nullable=False),
+        sa.Column('ReferenceSegmentationID', sa.Integer(), nullable=True),                
         sa.Column('DateInserted', sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(['ImageInstanceID'], ['ImageInstance.ImageInstanceID'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['ModelID'], ['Model.ModelID'], ),
         sa.ForeignKeyConstraint(['ReferenceSegmentationID'], ['Segmentation.SegmentationID'], ),
-        sa.PrimaryKeyConstraint('SegmentationID')
+        sa.PrimaryKeyConstraint('ModelSegmentationID')
     )
 
     # SegmentationTag: new table for linking tags to segmentations
@@ -162,9 +160,9 @@ def upgrade() -> None:
                nullable=False)
 
     # ImageInstance: make DeviceInstanceID non-nullable, drop ThumbnailIdentifier
-    op.alter_column('ImageInstance', 'DeviceInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=False)
+    # op.alter_column('ImageInstance', 'DeviceInstanceID',
+    #            existing_type=mysql.INTEGER(),
+    #            nullable=False)
     op.drop_column('ImageInstance', 'ThumbnailIdentifier')
 
     # Patient: change PatientIdentifier to AutoString(255)
@@ -201,74 +199,3 @@ def upgrade() -> None:
 
     # ### end Alembic commands ###
 
-
-def downgrade() -> None:
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_constraint(None, 'TaskState', type_='unique')
-    op.drop_column('TaskDefinition', 'TaskConfig')
-    op.add_column('SubTaskImageLink', sa.Column('SubTaskImageLinkID', mysql.INTEGER(), autoincrement=True, nullable=False))
-    op.drop_column('SubTask', 'Comments')
-    op.drop_index('StudyDate_idx', table_name='Study')
-    op.drop_constraint(None, 'Series', type_='foreignkey')
-    op.create_foreign_key('fk_Series_Study1', 'Series', 'Study', ['StudyID'], ['StudyID'], ondelete='CASCADE')
-    op.alter_column('Project', 'ProjectName',
-               existing_type=sqlmodel.sql.sqltypes.AutoString(length=255),
-               type_=mysql.VARCHAR(length=45),
-               existing_nullable=False)
-    op.drop_column('Project', 'DOI')
-    op.alter_column('Patient', 'PatientIdentifier',
-               existing_type=sqlmodel.sql.sqltypes.AutoString(length=255),
-               type_=mysql.VARCHAR(length=45),
-               nullable=True)
-    op.add_column('ImageInstance', sa.Column('ThumbnailIdentifier', mysql.VARCHAR(length=256), nullable=True))
-    op.alter_column('ImageInstance', 'DeviceInstanceID',
-               existing_type=mysql.INTEGER(),
-               nullable=True)
-    op.alter_column('FormSchema', 'SchemaName',
-               existing_type=sqlmodel.sql.sqltypes.AutoString(length=255),
-               type_=mysql.VARCHAR(length=45),
-               nullable=True)
-    op.drop_constraint(None, 'FormAnnotation', type_='foreignkey')
-    op.create_foreign_key('fk_FormAnnotation_ImageInstance1', 'FormAnnotation', 'ImageInstance', ['ImageInstanceID'], ['ImageInstanceID'], ondelete='CASCADE')
-    op.add_column('Feature', sa.Column('Modality', mysql.ENUM('OCT', 'CF'), nullable=True))
-    # Creator: rename EmployeeIdentifier back to MSN, drop PasswordHash
-    op.alter_column('Creator', 'EmployeeIdentifier', new_column_name='MSN', existing_type=sqlmodel.sql.sqltypes.AutoString(length=255), type_=mysql.CHAR(length=6), existing_nullable=True)
-    op.drop_column('Creator', 'PasswordHash')
-    op.alter_column('Contact', 'Institute',
-               existing_type=sqlmodel.sql.sqltypes.AutoString(length=255),
-               type_=mysql.VARCHAR(length=256),
-               existing_nullable=True)
-    op.alter_column('Contact', 'Email',
-               existing_type=sqlmodel.sql.sqltypes.AutoString(length=255),
-               type_=mysql.VARCHAR(length=256),
-               existing_nullable=False)
-    op.alter_column('Contact', 'Name',
-               existing_type=sqlmodel.sql.sqltypes.AutoString(length=255),
-               type_=mysql.VARCHAR(length=256),
-               existing_nullable=False)
-    op.drop_column('Contact', 'Orcid')
-    op.drop_constraint(None, 'Annotation', type_='foreignkey')
-    op.create_table('AnnotationTag',
-    sa.Column('TagID', mysql.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('AnnotationID', mysql.INTEGER(), autoincrement=False, nullable=False),
-    sa.ForeignKeyConstraint(['AnnotationID'], ['Annotation.AnnotationID'], name='fk_AnnotationTag_Annotation1'),
-    sa.ForeignKeyConstraint(['TagID'], ['Tag.TagID'], name='fk_AnnotationTag_Tag1'),
-    sa.PrimaryKeyConstraint('TagID', 'AnnotationID'),
-    mysql_default_charset='utf8mb3',
-    mysql_engine='InnoDB'
-    )
-    op.create_index('fk_AnnotationTag_Tag1_idx', 'AnnotationTag', ['TagID'], unique=False)
-    op.create_index('fk_AnnotationTag_Annotation1_idx', 'AnnotationTag', ['AnnotationID'], unique=False)
-    op.drop_index('fk_SegmentationTag_Tag1_idx', table_name='SegmentationTag')
-    op.drop_index('fk_SegmentationTag_Segmentation1_idx', table_name='SegmentationTag')
-    op.drop_table('SegmentationTag')
-    op.drop_table('ModelSegmentation')
-    op.drop_index('fk_FormAnnotationTag_Tag1_idx', table_name='FormAnnotationTag')
-    op.drop_index('fk_FormAnnotationTag_FormAnnotation1_idx', table_name='FormAnnotationTag')
-    op.drop_table('FormAnnotationTag')
-    op.drop_table('Segmentation')
-    op.drop_table('Model')
-    op.drop_index('fk_CompositeFeature_ParentFeature1_idx', table_name='CompositeFeature')
-    op.drop_index('fk_CompositeFeature_ChildFeature1_idx', table_name='CompositeFeature')
-    op.drop_table('CompositeFeature')
-    # ### end Alembic commands ###

@@ -51,16 +51,14 @@ class Datatype(Enum):
     R32F = "R32F"  # 32-bit float
 
 
-class Segmentation(Base):
-    __tablename__ = "Segmentation"
-
-    SegmentationID: Mapped[int] = mapped_column(primary_key=True)
+class SegmentationBase(Base):
+    __abstract__ = True  # This makes the class abstract
 
     # index in the zarr array of the segmentation
     ZarrArrayIndex: Mapped[Optional[int]]
 
     # image instance that the segmentation is associated with
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(
+    ImageInstanceID: Mapped[int] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE")
     )
 
@@ -88,22 +86,7 @@ class Segmentation(Base):
     Threshold: Mapped[Optional[float]]
     ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(ForeignKey("Segmentation.SegmentationID"))
 
-    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
-    SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID"))
-
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]]
-
-    Inactive: Mapped[bool] = mapped_column(default=False)
-
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
-        back_populates="Segmentations"
-    )
-    Creator: Mapped["Creator"] = relationship(back_populates="Segmentations")
-    Feature: Mapped["Feature"] = relationship(back_populates="Segmentations")
-    SubTask: Mapped["SubTask"] = relationship(back_populates="Segmentations")
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(back_populates="Segmentation")
+    
 
     @property
     def dtype(self) -> np.dtype:
@@ -137,6 +120,11 @@ class Segmentation(Base):
     def is_sparse(self) -> bool:
         return self.SparseAxis is not None
     
+    @property
+    def groupname(self) -> str:
+        return str(self.DataRepresentation)
+
+
     def write_data(self, data: np.ndarray, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
         """Write annotation data to the zarr array and update the ZarrArrayIndex."""
         
@@ -144,7 +132,7 @@ class Segmentation(Base):
             raise ValueError("Segmentation has no associated ImageInstance")
 
         zarr_index = self.storage_manager.write(
-            group_name=str(self.DataRepresentation),  
+            group_name=self.groupname,  
             data_dtype=self.dtype,
             data_shape=self.shape,
             data=data, 
@@ -163,6 +151,10 @@ class Segmentation(Base):
 
         self.ZarrArrayIndex = zarr_index
         return zarr_index
+    
+    def write_empty(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
+        """Write an empty segmentation to the zarr array and update the ZarrArrayIndex."""
+        return self.write_data(np.zeros(self.shape, dtype=self.dtype), axis, slice_index)
 
     def read_data(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> np.ndarray:
         if self.ZarrArrayIndex is None:
@@ -172,7 +164,7 @@ class Segmentation(Base):
             raise ValueError("Segmentation has no associated ImageInstance")
         
         return self.storage_manager.read(
-            group_name=str(self.DataRepresentation),
+            group_name=self.groupname,
             data_dtype=self.dtype,
             data_shape=self.shape,
             zarr_index=self.ZarrArrayIndex,
@@ -189,6 +181,27 @@ class Segmentation(Base):
                 return False
         return True
 
+
+class Segmentation(SegmentationBase, table=True):
+    __tablename__ = "Segmentation"
+    SegmentationID: Mapped[int] = mapped_column(primary_key=True)
+
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
+    SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID"))
+
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateModified: Mapped[Optional[datetime]]
+
+    Inactive: Mapped[bool] = mapped_column(default=False)
+
+    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+        back_populates="Segmentations"
+    )
+    Creator: Mapped["Creator"] = relationship(back_populates="Segmentations")
+    Feature: Mapped["Feature"] = relationship(back_populates="Segmentations")
+    SubTask: Mapped["SubTask"] = relationship(back_populates="Segmentations")
+    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(back_populates="Segmentation")
 
 class FeatureFeatureLink(Base):
     __tablename__ = "CompositeFeature"
@@ -289,44 +302,23 @@ class Model(Base):
     Description: Mapped[Optional[str]] = mapped_column(String(255))
     FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    Segmentations: List["ModelSegmentation"] = relationship(back_populates="Model")
 
+    
+class ModelSegmentation(SegmentationBase):
+    __tablename__ = "ModelSegmentation"   
 
-class ModelSegmentation(Base):
-    __tablename__ = "ModelSegmentation"    
-
-    SegmentationID: Mapped[int] = mapped_column(primary_key=True)
-
-    # index in the zarr array of the segmentation
-    ZarrArrayIndex: Mapped[Optional[int]]
-
-    # image instance that the segmentation is associated with
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE")
-    )
-
-    DataRepresentation: Mapped[DataRepresentation] = mapped_column(SAEnum(DataRepresentation))
-
-    # shape of the segmentation
-    Depth: Mapped[int]
-    Height: Mapped[int]
-    Width: Mapped[int]
-
-    # indicates the axis along which the segmentation is sparse
-    # axis 0 = depth, axis 1 = height, axis 2 = width
-    SparseAxis: Mapped[Optional[int]]
-
-    # Matrix that projects the segmentation to image space (along the sparse axis)
-    # If None, the shape of the segmentation must match the shape of the image instance
-    ImageProjectionMatrix: Mapped[Optional[List[List[float]]]] = mapped_column(JSON)
-
-    # indices with valid segmentation data along the sparse axis
-    # If None, the segmentation is dense (i.e valid for all ScanIndices)
-    ScanIndices: Mapped[Optional[List[int]]] = mapped_column(JSON)
-
-    DataType: Mapped[Datatype] = mapped_column(SAEnum(Datatype))
-
-    Threshold: Mapped[Optional[float]]
-
+    ModelSegmentationID: int = mapped_column(primary_key=True)
     ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID"))
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+    Model: "Model" = relationship(back_populates="Segmentations")    
+    ImageInstance: Optional["ImageInstance"] = relationship(
+        back_populates="ModelSegmentations"
+    )
+
+    @property
+    def groupname(self) -> str:
+        return f"model_{self.Model.ModelName}_{self.Model.Version}"

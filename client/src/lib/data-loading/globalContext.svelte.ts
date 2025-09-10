@@ -1,5 +1,5 @@
 import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
-import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
+import { ModelSegmentation, type Segmentation } from '$lib/datamodel/segmentation.svelte';
 import { UserManager } from '$lib/usermanager';
 
 export type ComponentDef = {
@@ -36,7 +36,10 @@ export class GlobalContext {
         this.popupComponent = component;
     }
 
-    canEdit(annotation: Segmentation | FormAnnotation) {
+    canEdit(annotation: Segmentation | FormAnnotation | ModelSegmentation) {
+        if (annotation instanceof ModelSegmentation) {
+            return false;
+        }
         return annotation.creator.id == this.userManager.creator.id;
     }
 
@@ -46,8 +49,8 @@ export class GlobalContext {
 
     get segmentationsFilter() {
         return (a: Segmentation | FormAnnotation) => {
-            
-            
+
+
             if (this.creator.name == 'test_user') {
                 // show everything for test user
                 return true;

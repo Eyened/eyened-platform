@@ -190,6 +190,10 @@ class ImageInstance(Base):
     Segmentations: Mapped[List["Segmentation"]] = relationship(
         back_populates="ImageInstance", cascade="all, delete"
     )
+    
+    ModelSegmentations: List["ModelSegmentation"] = Relationship(
+        back_populates="ImageInstance", cascade_delete=True
+    )
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
         back_populates="ImageInstance", cascade="all, delete"
