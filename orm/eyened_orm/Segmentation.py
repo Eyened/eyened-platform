@@ -182,12 +182,12 @@ class SegmentationBase(Base):
         return True
 
 
-class Segmentation(SegmentationBase, table=True):
+class Segmentation(SegmentationBase):
     __tablename__ = "Segmentation"
     SegmentationID: Mapped[int] = mapped_column(primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
+    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID", ondelete="RESTRICT"))
     SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID"))
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -210,8 +210,8 @@ class FeatureFeatureLink(Base):
         Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
     )
 
-    ParentFeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"), primary_key=True)
-    ChildFeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"), primary_key=True)
+    ParentFeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID", ondelete="CASCADE"), primary_key=True)
+    ChildFeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID", ondelete="RESTRICT"), primary_key=True)
     FeatureIndex: Mapped[int] = mapped_column(primary_key=True)
 
     Feature: Mapped["Feature"] = relationship(
@@ -235,12 +235,23 @@ class Feature(Base):
 
     # Relationships for parent-child feature hierarchy
     FeatureAssociations: Mapped[List["FeatureFeatureLink"]] = relationship(
-        back_populates="Feature", foreign_keys="FeatureFeatureLink.ParentFeatureID"
+        back_populates="Feature",
+        foreign_keys="FeatureFeatureLink.ParentFeatureID",
+        cascade="all, delete-orphan",  # remove CompositeFeature rows when parent Feature is deleted
     )
     
+    # Child side stays non-cascading (used only to detect blocking links)
     ChildFeatureAssociations: Mapped[List["FeatureFeatureLink"]] = relationship(
         back_populates="Child", foreign_keys="FeatureFeatureLink.ChildFeatureID"
     )
+
+    @property
+    def has_segmentations(self) -> bool:
+        return bool(self.Segmentations)
+
+    @property
+    def is_child(self) -> bool:
+        return bool(self.ChildFeatureAssociations)
 
     @classmethod
     def from_list(cls, session, feature_name: str, sub_features: List[str] | None = None) -> "Feature":
@@ -297,25 +308,25 @@ class Model(Base):
 
     ModelID: Mapped[int] = mapped_column(primary_key=True)
     ModelName: Mapped[str] = mapped_column(String(255), unique=True)
-    Version: Mapped[str] = mapped_column(String(255), unique=True)
-    ModelType: Mapped[str] = mapped_column(String(255))
+    Version: Mapped[str] = mapped_column(String(255))
+    # ModelType: Mapped[str] = mapped_column(String(255))
     Description: Mapped[Optional[str]] = mapped_column(String(255))
     FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    Segmentations: List["ModelSegmentation"] = relationship(back_populates="Model")
+    Segmentations: Mapped[List["ModelSegmentation"]] = relationship(back_populates="Model")
 
     
 class ModelSegmentation(SegmentationBase):
     __tablename__ = "ModelSegmentation"   
 
-    ModelSegmentationID: int = mapped_column(primary_key=True)
+    ModelSegmentationID: Mapped[int] = mapped_column(primary_key=True)
     ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID"))
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
-    Model: "Model" = relationship(back_populates="Segmentations")    
-    ImageInstance: Optional["ImageInstance"] = relationship(
+    Model: Mapped["Model"] = relationship(back_populates="Segmentations")    
+    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
         back_populates="ModelSegmentations"
     )
 

@@ -1,8 +1,11 @@
 import os
+import traceback
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from server.config import settings
 from server.routes import (
@@ -31,6 +34,35 @@ app_api.include_router(form_schema.router)
 app_api.include_router(feature.router)
 app_api.include_router(tag.router)
 app_api.include_router(task.router)
+
+
+### Exception handlers
+@app_api.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
+@app_api.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    if settings.environment == 'development':
+        # print stack trace
+        traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "A database error occurred."},
+    )
+
+@app_api.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    if settings.environment == 'development':
+        # print stack trace
+        traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred."},
+    )
 
 
 
@@ -87,3 +119,6 @@ async def catch_all(path: str):
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)  # Serve existing file
     return FileResponse(os.path.join("/client/build", "index.html"))
+
+
+

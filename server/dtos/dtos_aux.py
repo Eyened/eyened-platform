@@ -14,8 +14,6 @@ from pydantic import BaseModel, create_model
 from eyened_orm.Tag import TagType
 
 # Type aliases matching TypeScript types
-Laterality = Literal["L", "R"]
-Sex = Literal["M", "F"]
 AnnotationTypeInterpretation = Literal[
     "", "R/G mask", "Binary mask", "Label numbers", "Probability", "Layer bits"
 ]
@@ -81,12 +79,13 @@ class CreatorMetadata(BaseModel):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 class TagBase(BaseModel):
     name: str
+    tag_type: TagType
+    description: str
 
 
 class TagPUT(TagBase):
-    description: str
-    tag_type: TagType
-    creator_id: int
+    pass
+    
 
 
 class TagPATCH(TagPUT):
@@ -96,6 +95,8 @@ class TagPATCH(TagPUT):
 
 class TagGET(TagBase):
     id: int
+    creator: CreatorMetadata
+    date_inserted: datetime
 
 
 

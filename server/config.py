@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Literal, Optional
 import yaml
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
@@ -21,6 +21,8 @@ class Settings(EyenedORMConfig):
     auth_disabled: bool = False
 
     database_root_password: Optional[str] = Field(description="Database root password", validation_alias="DATABASE_ROOT_PASSWORD", default=None)
+
+    environment: Literal['development', 'production'] = Field(description="Environment", validation_alias="EYENED_ENV", default="production")
 
     # Print settings for debugging purposes - hide password and secret key
     def __str__(self):

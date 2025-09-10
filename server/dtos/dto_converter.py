@@ -18,9 +18,9 @@ from .dtos_instances import (
     DeviceMeta,
     ScanMeta,
 )
-from .dtos_aux import CreatorGET, TagGET
+from .dtos_aux import CreatorGET, CreatorMetadata, TagGET
 from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET
-from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET
+from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET, SubTaskWithImagesGET
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -55,21 +55,18 @@ class DTOConverter:
         return ProjectGET(
             id=project.ProjectID,
             name=project.ProjectName,
-            external=project.External.value == 1,
+            external=(project.External.value == "Y"),
             description=project.Description,
         )
 
     @staticmethod
     def patient_to_get(patient: "Patient") -> PatientGET:
         """Convert Patient ORM object to PatientGET."""
-        sex_str: Optional[str] = None
-        if patient.Sex is not None:
-            sex_str = patient.Sex.name
         return PatientGET(
             id=patient.PatientID,
             identifier=patient.PatientIdentifier or "",
             birth_date=patient.BirthDate,
-            sex=sex_str,
+            sex=patient.Sex,
         )
 
     @staticmethod
@@ -132,13 +129,11 @@ class DTOConverter:
             dataset_identifier=image_instance.DatasetIdentifier,
             thumbnail_identifier=image_instance.ThumbnailPath or "",
             thumbnail_path=image_instance.ThumbnailPath or "",
-            modality=image_instance.Modality.name if image_instance.Modality else "",
-            dicom_modality=(
-                image_instance.DICOMModality.name if image_instance.DICOMModality else ""
-            ),
-            etdrs_field=image_instance.ETDRSField.name if image_instance.ETDRSField else "",
+            modality=image_instance.Modality,
+            dicom_modality=image_instance.DICOMModality,
+            etdrs_field=image_instance.ETDRSField,
             angio_graphy=str(image_instance.Angiography) if image_instance.Angiography else "",
-            laterality=image_instance.Laterality.name if image_instance.Laterality else "L",
+            laterality=image_instance.Laterality,
             anatomic_region=str(image_instance.AnatomicRegion) if image_instance.AnatomicRegion is not None else "",
             rows=image_instance.Rows_y or 0,
             columns=image_instance.Columns_x or 0,
@@ -177,9 +172,17 @@ class DTOConverter:
         )
 
     @staticmethod
+    def creator_to_meta(creator: "Creator") -> CreatorMetadata:
+        """Convert Creator ORM object to CreatorMetadata."""
+        return CreatorMetadata(
+            id=creator.CreatorID,
+            name=creator.CreatorName
+        )
+
+    @staticmethod
     def tag_to_get(tag: "TagORM") -> TagGET:
         """Convert Tag ORM object to TagGET."""
-        return TagGET(id=tag.TagID, name=tag.TagName)
+        return TagGET(id=tag.TagID, name=tag.TagName, tag_type=tag.TagType, description=tag.TagDescription, creator=DTOConverter.creator_to_meta(tag.Creator), date_inserted=tag.DateInserted)
 
     @staticmethod
     def _tags_from_form_annotation(annotation: "FormAnnotationORM") -> List[TagGET]:
@@ -226,7 +229,7 @@ class DTOConverter:
             data_type=seg.DataType,
             data_representation=seg.DataRepresentation,
             feature=DTOConverter.feature_to_get(seg.Feature) if getattr(seg, "Feature", None) else None,  # type: ignore[arg-type]
-            creator=DTOConverter.creator_to_get(seg.Creator) if getattr(seg, "Creator", None) else None,  # type: ignore[arg-type]
+            creator=DTOConverter.creator_to_meta(seg.Creator) if getattr(seg, "Creator", None) else None,  # type: ignore[arg-type]
             tags=DTOConverter._tags_from_segmentation(seg),
             date_inserted=seg.DateInserted,
             date_modified=seg.DateModified,
@@ -299,4 +302,22 @@ class DTOConverter:
             task_id=subtask.TaskID,
             task_state_id=subtask.TaskStateID,
             creator_id=subtask.CreatorID,
+            comments=subtask.Comments,
+        )
+
+    @staticmethod
+    def subtask_with_images_to_get(subtask: "SubTaskORM") -> SubTaskWithImagesGET:
+        """Convert SubTask ORM object to SubTaskWithImagesGET, including images."""
+        images = [
+            DTOConverter.image_instance_to_get(link.ImageInstance)
+            for link in (getattr(subtask, "SubTaskImageLinks", None) or [])
+            if getattr(link, "ImageInstance", None)
+        ]
+        return SubTaskWithImagesGET(
+            id=subtask.SubTaskID,
+            task_id=subtask.TaskID,
+            task_state_id=subtask.TaskStateID,
+            creator_id=subtask.CreatorID,
+            comments=subtask.Comments,
+            images=images,
         )

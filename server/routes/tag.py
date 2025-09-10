@@ -15,7 +15,7 @@ async def create_tag(dto: TagPUT, db: Session = Depends(get_db), current_user: C
         TagName=dto.name,
         TagDescription=dto.description,
         TagType=dto.tag_type,
-        CreatorID=dto.creator_id,
+        CreatorID=current_user.id,
     )
     db.add(tag); db.commit(); db.refresh(tag)
     return DTOConverter.tag_to_get(tag)
@@ -34,7 +34,6 @@ async def patch_tag(tag_id: int, dto: TagPATCH, db: Session = Depends(get_db), c
     tag.TagName = payload.get("name", tag.TagName)
     tag.TagDescription = payload.get("description", tag.TagDescription)
     tag.TagType = payload.get("tag_type", tag.TagType)
-    tag.CreatorID = payload.get("creator_id", tag.CreatorID)
     db.commit(); db.refresh(tag)
     return DTOConverter.tag_to_get(tag)
 

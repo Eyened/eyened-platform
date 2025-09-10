@@ -24,7 +24,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Extra
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
@@ -262,6 +262,9 @@ class SegmentationPatch(BaseModel):
     FeatureID: Optional[int] = None
     Threshold: Optional[float] = None
     # TODO: should we allow to patch other fields?
+
+    class Config:
+        extra = 'forbid'
 
 @router.patch("/segmentations/{segmentation_id}")
 async def patch_segmentation(
