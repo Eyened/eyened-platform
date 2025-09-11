@@ -10,7 +10,7 @@ This file contains DTOs that represent:
 from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, Field
 
 from eyened_orm.ImageInstance import Laterality, ModalityType, Modality, ETDRSField
 from eyened_orm.Patient import SexEnum as Sex
@@ -42,6 +42,7 @@ class StudyGET(BaseModel):
     description: Optional[str] = None
     date: datetime
     study_instance_uid: Optional[str] = None
+    series: Optional[List["SeriesGET"]] = None
 
 
 
@@ -49,6 +50,7 @@ class SeriesGET(BaseModel):
     id: int
     series_number: Optional[int] = None
     series_instance_uid: str
+    instance_ids: List[int] = Field(default_factory=list)
 
 
 
@@ -108,6 +110,18 @@ class InstanceBase(BaseModel):
     date_modified: Optional[datetime] = None
     date_preprocessed: Optional[datetime] = None
 
+
+class InstanceMeta(BaseModel):
+    id: int
+    thumbnail_path: str
+    modality: Optional[Modality] = None
+    dicom_modality: Optional[ModalityType] = None
+    etdrs_field: Optional[ETDRSField] = None
+    laterality: Optional[Laterality] = None
+    anatomic_region: AnatomicRegion
+    device: DeviceMeta
+    tags: List[TagGET]
+    
 
 class InstanceGET(InstanceBase):
     id: int

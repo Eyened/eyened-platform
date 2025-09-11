@@ -2,113 +2,104 @@ import type { components } from '../../types/openapi';
 import { api } from '../api/client';
 import { Repo, type Id } from './datamodel.svelte';
 
-// Helper: naive singularization plus kebab->snake: e.g. "/form-schemas" -> "form_schema_id"
-function inferIdParam(base: string): string {
-	const last = base.replace(/\/+$/, '').split('/').pop() ?? '';
-	const singular = last.endsWith('ies') ? last.slice(0, -3) + 'y' : last.endsWith('s') ? last.slice(0, -1) : last;
-	const snake = singular.replace(/-([a-z])/g, (_, c) => `_${c}`);
-	return `${snake}_id`;
-}
-
-function fromOpenApiCrud<TGet, TCreate = Partial<TGet>, TPatch = Partial<TGet>>(base: string) {
-	const idParam = inferIdParam(base);
-	const itemPath = `${base}/{${idParam}}` as const;
-	return {
-		list: async (): Promise<TGet[]> => (await api.GET(base as any)).data as TGet[] ?? [],
-		get: async (id: Id): Promise<TGet> => {
-			const res = await api.GET(itemPath as any, { params: { path: { [idParam]: Number(id) } } as any });
-			if (!res.data) throw new Error('No data');
-			return res.data as TGet;
-		},
-		create: async (body: TCreate): Promise<TGet> => {
-			const res = await api.POST(base as any, { body } as any);
-			if (!res.data) throw new Error('No data');
-			return res.data as TGet;
-		},
-		update: async (id: Id, body: TPatch): Promise<TGet> => {
-			const res = await api.PATCH(itemPath as any, { params: { path: { [idParam]: Number(id) } } as any, body });
-			if (!res.data) throw new Error('No data');
-			return res.data as TGet;
-		},
-		delete: async (id: Id): Promise<void> => {
-			await api.DELETE(itemPath as any, { params: { path: { [idParam]: Number(id) } } as any });
-		}
-	};
-}
-
 // Tasks — full CRUD
 export type Task = components['schemas']['TaskGET'];
 type TaskCreate = components['schemas']['TaskPUT'];
 type TaskPatch = components['schemas']['TaskPATCH'];
-export const Tasks = new Repo<Task, Task, TaskCreate, TaskPatch>('tasks', fromOpenApiCrud<Task, TaskCreate, TaskPatch>('/task'));
 
-// Tags — list/create/patch/delete (no GET by id in API; just don't call fetchOne())
+class TasksRepoClass extends Repo<Task, Task, TaskCreate, TaskPatch> {
+	protected get basePath() { return '/task'; }
+}
+export const TasksRepo = new TasksRepoClass('tasks');
+
+// Tags — list/create/patch/delete (no GET by id)
 export type Tag = components['schemas']['TagGET'];
 type TagCreate = components['schemas']['TagPUT'];
 type TagPatch = components['schemas']['TagPATCH'];
-export const Tags = new Repo<Tag, Tag, TagCreate, TagPatch>('tags', fromOpenApiCrud<Tag, TagCreate, TagPatch>('/tags'));
 
-// Features — create/get/patch/delete (no list; don't call fetchAll())
+class TagsRepoClass extends Repo<Tag, Tag, TagCreate, TagPatch> {
+	protected get basePath() { return '/tags'; }
+	protected get capabilities() { return { list: true, create: true, update: true, delete: true, get: false }; }
+}
+export const TagsRepo = new TagsRepoClass('tags');
+
+// Features — create/get/patch/delete (no list)
 export type Feature = components['schemas']['FeatureGET'];
 type FeatureCreate = components['schemas']['FeaturePUT'];
 type FeaturePatch = components['schemas']['FeaturePATCH'];
-export const Features = new Repo<Feature, Feature, FeatureCreate, FeaturePatch>('features', fromOpenApiCrud<Feature, FeatureCreate, FeaturePatch>('/features'));
 
-// Instances — GET by id only
+class FeaturesRepoClass extends Repo<Feature, Feature, FeatureCreate, FeaturePatch> {
+	protected get basePath() { return '/features'; }
+	protected get capabilities() { return { list: false, get: true, create: true, update: true, delete: true }; }
+}
+export const FeaturesRepo = new FeaturesRepoClass('features');
+
+// Instances — GET by id only + search helper
 export type Instance = components['schemas']['InstanceGET'];
-export const Instances = new Repo<Instance, Instance, never, never>('instances', {
-	get: async (id: Id) => {
-		const res = await api.GET('/instances/{instance_id}', { params: { path: { instance_id: Number(id) } } });
+
+class InstancesRepoClass extends Repo<Instance, Instance, never, never> {
+	protected get basePath() { return '/instances'; }
+	protected get capabilities() { return { list: false, get: true, create: false, update: false, delete: false }; }
+
+	async search(query: components['schemas']['SearchQuery']): Promise<components['schemas']['SearchResponse']> {
+		const res = await api.POST('/instances/search', { body: query });
 		if (!res.data) throw new Error('No data');
-		return res.data as Instance;
+		return res.data as components['schemas']['SearchResponse'];
 	}
-});
+}
+export const InstancesRepo = new InstancesRepoClass('instances');
 
 // Form Schemas — GET by id only
 export type FormSchema = components['schemas']['FormSchemaGET'];
-export const FormSchemas = new Repo<FormSchema, FormSchema, never, never>('form-schemas', {
-	get: async (id: Id) => {
-		const res = await api.GET('/form-schemas/{form_schema_id}', { params: { path: { form_schema_id: Number(id) } } });
-		if (!res.data) throw new Error('No data');
-		return res.data as FormSchema;
-	}
-});
 
-// Segmentations — create (multipart), get/patch/delete; API returns `unknown` — assume `{ id: number }` is present
+class FormSchemasRepoClass extends Repo<FormSchema, FormSchema, never, never> {
+	protected get basePath() { return '/form-schemas'; }
+	protected get capabilities() { return { list: false, get: true, create: false, update: false, delete: false }; }
+}
+export const FormSchemasRepo = new FormSchemasRepoClass('form-schemas');
+
+// Segmentations — create (multipart), get/patch/delete + data helpers
 export type Segmentation = { id: Id } & Record<string, unknown>;
 type SegmentationCreate = components['schemas']['Body_create_segmentation_segmentations_post'];
 type SegmentationPatch = components['schemas']['SegmentationPatch'];
-export const Segmentations = new Repo<Segmentation, Segmentation, SegmentationCreate, SegmentationPatch>('segmentations', {
-	create: async (body: SegmentationCreate) => {
-		// body should be FormData for multipart; pass through as-is
-		const res = await api.POST('/segmentations', { body } as any);
-		if (!res.data) throw new Error('No data');
-		return res.data as Segmentation;
-	},
-	get: async (id: Id) => {
-		const res = await api.GET('/segmentations/{segmentation_id}', { params: { path: { segmentation_id: Number(id) } } });
-		if (!res.data) throw new Error('No data');
-		return res.data as Segmentation;
-	},
-	update: async (id: Id, patch: SegmentationPatch) => {
-		const res = await api.PATCH('/segmentations/{segmentation_id}', {
-			params: { path: { segmentation_id: Number(id) } },
-			body: patch
-		});
-		if (!res.data) throw new Error('No data');
-		return res.data as Segmentation;
-	},
-	delete: async (id: Id) => {
-		await api.DELETE('/segmentations/{segmentation_id}', { params: { path: { segmentation_id: Number(id) } } });
-	}
-});
 
-// SubTasks — nested resource; list by task_id and get/delete by (task_id, subtaskid)
+class SegmentationsRepoClass extends Repo<Segmentation, Segmentation, SegmentationCreate, SegmentationPatch> {
+	protected get basePath() { return '/segmentations'; }
+	protected toCreateBody(body: SegmentationCreate) { return body as any; }
+
+	async getData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }): Promise<unknown> {
+		const res = await api.GET('/segmentations/{segmentation_id}/data', { 
+			params: { 
+				path: { segmentation_id }, 
+				query: { axis: p?.axis, scan_nr: p?.scan_nr } 
+			} 
+		});
+		return res.data as unknown;
+	}
+
+	async updateData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }, body?: unknown): Promise<unknown> {
+		const res = await api.PUT('/segmentations/{segmentation_id}/data', { 
+			params: { 
+				path: { segmentation_id }, 
+				query: { axis: p?.axis, scan_nr: p?.scan_nr } 
+			}, 
+			body: body as any 
+		});
+		return res.data as unknown;
+	}
+}
+export const SegmentationsRepo = new SegmentationsRepoClass('segmentations');
+
+// SubTasks — nested list only + helpers
 export type SubTask = components['schemas']['SubTaskGET'];
 type SubTasksListParams = { task_id: number; with_images?: boolean; limit?: number; page?: number };
-export const SubTasks = new Repo<SubTask, SubTask, never, never, SubTasksListParams>('sub-tasks', {
-	list: async (p?: SubTasksListParams) => {
-		if (!p) throw new Error('task_id is required');
+
+class SubTasksRepoClass extends Repo<SubTask, SubTask, never, never, SubTasksListParams> {
+	protected get basePath() { return '/task'; }
+	protected get capabilities() { return { list: true, get: false, create: false, update: false, delete: false }; }
+
+	protected async remoteList(p?: SubTasksListParams): Promise<SubTask[]> {
+		if (!p?.task_id) throw new Error('task_id is required');
 		const res = await api.GET('/task/{task_id}/subtasks', {
 			params: {
 				path: { task_id: p.task_id },
@@ -117,19 +108,68 @@ export const SubTasks = new Repo<SubTask, SubTask, never, never, SubTasksListPar
 		});
 		const d = res.data as components['schemas']['SubTasksWithImagesResponse'] | components['schemas']['SubTasksResponse'] | undefined;
 		return d ? (d.subtasks as SubTask[]) : [];
-	},
-	get: async (id: Id) => {
-		throw new Error('Use getSubtask(task_id, subtaskid) helper'); // nested get needs both keys
 	}
-});
 
-// Optional helper for SubTasks (nested get/delete)
-export async function getSubtask(task_id: number, subtaskid: number): Promise<SubTask> {
-	const res = await api.GET('/task/{task_id}/subtask/{subtaskid}', { params: { path: { task_id, subtaskid } } });
-	if (!res.data) throw new Error('No data');
-	return res.data as SubTask;
+	async getSubtask(task_id: number, subtaskid: number, with_images?: boolean): Promise<SubTask> {
+		const res = await api.GET('/task/{task_id}/subtask/{subtaskid}', { 
+			params: { 
+				path: { task_id, subtaskid }, 
+				query: { with_images } 
+			} 
+		});
+		if (!res.data) throw new Error('No data');
+		return res.data as SubTask;
+	}
+
+	async deleteSubtask(task_id: number, subtaskid: number): Promise<void> {
+		await api.DELETE('/task/{task_id}/subtask/{subtaskid}', { 
+			params: { path: { task_id, subtaskid } } 
+		});
+	}
 }
+export const SubTasksRepo = new SubTasksRepoClass('sub-tasks');
 
-export async function deleteSubtask(task_id: number, subtaskid: number): Promise<void> {
-	await api.DELETE('/task/{task_id}/subtask/{subtaskid}', { params: { path: { task_id, subtaskid } } });
+// Form Annotations — full CRUD + filtered list + value helpers
+export type FormAnnotation = components['schemas']['FormAnnotationGET'];
+type FormAnnotationCreate = components['schemas']['FormAnnotationPUT'];
+type FormAnnotationUpdate = components['schemas']['FormAnnotationPUT'];
+type FormAnnotationsListParams = { 
+	patient_id?: number; 
+	study_id?: number; 
+	image_instance_id?: number; 
+	form_schema_id?: number; 
+	sub_task_id?: number; 
+};
+
+class FormAnnotationsRepoClass extends Repo<FormAnnotation, FormAnnotation, FormAnnotationCreate, FormAnnotationUpdate, FormAnnotationsListParams> {
+	protected get basePath() { return '/form-annotations'; }
+
+	protected async remoteList(filters?: FormAnnotationsListParams): Promise<FormAnnotation[]> {
+		const res = await api.GET('/form-annotations', { 
+			params: { query: filters ?? {} } 
+		});
+		return (res.data as FormAnnotation[]) ?? [];
+	}
+
+	async getValue(id: number): Promise<unknown> {
+		const res = await api.GET('/form-annotations/{form_annotation_id}/value', { 
+			params: { path: { form_annotation_id: id } } 
+		});
+		return res.data as unknown;
+	}
+
+	async setValue(id: number, value: unknown): Promise<void> {
+		await api.PUT('/form-annotations/{form_annotation_id}/value', { 
+			params: { path: { form_annotation_id: id } }, 
+			body: value as any 
+		});
+	}
+}
+export const FormAnnotationsRepo = new FormAnnotationsRepoClass('form-annotations');
+
+// Studies search helper (standalone)
+export async function searchStudies(query: components['schemas']['StudySearchQuery']): Promise<components['schemas']['StudySearchResponse']> {
+	const res = await api.POST('/studies/search', { body: query });
+	if (!res.data) throw new Error('No data');
+	return res.data as components['schemas']['StudySearchResponse'];
 }

@@ -1719,6 +1719,73 @@
         }
       }
     },
+    "/studies/search": {
+      "post": {
+        "summary": "Search Studies",
+        "operationId": "search_studies_studies_search_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudySearchQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudySearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/form-schemas/{form_schema_id}": {
       "get": {
         "summary": "Get Form Schema",
@@ -3782,6 +3849,81 @@
         ],
         "title": "InstanceGET"
       },
+      "InstanceMeta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "thumbnail_path": {
+            "type": "string",
+            "title": "Thumbnail Path"
+          },
+          "modality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Modality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dicom_modality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModalityType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "etdrs_field": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ETDRSField"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "anatomic_region": {
+            "type": "string",
+            "title": "Anatomic Region"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceMeta"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagGET"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "thumbnail_path",
+          "anatomic_region",
+          "device",
+          "tags"
+        ],
+        "title": "InstanceMeta"
+      },
       "Laterality": {
         "type": "string",
         "enum": [
@@ -3921,12 +4063,80 @@
         ],
         "title": "ScanMeta"
       },
+      "SearchCondition": {
+        "properties": {
+          "variable": {
+            "type": "string",
+            "enum": [
+              "Image DBID",
+              "Laterality",
+              "Modality",
+              "Anatomic Region",
+              "ETDRS Field",
+              "Color Fundus Quality",
+              "Study Date",
+              "Patient Identifier",
+              "Patient Sex",
+              "Patient Birthdate",
+              "Project Name",
+              "Device Model ID",
+              "SegmentationFeature Name",
+              "Segmentation Creator Name",
+              "Segmentation Tag Name",
+              "Form Schema Name",
+              "Form Creator Name",
+              "Form Tag Name",
+              "Image Tag Name"
+            ],
+            "title": "Variable"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              ">",
+              "<",
+              ">=",
+              "<=",
+              "==",
+              "!="
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variable",
+          "operator",
+          "value"
+        ],
+        "title": "SearchCondition"
+      },
       "SearchQuery": {
         "properties": {
           "conditions": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/SearchCondition"
             },
             "type": "array",
             "title": "Conditions"
@@ -3940,6 +4150,38 @@
             "type": "integer",
             "title": "Page",
             "default": 0
+          },
+          "order_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Study Date",
+                  "Patient Birthdate",
+                  "Date Inserted",
+                  "Date Modified",
+                  "Date Preprocessed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order By"
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "title": "Order",
+            "default": "ASC"
+          },
+          "include_count": {
+            "type": "boolean",
+            "title": "Include Count",
+            "default": false
           }
         },
         "type": "object",
@@ -3966,7 +4208,14 @@
             "title": "Page"
           },
           "count": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Count"
           },
           "result_ids": {
@@ -3976,9 +4225,9 @@
             "type": "array",
             "title": "Result Ids"
           },
-          "query": {
-            "type": "string",
-            "title": "Query"
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
           }
         },
         "type": "object",
@@ -3986,9 +4235,8 @@
           "instances",
           "limit",
           "page",
-          "count",
           "result_ids",
-          "query"
+          "has_more"
         ],
         "title": "SearchResponse"
       },
@@ -4031,6 +4279,42 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SegmentationPatch"
+      },
+      "SeriesGET": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "series_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Number"
+          },
+          "series_instance_uid": {
+            "type": "string",
+            "title": "Series Instance Uid"
+          },
+          "instance_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Instance Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "series_instance_uid"
+        ],
+        "title": "SeriesGET"
       },
       "SeriesMeta": {
         "properties": {
@@ -4085,6 +4369,20 @@
               }
             ],
             "title": "Study Instance Uid"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SeriesGET"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
           }
         },
         "type": "object",
@@ -4112,6 +4410,164 @@
           "date"
         ],
         "title": "StudyMeta"
+      },
+      "StudySearchCondition": {
+        "properties": {
+          "variable": {
+            "type": "string",
+            "enum": [
+              "Study Date",
+              "Study Description",
+              "Study Round",
+              "Study Instance UID",
+              "Patient Identifier",
+              "Patient Sex",
+              "Patient Birthdate",
+              "Project Name",
+              "Form Schema Name",
+              "Form Creator Name",
+              "Form Tag Name"
+            ],
+            "title": "Variable"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              ">",
+              "<",
+              ">=",
+              "<=",
+              "==",
+              "!="
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variable",
+          "operator",
+          "value"
+        ],
+        "title": "StudySearchCondition"
+      },
+      "StudySearchQuery": {
+        "properties": {
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/StudySearchCondition"
+            },
+            "type": "array",
+            "title": "Conditions"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 200
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "default": 0
+          },
+          "order_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Study Date",
+                  "Patient Birthdate",
+                  "Date Inserted",
+                  "Study Round"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order By"
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "title": "Order",
+            "default": "ASC"
+          },
+          "include_count": {
+            "type": "boolean",
+            "title": "Include Count",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "conditions"
+        ],
+        "title": "StudySearchQuery"
+      },
+      "StudySearchResponse": {
+        "properties": {
+          "studies": {
+            "items": {
+              "$ref": "#/components/schemas/StudyGET"
+            },
+            "type": "array",
+            "title": "Studies"
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceMeta"
+            },
+            "type": "array",
+            "title": "Instances"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "result_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Result Ids"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "studies",
+          "instances",
+          "limit",
+          "page",
+          "result_ids",
+          "has_more"
+        ],
+        "title": "StudySearchResponse"
       },
       "SubTaskGET": {
         "properties": {

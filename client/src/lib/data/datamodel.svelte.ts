@@ -1,16 +1,16 @@
 export type Id = string | number;
 
-export interface Adapter<TGet, TCreate = Partial<TGet>, TPatch = Partial<TGet>, ListParams = unknown> {
-	list?(params?: ListParams): Promise<TGet[]>;
-	get?(id: Id): Promise<TGet>;
-	create?(body: TCreate): Promise<TGet>;
-	update?(id: Id, body: TPatch): Promise<TGet>;
-	delete?(id: Id): Promise<void>;
+// Helper: naive singularization plus kebab->snake: e.g. "/form-schemas" -> "form_schema_id"
+function inferIdParam(base: string): string {
+	const last = base.replace(/\/+$/, '').split('/').pop() ?? '';
+	const singular = last.endsWith('ies') ? last.slice(0, -3) + 'y' : last.endsWith('s') ? last.slice(0, -1) : last;
+	const snake = singular.replace(/-([a-z])/g, (_, c) => `_${c}`);
+	return `${snake}_id`;
 }
 
 const _tables = $state<Record<string, Record<Id, any>>>({});
 
-export class Repo<
+export abstract class Repo<
 	TStore extends { id: Id },
 	TGet = TStore,
 	TCreate = Partial<TStore>,
@@ -19,9 +19,79 @@ export class Repo<
 > {
 	constructor(
 		public readonly key: string,
-		public readonly adapter?: Adapter<TGet, TCreate, TPatch, ListParams>,
 		private readonly toStore: (remote: TGet) => TStore = (x) => x as unknown as TStore
 	) {}
+
+	// Protected hooks for subclasses to override
+	protected abstract get basePath(): string;
+
+	protected get idParam(): string {
+		return inferIdParam(this.basePath);
+	}
+
+	protected get capabilities(): { 
+		list?: boolean; 
+		get?: boolean; 
+		create?: boolean; 
+		update?: boolean; 
+		delete?: boolean;
+	} {
+		return { list: true, get: true, create: true, update: true, delete: true };
+	}
+
+	// Optional serialization hooks
+	protected toCreateBody(body: TCreate): unknown {
+		return body;
+	}
+
+	protected toUpdateBody(body: TPatch): unknown {
+		return body;
+	}
+
+	// Remote operations - can be overridden by subclasses
+	protected async remoteList(params?: ListParams): Promise<TGet[]> {
+		const { api } = await import('../api/client');
+		const res = await api.GET(this.basePath as any);
+		return (res.data as TGet[]) ?? [];
+	}
+
+	protected async remoteGet(id: Id): Promise<TGet> {
+		const { api } = await import('../api/client');
+		const itemPath = `${this.basePath}/{${this.idParam}}`;
+		const res = await api.GET(itemPath as any, { 
+			params: { path: { [this.idParam]: Number(id) } } as any 
+		});
+		if (!res.data) throw new Error('No data');
+		return res.data as TGet;
+	}
+
+	protected async remoteCreate(body: TCreate): Promise<TGet> {
+		const { api } = await import('../api/client');
+		const res = await api.POST(this.basePath as any, { 
+			body: this.toCreateBody(body) 
+		} as any);
+		if (!res.data) throw new Error('No data');
+		return res.data as TGet;
+	}
+
+	protected async remoteUpdate(id: Id, body: TPatch): Promise<TGet> {
+		const { api } = await import('../api/client');
+		const itemPath = `${this.basePath}/{${this.idParam}}`;
+		const res = await api.PATCH(itemPath as any, { 
+			params: { path: { [this.idParam]: Number(id) } } as any, 
+			body: this.toUpdateBody(body) 
+		} as any);
+		if (!res.data) throw new Error('No data');
+		return res.data as TGet;
+	}
+
+	protected async remoteDelete(id: Id): Promise<void> {
+		const { api } = await import('../api/client');
+		const itemPath = `${this.basePath}/{${this.idParam}}`;
+		await api.DELETE(itemPath as any, { 
+			params: { path: { [this.idParam]: Number(id) } } as any 
+		});
+	}
 
 	get table(): Record<Id, TStore> {
 		return (_tables[this.key] ??= {});
@@ -58,25 +128,25 @@ export class Repo<
 	}
 
 	async fetchAll(params?: ListParams): Promise<void> {
-		if (!this.adapter?.list) return;
-		const list = await this.adapter.list(params);
+		if (!this.capabilities.list) return;
+		const list = await this.remoteList(params);
 		this.ingest(list);
 	}
 
 	async fetchOne(id: Id): Promise<Row<TStore, TGet, TCreate, TPatch, ListParams>> {
-		if (!this.adapter?.get) throw new Error('No get() adapter');
-		const row = await this.adapter.get(id);
+		if (!this.capabilities.get) throw new Error('Get operation not supported');
+		const row = await this.remoteGet(id);
 		return this.upsert(row);
 	}
 
 	async create(body: TCreate): Promise<Row<TStore, TGet, TCreate, TPatch, ListParams>> {
-		if (!this.adapter?.create) throw new Error('No create() adapter');
-		const created = await this.adapter.create(body);
+		if (!this.capabilities.create) throw new Error('Create operation not supported');
+		const created = await this.remoteCreate(body);
 		return this.upsert(created);
 	}
 
-	can(op: keyof Adapter<any, any, any, any>): boolean {
-		return Boolean(this.adapter?.[op as keyof typeof this.adapter]);
+	can(op: 'list' | 'get' | 'create' | 'update' | 'delete'): boolean {
+		return Boolean(this.capabilities[op]);
 	}
 }
 
@@ -128,16 +198,16 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 	}
 
 	async save(patch?: TPatch): Promise<TStore> {
-		if (!this.repo.adapter?.update) throw new Error('No update() adapter');
-		const updated = await this.repo.adapter.update(this.id, (patch ?? (this.data as unknown as TPatch)));
-		const stored = (this.repo as unknown as { toStore(remote: TGet): TStore }).toStore(updated as unknown as TGet);
+		if (!this.repo.can('update')) throw new Error('Update operation not supported');
+		const updated = await (this.repo as any).remoteUpdate(this.id, (patch ?? (this.data as unknown as TPatch)));
+		const stored = (this.repo as any).toStore(updated as unknown as TGet);
 		this.replace(stored);
 		return stored;
 	}
 
 	async destroy(): Promise<void> {
-		if (!this.repo.adapter?.delete) throw new Error('No delete() adapter');
-		await this.repo.adapter.delete(this.id);
+		if (!this.repo.can('delete')) throw new Error('Delete operation not supported');
+		await (this.repo as any).remoteDelete(this.id);
 		this.deleteLocal();
 	}
 }

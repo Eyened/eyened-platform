@@ -1,12 +1,13 @@
 from collections import defaultdict
-from typing import Any, Dict, List, Literal
+from datetime import date
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from eyened_orm import (
-    Creator,
     DeviceModel,
     DeviceInstance,
     Feature,
     FormAnnotation,
+    FormAnnotationTagLink,
     ImageInstance,
     ImageInstanceTagLink,
     Patient,
@@ -15,26 +16,67 @@ from eyened_orm import (
     Series,
     SourceInfo,
     Study,
+    FormSchema,
+    Tag,
+    Annotation,
+    StudyTagLink,
+    Creator,
     Segmentation,
-    Tag
+    SegmentationTagLink,
 )
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from sqlalchemy import select, text
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy import select, func, and_, or_, true
+from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy.dialects import mysql
 
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
-from ..dtos import InstanceGET
+from ..dtos import InstanceGET, StudyGET, InstanceMeta
 from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
 
+ActiveSegmentation = aliased(
+    Segmentation,
+    select(Segmentation).filter(~Segmentation.Inactive).subquery(name="active_segmentation"),
+    name="active_segmentation",
+)
+ActiveFormAnnotation = aliased(
+    FormAnnotation,
+    select(FormAnnotation).filter(~FormAnnotation.Inactive).subquery(name="active_form_annot"),
+    name="active_form_annot",
+)
+SegCreator = aliased(Creator, name="seg_creator")
+FormCreator = aliased(Creator, name="form_creator")
+SegTag = aliased(Tag, name="seg_tag")
+FormTag = aliased(Tag, name="form_tag")
+InstTag = aliased(Tag, name="image_tag")
 
 # list of properties that are searchable with identifier and mapped ORM property
-searchable_fields = Literal['Image DBID', 'Laterality', 'Modality', 'Anatomic Region', 'ETDRS Field', 'Color Fundus Quality', 'Study Date', 'Patient Identifier', 'Patient Sex', 'Patient Birthdata', 'Project Name', 'Device Model ID', 'Feature Name', 'Tag Name']
+searchable_fields = Literal[
+    'Image DBID', 
+    'Laterality', 
+    'Modality', 
+    'Anatomic Region', 
+    'ETDRS Field', 
+    'Color Fundus Quality',
+    'Study Date',
+    'Patient Identifier',
+    'Patient Sex',
+    'Patient Birthdate',
+    'Project Name',
+    'Device Model ID',
+
+    'SegmentationFeature Name',  # backward-compat
+    'Segmentation Creator Name',
+    'Segmentation Tag Name',
+    'Form Schema Name',
+    'Form Creator Name',
+    'Form Tag Name',
+    'Image Tag Name',
+]
 
 operators = Literal[">", "<", ">=", "<=", "==", "!="]
 
@@ -51,8 +93,77 @@ instance_search_fields_map: Dict[searchable_fields, Any] = {
     'Patient Birthdate': Patient.BirthDate,
     'Project Name': Project.ProjectName,
     'Device Model ID': DeviceModel.DeviceModelID,
-    'Feature Name': Feature.FeatureName,
-    'Tag Name': Tag.TagName,
+
+    'Segmentation Feature Name': Feature.FeatureName,
+    'Segmentation Creator Name': SegCreator.CreatorName,
+    'Segmentation Tag Name': SegTag.TagName,
+    'Form Schema Name': FormSchema.SchemaName,
+    'Form Creator Name': FormCreator.CreatorName,
+    'Form Tag Name': FormTag.TagName,
+    'Image Tag Name': InstTag.TagName,
+}
+
+# Study search
+study_searchable_fields = Literal[
+    'Study Date',
+    'Study Description',
+    'Study Round',
+    'Study Instance UID',
+    'Patient Identifier',
+    'Patient Sex',
+    'Patient Birthdate',
+    'Project Name',
+
+    'Form Schema Name',
+    'Form Creator Name',
+    'Form Tag Name',
+]
+
+study_search_fields_map: Dict[study_searchable_fields, Any] = {
+    'Study Date': Study.StudyDate,
+    'Study Description': Study.StudyDescription,
+    'Study Round': Study.StudyRound,
+    'Study Instance UID': Study.StudyInstanceUid,
+    'Patient Identifier': Patient.PatientIdentifier,
+    'Patient Sex': Patient.Sex,
+    'Patient Birthdate': Patient.BirthDate,
+    'Project Name': Project.ProjectName,
+
+    'Form Schema Name': FormSchema.SchemaName,
+    'Form Creator Name': FormCreator.CreatorName,
+    'Form Tag Name': FormTag.TagName,
+}
+
+# Order-by options for instances
+instance_order_by_fields = Literal[
+    'Study Date',
+    'Patient Birthdate',
+    'Date Inserted',
+    'Date Modified',
+    'Date Preprocessed',
+]
+
+instance_order_by_fields_map: Dict[instance_order_by_fields, Any] = {
+    'Study Date': Study.StudyDate,
+    'Patient Birthdate': Patient.BirthDate,
+    'Date Inserted': ImageInstance.DateInserted,
+    'Date Modified': ImageInstance.DateModified,
+    'Date Preprocessed': ImageInstance.DatePreprocessed,
+}
+
+# Order-by options for studies
+study_order_by_fields = Literal[
+    'Study Date',
+    'Patient Birthdate',
+    'Date Inserted',
+    'Study Round',
+]
+
+study_order_by_fields_map: Dict[study_order_by_fields, Any] = {
+    'Study Date': Study.StudyDate,
+    'Patient Birthdate': Patient.BirthDate,
+    'Date Inserted': Study.DateInserted,
+    'Study Round': Study.StudyRound,
 }
 
 
@@ -65,66 +176,206 @@ def _map_mysql_operator(operator: str, value: Any) -> str:
     return operator
 
 
-def format_condition(variable, condition):
-    operator = _map_mysql_operator(condition["operator"], condition["value"])
+def format_condition(variable: Any, condition: Dict[str, Any]) -> Any:
+    """Return a SQLAlchemy boolean expression for one condition."""
+    op = condition["operator"]
     value = condition["value"]
+
     if value is None:
-        # Only valid comparisons to NULL in SQL are IS / IS NOT
-        return "{} {} NULL".format(variable, operator)
+        return variable.is_(None) if op == "==" else variable.is_not(None)
     if isinstance(value, list):
-        return "{} IN ({})".format(variable, ", ".join(map(str, value)))
-    return '{} {} "{}"'.format(variable, operator, value)
+        return variable.in_(value)
+    if op == "==":
+        return variable == value
+    if op == "!=":
+        return variable != value
+    if op == ">":
+        return variable > value
+    if op == "<":
+        return variable < value
+    if op == ">=":
+        return variable >= value
+    if op == "<=":
+        return variable <= value
+    raise ValueError(f"Unsupported operator: {op}")
 
-def create_condition(conditions):
-    for condition in conditions:
-        assert (
-            condition["variable"] in instance_search_fields_map
-        ), f"Invalid variable: {condition['variable']}"
-        condition["variable"] = instance_search_fields_map[condition["variable"]]
 
-    # Group conditions by variable
-    conditions_by_variable = defaultdict(list)
-    for condition in conditions:
-        conditions_by_variable[condition["variable"]].append(condition)
+def create_condition(conditions: List[Dict[str, Any]], fields_map: Optional[Dict[str, Any]] = None) -> Any:
+    """Build a SQLAlchemy boolean expression from user conditions."""
+    if fields_map is None:
+        fields_map = instance_search_fields_map
 
-    # Generate the WHERE clause
-    where_clauses = []
-    for variable, conditions in conditions_by_variable.items():
-        # Check if the value is a date
-        is_date = variable in (
-            instance_search_fields_map['Study Date'],
-            instance_search_fields_map['Patient Birthdata'],
-        )
-        join_operator = " AND " if is_date else " OR "
+    # Map variables to ORM attributes
+    for c in conditions:
+        assert c["variable"] in fields_map, f"Invalid variable: {c['variable']}"
+        c["variable"] = fields_map[c["variable"]]
 
-        where_clauses.append(
-            "({})".format(
-                join_operator.join([format_condition(variable, c) for c in conditions])
-            )
-        )
-    return text(" AND ".join(where_clauses))
+    # OR all conditions globally (no per-variable grouping)
+    exprs: List[Any] = [format_condition(c["variable"], c) for c in conditions]
+    return or_(*exprs) if exprs else true()
 
 
 class SearchCondition(BaseModel):
     variable: searchable_fields
     operator: operators
-    value: Any
+    value: Union[date, int, float, str, None]
 
 class SearchQuery(BaseModel):
     conditions: List[SearchCondition]
     limit: int = 200
     page: int = 0
+    order_by: Optional[instance_order_by_fields] = None
+    order: Literal["ASC", "DESC"] = "ASC"
+    include_count: bool = False
 
 
 class SearchResponse(BaseModel):
     instances: List[InstanceGET]
     limit: int
     page: int
-    count: int
+    count: Optional[int] = None
     result_ids: List[int]
-    query: str
+    has_more: bool
 
-@router.post("/instances/search", response_model=SearchResponse)
+# Study search DTOs
+class StudySearchCondition(BaseModel):
+    variable: study_searchable_fields
+    operator: operators
+    value: Any
+
+class StudySearchQuery(BaseModel):
+    conditions: List[StudySearchCondition]
+    limit: int = 200
+    page: int = 0
+    order_by: Optional[study_order_by_fields] = None
+    order: Literal["ASC", "DESC"] = "ASC"
+    include_count: bool = False
+
+class StudySearchResponse(BaseModel):
+    studies: List[StudyGET]
+    instances: List[InstanceMeta]
+    limit: int
+    page: int
+    count: Optional[int] = None
+    result_ids: List[int]
+    has_more: bool
+
+
+def _build_instance_ids_select(conditions: List[Dict[str, Any]]):
+    """
+    Build the base ImageInstance ID select with conditional joins for Segmentation and FormAnnotation.
+    """
+    requested = {c["variable"] for c in conditions}
+
+    where = create_condition(conditions, fields_map=instance_search_fields_map)
+
+    # Determine needed joins
+    needs_seg_feature = bool(requested & {'Feature Name', 'Segmentation Feature Name'})
+    needs_seg_creator = 'Segmentation Creator Name' in requested
+    needs_seg_tag = 'Segmentation Tag Name' in requested
+    needs_seg = needs_seg_feature or needs_seg_creator or needs_seg_tag
+
+    needs_form_schema = 'Form Schema Name' in requested
+    needs_form_creator = 'Form Creator Name' in requested
+    needs_form_tag = 'Form Tag Name' in requested
+    needs_form = needs_form_schema or needs_form_creator or needs_form_tag
+
+    needs_inst_tag = bool(requested & {'Image Tag Name', 'Tag Name'})
+
+    q = (
+        select(ImageInstance.ImageInstanceID)
+        .join_from(ImageInstance, Series, ImageInstance.SeriesID == Series.SeriesID, isouter=True)
+        .join_from(Series, Study, isouter=True)
+        .join_from(Study, Patient, isouter=True)
+        .join_from(Patient, Project, isouter=True)
+        .join_from(ImageInstance, DeviceInstance, isouter=True)
+        .join_from(DeviceInstance, DeviceModel, isouter=True)
+        .join_from(ImageInstance, SourceInfo, isouter=True)
+        .join_from(ImageInstance, Scan, isouter=True)
+    )
+
+    if needs_seg:
+        q = q.join_from(
+            ImageInstance, ActiveSegmentation,
+            ActiveSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID, isouter=True
+        )
+        if needs_seg_feature:
+            q = q.join_from(ActiveSegmentation, Feature, isouter=True)
+        if needs_seg_creator:
+            q = q.join_from(
+                ActiveSegmentation, SegCreator,
+                ActiveSegmentation.CreatorID == SegCreator.CreatorID, isouter=True
+            )
+        if needs_seg_tag:
+            q = q.join_from(ActiveSegmentation, SegmentationTagLink, isouter=True)\
+                 .join_from(SegmentationTagLink, SegTag, isouter=True)
+
+    if needs_form:
+        q = q.join_from(
+            ImageInstance, ActiveFormAnnotation,
+            ActiveFormAnnotation.ImageInstanceID == ImageInstance.ImageInstanceID, isouter=True
+        )
+        if needs_form_schema:
+            q = q.join_from(ActiveFormAnnotation, FormSchema, ActiveFormAnnotation.SchemaID == FormSchema.FormSchemaID, isouter=True)
+        if needs_form_creator:
+            q = q.join_from(
+                ActiveFormAnnotation, FormCreator,
+                ActiveFormAnnotation.CreatorID == FormCreator.CreatorID, isouter=True
+            )
+        if needs_form_tag:
+            q = q.join_from(ActiveFormAnnotation, FormAnnotationTagLink, isouter=True)\
+                 .join_from(FormAnnotationTagLink, FormTag, isouter=True)
+
+    if needs_inst_tag:
+        q = q.join_from(ImageInstance, ImageInstanceTagLink, isouter=True)\
+             .join_from(ImageInstanceTagLink, InstTag, isouter=True)
+
+    return (
+        q.filter(ImageInstance.Modality.is_not(None))
+         .where(where)
+         .distinct()
+         .order_by(ImageInstance.ImageInstanceID.asc())
+    )
+
+
+def _build_study_ids_select(conditions: List[Dict[str, Any]]):
+    """
+    Build the base Study ID select with conditional joins for ActiveFormAnnotation.
+    """
+    requested = {c["variable"] for c in conditions}
+
+    where = create_condition(conditions, fields_map=study_search_fields_map)
+
+    needs_form_schema = 'Form Schema Name' in requested
+    needs_form_creator = 'Form Creator Name' in requested
+    needs_form_tag = 'Form Tag Name' in requested
+    needs_form = needs_form_schema or needs_form_creator or needs_form_tag
+
+    q = (
+        select(Study.StudyID)
+        .join_from(Study, Patient, onclause=Study.PatientID == Patient.PatientID)
+        .join_from(Patient, Project)
+        .join_from(Study, StudyTagLink, isouter=True)
+        .join_from(StudyTagLink, Tag, isouter=True)
+    )
+
+    if needs_form:
+        q = q.join_from(Study, ActiveFormAnnotation, ActiveFormAnnotation.StudyID == Study.StudyID, isouter=True)
+        if needs_form_schema:
+            q = q.join_from(ActiveFormAnnotation, FormSchema, ActiveFormAnnotation.SchemaID == FormSchema.FormSchemaID, isouter=True)
+        if needs_form_creator:
+            q = q.join_from(
+                ActiveFormAnnotation, FormCreator,
+                ActiveFormAnnotation.CreatorID == FormCreator.CreatorID, isouter=True
+            )
+        if needs_form_tag:
+            q = q.join_from(ActiveFormAnnotation, FormAnnotationTagLink, isouter=True)\
+                 .join_from(FormAnnotationTagLink, FormTag, isouter=True)
+
+    return q.where(where).distinct().order_by(Study.StudyID.asc())
+
+
+@router.post("/instances/search", response_model=SearchResponse, response_model_exclude_none=True)
 async def create_form_annotation(
     query: SearchQuery,
     db: Session = Depends(get_db),
@@ -135,81 +386,107 @@ async def create_form_annotation(
 
     limit = params.get("limit", 200)
     page = params.get("page", 0)
-
     offset = limit * page
 
-    # alias the annotation tables to filter out inactive annotations
-    ActiveSegmentation = aliased(
-        Segmentation,
-        select(Segmentation).filter(~Segmentation.Inactive).subquery(name="active_annot"),
-        name="active_annot",
-    )
-    ActiveFormAnnotation = aliased(
-        FormAnnotation,
-        select(FormAnnotation)
-        .filter(~FormAnnotation.Inactive)
-        .subquery(name="active_form_annot"),
-        name="active_form_annot",
-    )
+    base_ids = _build_instance_ids_select(conditions)
 
-    # TODO: join with other tables?
-    # perhaps FormSchema? Task?
-    where = create_condition(conditions)
-    query = (
+    ids = db.execute(base_ids.limit(limit + 1).offset(offset)).scalars().all()
+    has_more = len(ids) > limit
+    if has_more:
+        ids = ids[:limit]
+
+    if not ids:
+        return {"instances": [], "limit": limit, "page": page, "count": None, "result_ids": [], "has_more": False}
+
+    instances_stmt = (
         select(ImageInstance)
-        .join_from(
-            ImageInstance,
-            Series,
-            ImageInstance.SeriesID == Series.SeriesID,
-            isouter=True,
+        .where(ImageInstance.ImageInstanceID.in_(ids))
+        .options(
+            selectinload(ImageInstance.Series).selectinload(Series.Study).selectinload(Study.Patient).selectinload(Patient.Project),
+            selectinload(ImageInstance.DeviceInstance).selectinload(DeviceInstance.DeviceModel),
+            selectinload(ImageInstance.SourceInfo),
+            selectinload(ImageInstance.Scan),
+            selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
         )
-        .join_from(Series, Study, isouter=True)
-        .join_from(Study, Patient, isouter=True)
-        .join_from(Patient, Project, isouter=True)
-        .join_from(ImageInstance, DeviceInstance, isouter=True)
-        .join_from(DeviceInstance, DeviceModel, isouter=True)
-        .join_from(ImageInstance, SourceInfo, isouter=True)
-        .join_from(ImageInstance, Scan, isouter=True)
-        .join_from(ImageInstance, ImageInstanceTagLink, isouter=True)
-        .join_from(ImageInstanceTagLink, Tag, isouter=True)
-        .join_from(
-            ImageInstance,
-            ActiveFormAnnotation,
-            ActiveFormAnnotation.ImageInstanceID == ImageInstance.ImageInstanceID,
-            isouter=True,
-        )
-        .join_from(
-            ImageInstance,
-            ActiveSegmentation,
-            ActiveSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID,
-            isouter=True,
-        )
-        .join_from(ActiveSegmentation, Feature, isouter=True)
-        .join_from(
-            ActiveSegmentation,
-            Creator,
-            ActiveSegmentation.CreatorID == Creator.CreatorID,
-            isouter=True,
-        )
-        .filter(ImageInstance.Modality.is_not(None))
-        .where(where)
-        .distinct()
     )
+    instances = db.execute(instances_stmt).scalars().all()
+    order = {i: idx for idx, i in enumerate(ids)}
+    instances.sort(key=lambda x: order[x.ImageInstanceID])
 
-    instances = db.execute(query.limit(limit).offset(offset)).scalars().all()
-
-    # COUNT using subquery
-    subquery = query.compile(dialect=mysql.dialect())
-    # print(str(subquery))
-    count_query = f"SELECT COUNT(*) FROM({subquery}) as MYSUBQ"
-    count = db.execute(text(str(count_query))).first()[0]
-
+    count = None
+    if params.get("include_count"):
+        count = db.execute(select(func.count()).select_from(base_ids.subquery())).scalar_one()
 
     return {
-        "instances": [DTOConverter.image_instance_to_get(instance) for instance in instances],
+        "instances": [DTOConverter.image_instance_to_get(i) for i in instances],
         "limit": limit,
         "page": page,
         "count": count,
-        "result_ids": [instance.ImageInstanceID for instance in instances],
-        "query": str(subquery),
+        "result_ids": ids,
+        "has_more": has_more,
+    }
+
+# New endpoint: /studies/search
+@router.post("/studies/search", response_model=StudySearchResponse, response_model_exclude_none=True)
+async def search_studies(
+    query: StudySearchQuery,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    params = query.model_dump()
+    conditions = params.get("conditions", {})
+
+    limit = params.get("limit", 200)
+    page = params.get("page", 0)
+    offset = limit * page
+
+    base_ids = _build_study_ids_select(conditions)
+
+    study_ids = db.execute(base_ids.limit(limit + 1).offset(offset)).scalars().all()
+    has_more = len(study_ids) > limit
+    if has_more:
+        study_ids = study_ids[:limit]
+
+    if not study_ids:
+        return {"studies": [], "instances": [], "limit": limit, "page": page, "count": None, "result_ids": [], "has_more": False}
+
+    studies_stmt = (
+        select(Study)
+        .where(Study.StudyID.in_(study_ids))
+        .options(
+            selectinload(Study.Series).selectinload(Series.ImageInstances)
+        )
+    )
+    studies = db.execute(studies_stmt).scalars().all()
+
+    instances_q = (
+        select(ImageInstance)
+        .join(Series, ImageInstance.SeriesID == Series.SeriesID)
+        .where(Series.StudyID.in_(study_ids))
+        .options(
+            selectinload(ImageInstance.Series).selectinload(Series.Study).selectinload(Study.Patient).selectinload(Patient.Project),
+            selectinload(ImageInstance.DeviceInstance).selectinload(DeviceInstance.DeviceModel),
+            selectinload(ImageInstance.SourceInfo),
+            selectinload(ImageInstance.Scan),
+            selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
+        )
+        .distinct()
+    )
+    instances = db.execute(instances_q).scalars().all()
+
+    count = None
+    if params.get("include_count"):
+        count = db.execute(select(func.count()).select_from(base_ids.subquery())).scalar_one()
+
+    order = {i: idx for idx, i in enumerate(study_ids)}
+    studies.sort(key=lambda s: order[s.StudyID])
+
+    return {
+        "studies": [DTOConverter.study_to_get(s, include_series=True) for s in studies],
+        "instances": [DTOConverter.image_instance_to_get(i) for i in instances],
+        "limit": limit,
+        "page": page,
+        "count": count,
+        "result_ids": study_ids,
+        "has_more": has_more,
     }

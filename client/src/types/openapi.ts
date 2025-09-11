@@ -372,6 +372,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/studies/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search Studies */
+        post: operations["search_studies_studies_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/form-schemas/{form_schema_id}": {
         parameters: {
             query?: never;
@@ -869,6 +886,22 @@ export interface components {
             /** Tags */
             tags: components["schemas"]["TagGET"][];
         };
+        /** InstanceMeta */
+        InstanceMeta: {
+            /** Id */
+            id: number;
+            /** Thumbnail Path */
+            thumbnail_path: string;
+            modality?: components["schemas"]["Modality"] | null;
+            dicom_modality?: components["schemas"]["ModalityType"] | null;
+            etdrs_field?: components["schemas"]["ETDRSField"] | null;
+            laterality?: components["schemas"]["Laterality"] | null;
+            /** Anatomic Region */
+            anatomic_region: string;
+            device: components["schemas"]["DeviceMeta"];
+            /** Tags */
+            tags: components["schemas"]["TagGET"][];
+        };
         /**
          * Laterality
          * @enum {string}
@@ -915,12 +948,25 @@ export interface components {
             /** Mode */
             mode: string;
         };
+        /** SearchCondition */
+        SearchCondition: {
+            /**
+             * Variable
+             * @enum {string}
+             */
+            variable: "Image DBID" | "Laterality" | "Modality" | "Anatomic Region" | "ETDRS Field" | "Color Fundus Quality" | "Study Date" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Device Model ID" | "SegmentationFeature Name" | "Segmentation Creator Name" | "Segmentation Tag Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Image Tag Name";
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=";
+            /** Value */
+            value: string | number | null;
+        };
         /** SearchQuery */
         SearchQuery: {
             /** Conditions */
-            conditions: {
-                [key: string]: unknown;
-            }[];
+            conditions: components["schemas"]["SearchCondition"][];
             /**
              * Limit
              * @default 200
@@ -931,6 +977,19 @@ export interface components {
              * @default 0
              */
             page: number;
+            /** Order By */
+            order_by?: ("Study Date" | "Patient Birthdate" | "Date Inserted" | "Date Modified" | "Date Preprocessed") | null;
+            /**
+             * Order
+             * @default ASC
+             * @enum {string}
+             */
+            order: "ASC" | "DESC";
+            /**
+             * Include Count
+             * @default false
+             */
+            include_count: boolean;
         };
         /** SearchResponse */
         SearchResponse: {
@@ -941,11 +1000,11 @@ export interface components {
             /** Page */
             page: number;
             /** Count */
-            count: number;
+            count?: number | null;
             /** Result Ids */
             result_ids: number[];
-            /** Query */
-            query: string;
+            /** Has More */
+            has_more: boolean;
         };
         /** SegmentationPatch */
         SegmentationPatch: {
@@ -955,6 +1014,17 @@ export interface components {
             FeatureID?: number | null;
             /** Threshold */
             Threshold?: number | null;
+        };
+        /** SeriesGET */
+        SeriesGET: {
+            /** Id */
+            id: number;
+            /** Series Number */
+            series_number?: number | null;
+            /** Series Instance Uid */
+            series_instance_uid: string;
+            /** Instance Ids */
+            instance_ids?: number[];
         };
         /** SeriesMeta */
         SeriesMeta: {
@@ -979,6 +1049,8 @@ export interface components {
             date: string;
             /** Study Instance Uid */
             study_instance_uid?: string | null;
+            /** Series */
+            series?: components["schemas"]["SeriesGET"][] | null;
         };
         /** StudyMeta */
         StudyMeta: {
@@ -989,6 +1061,66 @@ export interface components {
              * Format: date-time
              */
             date: string;
+        };
+        /** StudySearchCondition */
+        StudySearchCondition: {
+            /**
+             * Variable
+             * @enum {string}
+             */
+            variable: "Study Date" | "Study Description" | "Study Round" | "Study Instance UID" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name";
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=";
+            /** Value */
+            value: unknown;
+        };
+        /** StudySearchQuery */
+        StudySearchQuery: {
+            /** Conditions */
+            conditions: components["schemas"]["StudySearchCondition"][];
+            /**
+             * Limit
+             * @default 200
+             */
+            limit: number;
+            /**
+             * Page
+             * @default 0
+             */
+            page: number;
+            /** Order By */
+            order_by?: ("Study Date" | "Patient Birthdate" | "Date Inserted" | "Study Round") | null;
+            /**
+             * Order
+             * @default ASC
+             * @enum {string}
+             */
+            order: "ASC" | "DESC";
+            /**
+             * Include Count
+             * @default false
+             */
+            include_count: boolean;
+        };
+        /** StudySearchResponse */
+        StudySearchResponse: {
+            /** Studies */
+            studies: components["schemas"]["StudyGET"][];
+            /** Instances */
+            instances: components["schemas"]["InstanceMeta"][];
+            /** Limit */
+            limit: number;
+            /** Page */
+            page: number;
+            /** Count */
+            count?: number | null;
+            /** Result Ids */
+            result_ids: number[];
+            /** Has More */
+            has_more: boolean;
         };
         /** SubTaskGET */
         SubTaskGET: {
@@ -2155,6 +2287,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_studies_studies_search_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudySearchQuery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudySearchResponse"];
                 };
             };
             /** @description Validation Error */

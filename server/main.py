@@ -1,10 +1,12 @@
+import logging
 import os
 import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, ORJSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
 from server.config import settings
@@ -26,7 +28,7 @@ from server.utils.database_init import (
 )
 from eyened_orm import Database
 
-app_api = FastAPI(title="Eyened API")
+app_api = FastAPI(title="Eyened API", default_response_class=ORJSONResponse)
 app_api.include_router(auth.router)
 app_api.include_router(instances.router)
 app_api.include_router(segmentations.router)
@@ -86,7 +88,11 @@ async def lifespan(app: FastAPI):
     else:
         print("DATABASE_ROOT_PASSWORD is not set, skipping database creation")
 
+
+
     # before startup
+    logging.basicConfig()
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
     
     
     db = Database(settings)
@@ -105,6 +111,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(GZipMiddleware, minimum_size=1024 * 1024)
 
 app.mount("/api", app_api)
 
