@@ -188,7 +188,7 @@ class Segmentation(SegmentationBase):
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID", ondelete="RESTRICT"))
-    SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID"))
+    SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="SET NULL"))
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]]
@@ -237,7 +237,7 @@ class Feature(Base):
     FeatureAssociations: Mapped[List["FeatureFeatureLink"]] = relationship(
         back_populates="Feature",
         foreign_keys="FeatureFeatureLink.ParentFeatureID",
-        cascade="all, delete-orphan",  # remove CompositeFeature rows when parent Feature is deleted
+        passive_deletes=True,
     )
     
     # Child side stays non-cascading (used only to detect blocking links)

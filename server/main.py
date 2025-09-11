@@ -14,14 +14,15 @@ from server.routes import (
     instances,
     segmentations,
     form_schema,
+    form_annotations,
     feature,
     tag,
     task,
+    search,
 )
 from server.utils.database_init import (
     create_database,
     init_admin,
-    init_task_states,
 )
 from eyened_orm import Database
 
@@ -30,6 +31,8 @@ app_api.include_router(auth.router)
 app_api.include_router(instances.router)
 app_api.include_router(segmentations.router)
 app_api.include_router(import_api.router)
+app_api.include_router(form_annotations.router)
+app_api.include_router(search.router)
 app_api.include_router(form_schema.router)
 app_api.include_router(feature.router)
 app_api.include_router(tag.router)
@@ -92,7 +95,6 @@ async def lifespan(app: FastAPI):
 
     with db.get_session() as session:
         init_admin(session)
-        init_task_states(session)
         
 
 

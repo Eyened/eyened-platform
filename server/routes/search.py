@@ -4,10 +4,11 @@ from typing import Any, Dict, List, Literal
 from eyened_orm import (
     Creator,
     DeviceModel,
+    DeviceInstance,
     Feature,
     FormAnnotation,
     ImageInstance,
-    ImageInstanceTag,
+    ImageInstanceTagLink,
     Patient,
     Project,
     Scan,
@@ -26,7 +27,8 @@ from sqlalchemy.dialects import mysql
 
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
-from ..dtos import InstanceGET, DTOConverter
+from ..dtos import InstanceGET
+from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
 
@@ -46,7 +48,7 @@ instance_search_fields_map: Dict[searchable_fields, Any] = {
     'Study Date': Study.StudyDate,
     'Patient Identifier': Patient.PatientIdentifier,
     'Patient Sex': Patient.Sex,
-    'Patient Birthdata': Patient.BirthDate,
+    'Patient Birthdate': Patient.BirthDate,
     'Project Name': Project.ProjectName,
     'Device Model ID': DeviceModel.DeviceModelID,
     'Feature Name': Feature.FeatureName,
@@ -54,28 +56,20 @@ instance_search_fields_map: Dict[searchable_fields, Any] = {
 }
 
 
+def _map_mysql_operator(operator: str, value: Any) -> str:
+    """Map user-provided operator to a MySQL-valid operator, considering NULL semantics."""
+    if operator == "==":
+        return "IS" if value is None else "="
+    if operator == "!=":
+        return "IS NOT" if value is None else "!="
+    return operator
 
-
-def get_series_studies_patients(session, instances: List[ImageInstance]):
-    series_ids = [instance.SeriesID for instance in instances]
-    # get series, studies, and patients for provided instances
-    rows = (
-        session.query(Series, Study, Patient)
-        .join(Study, Series.StudyID == Study.StudyID)
-        .join(Patient, Study.PatientID == Patient.PatientID)
-        .filter(Series.SeriesID.in_(series_ids))
-        .all()
-    )
-    return {
-        "series": set([row[0] for row in rows]),
-        "studies": set([row[1] for row in rows]),
-        "patients": set([row[2] for row in rows]),
-    }
 
 def format_condition(variable, condition):
-    operator = condition["operator"]
+    operator = _map_mysql_operator(condition["operator"], condition["value"])
     value = condition["value"]
     if value is None:
+        # Only valid comparisons to NULL in SQL are IS / IS NOT
         return "{} {} NULL".format(variable, operator)
     if isinstance(value, list):
         return "{} IN ({})".format(variable, ", ".join(map(str, value)))
@@ -117,7 +111,7 @@ class SearchCondition(BaseModel):
     value: Any
 
 class SearchQuery(BaseModel):
-    conditions: List[Dict[str, Any]]
+    conditions: List[SearchCondition]
     limit: int = 200
     page: int = 0
 
@@ -136,7 +130,7 @@ async def create_form_annotation(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    params = query.get_json()
+    params = query.model_dump()
     conditions = params.get("conditions", {})
 
     limit = params.get("limit", 200)
@@ -172,11 +166,12 @@ async def create_form_annotation(
         .join_from(Series, Study, isouter=True)
         .join_from(Study, Patient, isouter=True)
         .join_from(Patient, Project, isouter=True)
-        .join_from(ImageInstance, Device, isouter=True)
+        .join_from(ImageInstance, DeviceInstance, isouter=True)
+        .join_from(DeviceInstance, DeviceModel, isouter=True)
         .join_from(ImageInstance, SourceInfo, isouter=True)
         .join_from(ImageInstance, Scan, isouter=True)
-        .join_from(ImageInstance, ImageInstanceTag, isouter=True)
-        .join_from(ImageInstanceTag, Tag, isouter=True)
+        .join_from(ImageInstance, ImageInstanceTagLink, isouter=True)
+        .join_from(ImageInstanceTagLink, Tag, isouter=True)
         .join_from(
             ImageInstance,
             ActiveFormAnnotation,
@@ -211,7 +206,7 @@ async def create_form_annotation(
 
 
     return {
-        "instances": [DTOConverter.instance_to_get(instance) for instance in instances],
+        "instances": [DTOConverter.image_instance_to_get(instance) for instance in instances],
         "limit": limit,
         "page": page,
         "count": count,

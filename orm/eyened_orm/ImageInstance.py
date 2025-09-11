@@ -184,23 +184,24 @@ class ImageInstance(Base):
 
     # relationships:
     Annotations: Mapped[List["Annotation"]] = relationship(
-        back_populates="ImageInstance", cascade="all, delete"
+        back_populates="ImageInstance", passive_deletes=True
     )
 
     Segmentations: Mapped[List["Segmentation"]] = relationship(
-        back_populates="ImageInstance", cascade="all, delete"
+        back_populates="ImageInstance", passive_deletes=True
     )
     
     ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(
-        back_populates="ImageInstance", cascade="all, delete"
+        back_populates="ImageInstance", passive_deletes=True
     )
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
-        back_populates="ImageInstance", cascade="all, delete"
+        back_populates="ImageInstance", passive_deletes=True
     )
 
     SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(
-        back_populates="ImageInstance"
+        back_populates="ImageInstance",
+        passive_deletes=True,
     )
 
     ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(back_populates="ImageInstance")

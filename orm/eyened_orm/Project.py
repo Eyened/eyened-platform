@@ -42,7 +42,7 @@ class Project(Base):
     Contact: Mapped[Optional["Contact"]] = relationship(back_populates="Projects")
 
     Patients: Mapped[List["Patient"]] = relationship(
-        back_populates="Project", cascade="all, delete"
+        back_populates="Project", passive_deletes=True
     )
 
     def make_dataframe(self, session: Session) -> pd.DataFrame:

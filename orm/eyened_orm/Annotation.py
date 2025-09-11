@@ -54,7 +54,7 @@ class Annotation(Base):
         ForeignKey("AnnotationType.AnnotationTypeID")
     )
     AnnotationReferenceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Annotation.AnnotationID")
+        ForeignKey("Annotation.AnnotationID", ondelete="CASCADE")
     )
     Inactive: Mapped[bool] = mapped_column(default=False)
 
@@ -75,11 +75,11 @@ class Annotation(Base):
 
     ChildAnnotations: Mapped[List["Annotation"]] = relationship(
         back_populates="AnnotationReference",
-        cascade="all, delete",
+        passive_deletes=True,
     )
     # Actual data is stored in AnnotationData
     AnnotationData: Mapped[List["AnnotationData"]] = relationship(
-        back_populates="Annotation", cascade="all, delete"
+        back_populates="Annotation", passive_deletes=True
     )
 
     def __repr__(self):

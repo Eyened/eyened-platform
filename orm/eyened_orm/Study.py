@@ -23,7 +23,7 @@ class Study(Base):
     )
 
     StudyID: Mapped[int] = mapped_column(primary_key=True)
-    PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
+    PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID", ondelete="CASCADE"))
     StudyRound: Mapped[Optional[int]]
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))
     StudyInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
@@ -32,7 +32,7 @@ class Study(Base):
     DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
 
     Patient: Mapped["Patient"] = relationship(back_populates="Studies")
-    Series: Mapped[List["Series"]] = relationship(back_populates="Study")
+    Series: Mapped[List["Series"]] = relationship(back_populates="Study", passive_deletes=True)
     Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Study")
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Study")
 
@@ -74,7 +74,7 @@ class Series(Base):
     __table_args__ = (Index("fk_Series_Study1_idx", "StudyID"),)
 
     SeriesID: Mapped[int] = mapped_column(primary_key=True)
-    StudyID: Mapped[int] = mapped_column(ForeignKey("Study.StudyID"))
+    StudyID: Mapped[int] = mapped_column(ForeignKey("Study.StudyID", ondelete="CASCADE"))
     SeriesNumber: Mapped[Optional[int]]
     SeriesInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
 
