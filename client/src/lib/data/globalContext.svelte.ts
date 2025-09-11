@@ -1,6 +1,7 @@
 import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 import { ModelSegmentation, type Segmentation } from '$lib/datamodel/segmentation.svelte';
 import { UserManager } from '$lib/usermanager';
+import openAPISpec from '../../types/openapi.json';
 
 export type ComponentDef = {
     component: any,
@@ -45,6 +46,10 @@ export class GlobalContext {
 
     updateConfig(config: any) {
         this.config = { ...this.config, ...config };
+    }
+
+    get openAPISpec() {
+        return openAPISpec;
     }
 
     get segmentationsFilter() {

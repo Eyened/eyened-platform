@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ChangePasswordForm from './ChangePasswordForm.svelte';
-	import { getContext } from 'svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import type { GlobalContext } from '$lib/data/globalContext.svelte'
+	import { getContext } from 'svelte'
+	import ChangePasswordForm from './ChangePasswordForm.svelte'
 
 	const globalContext = getContext<GlobalContext>("globalContext");
 	const { userManager, creator } = globalContext;

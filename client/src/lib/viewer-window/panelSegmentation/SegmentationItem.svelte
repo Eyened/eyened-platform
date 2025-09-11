@@ -1,21 +1,21 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
-    import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
-    import ThresholdSlider from "./ThresholdSlider.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
+    import { getContext } from "svelte"
+    import { Hide, PanelIcon, Show, Trash } from "../icons/icons"
+    import ThresholdSlider from "./ThresholdSlider.svelte"
 
-    import CCPanel from "./CCPanel.svelte";
-    import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte";
-    import FeatureColorPicker from "./FeatureColorPicker.svelte";
-    import ImportPanel from "./ImportPanel.svelte";
-    import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
-    import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import StringDialogue from "$lib/StringDialogue.svelte";
-    import AI from "../icons/AI.svelte";
-    import { duplicate } from "./duplicate_utils";
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte"
+    import StringDialogue from "$lib/StringDialogue.svelte"
+    import AI from "../icons/AI.svelte"
+    import CCPanel from "./CCPanel.svelte"
+    import { duplicate } from "./duplicate_utils"
+    import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte"
+    import FeatureColorPicker from "./FeatureColorPicker.svelte"
+    import ImportPanel from "./ImportPanel.svelte"
+    import MultiFeatureSelector from "./MultiFeatureSelector.svelte"
+    import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte"
 
     const globalContext = getContext<GlobalContext>("globalContext");
 

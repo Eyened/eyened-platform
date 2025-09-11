@@ -1,11 +1,11 @@
 <script lang="ts">
-    import type { Position2D } from "$lib/types";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { getContext } from "svelte";
-    import { Edit, Hide, PanelIcon, Show, Trash } from "../icons/icons";
-    import type { ETDRSGridOverlay } from "$lib/viewer/overlays/ETDRSGridOverlay.svelte";
-    import type { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
+    import type { Position2D } from "$lib/types"
+    import type { ETDRSGridOverlay } from "$lib/viewer/overlays/ETDRSGridOverlay.svelte"
+    import type { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte"
+    import { getContext } from "svelte"
+    import { Edit, Hide, PanelIcon, Show, Trash } from "../icons/icons"
 
     const globalContext = getContext<GlobalContext>("globalContext");
 

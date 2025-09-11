@@ -4152,20 +4152,11 @@
             "default": 0
           },
           "order_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "Study Date",
-                  "Patient Birthdate",
-                  "Date Inserted",
-                  "Date Modified",
-                  "Date Preprocessed"
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "Study Date",
+              "Patient Birthdate",
+              "Date Inserted"
             ],
             "title": "Order By"
           },
@@ -4186,7 +4177,8 @@
         },
         "type": "object",
         "required": [
-          "conditions"
+          "conditions",
+          "order_by"
         ],
         "title": "SearchQuery"
       },
@@ -4286,6 +4278,16 @@
             "type": "integer",
             "title": "Id"
           },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "series_number": {
             "anyOf": [
               {
@@ -4358,6 +4360,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Date"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
           },
           "study_instance_uid": {
             "anyOf": [
@@ -4474,19 +4487,11 @@
             "default": 0
           },
           "order_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "Study Date",
-                  "Patient Birthdate",
-                  "Date Inserted",
-                  "Study Round"
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "Study Date",
+              "Patient Birthdate",
+              "Date Inserted"
             ],
             "title": "Order By"
           },
@@ -4507,7 +4512,8 @@
         },
         "type": "object",
         "required": [
-          "conditions"
+          "conditions",
+          "order_by"
         ],
         "title": "StudySearchQuery"
       },

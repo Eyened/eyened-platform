@@ -1,6 +1,9 @@
 <script lang="ts">
-	import type { Series } from '$lib/datamodel/series';
-	import InstanceComponent from './InstanceComponent.svelte';
+    import { getContext } from 'svelte'
+    import type { components } from '../../types/openapi'
+    import type { BrowserContext } from './browserContext.svelte'
+    import InstanceComponent from './InstanceComponent.svelte'
+	type Series = components['schemas']['SeriesGET'];
 
 	interface Props {
 		series: Series;
@@ -8,19 +11,19 @@
 		showSegmentationInfo?: boolean;
 	}
 
+	const {InstanceRepo} = getContext<BrowserContext>("browserContext");
+
 	let { series, laterality, showSegmentationInfo = true }: Props = $props();
 
-	const { instances } = series;
+	const instances = (series.instance_ids ?? []).map((id) => InstanceRepo.store[id]!);
     
-	const filtered = instances
-		.filter((instance) => instance.laterality == laterality)
-		.sort((a, b) => a.id - b.id);
+
 </script>
 
-{#if $filtered.length}
+{#if instances.length}
 	<div class="series">
 		<div class="items">
-			{#each $filtered as instance}
+			{#each instances as instance}
 				<InstanceComponent {instance} {showSegmentationInfo} />
 			{/each}
 		</div>

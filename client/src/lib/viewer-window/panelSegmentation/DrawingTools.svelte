@@ -1,27 +1,27 @@
 <script lang="ts">
-    import { getContext, onDestroy } from "svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
+    import { getContext, onDestroy } from "svelte"
     import {
-        Enhance,
-        Polygon,
         Brush,
+        Enhance,
         ErodeDilate,
-        Questionable,
         PanelIcon,
-        Undo,
+        Polygon,
+        Questionable,
         Redo,
-    } from "../icons/icons";
+        Undo,
+    } from "../icons/icons"
 
-    import Toggle from "$lib/Toggle.svelte";
-    import BrushradiusControl from "./BrushradiusControl.svelte";
-    import { PolygonTool } from "$lib/viewer/tools/Polygon";
-    import { BrushTool } from "$lib/viewer/tools/Brush";
-    import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte";
+    import Toggle from "$lib/Toggle.svelte"
+    import { BrushTool } from "$lib/viewer/tools/Brush"
+    import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte"
+    import { PolygonTool } from "$lib/viewer/tools/Polygon"
+    import BrushradiusControl from "./BrushradiusControl.svelte"
 
-    import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
-    import type { PaintSettings } from "$lib/webgl/mask.svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
+    import type { SegmentationTool } from "$lib/viewer/tools/segmentation"
+    import type { PaintSettings } from "$lib/webgl/mask.svelte"
     
 
     const viewerContext = getContext<ViewerContext>("viewerContext");

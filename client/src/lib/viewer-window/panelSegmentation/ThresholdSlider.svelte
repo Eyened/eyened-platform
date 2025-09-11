@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte"
+    import { getContext } from "svelte"
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {

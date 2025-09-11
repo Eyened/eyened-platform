@@ -1,13 +1,12 @@
 <script lang="ts">
-    import { getContext } from "svelte";
-    import { ImageLoader } from "$lib/data-loading/imageLoader";
-    import type { Instance } from "$lib/datamodel/instance.svelte";
-    import type { WebGL } from "$lib/webgl/webgl";
-    import { setContext } from "svelte";
-    import BaseViewer from "./BaseViewer.svelte";
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
-    import { Registration } from "$lib/registration/registration";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { ImageLoader } from "$lib/data-loading/imageLoader"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { Instance } from "$lib/datamodel/instance.svelte"
+    import { Registration } from "$lib/registration/registration"
+    import type { WebGL } from "$lib/webgl/webgl"
+    import { getContext, setContext } from "svelte"
+    import BaseViewer from "./BaseViewer.svelte"
+    import { ViewerWindowContext } from "./viewerWindowContext.svelte"
 
     interface Props {
         instance: Instance;

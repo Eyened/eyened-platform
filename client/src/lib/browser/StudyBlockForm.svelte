@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { Study } from "$lib/datamodel/study";
-    import type { Instance } from "$lib/datamodel/instance.svelte";
+    import type { Instance } from "$lib/datamodel/instance.svelte"
+    import type { Study } from "$lib/datamodel/study"
 
-    import { data } from "$lib/datamodel/model";
-    import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import type { TaskContext } from "$lib/types";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
+    import { data } from "$lib/datamodel/model"
+    import type { TaskContext } from "$lib/types"
+    import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte"
+    import { getContext } from "svelte"
 
     interface Props {
         title: string;

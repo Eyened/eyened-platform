@@ -1,8 +1,8 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import type { TaskContext } from "$lib/types";
-    import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
-    import { getContext, setContext } from "svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { TaskContext } from "$lib/types"
+    import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte"
+    import { getContext, setContext } from "svelte"
 
     const taskContext: TaskContext = $props();
     setContext("taskContext", taskContext);

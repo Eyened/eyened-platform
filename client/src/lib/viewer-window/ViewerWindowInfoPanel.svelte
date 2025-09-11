@@ -3,14 +3,14 @@
 Some UI components on the top right of the viewer window.
 -->
 <script lang="ts">
-	import { getContext, onMount } from 'svelte';
-	import type { ViewerWindowContext } from './viewerWindowContext.svelte';
-	import MainIcon from './icons/MainIcon.svelte';
-	import MultiImageViewer from './MultiImageViewer.svelte';
-	import { data } from '$lib/datamodel/model';
-	import { Image2D } from '$lib/webgl/image2D';
-	import UserMenu from '$lib/UserMenu.svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import type { GlobalContext } from '$lib/data/globalContext.svelte'
+	import { data } from '$lib/datamodel/model'
+	import UserMenu from '$lib/UserMenu.svelte'
+	import { Image2D } from '$lib/webgl/image2D'
+	import { getContext, onMount } from 'svelte'
+	import MainIcon from './icons/MainIcon.svelte'
+	import MultiImageViewer from './MultiImageViewer.svelte'
+	import type { ViewerWindowContext } from './viewerWindowContext.svelte'
 	
     const globalContext = getContext<GlobalContext>('globalContext');
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');

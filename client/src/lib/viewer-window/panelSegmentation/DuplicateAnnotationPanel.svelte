@@ -1,18 +1,12 @@
 <script lang="ts">
-    import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { Duplicate } from "../icons/icons";
-    import { getContext } from "svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import type { SegmentationItem } from "$lib/webgl/segmentationItem";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-
-    interface Props {
-        segmentation: Segmentation;
-        image: AbstractImage;
-        segmentationItem: SegmentationItem;
-    }
-    import { duplicate, types } from "./duplicate_utils";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte"
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
+    import { AbstractImage } from "$lib/webgl/abstractImage"
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem"
+    import { getContext } from "svelte"
+    import { Duplicate } from "../icons/icons"
+    import { duplicate, types } from "./duplicate_utils"
 
     let { segmentation, image, segmentationItem }: Props = $props();
 

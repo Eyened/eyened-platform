@@ -1,9 +1,9 @@
 <script lang="ts">
-    import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { converters } from "$lib/webgl/segmentationConverter";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte"
+    import type { AbstractImage } from "$lib/webgl/abstractImage"
+    import { converters } from "$lib/webgl/segmentationConverter"
+    import { getContext } from "svelte"
 
     const globalContext = getContext<GlobalContext>("globalContext");
 

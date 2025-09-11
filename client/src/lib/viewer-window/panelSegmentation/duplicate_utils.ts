@@ -1,16 +1,15 @@
 import type { Datatype } from "$lib/datamodel/segmentation.svelte";
 
-import { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import type { DataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import { convert } from "$lib/webgl/segmentationConverter";
-import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-import { NPYArray } from "$lib/utils/npy_loader";
-import type { DrawingArray } from "$lib/webgl/mask.svelte";
-import type { SegmentationItem } from "$lib/webgl/segmentationItem";
-import type { AbstractImage } from "$lib/webgl/abstractImage";
+import type { GlobalContext } from "$lib/data/globalContext.svelte";
 import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { DataRepresentation, SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
+import { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import { NPYArray } from "$lib/utils/npy_loader";
+import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+import type { AbstractImage } from "$lib/webgl/abstractImage";
+import type { DrawingArray } from "$lib/webgl/mask.svelte";
+import { convert } from "$lib/webgl/segmentationConverter";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem";
 
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
     Q: "DualBitMask",

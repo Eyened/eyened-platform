@@ -1,10 +1,10 @@
 <script lang="ts">
-    import Eye from "./Eye.svelte";
-    import Icon from "$lib/gui/Icon.svelte";
-    import type { Study } from "$lib/datamodel/study";
-    import StudyBlockForms from "./StudyBlockForms.svelte";
-    import AdditionalDataSources from "./AdditionalDataSources.svelte";
-    import extensions from "$lib/extensions";
+    import extensions from "$lib/extensions"
+    import Icon from "$lib/gui/Icon.svelte"
+    import type { components } from "../../types/openapi"
+    import Eye from "./Eye.svelte"
+    import StudyBlockForms from "./StudyBlockForms.svelte"
+    type Study = components['schemas']['StudyGET'];
 
     interface Props {
         study: Study;
@@ -14,15 +14,13 @@
     let { study, mode = "full" }: Props = $props();
     let collapse = $state(false);
 
-    const age = Math.floor(
-        (study.date - study.patient.birthDate) / (1000 * 60 * 60 * 24 * 365.25),
-    );
+    const age = study.age
 
-    const context = {
-        study,
-        patient: study.patient,
-        project: study.patient.project,
-    };
+    // const context = {
+    //     study,
+    //     patient: study.patient,
+    //     project: study.patient.project,
+    // };
     const { additional_data_sources } = extensions.browser.study;
 </script>
 
@@ -39,7 +37,7 @@
         <div class="date-age">
             <div class="date">
                 <Icon icon="calendar" />
-                {study.date.toISOString().slice(0, 10)}
+                {study.date}
             </div>
             <div class="age">({age} years)</div>
         </div>
@@ -53,7 +51,7 @@
 
         {#if mode == "full"}
             <StudyBlockForms {study} />
-            <AdditionalDataSources {context} {additional_data_sources} />
+            <!-- <AdditionalDataSources {context} {additional_data_sources} /> -->
         {/if}
     </div>
 </div>

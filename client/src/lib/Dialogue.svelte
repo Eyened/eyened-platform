@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { ComponentDef } from "./data-loading/globalContext.svelte";
+    import type { ComponentDef } from "./data/globalContext.svelte"
 
     interface Props {
         content: ComponentDef | string;

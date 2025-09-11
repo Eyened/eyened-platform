@@ -1,11 +1,11 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte";
-    import { data } from "$lib/datamodel/model";
-    import { Segmentation, type Datatype } from "$lib/datamodel/segmentation.svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte"
+    import { data } from "$lib/datamodel/model"
+    import { Segmentation, type Datatype } from "$lib/datamodel/segmentation.svelte"
+    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
+    import { getContext } from "svelte"
 
     export interface Props {
         dataRepresentation: "MultiLabel" | "MultiClass";
