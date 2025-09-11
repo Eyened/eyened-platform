@@ -6,6 +6,7 @@ Converts ORM objects (eyened_orm) into Pydantic GET DTOs defined in server/dtos.
 from typing import TYPE_CHECKING, Optional, List
 
 from .dtos_instances import (
+    InstanceMeta,
     ProjectGET,
     PatientGET,
     StudyGET,
@@ -70,14 +71,17 @@ class DTOConverter:
         )
 
     @staticmethod
-    def study_to_get(study: "Study") -> StudyGET:
+    def study_to_get(study: "Study", include_series: bool = False) -> StudyGET:
         """Convert Study ORM object to StudyGET."""
-        return StudyGET(
+        dto = StudyGET(
             id=study.StudyID,
             description=study.StudyDescription,
             date=study.StudyDate,
             study_instance_uid=study.StudyInstanceUid,
         )
+        if include_series:
+            dto.series = [DTOConverter.series_to_get(s) for s in (getattr(study, "Series", []) or [])]
+        return dto
 
     @staticmethod
     def series_to_get(series: "Series") -> SeriesGET:
@@ -86,6 +90,7 @@ class DTOConverter:
             id=series.SeriesID,
             series_number=series.SeriesNumber,
             series_instance_uid=series.SeriesInstanceUid or "",
+            instance_ids=[img.ImageInstanceID for img in (getattr(series, "ImageInstances", []) or [])],
         )
 
     @staticmethod
@@ -153,6 +158,33 @@ class DTOConverter:
             series=series_meta,
             device=device_meta,
             scan=scan_meta,
+            tags=DTOConverter._tags_from_image_instance(image_instance),
+        )
+
+    @staticmethod
+    def image_instance_to_meta(image_instance: "ImageInstance") -> InstanceMeta:
+        """Convert ImageInstance ORM object to InstanceMeta."""
+        device_meta = DeviceMeta(
+            manufacturer=(
+                image_instance.DeviceInstance.DeviceModel.Manufacturer
+                if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel
+                else "Unknown"
+            ),
+            model=(
+                image_instance.DeviceInstance.DeviceModel.ManufacturerModelName
+                if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel
+                else "Unknown"
+            ),
+        )
+        return InstanceMeta(
+            id=image_instance.ImageInstanceID,
+            thumbnail_path=image_instance.ThumbnailPath or "",
+            modality=image_instance.Modality,  # type: ignore[arg-type]
+            dicom_modality=image_instance.DICOMModality,  # type: ignore[arg-type]
+            etdrs_field=image_instance.ETDRSField,  # type: ignore[arg-type]
+            laterality=image_instance.Laterality,  # type: ignore[arg-type]
+            anatomic_region=str(image_instance.AnatomicRegion) if image_instance.AnatomicRegion is not None else "",
+            device=device_meta,
             tags=DTOConverter._tags_from_image_instance(image_instance),
         )
 
