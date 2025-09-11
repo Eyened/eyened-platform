@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel
+from eyened_orm import TaskState
 
 from .dtos_instances import InstanceGET
 
@@ -30,7 +31,6 @@ class TaskBase(BaseModel):
     description: Optional[str] = None
     contact_id: Optional[int] = None
     task_definition_id: int
-    task_state_id: int
 
 
 class TaskPUT(TaskBase):
@@ -50,7 +50,7 @@ class TaskGET(TaskBase):
 # === SUB TASK ===
 class SubTaskBase(BaseModel):
     task_id: int
-    task_state_id: int
+    task_state: TaskState
     comments: Optional[str] = None
 
 

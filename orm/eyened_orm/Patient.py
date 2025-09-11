@@ -35,12 +35,12 @@ class Patient(Base):
     PatientIdentifier: Mapped[str] = mapped_column(String(255))
     BirthDate: Mapped[Optional[date]]
     Sex: Mapped[Optional[SexEnum]] = mapped_column(SAEnum(SexEnum))
-    ProjectID: Mapped[int] = mapped_column(ForeignKey("Project.ProjectID"))
+    ProjectID: Mapped[int] = mapped_column(ForeignKey("Project.ProjectID", ondelete="CASCADE"))
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     Project: Mapped["Project"] = relationship(back_populates="Patients")
-    Studies: Mapped[List["Study"]] = relationship(back_populates="Patient", cascade="all, delete")
+    Studies: Mapped[List["Study"]] = relationship(back_populates="Patient", passive_deletes=True)
     Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Patient")
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Patient")
 

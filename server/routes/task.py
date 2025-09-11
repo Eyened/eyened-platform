@@ -1,6 +1,6 @@
 from typing import Union, List
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
 from eyened_orm import Task, SubTask, SubTaskImageLink, ImageInstance
 from ..db import get_db
@@ -49,10 +49,10 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
 
 @router.delete("/task/{task_id}", status_code=204)
 async def delete_task(task_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
-    task = db.get(Task, task_id)
-    if not task:
+    res = db.execute(delete(Task).where(Task.TaskID == task_id))
+    if res.rowcount == 0:
         raise HTTPException(404, "Task not found")
-    db.delete(task); db.commit()
+    db.commit()
     return Response(status_code=204)
 
 
@@ -68,7 +68,7 @@ async def list_tasks(
 
 @router.get(
     "/task/{task_id}/subtasks",
-    response_model=Union[SubTasksResponse, SubTasksWithImagesResponse],
+    response_model=Union[SubTasksWithImagesResponse,SubTasksResponse],
 )
 async def list_subtasks(
     task_id: int,
@@ -107,7 +107,7 @@ async def list_subtasks(
 
 @router.get(
     "/task/{task_id}/subtask/{subtaskid}",
-    response_model=Union[SubTaskGET, SubTaskWithImagesGET],
+    response_model=Union[SubTaskWithImagesGET,SubTaskGET],
 )
 async def get_subtask(
     task_id: int,
@@ -129,3 +129,12 @@ async def get_subtask(
     if with_images:
         return DTOConverter.subtask_with_images_to_get(subtask)
     return DTOConverter.subtask_to_get(subtask)
+
+
+@router.delete("/task/{task_id}/subtask/{subtaskid}", status_code=204)
+async def delete_subtask(task_id: int, subtaskid: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    res = db.execute(delete(SubTask).where(SubTask.SubTaskID == subtaskid, SubTask.TaskID == task_id))
+    if res.rowcount == 0:
+        raise HTTPException(404, "SubTask not found")
+    db.commit()
+    return Response(status_code=204)

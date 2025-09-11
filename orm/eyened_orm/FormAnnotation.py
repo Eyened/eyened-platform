@@ -40,11 +40,11 @@ class FormAnnotation(Base):
     FormSchemaID: Mapped[int] = mapped_column(ForeignKey("FormSchema.FormSchemaID"))
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID"))
+    ImageInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"))
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID"))
+    SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="SET NULL"))
     FormData: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    FormAnnotationReferenceID: Mapped[Optional[int]] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID"))
+    FormAnnotationReferenceID: Mapped[Optional[int]] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"))
     Inactive: Mapped[bool] = mapped_column(default=False)
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -56,7 +56,7 @@ class FormAnnotation(Base):
     ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="FormAnnotations")
     Creator: Mapped["Creator"] = relationship(back_populates="FormAnnotations")
     SubTask: Mapped["SubTask"] = relationship(back_populates="FormAnnotations")
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(back_populates="FormAnnotation")
+    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(back_populates="FormAnnotation", passive_deletes=True)
 
     @classmethod
     def by_schema_and_creator(

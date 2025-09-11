@@ -290,7 +290,6 @@ class DTOConverter:
             description=task.Description,
             contact_id=task.ContactID,
             task_definition_id=task.TaskDefinitionID,
-            task_state_id=task.TaskStateID if getattr(task, "TaskStateID", None) is not None else (task.TaskState.TaskStateID if getattr(task, "TaskState", None) else None),  # type: ignore[union-attr]
             date_inserted=task.DateInserted,
         )
 
@@ -300,7 +299,7 @@ class DTOConverter:
         return SubTaskGET(
             id=subtask.SubTaskID,
             task_id=subtask.TaskID,
-            task_state_id=subtask.TaskStateID,
+            task_state=subtask.TaskState,
             creator_id=subtask.CreatorID,
             comments=subtask.Comments,
         )
@@ -316,7 +315,7 @@ class DTOConverter:
         return SubTaskWithImagesGET(
             id=subtask.SubTaskID,
             task_id=subtask.TaskID,
-            task_state_id=subtask.TaskStateID,
+            task_state=subtask.TaskState,
             creator_id=subtask.CreatorID,
             comments=subtask.Comments,
             images=images,

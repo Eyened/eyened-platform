@@ -35,29 +35,29 @@ class Tag(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
-        back_populates="Tag",
-        cascade="all, delete-orphan",
-        lazy="selectin",
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
     )
     ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
-        back_populates="Tag",
-        cascade="all, delete-orphan",
-        lazy="selectin",
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
     )
     AnnotationTagLinks: Mapped[List["AnnotationTagLink"]] = relationship(
-        back_populates="Tag",
-        cascade="all, delete-orphan",
-        lazy="selectin",
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
     )
     SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
-        back_populates="Tag",
-        cascade="all, delete-orphan",
-        lazy="selectin",
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
     )
     FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(
-        back_populates="Tag",
-        cascade="all, delete-orphan",
-        lazy="selectin",
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
     )
 
     Creator: Mapped["Creator"] = relationship(back_populates="Tags")
@@ -70,8 +70,8 @@ class StudyTagLink(Base):
         ForeignKeyIndex(__tablename__, "Study", "StudyID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
-    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID"), primary_key=True)
-    StudyID: Mapped[int] = mapped_column(ForeignKey("Study.StudyID"), primary_key=True)
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    StudyID: Mapped[int] = mapped_column(ForeignKey("Study.StudyID", ondelete="CASCADE"), primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -86,8 +86,8 @@ class ImageInstanceTagLink(Base):
         ForeignKeyIndex(__tablename__, "ImageInstance", "ImageInstanceID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
-    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID"), primary_key=True)
-    ImageInstanceID: Mapped[int] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID"), primary_key=True)
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    ImageInstanceID: Mapped[int] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"), primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -102,8 +102,8 @@ class AnnotationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Annotation", "AnnotationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
-    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID"), primary_key=True)
-    AnnotationID: Mapped[int] = mapped_column(ForeignKey("Annotation.AnnotationID"), primary_key=True)
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    AnnotationID: Mapped[int] = mapped_column(ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -118,8 +118,8 @@ class SegmentationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Segmentation", "SegmentationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
-    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID"), primary_key=True)
-    SegmentationID: Mapped[int] = mapped_column(ForeignKey("Segmentation.SegmentationID"), primary_key=True)
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    SegmentationID: Mapped[int] = mapped_column(ForeignKey("Segmentation.SegmentationID", ondelete="CASCADE"), primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -135,8 +135,8 @@ class FormAnnotationTagLink(Base):
         ForeignKeyIndex(__tablename__, "FormAnnotation", "FormAnnotationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
-    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID"), primary_key=True)
-    FormAnnotationID: Mapped[int] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID"), primary_key=True)
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    FormAnnotationID: Mapped[int] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"), primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())

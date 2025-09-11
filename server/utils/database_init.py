@@ -71,19 +71,3 @@ def init_admin(session: Session) -> None:
     except Exception as e:
         raise RuntimeError(f"Failed to create admin user: {str(e)}")
    
-
-def init_task_states(session: Session):
-    expected_states = [
-        "Not started",
-        "Busy",
-        "Ready",
-    ]
-
-    task_states = TaskState.fetch_all(session)
-    for name in expected_states:
-        if name not in [t.TaskStateName for t in task_states]:
-            task_state = TaskState(TaskStateName=name)
-            print(f"Adding task state: {task_state}")
-            session.add(task_state)
-
-    session.commit()
