@@ -977,8 +977,11 @@ export interface components {
              * @default 0
              */
             page: number;
-            /** Order By */
-            order_by?: ("Study Date" | "Patient Birthdate" | "Date Inserted" | "Date Modified" | "Date Preprocessed") | null;
+            /**
+             * Order By
+             * @enum {string}
+             */
+            order_by: "Study Date" | "Patient Birthdate" | "Date Inserted";
             /**
              * Order
              * @default ASC
@@ -1019,6 +1022,7 @@ export interface components {
         SeriesGET: {
             /** Id */
             id: number;
+            laterality?: components["schemas"]["Laterality"] | null;
             /** Series Number */
             series_number?: number | null;
             /** Series Instance Uid */
@@ -1047,6 +1051,8 @@ export interface components {
              * Format: date-time
              */
             date: string;
+            /** Age */
+            age?: number | null;
             /** Study Instance Uid */
             study_instance_uid?: string | null;
             /** Series */
@@ -1091,8 +1097,11 @@ export interface components {
              * @default 0
              */
             page: number;
-            /** Order By */
-            order_by?: ("Study Date" | "Patient Birthdate" | "Date Inserted" | "Study Round") | null;
+            /**
+             * Order By
+             * @enum {string}
+             */
+            order_by: "Study Date" | "Patient Birthdate" | "Date Inserted";
             /**
              * Order
              * @default ASC

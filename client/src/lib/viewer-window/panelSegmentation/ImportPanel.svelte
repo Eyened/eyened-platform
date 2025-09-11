@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { SegmentationItem } from "$lib/webgl/segmentationItem";
-    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
+    import { AbstractImage } from "$lib/webgl/abstractImage"
+    import { SegmentationItem } from "$lib/webgl/segmentationItem"
+    import { getContext } from "svelte"
 
-    import ImportSegmentation from "../icons/ImportSegmentation.svelte";
-    import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
-    import { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import { Segmentation } from "$lib/datamodel/segmentation.svelte"
+    import ImportSegmentation from "../icons/ImportSegmentation.svelte"
+    import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte"
     interface Props {
         segmentation: Segmentation;
         image: AbstractImage;

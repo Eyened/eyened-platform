@@ -1,3 +1,4 @@
+
 export type Id = string | number;
 
 // Helper: naive singularization plus kebab->snake: e.g. "/form-schemas" -> "form_schema_id"
@@ -8,7 +9,7 @@ function inferIdParam(base: string): string {
 	return `${snake}_id`;
 }
 
-const _tables = $state<Record<string, Record<Id, any>>>({});
+// const _stores = $state<Record<string, Record<Id, any>>>({});
 
 export abstract class Repo<
 	TStore extends { id: Id },
@@ -21,6 +22,8 @@ export abstract class Repo<
 		public readonly key: string,
 		private readonly toStore: (remote: TGet) => TStore = (x) => x as unknown as TStore
 	) {}
+
+	public store = $state<Record<string, TStore>>({});
 
 	// Protected hooks for subclasses to override
 	protected abstract get basePath(): string;
@@ -93,37 +96,35 @@ export abstract class Repo<
 		});
 	}
 
-	get table(): Record<Id, TStore> {
-		return (_tables[this.key] ??= {});
-	}
+	
 
 	all(): TStore[] {
-		return Object.values(this.table);
+		return Object.values(this.store);
 	}
 
-	getLocal(id: Id): TStore | undefined {
-		return this.table[id];
+	get(id: Id): TStore | undefined {
+		return this.store[id];
 	}
 
 	upsert(remote: TGet): Row<TStore, TGet, TCreate, TPatch, ListParams> {
 		const s = this.toStore(remote);
-		this.table[s.id] = s;
+		this.store[s.id] = s;
 		return new Row<TStore, TGet, TCreate, TPatch, ListParams>(this, s.id);
 	}
 
 	deleteLocal(id: Id): void {
-		delete this.table[id];
+		delete this.store[id];
 	}
 
 	wrap(id: Id): Row<TStore, TGet, TCreate, TPatch, ListParams> {
-		if (!(id in this.table)) throw new Error(`No ${this.key}#${String(id)}`);
+		if (!(id in this.store)) throw new Error(`No ${this.key}#${String(id)}`);
 		return new Row<TStore, TGet, TCreate, TPatch, ListParams>(this, id);
 	}
 
 	ingest(list: TGet[]): void {
 		for (const r of list) {
 			const s = this.toStore(r);
-			this.table[s.id] = s;
+			this.store[s.id] = s;
 		}
 	}
 
@@ -154,7 +155,7 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 	constructor(private repo: Repo<TStore, TGet, TCreate, TPatch, ListParams>, public readonly id: Id) {}
 
 	get data(): TStore {
-		const row = this.repo.getLocal(this.id);
+		const row = this.repo.get(this.id);
 		if (!row) throw new Error(`Missing row ${String(this.id)}`);
 		return row;
 	}
@@ -164,7 +165,7 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 		run(this.data);
 		const stop = $effect(() => {
 			// row-level dependency: rerun on replace/updateLocal
-			const _ = this.repo.table[this.id];
+			const _ = this.repo.store[this.id];
 			run(this.data);
 		});
 		return stop;
@@ -179,12 +180,12 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 
 	updateLocal(patch: Partial<TStore>): TStore {
 		// replace object to trigger row-level subscribers
-		this.repo.table[this.id] = { ...this.repo.table[this.id], ...patch };
+		this.repo.store[this.id] = { ...this.repo.store[this.id], ...patch };
 		return this.data;
 	}
 
 	replace(next: TStore): TStore {
-		this.repo.table[this.id] = next;
+		this.repo.store[this.id] = next;
 		return next;
 	}
 

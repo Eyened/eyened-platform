@@ -1,11 +1,12 @@
 <script lang="ts">
-    import { getThumbUrl } from "$lib/data-loading/utils";
-    import { getContext, onDestroy } from "svelte";
-    import type { Instance } from "$lib/datamodel/instance.svelte";
-    import InstanceInfo from "./InstanceInfo.svelte";
-    import type { BrowserContext } from "./browserContext.svelte";
-    import { openNewWindow } from "$lib/newWindow";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { getThumbUrl } from "$lib/data-loading/utils"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import { openNewWindow } from "$lib/newWindow"
+    import { getContext, onDestroy } from "svelte"
+    import type { components } from "../../types/openapi"
+    import InstanceInfo from "./InstanceInfo.svelte"
+    import type { BrowserContext } from "./browserContext.svelte"
+    type Instance = components['schemas']['InstanceGET'];
 
     const browserContext = getContext<BrowserContext>("browserContext");
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -25,14 +26,14 @@
 
     let size = $derived(browserContext.thumbnailSize + "em");
 
-    const segmentations = instance.segmentations;
-    const creatorCounts = segmentations.reduce(
-        (acc, seg) => {
-            acc[seg.creator.name] = (acc[seg.creator.name] || 0) + 1;
-            return acc;
-        },
-        {} as { [name: string]: number },
-    );
+    // const segmentations = instance.segmentations;
+    // const creatorCounts = segmentations.reduce(
+    //     (acc, seg) => {
+    //         acc[seg.creator.name] = (acc[seg.creator.name] || 0) + 1;
+    //         return acc;
+    //     },
+    //     {} as { [name: string]: number },
+    // );
 
     const image_url = getThumbUrl(instance)!;
 
@@ -66,7 +67,7 @@
                 {instance.patient.identifier}
             </div>
             <div>
-                {instance.study.date.toISOString().slice(0, 10)}
+                {instance.study.date}
             </div>
         {/if}
         <div>
@@ -81,14 +82,14 @@
                 style:height={size}
                 style:background-image="url('{image_url}')"
             >
-                {#if instance.dicomModality == "OPT"}
+                {#if instance.dicom_modality == "OPT"}
                     <div class="oct-info">
-                        [{instance.anatomicRegion}] ({instance.nrOfFrames} x {instance.columns})
+                        [{instance.anatomic_region}] ({instance.nr_of_frames} x {instance.columns})
                     </div>
                 {/if}
             </div>
 
-            {#if showSegmentationInfo && $segmentations.length}
+            <!-- {#if showSegmentationInfo && $segmentations.length}
                 <ul>
                     {#each Object.entries($creatorCounts) as [c, count]}
                         <li class:has-own-segmentations={creator.name == c}>
@@ -96,7 +97,7 @@
                         </li>
                     {/each}
                 </ul>
-            {/if}
+            {/if} -->
         {/if}
     </div>
 </div>

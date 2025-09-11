@@ -1,6 +1,6 @@
 REPO_ROOT := $(shell git rev-parse --show-toplevel)
 PY := python3
-OPENAPI_DIR := $(REPO_ROOT)/docs/src/content/docs/api
+OPENAPI_DIR := $(REPO_ROOT)/client/src/types
 OPENAPI_JSON := $(OPENAPI_DIR)/openapi.json
 OPENAPI_TS := $(REPO_ROOT)/client/src/types/openapi.ts
 

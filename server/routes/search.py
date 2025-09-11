@@ -139,16 +139,12 @@ instance_order_by_fields = Literal[
     'Study Date',
     'Patient Birthdate',
     'Date Inserted',
-    'Date Modified',
-    'Date Preprocessed',
 ]
 
 instance_order_by_fields_map: Dict[instance_order_by_fields, Any] = {
     'Study Date': Study.StudyDate,
     'Patient Birthdate': Patient.BirthDate,
     'Date Inserted': ImageInstance.DateInserted,
-    'Date Modified': ImageInstance.DateModified,
-    'Date Preprocessed': ImageInstance.DatePreprocessed,
 }
 
 # Order-by options for studies
@@ -156,14 +152,12 @@ study_order_by_fields = Literal[
     'Study Date',
     'Patient Birthdate',
     'Date Inserted',
-    'Study Round',
 ]
 
 study_order_by_fields_map: Dict[study_order_by_fields, Any] = {
     'Study Date': Study.StudyDate,
     'Patient Birthdate': Patient.BirthDate,
     'Date Inserted': Study.DateInserted,
-    'Study Round': Study.StudyRound,
 }
 
 
@@ -224,7 +218,7 @@ class SearchQuery(BaseModel):
     conditions: List[SearchCondition]
     limit: int = 200
     page: int = 0
-    order_by: Optional[instance_order_by_fields] = None
+    order_by: instance_order_by_fields
     order: Literal["ASC", "DESC"] = "ASC"
     include_count: bool = False
 
@@ -247,7 +241,7 @@ class StudySearchQuery(BaseModel):
     conditions: List[StudySearchCondition]
     limit: int = 200
     page: int = 0
-    order_by: Optional[study_order_by_fields] = None
+    order_by: study_order_by_fields
     order: Literal["ASC", "DESC"] = "ASC"
     include_count: bool = False
 

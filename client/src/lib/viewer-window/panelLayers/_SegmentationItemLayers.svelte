@@ -3,32 +3,32 @@
 	Should perhaps be merged in a common component
 -->
 <script lang="ts">
-    import type { DialogueType } from "$lib/types";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext, onDestroy } from "svelte";
-    import { Duplicate, Hide, PanelIcon, Show, Trash } from "../icons/icons";
-    import ImportSegmentationSelector from "../panelSegmentation/ImportSegmentationSelector.svelte";
-    import LayerThicknessSelector from "./_LayerThicknessSelector.svelte";
+    import type { DialogueType } from "$lib/types"
+    import { ViewerContext } from "$lib/viewer/viewerContext.svelte"
+    import { getContext, onDestroy } from "svelte"
+    import { Duplicate, Hide, PanelIcon, Show, Trash } from "../icons/icons"
+    import ImportSegmentationSelector from "../panelSegmentation/ImportSegmentationSelector.svelte"
+    import LayerThicknessSelector from "./_LayerThicknessSelector.svelte"
 
-    import type { Annotation } from "$lib/datamodel/_annotation.svelte";
-    import { LayerSegmentationOverlay } from "$lib/viewer/overlays/LayerSegmentationOverlay.svelte";
-    import { type Writable } from "svelte/store";
-    import BscanLinks from "../panelSegmentation/BscanLinks.svelte";
-    import SegmentationTools from "../panelSegmentation/DrawingTools.svelte";
+    import type { Annotation } from "$lib/datamodel/_annotation.svelte"
+    import { LayerSegmentationOverlay } from "$lib/viewer/overlays/LayerSegmentationOverlay.svelte"
+    import { type Writable } from "svelte/store"
+    import BscanLinks from "../panelSegmentation/BscanLinks.svelte"
+    import SegmentationTools from "../panelSegmentation/DrawingTools.svelte"
     import {
         deleteAnnotation,
         macularLayers,
-    } from "../panelSegmentation/_segmentationUtils";
+    } from "../panelSegmentation/_segmentationUtils"
 
-    import { data } from "$lib/datamodel/model";
-    import ImportSegmentation from "../icons/ImportSegmentation.svelte";
+    import { data } from "$lib/datamodel/model"
+    import ImportSegmentation from "../icons/ImportSegmentation.svelte"
 
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
     import {
         MulticlassSegmentation,
         MultilabelSegmentation,
-    } from "$lib/webgl/layerSegmentation";
-    import type { SegmentationContext } from "../panelSegmentation/segmentationContext.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    } from "$lib/webgl/layerSegmentation"
+    import type { SegmentationContext } from "../panelSegmentation/segmentationContext.svelte"
 
     const globalContext = getContext<GlobalContext>('globalContext');
 

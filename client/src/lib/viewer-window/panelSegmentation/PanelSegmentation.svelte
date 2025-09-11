@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { getContext } from "svelte";
-    import NewSegmentation from "./NewSegmentation.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import CreatorSegmentations from "./CreatorSegmentations.svelte";
-    import DrawingTools from "./DrawingTools.svelte";
-    import ModelSegmentations from "./ModelSegmentations.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
+    import { getContext } from "svelte"
+    import CreatorSegmentations from "./CreatorSegmentations.svelte"
+    import DrawingTools from "./DrawingTools.svelte"
+    import ModelSegmentations from "./ModelSegmentations.svelte"
+    import NewSegmentation from "./NewSegmentation.svelte"
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {

@@ -1,16 +1,16 @@
+import type { GlobalContext } from "$lib/data/globalContext.svelte";
+import type { FilterList } from "$lib/datamodel/itemList";
+import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { toggleInSet, type Color } from "$lib/utils";
 import { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
+import { BinaryMask } from "$lib/webgl/mask.svelte";
+import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { RenderTarget } from "$lib/webgl/types";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
-import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import { SegmentationItem } from "$lib/webgl/segmentationItem";
-import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-import type { FilterList } from "$lib/datamodel/itemList";
-import { BinaryMask } from "$lib/webgl/mask.svelte";
-import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 export class SegmentationOverlay implements Overlay {
 

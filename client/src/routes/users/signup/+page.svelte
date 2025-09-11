@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import { getContext } from "svelte"
 
     const globalContext = getContext<GlobalContext>("globalContext");
 

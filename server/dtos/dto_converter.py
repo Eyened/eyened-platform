@@ -77,6 +77,7 @@ class DTOConverter:
             id=study.StudyID,
             description=study.StudyDescription,
             date=study.StudyDate,
+            age=study.age_years,
             study_instance_uid=study.StudyInstanceUid,
         )
         if include_series:
@@ -86,8 +87,10 @@ class DTOConverter:
     @staticmethod
     def series_to_get(series: "Series") -> SeriesGET:
         """Convert Series ORM object to SeriesGET."""
+        laterality = series.ImageInstances[0].Laterality if series.ImageInstances else None
         return SeriesGET(
             id=series.SeriesID,
+            laterality=laterality,
             series_number=series.SeriesNumber,
             series_instance_uid=series.SeriesInstanceUid or "",
             instance_ids=[img.ImageInstanceID for img in (getattr(series, "ImageInstances", []) or [])],

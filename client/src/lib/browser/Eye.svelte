@@ -1,8 +1,10 @@
 <script lang="ts">
-    import type { Study } from "$lib/datamodel/study";
-    import SeriesComponent from "./SeriesComponent.svelte";
-    import { getContext } from "svelte";
-    import type { BrowserContext } from "./browserContext.svelte";
+    import { getContext } from "svelte"
+    import type { components } from "../../types/openapi"
+    import type { BrowserContext } from "./browserContext.svelte"
+    import SeriesComponent from "./SeriesComponent.svelte"
+    type Study = components['schemas']['StudyGET'];
+    type Series = components['schemas']['SeriesGET'];
 
     interface Props {
         study: Study;
@@ -13,37 +15,32 @@
 
     const eye = laterality ? { L: "OS", R: "OD" }[laterality] : "OD/OS?";
 
-    const filtered = study.instances.filter(
-        (instance) => instance.laterality == laterality,
-    );
-    const bySeries = filtered.collectSet((instance) => instance.series);
     const browserContext = getContext<BrowserContext>("browserContext");
 
+    const eyeSeries = study.series!.filter((series) => series.laterality == laterality);
+
     function open() {
-        const numbers = [...$bySeries]
-        
+        const numbers = eyeSeries
             .sort((a, b) => a.id - b.id)
             .flatMap((series) =>
-                series.instances
-                .filter((instance) => instance.laterality == laterality)
-                .map((instance) => instance.id).$.sort(),
-            );
+                series.instance_ids
+            ) ?? [];
         browserContext.openTab(numbers);
     }
 </script>
 
-{#if $filtered.length}
+{#if study.series!.length}
     <div class="outer">
         <h3>
             {eye}
-            {#if $bySeries.size > 0}
+            {#if eyeSeries.length > 0}
                 <button class="link" onclick={open}>
                     Open all {eye} images</button
                 >
             {/if}
         </h3>
         <div class="series-container">
-            {#each [...$bySeries].sort((a, b) => a.id - b.id) as series (series.id)}
+            {#each [...eyeSeries].sort((a, b) => a.id - b.id) as series (series.id)}
                 <SeriesComponent {series} {laterality} />
             {/each}
         </div>

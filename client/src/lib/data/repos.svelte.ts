@@ -1,5 +1,6 @@
 import type { components } from '../../types/openapi';
 import { api } from '../api/client';
+import type { InstanceMeta, Study } from '../browser/browserContext.svelte';
 import { Repo, type Id } from './datamodel.svelte';
 
 // Tasks — full CRUD
@@ -172,4 +173,14 @@ export async function searchStudies(query: components['schemas']['StudySearchQue
 	const res = await api.POST('/studies/search', { body: query });
 	if (!res.data) throw new Error('No data');
 	return res.data as components['schemas']['StudySearchResponse'];
+}// Local repos for studies and instance metas (for studies search)
+export class StudiesLocalRepo extends Repo<Study, Study, never, never> {
+	protected get basePath() { return '/studies'; }
+	protected get capabilities() { return { list: false, get: false, create: false, update: false, delete: false }; }
 }
+
+export class InstanceMetasLocalRepo extends Repo<InstanceMeta, InstanceMeta, never, never> {
+	protected get basePath() { return '/instances'; }
+	protected get capabilities() { return { list: false, get: false, create: false, update: false, delete: false }; }
+}
+

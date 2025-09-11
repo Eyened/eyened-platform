@@ -41,6 +41,7 @@ class StudyGET(BaseModel):
     id: int
     description: Optional[str] = None
     date: datetime
+    age: Optional[float] = None # patient age in years
     study_instance_uid: Optional[str] = None
     series: Optional[List["SeriesGET"]] = None
 
@@ -48,6 +49,7 @@ class StudyGET(BaseModel):
 
 class SeriesGET(BaseModel):
     id: int
+    laterality: Optional[Laterality] = None
     series_number: Optional[int] = None
     series_instance_uid: str
     instance_ids: List[int] = Field(default_factory=list)
