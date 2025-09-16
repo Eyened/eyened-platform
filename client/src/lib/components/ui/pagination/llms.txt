@@ -1,0 +1,161 @@
+# Pagination Documentation
+
+Facilitates navigation between pages.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { Pagination } from "bits-ui";
+  import CaretLeft from "phosphor-svelte/lib/CaretLeft";
+  import CaretRight from "phosphor-svelte/lib/CaretRight";
+</script>
+<Pagination.Root count={100} perPage={10}>
+  {#snippet children({ pages, range })}
+    <div class="my-8 flex items-center">
+      <Pagination.PrevButton
+        class="hover:bg-dark-10 disabled:text-muted-foreground mr-[25px] inline-flex size-10 items-center justify-center rounded-[9px] bg-transparent active:scale-[0.98] disabled:cursor-not-allowed hover:disabled:bg-transparent"
+      >
+        <CaretLeft class="size-6" />
+      </Pagination.PrevButton>
+      <div class="flex items-center gap-2.5">
+        {#each pages as page (page.key)}
+          {#if page.type === "ellipsis"}
+            <div
+              class="text-foreground-alt select-none text-[15px] font-medium"
+            >
+              ...
+            </div>
+          {:else}
+            <Pagination.Page
+              {page}
+              class="hover:bg-dark-10 data-selected:bg-foreground data-selected:text-background inline-flex size-10 select-none items-center justify-center rounded-[9px] bg-transparent text-[15px] font-medium active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 hover:disabled:bg-transparent"
+            >
+              {page.value}
+            </Pagination.Page>
+          {/if}
+        {/each}
+      </div>
+      <Pagination.NextButton
+        class="hover:bg-dark-10 disabled:text-muted-foreground ml-[29px] inline-flex size-10 items-center justify-center rounded-[9px] bg-transparent active:scale-[0.98] disabled:cursor-not-allowed hover:disabled:bg-transparent"
+      >
+        <CaretRight class="size-6" />
+      </Pagination.NextButton>
+    </div>
+    <p class="text-muted-foreground text-center text-[13px]">
+      Showing {range.start} - {range.end} </p>
+  {/snippet}
+</Pagination.Root>
+```
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Pagination } from "bits-ui";
+</script>
+<Pagination.Root let:pages>
+  <Pagination.PrevButton />
+  {#each pages as page (page.key)}
+    <Pagination.Page {page} />
+  {/each}
+  <Pagination.NextButton />
+</Pagination.Root>
+```
+
+## Managing Page State
+
+This section covers how to manage the `page` state of the component.
+
+### Two-Way Binding
+
+Use `bind:page` for simple, automatic state synchronization:
+
+```svelte
+<script lang="ts">
+  import { Pagination } from "bits-ui";
+  let myPage = $state(1);
+</script>
+<button onclick={() => (myPage = 2)}> Go to page 2 </button>
+<Pagination.Root bind:page={myPage}>
+</Pagination.Root>
+```
+
+### Fully Controlled
+
+Use a [Function Binding](https://svelte.dev/docs/svelte/bind#Function-bindings) for complete control over the state's reads and writes.
+
+```svelte
+<script lang="ts">
+  import { Pagination } from "bits-ui";
+  let myPage = $state(1);
+  function getPage() {
+    return myPage;
+  }
+  function setPage(newPage: number) {
+    myPage = newPage;
+  }
+</script>
+<Pagination.Root bind:page={getPage, setPage}>
+</Pagination.Root>
+```
+
+## Ellipsis
+
+The `pages` snippet prop consists of two types of items: `'page'` and `'ellipsis'`. The `'page'` type represents an actual page number, while the `'ellipsis'` type represents a placeholder for rendering an ellipsis between pages.
+
+## API Reference
+
+### Pagination.Root
+
+The root pagination component which contains all other pagination components.
+
+| Property                                                                                     | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `count` required | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | The total number of items.`Default:  undefined`                                                                                            |                                      |
+| `page` $bindable                              | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | The selected page. You can bind this to a variable to control the selected page from outside the component.`Default:  undefined`           |                                      |
+| `onPageChange`                                             | `function`- (page: number) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | A function called when the selected page changes.`Default:  undefined`                                                                     |                                      |
+| `perPage`                                                  | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | The number of items per page.`Default: 1`                                                                                                     |                                      |
+| `siblingCount`                                             | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | The number of page triggers to show on either side of the current page.`Default: 1`                                                           |                                      |
+| `loop`                                                     | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Whether or not the pagination should loop through the items when reaching the end while navigating with the keyboard.`Default: false`         |                                      |
+| `orientation`                                              | `enum`- 'horizontal' \| 'vertical'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The orientation of the pagination. This determines how keyboard navigation will work with the component.`Default: 'horizontal'`               |                                      |
+| `ref` $bindable                               | `HTMLDivElement`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                 | `Snippet`- type Page = \&#123; type: "page"; value: number; \&#125;; type Ellipsis = \&#123; type: "ellipsis"; \&#125;; type PageItem = (Page \| Ellipsis) & \&#123; /\*\* A unique key to be used as the key in a svelte #each block. \*/ key: string; \&#125;; type ChildrenSnippetProps = \&#123; /\*\* The items to iterate over and render for the pagination component \*/ pages: PageItem\[]; /\*\* The range of pages to render \*/ range: \&#123; start: number; end: number \&#125;; /\*\* The currently active page \*/ currentPage: number; \&#125;;                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                    | `Snippet`- type Page = \&#123; type: "page"; value: number; \&#125;; type Ellipsis = \&#123; type: "ellipsis"; \&#125;; type PageItem = (Page \| Ellipsis) & \&#123; /\*\* A unique key to be used as the key in a svelte #each block. \*/ key: string; \&#125;; type ChildSnippetProps = \&#123; /\*\* The items to iterate over and render for the pagination component \*/ pages: PageItem\[]; /\*\* The range of pages to render \*/ range: \&#123; start: number; end: number \&#125;; /\*\* The currently active page \*/ currentPage: number; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### Pagination.Page
+
+A button that triggers a page change.
+
+| Property                                                              | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page` | `PageItem`- export type Page = \&#123; type: "page"; /\*\* The page number the 'PageItem' represents \*/ value: number; \&#125; export type Ellipsis = \&#123; type: "ellipsis"; \&#125; export type PageItem = (Page \| Ellipsis) & \&#123; /\*\* Unique key for the item, for svelte #each block \*/ key: string; \&#125; | The page item this component represents.`Default:  undefined`                                                                              |                                      |
+| `ref` $bindable        | `HTMLButtonElement`                                                                                                                                                                                                                                                                                                                                                                                                                                                                | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                          | `Snippet`                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                             | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;;                                                                                                                                                                                                                                     | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-selected` | `''` | Present on the current page element. |                                      |
+| `data-pagination-page`                       | `''` | Present on the page trigger element. |  |
+
+### Pagination.PrevButton
+
+The previous button of the pagination.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                            | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                                      | Value                 | Description                                    | Details                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-pagination-prev-button` | `''` | Present on the previous button element. |  |
+
+### Pagination.NextButton
+
+The next button of the pagination.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                        |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                                      | Value                 | Description                                | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-pagination-next-button` | `''` | Present on the next button element. |  |

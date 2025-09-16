@@ -1,17 +1,19 @@
 <script lang="ts">
     // icons from: https://fontawesome.com/v6/icons?o=r&m=free&s=solid
-    import { createEventDispatcher } from 'svelte'
-    import type { Tag } from '../datamodel/tag'
-    export let tagType: 'Annotation' | 'ImageInstance' | 'Study'
-    export let initTagName = '';
-    export let initTagDescription = '';
-    let newTagName = initTagName;
-    let newTagDescription = initTagDescription;
+    let { tagType, initTagName = '', initTagDescription = '', add }: { 
+        tagType: 'Annotation' | 'ImageInstance' | 'Study';
+        initTagName?: string;
+        initTagDescription?: string;
+        add: (payload: { name: string; description: string; type: 'Annotation' | 'ImageInstance' | 'Study' }) => void;
+    } = $props();
+    
+    let newTagName = $state(initTagName);
+    let newTagDescription = $state(initTagDescription);
     console.log('TagEditForm', tagType, initTagName, initTagDescription);
-    const dispatch = createEventDispatcher<{add: Partial<Tag>}>();
+    
     function addTag() {
         if (newTagName.trim() !== '') {
-            dispatch('add', { name: newTagName, description: newTagDescription, type: tagType });
+            add({ name: newTagName, description: newTagDescription, type: tagType });
             newTagName = '';
             newTagDescription = '';
         }
@@ -28,8 +30,8 @@
         placeholder="Short tag description"
         maxlength="256"
         bind:value={newTagDescription}
-        on:keydown={(e) => e.key === 'Enter' && addTag()} />
-    <button on:click={addTag}>Add</button>
+        onkeydown={(e) => e.key === 'Enter' && addTag()} />
+    <button onclick={addTag}>Add</button>
 </div>
 <style>
     .new-tag-input {

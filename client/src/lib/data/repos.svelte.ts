@@ -21,6 +21,24 @@ type TagPatch = components['schemas']['TagPATCH'];
 class TagsRepoClass extends Repo<Tag, Tag, TagCreate, TagPatch> {
 	protected get basePath() { return '/tags'; }
 	protected get capabilities() { return { list: true, create: true, update: true, delete: true, get: false }; }
+
+	async star(tag_id: number): Promise<void> {
+		try {
+			const { api } = await import('../api/client');
+			await api.POST('/tags/{tag_id}/star' as any, { params: { path: { tag_id } } as any });
+		} catch {
+			await fetch(`/api/tags/${tag_id}/star`, { method: 'POST', credentials: 'include' });
+		}
+	}
+
+	async unstar(tag_id: number): Promise<void> {
+		try {
+			const { api } = await import('../api/client');
+			await api.DELETE('/tags/{tag_id}/star' as any, { params: { path: { tag_id } } as any });
+		} catch {
+			await fetch(`/api/tags/${tag_id}/star`, { method: 'DELETE', credentials: 'include' });
+		}
+	}
 }
 export const TagsRepo = new TagsRepoClass('tags');
 
@@ -173,7 +191,20 @@ export async function searchStudies(query: components['schemas']['StudySearchQue
 	const res = await api.POST('/studies/search', { body: query });
 	if (!res.data) throw new Error('No data');
 	return res.data as components['schemas']['StudySearchResponse'];
-}// Local repos for studies and instance metas (for studies search)
+}
+
+// Signature fetchers for dynamic filters
+export async function getInstancesSignature(): Promise<components['schemas']['SignatureField'][]> {
+	const res = await api.GET('/instances/search/signature', {});
+	return (res.data ?? []) as components['schemas']['SignatureField'][];
+}
+
+export async function getStudiesSignature(): Promise<components['schemas']['SignatureField'][]> {
+	const res = await api.GET('/studies/search/signature', {});
+	return (res.data ?? []) as components['schemas']['SignatureField'][];
+}
+
+// Local repos for studies and instance metas (for studies search)
 export class StudiesLocalRepo extends Repo<Study, Study, never, never> {
 	protected get basePath() { return '/studies'; }
 	protected get capabilities() { return { list: false, get: false, create: false, update: false, delete: false }; }

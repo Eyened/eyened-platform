@@ -1,19 +1,19 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { Feature } from "$lib/datamodel/feature.svelte"
-    import { data } from "$lib/datamodel/model"
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
-    import { getContext } from "svelte"
-    import FeatureSelect from "./FeatureSelect.svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { Feature } from "$lib/datamodel/feature.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext } from "svelte";
+    import FeatureSelect from "./FeatureSelect.svelte";
 
     import {
         Segmentation,
         type DataRepresentation,
         type Datatype,
-    } from "$lib/datamodel/segmentation.svelte"
-    import type { TaskContext } from "$lib/types"
-    import NewMultiFeature from "./NewMultiFeature.svelte"
+    } from "$lib/datamodel/segmentation.svelte";
+    import type { TaskContext } from "$lib/types";
+    import NewMultiFeature from "./NewMultiFeature.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -23,7 +23,7 @@
         taskContext?.task?.definition?.config?.featureSubsets || {};
 
     const { image, axis } = viewerContext;
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );

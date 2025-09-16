@@ -1,0 +1,44 @@
+# Button Documentation
+
+A component that if passed a `href` prop will render an anchor element instead of a button element.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { Button } from "bits-ui";
+</script>
+<Button.Root
+  class="rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 inline-flex
+ h-12 items-center justify-center px-[21px] text-[15px]
+ font-semibold active:scale-[0.98] active:transition-all"
+>
+  Unlimited
+</Button.Root>
+```
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Button } from "bits-ui";
+</script>
+<Button.Root />
+```
+
+## API Reference
+
+### Button.Root
+
+A component that can switch between a button and an anchor tag based on the `href`/`type` props.
+
+| Property                                                              | Type                                 | Description                                                                                                                     | Details                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `href` | `string`            | An optional prop that when passed converts the button into an anchor tag.`Default:  undefined`                 |                                      |
+| `disabled`                          | `boolean`           | Whether or not the button is disabled. When disabled, the button cannot be interacted with.`Default: false`       |                                      |
+| `ref` $bindable        | `HTMLButtonElement` | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null` |                                      |
+| `children`                          | `Snippet`           | The children content to render.`Default:  undefined`                                                           |  |
+
+| Data Attribute                           | Value                 | Description                           | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-button-root` | `''` | Present on the button element. |  |

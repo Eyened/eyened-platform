@@ -1,22 +1,25 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { authClient } from "../auth";
-import { loadBase } from "./utils/api";
-import { type Creator } from "./datamodel/creator.svelte";
-import { data } from "./datamodel/model";
+import { authClient, type UserResponse } from "../auth";
 
 export class UserManager {
-    private _creator: Creator | null = null;
+    public loggedIn = $state(false);
+    // private _user: UserResponse | null = null;
+    public user = $state<UserResponse>({
+        id: 0,
+        username: '',
+        role: null,
+        starred_tags: []
+    });
+    public starredTagIds = $state<number[]>([]);
 
-    constructor() {
-    }
 
     async init(pathname: string) {
         if (pathname.startsWith('/users/login')) {
             return;
         }
 
-        const user = await authClient.getProfile();
+        const user = await authClient.me();
         if (user === null) {
             console.log('User is not logged in');
             // Only redirect if we're not already on the login page
@@ -27,12 +30,16 @@ export class UserManager {
             return;
         }
 
-        await this.setCreator(user.id);
+        this.user = user;
+        this.starredTagIds = user.starred_tags ?? [];
+
+        // await this.setCreator(user.id);
     }
 
     async login(username: string, password: string, rememberMe: boolean) {
-        const resp = await authClient.login(username, password, rememberMe);
-        await this.setCreator(resp.id);
+        this.user = await authClient.login(username, password, rememberMe);
+        this.starredTagIds = this.user.starred_tags ?? [];
+        // await this.setCreator(resp.id);
 
         // Get the redirect URL from the query parameters
         const params = new URLSearchParams(window.location.search);
@@ -48,30 +55,31 @@ export class UserManager {
 
     async logout() {
         await authClient.logout();
-        this._creator = null;
+        this.user = {
+            id: 0,
+            username: '',
+            role: null,
+            starred_tags: []
+        };
+        this.starredTagIds = [];
         goto('/users/login');
     }
 
     async changePassword(oldPassword: string, newPassword: string) {
-        const resp = await authClient.changePassword(oldPassword, newPassword);
-        // Optionally refresh user data after password change
-        await this.setCreator(resp.id);
+        const user = await authClient.changePassword(oldPassword, newPassword);
+        this.user = user; 
+        this.starredTagIds = user.starred_tags ?? this.starredTagIds;
     }
 
-    private async setCreator(id: number) {
-        await loadBase();
-        const { creators } = data;
-        this._creator = creators.get(id) ?? null;
-    }
-
-    get creator(): Creator {
-        if (!this._creator) {
-            throw new Error('Creator not found');
-        }
-        return this._creator;
-    }
+    // private async setCreator(id: number) {
+    //     await loadBase();
+    //     const { creators } = data;
+    //     this._creator = creators.get(id) ?? null;
+    // }
 
     async signup(username: string, password: string) {
-        await authClient.register(username, password);
+        const user = await authClient.register(username, password);
+        this.user = user; 
+        this.starredTagIds = user.starred_tags ?? [];
     }
 }

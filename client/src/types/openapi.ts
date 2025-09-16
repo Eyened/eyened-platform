@@ -389,6 +389,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/instances/search/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Instances Signature
+         * @description Return signature metadata for instance search fields.
+         */
+        get: operations["instances_signature_instances_search_signature_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/studies/search/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Studies Signature
+         * @description Return signature metadata for study search fields.
+         */
+        get: operations["studies_signature_studies_search_signature_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/form-schemas/{form_schema_id}": {
         parameters: {
             query?: never;
@@ -413,7 +453,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Features
+         * @description Return all features.
+         */
+        get: operations["list_features_features_get"];
         put?: never;
         /** Create Feature */
         post: operations["create_feature_features_post"];
@@ -476,6 +520,24 @@ export interface paths {
         head?: never;
         /** Patch Tag */
         patch: operations["patch_tag_tags__tag_id__patch"];
+        trace?: never;
+    };
+    "/tags/{tag_id}/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Star Tag */
+        post: operations["star_tag_tags__tag_id__star_post"];
+        /** Unstar Tag */
+        delete: operations["unstar_tag_tags__tag_id__star_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/task": {
@@ -559,6 +621,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Devices
+         * @description Return all device models.
+         */
+        get: operations["list_devices_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -589,6 +671,15 @@ export interface components {
         };
         /** DeviceMeta */
         DeviceMeta: {
+            /** Manufacturer */
+            manufacturer: string;
+            /** Model */
+            model: string;
+        };
+        /** DeviceModelGET */
+        DeviceModelGET: {
+            /** Id */
+            id: number;
             /** Manufacturer */
             manufacturer: string;
             /** Model */
@@ -835,7 +926,7 @@ export interface components {
             /** Thumbnail Identifier */
             thumbnail_identifier: string;
             /** Thumbnail Path */
-            thumbnail_path: string;
+            thumbnail_identifier: string;
             modality?: components["schemas"]["Modality"] | null;
             dicom_modality?: components["schemas"]["ModalityType"] | null;
             etdrs_field?: components["schemas"]["ETDRSField"] | null;
@@ -954,7 +1045,7 @@ export interface components {
              * Variable
              * @enum {string}
              */
-            variable: "Image DBID" | "Laterality" | "Modality" | "Anatomic Region" | "ETDRS Field" | "Color Fundus Quality" | "Study Date" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Device Model ID" | "SegmentationFeature Name" | "Segmentation Creator Name" | "Segmentation Tag Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Image Tag Name";
+            variable: "Image DBID" | "Laterality" | "Modality" | "ETDRS Field" | "Color Fundus Quality" | "Study Date" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Device Model ID" | "SegmentationFeature Name" | "Segmentation Creator Name" | "Segmentation Tag Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Image Tag Name";
             /**
              * Operator
              * @enum {string}
@@ -998,6 +1089,8 @@ export interface components {
         SearchResponse: {
             /** Instances */
             instances: components["schemas"]["InstanceGET"][];
+            /** Studies */
+            studies: components["schemas"]["StudyGET"][];
             /** Limit */
             limit: number;
             /** Page */
@@ -1040,6 +1133,16 @@ export interface components {
          * @enum {string}
          */
         SexEnum: "M" | "F";
+        /**
+         * SignatureField
+         * @description Signature descriptor for a searchable field.
+         */
+        SignatureField: {
+            /** Name */
+            name: string;
+            /** Values */
+            values: number | string | string[];
+        };
         /** StudyGET */
         StudyGET: {
             /** Id */
@@ -1332,6 +1435,11 @@ export interface components {
             username: string;
             /** Role */
             role: number | null;
+            /**
+             * Starred Tags
+             * @default []
+             */
+            starred_tags: number[];
         };
         /** ValidationError */
         ValidationError: {
@@ -2347,6 +2455,74 @@ export interface operations {
             };
         };
     };
+    instances_signature_instances_search_signature_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureField"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    studies_signature_studies_search_signature_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureField"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_form_schema_form_schemas__form_schema_id__get: {
         parameters: {
             query?: never;
@@ -2370,6 +2546,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormSchemaGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_features_features_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureGET"][];
                 };
             };
             /** @description Validation Error */
@@ -2677,6 +2887,74 @@ export interface operations {
             };
         };
     };
+    star_tag_tags__tag_id__star_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unstar_tag_tags__tag_id__star_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tasks_task_get: {
         parameters: {
             query?: never;
@@ -2961,6 +3239,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_devices_devices_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceModelGET"][];
+                };
             };
             /** @description Validation Error */
             422: {

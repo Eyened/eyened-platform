@@ -1,105 +1,76 @@
 <script lang="ts">
-    import { browser } from "$app/environment";
-    import { page } from "$app/state";
-    import { data } from "$lib/datamodel/model";
-    import { onMount } from "svelte";
-    import { getContext } from "svelte";
-    import { BrowserContext } from "./browserContext.svelte";
-    import { goto } from "$app/navigation";
+	import SelectWithSearch from '$lib/components/SelectWithSearch.svelte';
+	import * as Button from '$lib/components/ui/button';
+	import * as Input from '$lib/components/ui/input';
+	import { getContext } from 'svelte';
+	import { BrowserContext, type Condition } from './browserContext.svelte';
 
-    const { projects } = data;
-    const projectNames = projects.map((project) => project.name);
+	const browserContext = getContext<BrowserContext>('browserContext');
 
-    const params = browser ? page.url.searchParams : new URLSearchParams();
+	let patientIdentifier = $state('')
+	let studyDate = $state('')
+	let projectName = $state('')
 
-    const browserContext = getContext<BrowserContext>("browserContext");
+	function c(variable: Condition['variable'], value: string): Condition[] {
+		return [{ variable, operator: '==', value }];
+	}
 
-    let patientIdentifier: string | null = $state(
-        params.get("PatientIdentifier"),
-    );
-    let date: string | null = $state(params.get("StudyDate"));
-    let projectName: string | null = $state(params.get("ProjectName"));
+	async function submitPatientIdentifier() {
+		if (!patientIdentifier) return;
+		
+		await browserContext.fetch(c('Patient Identifier', patientIdentifier));
+	}
 
-    async function submitFilter(key: string, value: string | null) {
-        // Reset all state variables
-        patientIdentifier = key === "PatientIdentifier" ? value : null;
-        date = key === "StudyDate" ? value : null;
-        projectName = key === "ProjectName" ? value : null;
+	async function submitDate(e: Event) {
+		if (!studyDate) return;
+		await browserContext.fetch(c('Study Date', studyDate));
+	}
 
-        // Update URL params
-        params.forEach((_, k) => params.delete(k));
-        if (value) {
-            params.set(key, value);
-        }
-        await goto(`?${params.toString()}`);
-        browserContext.loadDataFromServer();
-    }
+	async function submitProjectName() {
+		if (!projectName) return;
+		await browserContext.fetch(c('Project Name', projectName));
+	}
 
-    async function submitPatientIdentifier(e: Event) {
-        e.preventDefault();
-        await submitFilter("PatientIdentifier", patientIdentifier);
-    }
-
-    async function submitDate(e: Event) {
-        e.preventDefault();
-        await submitFilter("StudyDate", date);
-    }
-
-    async function submitProjectName(e: Event) {
-        e.preventDefault();
-        await submitFilter("ProjectName", projectName);
-    }
-
-    let patientIdentifierInput: HTMLInputElement | undefined = $state(undefined );
-    onMount(() => patientIdentifierInput?.focus());
+	const projectOptions = $derived(
+		browserContext.getValueOptions('Project Name').map(v => ({ label: v, value: v }))
+	);
 </script>
 
-<!-- svelte-ignore a11y_label_has_associated_control -->
 <div>
-    <form onsubmit={submitPatientIdentifier}>
-        <label> PatientIdentifier: </label>
-        <input
-            type="text"
-            bind:this={patientIdentifierInput}
-            bind:value={patientIdentifier}
-            placeholder="PatientIdentifier"
-        />
-        <button type="submit" disabled={!patientIdentifier}>Search</button>
-    </form>
+	<form>
+		<label>Patient Identifier:</label>
+		<Input.Input bind:value={patientIdentifier} placeholder="Patient Identifier" />
+		<Button.Button type="submit" onclick={submitPatientIdentifier}>Search</Button.Button>
+	</form>
 
-    <form onsubmit={submitDate}>
-        <label> Study date: </label>
-        <input type="date" bind:value={date} />
-        <button type="submit" disabled={!date}>Search</button>
-    </form>
+	<form>
+		<label>Study Date:</label>
+		<Input.Input type="date" bind:value={studyDate} />
+		<Button.Button type="submit" disabled={!studyDate} onclick={submitDate}>Search</Button.Button>
+	</form>
 
-    <form onsubmit={submitProjectName}>
-        <label> Project Name: </label>
-        <select bind:value={projectName}>
-            <option></option>
-            {#each $projectNames as value}
-                <option {value}>{value}</option>
-            {/each}
-        </select>
-        <button type="submit" disabled={!projectName}>Search</button>
-    </form>
+	<form>
+		<label>Project Name:</label>
+		<SelectWithSearch 
+			options={projectOptions} 
+			bind:value={projectName} 
+			placeholder="Project Name" 
+		/>
+		<Button.Button type="submit" disabled={!projectName} onclick={submitProjectName}>Search</Button.Button>
+	</form>
 </div>
 
 <style>
-    div {
-        display: grid;
-        grid-template-columns: 0fr 16em 0fr;
-    }
-    label {
-        display: flex;
-        padding-right: 1em;
-        align-items: center;
-    }
-    input, select {
-        margin-right: 1em;
-    }
-    form {
-        display: contents;
-    }
-    
+	div {
+		display: grid;
+		grid-template-columns: 0fr 16em 0fr;
+	}
+	label {
+		display: flex;
+		padding-right: 1em;
+		align-items: center;
+	}
+	form {
+		display: contents;
+	}
 </style>

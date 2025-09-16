@@ -1,0 +1,553 @@
+# Alert Dialog Documentation
+
+A modal window that alerts users with important information and awaits their acknowledgment or action.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { AlertDialog } from "bits-ui";
+</script>
+<AlertDialog.Root>
+  <AlertDialog.Trigger
+    class="rounded-input bg-dark text-background
+ shadow-mini hover:bg-dark/95 inline-flex h-12 select-none
+ items-center justify-center whitespace-nowrap px-[21px] text-[15px] font-semibold transition-all active:scale-[0.98]"
+  >
+    Subscribe
+  </AlertDialog.Trigger>
+  <AlertDialog.Portal>
+    <AlertDialog.Overlay
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    />
+    <AlertDialog.Content
+      class="rounded-card-lg bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 outline-hidden fixed left-[50%] top-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 border p-7 sm:max-w-lg md:w-full "
+    >
+      <div class="flex flex-col gap-4 pb-6">
+        <AlertDialog.Title class="text-lg font-semibold tracking-tight">
+          Confirm your transaction
+        </AlertDialog.Title>
+        <AlertDialog.Description class="text-foreground-alt text-sm">
+          This action cannot be undone. This will initiate a monthly wire in the
+          amount of $10,000 to Huntabyte. Do you wish to continue?
+        </AlertDialog.Description>
+      </div>
+      <div class="flex w-full items-center justify-center gap-2">
+        <AlertDialog.Cancel
+          class="h-input rounded-input bg-muted shadow-mini hover:bg-dark-10 focus-visible:ring-foreground focus-visible:ring-offset-background focus-visible:outline-hidden inline-flex w-full items-center justify-center text-[15px] font-medium transition-all focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.98]"
+        >
+          Cancel
+        </AlertDialog.Cancel>
+        <AlertDialog.Action
+          class="h-input rounded-input bg-dark text-background shadow-mini hover:bg-dark/95 focus-visible:ring-dark focus-visible:ring-offset-background focus-visible:outline-hidden inline-flex w-full items-center justify-center text-[15px] font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.98]"
+        >
+          Continue
+        </AlertDialog.Action>
+      </div>
+    </AlertDialog.Content>
+  </AlertDialog.Portal>
+</AlertDialog.Root>
+```
+
+## Key Features
+
+- **Compound Component Structure**: Build flexible, customizable alert dialogs using sub-components.  
+- **Accessibility**: ARIA-compliant with full keyboard navigation support.  
+- **Portal Support**: Render content outside the normal DOM hierarchy for proper stacking.  
+- **Managed Focus**: Automatically traps focus with customization options.  
+- **Flexible State**: Supports both controlled and uncontrolled open states. ## Structure
+
+The Alert Dialog is built from sub-components, each with a specific purpose:
+
+- **Root**: Manages state and provides context to child components.  
+- **Trigger**: Toggles the dialog's open/closed state.  
+- **Portal**: Renders its children in a portal, outside the normal DOM hierarchy.  
+- **Overlay**: Displays a backdrop behind the dialog.  
+- **Content**: Holds the dialog's main content.  
+- **Title**: Displays the dialog's title.  
+- **Description**: Displays a description or additional context for the dialog.  
+- **Cancel**: Closes the dialog without action.  
+- **Action**: Confirms the dialog's action. Here's a simple example of an Alert Dialog:
+
+```svelte
+<script lang="ts">
+  import { AlertDialog } from "bits-ui";
+</script>
+<AlertDialog.Root>
+  <AlertDialog.Trigger>Open Dialog</AlertDialog.Trigger>
+  <AlertDialog.Portal>
+    <AlertDialog.Overlay />
+    <AlertDialog.Content>
+      <AlertDialog.Title>Confirm Action</AlertDialog.Title>
+      <AlertDialog.Description>Are you sure?</AlertDialog.Description>
+      <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+      <AlertDialog.Action>Confirm</AlertDialog.Action>
+    </AlertDialog.Content>
+  </AlertDialog.Portal>
+</AlertDialog.Root>
+```
+
+## Reusable Components
+
+For consistency across your app, create a reusable Alert Dialog component. Here's an example:
+
+MyAlertDialog.svelte
+
+```svelte
+<script lang="ts">
+  import type { Snippet } from "svelte";
+  import { AlertDialog, type WithoutChild } from "bits-ui";
+  type Props = AlertDialog.RootProps & {
+    buttonText: string;
+    title: Snippet;
+    description: Snippet;
+    contentProps?: WithoutChild<AlertDialog.ContentProps>;
+    // ...other component props if you wish to pass them
+  };
+  let {
+    open = $bindable(false),
+    children,
+    buttonText,
+    contentProps,
+    title,
+    description,
+    ...restProps
+  }: Props = $props();
+</script>
+<AlertDialog.Root bind:open {...restProps}>
+  <AlertDialog.Trigger>
+    {buttonText}
+  </AlertDialog.Trigger>
+  <AlertDialog.Portal>
+    <AlertDialog.Overlay />
+    <AlertDialog.Content {...contentProps}>
+      <AlertDialog.Title>
+        {@render title()}
+      </AlertDialog.Title>
+      <AlertDialog.Description>
+        {@render description()}
+      </AlertDialog.Description>
+      {@render children?.()}
+      <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+      <AlertDialog.Action>Confirm</AlertDialog.Action>
+    </AlertDialog.Content>
+  </AlertDialog.Portal>
+</AlertDialog.Root>
+```
+
+You can then use the `MyAlertDialog` component in your application like so:
+
++page.svelte
+
+```svelte
+<script lang="ts">
+  import MyAlertDialog from "$lib/components/MyAlertDialog.svelte";
+</script>
+<MyAlertDialog buttonText="Open Dialog">
+  {#snippet title()}
+    Delete your account
+  {/snippet}
+  {#snippet description()}
+    This action cannot be undone.
+  {/snippet}
+</MyAlertDialog>
+```
+
+Alternatively, you can define the snippets separately and pass them as props to the component:
+
++page.svelte
+
+```svelte
+<script lang="ts">
+  import MyAlertDialog from "$lib/components/MyAlertDialog.svelte";
+</script>
+{#snippet title()}
+  Delete your account
+{/snippet}
+{#snippet description()}
+  This action cannot be undone.
+{/snippet}
+<MyAlertDialog buttonText="Open Dialog" {title} {description}>
+</MyAlertDialog>
+```
+
+##### Tip
+
+Use string props for simplicity or snippets for dynamic content.
+
+## Managing Open State
+
+This section covers how to manage the `open` state of the Alert Dialog.
+
+### Two-Way Binding
+
+Use `bind:open` for simple, automatic state synchronization:
+
+```svelte
+<script lang="ts">
+  import { AlertDialog } from "bits-ui";
+  let isOpen = $state(false);
+</script>
+<button onclick={() => (isOpen = true)}>Open Dialog</button>
+<AlertDialog.Root bind:open={isOpen}>
+</AlertDialog.Root>
+```
+
+### Fully Controlled
+
+Use a [Function Binding](https://svelte.dev/docs/svelte/bind#Function-bindings) for total control:
+
+```svelte
+<script lang="ts">
+  import { AlertDialog } from "bits-ui";
+  let myOpen = $state(false);
+  function getOpen() {
+    return myOpen;
+  }
+  function setOpen(newOpen: boolean) {
+    myOpen = newOpen;
+  }
+</script>
+<AlertDialog.Root bind:open={getOpen, setOpen}>
+</AlertDialog.Root>
+```
+
+See the [State Management](/docs/state-management) documentation for more information.
+
+## Focus Management
+
+### Focus Trap
+
+Focus is trapped within the dialog by default. To disable:
+
+```svelte
+<AlertDialog.Content trapFocus={false}>
+</AlertDialog.Content>
+```
+
+##### Warning
+
+Disabling focus trap may reduce accessibility. Use with caution.
+
+### Open Focus
+
+By default, when a dialog is opened, focus will be set to the `AlertDialog.Content`. This is needed to allow screen readers to properly read the content. Focusing the `AlertDialog.Content` also ensures that people navigating with their keyboard end up somewhere within the Dialog that they can interact with.
+
+You can override this behavior using the `onOpenAutoFocus` prop on the `AlertDialog.Content` component. It's *highly* recommended that you use this prop to focus *something* within the Dialog.
+
+You'll first need to cancel the default behavior of focusing the first focusable element by cancelling the event passed to the `onOpenAutoFocus` callback. You can then focus whatever you wish.
+
+```svelte
+<script lang="ts">
+  import { AlertDialog } from "bits-ui";
+  let nameInput = $state<HTMLInputElement>();
+</script>
+<AlertDialog.Root>
+  <AlertDialog.Trigger>Open AlertDialog</AlertDialog.Trigger>
+  <AlertDialog.Content
+    onOpenAutoFocus={(e) => {
+      e.preventDefault();
+      nameInput?.focus();
+    }}
+  >
+    <input type="text" bind:this={nameInput} />
+  </AlertDialog.Content>
+</AlertDialog.Root>
+```
+
+### Close Focus
+
+By default, when a dialog is closed, focus will be set to the trigger element of the dialog. You can override this behavior using the `onCloseAutoFocus` prop on the `AlertDialog.Content` component.
+
+You'll need to cancel the default behavior of focusing the trigger element by cancelling the event passed to the `onCloseAutoFocus` callback, and then focus whatever you wish.
+
+```svelte
+<script lang="ts">
+  import { AlertDialog } from "bits-ui";
+  let nameInput = $state<HTMLInputElement>();
+</script>
+<input type="text" bind:this={nameInput} />
+<AlertDialog.Root>
+  <AlertDialog.Trigger>Open AlertDialog</AlertDialog.Trigger>
+  <AlertDialog.Content
+    onCloseAutoFocus={(e) => {
+      e.preventDefault();
+      nameInput?.focus();
+    }}
+  >
+  </AlertDialog.Content>
+</AlertDialog.Root>
+```
+
+## Advanced Behaviors
+
+The Alert Dialog component offers several advanced features to customize its behavior and enhance user experience. This section covers scroll locking, escape key handling, and interaction outside the dialog.
+
+### Scroll Lock
+
+By default, when an Alert Dialog opens, scrolling the body is disabled. This provides a more native-like experience, focusing user attention on the dialog content.
+
+#### Customizing Scroll Behavior
+
+To allow body scrolling while the dialog is open, use the `preventScroll` prop on `AlertDialog.Content`:
+
+```svelte
+<AlertDialog.Content preventScroll={false}>
+</AlertDialog.Content>
+```
+
+##### Note
+
+Enabling body scroll may affect user focus and accessibility. Use this option judiciously.
+
+### Escape Key Handling
+
+By default, pressing the `Escape` key closes an open Alert Dialog. Bits UI provides two methods to customize this behavior.
+
+#### Method 1: `escapeKeydownBehavior` The `escapeKeydownBehavior` prop allows you to customize the behavior taken by the component when the `Escape` key is pressed. It accepts one of the following values:
+
+- `'close'` (default): Closes the Alert Dialog immediately.
+- `'ignore'` : Prevents the Alert Dialog from closing.
+- `'defer-otherwise-close'` : If an ancestor Bits UI component also implements this prop, it will defer the closing decision to that component. Otherwise, the Alert Dialog will close immediately.
+- `'defer-otherwise-ignore'` : If an ancestor Bits UI component also implements this prop, it will defer the closing decision to that component. Otherwise, the Alert Dialog will ignore the key press and not close.
+
+To always prevent the Alert Dialog from closing on Escape key press, set the `escapeKeydownBehavior` prop to `'ignore'` on `Dialog.Content`:
+
+```svelte
+<AlertDialog.Content escapeKeydownBehavior="ignore">
+</AlertDialog.Content>
+```
+
+#### Method 2: `onEscapeKeydown` For more granular control, override the default behavior using the `onEscapeKeydown` prop:
+
+```svelte
+<AlertDialog.Content
+  onEscapeKeydown={(e) => {
+    e.preventDefault();
+    // do something else instead
+  }}
+>
+</AlertDialog.Content>
+```
+
+This method allows you to implement custom logic when the `Escape` key is pressed.
+
+### Interaction Outside
+
+By default, interacting outside the Alert Dialog content area does not close the dialog. Bits UI offers two ways to modify this behavior.
+
+#### Method 1: `interactOutsideBehavior` The `interactOutsideBehavior` prop allows you to customize the behavior taken by the component when an interaction (touch, mouse, or pointer event) occurs outside the content. It accepts one of the following values:
+
+- `'ignore'` (default): Prevents the Alert Dialog from closing.
+- `'close'` : Closes the Alert Dialog immediately.
+- `'defer-otherwise-close'` : If an ancestor Bits UI component also implements this prop, it will defer the closing decision to that component. Otherwise, the Alert Dialog will close immediately.
+- `'defer-otherwise-ignore'` : If an ancestor Bits UI component also implements this prop, it will defer the closing decision to that component. Otherwise, the Alert Dialog will ignore the event and not close.
+
+To make the Alert Dialog close when an interaction occurs outside the content, set the `interactOutsideBehavior` prop to `'close'` on `AlertDialog.Content`:
+
+```svelte
+<AlertDialog.Content interactOutsideBehavior="ignore">
+</AlertDialog.Content>
+```
+
+#### Method 2: `onInteractOutside` For custom handling of outside interactions, you can override the default behavior using the `onInteractOutside` prop:
+
+```svelte
+<AlertDialog.Content
+  onInteractOutside={(e) => {
+    e.preventDefault();
+    // do something else instead
+  }}
+>
+</AlertDialog.Content>
+```
+
+This approach allows you to implement specific behaviors when users interact outside the Alert Dialog content.
+
+### Best Practices
+
+- **Scroll Lock**: Consider your use case carefully before disabling scroll lock. It may be necessary for dialogs with scrollable content or for specific UX requirements.  
+- **Escape Keydown**: Overriding the default escape key behavior should be done thoughtfully. Users often expect the escape key to close modals.  
+- **Outside Interactions**: Ignoring outside interactions can be useful for important dialogs or multi-step processes, but be cautious not to trap users unintentionally.  
+- **Accessibility**: Always ensure that any customizations maintain or enhance the dialog's accessibility.  
+- **User Expectations**: Try to balance custom behaviors with common UX patterns to avoid confusing users. By leveraging these advanced features, you can create highly customized dialog experiences while maintaining usability and accessibility standards.
+
+## Nested Dialogs
+
+Dialogs can be nested within each other to create more complex layouts. See the [Dialog](/docs/components/dialog) component for more information on nested dialogs.
+
+## Svelte Transitions
+
+See the [Dialog](/docs/components/dialog) component for more information on Svelte Transitions with dialog components.
+
+## Working with Forms
+
+### Form Submission
+
+When using the `AlertDialog` component, often you'll want to submit a form or perform an asynchronous action when the user clicks the `Action` button.
+
+This can be done by waiting for the asynchronous action to complete, then programmatically closing the dialog.
+
+```svelte
+<script lang="ts">
+  import { AlertDialog } from "bits-ui";
+  function wait(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  let open = $state(false);
+</script>
+<AlertDialog.Root bind:open>
+  <AlertDialog.Portal>
+    <AlertDialog.Overlay />
+    <AlertDialog.Content>
+      <AlertDialog.Title>Confirm your action</AlertDialog.Title>
+      <AlertDialog.Description
+        >Are you sure you want to do this?</AlertDialog.Description
+      >
+      <form
+        method="POST"
+        action="?/someAction"
+        onsubmit={() => {
+          wait(1000).then(() => (open = false));
+        }}
+      >
+        <AlertDialog.Cancel type="button"
+          >No, cancel (close dialog)</AlertDialog.Cancel
+        >
+        <AlertDialog.Action type="submit">Yes (submit form)</AlertDialog.Action
+        >
+      </form>
+    </AlertDialog.Content>
+  </AlertDialog.Portal>
+</AlertDialog.Root>
+```
+
+### Inside a Form
+
+If you're using an `AlertDialog` *within* a form, you'll need to ensure that the `Portal` is disabled or not included in the `AlertDialog` structure. This is because the `Portal` will render the dialog content *outside* of the form, which will prevent the form from being submitted correctly.
+
+## API Reference
+
+### AlertDialog.Root
+
+The root component used to set and manage the state of the alert dialog.
+
+| Property                                                                                     | Type                                                                                                                                                                                                            | Description                                                                                                                      | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open` $bindable | `boolean`                                                                                                                                                                                      | The open state of the component.`Default: false`                                                                   |                                      |
+| `onOpenChange`                                             | `function`- (open: boolean) =\&gt; void | A callback function called when the open state changes.`Default:  undefined`                                    |                                      |
+| `onOpenChangeComplete`                                     | `function`- (open: boolean) =\&gt; void | A callback function called after the open state changes and all animations have completed.`Default:  undefined` |                                      |
+| `children`                                                 | `Snippet`                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                            |  |
+
+| Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### AlertDialog.Trigger
+
+The element which opens the alert dialog on press.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                            | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                     | Value                                                                                                                                                                                              | Description                            | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'open' \| 'closed' | The state of the alert dialog.  |                                      |
+| `data-alert-dialog-trigger`               | `''`                                                                                                                                                                              | Present on the trigger element. |  |
+
+### AlertDialog.Content
+
+The content displayed within the alert dialog modal.
+
+| Property                                                                           | Type                                                                                                                                                                                                                                                                             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                        | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onInteractOutside` | `function`- (event: PointerEvent) =\&gt; void                                                            | Callback fired when an outside interaction event occurs, which is a `pointerdown` event. You can call `event.preventDefault()` to prevent the default behavior of handling the outside interaction.`Default:  undefined`                                                                                                                                                                                                          |                                        |
+| `onFocusOutside`                                 | `function`- (event: FocusEvent) =\&gt; void                                                              | Callback fired when focus leaves the dismissible layer. You can call `event.preventDefault()` to prevent the default behavior on focus leaving the layer.`Default:  undefined`                                                                                                                                                                                                                                                    |                                        |
+| `interactOutsideBehavior`                        | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                       | The behavior to use when an interaction occurs outside of the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'`  |                                        |
+| `onEscapeKeydown`                                | `function`- (event: KeyboardEvent) =\&gt; void                                                           | Callback fired when an escape keydown event occurs in the floating content. You can call `event.preventDefault()` to prevent the default behavior of handling the escape keydown event.`Default:  undefined`                                                                                                                                                                                                                      |                                        |
+| `escapeKeydownBehavior`                          | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                       | The behavior to use when an escape keydown event occurs in the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'` |                                        |
+| `onOpenAutoFocus`                                | `function`- (event: Event) =\&gt; void                                                                   | Event handler called when auto-focusing the content as it is opened. Can be prevented.`Default:  undefined`                                                                                                                                                                                                                                                                                                                       |                                        |
+| `onCloseAutoFocus`                               | `function`- (event: Event) =\&gt; void                                                                   | Event handler called when auto-focusing the content as it is closed. Can be prevented.`Default:  undefined`                                                                                                                                                                                                                                                                                                                       |                                        |
+| `trapFocus`                                      | `boolean`                                                                                                                                                                                                                                                       | Whether or not to trap the focus within the content when open.`Default: true`                                                                                                                                                                                                                                                                                                                                                        |                                        |
+| `forceMount`                                     | `boolean`                                                                                                                                                                                                                                                       | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false`                                                                                                                                                                                                                                                                   |                                        |
+| `preventOverflowTextSelection`                   | `boolean`                                                                                                                                                                                                                                                       | When `true`, prevents the text selection from overflowing the bounds of the element.`Default: true`                                                                                                                                                                                                                                                                                                                                  |                                        |
+| `preventScroll`                                  | `boolean`                                                                                                                                                                                                                                                       | When `true`, prevents the body from scrolling when the content is open. This is useful when you want to use the content as a modal.`Default: true`                                                                                                                                                                                                                                                                                   |                                        |
+| `restoreScrollDelay`                             | `number`                                                                                                                                                                                                                                                        | The delay in milliseconds before the scrollbar is restored after closing the dialog. This is only applicable when using the `child` snippet for custom transitions and `preventScroll` and `forceMount` are `true`. You should set this to a value greater than the transition duration to prevent content from shifting during the transition.`Default: 0`                                                                          |                                       |
+| `ref` $bindable                     | `HTMLDivElement`                                                                                                                                                                                                                                                | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                                                                                                                                                                                                    |                                      |
+| `children`                                       | `Snippet`                                                                                                                                                                                                                                                       | The children content to render.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                                                              |                                      |
+| `child`                                          | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; open: boolean; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                                                                                                                                                                                                        |  | | Data Attribute                     | Value                                                                                                                                                                                                | Description                            | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'open' \| 'closed' | The state of the alert dialog.  |                                      |
+| `data-alert-dialog-content`               | `''`                                                                                                                                                                                | Present on the content element. |  |
+
+### AlertDialog.Overlay
+
+An overlay which covers the body when the alert dialog is open.
+
+| Property                                                                    | Type                                                                                                                                                                                                                                                                             | Description                                                                                                                                                                      | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forceMount` | `boolean`                                                                                                                                                                                                                                                       | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false` |                                      |
+| `ref` $bindable              | `HTMLDivElement`                                                                                                                                                                                                                                                | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                  |                                      |
+| `children`                                | `Snippet`                                                                                                                                                                                                                                                       | The children content to render.`Default:  undefined`                                                                                                            |                                      |
+| `child`                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; open: boolean; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                      |  | | Data Attribute                     | Value                                                                                                                                                                                                | Description                            | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'open' \| 'closed' | The state of the alert dialog.  |                                      |
+| `data-alert-dialog-overlay`               | `''`                                                                                                                                                                                | Present on the overlay element. |  |
+
+### AlertDialog.Portal
+
+A portal which renders the alert dialog into the body when it is open.
+
+| Property                                                            | Type                                                                                                                                                                                                 | Description                                                                                                                                    | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `to` | `union`- Element \| string | Where to render the content when it is open. Defaults to the body.`Default: document.body`                                       |                                      |
+| `disabled`                        | `boolean`                                                                                                                                                                           | Whether the portal is disabled or not. When disabled, the content will be rendered in its original DOM location.`Default: false` |                                      |
+| `children`                        | `Snippet`                                                                                                                                                                           | The children content to render.`Default:  undefined`                                                                          |  |
+
+| Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### AlertDialog.Action
+
+The button responsible for taking an action within the alert dialog. This button does not close the dialog out of the box. See the [Form Submission](#form-submission) documentation for more information.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                                   | Value                 | Description                           | Details                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-alert-dialog-action` | `''` | Present on the action element. |  |
+
+### AlertDialog.Cancel
+
+A button used to close the alert dialog without taking an action.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                                   | Value                 | Description                           | Details                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-alert-dialog-cancel` | `''` | Present on the cancel element. |  |
+
+### AlertDialog.Title
+
+An accessible title for the alert dialog.
+
+| Property                                                               | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `level` | `union`- 1 \| 2 \| 3 \| 4 \| 5 \| 6                                                     | The heading level of the title. This will be set as the `aria-level` attribute.`Default: 3`                                                   |                                      |
+| `ref` $bindable         | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                           | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                              | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                                  | Value                 | Description                          | Details                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-alert-dialog-title` | `''` | Present on the title element. |  |
+
+### AlertDialog.Description
+
+An accessible description for the alert dialog.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                                        | Value                 | Description                                | Details                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-alert-dialog-description` | `''` | Present on the description element. |  |

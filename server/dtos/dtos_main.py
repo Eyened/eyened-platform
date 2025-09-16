@@ -119,4 +119,14 @@ class FormAnnotationGET(FormAnnotationBase):
     date_modified: Optional[datetime] = None
 
 
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ========================= DEVICE MODELS =========================
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+class DeviceModelGET(BaseModel):
+    id: int
+    manufacturer: str
+    model: str
+
+
 

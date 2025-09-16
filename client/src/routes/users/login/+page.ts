@@ -1,4 +1,3 @@
-import { UserManager } from "$lib/usermanager.js";
 
 export const ssr = false;
 

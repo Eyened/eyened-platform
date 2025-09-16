@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button"
+    import { Button } from "$lib/components/ui/button";
     import {
         Command,
         CommandEmpty,
@@ -7,73 +7,76 @@
         CommandInput,
         CommandItem,
         CommandList,
-    } from "$lib/components/ui/command"
+    } from "$lib/components/ui/command";
     import {
         Dialog,
         DialogContent,
         DialogHeader,
         DialogTitle
-    } from "$lib/components/ui/dialog"
+    } from "$lib/components/ui/dialog";
     import {
         Popover,
         PopoverContent,
         PopoverTrigger,
-    } from "$lib/components/ui/popover"
+    } from "$lib/components/ui/popover";
     import {
         Tooltip,
         TooltipContent,
         TooltipTrigger,
-    } from "$lib/components/ui/tooltip"
-    import type { Tag, TagLink } from '$lib/types'
-    import { timeAgo } from '$lib/utils'
-    import { faSquareXmark } from "@fortawesome/free-solid-svg-icons"
-    import { createEventDispatcher, getContext } from 'svelte'
-    import Fa from "svelte-fa"
-    import { GlobalContext } from "../data-loading/globalContext"
-    import TagEditForm from "./TagEditForm.svelte"
-    export let tagType: 'Annotation' | 'ImageInstance' | 'Study'
-    export let itemTagLinks: TagLink[] = [];
-    export let maxTags: number = 3;
+    } from "$lib/components/ui/tooltip";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { timeAgo } from '$lib/utils';
+    import { faSquareXmark } from "@fortawesome/free-solid-svg-icons";
+    import { getContext } from 'svelte';
+    import Fa from "svelte-fa";
+    import TagEditForm from "./TagEditForm.svelte";
+    
+    let { tagType, itemTagLinks = [], maxTags = 3, tag: onTag = (id: number) => {}, untag: onUntag = (id: number) => {} }: { 
+        tagType: 'Annotation' | 'ImageInstance' | 'Study';
+        itemTagLinks?: any[];
+        maxTags?: number;
+        tag?: (id: number) => void;
+        untag?: (id: number) => void;
+    } = $props();
+    
     const {tagsStore, creatorsStore} = getContext<GlobalContext>('globalContext');
     const {studyTags, imageInstanceTags, annotationTags, studyTagNames, imageInstanceTagNames, annotationTagNames} = tagsStore;
-    let itemTagIDs: number[] = [];
-    $: itemTagIDs = itemTagLinks.map(link => link.TagID);
+    
+    let itemTagIDs = $derived(itemTagLinks.map(link => link.TagID));
     const tags = tagType === 'Annotation' ? annotationTags : tagType === 'ImageInstance' ? imageInstanceTags : studyTags;
     const tagNames = tagType === 'Annotation' ? annotationTagNames : tagType === 'ImageInstance' ? imageInstanceTagNames : studyTagNames;
-    const dispatch = createEventDispatcher<{
-        tag: number;
-        untag: number
-    }>();
+    
     // Tags that can be added to the item
-    let dropdownTags: Tag[] = [];
+    let dropdownTags = $derived(() => {
+        const itemTagsSet = new Set(itemTagIDs);
+        return $tags.filter(tag => !itemTagsSet.has(tag.TagID));
+    });
     // Tags the item has
-    // let itemTags: Tag[] = [];
-    let textValue: string;
-    let value: string
-    let dropdownOpen: boolean = false
-    let dialogOpen: boolean = false
-    let itemTags: (Tag & TagLink)[]
-    $: itemTags = itemTagLinks.map(link => ({
+    let itemTags = $derived(itemTagLinks.map(link => ({
         ...$tagsStore.byId[link.TagID],
         ...link
-    })).sort((a, b) => +b.Created - +a.Created);
-    //$tags.filter(tag => itemTagIDs.includes(tag.TagID));
-    // compute the tags that are not yet assigned to the item
-    $: {
-        const itemTagsSet = new Set(itemTagIDs);
-        dropdownTags = $tags.filter(tag => !itemTagsSet.has(tag.TagID));
-    }
+    })).sort((a, b) => +b.Created - +a.Created));
+    
+    let textValue: string;
+    let value = $state("");
+    let dropdownOpen = $state(false);
+    let dialogOpen = $state(false);
+    
+    $effect(() => {
+        console.log('value', value);
+    });
+    
     function linkTag(tagName: string) {
-        const tagID = $tags.find((tag: Tag) => tag.TagName === tagName)?.TagID;
+        const tagID = $tags.find((t) => t.TagName === tagName)?.TagID;
         if(tagID !== undefined) {
-            dispatch('tag', tagID)
+            onTag(tagID)
         }
     }
     function removeTag(tagID: number) {
-        dispatch('untag', tagID)
+        onUntag(tagID)
     }
-    function handleCreateTag({detail}) {
-        tagsStore.createTag(detail);
+    function handleCreateTag(payload) {
+        tagsStore.createTag(payload);
         setDialogOpen(false)
     }
     function handleCommandKeydown(event) {
@@ -95,7 +98,6 @@
     function setDialogOpen(newOpen: boolean) {
         dialogOpen = newOpen
     }
-    $: console.log('value', value)
 </script>
 <div class="tagging-component">
     <!-- Dialog with the new tag form -->
@@ -104,13 +106,13 @@
             <DialogHeader>
             <DialogTitle>New Tag</DialogTitle>
                 {value}
-                <TagEditForm {tagType} initTagName={textValue} on:add={handleCreateTag} />
+                <TagEditForm {tagType} initTagName={textValue} add={handleCreateTag} />
             </DialogHeader>
         </DialogContent>
     </Dialog>
     <!-- Combobox for adding new tags -->
     <!-- see: https://ui.shadcn.com/docs/components/combobox-->
-    <Popover portal={window.document.body} open={dropdownOpen} onOpenChange={setDropdownOpen}>
+    <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <PopoverTrigger>
             <Button
                 variant="outline"
@@ -121,7 +123,7 @@
             </Button>
         </PopoverTrigger>
         <PopoverContent class="w-40">
-            <Command value={value} onValueChange={setValue} onKeydown={handleCommandKeydown}>
+            <Command value={value} onValueChange={setValue} onkeydown={handleCommandKeydown}>
                 <CommandInput bind:value={textValue} placeholder="Search tags..." />
                 <CommandList>
                     <CommandEmpty>No tags found.</CommandEmpty>
@@ -129,9 +131,9 @@
                         {#each dropdownTags as tag}
                         <CommandItem
                             value={tag.TagName}
-                            onSelect={(val) => {
-                                linkTag(val)
-                                setValue(val)
+                            onSelect={() => {
+                                linkTag(tag.TagName)
+                                setValue(tag.TagName)
                                 setDropdownOpen(false)
                             }}
                         >
@@ -155,7 +157,7 @@
                         <p>Tagged by {$creatorsStore.byId[tag.CreatorID].CreatorName} {timeAgo(tag.Created)}</p>
                     </TooltipContent>
                 </Tooltip>
-                <button class="ml-2 hover:text-red-700" on:click={() => removeTag(tag.TagID)} >
+                <button class="ml-2 hover:text-red-700" onclick={() => removeTag(tag.TagID)} >
                     <Fa icon={faSquareXmark} size='lg'/>
                 </button>
             </div>

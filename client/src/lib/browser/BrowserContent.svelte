@@ -1,35 +1,30 @@
 <script lang="ts">
-	import { getContext } from 'svelte'
-	import StudyBlock from './StudyBlock.svelte'
-	import type { BrowserContext } from './browserContext.svelte'
+	import { getContext } from 'svelte';
+	import StudyBlock from './StudyBlock.svelte';
+	import type { BrowserContext } from './browserContext.svelte';
 
-    const {StudiesRepo, InstanceRepo} = getContext<BrowserContext>('browserContext');
+    const {StudiesRepo, InstanceRepo, queryMode} = getContext<BrowserContext>('browserContext');
 
 	// export let renderMode: 'studies' | 'instances' = 'studies';
-	export let mode: 'full' | 'overlay' = 'full';
-
-	const optio = {};
-
-	// iterating over the studies in the loaded instances rather than the studies directly
-	// because the instances may be capped by the limit and may therefore not be complete
-	// TODO: perhaps the limit / page in the query should be interpreted differently?
-
-	
-	// const studies = instances.filterlist.collectSet((i) => i.study);
-	
-
-	// const optio_list = optio ? Object.entries(optio).map(([tag, values]) => ({ tag, values })) : [];
+	let { mode = 'full' }: { mode?: 'full' | 'overlay' } = $props();
 
 
-	// TODO implement pagination
 </script>
 
-{#if StudiesRepo.all().length > 0}
-	{#each StudiesRepo.all().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) as study (study)}
-		<StudyBlock {study} {optio} {mode} />
-	{/each}
+{#if queryMode == "instances"}
+	{#if InstanceRepo.all.length > 0}
+		{'sdfsdf'}
+	{/if}
+{:else if queryMode == "studies"}
+	{#if StudiesRepo.all.length > 0}
+		{#each StudiesRepo.all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) as study (study)}
+			<StudyBlock {study} {mode} />
+		{/each}
+	{:else}
+		<div class="no-content">No results</div>
+	{/if}
 {:else}
-	<div class="no-content">No results</div>
+    <div class="no-content">No studies found</div>
 {/if}
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
