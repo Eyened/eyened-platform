@@ -1,44 +1,45 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
-    interface Props {
-        title?: string;
-        children?: Snippet;
-    }
+	import { getContext } from 'svelte';
+	import StudyBlock from './StudyBlock.svelte';
+	import type { BrowserContext } from './browserContext.svelte';
 
-    let { title = "", children }: Props = $props();
-    let collapse = $state(true);
+    const {StudiesRepo, InstanceRepo, queryMode} = getContext<BrowserContext>('browserContext');
+
+	// export let renderMode: 'studies' | 'instances' = 'studies';
+	let { mode = 'full' }: { mode?: 'full' | 'overlay' } = $props();
+
+
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div>
-    <h2 onclick={() => (collapse = !collapse)}>
-        {#if !collapse}
-            ▼
-        {:else}
-            ►
-        {/if}
-        {title}
-    </h2>
-    {#if !collapse}
-        {@render children?.()}
-    {/if}
-</div>
+{#if queryMode == "instances"}
+	{#if InstanceRepo.all.length > 0}
+		{'sdfsdf'}
+	{/if}
+{:else if queryMode == "studies"}
+	{#if StudiesRepo.all.length > 0}
+		{#each StudiesRepo.all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) as study (study)}
+			<StudyBlock {study} {mode} />
+		{/each}
+	{:else}
+		<div class="flex flex-col flex-1">No results</div>
+	{/if}
+{:else}
+    <div class="flex flex-col flex-1">No studies found</div>
+{/if}
+
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<!-- <div class="optio">
+	<h3>All optio forms:</h3>
+	<ul class="forms">
+		{#each optio_list as { tag, values }}
+			<li on:click={() => ($selectedOptio = { tag, values })}>
+				{tag}
+			</li>
+		{/each}
+	</ul>
+</div> -->
 
 <style>
-    div {
-        border: 1px solid rgba(0, 0, 0, 0.01);
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
-        border-radius: 2px;
-        margin: 1em;
-        padding: 0.5em;
-    }
-    h2 {
-        font-size: large;
-        margin: 0;
-        cursor: pointer;
-    }
-    h2:hover {
-        background-color: #f9f9f9;
-    }
+
 </style>

@@ -55,23 +55,23 @@
 			{instance.id}
 		</Dialog.Header>
 
-		<div class="content">
+		<div class="flex flex-col flex-1 p-4">
 		<div class="img-preview">
 			<img src={getThumbUrl(instance, 540)} alt="preview" />
 		</div>
-		<table>
+		<table class="text-sm table-fixed border-collapse text-gray-500">
 			<thead>
 				<tr>
-					<th>Property</th>
-					<th>Value</th>
+					<th class="text-black font-bold">Property</th>
+					<th class="text-black font-bold">Value</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each Object.entries(flattenToDotPaths(instance)) as [key, value]}
-					<tr>
-						<td>{key}</td>
+					<tr class="odd:bg-gray-100 even:bg-gray-200 hover:bg-white">
+						<td class="break-all p-1 border-t border-gray-400">{key}</td>
 						<!-- Not sure if this is the way to go, but it's a quick fix -->
-						<td>
+						<td class="break-all p-1 border-t border-gray-400">
 							{#if value == null}
 								NULL
 							{:else if typeof value === 'object' && value !== null}
@@ -92,35 +92,4 @@
 
 <style>
 
-	div.content {
-		display: flex;
-		flex-direction: column;
-		flex: 1;
-		padding: 1em;
-	}
-
-	table {
-		font-size: small;
-		table-layout: fixed;
-		border-collapse: collapse;
-		color: gray;
-	}
-	th {
-		color: black;
-		font-weight: bold;
-	}
-	tr:nth-child(even) {
-		background-color: rgb(230, 230, 230);
-	}
-	tr:nth-child(odd) {
-		background-color: rgb(245, 245, 245);
-	}
-	tr:hover {
-		background-color: white;
-	}
-	td {
-		word-wrap: break-all;
-		padding: 0.1em;
-		border-top: 1px solid gray;
-	}
 </style>

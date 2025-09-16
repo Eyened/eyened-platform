@@ -10,13 +10,14 @@
         values?: string[];
     };
 
-    let { options, values = $bindable([]) }: Props = $props();
+    let { options, values = $bindable() }: Props = $props();
 
-    let collapsibleOpen = false;
-    let triggerRef: HTMLButtonElement | null = null;
+    let collapsibleOpen = $state(false);
+	let triggerRef: HTMLButtonElement | null = $state(null);
 
+    const selectedValues = $derived(values ?? []);
     const valueToOption = $derived(Object.fromEntries(options.map(option => [option.value, option])));
-    const unselectedOptions = $derived(options.filter(option => !values.includes(option.value)));
+    const unselectedOptions = $derived(options.filter(option => !selectedValues.includes(option.value)));
 
     function closeAndFocusTrigger() {
         collapsibleOpen = false;
@@ -26,17 +27,16 @@
     }
 
     function removeValue(valueToRemove: string) {
-        values = values.filter(v => v !== valueToRemove);
+        values = selectedValues.filter(v => v !== valueToRemove);
     }
 
     function addValue(valueToAdd: string) {
-        values = [...values, valueToAdd];
+        values = [...selectedValues, valueToAdd];
     }
 </script>
-
 <div class="inline-block">
     <div class="inline-block">
-        {#each values as value}
+        {#each selectedValues as value}
             <div class="inline-block bg-gray-200 rounded-full px-2 py-1 m-1">
                 <button onclick={() => removeValue(value)}>
                     <Fa class="inline-block hover:cursor-pointer" icon={faXmark} />

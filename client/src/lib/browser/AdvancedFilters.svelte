@@ -36,7 +36,7 @@
 		conditions?: Condition[];
 	};
 
-	let { signature, conditions = $bindable([]) }: Props = $props();
+	let { signature, conditions = $bindable() }: Props = $props();
 
 	// Internal rows state
 	let rows: FilterRow[] = $state([{ id: nanoid() }]);
@@ -149,8 +149,6 @@
 </script>
 
 <div class="space-y-4">
-	<div class="font-medium text-sm">Advanced Filters</div>
-	
 	{#each rows as row (row.id)}
 		<div class="flex items-center gap-2 p-3 border rounded-lg">
 			<!-- Field Selector -->
@@ -248,7 +246,7 @@
 			<Button.Root
 				variant="outline"
 				size="sm"
-				on:click={() => removeRow(row.id)}
+				onclick={() => removeRow(row.id)}
 				disabled={rows.length === 1}
 				class="p-2"
 			>
@@ -258,7 +256,7 @@
 	{/each}
 
 	<!-- Add Filter Button -->
-	<Button.Root variant="outline" on:click={addRow} class="w-full">
+	<Button.Root variant="outline" onclick={addRow} class="w-full">
 		<Fa icon={faPlus} class="mr-2" size="sm" />
 		Add Filter
 	</Button.Root>

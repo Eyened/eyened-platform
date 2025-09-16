@@ -21,7 +21,7 @@
 			<StudyBlock {study} {mode} />
 		{/each}
 	{:else}
-		<div class="no-content">No results</div>
+		<div class="flex flex-col flex-1">No results</div>
 	{/if}
 {:else}
     <div class="no-content">No studies found</div>
@@ -41,22 +41,5 @@
 </div> -->
 
 <style>
-	div.optio {
-		display: flex;
-		flex-direction: column;
-	}
-	ul {
-		list-style-type: none;
-		padding-left: 1em;
-		margin-top: 0;
-	}
-	ul.forms > li:hover {
-		background-color: lightgray;
-		cursor: pointer;
-	}
-	div.no-content {
-		display: flex;
-		flex-direction: column;
-		flex: 1;
-	}
+
 </style>

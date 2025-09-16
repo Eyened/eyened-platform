@@ -17,19 +17,21 @@
     }
 </script>
 
-<div>
-    <div class="button-container">
+<div class="flex bg-black text-white">
+    <div class="button-container flex flex-col p-2">
         <div>
             {browserContext.selection.length}
             {browserContext.selection.length != 1 ? "images" : "image"} selected
         </div>
         <button
+            class="p-2"
             disabled={browserContext.selection.length === 0}
             onclick={openSelectionTab}
         >
             Open selected images
         </button>
         <button
+            class="p-2"
             disabled={browserContext.selection.length === 0}
             onclick={clear}
         >
@@ -44,16 +46,5 @@
 </div>
 
 <style>
-    div {
-        display: flex;
-        background-color: black;
-        color: white;
-    }
-    div.button-container {
-        flex-direction: column;
-        padding: 0.5em;
-    }
-    button {
-        padding: 0.5em;
-    }
+
 </style>

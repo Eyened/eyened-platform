@@ -10,13 +10,15 @@
 // import { showUserMenu } from '$lib/stores.svelte'
 	import { getContext, onMount, setContext } from 'svelte';
 	import Spinner from '../utils/Spinner.svelte';
+	import MainIcon from '../viewer-window/icons/MainIcon.svelte';
 	import AdvancedFilters from './AdvancedFilters.svelte';
 	import BrowserContent from './BrowserContent.svelte';
 	import { BrowserContext, decodeConditions } from './browserContext.svelte';
 	import FilterShorcuts from './FilterShorcuts.svelte';
 	import Pagination from './Pagination.svelte';
 	
-	const { user, openAPISpec } = getContext<GlobalContext>('globalContext');
+	const globalContext = getContext<GlobalContext>('globalContext');
+	const { user, openAPISpec } = globalContext;
 	const initials = user.username
 		.split(' ')
 		.map((name) => name[0])
@@ -29,7 +31,7 @@
 		initParamState();
 		await browserContext.loadSignatures();
 		// After signatures are in state, optionally kick off a search if there are pre-existing conditions
-		if (browserContext.conditions.length) {
+		if (browserContext.advancedConditions.length) {
 			await browserContext.search();
 		}
 	});
@@ -38,14 +40,29 @@
 		// read the query string into state
 		const params = page.url.searchParams;
 		// Retrieve the query parameters from the URL
-		browserContext.loadConditions(decodeConditions(params.get('conditions') || ''));
+		const conds = decodeConditions(params.get('conditions') || '');
+		browserContext.loadConditions(conds);
+		// also prime basicCondition if single condition is present
+		if (conds.length === 1) browserContext.basicCondition = conds[0];
+
 		browserContext.page = parseInt(params.get('page') || '0');
 		browserContext.limit = parseInt(params.get('limit') || '100');
+
+		// new: query mode and sort
+		const qm = params.get('query');
+		if (qm === 'instances' || qm === 'studies') browserContext.queryMode = qm;
+
+		const ob = params.get('order_by');
+		if (ob) browserContext.sortBy = ob as any;
+
+		const od = params.get('order');
+		if (od === 'ASC' || od === 'DESC') browserContext.sortDirection = od;
 	}
 
 	function onPageChange(pageNum: number) {
 		browserContext.page = pageNum;
-		browserContext.fetch(browserContext.conditions);
+		// Re-run search with whichever mode is active
+		browserContext.search();
 	}
 
 	function changeStudyMode(md: any) {
@@ -76,28 +93,19 @@
 </script>
 
 {#if browserContext.loading}
-	<div class="loader">
-		<div>
+	<div class="fixed inset-0 z-10 h-screen w-screen bg-white/70 backdrop-blur-sm">
+		<div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
 			<Spinner />
 		</div>
 	</div>
 {/if}
 
 
-<div id="container">
-	<div id="main">
-		<div id="browser-header">
-			<div id="browser-header-left">
-				<Button.Root
-					variant="secondary"
-					on:click={() => (browserContext.filterMode = browserContext.filterMode === 'basic' ? 'advanced' : 'basic')}
-					aria-pressed={browserContext.filterMode === 'advanced'}
-				>
-					{browserContext.filterMode === 'advanced' ? 'Advanced Filters v' : 'Advanced Filters >'}
-				</Button.Root>
-				
+<div id="container" class="h-screen flex flex-col overflow-hidden">
+	<div id="main" class="flex-0 flex flex-row bg-gray-200 font-sm border-b-3 border-gray-200">
+			<div id="browser-header-left" class="flex-5 flex-col min-w-0 p-4">
 				{#if browserContext.filterMode === 'basic'}
-					<FilterShorcuts />
+					<FilterShorcuts bind:condition={browserContext.basicCondition} />
 				{:else}
 					{#if browserContext.activeSignature.length}
 						<AdvancedFilters
@@ -105,70 +113,111 @@
 								name: s.name, 
 								values: typeof s.values === 'number' ? String(s.values) : s.values 
 							}))}
-							bind:conditions={browserContext.conditions}
+							bind:conditions={browserContext.advancedConditions}
 						/>
 					{/if}
 				{/if}
+
+				<div class="">
+					<div class="float-right">
+					<Button.Root
+						variant="link"
+						onclick={() => (browserContext.filterMode = browserContext.filterMode === 'basic' ? 'advanced' : 'basic')}
+						class="text-xs"
+					>
+						{browserContext.filterMode === 'advanced' ? 'Basic Filters' : 'Advanced Filters'}
+					</Button.Root>
+					</div>
+				</div>
+
+				<Button.Root
+					variant="default"
+					onclick={browserContext.search}
+					class="text-sm mr-2 w-full"
+				>
+					Search
+				</Button.Root>
+				
 			</div>
-			<div id="browser-header-right">
+			<div id="browser-header-right" class="flex-5 min-w-0 p-4">
 				<Card.Root>
 					
-					<Card.Content class="align-middle grid grid-cols-2 gap-4">
+					<Card.Content class="flex flex-col gap-4">
 
-						<label for="queryType">Query: </label>
-						<MySelect 
-							options={[{value: 'instances', label: 'Instances'}, {value: 'studies', label: 'Studies'}]} 
-							bind:value={browserContext.queryMode}
-							disabled={false}
-							placeholder="Query Type"/>
-
-						{#if browserContext.queryMode === 'instances'}
-							<label for="displayMode">Display: </label>
-							<MySelect 
-								options={[{value: 'instance', label: 'Instances'}, {value: 'partialStudy', label: 'Partial Studies'}, {value: 'fullStudy', label: 'Full Studies'}]} 
-								bind:value={browserContext.displayMode}
-								disabled={false}
-								placeholder="Render Mode"/>							
-						{/if}
-
-						<label for="sortBy">Sort: </label>
-						<div>
-						<MySelect 
-								options={sortByColumns.map(v => ({value: v, label: v}))} 
-								bind:value={browserContext.sortBy}
-								disabled={false}
-								placeholder="Sort by Column"/>			
-
-						<MySelect 
-								options={[{value:'ASC', label: 'ASC'}, {value: 'DESC', label:'DESC'}]} 
-								bind:value={browserContext.sortDirection}
-								disabled={false}
-								placeholder="Sort order"/>
+						<div class="flex-1">
+							<div class="flex items-center gap-8">
+								<div class="flex items-center gap-2">
+									<label for="queryType">Query: </label>
+									<MySelect 
+										options={[{value: 'instances', label: 'Instances'}, {value: 'studies', label: 'Studies'}]} 
+										bind:value={browserContext.queryMode}
+										disabled={false}
+										placeholder="Query Type"/>
+								</div>
+								{#if browserContext.queryMode === 'instances'}
+									<div class="flex items-center gap-2">
+										<label for="displayMode">Display: </label>
+										<MySelect 
+											options={[{value: 'instance', label: 'Instances'}, {value: 'partialStudy', label: 'Partial Studies'}, {value: 'fullStudy', label: 'Full Studies'}]} 
+											bind:value={browserContext.displayMode}
+											disabled={false}
+											placeholder="Render Mode"/>
+									</div>
+								{/if}
+							</div>
 						</div>
 
-						<label for="limit">Items per page: </label>
+						<div class="flex-1 flex items-center gap-8">
+							<div class="flex items-center gap-2">
+								<label for="sortBy">Sort: </label>
+								<MySelect 
+										options={sortByColumns.map(v => ({value: v, label: v}))} 
+										bind:value={browserContext.sortBy}
+										disabled={false}
+										placeholder="Sort by Column"/>			
 
-						<MySelect 
-								options={limitOptions.map(opt => ({value: String(opt), label: opt}))} 
-								bind:value={limitAsString}
-								disabled={false}
-								placeholder="Per page"/>
+								<MySelect 
+										options={[{value:'ASC', label: 'ASC'}, {value: 'DESC', label:'DESC'}]} 
+										bind:value={browserContext.sortDirection}
+										disabled={false}
+										placeholder="Sort order"/>
+							</div>
+
+							<div class="flex items-center gap-2">
+								<label for="limit">Items per page: </label>
+								<MySelect 
+										options={limitOptions.map(opt => ({value: String(opt), label: opt}))} 
+										bind:value={limitAsString}
+										disabled={false}
+										placeholder="Per page"/>
+							</div>
+						</div>
 						<!-- Instances <Switch onCheckedChange={toggleStudyMode} /> Studies -->
 					</Card.Content>
 			
 				</Card.Root>
 				<!-- <AdvancedFiltering /> -->
 				<!-- <FilterConditions /> -->
+				
 			</div>
-			<div id="user">
-				<!-- <MainIcon on:click={() => (globalContext.showUserMenu = true)} tooltip={creator.name} style="light">
-					<span class="icon">{initials}</span>
-				</MainIcon> -->
+			<div id="user" class="flex-1">
+				<div id="user" class="p-4">
+					<div class="float-right">
+						{#snippet icon()}
+							<span class="flex items-center justify-center p-[0.2em] w-10 h-10 m-auto border border-2 border-gray-500 rounded-full font-bold">{initials}</span>
+						{/snippet}
+						<MainIcon
+							onclick={() => (globalContext.showUserMenu = true)}
+							tooltip={user.username}
+							theme="light"
+							iconSnippet={icon}
+						/>
+					</div>
+				</div>
 			</div>
-		</div>
 	</div>
 
-	<div id="content">
+	<div id="content" class="flex-1 overflow-y-auto p-4">
 		<Pagination onChange={onPageChange}/>
 		<BrowserContent/>
 		<Pagination onChange={onPageChange}/>
@@ -180,78 +229,3 @@
 <!-- <OptioWindow /> -->
 <!-- <InstanceInfo /> -->
 
-<style>
-	.loader {
-		height: 100vh;
-		width: 100vw;
-		position: fixed; /* Stay in place */
-		z-index: 1; /* Sit on top */
-		left: 0;
-		top: 0;
-		background-color: rgba(255, 255, 255, 0.7); /* Black w/opacity */
-		backdrop-filter: blur(5px); /* Filter effect */
-	}
-	.loader > div {
-		position: absolute;
-		left: 50%;
-		top: 50%;
-		transform: translate(-50%, -50%);
-	}
-	div#browser-header {
-		display: flex;
-	}
-	div#browser-header {
-		flex: 1;
-	}
-
-	div#container {
-		height: 100vh;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
-	div#container > div {
-		flex: 0;
-	}
-	div#container > div#content {
-		padding: 1em;
-		overflow-y: auto;
-		flex: 1;
-	}
-	div#main {
-		flex: 1;
-		background-color: #d7d7d7;
-		font-size: 0.8em;
-		border-bottom: 3px solid #f1f1f1;
-	}
-	div#browser-header-left,
-	div#browser-header-right {
-		flex: 1;
-		padding: 1em;
-	}
-	div#user {
-		flex: 0;
-		padding: 1em;
-	}
-
-	div#selection {
-		flex: 0;
-	}
-
-	span.icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.2em;
-		width: 2em;
-		height: 2em;
-		margin: auto;
-		/* font-size: large; */
-		border: 1px solid rgba(255, 255, 255, 0.5);
-		border-radius: 50%;
-		font-weight: bold;
-	}
-	span.icon:hover {
-		background-color: rgba(178, 229, 253, 0.5);
-	}
-</style>

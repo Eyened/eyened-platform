@@ -14,7 +14,7 @@
 <div id="main">
 	<div>
 		<span>User:</span>
-		<span>{creator.name}</span>
+		<span>{creator.username}</span>
 	</div>
 	<div>
 		<ChangePasswordForm />
