@@ -1,9 +1,9 @@
 <script lang="ts">
-    import extensions from "$lib/extensions"
-    import Icon from "$lib/gui/Icon.svelte"
-    import type { components } from "../../types/openapi"
-    import Eye from "./Eye.svelte"
-    import StudyBlockForms from "./StudyBlockForms.svelte"
+    import extensions from "$lib/extensions";
+    import Icon from "$lib/gui/Icon.svelte";
+    import type { components } from "../../types/openapi";
+    import Eye from "./Eye.svelte";
+    import StudyBlockForms from "./StudyBlockForms.svelte";
     type Study = components['schemas']['StudyGET'];
 
     interface Props {
@@ -27,22 +27,22 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="main block">
-    <div class="header" onclick={() => (collapse = !collapse)}>
+<div class="main block p-[0.3em] flex flex-col border border-[rgb(181,188,206)] rounded-[2px] shadow-[0_6px_12px_rgba(149,157,165,0.2)] mb-4">
+    <div class="header text-lg font-bold cursor-pointer items-center hover:bg-gray-300/50 flex" onclick={() => (collapse = !collapse)}>
         {#if !collapse}
             ▼
         {:else}
             ►
         {/if}
-        <div class="date-age">
-            <div class="date">
+        <div class="date-age m-[0.1em] items-center flex">
+            <div class="date text-base">
                 <Icon icon="calendar" />
                 {study.date}
             </div>
-            <div class="age">({age} years)</div>
+            <div class="age m-[0.1em]">({age} years)</div>
         </div>
     </div>
-    <div class:collapse class="eyes">
+    <div class:hidden={collapse} class="eyes flex flex-col">
         <div>
             <Eye laterality="R" {study} />
             <Eye laterality="L" {study} />
@@ -57,44 +57,5 @@
 </div>
 
 <style>
-    div.block {
-        padding: 0.3em;
-        flex-direction: column;
 
-        border: 1px solid rgb(181, 188, 206);
-        border-radius: 2px;
-        box-shadow: rgba(149, 157, 165, 0.2) 0px 6px 12px;
-        margin-bottom: 1em;
-    }
-    div {
-        display: flex;
-    }
-    div.header {
-        font-size: large;
-        font-weight: bold;
-        cursor: pointer;
-        align-items: center;
-    }
-    div.header > div {
-        margin: 0.1em;
-        align-items: center;
-    }
-    div.header:hover {
-        background-color: lightgray;
-    }
-    div.collapse {
-        display: none;
-    }
-    div.eyes {
-        flex-direction: column;
-    }
-    div.date {
-        font-size: normal;
-    }
-    div.date-age {
-        align-items: center;
-    }
-    div.date-age > div {
-        margin: 0.1em;
-    }
 </style>

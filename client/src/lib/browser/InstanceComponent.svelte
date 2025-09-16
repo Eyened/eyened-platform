@@ -48,13 +48,20 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="main" class:selected class:showPatientInfo>
-    <div class="title" onclick={()=>{popupOpen=true}}>
+<div
+    class="main flex flex-col rounded-[0.1em] p-[0.2em] border-[0.2em] border-transparent"
+    class:border-[#72de80]={selected}
+    class:outline={showPatientInfo}
+    class:outline-1={showPatientInfo}
+    class:outline-[#d0d0d0]={showPatientInfo}
+    class:m-[0.2em]={showPatientInfo}
+>
+    <div class="title text-sm flex flex-col text-gray-500 cursor-pointer hover:text-black" onclick={()=>{popupOpen=true}}>
         {#if showPatientInfo}
-            <div>
+            <div class="flex justify-center flex-1">
                 {instance.patient.identifier}
             </div>
-            <div>
+            <div class="flex justify-center flex-1">
                 {instance.study.date}
             </div>
         {/if}
@@ -62,16 +69,16 @@
             {instance.id}
         </div>
     </div>
-    <div class="tile" onclick={toggleSelect}>
+    <div class="tile flex flex-col flex-1 items-center" onclick={toggleSelect}>
         {#if image_url}
             <div
-                class="img"
+                class="img bg-black m-px cursor-pointer flex flex-col items-center [flex-flow:column-reverse] bg-contain bg-no-repeat bg-center"
                 style:width={size}
                 style:height={size}
                 style:background-image="url('{image_url}')"
             >
                 {#if instance.dicom_modality == "OPT"}
-                    <div class="oct-info">
+                    <div class="oct-info text-[10px] text-white/70">
                         [{instance.anatomic_region}] ({instance.nr_of_frames} x {instance.columns})
                     </div>
                 {/if}
@@ -92,79 +99,5 @@
 </div>
 
 <style>
-    div {
-        display: flex;
-    }
-    ul {
-        list-style-type: none;
-        padding: 0;
-        margin: 0;
-        font-size: x-small;
-    }
-    li {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 10em;
-    }
-    div.title {
-        font-size: small;
-        flex-direction: column;
-        color: gray;
-        cursor: pointer;
-        display: flex;
-    }
-    div.title > div {
-        flex: 1;
-        justify-content: center;
-    }
 
-    div.oct-info {
-        font-size: x-small;
-        color: rgba(255, 255, 255, 0.7);
-    }
-    div.title:hover {
-        color: black;
-    }
-    div.img {
-        background-color: black;
-        margin: 1px;
-        cursor: pointer;
-        flex-direction: column;
-        align-items: center;
-        flex-flow: column-reverse;
-
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-    }
-    div.main {
-        flex-direction: column;
-        border-radius: 0.1em;
-        padding: 0.2em;
-        border: 0.2em solid transparent;
-    }
-    div.main.selected {
-        border: 0.2em solid #72de80;
-    }
-    div.main.showPatientInfo {
-        outline: 1px solid #d0d0d0;
-        margin: 0.2em;
-    }
-    div.tile {
-        flex-direction: column;
-        flex: 1;
-        align-items: center;
-    }
-    div.tile:hover {
-        transition:
-            transform 0.3s ease,
-            box-shadow 0.3s ease;
-        box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
-        cursor: pointer;
-    }
-
-    .has-own-segmentations {
-        background-color: #acdde1;
-    }
 </style>

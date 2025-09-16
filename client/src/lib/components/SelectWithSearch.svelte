@@ -32,12 +32,12 @@
 		<Button
 			variant="outline"
 			role="combobox"
-			class="w-[200px] justify-between"
+			class="w-full justify-between"
 		>
 			{selectedLabel}
 		</Button>
 	</Popover.Trigger>
-	<Popover.Content class="w-[200px] p-0">
+	<Popover.Content class="p-0">
 		<Command.Root>
 			<Command.Input placeholder={placeholder} />
 			<Command.Empty>No results found.</Command.Empty>

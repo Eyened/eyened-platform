@@ -32,7 +32,11 @@ export class BrowserContext {
 
 	resultIds: Set<number> = $state(new Set());
 
-	conditions: Condition[] = $state([]);
+	// renamed
+	advancedConditions: Condition[] = $state([]);
+
+	// new
+	basicCondition: Condition | null = $state(null);
 
 	// Signature state for dynamic filters
 	instancesSignature: SignatureField[] = $state([]);
@@ -73,13 +77,21 @@ export class BrowserContext {
 
 	// Compatibility method for search with current conditions
 	search = async () => {
-		if (!this.conditions.length) return;
-		return this.fetch(this.conditions);
+		const query =
+			this.filterMode === 'advanced'
+				? this.advancedConditions
+				: (this.basicCondition ? [this.basicCondition] : []);
+
+		if (!query.length) return;
+		return this.fetch(query);
 	}
 
 	// Method to load conditions from external source (like URL)
 	loadConditions = (conds: Condition[]) => { 
-		this.conditions = conds ?? []; 
+		// Preserve legacy callers; default these into advanced
+		this.advancedConditions = conds ?? []; 
+		// If it looks like a single basic condition, also set basic
+		this.basicCondition = conds?.length === 1 ? conds[0] : this.basicCondition;
 	}
 
 	toggleInstance(instance: Instance) {
@@ -96,7 +108,7 @@ export class BrowserContext {
 		}
 
 		// persist conditions for pagination
-		this.conditions = query;
+		this.advancedConditions = query;
 
 		// reflect in URL
 		const params = new URLSearchParams();
@@ -105,6 +117,9 @@ export class BrowserContext {
 		params.set('page', page.toString());
 		params.set('limit', limit.toString());
 		params.set('conditions', encodeConditions(query));
+		params.set('query', this.queryMode); // 'studies' | 'instances'
+		params.set('order_by', String(this.sortBy));
+		params.set('order', this.sortDirection);
 		goto(`?${params.toString()}`);
 
 		this.InstanceRepo.clear()

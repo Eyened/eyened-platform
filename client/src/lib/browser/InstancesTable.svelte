@@ -10,7 +10,7 @@
 </script>
 
 <div>
-	<div class="container">
+	<div class="container flex flex-wrap">
 		{#each instances as instance}
 			<InstanceComponent {instance} showPatientInfo={true} />
 		{/each}
@@ -18,8 +18,5 @@
 </div>
 
 <style>
-	div.container {
-		display: flex;
-		flex-wrap: wrap;
-	}
+
 </style>

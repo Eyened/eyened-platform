@@ -29,7 +29,7 @@
 
 
 <Select.Root type="single" bind:value disabled={disabled}>
-    <Select.Trigger class="w-[180px]">
+    <Select.Trigger>
         {value ? valueToLabel[value] : placeholder}
     </Select.Trigger>
     <Select.Content>

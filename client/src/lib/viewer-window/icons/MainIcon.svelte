@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Snippet, Component } from "svelte";
+    import type { Component, Snippet } from "svelte";
     import type { MouseEventHandler } from "svelte/elements";
 
     interface Props {
