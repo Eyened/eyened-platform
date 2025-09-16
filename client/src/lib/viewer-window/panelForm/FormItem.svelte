@@ -1,18 +1,18 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
-    import { openNewWindow } from "$lib/newWindow"
-    import type { TaskContext } from "$lib/types"
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte"
-    import { getContext } from "svelte"
-    import Duplicate from "../icons/Duplicate.svelte"
-    import { PanelIcon, Trash } from "../icons/icons"
-    import FormItemContent from "./FormItemContent.svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import { openNewWindow } from "$lib/newWindow";
+    import type { TaskContext } from "$lib/types";
+    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext } from "svelte";
+    import Duplicate from "../icons/Duplicate.svelte";
+    import { PanelIcon, Trash } from "../icons/icons";
+    import FormItemContent from "./FormItemContent.svelte";
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");   
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
     interface Props {
         form: FormAnnotation;

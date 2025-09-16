@@ -20,7 +20,7 @@ from .dtos_instances import (
     ScanMeta,
 )
 from .dtos_aux import CreatorGET, CreatorMetadata, TagGET
-from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET
+from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET, DeviceModelGET
 from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET, SubTaskWithImagesGET
 
 if TYPE_CHECKING:
@@ -218,6 +218,15 @@ class DTOConverter:
     def tag_to_get(tag: "TagORM") -> TagGET:
         """Convert Tag ORM object to TagGET."""
         return TagGET(id=tag.TagID, name=tag.TagName, tag_type=tag.TagType, description=tag.TagDescription, creator=DTOConverter.creator_to_meta(tag.Creator), date_inserted=tag.DateInserted)
+
+    @staticmethod
+    def device_model_to_get(model: "DeviceModel") -> DeviceModelGET:
+        """Convert DeviceModel ORM object to DeviceModelGET."""
+        return DeviceModelGET(
+            id=model.DeviceModelID,
+            manufacturer=model.Manufacturer,
+            model=model.ManufacturerModelName,
+        )
 
     @staticmethod
     def _tags_from_form_annotation(annotation: "FormAnnotationORM") -> List[TagGET]:

@@ -1,0 +1,517 @@
+# Tooltip Documentation
+
+Provides additional information or context when users hover over or interact with an element.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  import MagicWand from "phosphor-svelte/lib/MagicWand";
+</script>
+<Tooltip.Provider>
+  <Tooltip.Root delayDuration={200}>
+    <Tooltip.Trigger
+      class="border-border-input bg-background-alt shadow-btn ring-dark ring-offset-background
+  hover:bg-muted focus-visible:ring-dark focus-visible:ring-offset-background focus-visible:outline-hidden inline-flex size-10 items-center justify-center rounded-full border focus-visible:ring-2 focus-visible:ring-offset-2"
+    >
+      <MagicWand class="size-5" />
+    </Tooltip.Trigger>
+    <Tooltip.Content sideOffset={8}>
+      <div
+        class="rounded-input border-dark-10 bg-background shadow-popover outline-hidden z-0 flex items-center justify-center border p-3 text-sm font-medium"
+      >
+        Make some magic!
+      </div>
+    </Tooltip.Content>
+  </Tooltip.Root>
+</Tooltip.Provider>
+```
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+</script>
+<Tooltip.Provider>
+  <Tooltip.Root>
+    <Tooltip.Trigger />
+    <Tooltip.Portal>
+      <Tooltip.Content>
+        <Tooltip.Arrow />
+      </Tooltip.Content>
+    </Tooltip.Portal>
+  </Tooltip.Root>
+</Tooltip.Provider>
+```
+
+## Provider Component
+
+The `Tooltip.Provider` component is required to be an ancestor of the `Tooltip.Root` component. It provides shared state for the tooltip components used within it. You can set a single `delayDuration` or `disableHoverableContent` prop on the provider component to apply to all the tooltip components within it.
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+</script>
+<Tooltip.Provider delayDuration={0} disableHoverableContent={true}>
+  <Tooltip.Root>
+    <Tooltip.Trigger />
+    <Tooltip.Portal>
+      <Tooltip.Content>
+        <Tooltip.Arrow />
+      </Tooltip.Content>
+    </Tooltip.Portal>
+  </Tooltip.Root>
+  <Tooltip.Root>
+    <Tooltip.Trigger />
+    <Tooltip.Portal>
+      <Tooltip.Content>
+        <Tooltip.Arrow />
+      </Tooltip.Content>
+    </Tooltip.Portal>
+  </Tooltip.Root>
+</Tooltip.Provider>
+```
+
+It also ensures that only a single tooltip within the same provider can be open at a time. It's recommended to wrap your root layout content with the provider component, setting your sensible default props there.
+
++layout.svelte
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  let { children } = $props();
+</script>
+<Tooltip.Provider>
+  {@render children()}
+</Tooltip.Provider>
+```
+
+## Managing Open State
+
+This section covers how to manage the `open` state of the component.
+
+### Two-Way Binding
+
+Use `bind:open` for simple, automatic state synchronization:
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  let isOpen = $state(false);
+</script>
+<button onclick={() => (isOpen = true)}>Open Tooltip</button>
+<Tooltip.Root bind:open={isOpen}>
+</Tooltip.Root>
+```
+
+### Fully Controlled
+
+Use a [Function Binding](https://svelte.dev/docs/svelte/bind#Function-bindings) for complete control over the state's reads and writes.
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  let myOpen = $state(false);
+  function getOpen() {
+    return myOpen;
+  }
+  function setOpen(newOpen: boolean) {
+    myOpen = newOpen;
+  }
+</script>
+<Tooltip.Root bind:open={getOpen, setOpen}>
+</Tooltip.Root>
+```
+
+## Mobile Tooltips
+
+Tooltips are *not* supported on mobile devices. The intent of a tooltip is to provide a "tip" about a "tool" before the user interacts with that tool (in most cases, a button).
+
+This is not possible on mobile devices, because there is no sense of hover on mobile. If a user were to press/touch a button with a tooltip, the action that button triggers would be taken before they were even able to see the tooltip, which renders it useless.
+
+If you are using a tooltip on a button without an action, you should consider using a [Popover](/docs/components/popover) instead.
+
+If you'd like to learn more about how we came to this decision, here are some useful resources:
+
+> 
+>
+> The tooltip is not the appropriate role for the more information "i" icon, . A tooltip is directly associated with the owning element. The  isn't 'described by' detailed information; the tool or control is.
+>
+> 
+>
+> 
+>
+> [MDN ARIA Tooltips](https://arc.net/l/quote/zfvjgalg)
+>
+> 
+>
+> 
+
+> 
+>
+> Tooltips should only ever contain non-essential content. The best approach to writing tooltip content is to always assume it may never be read.
+>
+> 
+>
+> 
+>
+> [Tooltips in the time of WCAG 2.1](https://arc.net/l/quote/gdrkepxb)
+>
+> 
+>
+> 
+
+## Reusable Components
+
+It's recommended to use the `Tooltip` primitives to build your own custom tooltip component that can be used throughout your application.
+
+Below is an example of how you might create a reusable tooltip component that can be used throughout your application. Of course, this isn't the only way to do it, but it should give you a good idea of how to compose the primitives.
+
+MyTooltip.svelte
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  import { type Snippet } from "svelte";
+  type Props = Tooltip.RootProps & {
+    trigger: Snippet;
+    triggerProps?: Tooltip.TriggerProps;
+  };
+  let {
+    open = $bindable(false),
+    children,
+    trigger,
+    triggerProps = {},
+    ...restProps
+  }: Tooltip.RootProps = $props();
+</script>
+
+<Tooltip.Root bind:open {...restProps}>
+  <Tooltip.Trigger {...triggerProps}>
+    {@render trigger()}
+  </Tooltip.Trigger>
+  <Tooltip.Portal>
+    <Tooltip.Content>
+      <Tooltip.Arrow />
+      {@render children?.()}
+    </Tooltip.Content>
+  </Tooltip.Portal>
+</Tooltip.Root>
+```
+
+You could then use the `MyTooltip` component in your application like so:
+
++page.svelte
+
+```svelte
+<script lang="ts">
+  import MyTooltip from "$lib/components/MyTooltip.svelte";
+  import BoldIcon from "..some-icon-library"; // not real
+</script>
+<MyTooltip triggerProps={{ onclick: () => alert("changed to bold!") }}>
+  {#snippet trigger()}
+    <BoldIcon />
+  {/snippet}
+  Change font to bold
+</MyTooltip>
+```
+
+## Delay Duration
+
+You can change how long a user needs to hover over a trigger before the tooltip appears by setting the `delayDuration` prop on the `Tooltip.Root` or `Tooltip.Provider` component.
+
+```svelte
+<Tooltip.Root delayDuration={200}>
+</Tooltip.Root>
+```
+
+## Close on Trigger Click
+
+By default, the tooltip will close when the user clicks the trigger. If you want to disable this behavior, you can set the `disableCloseOnTriggerClick` prop to `true`.
+
+```svelte
+<Tooltip.Root disableCloseOnTriggerClick>
+</Tooltip.Root>
+```
+
+## Hoverable Content
+
+By default, the tooltip will remain open when the user hovers over the content. If you instead want the tooltip to close as the user moves their mouse towards the content, you can set the `disableHoverableContent` prop to `true`.
+
+```svelte
+<Tooltip.Root disableHoverableContent>
+</Tooltip.Root>
+```
+
+## Non-Keyboard Focus
+
+If you want to prevent opening the tooltip when the user focuses the trigger without using the keyboard, you can set the `ignoreNonKeyboardFocus` prop to `true`.
+
+```svelte
+<Tooltip.Root ignoreNonKeyboardFocus>
+</Tooltip.Root>
+```
+
+## Svelte Transitions
+
+You can use the `forceMount` prop along with the `child` snippet to forcefully mount the `Tooltip.Content` component to use Svelte Transitions or another animation library that requires more control.
+
+```svelte
+<script lang="ts">
+ import { Tooltip } from "bits-ui";
+ import { fly, fade } from "svelte/transition";
+</script>
+<Tooltip.Root>
+ <Tooltip.Content forceMount>
+  {#snippet child({ wrapperProps, props, open })}
+   {#if open}
+    <div {...wrapperProps}>
+     <div {...props} transition:fly>
+     </div>
+    </div>
+   {/if}
+  {/snippet}
+ </Tooltip.Content>
+</Dialog.Root>
+```
+
+Of course, this isn't the prettiest syntax, so it's recommended to create your own reusable content components that handles this logic if you intend to use this approach throughout your app. For more information on using transitions with Bits UI components, see the [Transitions](/docs/transitions) documentation.
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  import MagicWand from "phosphor-svelte/lib/MagicWand";
+  import { fly } from "svelte/transition";
+</script>
+<Tooltip.Provider>
+  <Tooltip.Root delayDuration={200}>
+    <Tooltip.Trigger
+      class="border-border-input bg-background-alt shadow-btn ring-dark ring-offset-background
+  hover:bg-muted focus-visible:ring-dark focus-visible:ring-offset-background focus-visible:outline-hidden inline-flex size-10 items-center justify-center rounded-full border focus-visible:ring-2 focus-visible:ring-offset-2"
+    >
+      <MagicWand class="size-5" />
+    </Tooltip.Trigger>
+    <Tooltip.Content sideOffset={8} forceMount>
+      {#snippet child({ wrapperProps, props, open })}
+        {#if open}
+          <div {...wrapperProps}>
+            <div {...props} transition:fly={{ duration: 300 }}>
+              <div
+                class="rounded-input border-dark-10 bg-background shadow-popover outline-hidden z-0 flex items-center justify-center border p-3 text-sm font-medium"
+              >
+                Make some magic!
+              </div>
+            </div>
+          </div>
+        {/if}
+      {/snippet}
+    </Tooltip.Content>
+  </Tooltip.Root>
+</Tooltip.Provider>
+```
+
+## Opt-out of Floating UI
+
+When you use the `Tooltip.Content` component, Bits UI uses [Floating UI](https://floating-ui.com/) to position the content relative to the trigger, similar to other popover-like components.
+
+You can opt-out of this behavior by instead using the `Tooltip.ContentStatic` component. This component does not use Floating UI and leaves positioning the content entirely up to you.
+
+```svelte
+<Tooltip.Root>
+  <Tooltip.Trigger>Hello</Tooltip.Trigger>
+  <Tooltip.ContentStatic>
+  </Tooltip.ContentStatic>
+</Tooltip.Root>
+```
+
+##### Note
+
+When using the `Tooltip.ContentStatic` component, the `Tooltip.Arrow` component will not be rendered relative to it as it is designed to be used with `Tooltip.Content`.
+
+## Custom Anchor
+
+By default, the `Tooltip.Content` is anchored to the `Tooltip.Trigger` component, which determines where the content is positioned.
+
+If you wish to instead anchor the content to a different element, you can pass either a selector `string` or an `HTMLElement` to the `customAnchor` prop of the `Tooltip.Content` component.
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  let customAnchor = $state<HTMLElement>(null!);
+</script>
+<div bind:this={customAnchor}></div>
+<Tooltip.Root>
+  <Tooltip.Trigger />
+  <Tooltip.Content {customAnchor}>
+  </Tooltip.Content>
+</Tooltip.Root>
+```
+
+```svelte
+<script lang="ts">
+  import { Tooltip } from "bits-ui";
+  import MagicWand from "phosphor-svelte/lib/MagicWand";
+  let customAnchor = $state<HTMLElement | null>(null);
+</script>
+<div class="flex items-center gap-6">
+  <div class="rounded-md border p-3" bind:this={customAnchor}>
+    Custom Anchor
+  </div>
+  <Tooltip.Provider>
+    <Tooltip.Root delayDuration={200}>
+      <Tooltip.Trigger
+        class="border-border-input bg-background-alt shadow-btn ring-dark ring-offset-background
+   hover:bg-muted focus-visible:ring-dark focus-visible:ring-offset-background focus-visible:outline-hidden inline-flex size-10 items-center justify-center rounded-full border focus-visible:ring-2 focus-visible:ring-offset-2"
+      >
+        <MagicWand class="size-5" />
+      </Tooltip.Trigger>
+      <Tooltip.Content sideOffset={8} {customAnchor}>
+        <div
+          class="rounded-input border-dark-10 bg-background shadow-popover outline-hidden z-0 flex items-center justify-center border p-3 text-sm font-medium"
+        >
+          Make some magic!
+        </div>
+      </Tooltip.Content>
+    </Tooltip.Root>
+  </Tooltip.Provider>
+</div>
+```
+
+## API Reference
+
+### Tooltip.Provider
+
+A provider component which contains shared state and logic for the tooltips within its subtree.
+
+| Property                                                                       | Type                       | Description                                                                                                                                                             | Details                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `delayDuration` | `number`  | The amount of time in milliseconds to delay opening the tooltip when hovering over the trigger.`Default: 700`                                             |                                        |
+| `disableHoverableContent`                    | `boolean` | Whether or not to disable the hoverable content. This is useful when the content contains interactive elements.`Default: false`                           |                                        |
+| `disabled`                                   | `boolean` | Whether or not the tooltip is disabled.`Default: false`                                                                                                   |                                        |
+| `disableCloseOnTriggerClick`                 | `boolean` | Whether or not to close the tooltip when pressing the escape key. This is useful when the content contains interactive elements.`Default: false`          |                                        |
+| `skipDelayDuration`                          | `number`  | The amount of time in milliseconds to delay opening the tooltip when the user has used their mouse to hover over the trigger.`Default: 300`               |                                        |
+| `ignoreNonKeyboardFocus`                     | `boolean` | Whether or not to ignore the tooltip when the focus is not on the trigger. This is useful when the content contains interactive elements.`Default: false` |                                      |
+| `children`                                   | `Snippet` | The children content to render.`Default:  undefined`                                                                                                   |  |
+
+| Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### Tooltip.Root
+
+The root component containing the parts of the tooltip. Must be a descendant of a `Tooltip.Provider` component.
+
+| Property                                                                                     | Type                                                                                                                                                                                                              | Description                                                                                                                                                             | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open` $bindable | `boolean`                                                                                                                                                                                        | The open state of the component.`Default: false`                                                                                                          |                                      |
+| `onOpenChange`                                             | `function`- (open: boolean) =\&gt; void | A callback function called when the open state changes.`Default:  undefined`                                                                           |                                      |
+| `onOpenChangeComplete`                                     | `function`- (open: boolean) =\&gt; void | A callback function called after the open state changes and all animations have completed.`Default:  undefined`                                        |                                      |
+| `disabled`                                                 | `boolean`                                                                                                                                                                                        | Whether or not the tooltip is disabled.`Default: false`                                                                                                   |                                      |
+| `delayDuration`                                            | `number`                                                                                                                                                                                         | The amount of time in milliseconds to delay opening the tooltip when hovering over the trigger.`Default: 700`                                             |                                      |
+| `disableHoverableContent`                                  | `boolean`                                                                                                                                                                                        | Whether or not to disable the hoverable content. This is useful when the content contains interactive elements.`Default: false`                           |                                      |
+| `disableCloseOnTriggerClick`                               | `boolean`                                                                                                                                                                                        | Whether or not to close the tooltip when pressing the escape key. This is useful when the content contains interactive elements.`Default: false`          |                                      |
+| `ignoreNonKeyboardFocus`                                   | `boolean`                                                                                                                                                                                        | Whether or not to ignore the tooltip when the focus is not on the trigger. This is useful when the content contains interactive elements.`Default: false` |                                      |
+| `children`                                                 | `Snippet`                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                                   |  |
+
+| Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### Tooltip.Trigger
+
+A component which triggers the opening and closing of the tooltip on hover or focus.
+
+| Property                                                                  | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled` | `boolean`                                                                                                                                                                                                                                        | Whether or not the tooltip trigger is disabled.`Default: false`                                                                               |                                      |
+| `ref` $bindable            | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                              | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                 | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                     | Value                                                                                                                                                                                                                          | Description                                                                                                                                                                                       | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'delayed-open' \| 'instant-open' \| 'closed' | Whether/how the tooltip is open or closed. When open, if there is a delay, the value will be 'delayed-open', otherwise it will be 'instant-open'. When closed, the value will be 'closed'. |                                      |
+| `data-tooltip-trigger`                    | `''`                                                                                                                                                                                                          | Present on the tooltip trigger element.                                                                                                                                                    |  |
+
+### Tooltip.Content
+
+The contents of the tooltip which are displayed when the tooltip is open.
+
+| Property                                                              | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                                                        | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `side` | `enum`- 'top' \| 'bottom' \| 'left' \| 'right'                                                                                                                                                                                                                                                                                                                                                                                                                                   | The preferred side of the anchor to render the floating element against when open. Will be reversed when collisions occur.`Default: 'bottom'`                                                                                                                                                                                                                                                                                        |                                      |
+| `sideOffset`                        | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The distance in pixels from the anchor to the floating element.`Default: 0`                                                                                                                                                                                                                                                                                                                                                          |                                      |
+| `align`                             | `enum`- 'start' \| 'center' \| 'end'                                                                                                                                                                                                                                                                                                                                                                                                                                             | The preferred alignment of the anchor to render the floating element against when open. This may change when collisions occur.`Default: 'start'`                                                                                                                                                                                                                                                                                     |                                      |
+| `alignOffset`                       | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The distance in pixels from the anchor to the floating element.`Default: 0`                                                                                                                                                                                                                                                                                                                                                          |                                      |
+| `arrowPadding`                      | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The amount in pixels of virtual padding around the viewport edges to check for overflow which will cause a collision.`Default: 0`                                                                                                                                                                                                                                                                                                    |                                      |
+| `avoidCollisions`                   | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | When `true`, overrides the `side` and `align` options to prevent collisions with the boundary edges.`Default: true`                                                                                                                                                                                                                                                                                                                  |                                      |
+| `collisionBoundary`                 | `union`- Element \| null                                                                                                                                                                                                                                                                                                                                                                                                                                                         | A boundary element or array of elements to check for collisions against.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                     |                                      |
+| `collisionPadding`                  | `union`- number \| Partial\&lt;Record\&lt;Side, number\&gt;\&gt;                                                                                                                                                                                                                                                                                                                                                                                                                 | The amount in pixels of virtual padding around the viewport edges to check for overflow which will cause a collision.`Default: 0`                                                                                                                                                                                                                                                                                                    |                                      |
+| `sticky`                            | `enum`- 'partial' \| 'always'                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The sticky behavior on the align axis. `'partial'` will keep the content in the boundary as long as the trigger is at least partially in the boundary whilst `'always'` will keep the content in the boundary regardless.`Default: 'partial'`                                                                                                                                                                                        |                                      |
+| `hideWhenDetached`                  | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | When `true`, hides the content when it is detached from the DOM. This is useful for when you want to hide the content when the user scrolls away.`Default: true`                                                                                                                                                                                                                                                                     |                                      |
+| `updatePositionStrategy`            | `enum`- 'optimized' \| 'always'                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The strategy to use when updating the position of the content. When `'optimized'` the content will only be repositioned when the trigger is in the viewport. When `'always'` the content will be repositioned whenever the position changes.`Default: 'optimized'`                                                                                                                                                                   |                                      |
+| `strategy`                          | `enum`- 'fixed' \| 'absolute'                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The positioning strategy to use for the floating element. When `'fixed'` the element will be positioned relative to the viewport. When `'absolute'` the element will be positioned relative to the nearest positioned ancestor.`Default: 'fixed'`                                                                                                                                                                                    |                                      |
+| `preventScroll`                     | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | When `true`, prevents the body from scrolling when the content is open. This is useful when you want to use the content as a modal.`Default: true`                                                                                                                                                                                                                                                                                   |                                      |
+| `customAnchor`                      | `union`- string \| HTMLElement \| Measurable \| null                                                                                                                                                                                                                                                                                                                                                                                                                             | Use an element other than the trigger to anchor the content to. If provided, the content will be anchored to the provided element instead of the trigger.`Default: null`                                                                                                                                                                                                                                                             |                                      |
+| `onInteractOutside`                 | `function`- (event: PointerEvent) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                    | Callback fired when an outside interaction event occurs, which is a `pointerdown` event. You can call `event.preventDefault()` to prevent the default behavior of handling the outside interaction.`Default:  undefined`                                                                                                                                                                                                          |                                      |
+| `onFocusOutside`                    | `function`- (event: FocusEvent) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                      | Callback fired when focus leaves the dismissible layer. You can call `event.preventDefault()` to prevent the default behavior on focus leaving the layer.`Default:  undefined`                                                                                                                                                                                                                                                    |                                      |
+| `interactOutsideBehavior`           | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                                                                                                                                                                                                                                                                                                                                                                                               | The behavior to use when an interaction occurs outside of the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'`  |                                      |
+| `onEscapeKeydown`                   | `function`- (event: KeyboardEvent) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                   | Callback fired when an escape keydown event occurs in the floating content. You can call `event.preventDefault()` to prevent the default behavior of handling the escape keydown event.`Default:  undefined`                                                                                                                                                                                                                      |                                      |
+| `escapeKeydownBehavior`             | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                                                                                                                                                                                                                                                                                                                                                                                               | The behavior to use when an escape keydown event occurs in the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'` |                                      |
+| `forceMount`                        | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false`                                                                                                                                                                                                                                                                   |                                      |
+| `dir`                               | `enum`- 'ltr' \| 'rtl'                                                                                                                                                                                                                                                                                                                                                                                                                                                           | The reading direction of the app.`Default: 'ltr'`                                                                                                                                                                                                                                                                                                                                                                                    |                                      |
+| `ref` $bindable        | `HTMLDivElement`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                                                                                                                                                                                                    |                                      |
+| `children`                          | `Snippet`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | The children content to render.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                                                              |                                      |
+| `child`                             | `Snippet`- type ChildSnippetProps = \&#123; /\*\* \* Props for the positioning wrapper \* Do not style this element - \* styling should be applied to the content element \*/ wrapperProps: Record\&lt;string, unknown\&gt;; /\*\* \* Props for your content element \* Apply your custom styles here \*/ props: Record\&lt;string, unknown\&gt;; /\*\* \* Content visibility state \* Use this for conditional rendering with \* Svelte transitions \*/ open: boolean; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                                                                                                                                                                                                        |  | | Data Attribute                     | Value                                                                                                                                                                                                                          | Description                                                                                                                                                                                       | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'delayed-open' \| 'instant-open' \| 'closed' | Whether/how the tooltip is open or closed. When open, if there is a delay, the value will be 'delayed-open', otherwise it will be 'instant-open'. When closed, the value will be 'closed'. |                                      |
+| `data-tooltip-content`                    | `''`                                                                                                                                                                                                          | Present on the tooltip content element.                                                                                                                                                    |  |
+
+| CSS Variable                                                    | Description                                                         | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--bits-tooltip-content-transform-origin` | The transform origin of the content element. |                                      |
+| `--bits-tooltip-content-available-width`                               | The available width of the content element.  |                                      |
+| `--bits-tooltip-content-available-height`                              | The available height of the content element. |                                      |
+| `--bits-tooltip-anchor-width`                                          | The width of the anchor element.             |                                      |
+| `--bits-tooltip-anchor-height`                                         | The height of the anchor element.            |  |
+
+### Tooltip.ContentStatic
+
+The contents of the tooltip which are displayed when the tooltip is open. (Static/No Floating UI)
+
+| Property                                                                           | Type                                                                                                                                                                                                                                                                                  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                        | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onInteractOutside` | `function`- (event: PointerEvent) =\&gt; void                                                               | Callback fired when an outside interaction event occurs, which is a `pointerdown` event. You can call `event.preventDefault()` to prevent the default behavior of handling the outside interaction.`Default:  undefined`                                                                                                                                                                                                          |                                      |
+| `onFocusOutside`                                 | `function`- (event: FocusEvent) =\&gt; void                                                                 | Callback fired when focus leaves the dismissible layer. You can call `event.preventDefault()` to prevent the default behavior on focus leaving the layer.`Default:  undefined`                                                                                                                                                                                                                                                    |                                      |
+| `interactOutsideBehavior`                        | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                          | The behavior to use when an interaction occurs outside of the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'`  |                                      |
+| `onEscapeKeydown`                                | `function`- (event: KeyboardEvent) =\&gt; void                                                              | Callback fired when an escape keydown event occurs in the floating content. You can call `event.preventDefault()` to prevent the default behavior of handling the escape keydown event.`Default:  undefined`                                                                                                                                                                                                                      |                                      |
+| `escapeKeydownBehavior`                          | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                          | The behavior to use when an escape keydown event occurs in the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'` |                                      |
+| `forceMount`                                     | `boolean`                                                                                                                                                                                                                                                            | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false`                                                                                                                                                                                                                                                                   |                                      |
+| `dir`                                            | `enum`- 'ltr' \| 'rtl'                                                                                      | The reading direction of the app.`Default: 'ltr'`                                                                                                                                                                                                                                                                                                                                                                                    |                                      |
+| `ref` $bindable                     | `HTMLDivElement`                                                                                                                                                                                                                                                     | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                                                                                                                                                                                                    |                                      |
+| `children`                                       | `Snippet`                                                                                                                                                                                                                                                            | The children content to render.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                                                              |                                      |
+| `child`                                          | `Snippet`- type ChildSnippetProps = \&#123; open: boolean; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                                                                                                                                                                                                        |  | | Data Attribute                     | Value                                                                                                                                                                                                                          | Description                                                                                                                                                                                       | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'delayed-open' \| 'instant-open' \| 'closed' | Whether/how the tooltip is open or closed. When open, if there is a delay, the value will be 'delayed-open', otherwise it will be 'instant-open'. When closed, the value will be 'closed'. |                                      |
+| `data-tooltip-content`                    | `''`                                                                                                                                                                                                          | Present on the tooltip content element.                                                                                                                                                    |  |
+
+### Tooltip.Arrow
+
+An optional arrow element which points to the trigger when the tooltip is open.
+
+| Property                                                               | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `width` | `number`                                                                                                                                                                                                                                         | The width of the arrow in pixels.`Default: 8`                                                                                                 |                                      |
+| `height`                             | `number`                                                                                                                                                                                                                                         | The height of the arrow in pixels.`Default: 8`                                                                                                |                                      |
+| `ref` $bindable         | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                           | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                              | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                     | Value                                                                                                                                                                                                                    | Description                                          | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-arrow` | `''`                                                                                                                                                                                                    | Present on the arrow element.                 |                                      |
+| `data-tooltip-arrow`                      | `''`                                                                                                                                                                                                    | Present on the arrow element.                 |                                      |
+| `data-side`                               | `enum`- 'top' \| 'right' \| 'bottom' \| 'left' | The side of the tooltip that the arrow is on. |  | ### Tooltip.Portal
+
+When used, will render the tooltip content into the body or custom `to` element when open
+
+| Property                                                            | Type                                                                                                                                                                                                 | Description                                                                                                                                    | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `to` | `union`- Element \| string | Where to render the content when it is open. Defaults to the body.`Default: document.body`                                       |                                      |
+| `disabled`                        | `boolean`                                                                                                                                                                           | Whether the portal is disabled or not. When disabled, the content will be rendered in its original DOM location.`Default: false` |                                      |
+| `children`                        | `Snippet`                                                                                                                                                                           | The children content to render.`Default:  undefined`                                                                          |  |
+
+| Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |

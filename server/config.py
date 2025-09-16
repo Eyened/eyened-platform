@@ -17,8 +17,8 @@ class Settings(EyenedORMConfig):
     admin_username: str
     admin_password: str
     
-    # Authentication bypass for development (reads from AUTH_DISABLED env var)
-    auth_disabled: bool = False
+    # Authentication bypass for development (reads from PUBLIC_AUTH_DISABLED env var)
+    public_auth_disabled: bool = False
 
     database_root_password: Optional[str] = Field(description="Database root password", validation_alias="DATABASE_ROOT_PASSWORD", default=None)
 

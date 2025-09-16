@@ -7,3 +7,4 @@ from . import feature
 from . import tag
 from . import form_schema
 from . import task
+from . import devices

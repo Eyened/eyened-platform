@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, Session, relationship
 from eyened_orm.base import Base, ForeignKeyIndex, CompositeUniqueConstraint
 
 if TYPE_CHECKING:
-    from eyened_orm import Study, ImageInstance, Annotation, Segmentation, FormAnnotation
+    from eyened_orm import Study, ImageInstance, Annotation, Segmentation, FormAnnotation, Creator
 
 class TagType(enum.Enum):
     Study = "Study"
@@ -18,6 +18,20 @@ class TagType(enum.Enum):
     Annotation = "Annotation"
     Segmentation = "Segmentation"
     FormAnnotation = "FormAnnotation"
+
+
+class CreatorTagLink(Base):
+    __tablename__ = "CreatorTag"
+    __table_args__ = (
+        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+    )
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID", ondelete="CASCADE"), primary_key=True)
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Tag: Mapped["Tag"] = relationship(back_populates="CreatorTagLinks")
+    Creator: Mapped["Creator"] = relationship(back_populates="StarredTags")
 
 
 class Tag(Base):
@@ -33,6 +47,12 @@ class Tag(Base):
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    CreatorTagLinks: Mapped[List["CreatorTagLink"]] = relationship(
+        back_populates="Tag",
+        passive_deletes=True,
+        lazy="selectin"
+    )
 
     StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
         back_populates="Tag", 

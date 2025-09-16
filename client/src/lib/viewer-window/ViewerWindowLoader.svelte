@@ -4,17 +4,17 @@ Used to create the viewerwindow context.
 
 -->
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
-    import { data } from "$lib/datamodel/model"
-    import { Registration } from "$lib/registration/registration"
-    import { Deferred } from "$lib/utils"
-    import { WebGL } from "$lib/webgl/webgl"
-    import { getContext, onMount } from "svelte"
-    import BrowserOverlay from "./BrowserOverlay.svelte"
-    import RegistrationItemLoader from "./RegistrationItemLoader.svelte"
-    import ViewerWindow from "./ViewerWindow.svelte"
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { Registration } from "$lib/registration/registration";
+    import { Deferred } from "$lib/utils";
+    import { WebGL } from "$lib/webgl/webgl";
+    import { getContext, onMount } from "svelte";
+    import BrowserOverlay from "./BrowserOverlay.svelte";
+    import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
+    import ViewerWindow from "./ViewerWindow.svelte";
+    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     interface Props {
         instanceIDs: number[];
@@ -30,7 +30,7 @@ Used to create the viewerwindow context.
         }
     }
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
     const { promise, resolve } = new Deferred<ViewerWindowContext>();
 

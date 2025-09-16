@@ -1,16 +1,16 @@
 
 <script lang="ts">
-	import * as Pagination from "$lib/components/ui/pagination"
-	import type { BrowserContext } from '$lib/data-loading/browserContext'
-	import { getContext } from "svelte"
+	import * as Pagination from "$lib/components/ui/pagination";
+	import { getContext } from "svelte";
+	import type { BrowserContext } from './browserContext.svelte';
 
 	const browserContext = getContext<BrowserContext>('browserContext');
-	const { loading, conditions, page, limit, count, search } = browserContext;
 
-	export let onChange: (page: number) => void;
+	let { onChange }: { onChange: (page: number) => void } = $props();
 </script>
 
-<Pagination.Root count={$count} perPage={$limit} onPageChange={onChange} let:pages let:currentPage>
+<Pagination.Root count={browserContext.count} perPage={browserContext.limit} onPageChange={onChange}>
+	{#snippet children({ pages, currentPage })}
 	<Pagination.Content>
 		<Pagination.Item>
 			<Pagination.PrevButton />
@@ -32,4 +32,5 @@
 			<Pagination.NextButton />
 		</Pagination.Item>
 	</Pagination.Content>
+	{/snippet}
 </Pagination.Root>

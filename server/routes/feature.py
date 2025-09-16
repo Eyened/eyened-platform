@@ -15,6 +15,12 @@ def set_subfeatures(db: Session, parent_id: int, sub_ids: list[int] | None) -> N
     for idx, child_id in enumerate(sub_ids or []):
         db.add(FeatureFeatureLink(ParentFeatureID=parent_id, ChildFeatureID=child_id, FeatureIndex=idx))
 
+@router.get("/features", response_model=list[FeatureGET])
+async def list_features(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Return all features."""
+    rows = db.scalars(select(Feature).order_by(Feature.FeatureName.asc())).all()
+    return [DTOConverter.feature_to_get(f) for f in rows]
+
 @router.post("/features", response_model=FeatureGET)
 async def create_feature(dto: FeaturePUT, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     feature = Feature(FeatureName=dto.name)

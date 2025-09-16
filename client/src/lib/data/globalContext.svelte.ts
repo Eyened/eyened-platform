@@ -1,7 +1,9 @@
+import { TagsRepo } from '$lib/data/repos.svelte';
 import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 import { ModelSegmentation, type Segmentation } from '$lib/datamodel/segmentation.svelte';
-import { UserManager } from '$lib/usermanager';
+import { UserManager } from '$lib/usermanager.svelte';
 import openAPISpec from '../../types/openapi.json';
+import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
 
 export type ComponentDef = {
     component: any,
@@ -11,9 +13,12 @@ export type ComponentDef = {
 export class GlobalContext {
 
     public userManager: UserManager;
+    public tags = TagsRepo;
+    public tagsLoaded: boolean = $state(false);
 
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
+    public showUserMenu: boolean = $state(false);
 
     public formShortcut: string | null = $state('WARMGS');
     public config: any = $state({
@@ -23,14 +28,22 @@ export class GlobalContext {
 
     constructor() {
         this.userManager = new UserManager()
+        console.log(`Loaded GlobalContext`)
+        console.log(`apiUrl: ${apiUrl}`)
+        console.log(`fsHost: ${fsHost}`)
+        console.log(`thumbnailHost: ${thumbnailHost}`)
+        console.log(`authEnabled: ${authEnabled}`)
+        console.log(import.meta.env.PUBLIC_AUTH_DISABLED)
     }
 
     async init(pathname: string) {
         await this.userManager.init(pathname);
+        await this.tags.fetchAll();
+        this.tagsLoaded = true;
     }
 
-    get creator() {
-        return this.userManager.creator;
+    get user() {
+        return this.userManager.user;
     }
 
     setPopup(component: ComponentDef | null) {
@@ -41,7 +54,7 @@ export class GlobalContext {
         if (annotation instanceof ModelSegmentation) {
             return false;
         }
-        return annotation.creator.id == this.userManager.creator.id;
+        return annotation.creator.id == this.userManager.user.id;
     }
 
     updateConfig(config: any) {
@@ -56,12 +69,12 @@ export class GlobalContext {
         return (a: Segmentation | FormAnnotation) => {
 
 
-            if (this.creator.name == 'test_user') {
+            if (this.user.username == 'test_user') {
                 // show everything for test user
                 return true;
             }
 
-            if (a.creator.id == this.creator.id) {
+            if (a.creator.id == this.user.id) {
                 // always show own annotations
                 return true;
             }

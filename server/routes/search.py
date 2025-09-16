@@ -24,6 +24,8 @@ from eyened_orm import (
     Segmentation,
     SegmentationTagLink,
 )
+from eyened_orm.ImageInstance import Laterality as ImgLaterality, Modality as ImgModality, ETDRSField as ImgETDRS
+from eyened_orm.Patient import SexEnum as PatientSex
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -56,11 +58,10 @@ InstTag = aliased(Tag, name="image_tag")
 
 # list of properties that are searchable with identifier and mapped ORM property
 searchable_fields = Literal[
-    'Image DBID', 
-    'Laterality', 
-    'Modality', 
-    'Anatomic Region', 
-    'ETDRS Field', 
+    'Image DBID',
+    'Laterality',
+    'Modality',
+    'ETDRS Field',
     'Color Fundus Quality',
     'Study Date',
     'Patient Identifier',
@@ -78,13 +79,12 @@ searchable_fields = Literal[
     'Image Tag Name',
 ]
 
-operators = Literal[">", "<", ">=", "<=", "==", "!="]
+operators = Literal[">", "<", ">=", "<=", "==", "!=", "IN"]
 
 instance_search_fields_map: Dict[searchable_fields, Any] = {
     'Image DBID': ImageInstance.ImageInstanceID,
     'Laterality': ImageInstance.Laterality,
     'Modality': ImageInstance.Modality,
-    'Anatomic Region': ImageInstance.AnatomicRegion,
     'ETDRS Field': ImageInstance.ETDRSField,
     'Color Fundus Quality': ImageInstance.CFQuality,
     'Study Date': Study.StudyDate,
@@ -209,10 +209,16 @@ def create_condition(conditions: List[Dict[str, Any]], fields_map: Optional[Dict
     return or_(*exprs) if exprs else true()
 
 
+class SignatureField(BaseModel):
+    """Signature descriptor for a searchable field."""
+    name: str
+    # Either a primitive type marker or an enum of allowed values
+    values: str | list[str]  # 'string' | 'int' | 'float' | 'date' | string[]
+
 class SearchCondition(BaseModel):
     variable: searchable_fields
     operator: operators
-    value: Union[date, int, float, str, None]
+    value: Union[date, int, float, str, list[str], None]  # add list[str]
 
 class SearchQuery(BaseModel):
     conditions: List[SearchCondition]
@@ -225,6 +231,7 @@ class SearchQuery(BaseModel):
 
 class SearchResponse(BaseModel):
     instances: List[InstanceGET]
+    studies: List[StudyGET]
     limit: int
     page: int
     count: Optional[int] = None
@@ -235,7 +242,7 @@ class SearchResponse(BaseModel):
 class StudySearchCondition(BaseModel):
     variable: study_searchable_fields
     operator: operators
-    value: Any
+    value: Union[date, int, float, str, list[str], None]  # add list[str]
 
 class StudySearchQuery(BaseModel):
     conditions: List[StudySearchCondition]
@@ -390,7 +397,7 @@ async def create_form_annotation(
         ids = ids[:limit]
 
     if not ids:
-        return {"instances": [], "limit": limit, "page": page, "count": None, "result_ids": [], "has_more": False}
+        return {"instances": [], "studies": [], "limit": limit, "page": page, "count": None, "result_ids": [], "has_more": False}
 
     instances_stmt = (
         select(ImageInstance)
@@ -407,16 +414,41 @@ async def create_form_annotation(
     order = {i: idx for idx, i in enumerate(ids)}
     instances.sort(key=lambda x: order[x.ImageInstanceID])
 
+    # build studies list for these instances
+    seen: set[int] = set()
+    study_ids_ordered: list[int] = []
+    for inst in instances:
+        st = inst.Series.Study if inst.Series and inst.Series.Study else None
+        if st and st.StudyID not in seen:
+            seen.add(st.StudyID)
+            study_ids_ordered.append(st.StudyID)
+
+    studies_dtos: list[StudyGET] = []
+    if study_ids_ordered:
+        studies_stmt = (
+            select(Study)
+            .where(Study.StudyID.in_(study_ids_ordered))
+            .options(selectinload(Study.Series).selectinload(Series.ImageInstances))
+        )
+        studies = db.execute(studies_stmt).scalars().all()
+        # preserve instance-first study order
+        s_order = {sid: i for i, sid in enumerate(study_ids_ordered)}
+        studies.sort(key=lambda s: s_order[s.StudyID])
+
+        # include series + full instance_ids as-is (no filtering)
+        studies_dtos = [DTOConverter.study_to_get(s, include_series=True) for s in studies]
+
     count = None
     if params.get("include_count"):
         count = db.execute(select(func.count()).select_from(base_ids.subquery())).scalar_one()
 
     return {
         "instances": [DTOConverter.image_instance_to_get(i) for i in instances],
+        "studies": studies_dtos,
         "limit": limit,
         "page": page,
         "count": count,
-        "result_ids": ids,
+        "result_ids": ids,           # remains instance IDs
         "has_more": has_more,
     }
 
@@ -484,3 +516,113 @@ async def search_studies(
         "result_ids": study_ids,
         "has_more": has_more,
     }
+
+@router.get("/instances/search/signature", response_model=list[SignatureField])
+async def instances_signature(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Return signature metadata for instance search fields."""
+    items: list[SignatureField] = []
+
+    # Enum-backed
+    items.append(SignatureField(name="Laterality", values=[e.value for e in ImgLaterality]))
+    items.append(SignatureField(name="Modality", values=[e.value for e in ImgModality]))
+    items.append(SignatureField(name="ETDRS Field", values=[e.value for e in ImgETDRS]))
+    items.append(SignatureField(name="Patient Sex", values=[e.value for e in PatientSex]))
+
+    # DB-derived lists
+    projects = db.execute(select(Project.ProjectName).distinct()).scalars().all()
+    items.append(SignatureField(name="Project Name", values=sorted(projects)))
+
+    model_ids = db.execute(select(DeviceModel.DeviceModelID).distinct()).scalars().all()
+    items.append(SignatureField(name="Device Model ID", values=[str(v) for v in sorted(model_ids)]))
+
+    feat_names = db.execute(select(Feature.FeatureName).distinct()).scalars().all()
+    items.append(SignatureField(name="Segmentation Feature Name", values=sorted(feat_names)))
+
+    seg_creators = db.execute(
+        select(Creator.CreatorName)
+        .join(Segmentation, Segmentation.CreatorID == Creator.CreatorID)
+        .where(~Segmentation.Inactive)
+        .distinct()
+    ).scalars().all()
+    items.append(SignatureField(name="Segmentation Creator Name", values=sorted(seg_creators)))
+
+    seg_tag_names = db.execute(
+        select(Tag.TagName)
+        .join(SegmentationTagLink, SegmentationTagLink.TagID == Tag.TagID)
+        .distinct()
+    ).scalars().all()
+    items.append(SignatureField(name="Segmentation Tag Name", values=sorted(seg_tag_names)))
+
+    form_schema_names = db.execute(select(FormSchema.SchemaName).distinct()).scalars().all()
+    items.append(SignatureField(name="Form Schema Name", values=sorted(form_schema_names)))
+
+    form_creators = db.execute(
+        select(Creator.CreatorName)
+        .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
+        .where(~FormAnnotation.Inactive)
+        .distinct()
+    ).scalars().all()
+    items.append(SignatureField(name="Form Creator Name", values=sorted(form_creators)))
+
+    form_tag_names = db.execute(
+        select(Tag.TagName)
+        .join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID)
+        .distinct()
+    ).scalars().all()
+    items.append(SignatureField(name="Form Tag Name", values=sorted(form_tag_names)))
+
+    image_tag_names = db.execute(
+        select(Tag.TagName)
+        .join(ImageInstanceTagLink, ImageInstanceTagLink.TagID == Tag.TagID)
+        .distinct()
+    ).scalars().all()
+    items.append(SignatureField(name="Image Tag Name", values=sorted(image_tag_names)))
+
+    # Free-text/number defaults
+    items.append(SignatureField(name="Image DBID", values="int"))
+    items.append(SignatureField(name="Color Fundus Quality", values="float"))
+    items.append(SignatureField(name="Study Date", values="date"))
+    items.append(SignatureField(name="Patient Identifier", values="string"))
+    items.append(SignatureField(name="Patient Birthdate", values="date"))
+
+    return items
+
+@router.get("/studies/search/signature", response_model=list[SignatureField])
+async def studies_signature(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Return signature metadata for study search fields."""
+    items: list[SignatureField] = []
+
+    # Enum-backed
+    items.append(SignatureField(name="Patient Sex", values=[e.value for e in PatientSex]))
+
+    # DB-derived
+    projects = db.execute(select(Project.ProjectName).distinct()).scalars().all()
+    items.append(SignatureField(name="Project Name", values=sorted(projects)))
+
+    form_schema_names = db.execute(select(FormSchema.SchemaName).distinct()).scalars().all()
+    items.append(SignatureField(name="Form Schema Name", values=sorted(form_schema_names)))
+
+    form_creators = db.execute(
+        select(Creator.CreatorName)
+        .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
+        .where(~FormAnnotation.Inactive)
+        .distinct()
+    ).scalars().all()
+    items.append(SignatureField(name="Form Creator Name", values=sorted(form_creators)))
+
+    form_tag_names = db.execute(
+        select(Tag.TagName)
+        .join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID)
+        .distinct()
+    ).scalars().all()
+    items.append(SignatureField(name="Form Tag Name", values=sorted(form_tag_names)))
+
+    # Typed free-entry fields
+    items.append(SignatureField(name="Study Date", values="date"))
+    items.append(SignatureField(name="Study Description", values="string"))
+    items.append(SignatureField(name="Study Round", values="int"))
+    items.append(SignatureField(name="Study Instance UID", values="string"))
+    items.append(SignatureField(name="Patient Identifier", values="string"))
+    items.append(SignatureField(name="Patient Birthdate", values="date"))
+
+    return items

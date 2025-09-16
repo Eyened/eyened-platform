@@ -1,0 +1,912 @@
+# Calendar Documentation
+
+Displays dates and days of the week, facilitating date-related interactions.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import CaretLeft from "phosphor-svelte/lib/CaretLeft";
+  import CaretRight from "phosphor-svelte/lib/CaretRight";
+  import { getLocalTimeZone, today } from "@internationalized/date";
+  let value = $state(today(getLocalTimeZone()));
+</script>
+<Calendar.Root
+  class="border-dark-10 bg-background-alt shadow-card mt-6 rounded-[15px] border p-[22px]"
+  weekdayFormat="short"
+  fixedWeeks={true}
+  type="single"
+  bind:value
+>
+  {#snippet children({ months, weekdays })}
+    <Calendar.Header class="flex items-center justify-between">
+      <Calendar.PrevButton
+        class="rounded-9px bg-background-alt hover:bg-muted inline-flex size-10 items-center justify-center active:scale-[0.98] active:transition-all"
+      >
+        <CaretLeft class="size-6" />
+      </Calendar.PrevButton>
+      <Calendar.Heading class="text-[15px] font-medium" />
+      <Calendar.NextButton
+        class="rounded-9px bg-background-alt hover:bg-muted inline-flex size-10 items-center justify-center active:scale-[0.98] active:transition-all"
+      >
+        <CaretRight class="size-6" />
+      </Calendar.NextButton>
+    </Calendar.Header>
+    <div
+      class="flex flex-col space-y-4 pt-4 sm:flex-row sm:space-x-4 sm:space-y-0"
+    >
+      {#each months as month, i (i)}
+        <Calendar.Grid class="w-full border-collapse select-none space-y-1">
+          <Calendar.GridHead>
+            <Calendar.GridRow class="mb-1 flex w-full justify-between">
+              {#each weekdays as day, i (i)}
+                <Calendar.HeadCell
+                  class="text-muted-foreground font-normal! w-10 rounded-md text-xs"
+                >
+                  <div>{day.slice(0, 2)}</div>
+                </Calendar.HeadCell>
+              {/each}
+            </Calendar.GridRow>
+          </Calendar.GridHead>
+          <Calendar.GridBody>
+            {#each month.weeks as weekDates, i (i)}
+              <Calendar.GridRow class="flex w-full">
+                {#each weekDates as date, i (i)}
+                  <Calendar.Cell
+                    {date}
+                    month={month.value}
+                    class="p-0! relative size-10 text-center text-sm"
+                  >
+                    <Calendar.Day
+                      class="rounded-9px text-foreground hover:border-foreground data-selected:bg-foreground data-disabled:text-foreground/30 data-selected:text-background data-unavailable:text-muted-foreground data-disabled:pointer-events-none data-outside-month:pointer-events-none data-selected:font-medium data-unavailable:line-through group relative inline-flex size-10 items-center justify-center whitespace-nowrap border border-transparent bg-transparent p-0 text-sm font-normal"
+                    >
+                      <div
+                        class="bg-foreground group-data-selected:bg-background group-data-today:block absolute top-[5px] hidden size-1 rounded-full"
+                      ></div>
+                      {date.day}
+                    </Calendar.Day>
+                  </Calendar.Cell>
+                {/each}
+              </Calendar.GridRow>
+            {/each}
+          </Calendar.GridBody>
+        </Calendar.Grid>
+      {/each}
+    </div>
+  {/snippet}
+</Calendar.Root>
+```
+
+##### Heads up!
+
+Before diving into this component, it's important to understand how dates/times work in Bits UI. Please read the [Dates](/docs/dates) documentation to learn more!
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+</script>
+<Calendar.Root>
+  {#snippet children({ months, weekdays })}
+    <Calendar.Header>
+      <Calendar.PrevButton />
+      <Calendar.Heading />
+      <Calendar.NextButton />
+    </Calendar.Header>
+    {#each months as month}
+      <Calendar.Grid>
+        <Calendar.GridHead>
+          <Calendar.GridRow>
+            {#each weekdays as day}
+              <Calendar.HeadCell>
+                {day}
+              </Calendar.HeadCell>
+            {/each}
+          </Calendar.GridRow>
+        </Calendar.GridHead>
+        <Calendar.GridBody>
+          {#each month.weeks as weekDates}
+            <Calendar.GridRow>
+              {#each weekDates as date}
+                <Calendar.Cell {date} month={month.value}>
+                  <Calendar.Day />
+                </Calendar.Cell>
+              {/each}
+            </Calendar.GridRow>
+          {/each}
+        </Calendar.GridBody>
+      </Calendar.Grid>
+    {/each}
+  {/snippet}
+</Calendar.Root>
+```
+
+## Placeholder
+
+The `placeholder` prop for the `Calendar.Root` component determines what date our calendar should start with when the user hasn't selected a date yet. It also determines the current "view" of the calendar.
+
+As the user navigates through the calendar, the `placeholder` will be updated to reflect the currently focused date in that view.
+
+By default, the `placeholder` will be set to the current date, and be of type `CalendarDate`.
+
+## Managing Placeholder State
+
+This section covers how to manage the `placeholder` state of the Calendar.
+
+### Two-Way Binding
+
+Use `bind:placeholder` for simple, automatic state synchronization:
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { CalendarDateTime } from "@internationalized/date";
+  let myPlaceholder = $state(new CalendarDateTime(2024, 8, 3, 12, 30));
+</script>
+<button onclick={() => (myPlaceholder = new CalendarDate(2024, 8, 3))}>
+  Set placeholder to August 3rd, 2024
+</button>
+<Calendar.Root bind:placeholder={myPlaceholder}>
+</Calendar.Root>
+```
+
+### Fully Controlled
+
+Use a [Function Binding](https://svelte.dev/docs/svelte/bind#Function-bindings) for complete control over the state's reads and writes.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import type { DateValue } from "@internationalized/date";
+  let myPlaceholder = $state<DateValue>();
+  function getPlaceholder() {
+    return myPlaceholder;
+  }
+  function setPlaceholder(newPlaceholder: DateValue) {
+    myPlaceholder = newPlaceholder;
+  }
+</script>
+<Calendar.Root bind:placeholder={getPlaceholder, setPlaceholder}>
+</Calendar.Root>
+```
+
+See the [State Management](/docs/state-management) documentation for more information.
+
+## Managing Value State
+
+This section covers how to manage the `value` state of the Calendar.
+
+### Two-Way Binding
+
+Use `bind:value` for simple, automatic state synchronization:
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { CalendarDateTime } from "@internationalized/date";
+  let myValue = $state(new CalendarDateTime(2024, 8, 3, 12, 30));
+</script>
+<button onclick={() => (myValue = myValue.add({ days: 1 }))}>
+  Add 1 day
+</button>
+<Calendar.Root type="single" bind:value={myValue}>
+</Calendar.Root>
+```
+
+### Fully Controlled
+
+Use a [Function Binding](https://svelte.dev/docs/svelte/bind#Function-bindings) for complete control over the state's reads and writes.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import type { DateValue } from "@internationalized/date";
+  let myValue = $state();
+  function getValue() {
+    return myValue;
+  }
+  function setValue(newValue: DateValue) {
+    myValue = newValue;
+  }
+</script>
+<Calendar.Root type="single" bind:value={getValue, setValue}>
+</Calendar.Root>
+```
+
+See the [State Management](/docs/state-management) documentation for more information.
+
+## Default Value
+
+Often, you'll want to start the `Calendar.Root` component with a default value. Likely this value will come from a database in the format of an ISO 8601 string.
+
+You can use the `parseDate` function from the `@internationalized/date` package to parse the string into a `CalendarDate` object.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { parseDate } from "@internationalized/date";
+  // this came from a database/API call
+  const date = "2024-08-03";
+  let value = $state(parseDate(date));
+</script>
+<Calendar.Root {value}>
+</Calendar.Root>
+```
+
+## Validation
+
+### Minimum Value
+
+You can set a minimum value for the calendar by using the `minValue` prop on `Calendar.Root`. If a user selects a date that is less than the minimum value, the calendar will be marked as invalid.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { today, getLocalTimeZone } from "@internationalized/date";
+  const todayDate = today(getLocalTimeZone());
+  const yesterday = todayDate.subtract({ days: 1 });
+</script>
+<Calendar.Root minValue={todayDate} value={yesterday}>
+</Calendar.Root>
+```
+
+### Maximum Value
+
+You can set a maximum value for the calendar by using the `maxValue` prop on `Calendar.Root`. If a user selects a date that is greater than the maximum value, the calendar will be marked as invalid.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { today, getLocalTimeZone } from "@internationalized/date";
+  const todayDate = today(getLocalTimeZone());
+  const tomorrow = todayDate.add({ days: 1 });
+</script>
+<Calendar.Root maxValue={todayDate} value={tomorrow}>
+</Calendar.Root>
+```
+
+### Unavailable Dates
+
+You can specify specific dates that are unavailable for selection by using the `isDateUnavailable` prop. This prop accepts a function that returns a boolean value indicating whether a date is unavailable or not.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { today, getLocalTimeZone, isNotNull } from "@internationalized/date";
+  const todayDate = today(getLocalTimeZone());
+  const tomorrow = todayDate.add({ days: 1 });
+  function isDateUnavailable(date: DateValue) {
+    return date.day === 1;
+  }
+</script>
+<Calendar.Root {isDateUnavailable} value={tomorrow}>
+</Calendar.Root>
+```
+
+### Disabled Dates
+
+You can specify specific dates that are disabled for selection by using the `isDateDisabled` prop.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { today, getLocalTimeZone, isNotNull } from "@internationalized/date";
+  const todayDate = today(getLocalTimeZone());
+  const tomorrow = todayDate.add({ days: 1 });
+  function isDateDisabled(date: DateValue) {
+    return date.day === 1;
+  }
+</script>
+<Calendar.Root {isDateDisabled} value={tomorrow}>
+</Calendar.Root>
+```
+
+### Max Days
+
+You can set the `maxDays` prop to limit the maximum number of days that can be selected when the calendar is `'multiple'` type.
+
+```svelte
+<Calendar.Root type="multiple" maxDays={3}>
+</Calendar.Root>
+```
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import CaretLeft from "phosphor-svelte/lib/CaretLeft";
+  import CaretRight from "phosphor-svelte/lib/CaretRight";
+  import { getLocalTimeZone, today } from "@internationalized/date";
+  let value = $state([today(getLocalTimeZone())]);
+</script>
+<Calendar.Root
+  class="border-dark-10 bg-background-alt shadow-card mt-6 rounded-[15px] border p-[22px]"
+  weekdayFormat="short"
+  fixedWeeks={true}
+  type="multiple"
+  bind:value
+  maxDays={3}
+>
+  {#snippet children({ months, weekdays })}
+    <Calendar.Header class="flex items-center justify-between">
+      <Calendar.PrevButton
+        class="rounded-9px bg-background-alt hover:bg-muted inline-flex size-10 items-center justify-center active:scale-[0.98] active:transition-all"
+      >
+        <CaretLeft class="size-6" />
+      </Calendar.PrevButton>
+      <Calendar.Heading class="text-[15px] font-medium" />
+      <Calendar.NextButton
+        class="rounded-9px bg-background-alt hover:bg-muted inline-flex size-10 items-center justify-center active:scale-[0.98] active:transition-all"
+      >
+        <CaretRight class="size-6" />
+      </Calendar.NextButton>
+    </Calendar.Header>
+    <div
+      class="flex flex-col space-y-4 pt-4 sm:flex-row sm:space-x-4 sm:space-y-0"
+    >
+      {#each months as month, i (i)}
+        <Calendar.Grid class="w-full border-collapse select-none space-y-1">
+          <Calendar.GridHead>
+            <Calendar.GridRow class="mb-1 flex w-full justify-between">
+              {#each weekdays as day, i (i)}
+                <Calendar.HeadCell
+                  class="text-muted-foreground font-normal! w-10 rounded-md text-xs"
+                >
+                  <div>{day.slice(0, 2)}</div>
+                </Calendar.HeadCell>
+              {/each}
+            </Calendar.GridRow>
+          </Calendar.GridHead>
+          <Calendar.GridBody>
+            {#each month.weeks as weekDates, i (i)}
+              <Calendar.GridRow class="flex w-full">
+                {#each weekDates as date, i (i)}
+                  <Calendar.Cell
+                    {date}
+                    month={month.value}
+                    class="p-0! relative size-10 text-center text-sm"
+                  >
+                    <Calendar.Day
+                      class="rounded-9px text-foreground hover:border-foreground data-selected:bg-foreground data-disabled:text-foreground/30 data-selected:text-background data-unavailable:text-muted-foreground data-disabled:pointer-events-none data-outside-month:pointer-events-none data-selected:font-medium data-unavailable:line-through group relative inline-flex size-10 items-center justify-center whitespace-nowrap border border-transparent bg-transparent p-0 text-sm font-normal"
+                    >
+                      <div
+                        class="bg-foreground group-data-selected:bg-background group-data-today:block absolute top-[5px] hidden size-1 rounded-full"
+                      ></div>
+                      {date.day}
+                    </Calendar.Day>
+                  </Calendar.Cell>
+                {/each}
+              </Calendar.GridRow>
+            {/each}
+          </Calendar.GridBody>
+        </Calendar.Grid>
+      {/each}
+    </div>
+  {/snippet}
+</Calendar.Root>
+```
+
+## Appearance & Behavior
+
+### Fixed Weeks
+
+You can use the `fixedWeeks` prop to ensure that the calendar renders a fixed number of weeks, regardless of the number of days in the month. This is useful to keep the calendar visually consistent when the number of days in the month changes.
+
+```svelte
+<Calendar.Root fixedWeeks>
+</Calendar.Root>
+```
+
+### Multiple Months
+
+You can use the `numberOfMonths` prop to render multiple months at once.
+
+```svelte
+<Calendar.Root numberOfMonths={2}>
+</Calendar.Root>
+```
+
+### Paged Navigation
+
+By default, when the calendar has more than one month, the previous and next buttons will shift the calendar forward or backward by one month. However, you can change this behavior by setting the `pagedNavigation` prop to `true`, which will shift the calendar forward or backward by the number of months being displayed.
+
+```svelte
+<Calendar.Root pagedNavigation>
+</Calendar.Root>
+```
+
+### Localization
+
+The calendar will automatically format the content of the calendar according to the `locale` prop, which defaults to `'en-US'`, but can be changed to any locale supported by the [`Intl.DateTimeFormat`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat) API.
+
+```svelte
+<Calendar.Root locale="fr-FR">
+</Calendar.Root>
+```
+
+### Week Starts On
+
+The calendar will automatically format the content of the calendar according to the `locale`, which will determine what day of the week is the first day of the week.
+
+You can also override this by setting the `weekStartsOn` prop, where `0` is Sunday and `6` is Saturday to force a consistent first day of the week across all locales.
+
+```svelte
+<Calendar.Root weekStartsOn={1}>
+</Calendar.Root>
+```
+
+### Multiple Selection
+
+You can set the `type` prop to `'multiple'` to allow users to select multiple dates at once.
+
+```svelte
+<Calendar.Root type="multiple">
+</Calendar.Root>
+```
+
+## Custom Composition
+
+### Month Selector
+
+The `Calendar` component includes a `PrevButton` and `NextButton` component to allow users to navigate between months. This is useful, but sometimes you may want to allow the user to select a specific month from a list of months, rather than having to navigate one at a time.
+
+To achieve this, you can use the `placeholder` prop to set the month of the the calendar view programmatically.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { CalendarDate } from "@internationalized/date";
+  let placeholder = $state(new CalendarDate(2024, 8, 3));
+</script>
+
+<button
+  onclick={() => {
+    placeholder = placeholder.set({ month: 8 });
+  }}
+>
+  Set month to August
+</button>
+<Calendar.Root bind:placeholder>
+</Calendar.Root>
+```
+
+Updating the `placeholder` will update the calendar view to reflect the new month.
+
+## Examples
+
+### Month and Year Selects
+
+This example demonstrates how to use the `placeholder` prop to set the month and year of the calendar view programmatically.
+
+```svelte
+<script lang="ts">
+  import { Calendar } from "bits-ui";
+  import { getLocalTimeZone, today } from "@internationalized/date";
+  let value = $state(today(getLocalTimeZone()));
+</script>
+<Calendar.Root
+  class="border-dark-10 bg-background-alt shadow-card mt-6 rounded-[15px] border p-[22px]"
+  weekdayFormat="short"
+  fixedWeeks={true}
+  type="single"
+  bind:value
+>
+  {#snippet children({ months, weekdays })}
+    <Calendar.Header class="flex items-center justify-between gap-3">
+      <Calendar.MonthSelect aria-label="Select month" class="w-full" />
+      <Calendar.YearSelect aria-label="Select year" />
+    </Calendar.Header>
+    <div
+      class="flex flex-col space-y-4 pt-4 sm:flex-row sm:space-x-4 sm:space-y-0"
+    >
+      {#each months as month, i (i)}
+        <Calendar.Grid class="w-full border-collapse select-none space-y-1">
+          <Calendar.GridHead>
+            <Calendar.GridRow class="mb-1 flex w-full justify-between">
+              {#each weekdays as day, i (i)}
+                <Calendar.HeadCell
+                  class="text-muted-foreground font-normal! w-10 rounded-md text-xs"
+                >
+                  <div>{day.slice(0, 2)}</div>
+                </Calendar.HeadCell>
+              {/each}
+            </Calendar.GridRow>
+          </Calendar.GridHead>
+          <Calendar.GridBody>
+            {#each month.weeks as weekDates, i (i)}
+              <Calendar.GridRow class="flex w-full">
+                {#each weekDates as date, i (i)}
+                  <Calendar.Cell
+                    {date}
+                    month={month.value}
+                    class="p-0! relative size-10 text-center text-sm"
+                  >
+                    <Calendar.Day
+                      class="rounded-9px text-foreground hover:border-foreground data-selected:bg-foreground data-disabled:text-foreground/30 data-selected:text-background data-unavailable:text-muted-foreground data-disabled:pointer-events-none data-outside-month:pointer-events-none data-selected:font-medium data-unavailable:line-through group relative inline-flex size-10 items-center justify-center whitespace-nowrap border border-transparent bg-transparent p-0 text-sm font-normal"
+                    >
+                      <div
+                        class="bg-foreground group-data-selected:bg-background group-data-today:block absolute top-[5px] hidden size-1 rounded-full"
+                      ></div>
+                      {date.day}
+                    </Calendar.Day>
+                  </Calendar.Cell>
+                {/each}
+              </Calendar.GridRow>
+            {/each}
+          </Calendar.GridBody>
+        </Calendar.Grid>
+      {/each}
+    </div>
+  {/snippet}
+</Calendar.Root>
+```
+
+### Preset Dates
+
+This example demonstrates how to programatically set the `value` of the calendar to a specific date when a user presses a button.
+
+```svelte
+<script lang="ts">
+  import { Button, Calendar, Separator } from "bits-ui";
+  import CaretLeft from "phosphor-svelte/lib/CaretLeft";
+  import CaretRight from "phosphor-svelte/lib/CaretRight";
+  import { getLocalTimeZone, today } from "@internationalized/date";
+  const currentDate = today(getLocalTimeZone());
+  let value = $state(currentDate);
+  const presets = [
+    {
+      label: "Today",
+      onclick: () => {
+        value = currentDate;
+      }
+    },
+    {
+      label: "Tomorrow",
+      onclick: () => {
+        value = currentDate.add({ days: 1 });
+      }
+    },
+    {
+      label: "In 3 days",
+      onclick: () => {
+        value = currentDate.add({ days: 3 });
+      }
+    },
+    {
+      label: "In a week",
+      onclick: () => {
+        value = currentDate.add({ days: 7 });
+      }
+    },
+    {
+      label: "In a month",
+      onclick: () => {
+        value = currentDate.add({ months: 1 });
+      }
+    },
+    {
+      label: "In a year",
+      onclick: () => {
+        value = currentDate.add({ years: 1 });
+      }
+    }
+  ];
+</script>
+<div
+  class="border-dark-10 bg-background-alt shadow-card mt-6 flex max-w-[324px] flex-col gap-4 rounded-[15px] border p-[22px]"
+>
+  <Calendar.Root
+    weekdayFormat="short"
+    fixedWeeks={true}
+    type="single"
+    bind:value
+  >
+    {#snippet children({ months, weekdays })}
+      <Calendar.Header class="flex items-center justify-between">
+        <Calendar.PrevButton
+          class="rounded-9px bg-background-alt hover:bg-muted inline-flex size-10 items-center justify-center active:scale-[0.98] active:transition-all"
+        >
+          <CaretLeft class="size-6" />
+        </Calendar.PrevButton>
+        <Calendar.Heading class="text-[15px] font-medium" />
+        <Calendar.NextButton
+          class="rounded-9px bg-background-alt hover:bg-muted inline-flex size-10 items-center justify-center active:scale-[0.98] active:transition-all"
+        >
+          <CaretRight class="size-6" />
+        </Calendar.NextButton>
+      </Calendar.Header>
+      <div
+        class="flex flex-col space-y-4 pt-4 sm:flex-row sm:space-x-4 sm:space-y-0"
+      >
+        {#each months as month, i (i)}
+          <Calendar.Grid class="w-full border-collapse select-none space-y-1">
+            <Calendar.GridHead>
+              <Calendar.GridRow class="mb-1 flex w-full justify-between">
+                {#each weekdays as day, i (i)}
+                  <Calendar.HeadCell
+                    class="text-muted-foreground font-normal! w-10 rounded-md text-xs"
+                  >
+                    <div>{day.slice(0, 2)}</div>
+                  </Calendar.HeadCell>
+                {/each}
+              </Calendar.GridRow>
+            </Calendar.GridHead>
+            <Calendar.GridBody>
+              {#each month.weeks as weekDates, i (i)}
+                <Calendar.GridRow class="flex w-full">
+                  {#each weekDates as date, i (i)}
+                    <Calendar.Cell
+                      {date}
+                      month={month.value}
+                      class="p-0! relative size-10 text-center text-sm"
+                    >
+                      <Calendar.Day
+                        class="rounded-9px text-foreground hover:border-foreground data-selected:bg-foreground data-disabled:text-foreground/30 data-selected:text-background data-unavailable:text-muted-foreground data-disabled:pointer-events-none data-outside-month:pointer-events-none data-selected:font-medium data-unavailable:line-through group relative inline-flex size-10 items-center justify-center whitespace-nowrap border border-transparent bg-transparent p-0 text-sm font-normal"
+                      >
+                        <div
+                          class="bg-foreground group-data-selected:bg-background group-data-today:block absolute top-[5px] hidden size-1 rounded-full"
+                        ></div>
+                        {date.day}
+                      </Calendar.Day>
+                    </Calendar.Cell>
+                  {/each}
+                </Calendar.GridRow>
+              {/each}
+            </Calendar.GridBody>
+          </Calendar.Grid>
+        {/each}
+      </div>
+    {/snippet}
+  </Calendar.Root>
+  <Separator.Root class="bg-dark-10 h-px w-full" />
+  <div class="flex w-full flex-row flex-wrap items-center gap-2">
+    {#each presets as preset (preset.label)}
+      <Button.Root
+        class="border-dark-10 text-foreground shadow-mini hover:bg-foreground/5 inline-flex h-8 flex-1 select-none items-center justify-center whitespace-nowrap rounded-md border px-[17px] text-xs font-medium transition-all active:scale-[0.98]"
+        onclick={preset.onclick}
+      >
+        <span class="sr-only"> Set date to </span>
+        {preset.label}
+      </Button.Root>
+    {/each}
+  </div>
+</div>
+```
+
+## API Reference
+
+### Calendar.Root
+
+The root calendar component which contains all other calendar components.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Description                                                                                                                                                                                                                                              | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type` required | `enum`- 'single' \| 'multiple'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | The type of the component, used to determine the type of the value, when `'multiple'` the value will be an array.`Default:  undefined`                                                                                                  |                                      |
+| `value` $bindable                            | `union`- DateValue \| DateValue\[]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | The selected date(s). If `type` is `'single'`, this will be a `DateValue`. If `type` is `'multiple'`, this will be an array of `DateValue`s.`Default:  undefined`                                                                       |                                      |
+| `onValueChange`                                           | `function`- (value: DateValue) =\&gt; void \| (value: DateValue\[]) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | A function that is called when the selected date changes.`Default:  undefined`                                                                                                                                                          |                                      |
+| `placeholder`                                             | `DateValue`- import type \&#123; CalendarDate, CalendarDateTime, ZonedDateTime \&#125; from "@internationalized/date"; type DateValue = CalendarDate \| CalendarDateTime \| ZonedDateTime                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The placeholder date, which is used to determine what month to display when no date is selected. This updates as the user navigates the calendar, and can be used to programmatically control the calendar's view.`Default:  undefined` |                                      |
+| `onPlaceholderChange`                                     | `function`- (date: DateValue) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | A function that is called when the placeholder date changes.`Default:  undefined`                                                                                                                                                       |                                      |
+| `pagedNavigation`                                         | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Whether or not to use paged navigation for the calendar. Paged navigation causes the previous and next buttons to navigate by the number of months displayed at once, rather than by one month.`Default: false`                            |                                      |
+| `preventDeselect`                                         | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Whether or not to prevent the user from deselecting a date without selecting another date first.`Default: false`                                                                                                                           |                                      |
+| `weekStartsOn`                                            | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | An absolute day of the week to start the calendar on, regardless of locale. `0` is Sunday, `1` is Monday, etc. If not provided, the calendar will default to the locale's first day of the week.`Default:  undefined`                   |                                      |
+| `weekdayFormat`                                           | `enum`- 'narrow' \| 'short' \| 'long'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | The format to use for the weekday strings provided via the `weekdays` slot prop.`Default: ''narrow''`                                                                                                                                      |                                      |
+| `calendarLabel`                                           | `string`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The accessible label for the calendar.`Default:  undefined`                                                                                                                                                                             |                                      |
+| `fixedWeeks`                                              | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Whether or not to always display 6 weeks in the calendar.`Default: false`                                                                                                                                                                  |                                      |
+| `isDateDisabled`                                          | `function`- (date: DateValue) =\&gt; boolean                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | A function that returns whether or not a date is disabled.`Default:  undefined`                                                                                                                                                         |                                      |
+| `isDateUnavailable`                                       | `function`- (date: DateValue) =\&gt; boolean                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | A function that returns whether or not a date is unavailable.`Default:  undefined`                                                                                                                                                      |                                      |
+| `maxValue`                                                | `DateValue`- import type \&#123; CalendarDate, CalendarDateTime, ZonedDateTime \&#125; from "@internationalized/date"; type DateValue = CalendarDate \| CalendarDateTime \| ZonedDateTime                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The maximum date that can be selected.`Default:  undefined`                                                                                                                                                                             |                                      |
+| `minValue`                                                | `DateValue`- import type \&#123; CalendarDate, CalendarDateTime, ZonedDateTime \&#125; from "@internationalized/date"; type DateValue = CalendarDate \| CalendarDateTime \| ZonedDateTime                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The minimum date that can be selected.`Default:  undefined`                                                                                                                                                                             |                                      |
+| `locale`                                                  | `string`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The locale to use for formatting dates.`Default: 'en'`                                                                                                                                                                                     |                                      |
+| `numberOfMonths`                                          | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The number of months to display at once.`Default: 1`                                                                                                                                                                                       |                                      |
+| `disabled`                                                | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Whether or not the accordion is disabled.`Default: false`                                                                                                                                                                                  |                                      |
+| `readonly`                                                | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Whether or not the calendar is readonly.`Default: false`                                                                                                                                                                                   |                                      |
+| `initialFocus`                                            | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | If `true`, the calendar will focus the selected day, today, or the first day of the month in that order depending on what is visible when the calendar is mounted.`Default: false`                                                         |                                      |
+| `disableDaysOutsideMonth`                                 | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Whether or not to disable days outside the current month.`Default: false`                                                                                                                                                                  |                                      |
+| `maxDays`                                                 | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The maximum number of days that can be selected when the calendar is `'multiple'` type.`Default:  undefined`                                                                                                                            |                                      |
+| `monthFormat`                                             | `union`- short \| long \| narrow \| numeric \| 2-digit \| (month: number) =\&gt; string                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The format to use for the month strings provided via the `months` slot prop.`Default: 'long'`                                                                                                                                              |                                      |
+| `yearFormat`                                              | `union`- numeric \| 2-digit \| (year: number) =\&gt; string                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | The format to use for the year strings provided via the `years` slot prop.`Default: 'numeric'`                                                                                                                                             |                                      |
+| `ref` $bindable                              | `HTMLDivElement`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                          |                                      |
+| `children`                                                | `Snippet`- type Month\&lt;T\&gt; = \&#123; /\*\* \* A DateValue used to represent the month. Since days \* from the previous and next months may be included in the \* calendar grid, we need a source of truth for the value \* the grid is representing. \*/ value: DateValue; /\*\* \* An array of arrays representing the weeks in the calendar. \* Each sub-array represents a week, and contains the dates for each \* day in that week. This structure is useful for rendering the calendar \* grid using a table, where each row represents a week and each cell \* represents a day. \*/ weeks: T\[]\[]; /\*\* \* An array of all the dates in the current month, including dates from \* the previous and next months that are used to fill out the calendar grid. \* This array is useful for rendering the calendar grid in a customizable way, \* as it provides all the dates that should be displayed in the grid in a flat \* array. \*/ dates: T\[]; \&#125;; type ChildrenSnippetProps = \&#123; months: Month\&lt;DateValue\&gt;\[]; weekdays: string\[]; \&#125;;                                      | The children content to render.`Default:  undefined`                                                                                                                                                                                    |                                      |
+| `child`                                                   | `Snippet`- type Month\&lt;T\&gt; = \&#123; /\*\* \* A DateValue used to represent the month. Since days \* from the previous and next months may be included in the \* calendar grid, we need a source of truth for the value \* the grid is representing. \*/ value: DateValue; /\*\* \* An array of arrays representing the weeks in the calendar. \* Each sub-array represents a week, and contains the dates for each \* day in that week. This structure is useful for rendering the calendar \* grid using a table, where each row represents a week and each cell \* represents a day. \*/ weeks: T\[]\[]; /\*\* \* An array of all the dates in the current month, including dates from \* the previous and next months that are used to fill out the calendar grid. \* This array is useful for rendering the calendar grid in a customizable way, \* as it provides all the dates that should be displayed in the grid in a flat \* array. \*/ dates: T\[]; \&#125;; type ChildSnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; months: Month\&lt;DateValue\&gt;\[]; weekdays: string\[]; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                              |  | | Data Attribute                       | Value                 | Description                                                       | Details                                                                                                                                                                                        |
+| ----------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-invalid` | `''` | Present on the root element when the calendar is invalid.  |                                      |
+| `data-disabled`                             | `''` | Present on the root element when the calendar is disabled. |                                      |
+| `data-readonly`                             | `''` | Present on the root element when the calendar is readonly. |                                      |
+| `data-calendar-root`                        | `''` | Present on the root element.                               |  |
+
+### Calendar.Header
+
+The header of the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLElement`                                                                                                                                                                                                                                    | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                         | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the header element when the calendar is disabled. |                                      |
+| `data-readonly`                              | `''` | Present on the header element when the calendar is readonly. |                                      |
+| `data-calendar-header`                       | `''` | Present on the header element.                               |  |
+
+### Calendar.Heading
+
+The heading of the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                          | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the heading element when the calendar is disabled. |                                      |
+| `data-readonly`                              | `''` | Present on the heading element when the calendar is readonly. |                                      |
+| `data-calendar-heading`                      | `''` | Present on the heading element.                               |  |
+
+### Calendar.NextButton
+
+The next button of the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                                             | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the next button element when the calendar or this button is disabled. |                                      |
+| `data-calendar-next-button`                  | `''` | Present on the next button element.                                              |  |
+
+### Calendar.PrevButton
+
+The previous button of the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                                             | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the prev button element when the calendar or this button is disabled. |                                      |
+| `data-calendar-prev-button`                  | `''` | Present on the prev button element.                                              |  |
+
+### Calendar.Cell
+
+A cell in the calendar grid.
+
+| Property                                                              | Type                                                                                                                                                                                                                                                                                                                                                                | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `date` | `DateValue`- import type \&#123; CalendarDate, CalendarDateTime, ZonedDateTime \&#125; from "@internationalized/date"; type DateValue = CalendarDate \| CalendarDateTime \| ZonedDateTime | The date for the cell.`Default:  undefined`                                                                                                |                                      |
+| `month`                             | `DateValue`- import type \&#123; CalendarDate, CalendarDateTime, ZonedDateTime \&#125; from "@internationalized/date"; type DateValue = CalendarDate \| CalendarDateTime \| ZonedDateTime | The current month the date is being displayed in.`Default:  undefined`                                                                     |                                      |
+| `ref` $bindable        | `HTMLTableCellElement`                                                                                                                                                                                                                                                                                                                             | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                          | `Snippet`                                                                                                                                                                                                                                                                                                                                          | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                             | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;;                                                                                                   | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present when the day is disabled.                   |                                      |
+| `data-unavailable`                           | `''` | Present when the day is unavailable.                |                                      |
+| `data-today`                                 | `''` | Present when the day is today.                      |                                      |
+| `data-outside-month`                         | `''` | Present when the day is outside the current month.  |                                      |
+| `data-outside-visible-months`                | `''` | Present when the day is outside the visible months. |                                      |
+| `data-focused`                               | `''` | Present when the day is focused.                    |                                      |
+| `data-selected`                              | `''` | Present when the day is selected.                   |                                      |
+| `data-value`                                 | `''` | The date in the format "YYYY-MM-DD".                |                                      |
+| `data-calendar-cell`                         | `''` | Present on the cell element.                        |  |
+
+### Calendar.Day
+
+A day in the calendar grid.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present when the day is disabled.                   |                                      |
+| `data-unavailable`                           | `''` | Present when the day is unavailable.                |                                      |
+| `data-today`                                 | `''` | Present when the day is today.                      |                                      |
+| `data-outside-month`                         | `''` | Present when the day is outside the current month.  |                                      |
+| `data-outside-visible-months`                | `''` | Present when the day is outside the visible months. |                                      |
+| `data-focused`                               | `''` | Present when the day is focused.                    |                                      |
+| `data-selected`                              | `''` | Present when the day is selected.                   |                                      |
+| `data-value`                                 | `''` | The date in the format "YYYY-MM-DD".                |                                      |
+| `data-calendar-day`                          | `''` | Present on the day element.                         |  |
+
+### Calendar.Grid
+
+The grid of dates in the calendar, typically representing a month.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLTableElement`                                                                                                                                                                                                                               | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                       | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the grid element when the calendar is disabled. |                                      |
+| `data-readonly`                              | `''` | Present on the grid element when the calendar is readonly. |                                      |
+| `data-calendar-grid`                         | `''` | Present on the grid element.                               |  |
+
+### Calendar.GridBody
+
+The body of the grid of dates in the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLTableSectionElement`                                                                                                                                                                                                                        | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                       | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the grid element when the calendar is disabled. |                                      |
+| `data-readonly`                              | `''` | Present on the grid element when the calendar is readonly. |                                      |
+| `data-calendar-grid-body`                    | `''` | Present on the grid body element.                          |  |
+
+### Calendar.GridHead
+
+The head of the grid of dates in the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLTableSectionElement`                                                                                                                                                                                                                        | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                            | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the grid head element when the calendar is disabled. |                                      |
+| `data-readonly`                              | `''` | Present on the grid head element when the calendar is readonly. |                                      |
+| `data-calendar-grid-head`                    | `''` | Present on the grid head element.                               |  |
+
+### Calendar.GridRow
+
+A row in the grid of dates in the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLTableRowElement`                                                                                                                                                                                                                            | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                           | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the grid row element when the calendar is disabled. |                                      |
+| `data-readonly`                              | `''` | Present on the grid row element when the calendar is readonly. |                                      |
+| `data-calendar-grid-row`                     | `''` | Present on the grid row element.                               |  |
+
+### Calendar.HeadCell
+
+A cell in the head of the grid of dates in the calendar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLTableCellElement`                                                                                                                                                                                                                           | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                        | Value                 | Description                                                            | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the head cell element when the calendar is disabled. |                                      |
+| `data-readonly`                              | `''` | Present on the head cell element when the calendar is readonly. |                                      |
+| `data-calendar-head-cell`                    | `''` | Present on the head cell element.                               |  |
+
+### Calendar.MonthSelect
+
+A select you can use to navigate to a specific month in the calendar view.
+
+| Property                                                                | Type                                                                                                                                                                                                                                                                                                                                                                                                             | Description                                                                                                                                                                                                                   | Details                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `months` | `number[]`                                                                                                                                                                                                                                                                                                                                                                                      | The month values to render in the select.`Default: [1-12]`                                                                                                                                                      |                                      |
+| `monthFormat`                         | `enum`- 'narrow' \| 'short' \| 'long' \| 'numeric' \| '2-digit' \| '(month: number) =\&gt; string'                                                                                                                                     | The format to use for the month strings provided via the `months` slot prop. If a function is provided, it will be called with the month number as an argument and should return a string.`Default: ''narrow''` |                                      |
+| `ref` $bindable          | `HTMLSelectElement`                                                                                                                                                                                                                                                                                                                                                                             | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                               |                                      |
+| `children`                            | `Snippet`- type ChildrenSnippetProps = \&#123; monthItems: Array\&lt;\&#123; value: number; label: string \&#125;\&gt;; selectedMonthItem: \&#123; value: number; label: string \&#125;; \&#125;;                                      | The children content to render.`Default:  undefined`                                                                                                                                                         |                                      |
+| `child`                               | `Snippet`- type ChildSnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; monthItems: Array\&lt;\&#123; value: number; label: string \&#125;\&gt;; selectedMonthItem: \&#123; value: number; label: string \&#125;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                   |  | | Data Attribute                        | Value                 | Description                                                               | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the month select element when the calendar is disabled. |                                      |
+| `data-calendar-month-select`                 | `''` | Present on the month select element.                               |  |
+
+### Calendar.YearSelect
+
+A select you can use to navigate to a specific year in the calendar view.
+
+| Property                                                               | Type                                                                                                                                                                                                                                                                                                                                                                                                           | Description                                                                                                                                                                                                                                                     | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `years` | `number[]`                                                                                                                                                                                                                                                                                                                                                                                    | The year values to render in the select.``Default: The current year or placeholder year (whichever is higher) + 10 and minus 100 years. When a `minValue`/`maxValue` is provided to `Calendar.Root`, those will be used to constrain the range.`` |                                      |
+| `yearFormat`                         | `enum`- 'numeric' \| '2-digit' \| '(year: number) =\&gt; string'                                                                                                                                                                     | The format to use for the year strings provided via the `years` slot prop. If a function is provided, it will be called with the year as an argument and should return a string.`Default: ''numeric''`                                            |                                      |
+| `ref` $bindable         | `HTMLSelectElement`                                                                                                                                                                                                                                                                                                                                                                           | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                 |                                      |
+| `children`                           | `Snippet`- type ChildrenSnippetProps = \&#123; yearItems: Array\&lt;\&#123; value: number; label: string \&#125;\&gt;; selectedYearItem: \&#123; value: number; label: string \&#125;; \&#125;;                                      | The children content to render.`Default:  undefined`                                                                                                                                                                                           |                                      |
+| `child`                              | `Snippet`- type ChildSnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; yearItems: Array\&lt;\&#123; value: number; label: string \&#125;\&gt;; selectedYearItem: \&#123; value: number; label: string \&#125;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                     |  | | Data Attribute                        | Value                 | Description                                                              | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-disabled` | `''` | Present on the year select element when the calendar is disabled. |                                      |
+| `data-calendar-year-select`                  | `''` | Present on the year select element.                               |  |

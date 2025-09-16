@@ -25,21 +25,13 @@ export abstract class Repo<
 
 	public store = $state<Record<string, TStore>>({});
 
+	public all = $derived(Object.values(this.store))
+
 	// Protected hooks for subclasses to override
 	protected abstract get basePath(): string;
 
 	protected get idParam(): string {
 		return inferIdParam(this.basePath);
-	}
-
-	protected get capabilities(): { 
-		list?: boolean; 
-		get?: boolean; 
-		create?: boolean; 
-		update?: boolean; 
-		delete?: boolean;
-	} {
-		return { list: true, get: true, create: true, update: true, delete: true };
 	}
 
 	// Optional serialization hooks
@@ -96,11 +88,6 @@ export abstract class Repo<
 		});
 	}
 
-	
-
-	all(): TStore[] {
-		return Object.values(this.store);
-	}
 
 	get(id: Id): TStore | undefined {
 		return this.store[id];
@@ -126,28 +113,27 @@ export abstract class Repo<
 			const s = this.toStore(r);
 			this.store[s.id] = s;
 		}
+		this.store = {...this.store}
+		console.log(this.store)
+	}
+
+	clear(): void {
+		this.store = {};
 	}
 
 	async fetchAll(params?: ListParams): Promise<void> {
-		if (!this.capabilities.list) return;
 		const list = await this.remoteList(params);
 		this.ingest(list);
 	}
 
 	async fetchOne(id: Id): Promise<Row<TStore, TGet, TCreate, TPatch, ListParams>> {
-		if (!this.capabilities.get) throw new Error('Get operation not supported');
 		const row = await this.remoteGet(id);
 		return this.upsert(row);
 	}
 
 	async create(body: TCreate): Promise<Row<TStore, TGet, TCreate, TPatch, ListParams>> {
-		if (!this.capabilities.create) throw new Error('Create operation not supported');
 		const created = await this.remoteCreate(body);
 		return this.upsert(created);
-	}
-
-	can(op: 'list' | 'get' | 'create' | 'update' | 'delete'): boolean {
-		return Boolean(this.capabilities[op]);
 	}
 }
 
@@ -160,23 +146,23 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 		return row;
 	}
 
-	// Option A: make Row itself a store (usable as `$row` in Svelte)
-	subscribe(run: (value: TStore) => void): () => void {
-		run(this.data);
-		const stop = $effect(() => {
-			// row-level dependency: rerun on replace/updateLocal
-			const _ = this.repo.store[this.id];
-			run(this.data);
-		});
-		return stop;
-	}
+	// // Option A: make Row itself a store (usable as `$row` in Svelte)
+	// subscribe(run: (value: TStore) => void): () => void {
+	// 	run(this.data);
+	// 	const stop = $effect(() => {
+	// 		// row-level dependency: rerun on replace/updateLocal
+	// 		const _ = this.repo.store[this.id];
+	// 		run(this.data);
+	// 	});
+	// 	return stop;
+	// }
 
-	// Option B: explicit readable store, if you prefer
-	dataReadable() {
-		return {
-			subscribe: (run: (value: TStore) => void) => this.subscribe(run)
-		};
-	}
+	// // Option B: explicit readable store, if you prefer
+	// dataReadable() {
+	// 	return {
+	// 		subscribe: (run: (value: TStore) => void) => this.subscribe(run)
+	// 	};
+	// }
 
 	updateLocal(patch: Partial<TStore>): TStore {
 		// replace object to trigger row-level subscribers
@@ -199,7 +185,6 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 	}
 
 	async save(patch?: TPatch): Promise<TStore> {
-		if (!this.repo.can('update')) throw new Error('Update operation not supported');
 		const updated = await (this.repo as any).remoteUpdate(this.id, (patch ?? (this.data as unknown as TPatch)));
 		const stored = (this.repo as any).toStore(updated as unknown as TGet);
 		this.replace(stored);
@@ -207,7 +192,6 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 	}
 
 	async destroy(): Promise<void> {
-		if (!this.repo.can('delete')) throw new Error('Delete operation not supported');
 		await (this.repo as any).remoteDelete(this.id);
 		this.deleteLocal();
 	}

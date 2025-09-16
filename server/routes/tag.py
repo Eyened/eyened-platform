@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from eyened_orm import Tag
+from eyened_orm import Tag, CreatorTagLink
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_aux import TagPUT, TagPATCH, TagGET
@@ -43,4 +43,22 @@ async def delete_tag(tag_id: int, db: Session = Depends(get_db), current_user: C
     if not tag:
         raise HTTPException(404, "Tag not found")
     db.delete(tag); db.commit()
+    return Response(status_code=204)
+
+@router.post("/tags/{tag_id}/star", status_code=204)
+async def star_tag(tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    tag = db.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    # idempotent insert
+    if not db.get(CreatorTagLink, {"TagID": tag_id, "CreatorID": current_user.id}):
+        db.add(CreatorTagLink(TagID=tag_id, CreatorID=current_user.id))
+        db.commit()
+    return Response(status_code=204)
+
+@router.delete("/tags/{tag_id}/star", status_code=204)
+async def unstar_tag(tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    link = db.get(CreatorTagLink, {"TagID": tag_id, "CreatorID": current_user.id})
+    if link:
+        db.delete(link); db.commit()
     return Response(status_code=204)

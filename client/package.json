@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "verify:runes": "rg -n \"export let \" src --glob \"**/*.svelte\" && echo \"Found legacy export let (should be 0)\" && exit 1 || exit 0"
   },
   "devDependencies": {
     "@iconify/json": "^2.2.142",
@@ -41,6 +42,7 @@
   },
   "dependencies": {
     "@cornerstonejs/dicom-image-loader": "^3.7.8",
+    "@fortawesome/free-solid-svg-icons": "^7.0.1",
     "@types/json-schema": "^7.0.15",
     "ajv": "^8.17.1",
     "cornerstone-core": "^2.6.1",
@@ -51,6 +53,7 @@
     "mathjs": "^12.0.0",
     "openapi-fetch": "^0.12.2",
     "pako": "^2.1.0",
+    "svelte-fa": "^4.0.4",
     "vite-plugin-glsl": "^1.1.2"
   }
 }

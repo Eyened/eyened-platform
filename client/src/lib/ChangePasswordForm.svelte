@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import { getContext } from "svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { getContext } from "svelte";
 
     let password = $state("");
     let newPassword1 = $state("");
@@ -9,7 +9,7 @@
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const { userManager } = globalContext;
-    const creator = userManager.creator;
+    const creator = userManager.user;
 
     let changed = $state(false);
     let collapsed = $state(true);

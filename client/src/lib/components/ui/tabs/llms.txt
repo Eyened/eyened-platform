@@ -1,0 +1,235 @@
+# Tabs Documentation
+
+Organizes content into distinct sections, allowing users to switch between them.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { Tabs } from "bits-ui";
+  import Airplane from "phosphor-svelte/lib/Airplane";
+</script>
+<div class="pt-6">
+  <Tabs.Root
+    value="outbound"
+    class="rounded-card border-muted bg-background-alt shadow-card w-[390px] border p-3"
+  >
+    <Tabs.List
+      class="rounded-9px bg-dark-10 shadow-mini-inset dark:bg-background grid w-full grid-cols-2 gap-1 p-1 text-sm font-semibold leading-[0.01em] dark:border dark:border-neutral-600/30"
+    >
+      <Tabs.Trigger
+        value="outbound"
+        class="data-[state=active]:shadow-mini dark:data-[state=active]:bg-muted h-8 rounded-[7px] bg-transparent py-2 data-[state=active]:bg-white"
+        >Outbound</Tabs.Trigger
+      >
+      <Tabs.Trigger
+        value="inbound"
+        class="data-[state=active]:shadow-mini dark:data-[state=active]:bg-muted h-8 rounded-[7px] bg-transparent py-2 data-[state=active]:bg-white"
+        >Inbound</Tabs.Trigger
+      >
+    </Tabs.List>
+    <Tabs.Content value="outbound" class="select-none pt-3">
+      <div class="grid grid-cols-3 grid-rows-2 gap-0 p-4 pb-1">
+        <div class="text-left">
+          <h4
+            class="mb-2 text-[20px] font-semibold leading-none tracking-[-0.01em]"
+          >
+            Prague
+          </h4>
+          <p class="text-muted-foreground text-sm font-medium">06:05</p>
+        </div>
+        <div class="self-end text-center">
+          <p class="text-muted-foreground text-sm font-medium">3h 30m</p>
+        </div>
+        <div class="text-right">
+          <h4
+            class="mb-2 text-[20px] font-semibold leading-none tracking-[-0.01em]"
+          >
+            Malaga
+          </h4>
+          <p class="text-muted-foreground text-sm font-medium">06:05</p>
+        </div>
+        <div class="relative col-span-3">
+          <hr
+            class="border-border-input border-1 relative top-4 h-px border-dashed"
+          />
+          <div class="bg-background-alt absolute left-1/2 -translate-x-1/2 p-1">
+            <Airplane class="text-muted-foreground size-6 rotate-90" />
+          </div>
+        </div>
+      </div>
+    </Tabs.Content>
+    <Tabs.Content value="inbound" class="select-none pt-3">
+      <div class="grid grid-cols-3 grid-rows-2 gap-0 p-4 pb-1">
+        <div class="text-left">
+          <h4
+            class="mb-2 text-[20px] font-semibold leading-none tracking-[-0.01em]"
+          >
+            Malaga
+          </h4>
+          <p class="text-muted-foreground text-sm font-medium">07:25</p>
+        </div>
+        <div class="self-end text-center">
+          <p class="text-muted-foreground text-sm font-medium">3h 20m</p>
+        </div>
+        <div class="text-right">
+          <h4
+            class="mb-2 text-[20px] font-semibold leading-none tracking-[-0.01em]"
+          >
+            Prague
+          </h4>
+          <p class="text-muted-foreground text-sm font-medium">10:45</p>
+        </div>
+        <div class="relative col-span-3">
+          <hr
+            class="border-border-input border-1 relative top-4 h-px border-dashed"
+          />
+          <div class="bg-background-alt absolute left-1/2 -translate-x-1/2 p-1">
+            <Airplane class="text-muted-foreground size-6 rotate-90" />
+          </div>
+        </div>
+      </div>
+    </Tabs.Content>
+  </Tabs.Root>
+</div>
+```
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Tabs } from "bits-ui";
+</script>
+<Tabs.Root>
+  <Tabs.List>
+    <Tabs.Trigger />
+  </Tabs.List>
+  <Tabs.Content />
+</Tabs.Root>
+```
+
+## Managing Value State
+
+This section covers how to manage the `value` state of the component.
+
+### Two-Way Binding
+
+Use `bind:value` for simple, automatic state synchronization:
+
+```svelte
+<script lang="ts">
+  import { Tabs } from "bits-ui";
+  let myValue = $state("");
+</script>
+<button onclick={() => (myValue = "tab-1")}> Activate tab 1 </button>
+<Tabs.Root bind:value={myValue}>
+</Tabs.Root>
+```
+
+### Fully Controlled
+
+Use a [Function Binding](https://svelte.dev/docs/svelte/bind#Function-bindings) for complete control over the state's reads and writes.
+
+```svelte
+<script lang="ts">
+  import { Tabs } from "bits-ui";
+  let myValue = $state("");
+  function getValue() {
+    return myValue;
+  }
+  function setValue(newValue: string) {
+    myValue = newValue;
+  }
+</script>
+<Tabs.Root bind:value={getValue, setValue}>
+</Tabs.Root>
+```
+
+## Orientation
+
+The `orientation` prop is used to determine the orientation of the `Tabs` component, which influences how keyboard navigation will work.
+
+When the `orientation` is set to `'horizontal'`, the `ArrowLeft` and `ArrowRight` keys will move the focus to the previous and next tab, respectively. When the `orientation` is set to `'vertical'`, the `ArrowUp` and `ArrowDown` keys will move the focus to the previous and next tab, respectively.
+
+```svelte
+<Tabs.Root orientation="horizontal">
+</Tabs.Root>
+<Tabs.Root orientation="vertical">
+</Tabs.Root>
+```
+
+## Activation Mode
+
+By default, the `Tabs` component will automatically activate the tab associated with a trigger when that trigger is focused. This behavior can be disabled by setting the `activationMode` prop to `'manual'`.
+
+When set to `'manual'`, the user will need to activate the tab by pressing the trigger.
+
+```svelte
+<Tabs.Root activationMode="manual">
+</Tabs.Root>
+```
+
+## API Reference
+
+### Tabs.Root
+
+The root tabs component which contains the other tab components.
+
+| Property                                                                                      | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                                                                                                    | Details                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value` $bindable | `string`                                                                                                                                                                                                                                       | The active tab value.`Default:  undefined`                                                                                                                                                                                    |                                      |
+| `onValueChange`                                             | `function`- (value: string) =\&gt; void                                                 | A callback function called when the active tab value changes.`Default:  undefined`                                                                                                                                            |                                      |
+| `activationMode`                                            | `enum`- 'automatic' \| 'manual'                                                         | How the activation of tabs should be handled. If set to `'automatic'`, the tab will be activated when the trigger is focused. If set to `'manual'`, the tab will be activated when the trigger is pressed.`Default: 'automatic'` |                                      |
+| `disabled`                                                  | `boolean`                                                                                                                                                                                                                                      | Whether or not the tabs are disabled.`Default: false`                                                                                                                                                                            |                                      |
+| `loop`                                                      | `boolean`                                                                                                                                                                                                                                      | Whether or not the tabs should loop when navigating with the keyboard.`Default: true`                                                                                                                                            |                                      |
+| `orientation`                                               | `enum`- 'horizontal' \| 'vertical'                                                      | The orientation of the tabs.`Default: 'horizontal'`                                                                                                                                                                              |                                      |
+| `ref` $bindable                                | `HTMLDivElement`                                                                                                                                                                                                                               | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                |                                      |
+| `children`                                                  | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                                                                                                          |                                      |
+| `child`                                                     | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                    |  | | Data Attribute                           | Value                                                                                                                                                                                                      | Description                         | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-orientation` | `enum`- 'horizontal' \| 'vertical' | The orientation of the tabs. |                                      |
+| `data-tabs-root`                                | `''`                                                                                                                                                                                      | Present on the root element. |  |
+
+### Tabs.List
+
+The component containing the tab triggers.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLDivElement`                                                                                                                                                                                                                               | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                           | Value                                                                                                                                                                                                      | Description                         | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-orientation` | `enum`- 'horizontal' \| 'vertical' | The orientation of the tabs. |                                      |
+| `data-tabs-list`                                | `''`                                                                                                                                                                                      | Present on the list element. |  |
+
+### Tabs.Trigger
+
+The trigger for a tab.
+
+| Property                                                                                     | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value` required | `string`                                                                                                                                                                                                                                       | The value of the tab this trigger represents.`Default:  undefined`                                                                         |                                      |
+| `disabled`                                                 | `boolean`                                                                                                                                                                                                                                      | Whether or not the tab is disabled.`Default: false`                                                                                           |                                      |
+| `ref` $bindable                               | `HTMLButtonElement`                                                                                                                                                                                                                            | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                 | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                    | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                     | Value                                                                                                                                                                                                        | Description                                          | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'active' \| 'inactive'     | The state of the tab trigger.                 |                                      |
+| `data-value`                              | `''`                                                                                                                                                                                        | The value of the tab this trigger represents. |                                      |
+| `data-orientation`                        | `enum`- 'horizontal' \| 'vertical' | The orientation of the tabs.                  |                                      |
+| `data-disabled`                           | `''`                                                                                                                                                                                        | Present when the tab trigger is disabled.     |                                      |
+| `data-tabs-trigger`                       | `''`                                                                                                                                                                                        | Present on the trigger elements.              |  |
+
+### Tabs.Content
+
+The panel containing the contents of a tab.
+
+| Property                                                                                     | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value` required | `string`                                                                                                                                                                                                                                         | The value of the tab this content represents.`Default:  undefined`                                                                         |                                      |
+| `ref` $bindable                               | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                 | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                    | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                            | Value                 | Description                             | Details                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-tabs-content` | `''` | Present on the content elements. |  |

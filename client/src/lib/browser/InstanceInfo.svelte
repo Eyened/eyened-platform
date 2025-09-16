@@ -1,18 +1,63 @@
 <script lang="ts">
+	import * as Dialog from '$lib/components/ui/dialog';
 	import { getThumbUrl } from '$lib/data-loading/utils';
-	import type { Instance } from '$lib/datamodel/instance.svelte';
-	import InstanceSegmentationTable from './InstanceSegmentationTable.svelte';
+	import { getContext } from 'svelte';
+	import type { components } from '../../types/openapi';
+	import type { GlobalContext } from '../data/globalContext.svelte';
+	type InstanceGET = components['schemas']['InstanceGET'];
+
+	const {userManager} = getContext<GlobalContext>('globalContext')
 
 	interface Props {
-		instance: Instance;
+		open: boolean;
+		instance: InstanceGET;
 	}
-	let { instance }: Props = $props();
+	let { instance, open = $bindable(false) }: Props = $props();
+
+	const flattenToDotPaths = (
+    input: Record<string, unknown> | unknown[]
+        ): Record<string, unknown> => {
+        const out: Record<string, unknown> = {};
+
+        const walk = (value: unknown, path: string): void => {
+            if (Array.isArray(value)) {
+            if (value.length === 0 && path) {
+                out[path] = [];
+                return;
+            }
+            value.forEach((item, idx) => {
+                const next = path ? `${path}.${idx}` : `${idx}`;
+                walk(item, next);
+            });
+            } else if (value !== null && typeof value === 'object') {
+            const entries = Object.entries(value as Record<string, unknown>);
+            if (entries.length === 0 && path) {
+                out[path] = {};
+                return;
+            }
+            for (const [k, v] of entries) {
+                const next = path ? `${path}.${k}` : k;
+                walk(v, next);
+            }
+            } else {
+            if (path) out[path] = value as unknown;
+            }
+        };
+
+        walk(input, '');
+        return out;
+        }
 </script>
 
-<div id="main">
-	<div class="content">
+<Dialog.Root bind:open={open}>
+	<Dialog.Content class="min-w-[80vw] min-h-[85vh] align-top">
+		<Dialog.Header class="relative">
+			{instance.id}
+		</Dialog.Header>
+
+		<div class="content">
 		<div class="img-preview">
-			<img src={getThumbUrl(instance)} alt="preview" />
+			<img src={getThumbUrl(instance, 540)} alt="preview" />
 		</div>
 		<table>
 			<thead>
@@ -22,43 +67,31 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each Object.entries(instance) as [key, value]}
+				{#each Object.entries(flattenToDotPaths(instance)) as [key, value]}
 					<tr>
 						<td>{key}</td>
 						<!-- Not sure if this is the way to go, but it's a quick fix -->
-						{#if key === 'device'}
-							<td>{value.model}</td>
-						{:else if key === 'scan'}
-							{#if value}
-								<td>{value.mode}</td>
+						<td>
+							{#if value == null}
+								NULL
+							{:else if typeof value === 'object' && value !== null}
+								<pre>{JSON.stringify(value, null, 2)}</pre>
 							{:else}
-								<td>N/A</td>
+								{value}
 							{/if}
-						{:else if ['series', 'study', 'patient', 'project'].includes(key) }
-							<td>{value.id}</td>
-						{:else}
-							<td>
-								{#if value == null}
-									NULL
-								{:else if typeof value === 'object' && value !== null}
-									<pre>{JSON.stringify(value, null, 2)}</pre>
-								{:else}
-									{value}
-								{/if}
-							</td>
-						{/if}
+						</td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
-		<InstanceSegmentationTable {instance} />
-	</div>
-</div>
+		<!-- <InstanceSegmentationTable {instance} /> -->
+		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
 
 <style>
-	div#main {
-		overflow: auto;
-	}
+
 	div.content {
 		display: flex;
 		flex-direction: column;

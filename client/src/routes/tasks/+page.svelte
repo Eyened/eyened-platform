@@ -1,12 +1,12 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import { data } from "$lib/datamodel/model"
-    import { Task } from "$lib/datamodel/task.svelte"
-    import { TaskDefinition } from "$lib/datamodel/taskDefinition"
-    import { getContext } from "svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { Task } from "$lib/datamodel/task.svelte";
+    import { TaskDefinition } from "$lib/datamodel/taskDefinition";
+    import { getContext } from "svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
     const tasks = data.tasks;
     const taskDefinitions = data.taskDefinitions;

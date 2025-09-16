@@ -1,31 +1,36 @@
 <script lang="ts">
 	import * as Select from "$lib/components/ui/select"
+
+    interface Props {
+        options: {label: string | number, value:string}[]
+        value: string | undefined
+        disabled: boolean
+        placeholder: string | undefined
+    }   
 	
-	export let options: {label: string | number, value:string | number}[]
-    export let selected: string | number | undefined
-    export let onSelectedChange: (val: string) => void
-    export let disabled: boolean = false
-    export let placeholder: string | undefined = undefined
+    let {options, value=$bindable(), disabled, placeholder}: Props = $props()
+    
+    const valueToLabel = $derived(Object.fromEntries(options.map(opt => [opt.value, opt.label])))
 
-    $: valueToLabel = Object.fromEntries(options.map(opt => [opt.value, opt.label]))
+    // $: valueToLabel = Object.fromEntries(options.map(opt => [opt.value, opt.label]))
 
-	$: selectedObj = selected
-    ? {
-        label: valueToLabel[selected],
-        value: selected
-      }
-    : undefined;
+	// $: selectedObj = selected
+    // ? {
+    //     label: valueToLabel[selected],
+    //     value: selected
+    //   }
+    // : undefined;
 
-    const handleChange : any = (changeObj) => {
-        onSelectedChange(changeObj?.value)
-    }
+    // const handleChange : any = (changeObj) => {
+    //     onSelectedChange(changeObj?.value)
+    // }
 
 </script>
 
 
-<Select.Root selected={selectedObj} onSelectedChange={handleChange} disabled={disabled}>
+<Select.Root type="single" bind:value disabled={disabled}>
     <Select.Trigger class="w-[180px]">
-        <Select.Value placeholder={placeholder} />
+        {value ? valueToLabel[value] : placeholder}
     </Select.Trigger>
     <Select.Content>
         {#each options as option}

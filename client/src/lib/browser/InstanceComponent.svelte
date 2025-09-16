@@ -1,16 +1,15 @@
 <script lang="ts">
-    import { getThumbUrl } from "$lib/data-loading/utils"
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import { openNewWindow } from "$lib/newWindow"
-    import { getContext, onDestroy } from "svelte"
-    import type { components } from "../../types/openapi"
-    import InstanceInfo from "./InstanceInfo.svelte"
-    import type { BrowserContext } from "./browserContext.svelte"
+    import { getThumbUrl } from "$lib/data-loading/utils";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { getContext } from "svelte";
+    import type { components } from "../../types/openapi";
+    import type { BrowserContext } from "./browserContext.svelte";
+    import InstanceInfo from "./InstanceInfo.svelte";
     type Instance = components['schemas']['InstanceGET'];
 
     const browserContext = getContext<BrowserContext>("browserContext");
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
     interface Props {
         instance: Instance;
@@ -25,6 +24,7 @@
     }: Props = $props();
 
     let size = $derived(browserContext.thumbnailSize + "em");
+    let popupOpen = $state(false)
 
     // const segmentations = instance.segmentations;
     // const creatorCounts = segmentations.reduce(
@@ -35,6 +35,8 @@
     //     {} as { [name: string]: number },
     // );
 
+    
+
     const image_url = getThumbUrl(instance)!;
 
     const selected = $derived(browserContext.selection.includes(instance.id));
@@ -42,26 +44,12 @@
     function toggleSelect() {
         browserContext.toggleInstance(instance);
     }
-    let window: Window | null = null;
-    function selectInstance() {
-        const props = { instance };
-        window = openNewWindow(
-            InstanceInfo,
-            props,
-            `Image info: [${instance.id}]`,
-        );
-    }
-    onDestroy(() => {
-        if (window) {
-            window.close();
-        }
-    });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="main" class:selected class:showPatientInfo>
-    <div class="title" onclick={selectInstance}>
+    <div class="title" onclick={()=>{popupOpen=true}}>
         {#if showPatientInfo}
             <div>
                 {instance.patient.identifier}
@@ -100,6 +88,7 @@
             {/if} -->
         {/if}
     </div>
+    <InstanceInfo {instance} open={popupOpen}/>
 </div>
 
 <style>

@@ -1786,6 +1786,130 @@
         }
       }
     },
+    "/instances/search/signature": {
+      "get": {
+        "summary": "Instances Signature",
+        "description": "Return signature metadata for instance search fields.",
+        "operationId": "instances_signature_instances_search_signature_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SignatureField"
+                  },
+                  "title": "Response Instances Signature Instances Search Signature Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studies/search/signature": {
+      "get": {
+        "summary": "Studies Signature",
+        "description": "Return signature metadata for study search fields.",
+        "operationId": "studies_signature_studies_search_signature_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SignatureField"
+                  },
+                  "title": "Response Studies Signature Studies Search Signature Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/form-schemas/{form_schema_id}": {
       "get": {
         "summary": "Get Form Schema",
@@ -1853,6 +1977,66 @@
       }
     },
     "/features": {
+      "get": {
+        "summary": "List Features",
+        "description": "Return all features.",
+        "operationId": "list_features_features_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeatureGET"
+                  },
+                  "title": "Response List Features Features Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Create Feature",
         "operationId": "create_feature_features_post",
@@ -2320,6 +2504,122 @@
       "delete": {
         "summary": "Delete Tag",
         "operationId": "delete_tag_tags__tag_id__delete",
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tags/{tag_id}/star": {
+      "post": {
+        "summary": "Star Tag",
+        "operationId": "star_tag_tags__tag_id__star_post",
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unstar Tag",
+        "operationId": "unstar_tag_tags__tag_id__star_delete",
         "parameters": [
           {
             "name": "tag_id",
@@ -2963,6 +3263,68 @@
           }
         }
       }
+    },
+    "/devices": {
+      "get": {
+        "summary": "List Devices",
+        "description": "Return all device models.",
+        "operationId": "list_devices_devices_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceModelGET"
+                  },
+                  "title": "Response List Devices Devices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3038,6 +3400,29 @@
           "model"
         ],
         "title": "DeviceMeta"
+      },
+      "DeviceModelGET": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "manufacturer": {
+            "type": "string",
+            "title": "Manufacturer"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "manufacturer",
+          "model"
+        ],
+        "title": "DeviceModelGET"
       },
       "ETDRSField": {
         "type": "string",
@@ -4071,7 +4456,6 @@
               "Image DBID",
               "Laterality",
               "Modality",
-              "Anatomic Region",
               "ETDRS Field",
               "Color Fundus Quality",
               "Study Date",
@@ -4191,6 +4575,13 @@
             "type": "array",
             "title": "Instances"
           },
+          "studies": {
+            "items": {
+              "$ref": "#/components/schemas/StudyGET"
+            },
+            "type": "array",
+            "title": "Studies"
+          },
           "limit": {
             "type": "integer",
             "title": "Limit"
@@ -4225,6 +4616,7 @@
         "type": "object",
         "required": [
           "instances",
+          "studies",
           "limit",
           "page",
           "result_ids",
@@ -4338,6 +4730,38 @@
           "F"
         ],
         "title": "SexEnum"
+      },
+      "SignatureField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "values"
+        ],
+        "title": "SignatureField",
+        "description": "Signature descriptor for a searchable field."
       },
       "StudyGET": {
         "properties": {
@@ -5103,6 +5527,14 @@
               }
             ],
             "title": "Role"
+          },
+          "starred_tags": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Starred Tags",
+            "default": []
           }
         },
         "type": "object",

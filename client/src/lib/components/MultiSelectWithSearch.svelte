@@ -1,49 +1,52 @@
 <script lang="ts">
-    import * as Command from "$lib/components/ui/command"
-    import * as Popover from "$lib/components/ui/popover"
-    import { faXmark } from '@fortawesome/free-solid-svg-icons'
-    import { createEventDispatcher, tick } from "svelte"
-    import Fa from 'svelte-fa'
+    import * as Command from "$lib/components/ui/command";
+    import * as Popover from "$lib/components/ui/popover";
+    import { faXmark } from '@fortawesome/free-solid-svg-icons';
+    import { tick } from "svelte";
+    import Fa from 'svelte-fa';
 
-    export let options: {name: string, value: string}[] = [];
-    export let values: string[] = [];
+    type Props = {
+        options: { label: string; value: string }[];
+        values?: string[];
+    };
 
-    let collapsibleOpen=false;
+    let { options, values = $bindable([]) }: Props = $props();
 
-    const dispatch = createEventDispatcher<{change: string[]}>()
+    let collapsibleOpen = false;
+    let triggerRef: HTMLButtonElement | null = null;
 
+    const valueToOption = $derived(Object.fromEntries(options.map(option => [option.value, option])));
+    const unselectedOptions = $derived(options.filter(option => !values.includes(option.value)));
 
-    let valueToOption: {[key: string]: {name: string, value: string}} = {};
-    $: valueToOption = Object.fromEntries(options.map(option => [option.value, option]));
+    function closeAndFocusTrigger() {
+        collapsibleOpen = false;
+        tick().then(() => {
+            triggerRef?.focus();
+        });
+    }
 
-    let selectedOptions
-    $: selectedOptions = options.filter(option => values.includes(option.value));
-    $: unselectedOptions = options.filter(option => !values.includes(option.value));
+    function removeValue(valueToRemove: string) {
+        values = values.filter(v => v !== valueToRemove);
+    }
 
-    function closeAndFocusTrigger(triggerId: string) {
-		collapsibleOpen = false;
-		tick().then(() => {
-			document.getElementById(triggerId)?.focus();
-		});
-	}
+    function addValue(valueToAdd: string) {
+        values = [...values, valueToAdd];
+    }
 </script>
 
 <div class="inline-block">
     <div class="inline-block">
         {#each values as value}
             <div class="inline-block bg-gray-200 rounded-full px-2 py-1 m-1">
-                <button on:click={()=>{
-                    dispatch('change', values.filter(v => v !== value));
-                }}>
+                <button onclick={() => removeValue(value)}>
                     <Fa class="inline-block hover:cursor-pointer" icon={faXmark} />
                 </button>
-                {valueToOption[value].name}
+                {valueToOption[value]?.label || value}
             </div>
         {/each}
-        
     </div>
-    <Popover.Root bind:open={collapsibleOpen} let:ids>
-        <Popover.Trigger>
+    <Popover.Root bind:open={collapsibleOpen}>
+        <Popover.Trigger bind:ref={triggerRef}>
             <button class="inline-block bg-gray-200 rounded-full px-2 py-1 m-1">
             +
             </button>
@@ -56,13 +59,12 @@
                     {#each unselectedOptions as option}
                         <Command.Item
                             value={option.value}
-                            onSelect={(currentValue) => {
-                                dispatch('change', [...values, currentValue]);
-                                closeAndFocusTrigger(ids.trigger);
-                            }}
+                            							onSelect={() => {
+								addValue(option.value);
+								closeAndFocusTrigger();
+							}}
                         >
-                            <!-- <Check class="mr-2 h-4 w-4"/> -->
-                            {option.name}
+                            {option.label}
                         </Command.Item>
                     {/each}
                 </Command.Group>

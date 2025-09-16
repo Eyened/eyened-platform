@@ -1,6 +1,4 @@
 <script lang="ts">
-    import Fa from 'svelte-fa'
-// icons from: https://fontawesome.com/v6/icons?o=r&m=free&s=solid
     import {
         AlertDialog,
         AlertDialogCancel,
@@ -9,34 +7,30 @@
         AlertDialogFooter,
         AlertDialogHeader,
         AlertDialogTitle
-    } from "$lib/components/ui/alert-dialog"
+    } from "$lib/components/ui/alert-dialog";
     import {
         Tooltip,
         TooltipContent,
         TooltipTrigger,
-    } from "$lib/components/ui/tooltip"
-    import { data } from '$lib/datamodel/model'
-    import { faStar, faTrash } from '@fortawesome/free-solid-svg-icons'
-    import { getContext } from 'svelte'
-    import { Button } from '../components/ui/button'
-    import { GlobalContext } from '../data-loading/globalContext'
-    import { CreatorTagConstructor, type Tag } from '../datamodel/tag'
-    import TagEditForm from './TagEditForm.svelte'
+    } from "$lib/components/ui/tooltip";
+    import { GlobalContext } from '$lib/data/globalContext.svelte';
+    import { type Tag } from '$lib/data/repos.svelte';
+    import { faStar, faTrash } from '@fortawesome/free-solid-svg-icons';
+    import { getContext } from 'svelte';
+    import Fa from 'svelte-fa';
+    import { Button } from '../components/ui/button';
+    import TagEditForm from './TagEditForm.svelte';
 
+    let { tagType = 'Annotation' }: { tagType?: 'Annotation' | 'ImageInstance' | 'Study' } = $props();
 
-    export let tagType: 'Annotation' | 'ImageInstance' | 'Study' = 'Annotation';
+    const ctx = getContext<GlobalContext>('globalContext');
 
+    let tagToDelete: number | null = $state(null);
+    let dialogOpen = $derived(tagToDelete !== null);
 
-    const { tags: tagsCollection, creatorTags: creatorTagsCollection } = data;
-    const {creator} = getContext<GlobalContext>('globalContext');
-    $: dialogOpen = tagToDelete !== null;
+    let tags = $derived(ctx.tags.all.filter(t => t.tag_type === tagType));
+    let favouriteTagIDs = $derived(new Set(ctx.userManager.starredTagIds));
 
-    const tags = tagsCollection.filter(tag => tag.type == tagType)
-    // $: tags = $allTags.filter(tag => tag.TagType === tagType);
-    let favouriteTagIDs: Set<number>;
-    $: favouriteTagIDs = new Set($creatorTagsCollection.map(ct => ct.tag.id))
-
-    let tagToDelete : number | null = null;
     const setDialogOpen = (value: boolean) => {
         if (!value) {
             tagToDelete = null;
@@ -46,28 +40,25 @@
         tagToDelete = tagID;
     }
 
-    function handleClickStar(tagID: number) {
+    async function handleClickStar(tagID: number) {
         if (favouriteTagIDs.has(tagID)) {
-            creatorTagsCollection.delete(
-                {id: CreatorTagConstructor.getID({CreatorID: creator.id, TagID: tagID})}
-            )
+            await ctx.tags.unstar(tagID);
+            ctx.userManager.starredTagIds = ctx.userManager.starredTagIds.filter(id => id !== tagID);
         } else {
-            creatorTagsCollection.create({
-                creator: creator,
-                tag: tagsCollection.get(tagID)
-            })
+            await ctx.tags.star(tagID);
+            ctx.userManager.starredTagIds = [...ctx.userManager.starredTagIds, tagID];
         }
     }
 
-    function handleCreateTag(event: CustomEvent<Partial<Tag>>) {
-        tagsCollection.create(event.detail)
-        // tagsStore.createTag(detail);
+    async function handleCreateTag(payload: Partial<Tag>) {
+        // map to API payload
+        await ctx.tags.create({ name: payload.name!, description: payload.description ?? '', tag_type: tagType as any });
     }
-    function handleDeleteTag() {
+    async function handleDeleteTag() {
         if (tagToDelete === null) {
             return;
         }
-        tagsCollection.delete({id: tagToDelete});
+        await ctx.tags.wrap(tagToDelete).destroy();
         tagToDelete = null;
     }
 </script>
@@ -82,27 +73,27 @@
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button on:click={handleDeleteTag}>Yes, Delete</Button>
+          <Button onclick={handleDeleteTag}>Yes, Delete</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
 
     <div class="border-radius-5 bg-gray-100 p-4">
-        <TagEditForm {tagType} on:add={handleCreateTag}/>
+        <TagEditForm {tagType} add={handleCreateTag}/>
     </div>
-    {#each $tags.sort((a, b) => a.name.localeCompare(b.name)) as tag}
+    {#each tags.sort((a, b) => a.name.localeCompare(b.name)) as tag}
         <div class:!bg-orange-200={favouriteTagIDs.has(tag.id)} class="relative inline-flex items-center py-2 px-2 m-1 border-1 border-gray-500 rounded-lg bg-gray-200 " >
-            <button class="inline-block" on:click={() => handleClickStar(tag.id)}>
+            <button class="inline-block" onclick={() => handleClickStar(tag.id)}>
                 <Fa icon={faStar} class="inline-block"/>
             
-                <Tooltip openDelay={50}>
+                <Tooltip delayDuration={50}>
                     <TooltipTrigger><span>{tag.name} ({tag.name}) </span></TooltipTrigger> 
                     <TooltipContent>
                         <p>{tag.description ? tag.description : 'No description'}</p>
                     </TooltipContent>
                 </Tooltip>
             </button>
-            <button class="delete" on:click={() => handleClickDelete(tag.id)}>
+            <button class="delete" onclick={() => handleClickDelete(tag.id)}>
                 <Fa icon={faTrash}/>
             </button>
             

@@ -1,16 +1,16 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
-    import type { FormSchema } from "$lib/datamodel/formSchema.svelte"
-    import { data } from "$lib/datamodel/model"
-    import type { TaskContext } from "$lib/types"
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
-    import { getContext } from "svelte"
-    import FormItem from "./FormItem.svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import type { FormSchema } from "$lib/datamodel/formSchema.svelte";
+    import { data } from "$lib/datamodel/model";
+    import type { TaskContext } from "$lib/types";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext } from "svelte";
+    import FormItem from "./FormItem.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const { creator, formShortcut } = globalContext;
+    const { user: creator, formShortcut } = globalContext;
     const { formSchemas, formAnnotations } = data;
 
     const {
