@@ -1,9 +1,8 @@
 <script lang="ts">
     import { getContext } from 'svelte';
-    import type { components } from '../../types/openapi';
+    import type { Series } from '../../types/openapi_types';
     import type { BrowserContext } from './browserContext.svelte';
     import InstanceComponent from './InstanceComponent.svelte';
-	type Series = components['schemas']['SeriesGET'];
 
 	interface Props {
 		series: Series;

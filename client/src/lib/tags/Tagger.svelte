@@ -29,90 +29,78 @@
     import { faSquareXmark } from "@fortawesome/free-solid-svg-icons";
     import { getContext } from 'svelte';
     import Fa from "svelte-fa";
+    import type { TagMeta } from '../../types/openapi_types';
     import TagEditForm from "./TagEditForm.svelte";
     
-    let { tagType, itemTagLinks = [], maxTags = 3, tag: onTag = (id: number) => {}, untag: onUntag = (id: number) => {} }: { 
+    let {
+        tagType,
+        tags = [],
+        maxTags = 3,
+        tag: onTag = (id: number) => {},
+        untag: onUntag = (id: number) => {}
+    }: {
         tagType: 'Annotation' | 'ImageInstance' | 'Study';
-        itemTagLinks?: any[];
+        tags?: TagMeta[];
         maxTags?: number;
         tag?: (id: number) => void;
         untag?: (id: number) => void;
     } = $props();
     
-    const {tagsStore, creatorsStore} = getContext<GlobalContext>('globalContext');
-    const {studyTags, imageInstanceTags, annotationTags, studyTagNames, imageInstanceTagNames, annotationTagNames} = tagsStore;
+    const ctx = getContext<GlobalContext>('globalContext');
     
-    let itemTagIDs = $derived(itemTagLinks.map(link => link.TagID));
-    const tags = tagType === 'Annotation' ? annotationTags : tagType === 'ImageInstance' ? imageInstanceTags : studyTags;
-    const tagNames = tagType === 'Annotation' ? annotationTagNames : tagType === 'ImageInstance' ? imageInstanceTagNames : studyTagNames;
+    // Choose available tags for the current type
+    const allTags = $derived(
+        tagType === 'Study' ? ctx.tags.studyTags
+        : tagType === 'ImageInstance' ? ctx.tags.imageInstanceTags
+        : /* Annotation */ ctx.tags.formAnnotationTags
+    );
     
-    // Tags that can be added to the item
-    let dropdownTags = $derived(() => {
-        const itemTagsSet = new Set(itemTagIDs);
-        return $tags.filter(tag => !itemTagsSet.has(tag.TagID));
-    });
-    // Tags the item has
-    let itemTags = $derived(itemTagLinks.map(link => ({
-        ...$tagsStore.byId[link.TagID],
-        ...link
-    })).sort((a, b) => +b.Created - +a.Created));
+    // Build dropdown candidates (ids already in `tags` are excluded)
+    const selectedIds = $derived(new Set(tags.map(t => t.id)));
+    const dropdownTags = $derived(allTags.filter(t => !selectedIds.has(t.id)));
     
-    let textValue: string;
-    let value = $state("");
+    let textValue = $state('');
+    let value = $state('');
     let dropdownOpen = $state(false);
     let dialogOpen = $state(false);
     
-    $effect(() => {
-        console.log('value', value);
-    });
+    function linkTag(name: string) {
+        const id = allTags.find(t => t.name === name)?.id;
+        if (id !== undefined) onTag(id);
+    }
     
-    function linkTag(tagName: string) {
-        const tagID = $tags.find((t) => t.TagName === tagName)?.TagID;
-        if(tagID !== undefined) {
-            onTag(tagID)
-        }
-    }
-    function removeTag(tagID: number) {
-        onUntag(tagID)
-    }
-    function handleCreateTag(payload) {
-        tagsStore.createTag(payload);
-        setDialogOpen(false)
-    }
-    function handleCommandKeydown(event) {
-        if (event.key === 'Enter') {
-            if($tagNames.has(value)) {
-                linkTag(value)
-                setValue('')
+    function handleCommandKeydown(e: KeyboardEvent) {
+        if (e.key === 'Enter') {
+            if (allTags.some(t => t.name === textValue)) {
+                linkTag(textValue);
+                value = '';
+                textValue = '';
             } else {
-                setDialogOpen(true)
+                dialogOpen = true;
             }
         }
     }
-    function setValue(newValue: string) {
-        value = newValue
-    }
-    function setDropdownOpen(newOpen: boolean) {
-        dropdownOpen = newOpen
-    }
-    function setDialogOpen(newOpen: boolean) {
-        dialogOpen = newOpen
+    
+    async function handleCreateTag(p: { name: string; description?: string; type: 'Annotation' | 'ImageInstance' | 'Study' }) {
+        const apiTagType = p.type === 'Annotation' ? 'FormAnnotation' : p.type;
+        await ctx.tags.create({ name: p.name, description: p.description ?? '', tag_type: apiTagType as any });
+        dialogOpen = false;
     }
 </script>
+
 <div class="tagging-component">
     <!-- Dialog with the new tag form -->
-    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <Dialog bind:open={dialogOpen}>
         <DialogContent>
             <DialogHeader>
-            <DialogTitle>New Tag</DialogTitle>
-                {value}
+                <DialogTitle>New Tag</DialogTitle>
                 <TagEditForm {tagType} initTagName={textValue} add={handleCreateTag} />
             </DialogHeader>
         </DialogContent>
     </Dialog>
+    
     <!-- Combobox for adding new tags -->
-    <!-- see: https://ui.shadcn.com/docs/components/combobox-->
-    <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
+    <Popover bind:open={dropdownOpen}>
         <PopoverTrigger>
             <Button
                 variant="outline"
@@ -123,21 +111,21 @@
             </Button>
         </PopoverTrigger>
         <PopoverContent class="w-40">
-            <Command value={value} onValueChange={setValue} onkeydown={handleCommandKeydown}>
+            <Command bind:value={value} onkeydown={handleCommandKeydown}>
                 <CommandInput bind:value={textValue} placeholder="Search tags..." />
                 <CommandList>
                     <CommandEmpty>No tags found.</CommandEmpty>
                     <CommandGroup>
                         {#each dropdownTags as tag}
                         <CommandItem
-                            value={tag.TagName}
+                            value={tag.name}
                             onSelect={() => {
-                                linkTag(tag.TagName)
-                                setValue(tag.TagName)
-                                setDropdownOpen(false)
+                                linkTag(tag.name);
+                                value = tag.name;
+                                dropdownOpen = false;
                             }}
                         >
-                            {tag.TagName}
+                            {tag.name}
                         </CommandItem>
                         {/each}
                     </CommandGroup>
@@ -148,27 +136,28 @@
     
     <!-- Display tags -->
     <div class="tags-list">
-        {#each itemTags.slice(0, maxTags) as tag}
+        {#each tags.slice(0, maxTags) as tag}
             <div class="tag">
-                <Tooltip openDelay={50}>
-                    <TooltipTrigger><span>{tag.TagName}</span></TooltipTrigger> 
+                <Tooltip delayDuration={50}>
+                    <TooltipTrigger><span>{tag.name}</span></TooltipTrigger>
                     <TooltipContent>
-                        <p>{tag.TagDescription ? tag.TagDescription : 'No description'}</p>
-                        <p>Tagged by {$creatorsStore.byId[tag.CreatorID].CreatorName} {timeAgo(tag.Created)}</p>
+                        <p>{ctx.tags.get(tag.id)?.description ?? 'No description'}</p>
+                        <p>Tagged by {tag.tagger.name} {timeAgo(new Date(tag.date))}</p>
                     </TooltipContent>
                 </Tooltip>
-                <button class="ml-2 hover:text-red-700" onclick={() => removeTag(tag.TagID)} >
-                    <Fa icon={faSquareXmark} size='lg'/>
+                <button class="ml-2 hover:text-red-700" onclick={() => onUntag(tag.id)}>
+                    <Fa icon={faSquareXmark} size="lg" />
                 </button>
             </div>
         {/each}
-        {#if itemTags.length > maxTags}
+        
+        {#if tags.length > maxTags}
             <div class="tag plus-tag">
-                <span>+{itemTags.length - maxTags}</span>
+                <span>+{tags.length - maxTags}</span>
                 <div class="overlay">
-                    {#each itemTags.slice(maxTags) as tag}
+                    {#each tags.slice(maxTags) as tag}
                         <div class="tag overlay-tag">
-                            <span>{tag.TagName} ({tag.TagCount})</span>
+                            <span>{tag.name}</span>
                         </div>
                     {/each}
                 </div>
@@ -176,14 +165,10 @@
         {/if}
     </div>
 </div>
+
 <style>
-    /* .tagging-component {
-        display: flex;
-        flex-direction: column;
-    } */
     .tags-list {
         display: inline-flex;
-        /* display: flex; */
         flex-wrap: wrap;
         margin-top: 1em;
     }
@@ -225,8 +210,5 @@
     }
     .overlay-tag {
         margin: 0.2em 0;
-    }
-    .combobox {
-        margin-top: 1em;
     }
 </style>

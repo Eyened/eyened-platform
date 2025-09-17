@@ -195,6 +195,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/instances/{instance_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tag Instance
+         * @description Attach a Tag to an ImageInstance by tag ID (idempotent).
+         */
+        post: operations["tag_instance_instances__instance_id__tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instances/{instance_id}/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Untag Instance
+         * @description Remove a Tag from an ImageInstance (idempotent).
+         */
+        delete: operations["untag_instance_instances__instance_id__tags__tag_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/segmentations": {
         parameters: {
             query?: never;
@@ -244,6 +284,46 @@ export interface paths {
         put: operations["update_segmentation_data_segmentations__segmentation_id__data_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/segmentations/{segmentation_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tag Segmentation
+         * @description Attach a Tag to a Segmentation by tag ID (idempotent).
+         */
+        post: operations["tag_segmentation_segmentations__segmentation_id__tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/segmentations/{segmentation_id}/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Untag Segmentation
+         * @description Remove a Tag from a Segmentation (idempotent).
+         */
+        delete: operations["untag_segmentation_segmentations__segmentation_id__tags__tag_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -350,6 +430,46 @@ export interface paths {
         put: operations["update_form_annotation_value_form_annotations__form_annotation_id__value_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/form-annotations/{annotation_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tag Form Annotation
+         * @description Attach a Tag to a FormAnnotation by tag ID (idempotent).
+         */
+        post: operations["tag_form_annotation_form_annotations__annotation_id__tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/form-annotations/{annotation_id}/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Untag Form Annotation
+         * @description Remove a Tag from a FormAnnotation (idempotent).
+         */
+        delete: operations["untag_form_annotation_form_annotations__annotation_id__tags__tag_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -641,6 +761,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/studies/{study_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tag Study
+         * @description Attach a Tag to a Study by tag ID (idempotent).
+         */
+        post: operations["tag_study_studies__study_id__tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/studies/{study_id}/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Untag Study
+         * @description Remove a Tag from a Study (idempotent).
+         */
+        delete: operations["untag_study_studies__study_id__tags__tag_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -669,6 +829,16 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * DataRepresentation
+         * @enum {string}
+         */
+        DataRepresentation: "Binary" | "DualBitMask" | "Probability" | "MultiLabel" | "MultiClass";
+        /**
+         * Datatype
+         * @enum {string}
+         */
+        Datatype: "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F";
         /** DeviceMeta */
         DeviceMeta: {
             /** Manufacturer */
@@ -748,11 +918,8 @@ export interface components {
              * @enum {string}
              */
             object_type: "patient" | "study" | "image_instance";
-            patient?: components["schemas"]["PatientGET"] | null;
-            study?: components["schemas"]["StudyGET"] | null;
-            image_instance?: components["schemas"]["InstanceGET"] | null;
             /** Tags */
-            tags: components["schemas"]["TagGET"][];
+            tags?: components["schemas"]["TagMetadata"][] | null;
             /**
              * Date Inserted
              * Format: date-time
@@ -926,7 +1093,7 @@ export interface components {
             /** Thumbnail Identifier */
             thumbnail_identifier: string;
             /** Thumbnail Path */
-            thumbnail_identifier: string;
+            thumbnail_path: string;
             modality?: components["schemas"]["Modality"] | null;
             dicom_modality?: components["schemas"]["ModalityType"] | null;
             etdrs_field?: components["schemas"]["ETDRSField"] | null;
@@ -975,7 +1142,7 @@ export interface components {
             device: components["schemas"]["DeviceMeta"];
             scan: components["schemas"]["ScanMeta"];
             /** Tags */
-            tags: components["schemas"]["TagGET"][];
+            tags?: components["schemas"]["TagMetadata"][] | null;
         };
         /** InstanceMeta */
         InstanceMeta: {
@@ -990,8 +1157,6 @@ export interface components {
             /** Anatomic Region */
             anatomic_region: string;
             device: components["schemas"]["DeviceMeta"];
-            /** Tags */
-            tags: components["schemas"]["TagGET"][];
         };
         /**
          * Laterality
@@ -1008,15 +1173,10 @@ export interface components {
          * @enum {string}
          */
         ModalityType: "OP" | "OPT" | "SC";
-        /** PatientGET */
-        PatientGET: {
-            /** Id */
-            id: number;
-            /** Identifier */
-            identifier: string;
-            /** Birth Date */
-            birth_date?: string | null;
-            sex?: components["schemas"]["SexEnum"] | null;
+        /** ObjectTagPOST */
+        ObjectTagPOST: {
+            /** Tag Id */
+            tag_id: number;
         };
         /** PatientMeta */
         PatientMeta: {
@@ -1050,9 +1210,9 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
             /** Value */
-            value: string | number | null;
+            value: string | number | string[] | null;
         };
         /** SearchQuery */
         SearchQuery: {
@@ -1102,14 +1262,48 @@ export interface components {
             /** Has More */
             has_more: boolean;
         };
-        /** SegmentationPatch */
-        SegmentationPatch: {
-            /** Referencesegmentationid */
-            ReferenceSegmentationID?: number | null;
-            /** Featureid */
-            FeatureID?: number | null;
+        /** SegmentationGET */
+        SegmentationGET: {
+            /** Depth */
+            depth: number;
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
+            /** Sparse Axis */
+            sparse_axis?: number | null;
+            /** Image Projection Matrix */
+            image_projection_matrix?: number[][] | null;
+            /** Scan Indices */
+            scan_indices?: number[] | null;
             /** Threshold */
-            Threshold?: number | null;
+            threshold?: number | null;
+            /** Reference Segmentation Id */
+            reference_segmentation_id?: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
+            /** Id */
+            id: number;
+            feature: components["schemas"]["FeatureGET"];
+            creator: components["schemas"]["CreatorMetadata"];
+            /** Tags */
+            tags?: components["schemas"]["TagMetadata"][] | null;
+            /**
+             * Date Inserted
+             * Format: date-time
+             */
+            date_inserted: string;
+            /** Date Modified */
+            date_modified?: string | null;
+        };
+        /** SegmentationPATCH */
+        SegmentationPATCH: {
+            /** Reference Segmentation Id */
+            reference_segmentation_id?: number | null;
+            /** Feature Id */
+            feature_id?: number | null;
+            /** Threshold */
+            threshold?: number | null;
         };
         /** SeriesGET */
         SeriesGET: {
@@ -1129,11 +1323,6 @@ export interface components {
             id: number;
         };
         /**
-         * SexEnum
-         * @enum {string}
-         */
-        SexEnum: "M" | "F";
-        /**
          * SignatureField
          * @description Signature descriptor for a searchable field.
          */
@@ -1141,7 +1330,7 @@ export interface components {
             /** Name */
             name: string;
             /** Values */
-            values: number | string | string[];
+            values: string | string[];
         };
         /** StudyGET */
         StudyGET: {
@@ -1160,6 +1349,8 @@ export interface components {
             study_instance_uid?: string | null;
             /** Series */
             series?: components["schemas"]["SeriesGET"][] | null;
+            /** Tags */
+            tags?: components["schemas"]["TagMetadata"][] | null;
         };
         /** StudyMeta */
         StudyMeta: {
@@ -1182,9 +1373,9 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
             /** Value */
-            value: unknown;
+            value: string | number | string[] | null;
         };
         /** StudySearchQuery */
         StudySearchQuery: {
@@ -1307,6 +1498,19 @@ export interface components {
              */
             date_inserted: string;
         };
+        /** TagMetadata */
+        TagMetadata: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            tagger: components["schemas"]["CreatorMetadata"];
+            /**
+             * Date
+             * Format: date-time
+             */
+            date: string;
+        };
         /**
          * TagPATCH
          * @description Partial update for Tag (same as PUT for now).
@@ -1348,6 +1552,10 @@ export interface components {
              * Format: date-time
              */
             date_inserted: string;
+            /** Num Tasks */
+            num_tasks: number;
+            /** Num Tasks Ready */
+            num_tasks_ready: number;
         };
         /**
          * TaskPATCH
@@ -1789,6 +1997,79 @@ export interface operations {
             };
         };
     };
+    tag_instance_instances__instance_id__tags_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                instance_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectTagPOST"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    untag_instance_instances__instance_id__tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                instance_id: number;
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_segmentation_segmentations_post: {
         parameters: {
             query?: never;
@@ -1813,7 +2094,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SegmentationGET"];
                 };
             };
             /** @description Validation Error */
@@ -1849,7 +2130,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SegmentationGET"];
                 };
             };
             /** @description Validation Error */
@@ -1913,7 +2194,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SegmentationPatch"];
+                "application/json": components["schemas"]["SegmentationPATCH"];
             };
         };
         responses: {
@@ -1923,7 +2204,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SegmentationGET"];
                 };
             };
             /** @description Validation Error */
@@ -2003,6 +2284,79 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tag_segmentation_segmentations__segmentation_id__tags_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                segmentation_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectTagPOST"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    untag_segmentation_segmentations__segmentation_id__tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                segmentation_id: number;
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -2353,6 +2707,79 @@ export interface operations {
             };
             path: {
                 form_annotation_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tag_form_annotation_form_annotations__annotation_id__tags_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                annotation_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectTagPOST"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    untag_form_annotation_form_annotations__annotation_id__tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                annotation_id: number;
+                tag_id: number;
             };
             cookie?: {
                 jwt_token?: string;
@@ -3273,6 +3700,79 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceModelGET"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tag_study_studies__study_id__tags_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                study_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectTagPOST"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    untag_study_studies__study_id__tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                study_id: number;
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

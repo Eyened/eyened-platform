@@ -14,7 +14,7 @@ from pydantic import BaseModel, create_model, Field
 
 from eyened_orm.ImageInstance import Laterality, ModalityType, Modality, ETDRSField
 from eyened_orm.Patient import SexEnum as Sex
-from .dtos_aux import ROI, Keypoints, TagGET
+from .dtos_aux import ROI, Keypoints, TagMetadata
 
 # Type aliases matching TypeScript types
 AnatomicRegion = str  # Based on database field
@@ -44,6 +44,7 @@ class StudyGET(BaseModel):
     age: Optional[float] = None # patient age in years
     study_instance_uid: Optional[str] = None
     series: Optional[List["SeriesGET"]] = None
+    tags: Optional[List[TagMetadata]] = None
 
 
 
@@ -122,7 +123,6 @@ class InstanceMeta(BaseModel):
     laterality: Optional[Laterality] = None
     anatomic_region: AnatomicRegion
     device: DeviceMeta
-    tags: List[TagGET]
     
 
 class InstanceGET(InstanceBase):
@@ -133,7 +133,7 @@ class InstanceGET(InstanceBase):
     series: SeriesMeta
     device: DeviceMeta
     scan: ScanMeta
-    tags: List[TagGET]
+    tags: Optional[List[TagMetadata]] = None
 
     date_inserted: datetime
     date_modified: Optional[datetime] = None

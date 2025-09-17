@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+	import InstanceComponent from './InstanceComponent.svelte';
 	import StudyBlock from './StudyBlock.svelte';
 	import type { BrowserContext } from './browserContext.svelte';
 
-    const {StudiesRepo, InstanceRepo, queryMode} = getContext<BrowserContext>('browserContext');
+	const { StudiesRepo, InstanceRepo, queryMode, displayMode } = getContext<BrowserContext>('browserContext');
 
 	// export let renderMode: 'studies' | 'instances' = 'studies';
 	let { mode = 'full' }: { mode?: 'full' | 'overlay' } = $props();
@@ -12,8 +13,24 @@
 </script>
 
 {#if queryMode == "instances"}
-	{#if InstanceRepo.all.length > 0}
-		{'sdfsdf'}
+	{#if displayMode === 'instance'}
+		{#if InstanceRepo.all.length > 0}
+			<div class="grid gap-2 grid-cols-[repeat(auto-fill,minmax(8em,1fr))]">
+				{#each InstanceRepo.all as instance (instance.id)}
+					<InstanceComponent {instance} />
+				{/each}
+			</div>
+		{:else}
+			<div class="flex flex-col flex-1">No results</div>
+		{/if}
+	{:else}
+		{#if StudiesRepo.all.length > 0}
+			{#each StudiesRepo.all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) as study (study)}
+				<StudyBlock {study} {mode} />
+			{/each}
+		{:else}
+			<div class="flex flex-col flex-1">No results</div>
+		{/if}
 	{/if}
 {:else if queryMode == "studies"}
 	{#if StudiesRepo.all.length > 0}

@@ -2,36 +2,38 @@
 export type Id = string | number;
 
 // Helper: naive singularization plus kebab->snake: e.g. "/form-schemas" -> "form_schema_id"
-function inferIdParam(base: string): string {
+export function inferIdParam(base: string): string {
 	const last = base.replace(/\/+$/, '').split('/').pop() ?? '';
 	const singular = last.endsWith('ies') ? last.slice(0, -3) + 'y' : last.endsWith('s') ? last.slice(0, -1) : last;
 	const snake = singular.replace(/-([a-z])/g, (_, c) => `_${c}`);
 	return `${snake}_id`;
 }
 
-// const _stores = $state<Record<string, Record<Id, any>>>({});
-
 export abstract class Repo<
-	TStore extends { id: Id },
-	TGet = TStore,
-	TCreate = Partial<TStore>,
-	TPatch = Partial<TStore>,
-	ListParams = unknown
+	TGet extends { id: Id },
+	TCreate = Partial<TGet>,
+	TPatch = Partial<TGet>,
+	ListParams = unknown,
+	TDataObject extends DataObject<TGet, TPatch> = DataObject<TGet, TPatch>
 > {
-	constructor(
-		public readonly key: string,
-		private readonly toStore: (remote: TGet) => TStore = (x) => x as unknown as TStore
-	) {}
+	constructor(public readonly key: string) {}
 
-	public store = $state<Record<string, TStore>>({});
+	public store = $state<Record<Id, TGet>>({});
 
-	public all = $derived(Object.values(this.store))
+	public all = $derived(Object.values(this.store));
 
 	// Protected hooks for subclasses to override
 	protected abstract get basePath(): string;
 
 	protected get idParam(): string {
 		return inferIdParam(this.basePath);
+	}
+
+	// Optional object factory for subclasses
+	protected createDataObject?(id: Id): TDataObject;
+
+	public object(id: Id): TDataObject {
+		return this.createDataObject ? this.createDataObject(id) : (new DataObject<TGet, TPatch>(this, id) as TDataObject);
 	}
 
 	// Optional serialization hooks
@@ -43,7 +45,7 @@ export abstract class Repo<
 		return body;
 	}
 
-	// Remote operations - can be overridden by subclasses
+	// Remote operations - can be overridden by subclasses, all return TGet
 	protected async remoteList(params?: ListParams): Promise<TGet[]> {
 		const { api } = await import('../api/client');
 		const res = await api.GET(this.basePath as any);
@@ -88,33 +90,23 @@ export abstract class Repo<
 		});
 	}
 
-
-	get(id: Id): TStore | undefined {
+	get(id: Id): TGet | undefined {
 		return this.store[id];
 	}
 
-	upsert(remote: TGet): Row<TStore, TGet, TCreate, TPatch, ListParams> {
-		const s = this.toStore(remote);
-		this.store[s.id] = s;
-		return new Row<TStore, TGet, TCreate, TPatch, ListParams>(this, s.id);
+	upsert(remote: TGet): void {
+		this.store[remote.id] = remote;
 	}
 
 	deleteLocal(id: Id): void {
 		delete this.store[id];
 	}
 
-	wrap(id: Id): Row<TStore, TGet, TCreate, TPatch, ListParams> {
-		if (!(id in this.store)) throw new Error(`No ${this.key}#${String(id)}`);
-		return new Row<TStore, TGet, TCreate, TPatch, ListParams>(this, id);
-	}
-
 	ingest(list: TGet[]): void {
 		for (const r of list) {
-			const s = this.toStore(r);
-			this.store[s.id] = s;
+			this.store[r.id] = r;
 		}
-		this.store = {...this.store}
-		console.log(this.store)
+		this.store = { ...this.store };
 	}
 
 	clear(): void {
@@ -126,51 +118,42 @@ export abstract class Repo<
 		this.ingest(list);
 	}
 
-	async fetchOne(id: Id): Promise<Row<TStore, TGet, TCreate, TPatch, ListParams>> {
+	async fetchOne(id: Id): Promise<DataObject<TGet, TPatch>> {
 		const row = await this.remoteGet(id);
-		return this.upsert(row);
+		this.upsert(row);
+		return this.object(id);
 	}
 
-	async create(body: TCreate): Promise<Row<TStore, TGet, TCreate, TPatch, ListParams>> {
+	async create(body: TCreate): Promise<DataObject<TGet, TPatch>> {
 		const created = await this.remoteCreate(body);
-		return this.upsert(created);
+		this.upsert(created);
+		return this.object(created.id);
 	}
 }
 
-export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
-	constructor(private repo: Repo<TStore, TGet, TCreate, TPatch, ListParams>, public readonly id: Id) {}
+export class DataObject<TGet extends { id: Id }, TPatch = Partial<TGet>> {
+	// Make data reactive using $derived
+	data: TGet | undefined;
 
-	get data(): TStore {
-		const row = this.repo.get(this.id);
-		if (!row) throw new Error(`Missing row ${String(this.id)}`);
-		return row;
+	constructor(protected repo: Repo<TGet, any, TPatch, any, any>, public readonly id: Id) {
+		this.data = $derived(this.repo.store[this.id] as TGet | undefined);
 	}
 
-	// // Option A: make Row itself a store (usable as `$row` in Svelte)
-	// subscribe(run: (value: TStore) => void): () => void {
-	// 	run(this.data);
-	// 	const stop = $effect(() => {
-	// 		// row-level dependency: rerun on replace/updateLocal
-	// 		const _ = this.repo.store[this.id];
-	// 		run(this.data);
-	// 	});
-	// 	return stop;
-	// }
-
-	// // Option B: explicit readable store, if you prefer
-	// dataReadable() {
-	// 	return {
-	// 		subscribe: (run: (value: TStore) => void) => this.subscribe(run)
-	// 	};
-	// }
-
-	updateLocal(patch: Partial<TStore>): TStore {
-		// replace object to trigger row-level subscribers
-		this.repo.store[this.id] = { ...this.repo.store[this.id], ...patch };
-		return this.data;
+	get required(): TGet {
+		const d = this.data;
+		if (!d) throw new Error(`Missing row ${String(this.id)}`);
+		return d;
 	}
 
-	replace(next: TStore): TStore {
+	updateLocal(patch: Partial<TGet>): TGet | undefined {
+		const curr = this.repo.store[this.id];
+		if (!curr) return undefined;
+		const next = { ...curr, ...patch } as TGet;
+		this.repo.store[this.id] = next;
+		return next;
+	}
+
+	replace(next: TGet): TGet {
 		this.repo.store[this.id] = next;
 		return next;
 	}
@@ -179,20 +162,52 @@ export class Row<TStore extends { id: Id }, TGet, TCreate, TPatch, ListParams> {
 		this.repo.deleteLocal(this.id);
 	}
 
-	async refresh(): Promise<TStore> {
-		const r = await this.repo.fetchOne(this.id);
-		return r.data;
+	async refresh(): Promise<TGet> {
+		const obj = await this.repo.fetchOne(this.id);
+		return (obj as DataObject<TGet, TPatch>).required;
 	}
 
-	async save(patch?: TPatch): Promise<TStore> {
-		const updated = await (this.repo as any).remoteUpdate(this.id, (patch ?? (this.data as unknown as TPatch)));
-		const stored = (this.repo as any).toStore(updated as unknown as TGet);
-		this.replace(stored);
-		return stored;
+	async save(patch?: TPatch): Promise<TGet> {
+		const updated = await (this.repo as any).remoteUpdate(this.id, (patch ?? (this.required as unknown as TPatch)));
+		this.replace(updated as TGet);
+		return updated as TGet;
 	}
 
 	async destroy(): Promise<void> {
 		await (this.repo as any).remoteDelete(this.id);
 		this.deleteLocal();
+	}
+}
+
+export abstract class MetaObject<TMeta extends { id: Id }, TGet extends { id: Id }> {
+	constructor(
+		protected getRepo: Repo<TGet, any, any, any, DataObject<TGet>>,
+		public readonly meta: Readonly<TMeta>
+	) {}
+
+	get id(): Id {
+		return this.meta.id;
+	}
+
+	protected abstract get baseEndpoint(): string;
+
+	protected get idParam(): string {
+		return inferIdParam(this.baseEndpoint);
+	}
+
+	async fetch(): Promise<TGet> {
+		const { api } = await import('../api/client');
+		const path = `${this.baseEndpoint}/{${this.idParam}}`;
+		const res = await api.GET(path as any, {
+			params: { path: { [this.idParam]: Number(this.id) } } as any
+		});
+		if (!res.data) throw new Error('No data');
+		return res.data as TGet;
+	}
+
+	async augment(): Promise<DataObject<TGet>> {
+		const full = await this.fetch();
+		this.getRepo.upsert(full);
+		return this.getRepo.object(this.id);
 	}
 }

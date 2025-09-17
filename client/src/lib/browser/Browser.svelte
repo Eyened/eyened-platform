@@ -7,7 +7,6 @@
 	import * as Button from '$lib/components/ui/button';
 	import * as Card from "$lib/components/ui/card";
 	import type { GlobalContext } from '$lib/data/globalContext.svelte';
-// import { showUserMenu } from '$lib/stores.svelte'
 	import { getContext, onMount, setContext } from 'svelte';
 	import Spinner from '../utils/Spinner.svelte';
 	import MainIcon from '../viewer-window/icons/MainIcon.svelte';
@@ -70,7 +69,11 @@
 		console.log(browserContext.queryMode)
 	}
 
-	let limitOptions = $derived((browserContext.displayMode === 'instance') ? [50, 100, 200, 500] : [10,20,30,40,50]);
+	let limitOptions = $derived(
+		(browserContext.queryMode === 'instances' && browserContext.displayMode === 'instance')
+			? [100, 200, 500, 1000]
+			: [10, 20, 30, 40, 50]
+	);
 
 	// let sortByColumns = $derived((browserContext.displayMode === 'instance') ? ['CFQuality', 'StudyDate', 'PatientIdentifier', 'BirthDate', 'DateInserted', 'DateModified'] : ['StudyDate', 'PatientIdentifier', 'BirthDate'])
 	let sortByColumns = $derived((browserContext.displayMode === 'instance') ? openAPISpec.components.schemas.SearchQuery.properties.order_by.enum : openAPISpec.components.schemas.StudySearchQuery.properties.order_by.enum);
@@ -158,7 +161,7 @@
 									<div class="flex items-center gap-2">
 										<label for="displayMode">Display: </label>
 										<MySelect 
-											options={[{value: 'instance', label: 'Instances'}, {value: 'partialStudy', label: 'Partial Studies'}, {value: 'fullStudy', label: 'Full Studies'}]} 
+											options={[{value: 'instance', label: 'Instances'},  {value: 'study', label: 'Studies'}]} 
 											bind:value={browserContext.displayMode}
 											disabled={false}
 											placeholder="Render Mode"/>

@@ -45,6 +45,8 @@ class TaskPATCH(TaskPUT):
 class TaskGET(TaskBase):
     id: int
     date_inserted: datetime
+    num_tasks: int
+    num_tasks_ready: int
 
 
 # === SUB TASK ===

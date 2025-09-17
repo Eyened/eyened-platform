@@ -2,10 +2,9 @@
     import { getThumbUrl } from "$lib/data-loading/utils";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext } from "svelte";
-    import type { components } from "../../types/openapi";
+    import type { Instance } from "../../types/openapi_types";
     import type { BrowserContext } from "./browserContext.svelte";
     import InstanceInfo from "./InstanceInfo.svelte";
-    type Instance = components['schemas']['InstanceGET'];
 
     const browserContext = getContext<BrowserContext>("browserContext");
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -56,7 +55,7 @@
     class:outline-[#d0d0d0]={showPatientInfo}
     class:m-[0.2em]={showPatientInfo}
 >
-    <div class="title text-sm flex flex-col text-gray-500 cursor-pointer hover:text-black" onclick={()=>{popupOpen=true}}>
+    <div class="title text-sm flex flex-col text-gray-500 cursor-pointer hover:text-black items-center" onclick={()=>{popupOpen=true}}>
         {#if showPatientInfo}
             <div class="flex justify-center flex-1">
                 {instance.patient.identifier}
