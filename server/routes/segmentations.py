@@ -1,6 +1,5 @@
 import gzip
 import io
-import json
 from typing import Optional
 
 import numpy as np
@@ -10,8 +9,11 @@ from eyened_orm import (
     Segmentation,
     Datatype,
     DataRepresentation,
-    ModelSegmentation
+    ModelSegmentation,
+    Tag,
+    SegmentationTagLink,
 )
+from eyened_orm.Tag import TagType
 from fastapi import (
     APIRouter,
     Depends,
@@ -23,11 +25,13 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Extra
+from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
+from ..dtos.dtos_main import SegmentationGET, SegmentationPOST, SegmentationPATCH
+from ..dtos.dto_converter import DTOConverter
+from ..dtos.dtos_aux import ObjectTagPOST
 
 router = APIRouter()
 
@@ -38,24 +42,6 @@ dtypes = {
     Datatype.R32UI: np.uint32,
     Datatype.R32F: np.float32,
 }
-
-
-
-def load_params(metadata: str):
-    required_params = ["ImageInstanceID", "FeatureID", "CreatorID", "DataType", "DataRepresentation"]
-
-    params = json.loads(metadata)
-    for param in required_params:
-        if param not in params:
-            raise HTTPException(status_code=400, detail=f"{param} is required")
-    # replace string with enum
-    params["DataType"] = Datatype[params["DataType"]]
-    params["DataRepresentation"] = DataRepresentation[params["DataRepresentation"]]
-    # remove ZarrArrayIndex from params (a new index needs to be assigned)
-    if "ZarrArrayIndex" in params:
-        del params["ZarrArrayIndex"]
-
-    return params
 
 
 async def load_array(np_array: Optional[UploadFile]) -> Optional[np.ndarray]:
@@ -94,7 +80,7 @@ def create_empty_array(segmentation: Segmentation, image: ImageInstance) -> np.n
 # if the annotation data (np_array) is not provided, an empty (zeros) annotation is created
 # once the annotation is created, its data can be updated using the PUT endpoint
 # but only by data with the same shape as the original annotation
-@router.post("/segmentations")
+@router.post("/segmentations", response_model=SegmentationGET)
 async def create_segmentation(
     np_array: UploadFile = File(default=None),
     metadata: str = Form(...),
@@ -102,7 +88,23 @@ async def create_segmentation(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     # create a new segmentation
-    segmentation = Segmentation(**load_params(metadata))
+    dto = SegmentationPOST.model_validate_json(metadata)
+
+    segmentation = Segmentation(
+        ImageInstanceID=dto.image_instance_id,
+        FeatureID=dto.feature_id,
+        CreatorID=dto.creator_id,
+        DataType=dto.data_type,
+        DataRepresentation=dto.data_representation,
+        Depth=dto.depth,
+        Height=dto.height,
+        Width=dto.width,
+        SparseAxis=dto.sparse_axis,
+        ImageProjectionMatrix=dto.image_projection_matrix,
+        ScanIndices=dto.scan_indices,
+        Threshold=dto.threshold,
+        ReferenceSegmentationID=dto.reference_segmentation_id,
+    )
 
     # creator can be different from the current_user and is passed in the params
     # segmentation.CreatorID = current_user.id
@@ -164,19 +166,28 @@ async def create_segmentation(
 
     db.commit()
     db.refresh(segmentation)
-    return segmentation
+    return DTOConverter.segmentation_to_get(segmentation)
 
 
-@router.get("/segmentations/{segmentation_id}")
+@router.get("/segmentations/{segmentation_id}", response_model=SegmentationGET)
 async def get_segmentation(
     segmentation_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    item = Segmentation.by_id(db, segmentation_id)
+    item = db.get(
+        Segmentation,
+        segmentation_id,
+        options=(
+            selectinload(Segmentation.SegmentationTagLinks)
+                .selectinload(SegmentationTagLink.Tag),
+            selectinload(Segmentation.SegmentationTagLinks)
+                .selectinload(SegmentationTagLink.Creator),
+        ),
+    )
     if item is None:
         raise HTTPException(status_code=404, detail="Segmentation not found")
-    return item
+    return DTOConverter.segmentation_to_get(item)
 
 
 @router.delete("/segmentations/{segmentation_id}", status_code=204)
@@ -257,30 +268,29 @@ async def get_segmentation_data(
     return StreamingResponse(buf, media_type="application/octet-stream")
 
 
-class SegmentationPatch(BaseModel):
-    ReferenceSegmentationID: Optional[int] = None
-    FeatureID: Optional[int] = None
-    Threshold: Optional[float] = None
-    # TODO: should we allow to patch other fields?
 
-    class Config:
-        extra = 'forbid'
 
-@router.patch("/segmentations/{segmentation_id}")
+@router.patch("/segmentations/{segmentation_id}", response_model=SegmentationGET)
 async def patch_segmentation(
     segmentation_id: int,
-    params: SegmentationPatch,
+    dto: SegmentationPATCH,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     segmentation = Segmentation.by_id(db, segmentation_id)
     if segmentation is None:
         raise HTTPException(status_code=404, detail="Segmentation not found")
-    for key, value in params.model_dump(exclude_unset=True).items():
-        setattr(segmentation, key, value)
+
+    if dto.reference_segmentation_id is not None:
+        segmentation.ReferenceSegmentationID = dto.reference_segmentation_id
+    if dto.feature_id is not None:
+        segmentation.FeatureID = dto.feature_id
+    if dto.threshold is not None:
+        segmentation.Threshold = dto.threshold
+
     db.commit()
     db.refresh(segmentation)
-    return segmentation
+    return DTOConverter.segmentation_to_get(segmentation)
 
 
 #### CONSISTENCY CHECKS ####
@@ -331,3 +341,31 @@ elif image.is_3d and annotation.is_3d:
 else:
     raise HTTPException(status_code=400, detail=f"Image and annotation shapes are not compatible")
 """
+
+
+@router.post("/segmentations/{segmentation_id}/tags", status_code=204)
+async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Attach a Tag to a Segmentation by tag ID (idempotent)."""
+    seg = db.get(Segmentation, segmentation_id)
+    if not seg:
+        raise HTTPException(404, "Segmentation not found")
+    tag = db.get(Tag, body.tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    if tag.TagType != TagType.Segmentation:
+        raise HTTPException(400, "Tag type must be Segmentation")
+    if not db.get(SegmentationTagLink, {"TagID": tag.TagID, "SegmentationID": segmentation_id}):
+        db.add(SegmentationTagLink(TagID=tag.TagID, SegmentationID=segmentation_id, CreatorID=current_user.id))
+        db.commit()
+    return Response(status_code=204)
+
+@router.delete("/segmentations/{segmentation_id}/tags/{tag_id}", status_code=204)
+async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Remove a Tag from a Segmentation (idempotent)."""
+    seg = db.get(Segmentation, segmentation_id)
+    if not seg:
+        raise HTTPException(404, "Segmentation not found")
+    link = db.get(SegmentationTagLink, {"TagID": tag_id, "SegmentationID": segmentation_id})
+    if link:
+        db.delete(link); db.commit()
+    return Response(status_code=204)

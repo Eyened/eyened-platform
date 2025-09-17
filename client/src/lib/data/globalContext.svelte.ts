@@ -13,7 +13,7 @@ export type ComponentDef = {
 export class GlobalContext {
 
     public userManager: UserManager;
-    public tags = TagsRepo;
+    public tags = new TagsRepo('tags');
     public tagsLoaded: boolean = $state(false);
 
     public popupComponent: ComponentDef | null = $state(null);

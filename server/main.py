@@ -22,6 +22,7 @@ from server.routes import (
     task,
     search,
     devices,
+    studies,
 )
 from server.utils.database_init import (
     create_database,
@@ -41,6 +42,7 @@ app_api.include_router(feature.router)
 app_api.include_router(tag.router)
 app_api.include_router(task.router)
 app_api.include_router(devices.router)
+app_api.include_router(studies.router)
 
 
 ### Exception handlers

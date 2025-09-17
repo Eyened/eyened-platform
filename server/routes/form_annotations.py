@@ -2,14 +2,16 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import FormAnnotation
+from eyened_orm import FormAnnotation, Tag, FormAnnotationTagLink, Study, StudyTagLink, ImageInstance, ImageInstanceTagLink
+from eyened_orm.Tag import TagType
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import FormAnnotationPUT, FormAnnotationGET
 from ..dtos.dto_converter import DTOConverter
+from ..dtos.dtos_aux import ObjectTagPOST
 
 router = APIRouter()
 
@@ -49,7 +51,18 @@ async def get_form_annotations(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    query = select(FormAnnotation).filter(~FormAnnotation.Inactive)
+    query = select(FormAnnotation).filter(~FormAnnotation.Inactive).options(
+        selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
+        selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
+        selectinload(FormAnnotation.Study)
+            .selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Tag),
+        selectinload(FormAnnotation.Study)
+            .selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Creator),
+        selectinload(FormAnnotation.ImageInstance)
+            .selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
+        selectinload(FormAnnotation.ImageInstance)
+            .selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Creator),
+    )
 
     if patient_id is not None:
         query = query.filter(FormAnnotation.PatientID == patient_id)
@@ -72,7 +85,14 @@ async def get_form_annotation(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    annotation = db.get(FormAnnotation, annotation_id)
+    annotation = db.get(
+        FormAnnotation,
+        annotation_id,
+        options=(
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
+        ),
+    )
     if annotation is None:
         raise HTTPException(status_code=404, detail="FormAnnotation not found")
     return DTOConverter.form_annotation_to_get(annotation)
@@ -150,6 +170,34 @@ async def update_form_annotation_value(
     form_data = await request.json()
     annotation.FormData = form_data
     db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/form-annotations/{annotation_id}/tags", status_code=204)
+async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Attach a Tag to a FormAnnotation by tag ID (idempotent)."""
+    ann = db.get(FormAnnotation, annotation_id)
+    if not ann:
+        raise HTTPException(404, "FormAnnotation not found")
+    tag = db.get(Tag, body.tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    if tag.TagType != TagType.FormAnnotation:
+        raise HTTPException(400, "Tag type must be FormAnnotation")
+    if not db.get(FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id}):
+        db.add(FormAnnotationTagLink(TagID=tag.TagID, FormAnnotationID=annotation_id, CreatorID=current_user.id))
+        db.commit()
+    return Response(status_code=204)
+
+@router.delete("/form-annotations/{annotation_id}/tags/{tag_id}", status_code=204)
+async def untag_form_annotation(annotation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Remove a Tag from a FormAnnotation (idempotent)."""
+    ann = db.get(FormAnnotation, annotation_id)
+    if not ann:
+        raise HTTPException(404, "FormAnnotation not found")
+    link = db.get(FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id})
+    if link:
+        db.delete(link); db.commit()
     return Response(status_code=204)
 
 

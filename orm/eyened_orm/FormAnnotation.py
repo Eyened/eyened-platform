@@ -56,7 +56,7 @@ class FormAnnotation(Base):
     ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="FormAnnotations")
     Creator: Mapped["Creator"] = relationship(back_populates="FormAnnotations")
     SubTask: Mapped["SubTask"] = relationship(back_populates="FormAnnotations")
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(back_populates="FormAnnotation", passive_deletes=True)
+    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
 
     @classmethod
     def by_schema_and_creator(

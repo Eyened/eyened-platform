@@ -2,9 +2,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { getThumbUrl } from '$lib/data-loading/utils';
 	import { getContext } from 'svelte';
-	import type { components } from '../../types/openapi';
+	import type { InstanceGET } from '../../types/openapi_types';
 	import type { GlobalContext } from '../data/globalContext.svelte';
-	type InstanceGET = components['schemas']['InstanceGET'];
 
 	const {userManager} = getContext<GlobalContext>('globalContext')
 

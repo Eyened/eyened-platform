@@ -204,7 +204,7 @@ class ImageInstance(Base):
         passive_deletes=True,
     )
 
-    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(back_populates="ImageInstance")
+    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(back_populates="ImageInstance", lazy="selectin")
 
     @property
     def shape(self) -> tuple[int, int, int]:

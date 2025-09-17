@@ -1,0 +1,132 @@
+# Progress Documentation
+
+Visualizes the progress or completion status of a task or process.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+Copy Page
+
+```svelte
+<script lang="ts">
+  import { Progress, useId } from "bits-ui";
+  import { onMount } from "svelte";
+  let value = $state(13);
+  const labelId = useId();
+  onMount(() => {
+    const timer = setTimeout(() => (value = 66), 500);
+    return () => clearTimeout(timer);
+  });
+</script>
+<div class="flex w-[60%] flex-col gap-2">
+  <div class="flex items-center justify-between text-sm font-medium">
+    <span id={labelId}> Uploading file... </span>
+    <span>{value}%</span>
+  </div>
+  <Progress.Root
+    aria-labelledby={labelId}
+    {value}
+    max={100}
+    class="bg-dark-10 shadow-mini-inset relative h-[15px] w-full overflow-hidden rounded-full"
+  >
+    <div
+      class="bg-foreground shadow-mini-inset h-full w-full flex-1 rounded-full transition-all duration-1000 ease-in-out"
+      style={`transform: translateX(-${100 - (100 * (value ?? 0)) / 100}%)`} ></div>
+  </Progress.Root>
+</div>
+```
+
+While often visually similar, progress bars and [Meters](/docs/components/meter) serve distinct purposes:
+
+**Progress**:
+
+- Shows **completion status** of a task  
+- Value only increases as task progresses  
+- Examples: File upload, installation status, form completion  
+- Use when tracking advancement toward completion **Meter**:
+
+- Displays a **static measurement** within a known range (0-100)  
+- Value can fluctuate up/down based on real-time measurements  
+- Examples: CPU usage, battery level, sound volume  
+- Use when showing current state relative to capacity If a meter better fits your requirements, check out the [Meter](/docs/components/meter) component.
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Progress } from "bits-ui";
+</script>
+<Progress.Root />
+```
+
+## Reusable Components
+
+It's recommended to use the `Progress` primitive to create your own custom meter component that can be used throughout your application. In the example below, we're using the `Progress` primitive to create a more comprehensive meter component.
+
+```svelte
+<script lang="ts">
+  import { Progress, useId } from "bits-ui";
+  import type { ComponentProps } from "svelte";
+  let {
+    max = 100,
+    value = 0,
+    min = 0,
+    label,
+    valueLabel,
+  }: ComponentProps<typeof Progress.Root> & {
+    label: string;
+    valueLabel: string;
+  } = $props();
+  const labelId = useId();
+</script>
+<div>
+  <span id={labelId}> {label} </span>
+  <span>{valueLabel}</span>
+</div>
+<Progress.Root
+  aria-labelledby={labelId}
+  aria-valuetext={valueLabel}
+  {value}
+  {min}
+  {max}
+/>
+```
+
+You can then use the `MyProgress` component in your application like so:
+
++page.svelte
+
+```svelte
+<script lang="ts">
+  import MyProgress from "$lib/components/MyProgress.svelte";
+  let value = $state(50);
+</script>
+<MyProgress label="Loading images..." valueLabel="{value}%" {value} />
+```
+
+Of course, you'd want to apply your own styles and other customizations to the `MyProgress` component to fit your application's design.
+
+## Accessibility
+
+If a visual label is used, the ID of the label element should be pass via the `aria-labelledby` prop to `Progress.Root`. If no visual label is used, the `aria-label` prop should be used to provide a text description of the progress bar.
+
+## API Reference
+
+### Progress.Root
+
+The progress bar component.
+
+| Property                                                             | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max` | `number`                                                                                                                                                                                                                                       | The maximum value of the progress bar.`Default: 100`                                                                                          |                                      |
+| `min`                              | `number`                                                                                                                                                                                                                                       | The minimum value of the progress bar.`Default: 0`                                                                                            |                                      |
+| `value`                            | `number \| null`                                                                                                                                                                                                                               | The current value of the progress bar. If set to `null` the progress bar will be indeterminate.`Default: 0`                                   |                                      |
+| `ref` $bindable       | `HTMLDivElement`                                                                                                                                                                                                                               | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                         | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                            | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                     | Value                                                                                                                                                                                                            | Description                                   | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-value` | `''`                                                                                                                                                                                            | The current value of the progress bar. |                                      |
+| `data-state`                              | `enum`- 'indeterminate' \| 'determinate' | The current state of the progress bar. |                                      |
+| `data-min`                                | `''`                                                                                                                                                                                            | The minimum value of the progress bar. |                                      |
+| `data-max`                                | `''`                                                                                                                                                                                            | The maximum value of the progress bar. |                                      |
+| `data-indeterminate`                      | `''`                                                                                                                                                                                            | Present when the value is `null`.      |                                      |
+| `data-progress-root`                      | `''`                                                                                                                                                                                            | Present on the root element.           |  |

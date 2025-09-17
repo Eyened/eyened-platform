@@ -98,6 +98,7 @@ class StudyTagLink(Base):
 
     Tag: Mapped["Tag"] = relationship(back_populates="StudyTagLinks")
     Study: Mapped["Study"] = relationship(back_populates="StudyTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
 
 class ImageInstanceTagLink(Base):
     __tablename__ = "ImageInstanceTag"
@@ -114,6 +115,7 @@ class ImageInstanceTagLink(Base):
 
     Tag: Mapped["Tag"] = relationship(back_populates="ImageInstanceTagLinks")
     ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="ImageInstanceTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
 
 class AnnotationTagLink(Base):
     __tablename__ = "AnnotationTag"
@@ -129,6 +131,7 @@ class AnnotationTagLink(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     Tag: Mapped["Tag"] = relationship(back_populates="AnnotationTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
 
 
 class SegmentationTagLink(Base):
@@ -146,6 +149,7 @@ class SegmentationTagLink(Base):
 
     Tag: Mapped["Tag"] = relationship(back_populates="SegmentationTagLinks")
     Segmentation: Mapped["Segmentation"] = relationship(back_populates="SegmentationTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
 
 
 class FormAnnotationTagLink(Base):
@@ -163,3 +167,4 @@ class FormAnnotationTagLink(Base):
 
     Tag: Mapped["Tag"] = relationship(back_populates="FormAnnotationTagLinks")
     FormAnnotation: Mapped["FormAnnotation"] = relationship(back_populates="FormAnnotationTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")

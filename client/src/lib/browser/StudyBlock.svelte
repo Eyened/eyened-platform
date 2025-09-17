@@ -1,10 +1,11 @@
 <script lang="ts">
+    import { StudyObject } from "$lib/data/objects.svelte";
     import extensions from "$lib/extensions";
     import Icon from "$lib/gui/Icon.svelte";
-    import type { components } from "../../types/openapi";
+    import Tagger from "$lib/tags/Tagger.svelte";
+    import type { Study } from "../../types/openapi_types";
     import Eye from "./Eye.svelte";
     import StudyBlockForms from "./StudyBlockForms.svelte";
-    type Study = components['schemas']['StudyGET'];
 
     interface Props {
         study: Study;
@@ -12,6 +13,7 @@
     }
 
     let { study, mode = "full" }: Props = $props();
+    const studyRow = StudyObject.wrap(study);
     let collapse = $state(false);
 
     const age = study.age
@@ -37,13 +39,20 @@
         <div class="date-age m-[0.1em] items-center flex">
             <div class="date text-base">
                 <Icon icon="calendar" />
-                {study.date}
+                {new Date(study.date).toISOString().slice(0, 10)}
             </div>
-            <div class="age m-[0.1em]">({age} years)</div>
+            <div class="age m-[0.1em]">({age ? Math.round(age) : ''} years)</div>
+
+            <Tagger
+                tagType="Study"
+                tags={study.tags ?? []}
+                tag={(id) => studyRow.tag(id)}
+                untag={(id) => studyRow.untag(id)}
+            />
         </div>
     </div>
-    <div class:hidden={collapse} class="eyes flex flex-col">
-        <div>
+    <div class:hidden={collapse} class="flex flex-col">
+        <div class="flex">
             <Eye laterality="R" {study} />
             <Eye laterality="L" {study} />
         </div>

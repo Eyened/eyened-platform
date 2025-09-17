@@ -1,7 +1,6 @@
 import { thumbnailHost } from '$lib/config.js';
 // import type { Instance } from '$lib/datamodel/instance.svelte';
-import type { components } from '../../types/openapi';
-type InstanceGET = components['schemas']['InstanceGET'];
+import type { InstanceGET } from '../../types/openapi_types';
 
 export class DefaultDict<T, Q> extends Map<T, Q> {
     defaultFactory: () => Q;

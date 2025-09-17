@@ -26,9 +26,26 @@ async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user:
     db.add(task); db.commit(); db.refresh(task)
     return DTOConverter.task_to_get(task)
 
+@router.get("/task", response_model=List[TaskGET])
+async def list_tasks(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """List all tasks (no pagination)."""
+    rows = db.execute(
+        select(Task)
+        .options(selectinload(Task.SubTasks))
+        .order_by(Task.TaskID)
+    ).scalars().all()
+    return [DTOConverter.task_to_get(t) for t in rows]
+
 @router.get("/task/{task_id}", response_model=TaskGET)
 async def get_task(task_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
-    task = db.get(Task, task_id)
+    task = db.execute(
+        select(Task)
+        .options(selectinload(Task.SubTasks))
+        .where(Task.TaskID == task_id)
+    ).scalars().first()
     if not task:
         raise HTTPException(404, "Task not found")
     return DTOConverter.task_to_get(task)
@@ -45,6 +62,14 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
     task.TaskDefinitionID = payload.get("task_definition_id", task.TaskDefinitionID)
     task.TaskStateID = payload.get("task_state_id", task.TaskStateID)
     db.commit(); db.refresh(task)
+    
+    # Reload with SubTasks for consistency
+    task = db.execute(
+        select(Task)
+        .options(selectinload(Task.SubTasks))
+        .where(Task.TaskID == task_id)
+    ).scalars().first()
+    
     return DTOConverter.task_to_get(task)
 
 @router.delete("/task/{task_id}", status_code=204)
@@ -56,14 +81,7 @@ async def delete_task(task_id: int, db: Session = Depends(get_db), current_user:
     return Response(status_code=204)
 
 
-@router.get("/task", response_model=List[TaskGET])
-async def list_tasks(
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
-):
-    """List all tasks (no pagination)."""
-    rows = db.execute(select(Task).order_by(Task.TaskID)).scalars().all()
-    return [DTOConverter.task_to_get(t) for t in rows]
+
 
 
 @router.get(

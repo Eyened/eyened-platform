@@ -1,0 +1,94 @@
+import type {
+	FormAnnotationGET,
+	InstanceGET, InstanceMeta,
+	SegmentationGET,
+	SeriesGET, SeriesMeta,
+	StudyGET, StudyMeta,
+	TagGET, TagMeta
+} from '../../types/openapi_types';
+import { api } from '../api/client';
+import type { Repo } from './datamodel.svelte';
+import { DataObject, MetaObject } from './datamodel.svelte';
+
+// GET object classes
+export class InstanceObject extends DataObject<InstanceGET> {
+	async tag(tag_id: number) {
+		await api.POST('/instances/{instance_id}/tags' as any, {
+			params: { path: { instance_id: Number(this.id) } } as any,
+			body: { tag_id } as any
+		});
+	}
+	async untag(tag_id: number) {
+		await api.DELETE('/instances/{instance_id}/tags/{tag_id}' as any, {
+			params: { path: { instance_id: Number(this.id), tag_id } } as any
+		});
+	}
+}
+
+export class StudyObject extends DataObject<StudyGET> {
+	async tag(tag_id: number) {
+		await api.POST('/studies/{study_id}/tags' as any, {
+			params: { path: { study_id: Number(this.id) } } as any,
+			body: { tag_id } as any
+		});
+	}
+	async untag(tag_id: number) {
+		await api.DELETE('/studies/{study_id}/tags/{tag_id}' as any, {
+			params: { path: { study_id: Number(this.id), tag_id } } as any
+		});
+	}
+}
+
+export class SeriesObject extends DataObject<SeriesGET> {}
+
+export class SegmentationObject extends DataObject<SegmentationGET> {}
+
+export class FormAnnotationObject extends DataObject<FormAnnotationGET> {
+	async tag(tag_id: number) {
+		await api.POST('/form-annotations/{annotation_id}/tags' as any, {
+			params: { path: { annotation_id: Number(this.id) } } as any,
+			body: { tag_id } as any
+		});
+	}
+	async untag(tag_id: number) {
+		await api.DELETE('/form-annotations/{annotation_id}/tags/{tag_id}' as any, {
+			params: { path: { annotation_id: Number(this.id), tag_id } } as any
+		});
+	}
+}
+
+export class TagObject extends DataObject<TagGET> {}
+
+// Meta object classes (no Meta repos)
+type SegmentationMeta = Pick<SegmentationGET, 'id'>;
+type FormAnnotationMeta = Pick<FormAnnotationGET, 'id'>;
+
+export class InstanceMetaObject extends MetaObject<InstanceMeta, InstanceGET> {
+	protected get baseEndpoint() { return '/instances'; }
+	constructor(getRepo: Repo<InstanceGET>, meta: InstanceMeta) { super(getRepo, meta); }
+}
+
+export class StudyMetaObject extends MetaObject<StudyMeta, StudyGET> {
+	protected get baseEndpoint() { return '/studies'; }
+	constructor(getRepo: Repo<StudyGET>, meta: StudyMeta) { super(getRepo, meta); }
+}
+
+export class SeriesMetaObject extends MetaObject<SeriesMeta, SeriesGET> {
+	protected get baseEndpoint() { return '/series'; }
+	constructor(getRepo: Repo<SeriesGET>, meta: SeriesMeta) { super(getRepo, meta); }
+}
+
+export class SegmentationMetaObject extends MetaObject<SegmentationMeta, SegmentationGET> {
+	protected get baseEndpoint() { return '/segmentations'; }
+	constructor(getRepo: Repo<SegmentationGET>, meta: SegmentationMeta) { super(getRepo, meta); }
+}
+
+export class FormAnnotationMetaObject extends MetaObject<FormAnnotationMeta, FormAnnotationGET> {
+	protected get baseEndpoint() { return '/form-annotations'; }
+	constructor(getRepo: Repo<FormAnnotationGET>, meta: FormAnnotationMeta) { super(getRepo, meta); }
+}
+
+export class TagMetaObject extends MetaObject<TagMeta, TagGET> {
+	protected get baseEndpoint() { return '/tags'; }
+	constructor(getRepo: Repo<TagGET>, meta: TagMeta) { super(getRepo, meta); }
+}

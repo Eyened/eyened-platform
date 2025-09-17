@@ -201,7 +201,7 @@ class Segmentation(SegmentationBase):
     Creator: Mapped["Creator"] = relationship(back_populates="Segmentations")
     Feature: Mapped["Feature"] = relationship(back_populates="Segmentations")
     SubTask: Mapped["SubTask"] = relationship(back_populates="Segmentations")
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(back_populates="Segmentation")
+    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(back_populates="Segmentation", lazy="selectin")
 
 class FeatureFeatureLink(Base):
     __tablename__ = "CompositeFeature"

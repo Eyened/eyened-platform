@@ -5,6 +5,8 @@ Converts ORM objects (eyened_orm) into Pydantic GET DTOs defined in server/dtos.
 
 from typing import TYPE_CHECKING, Optional, List
 
+from eyened_orm import TaskState
+
 from .dtos_instances import (
     InstanceMeta,
     ProjectGET,
@@ -19,7 +21,7 @@ from .dtos_instances import (
     DeviceMeta,
     ScanMeta,
 )
-from .dtos_aux import CreatorGET, CreatorMetadata, TagGET
+from .dtos_aux import CreatorGET, CreatorMetadata, TagGET, TagMetadata
 from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET, DeviceModelGET
 from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET, SubTaskWithImagesGET
 
@@ -43,6 +45,10 @@ if TYPE_CHECKING:
         TaskState as TaskStateORM,
         Task as TaskORM,
         SubTask as SubTaskORM,
+        StudyTagLink,
+        ImageInstanceTagLink,
+        SegmentationTagLink,
+        FormAnnotationTagLink,
     )
 
 
@@ -71,7 +77,17 @@ class DTOConverter:
         )
 
     @staticmethod
-    def study_to_get(study: "Study", include_series: bool = False) -> StudyGET:
+    def link_to_tag_metadata(link: "StudyTagLink | ImageInstanceTagLink | SegmentationTagLink | FormAnnotationTagLink") -> TagMetadata:
+        """Build TagMetadata from a TagLink using link.Creator and link.DateInserted."""
+        return TagMetadata(
+            id=link.Tag.TagID,
+            name=link.Tag.TagName,
+            tagger=DTOConverter.creator_to_meta(link.Creator),
+            date=link.DateInserted,
+        )
+
+    @staticmethod
+    def study_to_get(study: "Study", include_series: bool = False, with_tag_metadata: bool = False) -> StudyGET:
         """Convert Study ORM object to StudyGET."""
         dto = StudyGET(
             id=study.StudyID,
@@ -79,9 +95,12 @@ class DTOConverter:
             date=study.StudyDate,
             age=study.age_years,
             study_instance_uid=study.StudyInstanceUid,
+            tags=None,
         )
         if include_series:
             dto.series = [DTOConverter.series_to_get(s) for s in (getattr(study, "Series", []) or [])]
+        if with_tag_metadata:
+            dto.tags = DTOConverter._tags_from_study(study)
         return dto
 
     @staticmethod
@@ -97,7 +116,7 @@ class DTOConverter:
         )
 
     @staticmethod
-    def image_instance_to_get(image_instance: "ImageInstance") -> InstanceGET:
+    def image_instance_to_get(image_instance: "ImageInstance", with_tag_metadata: bool = False) -> InstanceGET:
         """Convert ImageInstance ORM object to InstanceGET."""
         device_meta = DeviceMeta(
             manufacturer=(
@@ -131,7 +150,7 @@ class DTOConverter:
         )
         series_meta = SeriesMeta(id=image_instance.Series.SeriesID)
 
-        return InstanceGET(
+        dto = InstanceGET(
             id=image_instance.ImageInstanceID,
             sop_instance_uid=image_instance.SOPInstanceUid or "",
             dataset_identifier=image_instance.DatasetIdentifier,
@@ -161,8 +180,11 @@ class DTOConverter:
             series=series_meta,
             device=device_meta,
             scan=scan_meta,
-            tags=DTOConverter._tags_from_image_instance(image_instance),
+            tags=None,
         )
+        if with_tag_metadata:
+            dto.tags = DTOConverter._tags_from_image_instance(image_instance)
+        return dto
 
     @staticmethod
     def image_instance_to_meta(image_instance: "ImageInstance") -> InstanceMeta:
@@ -188,7 +210,6 @@ class DTOConverter:
             laterality=image_instance.Laterality,  # type: ignore[arg-type]
             anatomic_region=str(image_instance.AnatomicRegion) if image_instance.AnatomicRegion is not None else "",
             device=device_meta,
-            tags=DTOConverter._tags_from_image_instance(image_instance),
         )
 
     # -------------------- Auxiliary entities --------------------
@@ -229,22 +250,28 @@ class DTOConverter:
         )
 
     @staticmethod
-    def _tags_from_form_annotation(annotation: "FormAnnotationORM") -> List[TagGET]:
+    def _tags_from_form_annotation(annotation: "FormAnnotationORM") -> List[TagMetadata]:
         """Extract tags from FormAnnotation using relationship."""
         links = getattr(annotation, "FormAnnotationTagLinks", None) or []
-        return [DTOConverter.tag_to_get(link.Tag) for link in links if getattr(link, "Tag", None)]
+        return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
 
     @staticmethod
-    def _tags_from_image_instance(image_instance: "ImageInstance") -> List[TagGET]:
+    def _tags_from_image_instance(image_instance: "ImageInstance") -> List[TagMetadata]:
         """Extract tags from ImageInstance using relationship."""
         links = getattr(image_instance, "ImageInstanceTagLinks", None) or []
-        return [DTOConverter.tag_to_get(link.Tag) for link in links if getattr(link, "Tag", None)]
+        return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
 
     @staticmethod
-    def _tags_from_segmentation(segmentation: "Segmentation") -> List[TagGET]:
+    def _tags_from_segmentation(segmentation: "Segmentation") -> List[TagMetadata]:
         """Extract tags from Segmentation using relationship."""
         links = getattr(segmentation, "SegmentationTagLinks", None) or []
-        return [DTOConverter.tag_to_get(link.Tag) for link in links if getattr(link, "Tag", None)]
+        return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
+
+    @staticmethod
+    def _tags_from_study(study: "Study") -> List[TagMetadata]:
+        """Extract tags from Study using relationship."""
+        links = getattr(study, "StudyTagLinks", None) or []
+        return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
 
     # -------------------- Feature/Segmentation --------------------
     @staticmethod
@@ -258,9 +285,9 @@ class DTOConverter:
         )
 
     @staticmethod
-    def segmentation_to_get(seg: "Segmentation") -> SegmentationGET:
+    def segmentation_to_get(seg: "Segmentation", with_tag_metadata: bool = False) -> SegmentationGET:
         """Convert Segmentation ORM object to SegmentationGET."""
-        return SegmentationGET(
+        dto = SegmentationGET(
             id=seg.SegmentationID,
             depth=seg.Depth,
             height=seg.Height,
@@ -274,10 +301,13 @@ class DTOConverter:
             data_representation=seg.DataRepresentation,
             feature=DTOConverter.feature_to_get(seg.Feature) if getattr(seg, "Feature", None) else None,  # type: ignore[arg-type]
             creator=DTOConverter.creator_to_meta(seg.Creator) if getattr(seg, "Creator", None) else None,  # type: ignore[arg-type]
-            tags=DTOConverter._tags_from_segmentation(seg),
+            tags=None,
             date_inserted=seg.DateInserted,
             date_modified=seg.DateModified,
         )
+        if with_tag_metadata:
+            dto.tags = DTOConverter._tags_from_segmentation(seg)
+        return dto
 
     # -------------------- Form schema/annotations --------------------
     @staticmethod
@@ -286,7 +316,7 @@ class DTOConverter:
         return FormSchemaGET(id=schema.FormSchemaID, name=schema.SchemaName, schema=schema.Schema)
 
     @staticmethod
-    def form_annotation_to_get(annotation: "FormAnnotationORM") -> FormAnnotationGET:
+    def form_annotation_to_get(annotation: "FormAnnotationORM", with_tag_metadata: bool = False) -> FormAnnotationGET:
         """Convert FormAnnotation ORM object to FormAnnotationGET."""
         if annotation.ImageInstanceID is not None:
             obj_type = "image_instance"
@@ -295,7 +325,7 @@ class DTOConverter:
         else:
             obj_type = "patient"
 
-        return FormAnnotationGET(
+        dto = FormAnnotationGET(
             id=annotation.FormAnnotationID,
             form_schema_id=annotation.FormSchemaID,
             patient_id=annotation.PatientID,
@@ -305,15 +335,14 @@ class DTOConverter:
             sub_task_id=annotation.SubTaskID,
             form_data=annotation.FormData,
             form_annotation_reference_id=annotation.FormAnnotationReferenceID,
-            inactive=annotation.Inactive,
             object_type=obj_type,  # type: ignore[assignment]
-            patient=(DTOConverter.patient_to_get(annotation.Patient) if getattr(annotation, "Patient", None) else None),
-            study=(DTOConverter.study_to_get(annotation.Study) if getattr(annotation, "Study", None) else None),
-            image_instance=(DTOConverter.image_instance_to_get(annotation.ImageInstance) if getattr(annotation, "ImageInstance", None) else None),
-            tags=DTOConverter._tags_from_form_annotation(annotation),
+            tags=None,
             date_inserted=annotation.DateInserted,
             date_modified=annotation.DateModified,
         )
+        if with_tag_metadata:
+            dto.tags = DTOConverter._tags_from_form_annotation(annotation)
+        return dto
 
     # -------------------- Task system --------------------
     @staticmethod
@@ -328,6 +357,10 @@ class DTOConverter:
     @staticmethod
     def task_to_get(task: "TaskORM") -> TaskGET:
         """Convert Task ORM object to TaskGET."""
+        subs = getattr(task, "SubTasks", []) or []
+        num_tasks = len(subs)
+        num_tasks_ready = sum(1 for st in subs if st.TaskState == TaskState.Ready)
+
         return TaskGET(
             id=task.TaskID,
             name=task.TaskName,
@@ -335,6 +368,8 @@ class DTOConverter:
             contact_id=task.ContactID,
             task_definition_id=task.TaskDefinitionID,
             date_inserted=task.DateInserted,
+            num_tasks=num_tasks,
+            num_tasks_ready=num_tasks_ready,
         )
 
     @staticmethod

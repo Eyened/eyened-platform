@@ -499,6 +499,145 @@
         }
       }
     },
+    "/instances/{instance_id}/tags": {
+      "post": {
+        "summary": "Tag Instance",
+        "description": "Attach a Tag to an ImageInstance by tag ID (idempotent).",
+        "operationId": "tag_instance_instances__instance_id__tags_post",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectTagPOST"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/instances/{instance_id}/tags/{tag_id}": {
+      "delete": {
+        "summary": "Untag Instance",
+        "description": "Remove a Tag from an ImageInstance (idempotent).",
+        "operationId": "untag_instance_instances__instance_id__tags__tag_id__delete",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/segmentations": {
       "post": {
         "summary": "Create Segmentation",
@@ -547,7 +686,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentationGET"
+                }
               }
             }
           },
@@ -611,7 +752,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentationGET"
+                }
               }
             }
           },
@@ -730,7 +873,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SegmentationPatch"
+                "$ref": "#/components/schemas/SegmentationPATCH"
               }
             }
           }
@@ -740,7 +883,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentationGET"
+                }
               }
             }
           },
@@ -933,6 +1078,145 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/segmentations/{segmentation_id}/tags": {
+      "post": {
+        "summary": "Tag Segmentation",
+        "description": "Attach a Tag to a Segmentation by tag ID (idempotent).",
+        "operationId": "tag_segmentation_segmentations__segmentation_id__tags_post",
+        "parameters": [
+          {
+            "name": "segmentation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Segmentation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectTagPOST"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/segmentations/{segmentation_id}/tags/{tag_id}": {
+      "delete": {
+        "summary": "Untag Segmentation",
+        "description": "Remove a Tag from a Segmentation (idempotent).",
+        "operationId": "untag_segmentation_segmentations__segmentation_id__tags__tag_id__delete",
+        "parameters": [
+          {
+            "name": "segmentation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Segmentation Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -1605,6 +1889,145 @@
             "schema": {
               "type": "integer",
               "title": "Form Annotation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/form-annotations/{annotation_id}/tags": {
+      "post": {
+        "summary": "Tag Form Annotation",
+        "description": "Attach a Tag to a FormAnnotation by tag ID (idempotent).",
+        "operationId": "tag_form_annotation_form_annotations__annotation_id__tags_post",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Annotation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectTagPOST"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/form-annotations/{annotation_id}/tags/{tag_id}": {
+      "delete": {
+        "summary": "Untag Form Annotation",
+        "description": "Remove a Tag from a FormAnnotation (idempotent).",
+        "operationId": "untag_form_annotation_form_annotations__annotation_id__tags__tag_id__delete",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Annotation Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
             }
           },
           {
@@ -3325,6 +3748,145 @@
           }
         }
       }
+    },
+    "/studies/{study_id}/tags": {
+      "post": {
+        "summary": "Tag Study",
+        "description": "Attach a Tag to a Study by tag ID (idempotent).",
+        "operationId": "tag_study_studies__study_id__tags_post",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectTagPOST"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studies/{study_id}/tags/{tag_id}": {
+      "delete": {
+        "summary": "Untag Study",
+        "description": "Remove a Tag from a Study (idempotent).",
+        "operationId": "untag_study_studies__study_id__tags__tag_id__delete",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3382,6 +3944,28 @@
           "name"
         ],
         "title": "CreatorMetadata"
+      },
+      "DataRepresentation": {
+        "type": "string",
+        "enum": [
+          "Binary",
+          "DualBitMask",
+          "Probability",
+          "MultiLabel",
+          "MultiClass"
+        ],
+        "title": "DataRepresentation"
+      },
+      "Datatype": {
+        "type": "string",
+        "enum": [
+          "R8",
+          "R8UI",
+          "R16UI",
+          "R32UI",
+          "R32F"
+        ],
+        "title": "Datatype"
       },
       "DeviceMeta": {
         "properties": {
@@ -3607,41 +4191,18 @@
             ],
             "title": "Object Type"
           },
-          "patient": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PatientGET"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "study": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StudyGET"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "image_instance": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/InstanceGET"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagGET"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TagMetadata"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Tags"
           },
           "date_inserted": {
@@ -3669,7 +4230,6 @@
           "creator_id",
           "id",
           "object_type",
-          "tags",
           "date_inserted"
         ],
         "title": "FormAnnotationGET"
@@ -4201,10 +4761,17 @@
             "$ref": "#/components/schemas/ScanMeta"
           },
           "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagGET"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TagMetadata"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Tags"
           }
         },
@@ -4229,8 +4796,7 @@
           "study",
           "series",
           "device",
-          "scan",
-          "tags"
+          "scan"
         ],
         "title": "InstanceGET"
       },
@@ -4290,13 +4856,6 @@
           },
           "device": {
             "$ref": "#/components/schemas/DeviceMeta"
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagGET"
-            },
-            "type": "array",
-            "title": "Tags"
           }
         },
         "type": "object",
@@ -4304,8 +4863,7 @@
           "id",
           "thumbnail_path",
           "anatomic_region",
-          "device",
-          "tags"
+          "device"
         ],
         "title": "InstanceMeta"
       },
@@ -4347,45 +4905,18 @@
         ],
         "title": "ModalityType"
       },
-      "PatientGET": {
+      "ObjectTagPOST": {
         "properties": {
-          "id": {
+          "tag_id": {
             "type": "integer",
-            "title": "Id"
-          },
-          "identifier": {
-            "type": "string",
-            "title": "Identifier"
-          },
-          "birth_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Birth Date"
-          },
-          "sex": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SexEnum"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "title": "Tag Id"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "identifier"
+          "tag_id"
         ],
-        "title": "PatientGET"
+        "title": "ObjectTagPOST"
       },
       "PatientMeta": {
         "properties": {
@@ -4482,7 +5013,8 @@
               ">=",
               "<=",
               "==",
-              "!="
+              "!=",
+              "IN"
             ],
             "title": "Operator"
           },
@@ -4500,6 +5032,12 @@
               },
               {
                 "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
@@ -4624,9 +5162,21 @@
         ],
         "title": "SearchResponse"
       },
-      "SegmentationPatch": {
+      "SegmentationGET": {
         "properties": {
-          "ReferenceSegmentationID": {
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "sparse_axis": {
             "anyOf": [
               {
                 "type": "integer"
@@ -4635,9 +5185,51 @@
                 "type": "null"
               }
             ],
-            "title": "Referencesegmentationid"
+            "title": "Sparse Axis"
           },
-          "FeatureID": {
+          "image_projection_matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Projection Matrix"
+          },
+          "scan_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Indices"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "reference_segmentation_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -4646,9 +5238,95 @@
                 "type": "null"
               }
             ],
-            "title": "Featureid"
+            "title": "Reference Segmentation Id"
           },
-          "Threshold": {
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "feature": {
+            "$ref": "#/components/schemas/FeatureGET"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/CreatorMetadata"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TagMetadata"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "date_inserted": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Date Inserted"
+          },
+          "date_modified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Modified"
+          }
+        },
+        "type": "object",
+        "required": [
+          "depth",
+          "height",
+          "width",
+          "data_type",
+          "data_representation",
+          "id",
+          "feature",
+          "creator",
+          "date_inserted"
+        ],
+        "title": "SegmentationGET"
+      },
+      "SegmentationPATCH": {
+        "properties": {
+          "reference_segmentation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Segmentation Id"
+          },
+          "feature_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Id"
+          },
+          "threshold": {
             "anyOf": [
               {
                 "type": "number"
@@ -4660,9 +5338,8 @@
             "title": "Threshold"
           }
         },
-        "additionalProperties": false,
         "type": "object",
-        "title": "SegmentationPatch"
+        "title": "SegmentationPATCH"
       },
       "SeriesGET": {
         "properties": {
@@ -4723,14 +5400,6 @@
         ],
         "title": "SeriesMeta"
       },
-      "SexEnum": {
-        "type": "string",
-        "enum": [
-          "M",
-          "F"
-        ],
-        "title": "SexEnum"
-      },
       "SignatureField": {
         "properties": {
           "name": {
@@ -4739,9 +5408,6 @@
           },
           "values": {
             "anyOf": [
-              {
-                "type": "integer"
-              },
               {
                 "type": "string"
               },
@@ -4820,6 +5486,20 @@
               }
             ],
             "title": "Series"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TagMetadata"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
           }
         },
         "type": "object",
@@ -4875,11 +5555,36 @@
               ">=",
               "<=",
               "==",
-              "!="
+              "!=",
+              "IN"
             ],
             "title": "Operator"
           },
           "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Value"
           }
         },
@@ -5197,6 +5902,34 @@
         ],
         "title": "TagGET"
       },
+      "TagMetadata": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tagger": {
+            "$ref": "#/components/schemas/CreatorMetadata"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "tagger",
+          "date"
+        ],
+        "title": "TagMetadata"
+      },
       "TagPATCH": {
         "properties": {
           "name": {
@@ -5293,6 +6026,14 @@
             "type": "string",
             "format": "date-time",
             "title": "Date Inserted"
+          },
+          "num_tasks": {
+            "type": "integer",
+            "title": "Num Tasks"
+          },
+          "num_tasks_ready": {
+            "type": "integer",
+            "title": "Num Tasks Ready"
           }
         },
         "type": "object",
@@ -5300,7 +6041,9 @@
           "name",
           "task_definition_id",
           "id",
-          "date_inserted"
+          "date_inserted",
+          "num_tasks",
+          "num_tasks_ready"
         ],
         "title": "TaskGET"
       },

@@ -1,26 +1,23 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import type { components } from '../../types/openapi';
+import type { InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
 import { getInstancesSignature, getStudiesSignature, InstanceMetasLocalRepo, InstancesRepo, searchStudies, StudiesLocalRepo } from '../data/repos.svelte';
 
 export type QueryMode = 'studies' | 'instances';
-export type DisplayMode = 'instance' | 'partialStudy' | 'fullStudy';
+export type DisplayMode = 'instance' | 'study';
 export type FilterMode = 'basic' | 'advanced';
 
-type Instance = components['schemas']['InstanceGET'];
-export type Study = components['schemas']['StudyGET'];
-export type InstanceMeta = components['schemas']['InstanceMeta'];
-export type Condition = components['schemas']['SearchCondition'];
-export type SignatureField = components['schemas']['SignatureField'];
-export type InstancesSortBy = components['schemas']['SearchQuery']['order_by'];
-export type StudiesSortBy = components['schemas']['StudySearchQuery']['order_by'];
+export type Condition = SearchConditionT;
+export type SignatureField = SignatureFieldT;
+export type InstancesSortBy = SearchQuery['order_by'];
+export type StudiesSortBy = StudySearchQuery['order_by'];
 export type SortDirection = 'ASC' | 'DESC';
 
 
 export class BrowserContext {
 	selection: number[] = $state([]);
 	queryMode: QueryMode = $state('studies');
-	displayMode: DisplayMode = $state('fullStudy');
+	displayMode: DisplayMode = $state('study');
 	loading: boolean = $state(false);
 	filterMode: FilterMode = $state('basic');
 
@@ -94,7 +91,7 @@ export class BrowserContext {
 		this.basicCondition = conds?.length === 1 ? conds[0] : this.basicCondition;
 	}
 
-	toggleInstance(instance: Instance) {
+	toggleInstance(instance: InstanceMeta) {
         if (this.selection.includes(instance.id)) {
             this.selection.splice(this.selection.indexOf(instance.id), 1);
         } else {
@@ -130,7 +127,7 @@ export class BrowserContext {
 			let count = 0;
 
 			if (this.queryMode === 'instances') {
-				const body: components['schemas']['SearchQuery'] = {
+				const body: SearchQuery = {
 					conditions: query,
 					limit,
 					page,
@@ -149,8 +146,8 @@ export class BrowserContext {
 				this.count = count;
 				return res;
 			} else {
-				const body: components['schemas']['StudySearchQuery'] = {
-					conditions: query as unknown as components['schemas']['StudySearchCondition'][],
+				const body: StudySearchQuery = {
+					conditions: query as unknown as StudySearchCondition[],
 					limit,
 					page,
 					order_by: this.sortBy,

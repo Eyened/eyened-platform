@@ -20,6 +20,9 @@ AnnotationTypeInterpretation = Literal[
 AnatomicRegion = str  # Based on database field
 VesselType = Literal["Artery", "Vein", "Vessel"]
 
+class ObjectTagPOST(BaseModel):
+    tag_id: int
+
 # Utility DTOs
 class Position2D(BaseModel):
     x: float
@@ -99,4 +102,8 @@ class TagGET(TagBase):
     date_inserted: datetime
 
 
-
+class TagMetadata(BaseModel):
+    id: int
+    name: str
+    tagger: CreatorMetadata
+    date: datetime
