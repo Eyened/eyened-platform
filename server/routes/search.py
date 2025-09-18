@@ -436,14 +436,14 @@ async def create_form_annotation(
         studies.sort(key=lambda s: s_order[s.StudyID])
 
         # include series + full instance_ids as-is (no filtering)
-        studies_dtos = [DTOConverter.study_to_get(s, include_series=True) for s in studies]
+        studies_dtos = [DTOConverter.study_to_get(s, include_series=True, with_tag_metadata=True) for s in studies]
 
     count = None
     if params.get("include_count"):
         count = db.execute(select(func.count()).select_from(base_ids.subquery())).scalar_one()
 
     return {
-        "instances": [DTOConverter.image_instance_to_get(i) for i in instances],
+        "instances": [DTOConverter.image_instance_to_get(i, with_tag_metadata=True) for i in instances],
         "studies": studies_dtos,
         "limit": limit,
         "page": page,
@@ -508,8 +508,8 @@ async def search_studies(
     studies.sort(key=lambda s: order[s.StudyID])
 
     return {
-        "studies": [DTOConverter.study_to_get(s, include_series=True) for s in studies],
-        "instances": [DTOConverter.image_instance_to_get(i) for i in instances],
+        "studies": [DTOConverter.study_to_get(s, include_series=True, with_tag_metadata=True) for s in studies],
+        "instances": [DTOConverter.image_instance_to_get(i, with_tag_metadata=True) for i in instances],
         "limit": limit,
         "page": page,
         "count": count,

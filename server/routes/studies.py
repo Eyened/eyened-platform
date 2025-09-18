@@ -4,12 +4,13 @@ from eyened_orm import Study, Tag, StudyTagLink
 from eyened_orm.Tag import TagType
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
-from ..dtos.dtos_aux import ObjectTagPOST
+from ..dtos.dto_converter import DTOConverter
+from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
 router = APIRouter()
 
-@router.post("/studies/{study_id}/tags", status_code=204)
-async def tag_study(study_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+@router.post("/studies/{study_id}/tags", response_model=TagMeta)
+async def tag_study(study_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
     """Attach a Tag to a Study by tag ID (idempotent)."""
     study = db.get(Study, study_id)
     if not study:
@@ -19,10 +20,14 @@ async def tag_study(study_id: int, body: ObjectTagPOST, db: Session = Depends(ge
         raise HTTPException(404, "Tag not found")
     if tag.TagType != TagType.Study:
         raise HTTPException(400, "Tag type must be Study")
-    if not db.get(StudyTagLink, {"TagID": tag.TagID, "StudyID": study_id}):
-        db.add(StudyTagLink(TagID=tag.TagID, StudyID=study_id, CreatorID=current_user.id))
-        db.commit()
-    return Response(status_code=204)
+
+    link = db.get(StudyTagLink, {"TagID": tag.TagID, "StudyID": study_id})
+    if not link:
+        link = StudyTagLink(TagID=tag.TagID, StudyID=study_id, CreatorID=current_user.id)
+        db.add(link); db.commit(); db.refresh(link)
+        link.Tag = tag
+
+    return DTOConverter.link_to_tag_metadata(link)
 
 @router.delete("/studies/{study_id}/tags/{tag_id}", status_code=204)
 async def untag_study(study_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):

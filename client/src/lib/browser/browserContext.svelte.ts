@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import type { InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
-import { getInstancesSignature, getStudiesSignature, InstanceMetasLocalRepo, InstancesRepo, searchStudies, StudiesLocalRepo } from '../data/repos.svelte';
+import { getInstancesSignature, getStudiesSignature, InstancesRepo, searchStudies, StudiesRepo } from '../data/repos.svelte';
 
 export type QueryMode = 'studies' | 'instances';
 export type DisplayMode = 'instance' | 'study';
@@ -39,9 +39,9 @@ export class BrowserContext {
 	instancesSignature: SignatureField[] = $state([]);
 	studiesSignature: SignatureField[] = $state([]);
 
-	StudiesRepo = new StudiesLocalRepo('studies');
+	StudiesRepo = new StudiesRepo('studies');
 
-	InstanceRepo = new InstanceMetasLocalRepo('instance-metas');
+	InstanceRepo = new InstancesRepo('instances');
 
 	thumbnailSize: number = $state(6);
 
@@ -139,7 +139,7 @@ export class BrowserContext {
 
 				const res = await InstancesRepo.search(body);
 				this.StudiesRepo.ingest(res.studies ?? []);
-				this.InstanceRepo.ingest(res.instances ?? []);
+				this.InstanceRepo.ingest(res.instances as any[] ?? []);
 				result_ids = res.result_ids ?? [];
 				count = res.count ?? 0;
 				this.resultIds = new Set(result_ids);
@@ -157,7 +157,7 @@ export class BrowserContext {
 
 				const res = await searchStudies(body);
 				this.StudiesRepo.ingest(res.studies ?? []);
-				this.InstanceRepo.ingest(res.instances ?? []);
+				this.InstanceRepo.ingest(res.instances as any[] ?? []);
 				result_ids = res.result_ids ?? [];
 				count = res.count ?? 0;
 				this.resultIds = new Set(result_ids);
@@ -178,8 +178,10 @@ export class BrowserContext {
 }
 
 // Encoding helpers for URL round-trip
-function encodeValue(value: string | number | null): string {
-	return value === null || value === undefined ? '' : value.toString();
+function encodeValue(value: string | number | string[] | null): string {
+	if (value === null || value === undefined) return '';
+	if (Array.isArray(value)) return value.map(v => encodeURIComponent(String(v))).join(',');
+	return value.toString();
 }
 
 function decodeValue(value: string): string | number | null {

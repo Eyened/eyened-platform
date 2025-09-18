@@ -21,7 +21,7 @@ from .dtos_instances import (
     DeviceMeta,
     ScanMeta,
 )
-from .dtos_aux import CreatorGET, CreatorMetadata, TagGET, TagMetadata
+from .dtos_aux import CreatorGET, CreatorMetadata, TagGET, TagMeta
 from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET, DeviceModelGET
 from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET, SubTaskWithImagesGET
 
@@ -77,9 +77,9 @@ class DTOConverter:
         )
 
     @staticmethod
-    def link_to_tag_metadata(link: "StudyTagLink | ImageInstanceTagLink | SegmentationTagLink | FormAnnotationTagLink") -> TagMetadata:
+    def link_to_tag_metadata(link: "StudyTagLink | ImageInstanceTagLink | SegmentationTagLink | FormAnnotationTagLink") -> TagMeta:
         """Build TagMetadata from a TagLink using link.Creator and link.DateInserted."""
-        return TagMetadata(
+        return TagMeta(
             id=link.Tag.TagID,
             name=link.Tag.TagName,
             tagger=DTOConverter.creator_to_meta(link.Creator),
@@ -95,7 +95,7 @@ class DTOConverter:
             date=study.StudyDate,
             age=study.age_years,
             study_instance_uid=study.StudyInstanceUid,
-            tags=None,
+            tags=[],
         )
         if include_series:
             dto.series = [DTOConverter.series_to_get(s) for s in (getattr(study, "Series", []) or [])]
@@ -180,7 +180,7 @@ class DTOConverter:
             series=series_meta,
             device=device_meta,
             scan=scan_meta,
-            tags=None,
+            tags=[],
         )
         if with_tag_metadata:
             dto.tags = DTOConverter._tags_from_image_instance(image_instance)
@@ -250,25 +250,25 @@ class DTOConverter:
         )
 
     @staticmethod
-    def _tags_from_form_annotation(annotation: "FormAnnotationORM") -> List[TagMetadata]:
+    def _tags_from_form_annotation(annotation: "FormAnnotationORM") -> List[TagMeta]:
         """Extract tags from FormAnnotation using relationship."""
         links = getattr(annotation, "FormAnnotationTagLinks", None) or []
         return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
 
     @staticmethod
-    def _tags_from_image_instance(image_instance: "ImageInstance") -> List[TagMetadata]:
+    def _tags_from_image_instance(image_instance: "ImageInstance") -> List[TagMeta]:
         """Extract tags from ImageInstance using relationship."""
         links = getattr(image_instance, "ImageInstanceTagLinks", None) or []
         return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
 
     @staticmethod
-    def _tags_from_segmentation(segmentation: "Segmentation") -> List[TagMetadata]:
+    def _tags_from_segmentation(segmentation: "Segmentation") -> List[TagMeta]:
         """Extract tags from Segmentation using relationship."""
         links = getattr(segmentation, "SegmentationTagLinks", None) or []
         return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
 
     @staticmethod
-    def _tags_from_study(study: "Study") -> List[TagMetadata]:
+    def _tags_from_study(study: "Study") -> List[TagMeta]:
         """Extract tags from Study using relationship."""
         links = getattr(study, "StudyTagLinks", None) or []
         return [DTOConverter.link_to_tag_metadata(link) for link in links if getattr(link, "Tag", None) and getattr(link, "Creator", None)]
@@ -301,7 +301,7 @@ class DTOConverter:
             data_representation=seg.DataRepresentation,
             feature=DTOConverter.feature_to_get(seg.Feature) if getattr(seg, "Feature", None) else None,  # type: ignore[arg-type]
             creator=DTOConverter.creator_to_meta(seg.Creator) if getattr(seg, "Creator", None) else None,  # type: ignore[arg-type]
-            tags=None,
+            tags=[],
             date_inserted=seg.DateInserted,
             date_modified=seg.DateModified,
         )
@@ -336,7 +336,7 @@ class DTOConverter:
             form_data=annotation.FormData,
             form_annotation_reference_id=annotation.FormAnnotationReferenceID,
             object_type=obj_type,  # type: ignore[assignment]
-            tags=None,
+            tags=[],
             date_inserted=annotation.DateInserted,
             date_modified=annotation.DateModified,
         )

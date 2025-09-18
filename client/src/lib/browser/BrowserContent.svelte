@@ -9,6 +9,7 @@
 	// export let renderMode: 'studies' | 'instances' = 'studies';
 	let { mode = 'full' }: { mode?: 'full' | 'overlay' } = $props();
 
+	
 
 </script>
 
@@ -26,7 +27,7 @@
 	{:else}
 		{#if StudiesRepo.all.length > 0}
 			{#each StudiesRepo.all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) as study (study)}
-				<StudyBlock {study} {mode} />
+				<StudyBlock study={StudiesRepo.object(study.id)} {mode} />
 			{/each}
 		{:else}
 			<div class="flex flex-col flex-1">No results</div>
@@ -35,7 +36,7 @@
 {:else if queryMode == "studies"}
 	{#if StudiesRepo.all.length > 0}
 		{#each StudiesRepo.all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) as study (study)}
-			<StudyBlock {study} {mode} />
+			<StudyBlock study={StudiesRepo.object(study.id)} {mode} />
 		{/each}
 	{:else}
 		<div class="flex flex-col flex-1">No results</div>

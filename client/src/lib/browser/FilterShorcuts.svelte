@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SelectWithSearch from '$lib/components/SelectWithSearch.svelte';
 	import * as Input from '$lib/components/ui/input';
-	import { getContext } from 'svelte';
+	import { getContext, onMount, tick } from 'svelte';
 	import DatePicker from '../components/DatePicker.svelte';
 	import { BrowserContext, type Condition } from './browserContext.svelte';
 
@@ -15,6 +15,20 @@
 	let projectName = $state('');
 
 	function setCondition(c: Condition | null) { condition = c; }
+
+	// NEW: ref and key handler
+	let patientInputRef: HTMLInputElement | null = null;
+	function onPatientIdentifierKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			browserContext.search();
+		}
+	}
+
+	// Focus on page load
+	onMount(async () => {
+		await tick();
+		patientInputRef?.focus();
+	});
 
 	// Mutually exclusive setters
 	$effect(() => {
@@ -54,7 +68,7 @@
 	<div class="w-full grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 items-center">
 		<!-- No submit buttons; inputs only set the bindable condition -->
 		<label>Patient Identifier:</label>
-		<Input.Input bind:value={patientIdentifier} placeholder="Patient Identifier"/>
+		<Input.Input bind:value={patientIdentifier} placeholder="Patient Identifier" bind:ref={patientInputRef} on:keydown={onPatientIdentifierKeydown} />
 
 		<label>Study Date:</label>
 		<DatePicker bind:value={studyDate} />

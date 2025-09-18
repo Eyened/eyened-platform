@@ -3,20 +3,18 @@
     import extensions from "$lib/extensions";
     import Icon from "$lib/gui/Icon.svelte";
     import Tagger from "$lib/tags/Tagger.svelte";
-    import type { Study } from "../../types/openapi_types";
     import Eye from "./Eye.svelte";
     import StudyBlockForms from "./StudyBlockForms.svelte";
 
     interface Props {
-        study: Study;
+        study: StudyObject;
         mode?: "full" | "overlay";
     }
 
     let { study, mode = "full" }: Props = $props();
-    const studyRow = StudyObject.wrap(study);
     let collapse = $state(false);
 
-    const age = study.age
+    const age = study.$?.age
 
     // const context = {
     //     study,
@@ -39,15 +37,15 @@
         <div class="date-age m-[0.1em] items-center flex">
             <div class="date text-base">
                 <Icon icon="calendar" />
-                {new Date(study.date).toISOString().slice(0, 10)}
+                {new Date(study.$?.date).toISOString().slice(0, 10)}
             </div>
             <div class="age m-[0.1em]">({age ? Math.round(age) : ''} years)</div>
 
             <Tagger
                 tagType="Study"
-                tags={study.tags ?? []}
-                tag={(id) => studyRow.tag(id)}
-                untag={(id) => studyRow.untag(id)}
+                tags={study.$.tags ?? []}
+                tag={(id) => study.tag(id)}
+                untag={(id) => study.untag(id)}
             />
         </div>
     </div>
