@@ -553,8 +553,15 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagMeta"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1146,8 +1153,15 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagMeta"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1990,8 +2004,15 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagMeta"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -3803,8 +3824,15 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagMeta"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4192,17 +4220,10 @@
             "title": "Object Type"
           },
           "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TagMetadata"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/TagMeta"
+            },
+            "type": "array",
             "title": "Tags"
           },
           "date_inserted": {
@@ -4230,6 +4251,7 @@
           "creator_id",
           "id",
           "object_type",
+          "tags",
           "date_inserted"
         ],
         "title": "FormAnnotationGET"
@@ -4761,17 +4783,10 @@
             "$ref": "#/components/schemas/ScanMeta"
           },
           "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TagMetadata"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/TagMeta"
+            },
+            "type": "array",
             "title": "Tags"
           }
         },
@@ -4796,7 +4811,8 @@
           "study",
           "series",
           "device",
-          "scan"
+          "scan",
+          "tags"
         ],
         "title": "InstanceGET"
       },
@@ -5257,17 +5273,10 @@
             "$ref": "#/components/schemas/CreatorMetadata"
           },
           "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TagMetadata"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/TagMeta"
+            },
+            "type": "array",
             "title": "Tags"
           },
           "date_inserted": {
@@ -5298,6 +5307,7 @@
           "id",
           "feature",
           "creator",
+          "tags",
           "date_inserted"
         ],
         "title": "SegmentationGET"
@@ -5488,24 +5498,18 @@
             "title": "Series"
           },
           "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TagMetadata"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/TagMeta"
+            },
+            "type": "array",
             "title": "Tags"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "date"
+          "date",
+          "tags"
         ],
         "title": "StudyGET"
       },
@@ -5902,7 +5906,7 @@
         ],
         "title": "TagGET"
       },
-      "TagMetadata": {
+      "TagMeta": {
         "properties": {
           "id": {
             "type": "integer",
@@ -5928,7 +5932,7 @@
           "tagger",
           "date"
         ],
-        "title": "TagMetadata"
+        "title": "TagMeta"
       },
       "TagPATCH": {
         "properties": {

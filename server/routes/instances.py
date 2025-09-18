@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_instances import InstanceGET
-from ..dtos.dtos_aux import ObjectTagPOST
+from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
@@ -55,8 +55,8 @@ async def get_thumb(
     return response
 
 
-@router.post("/instances/{instance_id}/tags", status_code=204)
-async def tag_instance(instance_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+@router.post("/instances/{instance_id}/tags", response_model=TagMeta)
+async def tag_instance(instance_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
     """Attach a Tag to an ImageInstance by tag ID (idempotent)."""
     instance = db.get(ImageInstance, instance_id)
     if not instance:
@@ -66,10 +66,14 @@ async def tag_instance(instance_id: int, body: ObjectTagPOST, db: Session = Depe
         raise HTTPException(404, "Tag not found")
     if tag.TagType != TagType.ImageInstance:
         raise HTTPException(400, "Tag type must be ImageInstance")
-    if not db.get(ImageInstanceTagLink, {"TagID": tag.TagID, "ImageInstanceID": instance_id}):
-        db.add(ImageInstanceTagLink(TagID=tag.TagID, ImageInstanceID=instance_id, CreatorID=current_user.id))
-        db.commit()
-    return Response(status_code=204)
+
+    link = db.get(ImageInstanceTagLink, {"TagID": tag.TagID, "ImageInstanceID": instance_id})
+    if not link:
+        link = ImageInstanceTagLink(TagID=tag.TagID, ImageInstanceID=instance_id, CreatorID=current_user.id)
+        db.add(link); db.commit(); db.refresh(link)
+        link.Tag = tag  # optional: avoid Tag lazy-load
+
+    return DTOConverter.link_to_tag_metadata(link)
 
 @router.delete("/instances/{instance_id}/tags/{tag_id}", status_code=204)
 async def untag_instance(instance_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):

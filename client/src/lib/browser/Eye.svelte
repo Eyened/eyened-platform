@@ -1,11 +1,11 @@
 <script lang="ts">
     import { getContext } from "svelte";
-    import type { Study } from "../../types/openapi_types";
+    import type { StudyObject } from "../data/objects.svelte";
     import type { BrowserContext } from "./browserContext.svelte";
     import SeriesComponent from "./SeriesComponent.svelte";
 
     interface Props {
-        study: Study;
+        study: StudyObject;
         laterality: "L" | "R" | null;
     }
 
@@ -15,7 +15,7 @@
 
     const browserContext = getContext<BrowserContext>("browserContext");
 
-    const eyeSeries = study.series!.filter((series) => series.laterality == laterality);
+    const eyeSeries = study.$.series!.filter((series) => series.laterality == laterality);
 
     function open() {
         const numbers = eyeSeries
@@ -27,7 +27,7 @@
     }
 </script>
 
-{#if study.series!.length}
+{#if study.$.series!.length}
     <div class="outer flex flex-1 flex-col p-2">
         <h3 class="m-0 text-base flex items-center gap-4">
             {eye}

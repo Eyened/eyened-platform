@@ -11,7 +11,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from eyened_orm.Segmentation import DataRepresentation, Datatype
-from .dtos_aux import CreatorGET, CreatorMetadata, TagMetadata
+from .dtos_aux import CreatorGET, CreatorMetadata, TagMeta
 from .dtos_instances import InstanceGET, PatientGET, StudyGET
 from pydantic import BaseModel
 
@@ -72,7 +72,7 @@ class SegmentationGET(SegmentationBase):
    
     feature: FeatureGET
     creator: CreatorMetadata
-    tags: Optional[List[TagMetadata]] = None
+    tags: List[TagMeta]
 
     date_inserted: datetime
     date_modified: Optional[datetime] = None
@@ -117,7 +117,7 @@ class FormAnnotationGET(FormAnnotationBase):
     id: int
 
     object_type: Literal['patient', 'study', 'image_instance']
-    tags: Optional[List[TagMetadata]] = None
+    tags: List[TagMeta]
 
     date_inserted: datetime
     date_modified: Optional[datetime] = None

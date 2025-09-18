@@ -11,7 +11,7 @@ from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import FormAnnotationPUT, FormAnnotationGET
 from ..dtos.dto_converter import DTOConverter
-from ..dtos.dtos_aux import ObjectTagPOST
+from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
 router = APIRouter()
 
@@ -173,8 +173,8 @@ async def update_form_annotation_value(
     return Response(status_code=204)
 
 
-@router.post("/form-annotations/{annotation_id}/tags", status_code=204)
-async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+@router.post("/form-annotations/{annotation_id}/tags", response_model=TagMeta)
+async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
     """Attach a Tag to a FormAnnotation by tag ID (idempotent)."""
     ann = db.get(FormAnnotation, annotation_id)
     if not ann:
@@ -184,10 +184,14 @@ async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Sessi
         raise HTTPException(404, "Tag not found")
     if tag.TagType != TagType.FormAnnotation:
         raise HTTPException(400, "Tag type must be FormAnnotation")
-    if not db.get(FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id}):
-        db.add(FormAnnotationTagLink(TagID=tag.TagID, FormAnnotationID=annotation_id, CreatorID=current_user.id))
-        db.commit()
-    return Response(status_code=204)
+
+    link = db.get(FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id})
+    if not link:
+        link = FormAnnotationTagLink(TagID=tag.TagID, FormAnnotationID=annotation_id, CreatorID=current_user.id)
+        db.add(link); db.commit(); db.refresh(link)
+        link.Tag = tag
+
+    return DTOConverter.link_to_tag_metadata(link)
 
 @router.delete("/form-annotations/{annotation_id}/tags/{tag_id}", status_code=204)
 async def untag_form_annotation(annotation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):

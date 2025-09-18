@@ -102,7 +102,7 @@ class TagGET(TagBase):
     date_inserted: datetime
 
 
-class TagMetadata(BaseModel):
+class TagMeta(BaseModel):
     id: int
     name: str
     tagger: CreatorMetadata

@@ -31,7 +31,7 @@ from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import SegmentationGET, SegmentationPOST, SegmentationPATCH
 from ..dtos.dto_converter import DTOConverter
-from ..dtos.dtos_aux import ObjectTagPOST
+from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
 router = APIRouter()
 
@@ -343,8 +343,8 @@ else:
 """
 
 
-@router.post("/segmentations/{segmentation_id}/tags", status_code=204)
-async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+@router.post("/segmentations/{segmentation_id}/tags", response_model=TagMeta)
+async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
     """Attach a Tag to a Segmentation by tag ID (idempotent)."""
     seg = db.get(Segmentation, segmentation_id)
     if not seg:
@@ -354,10 +354,14 @@ async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Sessio
         raise HTTPException(404, "Tag not found")
     if tag.TagType != TagType.Segmentation:
         raise HTTPException(400, "Tag type must be Segmentation")
-    if not db.get(SegmentationTagLink, {"TagID": tag.TagID, "SegmentationID": segmentation_id}):
-        db.add(SegmentationTagLink(TagID=tag.TagID, SegmentationID=segmentation_id, CreatorID=current_user.id))
-        db.commit()
-    return Response(status_code=204)
+
+    link = db.get(SegmentationTagLink, {"TagID": tag.TagID, "SegmentationID": segmentation_id})
+    if not link:
+        link = SegmentationTagLink(TagID=tag.TagID, SegmentationID=segmentation_id, CreatorID=current_user.id)
+        db.add(link); db.commit(); db.refresh(link)
+        link.Tag = tag
+
+    return DTOConverter.link_to_tag_metadata(link)
 
 @router.delete("/segmentations/{segmentation_id}/tags/{tag_id}", status_code=204)
 async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):

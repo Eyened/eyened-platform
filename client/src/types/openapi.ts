@@ -919,7 +919,7 @@ export interface components {
              */
             object_type: "patient" | "study" | "image_instance";
             /** Tags */
-            tags?: components["schemas"]["TagMetadata"][] | null;
+            tags: components["schemas"]["TagMeta"][];
             /**
              * Date Inserted
              * Format: date-time
@@ -1142,7 +1142,7 @@ export interface components {
             device: components["schemas"]["DeviceMeta"];
             scan: components["schemas"]["ScanMeta"];
             /** Tags */
-            tags?: components["schemas"]["TagMetadata"][] | null;
+            tags: components["schemas"]["TagMeta"][];
         };
         /** InstanceMeta */
         InstanceMeta: {
@@ -1287,7 +1287,7 @@ export interface components {
             feature: components["schemas"]["FeatureGET"];
             creator: components["schemas"]["CreatorMetadata"];
             /** Tags */
-            tags?: components["schemas"]["TagMetadata"][] | null;
+            tags: components["schemas"]["TagMeta"][];
             /**
              * Date Inserted
              * Format: date-time
@@ -1350,7 +1350,7 @@ export interface components {
             /** Series */
             series?: components["schemas"]["SeriesGET"][] | null;
             /** Tags */
-            tags?: components["schemas"]["TagMetadata"][] | null;
+            tags: components["schemas"]["TagMeta"][];
         };
         /** StudyMeta */
         StudyMeta: {
@@ -1498,8 +1498,8 @@ export interface components {
              */
             date_inserted: string;
         };
-        /** TagMetadata */
-        TagMetadata: {
+        /** TagMeta */
+        TagMeta: {
             /** Id */
             id: number;
             /** Name */
@@ -2018,11 +2018,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TagMeta"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -2317,11 +2319,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TagMeta"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -2754,11 +2758,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TagMeta"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -3733,11 +3739,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TagMeta"];
+                };
             };
             /** @description Validation Error */
             422: {

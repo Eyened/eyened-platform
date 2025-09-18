@@ -4,7 +4,8 @@ import type {
 	FeaturePATCH,
 	FeaturePUT,
 	FormAnnotationGET, FormAnnotationPUT,
-	InstanceGET, InstanceMeta, SearchQuery, SearchResponse,
+	InstanceGET,
+	SearchQuery, SearchResponse,
 	SegmentationGET, SegmentationPATCH,
 	SeriesGET,
 	StudyGET,
@@ -14,16 +15,23 @@ import type {
 } from '../../types/openapi_types';
 import { api } from '../api/client';
 import { Repo } from './datamodel.svelte';
+import { FormAnnotationObject, InstanceObject, SegmentationObject, SeriesObject, StudyObject, TagObject, TaskObject } from './objects.svelte';
 
 // Type aliases for backward compatibility
 export type Tag = TagGET;
 
-export class TasksRepo extends Repo<FeatureGET, FeaturePUT, FeaturePATCH> {
-	protected get basePath() { return '/task'; }
+export class TasksRepo extends Repo<FeatureGET, FeaturePUT, FeaturePATCH, unknown, TaskObject> {
+	public static path = '/task';
+	protected createDataObject(obj: FeatureGET): TaskObject { return new TaskObject(obj, this); }
 }
 
-export class TagsRepo extends Repo<TagGET, TagPUT, TagPATCH> {
-	protected get basePath() { return '/tags'; }
+export class TagsRepo extends Repo<TagGET, TagPUT, TagPATCH, unknown, TagObject> {
+	public static path = '/tags';
+	protected createDataObject(obj: TagGET): TagObject { return new TagObject(obj, this); }
+
+	public studyTags = $derived(this.all.filter(t => t.tag_type === 'Study'));
+	public imageInstanceTags = $derived(this.all.filter(t => t.tag_type === 'ImageInstance'));
+	public formAnnotationTags = $derived(this.all.filter(t => t.tag_type === 'Annotation'));
 
 	async star(tag_id: number) {
 		try {
@@ -42,26 +50,30 @@ export class TagsRepo extends Repo<TagGET, TagPUT, TagPATCH> {
 	}
 }
 
-export class InstancesRepo extends Repo<InstanceGET, never, never> {
-	protected get basePath() { return '/instances'; }
+export class InstancesRepo extends Repo<InstanceGET, never, never, unknown, InstanceObject> {
+	public static path = '/instances';
+	protected createDataObject(obj: InstanceGET): InstanceObject { return new InstanceObject(obj, this); }
 
-	async search(query: SearchQuery): Promise<SearchResponse> {
+	static async search(query: SearchQuery): Promise<SearchResponse> {
 		const res = await api.POST('/instances/search', { body: query });
 		if (!res.data) throw new Error('No data');
 		return res.data as SearchResponse;
 	}
 }
 
-export class StudiesRepo extends Repo<StudyGET, never, never> {
-	protected get basePath() { return '/studies'; }
+export class StudiesRepo extends Repo<StudyGET, never, never, unknown, StudyObject> {
+	public static path = '/studies';
+	protected createDataObject(obj: StudyGET): StudyObject { return new StudyObject(obj, this); }
 }
 
-export class SeriesRepo extends Repo<SeriesGET, never, never> {
-	protected get basePath() { return '/series'; }
+export class SeriesRepo extends Repo<SeriesGET, never, never, unknown, SeriesObject> {
+	public static path = '/series';
+	protected createDataObject(obj: SeriesGET): SeriesObject { return new SeriesObject(obj, this); }
 }
 
-export class SegmentationsRepo extends Repo<SegmentationGET, {}, SegmentationPATCH> {
-	protected get basePath() { return '/segmentations'; }
+export class SegmentationsRepo extends Repo<SegmentationGET, {}, SegmentationPATCH, unknown, SegmentationObject> {
+	public static path = '/segmentations';
+	protected createDataObject(obj: SegmentationGET): SegmentationObject { return new SegmentationObject(obj, this); }
 
 	async getData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }) {
 		const res = await api.GET('/segmentations/{segmentation_id}/data', {
@@ -87,8 +99,9 @@ export class SegmentationsRepo extends Repo<SegmentationGET, {}, SegmentationPAT
 
 export type FormAnnotationsListParams = { patient_id?: number; study_id?: number; image_instance_id?: number; form_schema_id?: number; sub_task_id?: number };
 
-export class FormAnnotationsRepo extends Repo<FormAnnotationGET, FormAnnotationPUT, FormAnnotationPUT, FormAnnotationsListParams> {
-	protected get basePath() { return '/form-annotations'; }
+export class FormAnnotationsRepo extends Repo<FormAnnotationGET, FormAnnotationPUT, FormAnnotationPUT, FormAnnotationsListParams, FormAnnotationObject> {
+	public static path = '/form-annotations';
+	protected createDataObject(obj: FormAnnotationGET): FormAnnotationObject { return new FormAnnotationObject(obj, this); }
 
 	protected async remoteList(filters?: FormAnnotationsListParams): Promise<FormAnnotationGET[]> {
 		const res = await api.GET('/form-annotations', {
@@ -129,12 +142,12 @@ export async function getStudiesSignature(): Promise<components['schemas']['Sign
 	return (res.data ?? []) as components['schemas']['SignatureField'][];
 }
 
-// Legacy local repos for backward compatibility during transition
-export class StudiesLocalRepo extends Repo<StudyGET, never, never> {
-	protected get basePath() { return '/studies'; }
-}
-
-export class InstanceMetasLocalRepo extends Repo<InstanceMeta, never, never> {
-	protected get basePath() { return '/instances'; }
-}
+// DefaultRepo wiring
+InstanceObject.DefaultRepo = InstancesRepo;
+StudyObject.DefaultRepo = StudiesRepo;
+SeriesObject.DefaultRepo = SeriesRepo;
+SegmentationObject.DefaultRepo = SegmentationsRepo;
+FormAnnotationObject.DefaultRepo = FormAnnotationsRepo;
+TagObject.DefaultRepo = TagsRepo;
+TaskObject.DefaultRepo = TasksRepo;
 

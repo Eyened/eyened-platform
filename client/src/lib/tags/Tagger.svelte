@@ -88,7 +88,9 @@
     }
 </script>
 
-<div class="tagging-component">
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="tagging-component" onclick={(e) => e.stopPropagation()}>
     <!-- Dialog with the new tag form -->
     <Dialog bind:open={dialogOpen}>
         <DialogContent>
@@ -138,10 +140,10 @@
     <div class="tags-list">
         {#each tags.slice(0, maxTags) as tag}
             <div class="tag">
-                <Tooltip delayDuration={50}>
+                <Tooltip>
                     <TooltipTrigger><span>{tag.name}</span></TooltipTrigger>
                     <TooltipContent>
-                        <p>{ctx.tags.get(tag.id)?.description ?? 'No description'}</p>
+                        <!-- <p>{ctx.tags.get(tag.id)?.description ?? 'No description'}</p> -->
                         <p>Tagged by {tag.tagger.name} {timeAgo(new Date(tag.date))}</p>
                     </TooltipContent>
                 </Tooltip>
