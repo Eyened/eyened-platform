@@ -39,7 +39,7 @@
 	let { signature, conditions = $bindable() }: Props = $props();
 
 	// Internal rows state
-	let rows: FilterRow[] = $state([{ id: nanoid() }]);
+	let rows: FilterRow[] = $state([{ id: nanoid(), field: undefined, operator: undefined, value: undefined }]);
 
 	// Field options for SelectWithSearch
 	const fieldOptions = $derived(
@@ -85,12 +85,18 @@
 
 		return sig.values.map(v => ({ label: v, value: v }));
 	}
+	
+	// Default operator per field
+	function getDefaultOperator(fieldName: string): ConditionOperator {
+		const sig = getFieldSignature(fieldName);
+		if (!sig) return '==';
+		return Array.isArray(sig.values) ? 'IN' : '==';
+	}
 
 	// Handle field change
 	function onFieldChange(row: FilterRow, newField: string) {
 		row.field = newField;
-		const operatorOptions = getOperatorOptions(newField);
-		row.operator = operatorOptions[0];
+		row.operator = getDefaultOperator(newField);
 		
 		const sig = getFieldSignature(newField);
 		if (sig && Array.isArray(sig.values)) {
@@ -128,9 +134,13 @@
 		}
 	}
 
+	const rowsDeps = $derived(
+		rows.map(r => ({ id: r.id, field: r.field, operator: r.operator, value: r.value }))
+	);
+
 	// Derive conditions from rows
 	let derivedConditions = $derived(
-		rows
+		rowsDeps
 			.filter(row => row.field && row.operator && row.value !== '' && row.value !== undefined)
 			.map(row => {
 				const sig = getFieldSignature(row.field!);

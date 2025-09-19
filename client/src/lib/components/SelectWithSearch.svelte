@@ -8,9 +8,10 @@
 		options: { label: string; value: string }[];
 		value?: string;
 		placeholder?: string;
+		onSelect?: (value: string) => void;
 	};
 
-	let { options, value = $bindable(), placeholder = "Select..." }: Props = $props();
+	let { options, value = $bindable(), placeholder = "Select...", onSelect }: Props = $props();
 
 	let collapsibleOpen = $state(false);
 	let triggerRef: HTMLButtonElement | null = $state(null);
@@ -47,6 +48,7 @@
 						value={option.value}
 						onSelect={() => {
 							value = option.value;
+							onSelect?.(option.value);
 							closeAndFocusTrigger();
 						}}
 					>

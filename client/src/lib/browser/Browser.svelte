@@ -44,8 +44,12 @@
 		// also prime basicCondition if single condition is present
 		if (conds.length === 1) browserContext.basicCondition = conds[0];
 
-		browserContext.page = parseInt(params.get('page') || '0');
-		browserContext.limit = parseInt(params.get('limit') || '100');
+		browserContext.page = parseInt(params.get('page') || '0', 10);
+		const limitParam = params.get('limit');
+		if (limitParam !== null && limitParam !== '') {
+			const parsedLimit = parseInt(limitParam, 10);
+			if (!Number.isNaN(parsedLimit)) browserContext.limit = parsedLimit;
+		}
 
 		// new: query mode and sort
 		const qm = params.get('query');
@@ -87,7 +91,7 @@
 	
 	$effect(() => {
 		if (limitAsString && limitAsString !== String(browserContext.limit)) {
-			browserContext.limit = parseInt(limitAsString);
+			browserContext.limit = parseInt(limitAsString, 10);
 		}
 	});
 

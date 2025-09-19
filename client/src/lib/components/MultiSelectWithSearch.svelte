@@ -27,10 +27,12 @@
     }
 
     function removeValue(valueToRemove: string) {
+        console.log(valueToRemove);
         values = selectedValues.filter(v => v !== valueToRemove);
     }
 
     function addValue(valueToAdd: string) {
+        console.log(valueToAdd);
         values = [...selectedValues, valueToAdd];
     }
 </script>
