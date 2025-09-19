@@ -15,6 +15,11 @@ export type SortDirection = 'ASC' | 'DESC';
 
 
 export class BrowserContext {
+	// Default smallest per current mode
+	getDefaultLimit(): number {
+		return (this.queryMode === 'instances' && this.displayMode === 'instance') ? 100 : 10;
+	}
+
 	selection: number[] = $state([]);
 	queryMode: QueryMode = $state('studies');
 	displayMode: DisplayMode = $state('study');
@@ -28,6 +33,10 @@ export class BrowserContext {
 	sortDirection: SortDirection = $state('ASC');
 
 	resultIds: Set<number> = $state(new Set());
+
+	// NEW: ordered arrays for rendering
+	orderedInstanceIds: number[] = $state([]);
+	orderedStudyIds: number[] = $state([]);
 
 	// renamed
 	advancedConditions: Condition[] = $state([]);
@@ -144,6 +153,11 @@ export class BrowserContext {
 				count = res.count ?? 0;
 				this.resultIds = new Set(result_ids);
 				this.count = count;
+
+				// NEW: ordered ids for rendering
+				this.orderedInstanceIds = res.result_ids ?? [];
+				this.orderedStudyIds = (res.studies ?? []).map(s => s.id);
+
 				return res;
 			} else {
 				const body: StudySearchQuery = {
@@ -162,6 +176,11 @@ export class BrowserContext {
 				count = res.count ?? 0;
 				this.resultIds = new Set(result_ids);
 				this.count = count;
+
+				// NEW: ordered ids for rendering
+				this.orderedStudyIds = res.result_ids ?? [];
+				this.orderedInstanceIds = [];
+
 				return res;
 			}
 		} finally {

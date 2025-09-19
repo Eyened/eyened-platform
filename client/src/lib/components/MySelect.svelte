@@ -12,19 +12,6 @@
     
     const valueToLabel = $derived(Object.fromEntries(options.map(opt => [opt.value, opt.label])))
 
-    // $: valueToLabel = Object.fromEntries(options.map(opt => [opt.value, opt.label]))
-
-	// $: selectedObj = selected
-    // ? {
-    //     label: valueToLabel[selected],
-    //     value: selected
-    //   }
-    // : undefined;
-
-    // const handleChange : any = (changeObj) => {
-    //     onSelectedChange(changeObj?.value)
-    // }
-
 </script>
 
 
