@@ -2,7 +2,7 @@ import mysql.connector
 from collections import defaultdict
 from eyened_orm.utils.config import DatabaseSettings
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Dict, List, Set, Tuple, Any
 
 
@@ -108,7 +108,7 @@ class DatabaseDumper:
     @property
     @contextmanager
     def cursor(self):
-        with mysql.connector.connect(**self.config.model_dump()) as conn:
+        with mysql.connector.connect(**asdict(self.config)) as conn:
             with conn.cursor(dictionary=True) as cursor:
                 yield cursor
 

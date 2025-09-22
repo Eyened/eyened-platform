@@ -17,6 +17,8 @@ class ZarrStorageManager:
     """
 
     def __init__(self, store_path: str | Path):
+        print('creating zarr storage manager with store path', store_path)
+        self.store_path = store_path
         self.root = zarr.open_group(store=store_path, mode="a")
         self._open_arrays: Dict[Tuple, ZarrArray] = {}
 
