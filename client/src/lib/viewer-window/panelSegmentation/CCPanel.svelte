@@ -2,7 +2,7 @@
     import { ConnectedComponents, PanelIcon } from "../icons/icons";
     import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 
     interface Props {
         segmentationItem: SegmentationItem;

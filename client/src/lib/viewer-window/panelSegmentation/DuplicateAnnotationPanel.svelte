@@ -4,7 +4,7 @@
     import { getContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 
     interface Props {

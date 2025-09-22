@@ -6,7 +6,7 @@ import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import { SegmentationItem } from "$lib/webgl/segmentationItem";
+import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 import type { FilterList } from "$lib/datamodel/itemList";
 import { BinaryMask } from "$lib/webgl/mask.svelte";

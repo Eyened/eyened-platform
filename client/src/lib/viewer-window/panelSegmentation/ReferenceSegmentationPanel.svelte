@@ -4,7 +4,7 @@
     import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
     import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
     import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     interface Props {
