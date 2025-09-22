@@ -64,7 +64,11 @@ class ZarrArray:
                 f"Expected dtype {self.array.dtype}, got {segmentation_data.dtype}"
             )
 
-        if zarr_index is not None and zarr_index < self.array.shape[0]:
+        if zarr_index is not None:
+            if zarr_index >= self.array.shape[0]:
+                raise IndexError(
+                    f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}"
+                )
             
             # Write to existing index
             self.array[zarr_index, ...] = segmentation_data

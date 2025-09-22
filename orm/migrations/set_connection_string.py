@@ -1,17 +1,6 @@
 import sys
 from pathlib import Path
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
-
-class DatabaseSettings(BaseSettings): 
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
-
-    password: str = Field(description="Database password", validation_alias="DATABASE_PASSWORD")
-    user: str = Field(description="Database user", validation_alias="DATABASE_USER")
-    host: str = Field(description="Database host", validation_alias="DATABASE_HOST")
-    port: str = Field(description="Database port", validation_alias="DATABASE_PORT")
-    database: str = Field(description="Database name", validation_alias="DATABASE_NAME")
 
 if __name__ == "__main__":
     # Check if path argument is provided
@@ -27,9 +16,18 @@ if __name__ == "__main__":
         sys.exit(1)
     
     print(f"Loading environment from: {env_path}")
-    load_dotenv(dotenv_path=env_path, override=True)
-
-    settings = DatabaseSettings()
+    from dotenv import dotenv_values
+    env = dotenv_values(dotenv_path=env_path)
+    # Extract required values from the provided .env file (no process env mutation)
+    try:
+        user = env["DATABASE_USER"]
+        password = env["DATABASE_PASSWORD"]
+        host = env["DATABASE_HOST"]
+        port = env["DATABASE_PORT"]
+        database = env["DATABASE_NAME"]
+    except KeyError as e:
+        print(f"Missing required key in env file: {e}")
+        sys.exit(1)
     
     # Use absolute path for cleaner output
     filename = Path(__file__).parent.resolve() / "alembic.ini.sample"
@@ -38,7 +36,7 @@ if __name__ == "__main__":
     with open(filename, 'r') as configfile:
         lines = configfile.readlines()
 
-    new_url = f'mysql+pymysql://{settings.user}:{settings.password}@{settings.host}:{settings.port}/{settings.database}'
+    new_url = f'mysql+pymysql://{user}:{password}@{host}:{port}/{database}'
     print(f'New connection URL: {new_url}')
 
     # Check if we found and updated the line
