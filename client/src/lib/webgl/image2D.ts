@@ -70,10 +70,20 @@ export class Image2D extends AbstractImage {
             data = pixelData;
         } else if (source_num_channels === 1 || source_num_channels === 2 || source_num_channels === 3) {
             data = new Uint8Array(dimensions.width * dimensions.height * 4);
+
             for (let i = 0; i < dimensions.width * dimensions.height; i++) {
-                for (let c = 0; c < source_num_channels; c++) {
-                    data[4 * i + c] = pixelData[source_num_channels * i + c];
+                if (source_num_channels === 1) {
+                    // interpret as grayscale
+                    data[4 * i + 0] = pixelData[i];
+                    data[4 * i + 1] = pixelData[i];
+                    data[4 * i + 2] = pixelData[i];
+                } else {
+                    // in case of 2 or 3 channels, interpret as RGB
+                    for (let c = 0; c < source_num_channels; c++) {
+                        data[4 * i + c] = pixelData[source_num_channels * i + c];
+                    }
                 }
+
                 data[4 * i + 3] = 255;
             }
         } else {
