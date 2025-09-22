@@ -2,7 +2,7 @@ import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 import type { Instance } from "$lib/datamodel/instance.svelte";
 import { Matrix } from "$lib/matrix";
-import { SegmentationItem } from "./segmentationItem";
+import { SegmentationItem } from "./segmentationItem.svelte";
 import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { SvelteMap } from "svelte/reactivity";
 

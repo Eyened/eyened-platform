@@ -8,7 +8,7 @@ import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 import { NPYArray } from "$lib/utils/npy_loader";
 import type { DrawingArray } from "$lib/webgl/mask.svelte";
-import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { Creator } from "$lib/datamodel/creator.svelte";
 

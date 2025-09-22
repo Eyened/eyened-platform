@@ -1,7 +1,7 @@
 
 import type { Creator } from "$lib/datamodel/creator.svelte";
 import type { Model, Segmentation } from "$lib/datamodel/segmentation.svelte";
-import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import { SvelteSet } from "svelte/reactivity";
 
 export class SegmentationContext {
