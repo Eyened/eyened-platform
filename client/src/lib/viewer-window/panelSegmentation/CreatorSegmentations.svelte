@@ -3,6 +3,7 @@
     import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import SegmentationItem from "./SegmentationItem.svelte";
+    import { data } from "$lib/datamodel/model";
 
     interface Props {
         creator: Creator;
@@ -12,7 +13,11 @@
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
+    const { creators } = data;
     const hideCreators = segmentationOverlay.segmentationContext.hideCreators;
+    for (const c of $creators) {
+        hideCreators.add(c);
+    }
     function toggle() {
         if (hideCreators.has(creator)) {
             hideCreators.delete(creator);

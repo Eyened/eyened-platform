@@ -36,7 +36,9 @@
     );
 
     const { segmentationContext } = segmentationOverlay;
-    segmentationContext.visibleSegmentations.add(segmentation);
+    if (style == "normal") {
+        segmentationContext.visibleSegmentations.add(segmentation);
+    }
 
     const segmentationItem = image.getSegmentationItem(segmentation);
     let segmentationState = $derived(
