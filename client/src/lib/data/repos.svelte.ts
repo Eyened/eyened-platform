@@ -11,18 +11,26 @@ import type {
 	StudyGET,
 	TagGET,
 	TagPATCH,
-	TagPUT
+	TagPUT,
+	TaskGET,
+	TaskPATCH,
+	TaskPUT
 } from '../../types/openapi_types';
 import { api } from '../api/client';
 import { Repo } from './datamodel.svelte';
-import { FormAnnotationObject, InstanceObject, SegmentationObject, SeriesObject, StudyObject, TagObject, TaskObject } from './objects.svelte';
+import { FeatureObject, FormAnnotationObject, InstanceObject, SegmentationObject, SeriesObject, StudyObject, TagObject, TaskObject } from './objects.svelte';
 
 // Type aliases for backward compatibility
 export type Tag = TagGET;
 
-export class TasksRepo extends Repo<FeatureGET, FeaturePUT, FeaturePATCH, unknown, TaskObject> {
+export class TasksRepo extends Repo<TaskGET, TaskPUT, TaskPATCH, unknown, TaskObject> {
 	public static path = '/task';
-	protected createDataObject(obj: FeatureGET): TaskObject { return new TaskObject(obj, this); }
+	protected createDataObject(obj: TaskGET): TaskObject { return new TaskObject(obj, this); }
+}
+
+export class FeaturesRepo extends Repo<FeatureGET, FeaturePUT, FeaturePATCH, unknown, FeatureObject> {
+	public static path = '/features';
+	protected createDataObject(obj: FeatureGET): FeatureObject { return new FeatureObject(obj, this); }
 }
 
 export class TagsRepo extends Repo<TagGET, TagPUT, TagPATCH, unknown, TagObject> {
@@ -150,4 +158,5 @@ SegmentationObject.DefaultRepo = SegmentationsRepo;
 FormAnnotationObject.DefaultRepo = FormAnnotationsRepo;
 TagObject.DefaultRepo = TagsRepo;
 TaskObject.DefaultRepo = TasksRepo;
+FeatureObject.DefaultRepo = FeaturesRepo;
 

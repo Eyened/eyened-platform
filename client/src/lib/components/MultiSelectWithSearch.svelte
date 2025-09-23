@@ -56,20 +56,22 @@
         <Popover.Content class="w-[200px] p-0">
             <Command.Root>
                 <Command.Input placeholder="Search ..." />
-                <Command.Empty>No results found.</Command.Empty>
-                <Command.Group>
-                    {#each unselectedOptions as option}
-                        <Command.Item
-                            value={option.value}
-                            							onSelect={() => {
-								addValue(option.value);
-								closeAndFocusTrigger();
-							}}
-                        >
-                            {option.label}
-                        </Command.Item>
-                    {/each}
-                </Command.Group>
+                <Command.List class="max-h-[140px] overflow-y-auto">
+                        <Command.Empty>No results found.</Command.Empty>
+                        <Command.Group>
+                            {#each unselectedOptions as option}
+                                <Command.Item
+                                    value={option.value}
+                                                                onSelect={() => {
+                                        addValue(option.value);
+                                        closeAndFocusTrigger();
+                                    }}
+                                >
+                                    {option.label}
+                                </Command.Item>
+                            {/each}
+                        </Command.Group>
+                </Command.List>
             </Command.Root>
         </Popover.Content>
     </Popover.Root>

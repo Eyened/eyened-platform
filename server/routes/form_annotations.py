@@ -9,7 +9,7 @@ from eyened_orm.Tag import TagType
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
-from ..dtos.dtos_main import FormAnnotationPUT, FormAnnotationGET
+from ..dtos.dtos_main import FormAnnotationPUT, FormAnnotationPATCH, FormAnnotationGET
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
@@ -101,7 +101,7 @@ async def get_form_annotation(
 @router.patch("/form-annotations/{annotation_id}", response_model=FormAnnotationGET)
 async def update_form_annotation(
     annotation_id: int,
-    annotation: FormAnnotationPUT,
+    annotation: FormAnnotationPATCH,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -109,19 +109,22 @@ async def update_form_annotation(
     if existing_annotation is None:
         raise HTTPException(status_code=404, detail="FormAnnotation not found")
 
-    payload = annotation.dict()
-    editable_field_map = {
-        "form_schema_id": "FormSchemaID",
-        "patient_id": "PatientID",
-        "study_id": "StudyID",
-        "image_instance_id": "ImageInstanceID",
-        "creator_id": "CreatorID",
-        "sub_task_id": "SubTaskID",
-        "form_data": "FormData",
-        "form_annotation_reference_id": "FormAnnotationReferenceID",
-    }
-    for dto_key, orm_key in editable_field_map.items():
-        setattr(existing_annotation, orm_key, payload.get(dto_key))
+    if annotation.form_schema_id is not None:
+        existing_annotation.FormSchemaID = annotation.form_schema_id
+    if annotation.patient_id is not None:
+        existing_annotation.PatientID = annotation.patient_id
+    if annotation.study_id is not None:
+        existing_annotation.StudyID = annotation.study_id
+    if annotation.image_instance_id is not None:
+        existing_annotation.ImageInstanceID = annotation.image_instance_id
+    if annotation.creator_id is not None:
+        existing_annotation.CreatorID = annotation.creator_id
+    if annotation.sub_task_id is not None:
+        existing_annotation.SubTaskID = annotation.sub_task_id
+    if annotation.form_data is not None:
+        existing_annotation.FormData = annotation.form_data
+    if annotation.form_annotation_reference_id is not None:
+        existing_annotation.FormAnnotationReferenceID = annotation.form_annotation_reference_id
 
     db.commit()
     db.refresh(existing_annotation)

@@ -12,9 +12,8 @@
 	import MainIcon from '../viewer-window/icons/MainIcon.svelte';
 	import AdvancedFilters from './AdvancedFilters.svelte';
 	import BrowserContent from './BrowserContent.svelte';
-	import { BrowserContext, decodeConditions } from './browserContext.svelte';
+	import { BrowserContext, decodeConditions, type QueryMode } from './browserContext.svelte';
 	import FilterShorcuts from './FilterShorcuts.svelte';
-	import Pagination from './Pagination.svelte';
 	
 	const globalContext = getContext<GlobalContext>('globalContext');
 	const { user, openAPISpec } = globalContext;
@@ -26,13 +25,17 @@
 	const browserContext: BrowserContext = new BrowserContext();
 	setContext('browserContext', browserContext);
 
+	let initializing = true;
+
 	onMount(async () => {
+		initializing = true;
 		initParamState();
 		await browserContext.loadSignatures();
 		// After signatures are in state, optionally kick off a search if there are pre-existing conditions
 		if (browserContext.advancedConditions.length) {
 			await browserContext.search();
 		}
+		initializing = false;
 	});
 
 	function initParamState() {
@@ -62,21 +65,11 @@
 		if (od === 'ASC' || od === 'DESC') browserContext.sortDirection = od;
 	}
 
-	function onPageChange(pageNum: number) {
-		browserContext.page = pageNum;
-		// Re-run search with whichever mode is active
-		browserContext.search();
-	}
-
-	function changeStudyMode(md: any) {
-		browserContext.queryMode = md.value;
-		console.log(browserContext.queryMode)
-	}
 
 	let limitOptions = $derived(
 		(browserContext.queryMode === 'instances' && browserContext.displayMode === 'instance')
-			? [100, 200, 500, 1000]
-			: [10, 20, 30, 40, 50]
+			? browserContext.limitOptionsInstances
+			: browserContext.limitOptionsStudies
 	);
 
 	// let sortByColumns = $derived((browserContext.displayMode === 'instance') ? ['CFQuality', 'StudyDate', 'PatientIdentifier', 'BirthDate', 'DateInserted', 'DateModified'] : ['StudyDate', 'PatientIdentifier', 'BirthDate'])
@@ -159,6 +152,9 @@
 										options={[{value: 'instances', label: 'Instances'}, {value: 'studies', label: 'Studies'}]} 
 										bind:value={browserContext.queryMode}
 										disabled={false}
+										onChange={(queryMode) => {
+											browserContext.resetForQueryModeChange(queryMode as QueryMode);
+										}}
 										placeholder="Query Type"/>
 								</div>
 								{#if browserContext.queryMode === 'instances'}
@@ -225,9 +221,7 @@
 	</div>
 
 	<div id="content" class="flex-1 overflow-y-auto p-4">
-		<Pagination onChange={onPageChange}/>
 		<BrowserContent/>
-		<Pagination onChange={onPageChange}/>
 	</div>
 	<div id="selection">
 		<Selection />

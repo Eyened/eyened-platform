@@ -1,4 +1,4 @@
-import { TagsRepo } from '$lib/data/repos.svelte';
+import { FeaturesRepo, TagsRepo } from '$lib/data/repos.svelte';
 import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 import { ModelSegmentation, type Segmentation } from '$lib/datamodel/segmentation.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
@@ -15,6 +15,8 @@ export class GlobalContext {
     public userManager: UserManager;
     public tags = new TagsRepo('tags');
     public tagsLoaded: boolean = $state(false);
+    public features = new FeaturesRepo('features');
+    public featuresLoaded: boolean = $state(false);
 
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
@@ -59,6 +61,13 @@ export class GlobalContext {
 
     updateConfig(config: any) {
         this.config = { ...this.config, ...config };
+    }
+
+    async ensureFeaturesLoaded() {
+        if (!this.featuresLoaded) {
+            await this.features.fetchAll();
+            this.featuresLoaded = true;
+        }
     }
 
     get openAPISpec() {

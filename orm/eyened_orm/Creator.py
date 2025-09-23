@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, SubTask, Segmentation, Tag, CreatorTagLink
+    from eyened_orm import Annotation, FormAnnotation, SubTask, Segmentation, Tag, CreatorTagLink, Task
 
 
 class Creator(Base):
@@ -41,5 +41,6 @@ class Creator(Base):
     SubTasks: Mapped[List["SubTask"]] = relationship(back_populates="Creator")
     Segmentations: Mapped[List["Segmentation"]] = relationship(back_populates="Creator")
     Tags: Mapped[List["Tag"]] = relationship(back_populates="Creator")
+    Tasks: Mapped[List["Task"]] = relationship(back_populates="Creator")
     # Tags that this creator starred
     StarredTags: Mapped[List["CreatorTagLink"]] = relationship("CreatorTagLink", back_populates="Creator", viewonly=True, lazy="selectin")

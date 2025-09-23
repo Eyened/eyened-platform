@@ -593,7 +593,6 @@ def _build_instance_select(
     return (
         q.filter(ImageInstance.Modality.is_not(None))
          .where(where_clause)
-         .distinct()
          .order_by(sort_dir, ImageInstance.ImageInstanceID.asc())
     )
 

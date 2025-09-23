@@ -484,8 +484,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Form Annotation */
-        post: operations["create_form_annotation_instances_search_post"];
+        /** Search Instances */
+        post: operations["search_instances_instances_search_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1368,7 +1368,7 @@ export interface components {
              * Variable
              * @enum {string}
              */
-            variable: "Study Date" | "Study Description" | "Study Round" | "Study Instance UID" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name";
+            variable: "Study Date" | "Study Description" | "Study Round" | "Study Instance UID" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Study Tag Name";
             /**
              * Operator
              * @enum {string}
@@ -1556,20 +1556,20 @@ export interface components {
             num_tasks: number;
             /** Num Tasks Ready */
             num_tasks_ready: number;
+            creator?: components["schemas"]["CreatorMetadata"] | null;
+            task_state?: components["schemas"]["TaskState"] | null;
         };
-        /**
-         * TaskPATCH
-         * @description Partial update for Task (same fields as PUT for now).
-         */
+        /** TaskPATCH */
         TaskPATCH: {
             /** Name */
-            name: string;
+            name?: string | null;
             /** Description */
             description?: string | null;
             /** Contact Id */
             contact_id?: number | null;
             /** Task Definition Id */
-            task_definition_id: number;
+            task_definition_id?: number | null;
+            task_state?: components["schemas"]["TaskState"] | null;
         };
         /** TaskPUT */
         TaskPUT: {
@@ -1597,7 +1597,7 @@ export interface components {
          * TaskState
          * @enum {string}
          */
-        TaskState: "NotStarted" | "Busy" | "Ready";
+        TaskState: "NotStarted" | "Busy" | "Finished" | "Aborted" | "Archived";
         /** TokenLoginRequest */
         TokenLoginRequest: {
             /** Username */
@@ -2812,7 +2812,7 @@ export interface operations {
             };
         };
     };
-    create_form_annotation_instances_search_post: {
+    search_instances_instances_search_post: {
         parameters: {
             query?: never;
             header?: {

@@ -91,9 +91,11 @@ class TagPUT(TagBase):
     
 
 
-class TagPATCH(TagPUT):
-    """Partial update for Tag (same as PUT for now)."""
-    pass
+class TagPATCH(BaseModel):
+    """Partial update for Tag with optional fields."""
+    name: Optional[str] = None
+    tag_type: Optional[TagType] = None
+    description: Optional[str] = None
 
 
 class TagGET(TagBase):

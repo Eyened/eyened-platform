@@ -2098,8 +2098,8 @@
     },
     "/instances/search": {
       "post": {
-        "summary": "Create Form Annotation",
-        "operationId": "create_form_annotation_instances_search_post",
+        "summary": "Search Instances",
+        "operationId": "search_instances_instances_search_post",
         "parameters": [
           {
             "name": "authorization",
@@ -5547,7 +5547,8 @@
               "Project Name",
               "Form Schema Name",
               "Form Creator Name",
-              "Form Tag Name"
+              "Form Tag Name",
+              "Study Tag Name"
             ],
             "title": "Variable"
           },
@@ -6038,6 +6039,26 @@
           "num_tasks_ready": {
             "type": "integer",
             "title": "Num Tasks Ready"
+          },
+          "creator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreatorMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6054,7 +6075,14 @@
       "TaskPATCH": {
         "properties": {
           "name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Name"
           },
           "description": {
@@ -6080,17 +6108,29 @@
             "title": "Contact Id"
           },
           "task_definition_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Task Definition Id"
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "task_definition_id"
-        ],
-        "title": "TaskPATCH",
-        "description": "Partial update for Task (same fields as PUT for now)."
+        "title": "TaskPATCH"
       },
       "TaskPUT": {
         "properties": {
@@ -6177,7 +6217,9 @@
         "enum": [
           "NotStarted",
           "Busy",
-          "Ready"
+          "Finished",
+          "Aborted",
+          "Archived"
         ],
         "title": "TaskState"
       },

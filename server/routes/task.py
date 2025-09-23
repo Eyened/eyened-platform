@@ -21,7 +21,7 @@ async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user:
         Description=dto.description,
         ContactID=dto.contact_id,
         TaskDefinitionID=dto.task_definition_id,
-        TaskStateID=dto.task_state_id,
+        CreatorID=current_user.id,
     )
     db.add(task); db.commit(); db.refresh(task)
     return DTOConverter.task_to_get(task)
@@ -34,7 +34,7 @@ async def list_tasks(
     """List all tasks (no pagination)."""
     rows = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks))
+        .options(selectinload(Task.SubTasks), selectinload(Task.Creator))
         .order_by(Task.TaskID)
     ).scalars().all()
     return [DTOConverter.task_to_get(t) for t in rows]
@@ -43,7 +43,7 @@ async def list_tasks(
 async def get_task(task_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     task = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks))
+        .options(selectinload(Task.SubTasks), selectinload(Task.Creator))
         .where(Task.TaskID == task_id)
     ).scalars().first()
     if not task:
@@ -55,18 +55,22 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(404, "Task not found")
-    payload = dto.model_dump()
-    task.TaskName = payload.get("name", task.TaskName)
-    task.Description = payload.get("description", task.Description)
-    task.ContactID = payload.get("contact_id", task.ContactID)
-    task.TaskDefinitionID = payload.get("task_definition_id", task.TaskDefinitionID)
-    task.TaskStateID = payload.get("task_state_id", task.TaskStateID)
+    if dto.name is not None:
+        task.TaskName = dto.name
+    if dto.description is not None:
+        task.Description = dto.description
+    if dto.contact_id is not None:
+        task.ContactID = dto.contact_id
+    if dto.task_definition_id is not None:
+        task.TaskDefinitionID = dto.task_definition_id
+    # dto.task_state intentionally not applied (no persisted column)
+
     db.commit(); db.refresh(task)
     
     # Reload with SubTasks for consistency
     task = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks))
+        .options(selectinload(Task.SubTasks), selectinload(Task.Creator))
         .where(Task.TaskID == task_id)
     ).scalars().first()
     

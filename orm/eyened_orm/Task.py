@@ -15,7 +15,7 @@ if TYPE_CHECKING:
         ImageInstance,
         SubTask,
         TaskDefinition,
-        TaskState,
+        SubTaskState,
         Segmentation,
     )
 
@@ -32,10 +32,19 @@ class TaskDefinition(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
-class TaskState(Enum):
+class SubTaskState(Enum):
     NotStarted = "NotStarted"
     Busy = "Busy"
     Ready = "Ready"
+
+
+class TaskState(Enum):
+    NotStarted = "NotStarted"
+    Busy = "Busy"
+    Finished = "Finished"
+    Aborted = "Aborted"
+    Archived = "Archived"
+
 
 class Task(Base):
     __tablename__ = "Task"
@@ -47,6 +56,7 @@ class Task(Base):
     TaskID: Mapped[int] = mapped_column(primary_key=True)
     TaskName: Mapped[str] = mapped_column(String(256))
     Description: Mapped[Optional[str]] = mapped_column(Text)
+    CreatorID: Mapped[Optional[int]] = mapped_column(ForeignKey("Creator.CreatorID"))
     ContactID: Mapped[Optional[int]] = mapped_column(ForeignKey("Contact.ContactID"))
     TaskDefinitionID: Mapped[int] = mapped_column(ForeignKey("TaskDefinition.TaskDefinitionID"))
     # TaskStateID: Mapped[Optional[int]] = mapped_column(ForeignKey("TaskState.TaskStateID"))
@@ -54,8 +64,10 @@ class Task(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     Contact: Mapped[Optional["Contact"]] = relationship(back_populates="Tasks")
+
+    Creator: Mapped["Creator"] = relationship(back_populates="Tasks")
     TaskDefinition: Mapped["TaskDefinition"] = relationship(back_populates="Tasks")
-    # TaskState: Mapped["TaskState"] = relationship(back_populates="Tasks")
+    TaskState: Mapped["TaskState"] 
     
     SubTasks: Mapped[List["SubTask"]] = relationship(
         back_populates="Task",
@@ -76,7 +88,7 @@ class Task(Base):
         subtasks = [
             SubTask.create_from_image_ids(session, imset) for imset in imagesets
         ]
-        state = TaskState.by_name(session, "Not Started")
+        state = SubTaskState.by_name(session, "Not Started")
 
         if creator_name is not None:
             creator = Creator.by_name(session, creator_name)
@@ -129,7 +141,7 @@ class SubTask(Base):
     TaskID: Mapped[int] = mapped_column(ForeignKey("Task.TaskID", ondelete="CASCADE"))
     CreatorID: Mapped[Optional[int]] = mapped_column(ForeignKey("Creator.CreatorID"))
     Comments: Mapped[Optional[str]] = mapped_column(Text)
-    TaskState: Mapped["TaskState"] = mapped_column(default=TaskState.NotStarted)
+    TaskState: Mapped["SubTaskState"] = mapped_column(default=SubTaskState.NotStarted)
 
     Task: Mapped["Task"] = relationship(back_populates="SubTasks")
     Creator: Mapped[Optional["Creator"]] = relationship(back_populates="SubTasks")
@@ -147,7 +159,7 @@ class SubTask(Base):
         if task_state is None:
             task_state = "Not Started"
 
-        subtask = cls(TaskState=TaskState.by_name(session, task_state))
+        subtask = cls(TaskState=SubTaskState.by_name(session, task_state))
         subtask.SubTaskImageLinks = [
             SubTaskImageLink(ImageInstanceID=id, SubTask=subtask) for id in image_ids
         ]
