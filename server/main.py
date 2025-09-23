@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     
     print(settings)
 
-    if settings.database_root_password is not None:
+    if settings.database_root_password:
         try:
             # create database tables and user if they don't exist
             create_database()
