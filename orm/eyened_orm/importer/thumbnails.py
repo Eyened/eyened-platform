@@ -63,7 +63,7 @@ def generate_thumbnail_name(db_id, secret_key):
 
 def get_thumbnail_identifier(im: ImageInstance) -> str:
     """Generate a unique identifier for the thumbnail."""
-    secret_key = ImageInstance.config.secret_key
+    secret_key = im.config.secret_key
     project_id = str(im.Patient.Project.ProjectID)
     thumbnail_name = generate_thumbnail_name(im.ImageInstanceID, secret_key)[:24]
     return f"{project_id}/{thumbnail_name}"
@@ -94,16 +94,11 @@ def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
         )
 
 
-def get_missing_thumbnail_images(session, where, include_failed=False):
+def get_missing_thumbnail_images(session, include_failed=False):
     where = ImageInstance.ThumbnailPath == None
     if include_failed:
         where = where | (ImageInstance.ThumbnailPath == "")
-
-    images = (
-        session.execute(select(ImageInstance).where(where).order_by(func.random()))
-        .scalars()
-        .all()
-    )
+    images = ImageInstance.where(session, where)
     print(f"Found {len(images)} images without thumbnails")
     return images
 
