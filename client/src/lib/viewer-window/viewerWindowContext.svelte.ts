@@ -1,7 +1,7 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { loadInstances } from "$lib/datamodel/api";
-import type { Creator } from "$lib/datamodel/creator";
-import type { Instance } from "$lib/datamodel/instance";
+import { loadInstances } from "$lib/utils/api";
+import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { Instance } from "$lib/datamodel/instance.svelte";
 import { data } from "$lib/datamodel/model";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
@@ -136,7 +136,7 @@ export class ViewerWindowContext {
 
         for (const locator of photoLocators) {
             for (const key of ['enfaceImageId', 'octImageId']) {
-                const image_id = locator[key];
+                const image_id = locator[key as keyof PhotoLocator];
                 if (!this.photoLocators.has(image_id)) {
                     this.photoLocators.set(image_id, []);
                 }

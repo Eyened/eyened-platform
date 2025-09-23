@@ -11,22 +11,15 @@ export class BrushTool extends SegmentationTool {
 	offscreenCanvas: HTMLCanvasElement;
 
 	alpha: number = 0.5;
-	viewerWidth: number;
-	viewerHeight: number;
-
+	
 	constructor(
 		drawingExecutor: DrawingExecutor,
 		viewerContext: ViewerContext,
 		segmentationContext: SegmentationContext
 	) {
 		super(drawingExecutor, viewerContext, segmentationContext);
-		const { width, height } = viewerContext.canvas2D; // viewer size
-		this.viewerWidth = width;
-		this.viewerHeight = height;
 		// Create an offscreen canvas for drawing the ellipses
 		this.offscreenCanvas = document.createElement('canvas');
-		this.offscreenCanvas.width = width;
-		this.offscreenCanvas.height = height;
 		this.offscreenCtx = this.offscreenCanvas.getContext('2d')!;
 	}
 
@@ -34,15 +27,18 @@ export class BrushTool extends SegmentationTool {
 		return this.segmentationContext.brushRadius;
 	}
 	
-	startDraw() {
-		super.startDraw();
-		this.offscreenCtx.clearRect(0, 0, this.viewerWidth, this.viewerHeight);
+	startDraw(viewerContext: ViewerContext) {
+		super.startDraw(viewerContext);
+        const { width, height } = viewerContext.canvas2D;
+        this.offscreenCanvas.width = width;
+        this.offscreenCanvas.height = height;
+		this.offscreenCtx.clearRect(0, 0, width, height);
 		this.offscreenCtx.fillStyle = this.drawingColor;
 	}
 
 
 	pointerdown(e: ViewerEvent<PointerEvent>) {
-		const { event, position } = e;
+		const { event, position, viewerContext } = e;
 
 		this.lastPosition = position;
 
@@ -51,7 +47,7 @@ export class BrushTool extends SegmentationTool {
 		if (event.button === 0) this.drawingState = 'paint';
 		else if (event.button === 2) this.drawingState = 'erase';
 
-		this.startDraw();
+		this.startDraw(viewerContext);
 	}
 
 	pointerup(e: ViewerEvent<PointerEvent>) {
@@ -115,13 +111,16 @@ export class BrushTool extends SegmentationTool {
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        super.repaint(viewerContext, renderTarget);
 		const ctx = viewerContext.context2D;
+
 		if (!this.drawingState || !this.currentPoints) return;
 
 		if (this.currentPoints) {
-			ctx.globalAlpha = this.alpha;
-			ctx.drawImage(this.offscreenCanvas, 0, 0);
-			ctx.globalAlpha = 1.0;
+            ctx.save();
+            ctx.globalAlpha = this.alpha;
+			ctx.drawImage(this.offscreenCanvas, 0, 0);			
+            ctx.restore();
 		}
 	}
 

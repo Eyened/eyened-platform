@@ -16,10 +16,12 @@ from .utils import auto_device
 def run_basic_models(fpaths, ids, device: torch.device = None):
     if device is None:
         device = auto_device()
-    ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface('Eyened/vascx:fovea/fovea_july24.pt').to(
-        device
-    )
-    ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface('Eyened/vascx:discedge/discedge_july24.pt').to(device)
+    ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface(
+        "Eyened/vascx:fovea/fovea_july24.pt"
+    ).to(device)
+    ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface(
+        "Eyened/vascx:discedge/discedge_july24.pt"
+    ).to(device)
 
     dataloader = ensemble_fovea._make_inference_dataloader(
         fpaths,
@@ -34,7 +36,6 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
         for batch in tqdm(dataloader):
             if len(batch) == 0:
                 continue
-
 
             im = batch["image"].to(device)
             # im_rgb = im[..., :3, :, :]  # only rgb part
@@ -82,7 +83,9 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
 def run_quality_model(fpaths, ids, device: torch.device = None):
     if device is None:
         device = auto_device()
-    ensemble_quality = ClassificationEnsemble.from_huggingface('Eyened/vascx:quality/quality.pt').to(device)
+    ensemble_quality = ClassificationEnsemble.from_huggingface(
+        "Eyened/vascx:quality/quality.pt"
+    ).to(device)
     dataloader = ensemble_quality._make_inference_dataloader(
         fpaths,
         ids=ids,
@@ -117,11 +120,13 @@ def run_quality_model(fpaths, ids, device: torch.device = None):
     )
 
 
-def run_inference_for_images(session, images, device: torch.device = None, cfi_cache_path=None):
+def run_inference_for_images(
+    session, images, device: torch.device = None, cfi_cache_path=None
+):
     from rtnls_fundusprep.preprocessor import parallel_preprocess
+
     if device is None:
         device = auto_device()
-    
 
     ids = [im.ImageInstanceID for im in images]
     paths = [im.path for im in images]
@@ -129,12 +134,12 @@ def run_inference_for_images(session, images, device: torch.device = None, cfi_c
     bounds = parallel_preprocess(
         paths,  # List of image files
         ids,
-        rgb_path=cfi_cache_path / "rgb"
-        if cfi_cache_path is not None
-        else None,  # Output path for RGB images
-        ce_path=cfi_cache_path / "ce"
-        if cfi_cache_path is not None
-        else None,  # Output path for Contrast Enhanced images
+        rgb_path=(
+            cfi_cache_path / "rgb" if cfi_cache_path is not None else None
+        ),  # Output path for RGB images
+        ce_path=(
+            cfi_cache_path / "ce" if cfi_cache_path is not None else None
+        ),  # Output path for Contrast Enhanced images
         n_jobs=8,  # number of preprocessing workers
     )
 
@@ -184,17 +189,12 @@ def run_inference_for_images(session, images, device: torch.device = None, cfi_c
 def run_inference(session, device: torch.device = None, cfi_cache_path=None):
     if device is None:
         device = auto_device()
-        
+
     # We run preprocessing + inference on all ColorFundus images with DatePreprocessed==None
-    images = (
-        session.execute(
-            select(ImageInstance).where(
-                (ImageInstance.Modality == Modality.ColorFundus)
-                & (ImageInstance.DatePreprocessed == None)
-            )
-        )
-        .scalars()
-        .all()
+    images = ImageInstance.where(
+        session,
+        (ImageInstance.Modality == Modality.ColorFundus)
+        & (ImageInstance.DatePreprocessed == None)
     )
 
     if len(images) == 0:

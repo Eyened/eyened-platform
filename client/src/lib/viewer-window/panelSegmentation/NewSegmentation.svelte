@@ -1,98 +1,136 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
-	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import type { DialogueType } from '$lib/types';
-	import type { Writable } from 'svelte/store';
-	import FeatureSelect from './FeatureSelect.svelte';
-	import { data } from '$lib/datamodel/model';
-	import type { Feature } from '$lib/datamodel/feature';
-	import { createAnnotation } from '$lib/datamodel/annotation';
-	import { featureSetColorFundus, featureSetOCT } from '$lib/viewer-config';
-	import { SegmentationContext } from './segmentationContext.svelte';
-	import { globalContext } from '$lib/main';
+    import { getContext } from "svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import FeatureSelect from "./FeatureSelect.svelte";
+    import { data } from "$lib/datamodel/model";
+    import type { Feature } from "$lib/datamodel/feature.svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
 
-	const { creator } = globalContext;
-	const { image } = getContext<ViewerContext>('viewerContext');
-	const segmentationContext = getContext<SegmentationContext>('segmentationContext');
-	const { annotationTypes, features } = data;
+    import {
+        Segmentation,
+        type DataRepresentation,
+        type Datatype,
+    } from "$lib/datamodel/segmentation.svelte";
+    import NewMultiFeature from "./NewMultiFeature.svelte";
+    import type { TaskContext } from "$lib/types";
 
-	function getAnnotationType() {
-		let annotationTypeName: string;
-		if (image.is3D) annotationTypeName = 'Segmentation OCT B-scan';
-		else if (image.image_id.endsWith('proj')) annotationTypeName = 'Segmentation OCT Enface';
-		else annotationTypeName = 'Segmentation 2D';
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const viewerContext = getContext<ViewerContext>("viewerContext");
+    const taskContext = getContext<TaskContext>("taskContext");
 
-		return annotationTypes.find(
-			(t) => t.name == annotationTypeName && t.interpretation == 'R/G mask'
-		)!;
-	}
+    const featureSubsets: { [name: string]: [number] } =
+        taskContext?.task?.definition?.config?.featureSubsets || {};
 
-	const dialogue = getContext<Writable<DialogueType>>('dialogue');
+    const { image, axis } = viewerContext;
+    const { creator } = globalContext;
+    const segmentationOverlay = getContext<SegmentationOverlay>(
+        "segmentationOverlay",
+    );
+    const segmentationContext = segmentationOverlay.segmentationContext;
+    const { features } = data;
 
-	let selectedFeature: Feature | undefined = $state(undefined);
+    const types = ["Q", "B", "P"];
+    let selectedType = $state("Q");
 
-	async function create(feature: Feature) {
-		dialogue.set(`Creating annotation...`);
-		const annotation = await createAnnotation(
-			image.instance,
-			feature,
-			creator,
-			getAnnotationType()
-		);
-		segmentationContext.hideCreators.delete(creator);
-		dialogue.set(undefined);
-	}
+    const dataRepresentations: { [key: string]: DataRepresentation } = {
+        Q: "DualBitMask",
+        B: "Binary",
+        P: "Probability",
+    };
 
-	let selectList: { [name: string]: Feature[] } = $state({});
-	function selectFeatures(featureSet: { [name: string]: string[] }) {
-		for (const [groupname, featurenames] of Object.entries(featureSet)) {
-			selectList[groupname] = [];
-			for (const name of featurenames) {
-				const feature = features.find((f) => f.name == name);
-				if (feature) {
-					selectList[groupname].push(feature);
-				}
-			}
-		}
-	}
-	if (image.is3D) {
-		selectFeatures(featureSetOCT);
-	} else {
-		selectFeatures(featureSetColorFundus);
-	}
-	const availableFeatures = features.filter((f) => {
-		// TODO: filter features that are not available for the current image?
-		return true;
-	}).$;
+    async function create(feature: Feature) {
+        globalContext.dialogue = `Creating annotation...`;
+
+        let dataType: Datatype = "R8UI";
+        if (selectedType == "P") {
+            // TODO: this could perhaps also be R32F?
+            dataType = "R8";
+        }
+
+        const segmentation = await Segmentation.createFrom(
+            image,
+            feature,
+            creator,
+            dataRepresentations[selectedType],
+            dataType,
+            0.5,
+            axis,
+            taskContext?.subTask
+        );
+        // show segmentations for this creator
+        segmentationContext.hideCreators.delete(creator);
+        const segmentationItem = image.getSegmentationItem(segmentation);
+
+        segmentationContext.segmentationItem = segmentationItem
+
+        globalContext.dialogue = null;
+    }
+
+    const availableFeatures = features.filter((f) => true);
+    let selectedFeatureId: number | undefined = $state(undefined);
 </script>
 
 <div class="new">
-	<div>
-		<select bind:value={selectedFeature}>
-			<option value="" selected disabled hidden>Select feature:</option>
-			{#each Object.entries(selectList) as [groupname, features]}
-				<optgroup label={groupname}>
-					{#each features as feature}
-						<option value={feature}>{feature.name}</option>
-					{/each}
-				</optgroup>
-			{/each}
-		</select>
-		<button onclick={() => create(selectedFeature!)} disabled={selectedFeature == undefined}>
-			Create
-		</button>
-	</div>
-	<FeatureSelect values={availableFeatures} onselect={(feature) => create(feature)} />
+    {#if Object.keys(featureSubsets).length > 0}
+        <div>
+            <select bind:value={selectedFeatureId}>
+                <option value="" selected disabled hidden>
+                    Select feature:
+                </option>
+                {#each Object.entries(featureSubsets) as [groupname, featureId]}
+                    <optgroup label={groupname}>
+                        {#each featureId as featureId}
+                            {@const feature = features.get(featureId)}
+                            {#if feature}
+                                <option value={featureId}>
+                                    {feature.name}
+                                </option>
+                            {:else}
+                                <option value={featureId} disabled>
+                                    {featureId} (not available)
+                                </option>
+                            {/if}
+                        {/each}
+                    </optgroup>
+                {/each}
+            </select>
+            <button
+                onclick={() => create(features.get(selectedFeatureId!)!)}
+                disabled={selectedFeatureId == undefined}
+            >
+                Create
+            </button>
+        </div>
+    {/if}
+
+    <div>
+        <span>Type:</span>
+        {#each types as type}
+            <label>
+                <input
+                    type="radio"
+                    name="type"
+                    value={type}
+                    bind:group={selectedType}
+                />
+                {type}
+            </label>
+        {/each}
+    </div>
+    <FeatureSelect
+        values={availableFeatures}
+        onselect={(feature) => create(feature)}
+    />
+    <NewMultiFeature dataRepresentation="MultiLabel" />
+    <NewMultiFeature dataRepresentation="MultiClass" />
 </div>
 
 <style>
-	div {
-		display: flex;
-	}
-	div.new {
-		flex-direction: column;
-	}
-	select {
-		width: 10em;
-	}
+    div {
+        display: flex;
+    }
+    div.new {
+        flex-direction: column;
+    }
 </style>

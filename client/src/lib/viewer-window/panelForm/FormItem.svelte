@@ -1,18 +1,17 @@
 <script lang="ts">
     import FormItemContent from "./FormItemContent.svelte";
     import { PanelIcon, Trash } from "../icons/icons";
-    import { data } from "$lib/datamodel/model";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation";
+    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { openNewWindow } from "$lib/newWindow";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import { globalContext } from "$lib/main";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import Duplicate from "../icons/Duplicate.svelte";
     import type { TaskContext } from "$lib/types";
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
-
+    const globalContext = getContext<GlobalContext>("globalContext");   
     const { creator } = globalContext;
 
     interface Props {
@@ -21,7 +20,6 @@
     }
 
     let { form, theme = "dark" }: Props = $props();
-    const { formAnnotations } = data;
 
     const dt = new Date().getTime() - (form.created?.getTime() ?? 0);
     const daysSinceCreation = dt / (1000 * 60 * 60 * 24);
@@ -39,20 +37,12 @@
             if (progress >= maxTime) {
                 clearInterval(removing);
                 removing = undefined;
-                formAnnotations.delete(form);
+                form.delete();
             }
         }, 10);
     }
     function duplicate() {
-        const item: any = { ...form };
-        item.creator = creator;
-        if (taskContext) {
-            item.subTask = taskContext.subTask;
-        } else {
-            item.subTask = undefined;
-        }
-        item.reference = form;
-        formAnnotations.create(item);
+        FormAnnotation.createFrom(creator, form.instance, form.formSchema, taskContext?.subTask, form);
     }
 
     let window: Window | null = null;

@@ -1,181 +1,129 @@
-import { ItemCollection, MutableItemCollection } from "./itemList";
+import type { BaseItem } from "./baseItem";
+import type { CompositeFeature } from "./compositeFeature.svelte";
+import type { Contact } from "./contact.svelte";
+import type { Creator } from "./creator.svelte";
+import type { Device, DeviceModel } from "./device.svelte";
+import type { Feature } from "./feature.svelte";
+import type { FormAnnotation } from "./formAnnotation.svelte";
+import type { FormSchema } from "./formSchema.svelte";
+import type { Instance } from "./instance.svelte";
+import { ItemCollection } from "./itemList";
+import type { Patient } from "./patient";
+import type { Project } from "./project.svelte";
+import type { Scan } from "./scan";
+import type { Model, ModelSegmentation, Segmentation } from "./segmentation.svelte";
+import type { Series } from "./series";
+import type { Study } from "./study";
+import type { SubTask, SubTaskImageLink } from "./subTask.svelte";
+import type { AnnotationTag, InstanceTag, StudyTag, Tag } from "./tag";
+import type { Task } from "./task.svelte";
+import type { TaskDefinition } from "./taskDefinition";
+import type { TaskState } from "./taskState";
 
-import { AnnotationConstructor, type Annotation } from "./annotation";
-import { AnnotationDataConstructor, type AnnotationData } from "./annotationData";
-import { AnnotationTypeConstructor, type AnnotationType } from "./annotationType";
-import { CreatorConstructor, type Creator } from "./creator";
-import { DeviceConstructor, DeviceModelConstructor, type Device, type DeviceModel } from "./device";
-import { FeatureConstructor, type Feature } from "./feature";
-import { FormAnnotationConstructor, type FormAnnotation } from "./formAnnotation";
-import { FormSchemaConstructor, type FormSchema } from "./formSchema";
-import { InstanceConstructor, type Instance } from "./instance";
-import { PatientConstructor, type Patient } from "./patient";
-import { ProjectConstructor, type Project } from "./project";
-import { ScanConstructor, type Scan } from "./scan";
-import { SeriesConstructor, type Series } from "./series";
-import { StudyConstructor, type Study } from "./study";
-import { SubTaskConstructor, type SubTask } from "./subTask";
-import { SubTaskImageLinkConstructor, type SubTaskImageLink } from "./subTaskImageLink";
-import { AnnotationTagConstructor, InstanceTagConstructor, StudyTagConstructor, TagConstructor, type AnnotationTag, type InstanceTag, type StudyTag, type Tag } from "./tag";
-import { TaskConstructor, type Task } from "./task";
-import { TaskDefinitionConstructor, type TaskDefinition } from "./taskDefinition";
-import { TaskStateConstructor, type TaskState } from "./taskState";
+export const data: {
+    compositeFeatures: ItemCollection<CompositeFeature>;
+    'composite-features': ItemCollection<CompositeFeature>;
+    formAnnotations: ItemCollection<FormAnnotation>;
+    'form-annotations': ItemCollection<FormAnnotation>;
+    formSchemas: ItemCollection<FormSchema>;
+    'form-schemas': ItemCollection<FormSchema>;
+    deviceModels: ItemCollection<DeviceModel>;
+    'device-models': ItemCollection<DeviceModel>;
+    taskDefinitions: ItemCollection<TaskDefinition>;
+    'task-definitions': ItemCollection<TaskDefinition>;
+    taskStates: ItemCollection<TaskState>;
+    'task-states': ItemCollection<TaskState>;
+    subTasks: ItemCollection<SubTask>;
+    'sub-tasks': ItemCollection<SubTask>;
+    subTaskImageLinks: ItemCollection<SubTaskImageLink>;
+    'sub-task-image-links': ItemCollection<SubTaskImageLink>;
+    instances: ItemCollection<Instance>;
+    series: ItemCollection<Series>;
+    studies: ItemCollection<Study>;
+    patients: ItemCollection<Patient>;
+    segmentations: ItemCollection<Segmentation>;
+    creators: ItemCollection<Creator>;
+    contacts: ItemCollection<Contact>;
+    projects: ItemCollection<Project>;
+    devices: ItemCollection<Device>;
+    features: ItemCollection<Feature>;
+    scans: ItemCollection<Scan>;
+    tasks: ItemCollection<Task>;
+    tags: ItemCollection<Tag>;
+    annotationTags: ItemCollection<AnnotationTag>;
+    'annotation-tags': ItemCollection<AnnotationTag>;
+    instanceTags: ItemCollection<InstanceTag>;
+    'instance-tags': ItemCollection<InstanceTag>;
+    studyTags: ItemCollection<StudyTag>;
+    'study-tags': ItemCollection<StudyTag>;
+    models: ItemCollection<Model>;
+    modelSegmentations: ItemCollection<ModelSegmentation>;
+    'model-segmentations': ItemCollection<ModelSegmentation>;
+} = { } as any;
 
-export const constructors = {
-    annotationDatas: AnnotationDataConstructor,
-    annotations: AnnotationConstructor,
-    annotationTypes: AnnotationTypeConstructor,
+const constructors: { [key: string]: (new (item: any) => BaseItem) } = {};
 
-    creators: CreatorConstructor,
-    devices: DeviceConstructor,
-    deviceModels: DeviceModelConstructor,
-    features: FeatureConstructor,
-    formAnnotations: FormAnnotationConstructor,
-    formSchemas: FormSchemaConstructor,
-
-    instances: InstanceConstructor,
-    patients: PatientConstructor,
-    projects: ProjectConstructor,
-    scans: ScanConstructor,
-    series: SeriesConstructor,
-    studies: StudyConstructor,
-
-
-    taskDefinitions: TaskDefinitionConstructor,
-    tasks: TaskConstructor,
-    taskStates: TaskStateConstructor,
-    subTasks: SubTaskConstructor,
-    subTaskImageLinks: SubTaskImageLinkConstructor,
-
-    tags: TagConstructor,
-    instanceTags: InstanceTagConstructor,
-    studyTags: StudyTagConstructor,
-    annotationTags: AnnotationTagConstructor,
-};
-
-export class DataModel {
-
-    annotationDatas = new MutableItemCollection<AnnotationData>('annotationDatas');
-    annotations = new MutableItemCollection<Annotation>('annotations');
-    annotationTypes = new ItemCollection<AnnotationType>();
-
-    creators = new ItemCollection<Creator>();
-    devices = new ItemCollection<Device>();
-    deviceModels = new ItemCollection<DeviceModel>();
-    features = new MutableItemCollection<Feature>('features');
-    formAnnotations = new MutableItemCollection<FormAnnotation>('formAnnotations');
-    formSchemas = new ItemCollection<FormSchema>();
-
-    instances = new ItemCollection<Instance>();
-    patients = new ItemCollection<Patient>();
-    projects = new ItemCollection<Project>();
-    scans = new ItemCollection<Scan>();
-    series = new ItemCollection<Series>();
-    studies = new ItemCollection<Study>();
-
-    taskDefinitions = new MutableItemCollection<TaskDefinition>('taskDefinitions');
-    tasks = new MutableItemCollection<Task>('tasks');
-    taskStates = new ItemCollection<TaskState>();
-    subTasks = new MutableItemCollection<SubTask>('subTasks');
-    subTaskImageLinks = new MutableItemCollection<SubTaskImageLink>('subTaskImageLinks');
-
-    tags = new MutableItemCollection<Tag>('tags');
-    instanceTags = new MutableItemCollection<InstanceTag>('instanceTags');
-    studyTags = new MutableItemCollection<StudyTag>('studyTags');
-    annotationTags = new MutableItemCollection<AnnotationTag>('annotationTags');
-}
-export const data = new DataModel();
-
-export function instanceTags(instance: Instance) {
-    return data.instanceTags.filter(it => it.instance === instance);
+export function registerConstructor(key: string, constructor: any) {
+    const keyCamel = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    constructors[key] = constructor;
+    constructors[keyCamel] = constructor;
+    data[keyCamel] = new ItemCollection<InstanceType<typeof constructor>>();
+    data[key] = data[keyCamel];
 }
 
-export function annotationDatas(annotation: Annotation) {
-    return data.annotationDatas.filter(a => a.annotation.id === annotation.id);
+function initializeModel() {
+    // Import all model classes - this will trigger their registerConstructor calls
+    import('./scan');
+    import('./patient');
+    import('./study');
+    import('./series');
+    import('./instance.svelte');
+    import('./project.svelte');
+    import('./device.svelte');
+    import('./creator.svelte');
+    import('./contact.svelte');
+    import('./compositeFeature.svelte');
+    import('./feature.svelte');
+    import('./formSchema.svelte');
+    import('./formAnnotation.svelte');
+    import('./segmentation.svelte');
+    import('./task.svelte');
+    import('./taskDefinition');
+    import('./taskState');
+    import('./subTask.svelte');
+    import('./tag');
 }
+initializeModel();
 
-export function instanceAnnotations(instance: Instance) {
-    return data.annotations.filter(a => a.instance === instance);
-}
 export function clearData() {
-    data['instances'].clear();
-    data['series'].clear();
-    data['studies'].clear();
-    data['patients'].clear();
-    data['annotationDatas'].clear();
-    data['annotations'].clear();
-    data['formAnnotations'].clear();
-    
+    data.instances.clear();
+    data.series.clear();
+    data.studies.clear();
+    data.patients.clear();
+    data.formAnnotations.clear();
 }
+
+export function removeData(items: { [key: string]: number[] }) {
+    for (const [key, ids] of Object.entries(items)) {
+        const collection = data[key as keyof typeof data];
+        for (const id of ids) {
+            collection.delete(id);
+        }
+    }
+}
+
 export function importData(itemCollections: { [key: string]: any[] }) {
-
-    const newData: { [key: string]: Map<string | number, any> } = {};
-    const allNewItems = [];
-    // First pass: create all new objects with only the id
+    const resp = {};
     for (const [key, items] of Object.entries(itemCollections)) {
-
-        if (!(key in data)) {
-            console.warn(`No collection for ${key}`);
+        if (!(key in constructors)) {
+            console.error(`Unknown key: ${key}`);
             continue;
         }
-        const collection = data[key];
-        const constructor = constructors[key];
-        const newItems = [];
-        for (const itemData of items) {
-            const id = constructor.getID(itemData);
-            if (collection.get(id)) {
-                // item already exists
-                continue;
-            }
-            // create new object with just the id            
-            const newItem = constructor.create(itemData);
-            newItems.push(newItem);
-            let newItemMap = newData[key];
-            if (!newItemMap) {
-                newItemMap = new Map<string | number, any>();
-                newData[key] = newItemMap;
-            }
-            newItemMap.set(id, newItem);
-            allNewItems.push([newItem, itemData, constructor]);
-        }
-    }
-
-    // initialize full objects (resolves FKs)
-    for (const [item, itemData, constructor] of allNewItems) {
-        constructor.toItem(item, itemData, data, newData);
-
-    }
-    for (const [key, map] of Object.entries(newData)) {
-        const collection = data[key as keyof DataModel];
-        const newItems = Array.from(map.values());
+        const collection = data[key as keyof typeof data];
+        const cstr = constructors[key as keyof typeof constructors];
+        const newItems = items.map(item => new cstr(item));
         collection.importItems(newItems);
+        resp[key] = newItems;
     }
+    return resp;
 }
-
-export function importItem(key: string, itemData: any) {
-    const constructor = constructors[key];
-    const collection = data[key];
-    const id = constructor.getID(itemData);
-    if (collection.get(id)) {
-        throw new Error(`Item with id ${id} already exists`);
-    }
-    const newItem = constructor.create(itemData);
-    constructor.toItem(newItem, itemData, data, {});
-    collection.importItems([newItem]);
-    return newItem;
-}
-
-export async function createFormAnnotation(creator: Creator, instance: Instance, formSchema: FormSchema, subTask?: SubTask): Promise<FormAnnotation> {
-    const item: any = {
-        formSchema,
-        patient: instance.patient,
-        study: instance.study,
-        instance,
-        creator,
-        subTask
-    };
-    const result = await data.formAnnotations.create(item);
-    await result.value.setValue({});
-    return result;
-}
-

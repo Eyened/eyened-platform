@@ -1,37 +1,34 @@
 <script lang="ts">
+    import type { TaskContext } from "$lib/types";
+    import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
     import Viewer from "$lib/viewer/Viewer.svelte";
-    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
-    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
-    import { getContext, onDestroy, setContext } from "svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import Dialogue from "./Dialogue.svelte";
-    import { get_url_params } from "$lib/utils";
-    import PanelRendering from "./panelRendering/PanelRendering.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import type { DialogueType, TaskContext } from "$lib/types";
-    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
-    import { writable } from "svelte/store";
-    import PanelForm from "./panelForm/PanelForm.svelte";
-    import PanelLayers from "./panelLayers/PanelLayers.svelte";
-    import type { ViewerEvent, PanelName } from "$lib/viewer/viewer-utils";
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
+    import { getContext, onDestroy, setContext, type Component } from "svelte";
     import MainIcon from "./icons/MainIcon.svelte";
+    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
+    import PanelForm from "./panelForm/PanelForm.svelte";
     import PanelHeader from "./PanelHeader.svelte";
+    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
+    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
+    import PanelRendering from "./panelRendering/PanelRendering.svelte";
+    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
+
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import {
         Close,
-        Info,
-        Rendering,
-        ETDRS,
-        Registration,
-        Form,
         Draw,
-        Layers,
+        ETDRS,
+        Form,
+        Info,
+        Registration,
+        Rendering,
     } from "./icons/icons";
     import Measure from "./icons/Measure.svelte";
     import PanelInfo from "./panelInfo/panelInfo.svelte";
     import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
-    import { data } from "$lib/datamodel/model";
-
     interface Props {
         image: AbstractImage;
     }
@@ -48,19 +45,17 @@
     const viewerContext = new ViewerContext(image, registration);
     setContext("viewerContext", viewerContext);
 
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const segmentationOverlay = new SegmentationOverlay(viewerContext, globalContext);
+    setContext("segmentationOverlay", segmentationOverlay);    
+    onDestroy(viewerContext.addOverlay(segmentationOverlay));
+
     const { activePanels } = viewerContext;
-    const params = get_url_params();
-
-    if (params["panel"]) {
-        activePanels.add(params["panel"] as PanelName);
-    }
-
-    const dialogue = writable<DialogueType>(undefined);
-    setContext("dialogue", dialogue);
+    activePanels.add("Segmentation");
 
     const topViewer = viewerWindowContext.topViewers.get(image)!;
 
-    const overlay = {
+    const followCursor = {
         pointermove(e: ViewerEvent<PointerEvent>) {
             const { viewerContext } = e;
             const { x, y } = e.cursor;
@@ -81,7 +76,7 @@
         },
     };
 
-    onDestroy(viewerContext.addOverlay(overlay));
+    onDestroy(viewerContext.addOverlay(followCursor));
     onDestroy(() => {
         topViewer.initTransform();
     });
@@ -99,57 +94,49 @@
         (schema) => schema.name === "Pointset registration",
     )!;
 
-    const panels = [
-        { name: "Info" as PanelName, component: PanelInfo, icon: Info },
+    const panels: { name: PanelName, component: Component, Icon: Component, props?: any }[] = [
+        { name: "Info", component: PanelInfo, Icon: Info },
         {
-            name: "Rendering" as PanelName,
+            name: "Rendering",
             component: PanelRendering,
-            icon: Rendering,
+            Icon: Rendering,
         },
     ];
 
     if (image.is2D && etdrsSchema) {
         panels.push({
-            name: "ETDRS" as PanelName,
+            name: "ETDRS",
             component: PanelETDRS,
-            icon: ETDRS,
+            Icon: ETDRS,
             props: { etdrsSchema, active: false },
         });
     }
 
     if (image.is2D && registrationSchema) {
         panels.push({
-            name: "Registration" as PanelName,
+            name: "Registration",
             component: PanelRegistration,
-            icon: Registration,
+            Icon: Registration,
             props: { registrationSchema, active: false },
         });
     }
 
     panels.push(
         {
-            name: "Measure" as PanelName,
+            name: "Measure",
             component: PanelMeasure,
-            icon: Measure,
+            Icon: Measure,
             props: { active: false },
         },
-        { name: "Form" as PanelName, component: PanelForm, icon: Form },
+        { name: "Form", component: PanelForm, Icon: Form },
         {
-            name: "Segmentation" as PanelName,
+            name: "Segmentation",
             component: PanelSegmentation,
-            icon: Draw,
+            Icon: Draw,
         },
     );
-    if (image.is3D) {
-        panels.push({
-            name: "LayerSegmentation" as PanelName,
-            component: PanelLayers,
-            icon: Layers,
-        });
-    }
 </script>
 
-<Dialogue />
 
 <div class="main">
     <div id="viewer">
@@ -157,6 +144,8 @@
     </div>
     <div id="right">
         <div id="close" class:vertical={minimize}>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <span
                 class="image-id"
                 onclick={() => (minimize = !minimize)}
@@ -165,15 +154,11 @@
                 &#9660; [{image.image_id}]
             </span>
 
-            <MainIcon onclick={closePanel} tooltip="Close">
-                {#snippet icon()}
-                    <Close />
-                {/snippet}
-            </MainIcon>
+            <MainIcon onclick={closePanel} tooltip="Close" Icon={Close} />
 
             {#if minimize}
-                <MainIcon onclick={() => (minimize = false)} tooltip="Close">
-                    {#snippet icon()}
+                <MainIcon onclick={() => (minimize = false)} tooltip="minimize">
+                    {#snippet iconSnippet()}
                         <span class="dots">&#8942;</span>
                     {/snippet}
                 </MainIcon>
@@ -181,12 +166,8 @@
         </div>
 
         <div id="panels" class:minimize>
-            {#each panels as { name, component: Component, icon: Icon, props = { } }}
-                <PanelHeader text={name} panelName={name}>
-                    {#snippet icon()}
-                        <Icon />
-                    {/snippet}
-                </PanelHeader>
+            {#each panels as { name, component: Component, Icon, props = { } }}
+                <PanelHeader text={name} panelName={name} {Icon} />
                 <div
                     class="panel {activePanels.has(name)
                         ? 'expanded'

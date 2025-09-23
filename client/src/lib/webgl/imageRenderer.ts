@@ -28,6 +28,7 @@ export class BaseImageRenderer implements ImageRenderer {
         const { image } = viewerContext;
 
         const uniforms = getBaseUniforms(viewerContext);
+        // console.log(uniforms);
         if (image.is3D) {
             this.shader3D.pass(renderTarget, uniforms);
             return;
@@ -37,8 +38,14 @@ export class BaseImageRenderer implements ImageRenderer {
         // image stores different textures for different render modes
         uniforms.u_image = (image as Image2D).selectTexture(renderMode);
 
-        if (renderMode == 'Luminance') {
-            // luminance is not stored in a separate texture, but calculated in the fragment shader
+        if (renderMode == 'Luminance' || renderMode == 'Red' || renderMode == 'Green' || renderMode == 'Blue') {
+            // luminance, red, green, blue are not stored in a separate texture, but calculated in the fragment shader
+            uniforms.u_channel = {
+                'R': 0,
+                'G': 1,
+                'B': 2,
+                'L': -1,
+            }[renderMode[0]];
             this.shaderLuminance.pass(renderTarget, uniforms);
         } else {
             this.shaderBase.pass(renderTarget, uniforms);

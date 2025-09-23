@@ -1,29 +1,68 @@
+import os
+from dataclasses import asdict, dataclass
+from typing import Optional
+from pathlib import Path
+
 import yaml
-from typing import Dict, Optional
+from eyened_orm.utils.config import EyenedORMConfig, load_config_from_environ, load_config_from_env_file, DatabaseSettings
 
-from pydantic import Field
-from pydantic_settings import SettingsConfigDict
-from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig
-
+@dataclass
 class Settings(EyenedORMConfig):
-    # IMPORTANT: the base fields in this file must match environment variable names exactly (with the exception of case) unless otherwise specified with validation_alias
-    # NOTE: that this file also inherits from EyenedORMConfig
-    # Pydantic will take care of reading the environment internally
-    
-    # Server-specific configuration with non-redundant fields
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
-
-    # Default username and password for the admin user
-    admin_username: str
-    admin_password: str
+    # Server-specific settings
+    admin_username: str = ""
+    admin_password: str = ""
+    database_root_password: Optional[str] = None
 
     # Print settings for debugging purposes - hide password and secret key
     def __str__(self):
-        settings_dict = self.model_dump()
-        settings_dict['secret_key'] = '***HIDDEN***'
-        settings_dict['admin_password'] = '***HIDDEN***'
-        settings_dict['database']['password'] = '***HIDDEN***'
+        settings_dict = asdict(self)
+        settings_dict["secret_key"] = "***HIDDEN***"
+        settings_dict["admin_password"] = "***HIDDEN***"
+        settings_dict["database"]["password"] = "***HIDDEN***"
         return yaml.dump(settings_dict, default_flow_style=False)
 
-settings = Settings()
-settings.database = DatabaseSettings()
+
+def load_settings(env_file: Optional[str | Path] = None) -> Settings:
+    """
+    Load settings from environment variables or .env file.
+    
+    Args:
+        env_file: Optional path to .env file. If None, loads from current environment.
+    
+    Returns:
+        Settings object with all configuration loaded
+    """
+    if env_file:
+        # Load from .env file
+        base_config = load_config_from_env_file(env_file)
+    else:
+        # Load from current environment
+        base_config = load_config_from_environ(os.environ)
+    
+    # Create Settings object by copying the base config and adding server-specific settings
+    settings = Settings(
+        database=base_config.database, 
+        secret_key=base_config.secret_key,
+        images_basepath=base_config.images_basepath,
+        segmentations_zarr_store=base_config.segmentations_zarr_store,
+        thumbnails_path=base_config.thumbnails_path,
+        annotations_path=base_config.annotations_path,
+        default_study_date=base_config.default_study_date,
+        cfi_cache_path=base_config.cfi_cache_path,
+        image_server_url=base_config.image_server_url,
+        # Server-specific settings
+        admin_username=os.getenv("ADMIN_USERNAME", ""),
+        admin_password=os.getenv("ADMIN_PASSWORD", ""),
+        database_root_password=os.getenv("DATABASE_ROOT_PASSWORD"),
+    )
+    
+    # Handle database fallback logic
+    if settings.database.user == "" or settings.database.password == "":
+        settings.database.user = "root"
+        settings.database.password = settings.database_root_password
+    
+    return settings
+
+
+# Load settings at module level
+settings = load_settings()

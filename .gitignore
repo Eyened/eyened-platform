@@ -1,3 +1,4 @@
+orm/eyened_orm/environments/*.env
 docker/.env
 *.env
 *.zip
@@ -6,3 +7,15 @@ notebooks/hrfav/**/*
 node_modules/**/*
 extensions.ts
 client/src/lib/extensions.ts
+storage/**/*
+images/**/*
+dev/docker-compose.yml
+cookies.txt
+.vscode/settings.json
+client/package-lock.json
+client/src/lib/extensions.ts
+TODO.md
+orm/migrations/transfer-config.yml
+orm/migrations/transfer-config.*.yml
+database/
+segmentations.zarr/

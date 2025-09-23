@@ -55,20 +55,3 @@ def decode_params(params_multi_items):
         result[field, operator] = value
 
     return result
-
-
-def apply_filters(query, column_mapping, params):
-    applied = False
-
-    for field, (operator, value) in params.items():
-        if field not in column_mapping:
-            continue
-        print("applying filter", field, operator, value)
-        applied = True
-
-        column = column_mapping[field]
-        op_func = sqlalchemy_operators[operator]
-
-        query = query.where(op_func(column, value))
-
-    return query, applied

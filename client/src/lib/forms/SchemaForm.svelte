@@ -28,8 +28,8 @@
         value,
         onchange,
         max_radio_options = 8,
-        vertical = $bindable(true),
-        collapse = $bindable(true),
+        vertical = true,
+        collapse = true,
         canEdit = true,
         requiredAbsent = false,
     }: Props = $props();
@@ -109,6 +109,8 @@
         }
         return false;
     });
+
+    let textFocus = $state(false);
 </script>
 
 {#snippet query(showValue = true)}
@@ -159,8 +161,8 @@
                             schema={schema.properties![key]}
                             value={schemaValidator.value?.[key]}
                             onchange={(value) => keyUpdate(key, value)}
-                            bind:vertical
-                            bind:collapse
+                            {vertical}
+                            {collapse}
                             requiredAbsent={schemaValidator.requiredAbsent.includes(
                                 key,
                             )}
@@ -179,19 +181,17 @@
                             value={sub_value}
                             schema={schema.items}
                             onchange={(v) => setArray(i, v)}
-                            bind:vertical
-                            bind:collapse
+                            {vertical}
+                            {collapse}
                             {canEdit}
                         />
                         <div class="icon">
                             {#if canEdit}
-                                {#snippet icon()}
-                                    <Trash size="1.5em" />
-                                {/snippet}
                                 <MainIcon
                                     onclick={() => removeArrayValue(i)}
                                     theme="light"
-                                    {icon}
+                                    Icon={Trash}
+                                    size="1.5em"
                                 />
                             {/if}
                         </div>
@@ -238,9 +238,11 @@
                         </select>
                     </div>
                 {/if}
-            {:else if inputVisible}
+            {:else if inputVisible || textFocus}
                 <div class="input">
                     <input
+                        onfocus={() => (textFocus = true)}
+                        onblur={() => (textFocus = false)}
                         type={schemaValidator.inputType}
                         bind:value={val.value}
                         size={schemaValidator.inputType == "text" ? 100 : 4}

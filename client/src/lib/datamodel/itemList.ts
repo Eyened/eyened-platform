@@ -1,7 +1,4 @@
-import { apiUrl } from '$lib/config';
-import { derived, get, writable, type Invalidator, type Readable, type Subscriber, type Unsubscriber } from 'svelte/store';
-import type { ItemConstructor } from './itemContructor';
-import { constructors, importItem } from './model';
+import { derived, get, writable, type Readable, type Subscriber, type Unsubscriber } from 'svelte/store';
 
 export interface Item {
     id: number | string;
@@ -11,34 +8,63 @@ export class FilterList<T> implements Readable<T[]> {
 
     constructor(public readonly items: Readable<T[]>) { }
 
+    private derive<S>(fn: (items: T[]) => S[]): FilterList<S> {
+        return new FilterList(derived(this.items, fn));
+    }
+
     first(): T | undefined {
         return this.$[0];
     }
 
-    subscribe(run: Subscriber<T[]>, invalidate?: Invalidator<T[]> | undefined): Unsubscriber {
+    subscribe(run: Subscriber<T[]>, invalidate?: () => void): Unsubscriber {
         return this.items.subscribe(run, invalidate);
     }
 
-    find(predicate: (value: T) => boolean): T | undefined {
+    get(index: number): Readable<T | undefined> {
+        return derived(this.items, lst => lst[index]);
+    }
+
+    get$(index: number): T | undefined {
+        return this.$[index];
+    }
+
+    find$(predicate: (value: T) => boolean): T | undefined {
         const items = get(this.items);
         return items.find(predicate);
     }
 
+    find(predicate: (value: T) => boolean): Readable<T | undefined> {
+        return derived(this.items, lst => lst.find(predicate));
+    }
+
+    concat<S>(other: FilterList<S>): FilterList<T | S> {
+        return new FilterList(derived([this.items, other.items], ([a, b]) => [...a, ...b]));
+    }
+
     filter(predicate: (value: T) => boolean): FilterList<T> {
-        return new FilterList(derived(this.items, lst => lst.filter(predicate)));
+        return this.derive(lst => lst.filter(predicate));
     }
 
     sort(compareFn: (a: T, b: T) => number): FilterList<T> {
-        return new FilterList(derived(this.items, lst => lst.slice().sort(compareFn)));
+        return this.derive(lst => lst.slice().sort(compareFn));
+    }
+
+    forEach$(callback: (value: T) => void): void {
+        this.$.forEach(callback);
     }
 
     map<S>(mapFn: (value: T) => S): FilterList<S> {
-        return new FilterList(derived(this.items, lst => lst.map(mapFn)));
+        return this.derive(lst => lst.map(mapFn));
     }
 
-    forEach(callback: (value: T) => void): void {
-        get(this.items).forEach(callback);
+    map$<S>(mapFn: (value: T) => S): S[] {
+        return this.$.map(mapFn);
     }
+
+    flatMap<S>(mapFn: (value: T) => S[]): FilterList<S> {
+        return this.derive(lst => lst.flatMap(mapFn));
+    }
+
 
     reduce<S>(reducer: (accumulator: S, currentValue: T) => S, initialValue: S): Readable<S> {
         return derived(this.items, lst => lst.reduce(reducer, initialValue));
@@ -95,9 +121,29 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
     protected readonly items: Map<number | string, T> = new Map();
     protected readonly store = writable(0);
 
+
+    constructor() {
+    }
+
+    private emit() {
+        this.store.update(n => n + 1);
+    }
+
+    importItems(items: T[]) {
+        for (const item of items) {
+            this.items.set(item.id, item);
+        }
+        this.emit();
+    }
+
     clear() {
         this.items.clear();
-        this.store.update(n => n + 1);
+        this.emit();
+    }
+
+    delete(id: number | string) {
+        this.items.delete(id);
+        this.emit();
     }
 
     get(id: number | string): T | undefined {
@@ -112,69 +158,38 @@ export class ItemCollection<T extends Item> implements Readable<T[]> {
         return this.values()[0];
     }
 
-    importItems(items: T[]) {
-        for (const item of items) {
-            this.items.set(item.id, item);
-        }
-        this.store.update(n => n + 1);
-    }
-
     subscribe(run: Subscriber<T[]>): Unsubscriber {
-        return this.store.subscribe(_ => run(Array.from(this.items.values())));
-    }
-
-    filter(predicate: (value: T) => boolean): FilterList<T> {
-        return new FilterList(this).filter(predicate);
+        return this.store.subscribe(_ => run(this.values()));
     }
 
     get filterlist() {
         return new FilterList(this);
     }
 
+    filter(predicate: (value: T) => boolean): FilterList<T> {
+        return this.filterlist.filter(predicate);
+    }
+
+    filter$(predicate: (value: T) => boolean): T[] {
+        return this.values().filter(predicate);
+    }
+
+
     values(): T[] {
         return Array.from(this.items.values());
     }
 
     find(predicate: (value: T) => boolean): T | undefined {
-        const items = Array.from(this.items.values());
-        return items.find(predicate);
+        return this.values().find(predicate);
     }
 
     map<S>(predicate: (value: T) => S): FilterList<S> {
-        return new FilterList(this).map(predicate);
-    }
-}
-export class MutableItemCollection<T extends Item> extends ItemCollection<T> {
-
-    constructor(private readonly endpoint: string) {
-        super();
+        return this.filterlist.map(predicate);
     }
 
-    async create(item: Omit<T, 'id'>): Promise<T> {
-        const itemConstructor = constructors[this.endpoint] as ItemConstructor<T>;
-        const apiParams = itemConstructor.toParams(item);
-
-        const resp = await fetch(`${apiUrl}/${this.endpoint}/new`, {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(apiParams)
-        });
-        const params = await resp.json();
-        return importItem(this.endpoint, params) as T;
+    flatMap<S>(predicate: (value: T) => S[]): FilterList<S> {
+        return this.filterlist.flatMap(predicate);
     }
 
-    async delete(item: T, fromServer = true): Promise<void> {
-        if (fromServer) {
-            const url = `${apiUrl}/${this.endpoint}/${item.id}`;
-            const resp = await fetch(url, { method: 'DELETE' });
-            if (resp.status != 204) {
-                throw new Error('Failed to delete');
-            }
-        }
-        this.items.delete(item.id);
-        this.store.update(n => n + 1);
-    }
+
 }

@@ -1,6 +1,5 @@
 import hashlib
 import hmac
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -11,7 +10,7 @@ from tqdm import tqdm
 from eyened_orm import ImageInstance, Modality
 
 
-def get2Darray(im: ImageInstance):
+def get_thumbnail(im: ImageInstance):
     pixel_array = im.pixel_array
     shape = pixel_array.shape
     if len(shape) == 3:
@@ -20,15 +19,26 @@ def get2Darray(im: ImageInstance):
         else:  # OCT 
             n_scans, _, _ = pixel_array.shape
             if n_scans == 1:
+                # single B-scan
                 return pixel_array.squeeze()
             elif n_scans < 10:
+                # few B-scans (take the middle one)
                 return pixel_array[n_scans // 2]
             else:
+                # many B-scans (create enface projection)
                 np_im = pixel_array.mean(axis=1)
-                np_im = np_im - np.min(np_im)
-                np_im = np_im / np.max(np_im)
-                np_im = (np_im * 255).astype(np.uint8)
-                aspect_ratio = im.ResolutionHorizontal / im.ResolutionVertical
+                try:
+                    np_im = np_im - np.min(np_im)
+                    np_im = np_im / np.max(np_im)
+                    np_im = (np_im * 255).astype(np.uint8)
+                except ValueError:
+                    pass
+                    
+                try:
+                    aspect_ratio = im.ResolutionHorizontal / im.ResolutionVertical
+                except (TypeError, ZeroDivisionError):
+                    aspect_ratio = 1
+                    
                 h, w = np_im.shape
                 if aspect_ratio > 1:
                     target_shape = (int(w * aspect_ratio), h)
@@ -53,7 +63,7 @@ def generate_thumbnail_name(db_id, secret_key):
 
 def get_thumbnail_identifier(im: ImageInstance) -> str:
     """Generate a unique identifier for the thumbnail."""
-    secret_key = ImageInstance.config.secret_key
+    secret_key = im.config.secret_key
     project_id = str(im.Patient.Project.ProjectID)
     thumbnail_name = generate_thumbnail_name(im.ImageInstanceID, secret_key)[:24]
     return f"{project_id}/{thumbnail_name}"
@@ -65,7 +75,7 @@ def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
         _, bounds_cropped = im.bounds.crop(max(sizes))
         np_im = bounds_cropped.image
     else:
-        np_im = get2Darray(im)
+        np_im = get_thumbnail(im)
     pil_im = Image.fromarray(np_im)
 
     # Save thumbnails for each size    
@@ -84,16 +94,11 @@ def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
         )
 
 
-def get_missing_thumbnail_images(session, where, include_failed=False):
+def get_missing_thumbnail_images(session, include_failed=False):
     where = ImageInstance.ThumbnailPath == None
     if include_failed:
         where = where | (ImageInstance.ThumbnailPath == "")
-
-    images = (
-        session.execute(select(ImageInstance).where(where).order_by(func.random()))
-        .scalars()
-        .all()
-    )
+    images = ImageInstance.where(session, where)
     print(f"Found {len(images)} images without thumbnails")
     return images
 
@@ -108,7 +113,7 @@ def update_thumbnails(
         try:
             if image.path.suffix == ".json":
                 image.ThumbnailPath = None
-                print(f"Skipping {image.ImageInstanceID} because it is a JSON file")
+                # print(f"Skipping {image.ImageInstanceID} because it is a JSON file")
             else:
                 image.ThumbnailPath = get_thumbnail_identifier(image)
                 save_thumbnails(image)

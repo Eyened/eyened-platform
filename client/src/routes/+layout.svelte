@@ -1,18 +1,38 @@
 <script lang="ts">
-    import { globalContext } from "$lib/main.js";
+    import { page } from "$app/state";
+    import { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import Popup from "$lib/Popup.svelte";
-    let { children } = $props();
+    import Dialogue from "$lib/Dialogue.svelte";
+    import { setContext } from "svelte";
 
-    function close() {
+    let { children }: { children: any } = $props();
+
+    function closePopup() {
         globalContext.popupComponent = null;
     }
+    function closeDialogue() {
+        globalContext.dialogue = null;
+    }
+
+    const globalContext = new GlobalContext();
+
+    setContext("globalContext", globalContext);
+    let ready = $state(false);
+    globalContext.init(page.url.pathname).then(() => {
+        ready = true;
+    });
 </script>
 
 {#if globalContext.popupComponent}
-    <Popup componentDef={globalContext.popupComponent} {close} />
+    <Popup componentDef={globalContext.popupComponent} close={closePopup} />
+{/if}
+{#if globalContext.dialogue}
+    <Dialogue content={globalContext.dialogue} close={closeDialogue} />
 {/if}
 
-{@render children()}
+{#if ready}
+    {@render children()}
+{/if}
 
 <style>
     :global(body) {

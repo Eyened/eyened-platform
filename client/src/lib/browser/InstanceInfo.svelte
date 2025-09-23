@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getThumbUrl } from '$lib/data-loading/utils';
-	import type { Instance } from '$lib/datamodel/instance';
+	import type { Instance } from '$lib/datamodel/instance.svelte';
 	import InstanceSegmentationTable from './InstanceSegmentationTable.svelte';
 
 	interface Props {
@@ -37,7 +37,15 @@
 						{:else if ['series', 'study', 'patient', 'project'].includes(key) }
 							<td>{value.id}</td>
 						{:else}
-							<td>{value}</td>
+							<td>
+								{#if value == null}
+									NULL
+								{:else if typeof value === 'object' && value !== null}
+									<pre>{JSON.stringify(value, null, 2)}</pre>
+								{:else}
+									{value}
+								{/if}
+							</td>
 						{/if}
 					</tr>
 				{/each}

@@ -1,8 +1,10 @@
+from dataclasses import asdict
 import subprocess
 import tempfile
 import mysql.connector
 from eyened_orm.utils.smart_dump import DatabaseDumper
 from eyened_orm.utils.paths import paths
+
 
 def build_command(command, db_config, args=[], include_database=True):
     result = [
@@ -18,7 +20,7 @@ def build_command(command, db_config, args=[], include_database=True):
     ]
     if include_database:
         result.append(db_config.database)
-    return result
+    return [str(arg) for arg in result]
 
 
 def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=[]):
@@ -97,22 +99,22 @@ class DatabaseTransfer:
             dump_file.seek(0)
             load_db(self.test_db, dump_file)
 
-    def populate(self, root_conditions: dict):
-        
-        dumper = DatabaseDumper(self.source_db, paths, root_conditions)        
+    def populate(self, copy_objects: list):
+
+        dumper = DatabaseDumper(self.source_db, paths, copy_objects)
         sql_statements = dumper.dump()
 
-        conn = mysql.connector.connect(**self.source_db.model_dump())
+        conn = mysql.connector.connect(**asdict(self.source_db))
         with conn.cursor() as cursor:
             cursor.execute("SELECT version_num FROM alembic_version;")
             version = cursor.fetchone()[0]
 
-        
-
-        conn = mysql.connector.connect(**self.test_db.model_dump())
+        conn = mysql.connector.connect(**asdict(self.test_db))
         with conn.cursor() as cursor:
-            cursor.execute(f"INSERT INTO alembic_version (version_num) VALUES ('{version}');")
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")            
+            cursor.execute(
+                f"INSERT INTO alembic_version (version_num) VALUES ('{version}');"
+            )
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
             for sql, values in sql_statements:
                 try:
                     cursor.execute(sql, values)

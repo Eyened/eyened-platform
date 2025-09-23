@@ -11,9 +11,6 @@ export abstract class FragmentShaderProgram {
 
 	setUniforms(uniforms: { [name: string]: any }) {
 		this.programInfo.setUniforms(uniforms);
-		// for (const [name, value] of Object.entries(uniforms)) {
-		// 	this.programInfo.setUniform(this.gl, name, value);
-		// }
 	}
 
 	abstract pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }): void;
@@ -25,8 +22,6 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
 		/*
 		draw inside a rectangle with fragment coordinates v_uv 0-1
 		specify these uniforms to determine the position of the rectangle:
-		//uniform vec2 u_translate;
-		//uniform vec2 u_scale;
 		uniform mat3 u_transform;
 		uniform vec2 u_image_size;
 		uniform vec2 u_viewer_size;

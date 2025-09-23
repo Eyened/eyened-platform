@@ -1,113 +1,111 @@
 <script lang="ts">
-	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import { getContext, onDestroy, setContext } from 'svelte';
-	import NewSegmentation from './NewSegmentation.svelte';
-	import PanelIcon from '../icons/PanelIcon.svelte';
-	import { Hide, Show } from '../icons/icons';
-	import CreatorSegmentations from './CreatorSegmentations.svelte';
-	import { SegmentationOverlay } from '$lib/viewer/overlays/SegmentationOverlay.svelte';
-	import { SegmentationContext } from './segmentationContext.svelte';
-	import { derived, type Readable } from 'svelte/store';
-	import type { Annotation } from '$lib/datamodel/annotation';
-	import type { Creator } from '$lib/datamodel/creator';
-	import { globalContext } from '$lib/main';
+    import { getContext } from "svelte";
+    import NewSegmentation from "./NewSegmentation.svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import CreatorSegmentations from "./CreatorSegmentations.svelte";
+    import DrawingTools from "./DrawingTools.svelte";
+    import ModelSegmentations from "./ModelSegmentations.svelte";
+    const globalContext = getContext<GlobalContext>("globalContext");
 
-    const viewerContext = getContext<ViewerContext>('viewerContext');
+    interface Props {
+        active: boolean;
+    }
+    let { active }: Props = $props();
 
-	const {
-		image: { segmentationAnnotations, segmentationController }
-	} = viewerContext;
+    const { creator } = globalContext;
 
-	const { creator } = globalContext;
-	const segmentationContext = new SegmentationContext();
-	setContext('segmentationContext', segmentationContext);
-	const overlay = new SegmentationOverlay(
-		viewerContext,
-		segmentationController,
-		segmentationContext
-	);
-	setContext('segmentationOverlay', overlay);
+    const segmentationOverlay = getContext<SegmentationOverlay>(
+        "segmentationOverlay",
+    );
 
-	// The segmentation overlay is active while this panel is open
-	// The overlay is removed when the panel is destroyed
-	onDestroy(viewerContext.addOverlay(overlay));
+    // This is used to not render when the panel is collapsed
+    // Perhaps there is a cleaner solution?
+    $effect(() => {
+        segmentationOverlay.active = active;
+    });
 
-	// filtered contains only annotations to be shown (based on config settings)
-	const filtered = segmentationAnnotations.filter(globalContext.annotationsFilter);
-	const creatorSegmentations = filtered.groupBy((a) => a.creator);
+    const { segmentationContext, allSegmentations } = segmentationOverlay;
 
-	// hide all on load
-	for (const annotation of $segmentationAnnotations) {
-		segmentationContext.hideCreators.add(annotation.creator);
-	}
-
-	const creatorSegmentationsSorted: Readable<[Creator, Annotation[]][]> = derived(
-		creatorSegmentations,
-		(c) => {
-			const result: [Creator, Annotation[]][] = [];
-			// always show own segmentations first
-			if (c.has(creator)) {
-				result.push([creator, c.get(creator)!]);
-			}
-			for (const [creator_, annotations] of [...c.entries()].sort((a, b) =>
-				a[0].name.localeCompare(b[0].name)
-			)) {
-				if (creator == creator_) continue;
-				result.push([creator_, annotations]);
-			}
-			return result.map(([creator, annotations]) => [creator, annotations.sort((a) => a.id)]) as [
-				Creator,
-				Annotation[]
-			][];
-		}
-	);
-
-	function toggleAll(toggle: boolean) {
-		if (toggle) {
-			segmentationContext.hideSegmentations.clear();
-		} else {
-			for (const s of segmentationController.allSegmentations) {
-				segmentationContext.hideSegmentations.add(s);
-			}
-		}
-	}
+    const creators = segmentationOverlay.allSegmentations.collectSet(
+        (s) => s.creator,
+    );
+    const models = segmentationOverlay.allModelSegmentations.collectSet(
+        (s) => s.model,
+    );
+    // hide all on load
+    for (const segmentation of $allSegmentations) {
+        segmentationContext.hideCreators.add(segmentation.creator);
+    }
+    // show own segmentations
+    segmentationContext.hideCreators.delete(creator);
 </script>
 
 <div class="main">
-	<div>
-		<PanelIcon onclick={() => toggleAll(false)} isText={true}>
-			<Hide size="1.5em" /> Hide all
-		</PanelIcon>
-		<PanelIcon onclick={() => toggleAll(true)} isText={true}>
-			<Show size="1.5em" /> Show all
-		</PanelIcon>
-		<div>
-			<label>
-				Opacity:
-				<input type="range" bind:value={overlay.alpha} min="0" max="1" step="0.01" />
-			</label>
-		</div>
-		<ul class="users">
-			{#each $creatorSegmentationsSorted as [creator, annotations] (creator.id)}
-				<li>
-					<CreatorSegmentations {creator} {annotations} />
-				</li>
-			{/each}
-		</ul>
-		<NewSegmentation />
-	</div>
+    <div class="models">
+        <ul class="users">
+            {#each $models as model}
+                <li>
+                    <ModelSegmentations {model} />
+                </li>
+            {/each}
+        </ul>
+    </div>
+    <DrawingTools />
+    <div class="opacity">
+        <label>
+            Opacity:
+            <input
+                type="range"
+                bind:value={segmentationOverlay.alpha}
+                min="0"
+                max="1"
+                step="0.01"
+            />
+        </label>
+    </div>
+
+    <ul class="users">
+        <!-- show own segmentations first -->
+        {#if $creators.has(creator)}
+            <li>
+                <CreatorSegmentations {creator} />
+            </li>
+        {/if}
+        {#each $creators as creator_}
+            {#if creator_ != creator}
+                <li>
+                    <CreatorSegmentations creator={creator_} />
+                </li>
+            {/if}
+        {/each}
+    </ul>
+    <NewSegmentation />
 </div>
 
 <style>
-	div.main {
-		padding: 0.5em;
-	}
-	ul {
-		list-style-type: none;
-		padding-inline-start: 0em;
-		margin: 0;
-	}
-	label {
-		display: flex;
-	}
+    div {
+        display: flex;
+    }
+    div.models {
+        flex: 1;
+        flex-direction: column;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 0.5em;
+    }
+    ul {
+        list-style-type: none;
+        padding-inline-start: 0em;
+        margin: 0;
+    }
+    div.opacity {
+        padding: 0.5em;
+    }
+    div.main {
+        flex: 1;
+        flex-direction: column;
+    }
+    label {
+        display: flex;
+    }
 </style>

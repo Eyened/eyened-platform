@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getContext, onDestroy } from 'svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
-	import { createFormAnnotation, data } from '$lib/datamodel/model';
+	import { data } from '$lib/datamodel/model';
 	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import {
 		ETDRSGridOverlay,
@@ -9,11 +9,10 @@
 	} from '$lib/viewer/overlays/ETDRSGridOverlay.svelte';
 	import { ETDRSGridTool } from '$lib/viewer/tools/ETDRSGrid.svelte';
 	import ETDRSGridItem from './ETDRSGridItem.svelte';
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation';
+	import { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import type { TaskContext } from '$lib/types';
-	import { PanelIcon } from '../icons/icons';
-	import ShowHideToggle from '../icons/ShowHideToggle.svelte';
-	import type { FormSchema } from '$lib/datamodel/formSchema';
+	import { Hide, PanelIcon, Show } from '../icons/icons';
+	import type { FormSchema } from '$lib/datamodel/formSchema.svelte';
 
 	interface Props {
 		active: boolean;
@@ -21,10 +20,16 @@
 	}
 	let { active, etdrsSchema }: Props = $props();
 
+    let firstOpen = true;
 	$effect(() => {
 		if (!active) {
 			tool.annotation = undefined;
-		}
+		} else {
+            if (autoItem && firstOpen) {
+                overlay.visible.add(autoItem);
+                firstOpen = false;
+            }
+        }
 	});
 
 	const { creator, registration } = getContext<ViewerWindowContext>('viewerWindowContext');
@@ -36,8 +41,9 @@
 	const { instance } = image;
 
 	const filter = (formAnnotation: FormAnnotation) => {
-		if (formAnnotation.formSchema !== etdrsSchema) return false;
-		if (formAnnotation.instance == image.instance) return true;
+		if (formAnnotation.formSchemaId !== etdrsSchema.id) return false;
+        
+		if (formAnnotation.instanceId == image.instance.id) return true;
 
 		// also show annotations on linked images
 		// TODO: this should be reactive?
@@ -48,8 +54,9 @@
 	};
 	const filtered = formAnnotations.filter(filter);
 
+
 	async function create() {
-		createFormAnnotation(creator, instance, etdrsSchema, taskContext?.subTask);
+        await FormAnnotation.createFrom(creator, instance, etdrsSchema, taskContext?.subTask);
 	}
 
 	const overlay = new ETDRSGridOverlay(registration);
@@ -63,9 +70,11 @@
 		const [odx, ody] = instance.cfKeypoints.disc_edge_xy;
 		autoItem = {
 			instance,
-			value: { value: { fovea: { x: fx, y: fy }, disc_edge: { x: odx, y: ody } } }
-		};
-		// overlay.visible.add(autoItem);
+			value: {
+				fovea: { x: fx, y: fy },
+				disc_edge: { x: odx, y: ody }
+			}
+		};        
 	}
 	function toggleVisisble() {
 		if (overlay.visible.has(autoItem)) {
@@ -74,6 +83,13 @@
 			overlay.visible.add(autoItem);
 		}
 	}
+    let autoToggleIcon = $derived.by(() => {
+        if (overlay.visible.has(autoItem)) {
+            return Show;
+        } else {
+            return Hide;
+        }
+    });
 </script>
 
 <div class="main">
@@ -95,15 +111,18 @@
 					active={overlay.visible.has(autoItem)}
 					onclick={toggleVisisble}
 					tooltip="show/hide"
-				>
-					<ShowHideToggle show={overlay.visible.has(autoItem)} />
-				</PanelIcon>
+                    Icon={autoToggleIcon}
+				/>
 				Automatic
 			</div>
 		{/if}
 
 		{#each $filtered as formAnnotation (formAnnotation.id)}
-			<ETDRSGridItem {overlay} {tool} {formAnnotation} />
+            {#await formAnnotation.load()}
+                <div>Loading [{formAnnotation.id}]§</div>
+            {:then}
+                <ETDRSGridItem {overlay} {tool} {formAnnotation} />
+            {/await}
 		{/each}
 	</div>
 	<div class="new">

@@ -4,14 +4,14 @@
 
 	interface Props {
 		series: Series;
-		laterality: 'L' | 'R';
+		laterality: 'L' | 'R' | null;
 		showSegmentationInfo?: boolean;
 	}
 
 	let { series, laterality, showSegmentationInfo = true }: Props = $props();
 
 	const { instances } = series;
-
+    
 	const filtered = instances
 		.filter((instance) => instance.laterality == laterality)
 		.sort((a, b) => a.id - b.id);

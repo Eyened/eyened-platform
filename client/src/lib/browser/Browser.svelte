@@ -10,8 +10,13 @@
     import FilterConditions from "./FilterConditions.svelte";
     import FilterImages from "./FilterImages.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
-    import { globalContext } from "$lib/main";
+    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { data } from "$lib/datamodel/model";
+    
+    const globalContext = getContext<GlobalContext>("globalContext");
     const { creator } = globalContext;
+    const { instances, patients } = data;
     const initials = creator.name
         .split(" ")
         .map((name) => name[0])
@@ -24,24 +29,27 @@
         browserContext.loadDataFromServer();
     });
 
+    // true = studies, false = images
     let renderMode = $state(true);
 
     function showUserMenu() {
         globalContext.popupComponent = { component: UserMenu };
+    }
+    
+    function showFilterImages() {
+        globalContext.popupComponent = { component: FilterImages };
     }
 
     function search() {
         browserContext.loadDataFromServer();
     }
 
-    async function loadMore(event) {
+    async function loadMore() {
         await setParam("StudyDate~~gte", browserContext.next_cursor!);
         browserContext.loadDataFromServer();
     }
 
-    function showFilterImages() {
-        globalContext.popupComponent = { component: FilterImages };
-    }
+
 </script>
 
 {#if browserContext.loading}
@@ -61,7 +69,6 @@
             </div>
             <div id="browser-header-right">
                 <button onclick={showFilterImages}>Advanced search</button>
-
                 <FilterConditions />
                 <button
                     onclick={search}
@@ -78,7 +85,7 @@
                     onclick={showUserMenu}
                     tooltip={creator.name}
                     theme="light"
-                    {icon}
+                    iconSnippet={icon}
                 />
             </div>
         </div>
@@ -88,7 +95,7 @@
                 <Toggle
                     bind:control={renderMode}
                     textOn="studies"
-                    textOff="instances"
+                    textOff="images"
                 />
             </div>
             <div>
@@ -112,7 +119,11 @@
     </div>
 
     <div id="content">
-        <BrowserContent renderMode={renderMode ? "studies" : "instances"} />
+        <BrowserContent
+            renderMode={renderMode ? "studies" : "images"}
+            instances={$instances}
+            patients={$patients}
+        />
     </div>
 
     <div id="selection">
@@ -162,7 +173,7 @@
         flex: 0;
     }
     div#container > div#content {
-        padding: 1em;
+        margin-top: 0.5em;
         overflow-y: auto;
         flex: 1;
     }

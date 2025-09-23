@@ -7,7 +7,7 @@ sidebar:
 
 {/* Claude query: Update the documentation in getting_started.mdx using the sample in import.ipynb. Keep the setup section the same but update the Connecting section and add a section briefly showing how to import and use the database objects.  */}
 
-The ORM allows to interact with the Eyened database for operations such as:
+The ORM allows you to interact with the Eyened database for operations such as:
 - Updating fields not updateable in the viewer
 - Importing and exporting data
 - Bulk updates to metadata or corrections
@@ -28,14 +28,17 @@ pip install -e .
 
 ## Connecting to the database
 
-The easiest way to connect the ORM to a database from Python code, use the `DBManager` class with a configuration:
+The easiest way to connect the ORM to a database from Python code is to use the `Database` class with a configuration:
 
 ```python
-from eyened_orm import DBManager
-# Initialize with environment variables from `orm/eyened_orm/environments/prod.env`
-DBManager.init("prod")
-# Get a session to interact with the database
-session = DBManager.get_session()
+from eyened_orm import Database
+
+# Initialize database
+database = Database()
+
+with database.get_session() as session:
+    # Use session for database operations
+    pass
 ```
 
 :::tip
@@ -49,25 +52,37 @@ Once connected, you can import and use database objects from the ORM:
 
 ```python
 # Import database model classes
-from eyened_orm import Project, Patient, Study, Series, Image
+from eyened_orm import Project, Patient, Study, Series, ImageInstance
 
 # Find a project by name
 project = Project.by_name(session, 'My Project Name')
 
 # Access related objects
-for patient in project.patients:
-    print(f"Patient ID: {patient.patient_id}, Identifier: {patient.patient_identifier}")
+for patient in project.Patients:
+    print(f"Patient ID: {patient.PatientID}, Identifier: {patient.PatientIdentifier}")
     
-    for study in patient.studies:
-        print(f"  Study date: {study.study_date}")
+    for study in patient.Studies:
+        print(f"  Study date: {study.StudyDate}")
         
-        for series in study.series:
-            print(f"    Series ID: {series.series_id}")
+        for series in study.Series:
+            print(f"    Series ID: {series.SeriesID}")
             
-            for image in series.images:
+            for image in series.ImageInstances:
                 print(f"      Image path: {image.path}")
 
 # Query objects directly
-patients = session.query(Patient).filter(Patient.patient_identifier.like("Patient_%")).all()
+patients = session.query(Patient).filter(Patient.PatientIdentifier.like("Patient_%")).all()
+
+# You can also use Python-style attribute names
+for patient in project.Patients:
+    print(f"Patient ID: {patient.patient_id}, Identifier: {patient.patient_identifier}")
+    
+    for study in patient.Studies:
+        print(f"  Study date: {study.study_date}")
 ```
+
+:::tip
+The properties on each ORM object are the same as the database column names (in capitalized camel case), but they're also exposed in Python style (snake_case). For example, you can access `patient_id` instead of `PatientID`, `patient_identifier` instead of `PatientIdentifier`, and `study_date` instead of `StudyDate`.
+:::
+
 For more information on using the ORM, see the [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/).

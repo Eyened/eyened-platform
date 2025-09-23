@@ -4,20 +4,20 @@ from typing import Optional
 from sqlalchemy.orm import select
 from eyened_orm import (
     ImageInstance,
-    Annotation,
-    Feature, Creator, AnnotationType, AnnotationData)
+    Segmentation,
+    Feature, Creator, SegmentationType, SegmentationData)
 
 
 def find_annotation(instance: ImageInstance,
                     creator: Creator,
-                    annotationtype: AnnotationType,
+                    annotationtype: SegmentationType,
                     feature: Feature,
-                    session) -> Optional[Annotation]:
-    statement = (select(Annotation)
-                 .where(Annotation.ImageInstanceID == instance.ImageInstanceID,
-                        Annotation.AnnotationTypeID == annotationtype.AnnotationTypeID,
-                        Annotation.FeatureID == feature.FeatureID,
-                        Annotation.CreatorID == creator.CreatorID)
+                    session) -> Optional[Segmentation]:
+    statement = (select(Segmentation)
+                 .where(Segmentation.ImageInstanceID == instance.ImageInstanceID,
+                        Segmentation.AnnotationTypeID == annotationtype.AnnotationTypeID,
+                        Segmentation.FeatureID == feature.FeatureID,
+                        Segmentation.CreatorID == creator.CreatorID)
                  )
     result = session.scalars(statement)
     if len(result) == 1:
@@ -32,7 +32,7 @@ def find_annotation(instance: ImageInstance,
 def import_annotation_from_file(
         instance: ImageInstance,
         creator: Creator,
-        annotationtype: AnnotationType,
+        annotationtype: SegmentationType,
         feature: Feature,
         filepath,
         session,
@@ -63,7 +63,7 @@ def import_annotation_from_file(
 
     if annotation is None:
         if mode == "create":
-            annotation = Annotation.create(
+            annotation = Segmentation.create(
                 instance, feature, creator, annotationtype)
             session.add(annotation)
             session.flush()
@@ -76,7 +76,7 @@ def import_annotation_from_file(
     extension = os.path.splitext(filepath)[1]
     if annotationdata is None:
         if mode == "create":
-            annotationdata = AnnotationData.create(
+            annotationdata = SegmentationData.create(
                 annotation, extension, ScanNr)
             session.add(annotationdata)
             session.commit()

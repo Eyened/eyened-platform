@@ -1,13 +1,14 @@
 <script lang="ts">
     import { getThumbUrl } from "$lib/data-loading/utils";
     import { getContext, onDestroy } from "svelte";
-    import type { Instance } from "$lib/datamodel/instance";
+    import type { Instance } from "$lib/datamodel/instance.svelte";
     import InstanceInfo from "./InstanceInfo.svelte";
     import type { BrowserContext } from "./browserContext.svelte";
     import { openNewWindow } from "$lib/newWindow";
-    import { globalContext } from "$lib/main";
+    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
     const browserContext = getContext<BrowserContext>("browserContext");
+    const globalContext = getContext<GlobalContext>("globalContext");
     const { creator } = globalContext;
 
     interface Props {
@@ -23,10 +24,8 @@
     }: Props = $props();
 
     let size = $derived(browserContext.thumbnailSize + "em");
-    
-    const segmentations = instance.annotations.filter((a) =>
-        a.annotationType.name.includes("Segmentation"),
-    );
+
+    const segmentations = instance.segmentations;
     const creatorCounts = segmentations.reduce(
         (acc, seg) => {
             acc[seg.creator.name] = (acc[seg.creator.name] || 0) + 1;
@@ -34,7 +33,7 @@
         },
         {} as { [name: string]: number },
     );
-    
+
     const image_url = getThumbUrl(instance)!;
 
     const selected = $derived(browserContext.selection.includes(instance.id));
@@ -88,16 +87,19 @@
                     </div>
                 {/if}
             </div>
-
-            {#if showSegmentationInfo && $segmentations.length}
-                <ul>
-                    {#each Object.entries($creatorCounts) as [c, count]}
-                        <li class:has-own-segmentations={creator.name == c}>
-                            {count} x {c}
-                        </li>
-                    {/each}
-                </ul>
-            {/if}
+        {:else}
+            <div class="img no-image" style:width={size} style:height={size}>
+                <div>No thumbnail available</div>
+            </div>
+        {/if}
+        {#if showSegmentationInfo && $segmentations.length}
+            <ul>
+                {#each Object.entries($creatorCounts) as [c, count]}
+                    <li class:has-own-segmentations={creator.name == c}>
+                        {count} x {c}
+                    </li>
+                {/each}
+            </ul>
         {/if}
     </div>
 </div>
@@ -177,5 +179,15 @@
 
     .has-own-segmentations {
         background-color: #acdde1;
+    }
+    div.img.no-image {
+        background-color: gray;
+        opacity: 0.3;
+       
+        color:black;
+    }
+    div.img.no-image > div {
+        font-size: x-small;
+        color:black;
     }
 </style>

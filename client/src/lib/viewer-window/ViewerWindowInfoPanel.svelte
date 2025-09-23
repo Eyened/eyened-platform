@@ -10,8 +10,9 @@ Some UI components on the top right of the viewer window.
 	import { data } from '$lib/datamodel/model';
 	import { Image2D } from '$lib/webgl/image2D';
 	import UserMenu from '$lib/UserMenu.svelte';
-	import { globalContext } from '$lib/main';
-
+	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	
+    const globalContext = getContext<GlobalContext>('globalContext');
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
 	const { creator } = viewerWindowContext;
 	const { instances } = data;
@@ -46,12 +47,12 @@ Some UI components on the top right of the viewer window.
 
 <div id="main">
 	<MainIcon onclick={showUserMenu} tooltip={creator.name}>
-		{#snippet icon()}
+		{#snippet iconSnippet()}
 			<span class="icon">{initials}</span>
 		{/snippet}
 	</MainIcon>
 	<MainIcon onclick={browse} tooltip="Browse">
-		{#snippet icon()}
+		{#snippet iconSnippet()}
 			<span class="icon">+</span>
 		{/snippet}
 	</MainIcon>
