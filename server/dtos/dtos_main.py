@@ -26,14 +26,16 @@ class FeaturePUT(FeatureBase):
     subfeature_ids: List[int] | None = None
 
 
-class FeaturePATCH(FeaturePUT):
-    """Partial update for Feature (same fields as PUT for now)."""
-    pass
+class FeaturePATCH(BaseModel):
+    """Partial update for Feature with optional fields."""
+    name: Optional[str] = None
+    subfeature_ids: Optional[List[int]] = None
 
 
 class FeatureGET(FeatureBase):
     id: int
     subfeatures: List[str]
+    subfeature_ids: List[int]
     date_inserted: datetime
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -121,6 +123,18 @@ class FormAnnotationGET(FormAnnotationBase):
 
     date_inserted: datetime
     date_modified: Optional[datetime] = None
+
+
+class FormAnnotationPATCH(BaseModel):
+    """Partial update for FormAnnotation with optional fields."""
+    form_schema_id: Optional[int] = None
+    patient_id: Optional[int] = None
+    study_id: Optional[int] = None
+    image_instance_id: Optional[int] = None
+    creator_id: Optional[int] = None
+    sub_task_id: Optional[int] = None
+    form_data: Optional[Dict[str, Any]] = None
+    form_annotation_reference_id: Optional[int] = None
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

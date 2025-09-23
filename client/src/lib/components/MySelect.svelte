@@ -6,16 +6,17 @@
         value: string | undefined
         disabled: boolean
         placeholder: string | undefined
+        onChange: (value: string) => void
     }   
 	
-    let {options, value=$bindable(), disabled, placeholder}: Props = $props()
+    let {options, value=$bindable(), disabled, placeholder, onChange}: Props = $props()
     
     const valueToLabel = $derived(Object.fromEntries(options.map(opt => [opt.value, opt.label])))
 
 </script>
 
 
-<Select.Root type="single" bind:value disabled={disabled}>
+<Select.Root type="single" bind:value disabled={disabled} onValueChange={onChange}>
     <Select.Trigger>
         {value ? valueToLabel[value] : placeholder}
     </Select.Trigger>

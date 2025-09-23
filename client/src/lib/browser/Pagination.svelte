@@ -9,7 +9,8 @@
 	let { onChange }: { onChange: (page: number) => void } = $props();
 </script>
 
-<Pagination.Root count={browserContext.count} perPage={browserContext.limit} onPageChange={onChange}>
+
+<Pagination.Root count={browserContext.count} perPage={browserContext.limit} page={browserContext.page} onPageChange={onChange}>
 	{#snippet children({ pages, currentPage })}
 	<Pagination.Content>
 		<Pagination.Item>

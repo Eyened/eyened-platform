@@ -4,9 +4,10 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel
-from eyened_orm import TaskState
+from eyened_orm import TaskState, SubTaskState
 
 from .dtos_instances import InstanceGET
+from .dtos_aux import CreatorMetadata
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= TASK SYSTEM=========================
@@ -32,14 +33,16 @@ class TaskBase(BaseModel):
     contact_id: Optional[int] = None
     task_definition_id: int
 
-
 class TaskPUT(TaskBase):
     pass
 
 
-class TaskPATCH(TaskPUT):
-    """Partial update for Task (same fields as PUT for now)."""
-    pass
+class TaskPATCH(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    contact_id: Optional[int] = None
+    task_definition_id: Optional[int] = None
+    task_state: Optional[TaskState] = None
 
 
 class TaskGET(TaskBase):
@@ -47,12 +50,14 @@ class TaskGET(TaskBase):
     date_inserted: datetime
     num_tasks: int
     num_tasks_ready: int
+    creator: Optional[CreatorMetadata] = None
+    task_state: Optional[TaskState] = None
 
 
 # === SUB TASK ===
 class SubTaskBase(BaseModel):
     task_id: int
-    task_state: TaskState
+    task_state: SubTaskState
     comments: Optional[str] = None
 
 

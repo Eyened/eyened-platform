@@ -5,7 +5,7 @@ Converts ORM objects (eyened_orm) into Pydantic GET DTOs defined in server/dtos.
 
 from typing import TYPE_CHECKING, Optional, List
 
-from eyened_orm import TaskState
+from eyened_orm import SubTaskState
 
 from .dtos_instances import (
     InstanceMeta,
@@ -277,10 +277,17 @@ class DTOConverter:
     @staticmethod
     def feature_to_get(feature: "Feature") -> FeatureGET:
         """Convert Feature ORM object to FeatureGET."""
+        # Prefer a precomputed ORM property if available; otherwise gather from relationship
+        child_ids = getattr(feature, "subfeature_ids_list", None)
+        if child_ids is None:
+            # fallback if your ORM exposes links (rename 'ChildLinks' if different)
+            child_ids = [link.ChildFeatureID for link in getattr(feature, "ChildLinks", [])]
+        
         return FeatureGET(
             id=feature.FeatureID,
             name=feature.FeatureName,
             subfeatures=feature.subfeatures_list,
+            subfeature_ids=child_ids,
             date_inserted=feature.DateInserted,
         )
 
@@ -359,7 +366,7 @@ class DTOConverter:
         """Convert Task ORM object to TaskGET."""
         subs = getattr(task, "SubTasks", []) or []
         num_tasks = len(subs)
-        num_tasks_ready = sum(1 for st in subs if st.TaskState == TaskState.Ready)
+        num_tasks_ready = sum(1 for st in subs if st.TaskState == SubTaskState.Ready)
 
         return TaskGET(
             id=task.TaskID,
@@ -370,6 +377,8 @@ class DTOConverter:
             date_inserted=task.DateInserted,
             num_tasks=num_tasks,
             num_tasks_ready=num_tasks_ready,
+            creator=DTOConverter.creator_to_meta(task.Creator) if getattr(task, "Creator", None) else None,
+            task_state=getattr(task, "TaskState", None),
         )
 
     @staticmethod

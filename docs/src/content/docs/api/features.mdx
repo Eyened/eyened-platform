@@ -50,8 +50,8 @@ The Features API provides endpoints for creating, reading, updating, and deletin
 ### Data Transfer Objects
 - `FeaturePUT`: Contains name and optional subfeature_ids for creation
 - `FeaturePATCH`: Same structure as PUT for partial updates
-- `FeatureGET`: Returns id, name, subfeatures list, and date_inserted
-- Subfeatures returned as string names rather than IDs for frontend convenience
+- `FeatureGET`: Returns id, name, subfeatures list, subfeature_ids array, and date_inserted
+- Subfeatures returned as both string names (subfeatures) and IDs (subfeature_ids) for frontend convenience
 
 ### Subfeature Management
 - `set_subfeatures()` helper function manages parent-child link replacement

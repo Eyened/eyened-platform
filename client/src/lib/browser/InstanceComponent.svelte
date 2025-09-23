@@ -2,7 +2,7 @@
     import { getThumbUrl } from "$lib/data-loading/utils";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext } from "svelte";
-    import type { Instance } from "../../types/openapi_types";
+    import type { InstanceGET } from "../../types/openapi_types";
     import type { BrowserContext } from "./browserContext.svelte";
     import InstanceInfo from "./InstanceInfo.svelte";
 
@@ -11,7 +11,7 @@
     const { user: creator } = globalContext;
 
     interface Props {
-        instance: Instance;
+        instance: InstanceGET;
         showPatientInfo?: boolean;
         showSegmentationInfo?: boolean;
     }
@@ -21,6 +21,7 @@
         showPatientInfo = false,
         showSegmentationInfo = false,
     }: Props = $props();
+
 
     let size = $derived(browserContext.thumbnailSize + "em");
     let popupOpen = $state(false)
@@ -70,18 +71,19 @@
     </div>
     <div class="tile flex flex-col flex-1 items-center" onclick={toggleSelect}>
         {#if image_url}
-            <div
+            <img src={image_url} alt="Thumbnail" loading="lazy" style="transform: translateZ(0);" width="144" height="144" class="thumbnail" />
+            <!-- <div
                 class="img bg-black m-px cursor-pointer flex flex-col items-center [flex-flow:column-reverse] bg-contain bg-no-repeat bg-center"
                 style:width={size}
                 style:height={size}
                 style:background-image="url('{image_url}')"
-            >
-                {#if instance.dicom_modality == "OPT"}
+            > -->
+                <!-- {#if instance.dicom_modality == "OPT"}
                     <div class="oct-info text-[10px] text-white/70">
                         [{instance.anatomic_region}] ({instance.nr_of_frames} x {instance.columns})
                     </div>
                 {/if}
-            </div>
+            </div> -->
 
             <!-- {#if showSegmentationInfo && $segmentations.length}
                 <ul>
@@ -94,9 +96,12 @@
             {/if} -->
         {/if}
     </div>
-    <InstanceInfo {instance} open={popupOpen}/>
+    <InstanceInfo {instance} bind:open={popupOpen}/>
 </div>
 
 <style>
-
+img.thumbnail {
+    width: 144px;
+    height: 144px;
+}
 </style>

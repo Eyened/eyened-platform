@@ -5,7 +5,8 @@ import type {
 	SegmentationGET, SegmentationPATCH,
 	SeriesGET, SeriesMeta,
 	StudyGET, StudyMeta,
-	TagGET, TagMeta, TagPATCH
+	TagGET, TagMeta, TagPATCH,
+	TaskGET, TaskPATCH
 } from '../../types/openapi_types';
 import { api } from '../api/client';
 import type { Repo } from './datamodel.svelte';
@@ -84,7 +85,9 @@ export class FormAnnotationObject extends DataObject<FormAnnotationGET, FormAnno
 
 export class TagObject extends DataObject<TagGET, TagPATCH> { static DefaultRepo: unknown; }
 
-export class TaskObject extends DataObject<FeatureGET, FeaturePATCH> { static DefaultRepo: unknown; }
+export class TaskObject extends DataObject<TaskGET, TaskPATCH> { static DefaultRepo: unknown; }
+
+export class FeatureObject extends DataObject<FeatureGET, FeaturePATCH> { static DefaultRepo: unknown; }
 
 // Meta object classes (no Meta repos)
 type SegmentationMeta = Pick<SegmentationGET, 'id'>;

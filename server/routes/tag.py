@@ -30,10 +30,12 @@ async def patch_tag(tag_id: int, dto: TagPATCH, db: Session = Depends(get_db), c
     tag = db.get(Tag, tag_id)
     if not tag:
         raise HTTPException(404, "Tag not found")
-    payload = dto.model_dump()
-    tag.TagName = payload.get("name", tag.TagName)
-    tag.TagDescription = payload.get("description", tag.TagDescription)
-    tag.TagType = payload.get("tag_type", tag.TagType)
+    if dto.name is not None:
+        tag.TagName = dto.name
+    if dto.description is not None:
+        tag.TagDescription = dto.description
+    if dto.tag_type is not None:
+        tag.TagType = dto.tag_type
     db.commit(); db.refresh(tag)
     return DTOConverter.tag_to_get(tag)
 

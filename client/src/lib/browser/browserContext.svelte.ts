@@ -20,6 +20,9 @@ export class BrowserContext {
 		return (this.queryMode === 'instances' && this.displayMode === 'instance') ? 100 : 10;
 	}
 
+	limitOptionsStudies = [10, 20, 30, 40, 50];
+	limitOptionsInstances = [100, 200, 500, 1000];
+
 	selection: number[] = $state([]);
 	queryMode: QueryMode = $state('studies');
 	displayMode: DisplayMode = $state('study');
@@ -79,6 +82,34 @@ export class BrowserContext {
 		} finally {
 			this.loading = false;
 		}
+	}
+
+	// Reset state when queryMode changes
+	resetForQueryModeChange = (queryMode: QueryMode) => {
+		this.advancedConditions = [];
+		this.basicCondition = null;
+
+		this.page = 0;
+		this.limit = this.getDefaultLimit();
+		this.count = 0;
+
+		this.sortBy = 'Study Date';
+		this.sortDirection = 'ASC';
+
+		this.resultIds = new Set();
+		this.orderedInstanceIds = [];
+		this.orderedStudyIds = [];
+
+		if(queryMode == 'instances') {
+			this.displayMode = 'instance';
+			this.limit = this.limitOptionsInstances[0];
+		} else {
+			this.displayMode = 'study';
+			this.limit = this.limitOptionsStudies[0];
+		}
+
+		this.InstanceRepo.clear();
+		this.StudiesRepo.clear();
 	}
 
 	// Compatibility method for search with current conditions
