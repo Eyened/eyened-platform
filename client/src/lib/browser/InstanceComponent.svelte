@@ -87,16 +87,19 @@
                     </div>
                 {/if}
             </div>
-
-            {#if showSegmentationInfo && $segmentations.length}
-                <ul>
-                    {#each Object.entries($creatorCounts) as [c, count]}
-                        <li class:has-own-segmentations={creator.name == c}>
-                            {count} x {c}
-                        </li>
-                    {/each}
-                </ul>
-            {/if}
+        {:else}
+            <div class="img no-image" style:width={size} style:height={size}>
+                <div>No thumbnail available</div>
+            </div>
+        {/if}
+        {#if showSegmentationInfo && $segmentations.length}
+            <ul>
+                {#each Object.entries($creatorCounts) as [c, count]}
+                    <li class:has-own-segmentations={creator.name == c}>
+                        {count} x {c}
+                    </li>
+                {/each}
+            </ul>
         {/if}
     </div>
 </div>
@@ -176,5 +179,15 @@
 
     .has-own-segmentations {
         background-color: #acdde1;
+    }
+    div.img.no-image {
+        background-color: gray;
+        opacity: 0.3;
+       
+        color:black;
+    }
+    div.img.no-image > div {
+        font-size: x-small;
+        color:black;
     }
 </style>
