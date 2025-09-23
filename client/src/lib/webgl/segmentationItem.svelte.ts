@@ -44,7 +44,7 @@ export class SegmentationItem {
                 this.getSegmentationState(scanNr, true, slice);
             }
         } catch (error) {
-            console.error('SegmentationItem loadBulkIfNeeded failed', error);
+            console.error('SegmentationItem loadFull failed', error);
         } finally {
             this.loading = false;
         }
