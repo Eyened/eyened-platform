@@ -38,6 +38,12 @@ paths = {
         "FormSchema",
         "Creator",
     },
+    "Feature": {
+        "CompositeFeature",
+    },
+    "CompositeFeature": {
+        "Feature",
+    },
     "Task": {"TaskDefinition", "TaskState", "SubTask"},
     "SubTask": {"Task", "TaskState", "Creator", "SubTaskImageLink"},
     "SubTaskImageLink": {"SubTask", "ImageInstance"},

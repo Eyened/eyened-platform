@@ -1,5 +1,4 @@
 from typing import Optional
-from dotenv import load_dotenv
 import yaml
 from pathlib import Path
 import click
