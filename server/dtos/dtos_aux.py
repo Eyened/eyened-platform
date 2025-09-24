@@ -69,7 +69,7 @@ class CreatorGET(CreatorBase):
     date_inserted: datetime
 
 
-class CreatorMetadata(BaseModel):
+class CreatorMeta(BaseModel):
     id: int
     name: str
 
@@ -100,12 +100,12 @@ class TagPATCH(BaseModel):
 
 class TagGET(TagBase):
     id: int
-    creator: CreatorMetadata
+    creator: CreatorMeta
     date_inserted: datetime
 
 
 class TagMeta(BaseModel):
     id: int
     name: str
-    tagger: CreatorMetadata
+    tagger: CreatorMeta
     date: datetime

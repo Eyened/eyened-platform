@@ -5,14 +5,11 @@ Used to create the viewerwindow context.
 -->
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import { data } from "$lib/datamodel/model";
     import { Registration } from "$lib/registration/registration";
     import { Deferred } from "$lib/utils";
     import { WebGL } from "$lib/webgl/webgl";
     import { getContext, onMount } from "svelte";
     import BrowserOverlay from "./BrowserOverlay.svelte";
-    import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
     import ViewerWindow from "./ViewerWindow.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
@@ -54,28 +51,11 @@ Used to create the viewerwindow context.
             viewerWindowContext.destroy();
         };
     });
-
-    const filter = (formAnnotation: FormAnnotation) => {
-        if (formAnnotation.formSchema.name === "Pointset registration")
-            return true;
-        if (formAnnotation.formSchema.name === "Affine registration")
-            return true;
-        if (formAnnotation.formSchema.name === "RegistrationSet") return true;
-        return false;
-    };
-
-    const filteredFormAnnotations = data.formAnnotations.filter(filter);
 </script>
 
 <canvas bind:this={mainCanvas} class="editor"></canvas>
 
 {#await promise then viewerWindowContext}
-    {#each $filteredFormAnnotations as formAnnotation (formAnnotation.id)}
-        {#await formAnnotation.load() then _}
-            <RegistrationItemLoader {formAnnotation} registration={viewerWindowContext.registration} />
-        {/await}
-    {/each}
-
     <ViewerWindow {viewerWindowContext} />
     {#if viewerWindowContext.browserOverlay}
         <BrowserOverlay {viewerWindowContext} />

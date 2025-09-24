@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from eyened_orm import TaskState, SubTaskState
 
 from .dtos_instances import InstanceGET
-from .dtos_aux import CreatorMetadata
+from .dtos_aux import CreatorMeta
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= TASK SYSTEM=========================
@@ -50,7 +50,7 @@ class TaskGET(TaskBase):
     date_inserted: datetime
     num_tasks: int
     num_tasks_ready: int
-    creator: Optional[CreatorMetadata] = None
+    creator: Optional[CreatorMeta] = None
     task_state: Optional[TaskState] = None
 
 

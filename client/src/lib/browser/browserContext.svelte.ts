@@ -23,7 +23,7 @@ export class BrowserContext {
 	limitOptionsStudies = [10, 20, 30, 40, 50];
 	limitOptionsInstances = [100, 200, 500, 1000];
 
-	selection: number[] = $state([]);
+	selectedIds: number[] = $state([]);
 	queryMode: QueryMode = $state('studies');
 	displayMode: DisplayMode = $state('study');
 	loading: boolean = $state(false);
@@ -60,6 +60,13 @@ export class BrowserContext {
 	// Derived: depends on queryMode + signatures
 	activeSignature: SignatureField[] = $derived(
 		this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
+	);
+
+	// Derived: selected instances from repo
+	selectedInstances = $derived(
+		this.selectedIds
+			.map(id => this.InstanceRepo.store[id])
+			.filter((x): x is NonNullable<typeof x> => Boolean(x))
 	);
 
 	toggleFilterMode = () => {
@@ -99,6 +106,7 @@ export class BrowserContext {
 		this.resultIds = new Set();
 		this.orderedInstanceIds = [];
 		this.orderedStudyIds = [];
+		this.selectedIds = [];
 
 		if(queryMode == 'instances') {
 			this.displayMode = 'instance';
@@ -132,12 +140,13 @@ export class BrowserContext {
 	}
 
 	toggleInstance(instance: InstanceMeta) {
-        if (this.selection.includes(instance.id)) {
-            this.selection.splice(this.selection.indexOf(instance.id), 1);
-        } else {
-            this.selection.push(instance.id);
-        }
-    }
+		const i = this.selectedIds.indexOf(instance.id);
+		if (i !== -1) {
+			this.selectedIds.splice(i, 1);
+		} else {
+			this.selectedIds.push(instance.id);
+		}
+	}
 
 	fetch = async (query: Condition[]) => {
 		if (!query.length) {

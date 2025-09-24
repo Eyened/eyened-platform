@@ -1,8 +1,8 @@
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import type { AbstractImage } from "./abstractImage";
-import { SegmentationState } from "./segmentationState";
-import type { Mask, PaintSettings } from "./mask.svelte";
 import { SvelteMap } from "svelte/reactivity";
+import type { SegmentationGET } from "../../types/openapi_types";
+import type { AbstractImage } from "./abstractImage";
+import type { Mask, PaintSettings } from "./mask.svelte";
+import { SegmentationState } from "./segmentationState";
 
 // manages the segmentation states (one per scan) for a single segmentation
 export class SegmentationItem {
@@ -12,9 +12,9 @@ export class SegmentationItem {
 
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: Segmentation) {
+        readonly segmentation: SegmentationGET) {
 
-        for (const scanNr of this.segmentation.scanIndices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
+        for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
             this.getSegmentationState(scanNr, true);
         }
     }

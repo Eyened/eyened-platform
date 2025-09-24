@@ -3,6 +3,7 @@ import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 import { ModelSegmentation, type Segmentation } from '$lib/datamodel/segmentation.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
 import openAPISpec from '../../types/openapi.json';
+import type { FormAnnotationGET, SegmentationGET } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
 
 export type ComponentDef = {
@@ -75,7 +76,7 @@ export class GlobalContext {
     }
 
     get segmentationsFilter() {
-        return (a: Segmentation | FormAnnotation) => {
+        return (a: SegmentationGET | FormAnnotationGET) => {
 
 
             if (this.user.username == 'test_user') {
@@ -88,11 +89,11 @@ export class GlobalContext {
                 return true;
             }
 
-            if (a.creator.isHuman) {
-                return this.config.showOtherAnnotationsHuman;
-            } else {
-                return this.config.showOtherAnnotationsMachine;
-            }
+            // if (a.creator.isHuman) {
+            //     return this.config.showOtherAnnotationsHuman;
+            // } else {
+            //     return this.config.showOtherAnnotationsMachine;
+            // }
         }
     }
 }

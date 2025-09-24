@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Creator } from "$lib/datamodel/creator.svelte";
-    import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { getContext } from "svelte";
     import SegmentationItem from "./SegmentationItem.svelte";
 
     interface Props {
@@ -32,7 +32,7 @@
     {creator.name}
 </span>
 
-{#each $segmentations as segmentation (segmentation.id)}
+{#each segmentationOverlay.allSegmentations as segmentation (segmentation.id)}
     <div class="item" class:hide={hideCreators.has(segmentation.creator)}>
         <SegmentationItem {segmentation} />
     </div>

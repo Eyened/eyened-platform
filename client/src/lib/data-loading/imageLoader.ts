@@ -1,9 +1,9 @@
 import { fsHost } from '$lib/config';
-import type { Instance } from '$lib/datamodel/instance.svelte';
 import { Image2D } from '$lib/webgl/image2D';
 import { Image3D } from '$lib/webgl/image3D';
 import type { Dimensions } from '$lib/webgl/types';
 import type { WebGL } from '$lib/webgl/webgl';
+import type { InstanceGET } from '../../types/openapi_types';
 import { splitTail } from '../utils';
 
 import * as cornerstone from 'cornerstone-core';
@@ -26,26 +26,26 @@ export class ImageLoader {
     minBscansForEnface = 5;
     constructor(public readonly webgl: WebGL) { }
 
-    async load(instance: Instance): Promise<LoadedImages> {
+    async load(instance: InstanceGET): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
         // Convert to lowercase for case-insensitive comparison
-        const extension = instance.datasetIdentifier.toLowerCase().split('.').pop();
+        const extension = instance.dataset_identifier.toLowerCase().split('.').pop();
         const supportedFormats = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 
         if (extension && supportedFormats.includes(extension)) {
             return [await this.loadImage2D(instance, img_id)];
 
-        } else if (instance.datasetIdentifier.endsWith('.binary')) {
-            const url = `${fsHost}/${instance.datasetIdentifier}`;
+        } else if (instance.dataset_identifier.endsWith('.binary')) {
+            const url = `${fsHost}/${instance.dataset_identifier}`;
             const meta = await this.loadMeta(url);
             const image = await this.loadBinary3D(instance, url, meta, img_id);
             return this.returnImage3D(image);
 
-        } else if (instance.datasetIdentifier.endsWith('.dcm')) {
+        } else if (instance.dataset_identifier.endsWith('.dcm')) {
             return this.loadDicom(instance, img_id);
 
-        } else if (instance.datasetIdentifier.startsWith('[png_series')) {
-            const [pre, base_url] = instance.datasetIdentifier.split(']');
+        } else if (instance.dataset_identifier.startsWith('[png_series')) {
+            const [pre, base_url] = instance.dataset_identifier.split(']');
             const [folder, source_id] = splitTail(base_url, '/');
             const meta_url = `${fsHost}/${folder}/metadata.json`;
             const response = await fetch(meta_url);
@@ -56,7 +56,7 @@ export class ImageLoader {
         }
     }
 
-    async loadPngSeries(instance: Instance, meta: any, img_id: string, pre: string, base_url: string, source_id: string): Promise<LoadedImages> {
+    async loadPngSeries(instance: InstanceGET, meta: any, img_id: string, pre: string, base_url: string, source_id: string): Promise<LoadedImages> {
         const n_scans = parseInt(pre.split('_')[2]);
         const urls = Array.from({ length: n_scans }, (_, i) => {
             const fileName = `${base_url}_${i}.png`;
@@ -93,16 +93,16 @@ export class ImageLoader {
         }
     }
 
-    async loadImage2D(instance: Instance, img_id: string): Promise<Image2D> {
+    async loadImage2D(instance: InstanceGET, img_id: string): Promise<Image2D> {
 
-        const url = `${fsHost}/${instance.datasetIdentifier}`;
+        const url = `${fsHost}/${instance.dataset_identifier}`;
         const bitmap = await getImage(url);
         const dimensions = {
             width: bitmap.width,
             height: bitmap.height,
             depth: 1,
-            width_mm: instance.resolutionHorizontal ? instance.resolutionHorizontal * bitmap.width : -1,
-            height_mm: instance.resolutionVertical ? instance.resolutionVertical * bitmap.height : -1,
+            width_mm: instance.resolution_horizontal ? instance.resolution_horizontal * bitmap.width : -1,
+            height_mm: instance.resolution_vertical ? instance.resolution_vertical * bitmap.height : -1,
             depth_mm: -1
         };
         const meta = undefined;
@@ -115,7 +115,7 @@ export class ImageLoader {
         return meta;
     }
 
-    async loadBinary3D(instance: Instance, url: string, meta: any, img_id: string): Promise<Image3D> {
+    async loadBinary3D(instance: InstanceGET, url: string, meta: any, img_id: string): Promise<Image3D> {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
         const pixelData = new Uint8Array(buffer);
@@ -131,13 +131,13 @@ export class ImageLoader {
         };
         if (instance.scan?.mode == 'Circle-Scan') {
             // this is not correct in the meta file
-            dimensions.width_mm = instance.resolutionHorizontal * dimensions.width;
+            dimensions.width_mm = instance.resolution_horizontal * dimensions.width;
         }
         return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, meta);
     }
 
-    async loadDicom(instance: Instance, img_id: string): Promise<LoadedImages> {
-        const url = `${fsHost}/${instance.datasetIdentifier}`;
+    async loadDicom(instance: InstanceGET, img_id: string): Promise<LoadedImages> {
+        const url = `${fsHost}/${instance.dataset_identifier}`;
 
         const imageId = `wadouri:${url}`;
         const image = await cornerstone.loadImage(imageId);

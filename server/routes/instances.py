@@ -1,8 +1,9 @@
 from eyened_orm import (
-    ImageInstance,
-    Tag,
-    ImageInstanceTagLink,
+    ImageInstance, Tag, ImageInstanceTagLink,
+    Series, Study, Patient, Project, DeviceInstance, DeviceModel, Scan,
+    Segmentation, ModelSegmentation, Model, Feature, FormAnnotation,
 )
+from eyened_orm.Tag import SegmentationTagLink, FormAnnotationTagLink
 from eyened_orm.Tag import TagType
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -18,20 +19,54 @@ from ..db import get_db
 router = APIRouter()
 
 @router.get("/instances/{instance_id}", response_model=InstanceGET)
-async def get_instance(instance_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
-    item = db.get(
-        ImageInstance,
-        instance_id,
-        options=(
-            selectinload(ImageInstance.ImageInstanceTagLinks)
-                .selectinload(ImageInstanceTagLink.Tag),
-            selectinload(ImageInstance.ImageInstanceTagLinks)
-                .selectinload(ImageInstanceTagLink.Creator),
-        ),
-    )
+async def get_instance(
+    instance_id: int,
+    with_segmentations: bool = False,
+    with_form_annotations: bool = False,
+    with_model_segmentations: bool = False,
+    with_tag_metadata: bool = False,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    opts = [
+        # base graph
+        selectinload(ImageInstance.Series).selectinload(Series.Study).selectinload(Study.Patient).selectinload(Patient.Project),
+        selectinload(ImageInstance.DeviceInstance).selectinload(DeviceInstance.DeviceModel),
+        selectinload(ImageInstance.Scan),
+        # instance tags
+        selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
+        selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Creator),
+    ]
+    if with_segmentations:
+        opts += [
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.Feature),
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.Creator),
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.SegmentationTagLinks).selectinload(SegmentationTagLink.Tag),
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.SegmentationTagLinks).selectinload(SegmentationTagLink.Creator),
+        ]
+    if with_form_annotations:
+        opts += [
+            selectinload(ImageInstance.FormAnnotations).selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
+            selectinload(ImageInstance.FormAnnotations).selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
+        ]
+    if with_model_segmentations:
+        opts += [
+            selectinload(ImageInstance.ModelSegmentations).selectinload(ModelSegmentation.Model),
+            # optional if Model.Feature relationship is added later:
+            # selectinload(ImageInstance.ModelSegmentations).selectinload(ModelSegmentation.Model).selectinload(Model.Feature),
+        ]
+
+    item = db.get(ImageInstance, instance_id, options=tuple(opts))
     if not item:
         raise HTTPException(404, "ImageInstance not found")
-    return DTOConverter.image_instance_to_get(item)
+
+    return DTOConverter.image_instance_to_get(
+        item,
+        with_tag_metadata=with_tag_metadata,
+        with_segmentations=with_segmentations,
+        with_form_annotations=with_form_annotations,
+        with_model_segmentations=with_model_segmentations,
+    )
 
 
 @router.get("/instances/images/{dataset_identifier:path}")

@@ -5,6 +5,7 @@ import type {
 	SegmentationGET, SegmentationPATCH,
 	SeriesGET, SeriesMeta,
 	StudyGET, StudyMeta,
+	SubTaskGET, SubTaskWithImagesGET, SubTasksResponse, SubTasksWithImagesResponse,
 	TagGET, TagMeta, TagPATCH,
 	TaskGET, TaskPATCH
 } from '../../types/openapi_types';
@@ -14,7 +15,7 @@ import { DataObject, MetaObject } from './datamodel.svelte';
 
 // GET object classes
 export class InstanceObject extends DataObject<InstanceGET, never> {
-	static DefaultRepo: unknown;
+	static DefaultRepo: typeof Repo;
 	async tag(tag_id: number) {
 		const {data} = await api.POST('/instances/{instance_id}/tags' as any, {
 			params: { path: { instance_id: Number(this.id) } } as any,
@@ -31,7 +32,7 @@ export class InstanceObject extends DataObject<InstanceGET, never> {
 }
 
 export class StudyObject extends DataObject<StudyGET, never> {
-	static DefaultRepo: unknown;
+	static DefaultRepo: typeof Repo;
 	async tag(tag_id: number) {
 		const {data} = await api.POST('/studies/{study_id}/tags' as any, {
 			params: { path: { study_id: Number(this.id) } } as any,
@@ -47,10 +48,10 @@ export class StudyObject extends DataObject<StudyGET, never> {
 	}
 }
 
-export class SeriesObject extends DataObject<SeriesGET, never> { static DefaultRepo: unknown; }
+export class SeriesObject extends DataObject<SeriesGET, never> { static DefaultRepo: typeof Repo; }
 
 export class SegmentationObject extends DataObject<SegmentationGET, SegmentationPATCH> { 
-	static DefaultRepo: unknown;
+	static DefaultRepo: typeof Repo;
 	async tag(tag_id: number) {
 		const {data} = await api.POST('/segmentations/{segmentation_id}/tags' as any, {
 			params: { path: { segmentation_id: Number(this.id) } } as any,
@@ -67,7 +68,7 @@ export class SegmentationObject extends DataObject<SegmentationGET, Segmentation
 }
 
 export class FormAnnotationObject extends DataObject<FormAnnotationGET, FormAnnotationPUT> {
-	static DefaultRepo: unknown;
+	static DefaultRepo: typeof Repo;
 	async tag(tag_id: number) {
 		const {data} = await api.POST('/form-annotations/{annotation_id}/tags' as any, {
 			params: { path: { annotation_id: Number(this.id) } } as any,
@@ -83,11 +84,52 @@ export class FormAnnotationObject extends DataObject<FormAnnotationGET, FormAnno
 	}
 }
 
-export class TagObject extends DataObject<TagGET, TagPATCH> { static DefaultRepo: unknown; }
+export class TagObject extends DataObject<TagGET, TagPATCH> { static DefaultRepo: typeof Repo; }
 
-export class TaskObject extends DataObject<TaskGET, TaskPATCH> { static DefaultRepo: unknown; }
+export class TaskObject extends DataObject<TaskGET, TaskPATCH> { 
+	static DefaultRepo: typeof Repo;
+	
+	async subtasks(p?: { with_images?: boolean; limit?: number; page?: number }) {
+		const { api } = await import('../api/client');
+		const res = await api.GET('/subtasks' as any, {
+			params: {
+				query: {
+					task_id: Number(this.id),
+					with_images: p?.with_images ?? true,
+					limit: p?.limit ?? 200,
+					page: p?.page ?? 0
+				}
+			}
+		});
+		return res.data as SubTasksWithImagesResponse | SubTasksResponse;
+	}
+}
 
-export class FeatureObject extends DataObject<FeatureGET, FeaturePATCH> { static DefaultRepo: unknown; }
+export class FeatureObject extends DataObject<FeatureGET, FeaturePATCH> { static DefaultRepo: typeof Repo; }
+
+export class SubTaskObject extends DataObject<SubTaskGET | SubTaskWithImagesGET, Partial<SubTaskGET | SubTaskWithImagesGET>> {
+	async addImage(instance_id: number) {
+		const { api } = await import('../api/client');
+		await api.POST('/subtasks/{subtaskid}/images' as any, {
+			params: { path: { subtaskid: Number(this.id) } } as any,
+			body: { instance_id } as any
+		});
+	}
+	async removeImage(instance_id: number) {
+		const { api } = await import('../api/client');
+		await api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
+			params: { path: { subtaskid: Number(this.id), instance_id } } as any
+		});
+	}
+	async setComments(comments: string) {
+		const { api } = await import('../api/client');
+		const { data } = await api.PATCH('/subtasks/{subtaskid}' as any, {
+			params: { path: { subtaskid: Number(this.id) } } as any,
+			body: { comments } as any
+		});
+		this.replace(data as SubTaskGET | SubTaskWithImagesGET);
+	}
+}
 
 // Meta object classes (no Meta repos)
 type SegmentationMeta = Pick<SegmentationGET, 'id'>;

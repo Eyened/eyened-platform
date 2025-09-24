@@ -1,17 +1,17 @@
-import type { AbstractImage } from '$lib/webgl/abstractImage';
-import type { Shaders } from '$lib/webgl/shaders';
-import type { MeasureTool } from './tools/Measure.svelte.js';
-import type { EventName, Overlay, PanelName, RenderMode, ViewerEvent, ViewerEventListener, WindowLevel } from './viewer-utils';
 import { Matrix } from '$lib/matrix';
 import type { Registration } from '$lib/registration/registration.js';
 import type { Position2D } from '$lib/types';
+import type { AbstractImage } from '$lib/webgl/abstractImage';
 import { BaseImageRenderer } from '$lib/webgl/imageRenderer';
+import type { Shaders } from '$lib/webgl/shaders';
+import { SvelteSet } from 'svelte/reactivity';
+import { HotKeys } from './controls/hotkeys';
 import { ScrollOCT } from './controls/scrollOCT';
 import { UpdatePosition } from './controls/updatePosition';
 import { ZoomPan } from './controls/zoomPan';
 import { CursorOverlay } from './overlays/CursorOverlay';
-import { HotKeys } from './controls/hotkeys';
-import { SvelteSet } from 'svelte/reactivity';
+import type { MeasureTool } from './tools/Measure.svelte.js';
+import type { EventName, Overlay, PanelName, RenderMode, ViewerEvent, ViewerEventListener, WindowLevel } from './viewer-utils';
 
 export type cursorStyle = 'default' | 'none' | 'help' | 'pointer' | 'progress' | 'wait' | 'crosshair' | 'text' | 'vertical-text' | 'alias' | 'copy' | 'move' | 'no-drop' | 'not-allowed' | 'grab' | 'grabbing' | 'all-scroll' | 'col-resize' | 'row-resize' | 'n-resize' | 'e-resize' | 's-resize' | 'w-resize' | 'ne-resize' | 'nw-resize' | 'se-resize' | 'sw-resize' | 'ew-resize' | 'ns-resize' | 'nesw-resize' | 'nwse-resize' | 'zoom-in' | 'zoom-out';
 
@@ -78,9 +78,9 @@ export class ViewerContext {
         this.windowLevel = { min: 0, max: 255 };
         if (image.is3D) {
             this.index = Math.round(image.depth / 2);
-            if (image.instance.deviceModel.model == '3D OCT-1000' ||
-                image.instance.deviceModel.model == '3D OCT-1000 MARK II' ||
-                image.instance.deviceModel.model == '3D OCT-2000 FA Plus'
+            if (image.instance.device.model == '3D OCT-1000' ||
+                image.instance.device.model == '3D OCT-1000 MARK II' ||
+                image.instance.device.model == '3D OCT-2000 FA Plus'
             ) {
                 this.windowLevel = { min: 30, max: 225 };
             }
@@ -119,7 +119,7 @@ export class ViewerContext {
 
     /**
      * Takes into account image local transform and ROI to fit the image into the viewer
-	
+    
      * @returns transform that fits the image into the viewer
      */
     getInitTransform() {
@@ -129,7 +129,7 @@ export class ViewerContext {
         let y_min = 0;
         let y_max = this.image.height;
         const instance = this.image.instance
-        if (instance.cfROI) {
+        if (instance.cf_roi) {
             let center;
             let cx = this.image.width / 2;
             let cy = this.image.height / 2;
@@ -139,8 +139,8 @@ export class ViewerContext {
             let max_y = this.image.height;
             let radius = Math.min(this.image.width, this.image.height) / 2;
             try {
-                ({ center, radius, min_x, max_x, min_y, max_y } = instance.cfROI);
-                ([cx, cy] = center);
+                ({ center, radius, min_x, max_x, min_y, max_y } = instance.cf_roi as any);
+                ([cx, cy] = center as [number, number]);
             } catch (e) {
                 console.warn('Error in cfROI', e);
 

@@ -34,7 +34,7 @@
         (s) => s.model,
     );
     // hide all on load
-    for (const segmentation of $allSegmentations) {
+    for (const segmentation of allSegmentations) {
         segmentationContext.hideCreators.add(segmentation.creator);
     }
     // show own segmentations

@@ -320,6 +320,46 @@
             }
           },
           {
+            "name": "with_segmentations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Segmentations"
+            }
+          },
+          {
+            "name": "with_form_annotations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Form Annotations"
+            }
+          },
+          {
+            "name": "with_model_segmentations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Model Segmentations"
+            }
+          },
+          {
+            "name": "with_tag_metadata",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Tag Metadata"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -1743,7 +1783,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FormAnnotationPUT"
+                "$ref": "#/components/schemas/FormAnnotationPATCH"
               }
             }
           }
@@ -3708,6 +3748,462 @@
         }
       }
     },
+    "/subtasks": {
+      "get": {
+        "summary": "List Subtasks",
+        "operationId": "list_subtasks_subtasks_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "with_images",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Images"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SubTasksWithImagesResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SubTasksResponse"
+                    }
+                  ],
+                  "title": "Response List Subtasks Subtasks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subtasks/{subtaskid}": {
+      "get": {
+        "summary": "Get Subtask",
+        "operationId": "get_subtask_subtasks__subtaskid__get",
+        "parameters": [
+          {
+            "name": "subtaskid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtaskid"
+            }
+          },
+          {
+            "name": "with_images",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Images"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SubTaskWithImagesGET"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SubTaskGET"
+                    }
+                  ],
+                  "title": "Response Get Subtask Subtasks  Subtaskid  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch Subtask",
+        "operationId": "patch_subtask_subtasks__subtaskid__patch",
+        "parameters": [
+          {
+            "name": "subtaskid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtaskid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubTaskPATCH"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubTaskGET"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Subtask",
+        "operationId": "delete_subtask_subtasks__subtaskid__delete",
+        "parameters": [
+          {
+            "name": "subtaskid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtaskid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subtasks/{subtaskid}/images": {
+      "post": {
+        "summary": "Add Subtask Image",
+        "operationId": "add_subtask_image_subtasks__subtaskid__images_post",
+        "parameters": [
+          {
+            "name": "subtaskid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtaskid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddImageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subtasks/{subtaskid}/images/{instance_id}": {
+      "delete": {
+        "summary": "Remove Subtask Image",
+        "operationId": "remove_subtask_image_subtasks__subtaskid__images__instance_id__delete",
+        "parameters": [
+          {
+            "name": "subtaskid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtaskid"
+            }
+          },
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/devices": {
       "get": {
         "summary": "List Devices",
@@ -3919,6 +4415,19 @@
   },
   "components": {
     "schemas": {
+      "AddImageRequest": {
+        "properties": {
+          "instance_id": {
+            "type": "integer",
+            "title": "Instance Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instance_id"
+        ],
+        "title": "AddImageRequest"
+      },
       "Body_create_segmentation_segmentations_post": {
         "properties": {
           "np_array": {
@@ -4066,6 +4575,13 @@
             "type": "array",
             "title": "Subfeatures"
           },
+          "subfeature_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Subfeature Ids"
+          },
           "date_inserted": {
             "type": "string",
             "format": "date-time",
@@ -4077,6 +4593,7 @@
           "name",
           "id",
           "subfeatures",
+          "subfeature_ids",
           "date_inserted"
         ],
         "title": "FeatureGET"
@@ -4084,7 +4601,14 @@
       "FeaturePATCH": {
         "properties": {
           "name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Name"
           },
           "subfeature_ids": {
@@ -4103,11 +4627,8 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
         "title": "FeaturePATCH",
-        "description": "Partial update for Feature (same fields as PUT for now)."
+        "description": "Partial update for Feature with optional fields."
       },
       "FeaturePUT": {
         "properties": {
@@ -4168,10 +4689,6 @@
             ],
             "title": "Image Instance Id"
           },
-          "creator_id": {
-            "type": "integer",
-            "title": "Creator Id"
-          },
           "sub_task_id": {
             "anyOf": [
               {
@@ -4226,6 +4743,9 @@
             "type": "array",
             "title": "Tags"
           },
+          "creator": {
+            "$ref": "#/components/schemas/CreatorMetadata"
+          },
           "date_inserted": {
             "type": "string",
             "format": "date-time",
@@ -4248,13 +4768,109 @@
         "required": [
           "form_schema_id",
           "patient_id",
-          "creator_id",
           "id",
           "object_type",
           "tags",
+          "creator",
           "date_inserted"
         ],
         "title": "FormAnnotationGET"
+      },
+      "FormAnnotationPATCH": {
+        "properties": {
+          "form_schema_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Schema Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "image_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Instance Id"
+          },
+          "creator_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator Id"
+          },
+          "sub_task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Task Id"
+          },
+          "form_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Data"
+          },
+          "form_annotation_reference_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Annotation Reference Id"
+          }
+        },
+        "type": "object",
+        "title": "FormAnnotationPATCH",
+        "description": "Partial update for FormAnnotation with optional fields."
       },
       "FormAnnotationPUT": {
         "properties": {
@@ -4287,10 +4903,6 @@
               }
             ],
             "title": "Image Instance Id"
-          },
-          "creator_id": {
-            "type": "integer",
-            "title": "Creator Id"
           },
           "sub_task_id": {
             "anyOf": [
@@ -4330,8 +4942,7 @@
         "type": "object",
         "required": [
           "form_schema_id",
-          "patient_id",
-          "creator_id"
+          "patient_id"
         ],
         "title": "FormAnnotationPUT"
       },
@@ -4788,6 +5399,48 @@
             },
             "type": "array",
             "title": "Tags"
+          },
+          "segmentations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SegmentationGET"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmentations"
+          },
+          "model_segmentations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ModelSegmentationGET"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Segmentations"
+          },
+          "form_annotations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FormAnnotationGET"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Annotations"
           }
         },
         "type": "object",
@@ -4920,6 +5573,179 @@
           "SC"
         ],
         "title": "ModalityType"
+      },
+      "ModelMeta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version"
+        ],
+        "title": "ModelMeta"
+      },
+      "ModelSegmentationGET": {
+        "properties": {
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "sparse_axis": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sparse Axis"
+          },
+          "image_projection_matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Projection Matrix"
+          },
+          "scan_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Indices"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "reference_segmentation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Segmentation Id"
+          },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelMeta"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeatureGET"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "creator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreatorMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagMeta"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "date_inserted": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Date Inserted"
+          },
+          "date_modified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Modified"
+          }
+        },
+        "type": "object",
+        "required": [
+          "depth",
+          "height",
+          "width",
+          "data_type",
+          "data_representation",
+          "id",
+          "model",
+          "tags",
+          "date_inserted"
+        ],
+        "title": "ModelSegmentationGET"
       },
       "ObjectTagPOST": {
         "properties": {
@@ -5716,7 +6542,7 @@
             "title": "Task Id"
           },
           "task_state": {
-            "$ref": "#/components/schemas/TaskState"
+            "$ref": "#/components/schemas/SubTaskState"
           },
           "comments": {
             "anyOf": [
@@ -5753,6 +6579,43 @@
         ],
         "title": "SubTaskGET"
       },
+      "SubTaskPATCH": {
+        "properties": {
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "task_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task State"
+          }
+        },
+        "type": "object",
+        "title": "SubTaskPATCH"
+      },
+      "SubTaskState": {
+        "type": "string",
+        "enum": [
+          "NotStarted",
+          "Busy",
+          "Ready"
+        ],
+        "title": "SubTaskState"
+      },
       "SubTaskWithImagesGET": {
         "properties": {
           "task_id": {
@@ -5760,7 +6623,7 @@
             "title": "Task Id"
           },
           "task_state": {
-            "$ref": "#/components/schemas/TaskState"
+            "$ref": "#/components/schemas/SubTaskState"
           },
           "comments": {
             "anyOf": [
@@ -5938,25 +6801,41 @@
       "TagPATCH": {
         "properties": {
           "name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Name"
           },
           "tag_type": {
-            "$ref": "#/components/schemas/TagType"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TagType"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "description": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Description"
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "tag_type",
-          "description"
-        ],
         "title": "TagPATCH",
-        "description": "Partial update for Tag (same as PUT for now)."
+        "description": "Partial update for Tag with optional fields."
       },
       "TagPUT": {
         "properties": {

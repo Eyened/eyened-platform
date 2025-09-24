@@ -9,6 +9,7 @@ import type {
 	SegmentationGET, SegmentationPATCH,
 	SeriesGET,
 	StudyGET,
+	SubTaskGET, SubTaskWithImagesGET, SubTasksResponse, SubTasksWithImagesResponse,
 	TagGET,
 	TagPATCH,
 	TagPUT,
@@ -18,7 +19,7 @@ import type {
 } from '../../types/openapi_types';
 import { api } from '../api/client';
 import { Repo } from './datamodel.svelte';
-import { FeatureObject, FormAnnotationObject, InstanceObject, SegmentationObject, SeriesObject, StudyObject, TagObject, TaskObject } from './objects.svelte';
+import { FeatureObject, FormAnnotationObject, InstanceObject, SegmentationObject, SeriesObject, StudyObject, SubTaskObject, TagObject, TaskObject } from './objects.svelte';
 
 // Type aliases for backward compatibility
 export type Tag = TagGET;
@@ -26,6 +27,35 @@ export type Tag = TagGET;
 export class TasksRepo extends Repo<TaskGET, TaskPUT, TaskPATCH, unknown, TaskObject> {
 	public static path = '/task';
 	protected createDataObject(obj: TaskGET): TaskObject { return new TaskObject(obj, this); }
+}
+
+type SubTaskAny = SubTaskGET | SubTaskWithImagesGET;
+
+export class SubTasksRepo extends Repo<SubTaskAny, never, Partial<SubTaskAny>, { task_id: number; with_images?: boolean; limit?: number; page?: number }, SubTaskObject> {
+	public static path = '/subtasks';
+	constructor(key: string) { super(key); }
+
+	public paging = $state({ limit: 200, page: 0, count: 0 });
+
+	protected createDataObject(obj: SubTaskAny): SubTaskObject { return new SubTaskObject(obj, this as any); }
+
+	protected async remoteList(params?: { task_id: number; with_images?: boolean; limit?: number; page?: number }): Promise<SubTaskAny[]> {
+		const { api } = await import('../api/client');
+		if (!params?.task_id) throw new Error('task_id is required');
+		const res = await api.GET('/subtasks' as any, {
+			params: {
+				query: {
+					task_id: params.task_id,
+					with_images: params?.with_images ?? true,
+					limit: params?.limit ?? this.paging.limit,
+					page: params?.page ?? this.paging.page
+				}
+			}
+		});
+		const data = (res.data ?? {}) as SubTasksWithImagesResponse | SubTasksResponse;
+		if ('limit' in data && 'page' in data) this.paging = { limit: data.limit, page: data.page, count: (data as any).count ?? 0 };
+		return data.subtasks ?? [];
+	}
 }
 
 export class FeaturesRepo extends Repo<FeatureGET, FeaturePUT, FeaturePATCH, unknown, FeatureObject> {

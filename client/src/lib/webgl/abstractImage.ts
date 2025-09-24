@@ -1,17 +1,17 @@
+// import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import { Matrix } from "$lib/matrix";
+import { SvelteMap } from "svelte/reactivity";
+import type { InstanceGET, SegmentationGET } from "../../types/openapi_types";
+import { SegmentationItem } from "./segmentationItem";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
-import type { Instance } from "$lib/datamodel/instance.svelte";
-import { Matrix } from "$lib/matrix";
-import { SegmentationItem } from "./segmentationItem";
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import { SvelteMap } from "svelte/reactivity";
 
 export abstract class AbstractImage {
 
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-    public readonly segmentationItems = new SvelteMap<Segmentation, SegmentationItem>();
+    public readonly segmentationItems = new SvelteMap<SegmentationGET, SegmentationItem>();
     abstract texture: WebGLTexture;
 
     // in micrometers / pixel
@@ -19,7 +19,7 @@ export abstract class AbstractImage {
     transform: Matrix = Matrix.identity;
 
     constructor(
-        public readonly instance: Instance,
+        public readonly instance: InstanceGET,
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
@@ -41,7 +41,7 @@ export abstract class AbstractImage {
     abstract is3D: boolean;
     abstract is2D: boolean;
 
-    getSegmentationItem(segmentation: Segmentation): SegmentationItem {
+    getSegmentationItem(segmentation: SegmentationGET): SegmentationItem {
         // If the segmentationItem is already created, return it
         if (this.segmentationItems.has(segmentation)) {
             return this.segmentationItems.get(segmentation)!;

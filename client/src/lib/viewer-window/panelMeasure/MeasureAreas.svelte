@@ -16,7 +16,7 @@
 </script>
 
 <ul>
-    {#each $allSegmentations as segmentation}
+    {#each allSegmentations as segmentation}
         <li>
             <SegmentationArea {segmentation} {measureTool} />
         </li>
