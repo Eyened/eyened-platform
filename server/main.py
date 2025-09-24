@@ -20,6 +20,7 @@ from server.routes import (
     feature,
     tag,
     task,
+    subtask,
     search,
     devices,
     studies,
@@ -41,6 +42,7 @@ app_api.include_router(form_schema.router)
 app_api.include_router(feature.router)
 app_api.include_router(tag.router)
 app_api.include_router(task.router)
+app_api.include_router(subtask.router)
 app_api.include_router(devices.router)
 app_api.include_router(studies.router)
 

@@ -4,6 +4,7 @@
 	import { authEnabled } from '$lib/config';
 	import { getContext } from 'svelte';
 	import type { GlobalContext } from '../data/globalContext.svelte';
+	import TopMenu from './TopMenu.svelte';
 	import UserMenu from './UserMenu.svelte';
 	import * as Tooltip from './ui/tooltip';
 
@@ -20,11 +21,14 @@
 </script>
 
 <Tooltip.Provider>
-{#if !authEnabled || (authEnabled && userManager.loggedIn)}
-	{@render children?.()}
-{/if}
+	<TopMenu />
+	<div class="page-container">
+		{#if !authEnabled || (authEnabled && userManager.loggedIn)}
+			{@render children?.()}
+		{/if}
+	</div>
 
-<UserMenu />
+	<UserMenu />
 </Tooltip.Provider>
 
 <style>
@@ -35,5 +39,9 @@
 		background-color: white;
 		display: flex;
 		flex-direction: column;
+	}
+	.page-container {
+		padding-top: 56px; /* matches --topmenu-height */
+		overflow-y: scroll;
 	}
 </style>

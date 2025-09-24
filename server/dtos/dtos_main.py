@@ -7,12 +7,11 @@ This file contains DTOs that represent:
 2. Frontend object representations (with property names as used in TypeScript)
 """
 
-from datetime import date, datetime
-from typing import Any, Dict, List, Literal, Optional, get_origin
+from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
 from eyened_orm.Segmentation import DataRepresentation, Datatype
-from .dtos_aux import CreatorGET, CreatorMetadata, TagMeta
-from .dtos_instances import InstanceGET, PatientGET, StudyGET
+from .dtos_aux import CreatorMeta, TagMeta
 from pydantic import BaseModel
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -73,7 +72,28 @@ class SegmentationGET(SegmentationBase):
     id: int
    
     feature: FeatureGET
-    creator: CreatorMetadata
+    creator: CreatorMeta
+    tags: List[TagMeta]
+
+    date_inserted: datetime
+    date_modified: Optional[datetime] = None
+
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ========================= MODEL SEGMENTATIONS =========================
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+class ModelMeta(BaseModel):
+    id: int
+    name: str
+    version: str
+
+class ModelSegmentationGET(SegmentationBase):
+    id: int
+   
+    model: ModelMeta
+    feature: Optional[FeatureGET] = None
+    creator: Optional[CreatorMeta] = None
     tags: List[TagMeta]
 
     date_inserted: datetime
@@ -105,7 +125,6 @@ class FormAnnotationBase(BaseModel):
     patient_id: int
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
-    creator_id: int
     sub_task_id: Optional[int] = None
     form_data: Optional[Dict[str, Any]] = None
     form_annotation_reference_id: Optional[int] = None
@@ -120,6 +139,7 @@ class FormAnnotationGET(FormAnnotationBase):
 
     object_type: Literal['patient', 'study', 'image_instance']
     tags: List[TagMeta]
+    creator: CreatorMeta
 
     date_inserted: datetime
     date_modified: Optional[datetime] = None

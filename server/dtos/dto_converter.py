@@ -21,8 +21,8 @@ from .dtos_instances import (
     DeviceMeta,
     ScanMeta,
 )
-from .dtos_aux import CreatorGET, CreatorMetadata, TagGET, TagMeta
-from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET, DeviceModelGET
+from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
+from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET, DeviceModelGET, ModelMeta, ModelSegmentationGET
 from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET, SubTaskWithImagesGET
 
 if TYPE_CHECKING:
@@ -49,6 +49,8 @@ if TYPE_CHECKING:
         ImageInstanceTagLink,
         SegmentationTagLink,
         FormAnnotationTagLink,
+        Model,
+        ModelSegmentation,
     )
 
 
@@ -116,7 +118,13 @@ class DTOConverter:
         )
 
     @staticmethod
-    def image_instance_to_get(image_instance: "ImageInstance", with_tag_metadata: bool = False) -> InstanceGET:
+    def image_instance_to_get(
+        image_instance: "ImageInstance",
+        with_tag_metadata: bool = False,
+        with_segmentations: bool = False,
+        with_form_annotations: bool = False,
+        with_model_segmentations: bool = False,
+    ) -> InstanceGET:
         """Convert ImageInstance ORM object to InstanceGET."""
         device_meta = DeviceMeta(
             manufacturer=(
@@ -184,6 +192,21 @@ class DTOConverter:
         )
         if with_tag_metadata:
             dto.tags = DTOConverter._tags_from_image_instance(image_instance)
+        if with_segmentations:
+            dto.segmentations = [
+                DTOConverter.segmentation_to_get(s, with_tag_metadata=with_tag_metadata)
+                for s in (getattr(image_instance, "Segmentations", []) or [])
+            ]
+        if with_form_annotations:
+            dto.form_annotations = [
+                DTOConverter.form_annotation_to_get(fa, with_tag_metadata=with_tag_metadata)
+                for fa in (getattr(image_instance, "FormAnnotations", []) or [])
+            ]
+        if with_model_segmentations:
+            dto.model_segmentations = [
+                DTOConverter.model_segmentation_to_get(ms, with_tag_metadata=with_tag_metadata)
+                for ms in (getattr(image_instance, "ModelSegmentations", []) or [])
+            ]
         return dto
 
     @staticmethod
@@ -228,9 +251,9 @@ class DTOConverter:
         )
 
     @staticmethod
-    def creator_to_meta(creator: "Creator") -> CreatorMetadata:
+    def creator_to_meta(creator: "Creator") -> CreatorMeta:
         """Convert Creator ORM object to CreatorMetadata."""
-        return CreatorMetadata(
+        return CreatorMeta(
             id=creator.CreatorID,
             name=creator.CreatorName
         )
@@ -247,6 +270,34 @@ class DTOConverter:
             id=model.DeviceModelID,
             manufacturer=model.Manufacturer,
             model=model.ManufacturerModelName,
+        )
+
+    @staticmethod
+    def model_to_meta(model: "Model") -> ModelMeta:
+        """Convert Model ORM object to ModelMeta."""
+        return ModelMeta(id=model.ModelID, name=model.ModelName, version=model.Version)
+
+    @staticmethod
+    def model_segmentation_to_get(ms: "ModelSegmentation", with_tag_metadata: bool = False) -> ModelSegmentationGET:
+        """Convert ModelSegmentation ORM object to ModelSegmentationGET."""
+        # feature best-effort via model.Feature if relationship exists; else omit
+        feat = getattr(getattr(ms, "Model", None), "Feature", None)
+        feature_get = DTOConverter.feature_to_get(feat) if feat is not None else None  # type: ignore[arg-type]
+        return ModelSegmentationGET(
+            id=ms.ModelSegmentationID,
+            depth=ms.Depth, height=ms.Height, width=ms.Width,
+            sparse_axis=ms.SparseAxis,
+            image_projection_matrix=ms.ImageProjectionMatrix,
+            scan_indices=ms.ScanIndices,
+            threshold=ms.Threshold,
+            reference_segmentation_id=ms.ReferenceSegmentationID,
+            data_type=ms.DataType, data_representation=ms.DataRepresentation,
+            model=DTOConverter.model_to_meta(ms.Model),
+            feature=feature_get,  # may be None if not joined
+            creator=None,  # no Creator on ModelSegmentation
+            tags=[],       # no tags on ModelSegmentation
+            date_inserted=ms.DateInserted,
+            date_modified=None,
         )
 
     @staticmethod
@@ -338,12 +389,12 @@ class DTOConverter:
             patient_id=annotation.PatientID,
             study_id=annotation.StudyID,
             image_instance_id=annotation.ImageInstanceID,
-            creator_id=annotation.CreatorID,
             sub_task_id=annotation.SubTaskID,
             form_data=annotation.FormData,
             form_annotation_reference_id=annotation.FormAnnotationReferenceID,
             object_type=obj_type,  # type: ignore[assignment]
             tags=[],
+            creator=DTOConverter.creator_to_meta(annotation.Creator) if getattr(annotation, "Creator", None) else None,
             date_inserted=annotation.DateInserted,
             date_modified=annotation.DateModified,
         )

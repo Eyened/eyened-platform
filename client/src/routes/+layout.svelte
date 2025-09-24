@@ -1,10 +1,11 @@
 <script lang="ts">
-    import { page } from "$app/state"
-    import { GlobalContext } from "$lib/data/globalContext.svelte"
-    import Dialogue from "$lib/Dialogue.svelte"
-    import Popup from "$lib/Popup.svelte"
-    import { setContext } from "svelte"
-    import '../app.css'
+    import { page } from "$app/state";
+    import { Toaster } from "$lib/components/ui/sonner";
+    import { GlobalContext } from "$lib/data/globalContext.svelte";
+    import Dialogue from "$lib/Dialogue.svelte";
+    import Popup from "$lib/Popup.svelte";
+    import { setContext } from "svelte";
+    import '../app.css';
     
     let { children }: { children: any } = $props();
     
@@ -37,6 +38,7 @@
 {#if ready}
     {@render children()}
 {/if}
+<Toaster />
 
 <style>
     :global(body) {

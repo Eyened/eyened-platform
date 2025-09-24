@@ -1,6 +1,6 @@
 import type { GlobalContext } from "$lib/data/globalContext.svelte";
-import type { FilterList } from "$lib/datamodel/itemList";
-import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
+// import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
+
 import { toggleInSet, type Color } from "$lib/utils";
 import { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
@@ -8,13 +8,14 @@ import { BinaryMask } from "$lib/webgl/mask.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import type { SegmentationGET } from "../../../types/openapi_types";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
 
 export class SegmentationOverlay implements Overlay {
 
-    private featureColors = new SvelteMap<Segmentation, Color>();
+    private featureColors = new SvelteMap<SegmentationGET, Color>();
     
     public readonly applyConnectedComponents = new SvelteSet<SegmentationItem>();
     public readonly applyMasking = new SvelteSet<SegmentationItem>();
@@ -25,17 +26,27 @@ export class SegmentationOverlay implements Overlay {
     public activeFeatureMask = $state<number | undefined>(undefined);
     public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
     public readonly segmentationContext = new SegmentationContext();
-    public readonly allSegmentations: FilterList<Segmentation>;
-    public readonly allModelSegmentations: FilterList<ModelSegmentation>;
+    public readonly allSegmentations: SegmentationGET[];
+    public readonly allModelSegmentations: SegmentationGET[];
 
     constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
         const instance = viewerContext.image.instance;
-        this.allSegmentations = instance.segmentations
-        .filter(globalContext.segmentationsFilter)
-        .filter((s) => s.sparseAxis == viewerContext.axis);
+        this.allSegmentations = $derived(
+            instance.segmentations!.filter(globalContext.segmentationsFilter)
+                .filter((s) => s.sparse_axis == viewerContext.axis)
+        );
+        
+        this.allModelSegmentations = $derived(instance.model_segmentations!.filter((s) => s.sparse_axis == viewerContext.axis));
+        // this.allSegmentations = new FilterList<SegmentationGET>(
+        //     instance.segmentations!
+        //     .filter(globalContext.segmentationsFilter)
+        //     .filter((s) => s.sparse_axis == viewerContext.axis)
+        // );
 
-        this.allModelSegmentations = instance.modelSegmentations
-        .filter((s) => s.sparseAxis == viewerContext.axis);
+        // this.allModelSegmentations = new FilterList<SegmentationGET>(
+        //     instance.model_segmentations!
+        //     .filter((s) => s.sparse_axis == viewerContext.axis)
+        // );
     }
 
     toggleMasking(segmentation: SegmentationItem) {
@@ -46,12 +57,12 @@ export class SegmentationOverlay implements Overlay {
         toggleInSet(this.applyConnectedComponents, segmentationItem);
     }
 
-    setFeatureColor(segmentation: Segmentation, color: Color) {
+    setFeatureColor(segmentation: SegmentationGET, color: Color) {
         this.featureColors.set(segmentation, color);
     }
 
     private _colorIndex = 0;
-    getFeatureColor(segmentation: Segmentation): Color {
+    getFeatureColor(segmentation: SegmentationGET): Color {
         let color = this.featureColors.get(segmentation);
         if (!color) {
             color = colors[(this._colorIndex++) % colors.length];

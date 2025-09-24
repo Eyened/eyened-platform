@@ -6,8 +6,8 @@
     import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
     import StringDialogue from "$lib/StringDialogue.svelte";
+    import { type SegmentationGET } from "../../../types/openapi_types";
     import AI from "../icons/AI.svelte";
     import CCPanel from "./CCPanel.svelte";
     import { duplicate } from "./duplicate_utils";
@@ -20,12 +20,12 @@
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
-        segmentation: Segmentation;
+        segmentation: SegmentationGET;
         style?: "AI" | "normal";
     }
 
     let { segmentation, style = "normal" }: Props = $props();
-    const { feature, dataRepresentation } = segmentation;
+    const { feature, data_representation: dataRepresentation } = segmentation;
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
@@ -94,7 +94,7 @@
         Probability: "P",
         MultiClass: "MC",
         MultiLabel: "ML",
-    }[segmentation.dataRepresentation];
+    }[segmentation.data_representation];
 
     function applyDuplicate() {
         duplicate(

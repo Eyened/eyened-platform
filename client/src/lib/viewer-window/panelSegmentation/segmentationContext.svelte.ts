@@ -1,13 +1,12 @@
 
-import type { Creator } from "$lib/datamodel/creator.svelte";
-import type { Model, Segmentation } from "$lib/datamodel/segmentation.svelte";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem";
 import { SvelteSet } from "svelte/reactivity";
+import type { CreatorMeta, ModelMeta, SegmentationGET } from "../../../types/openapi_types";
 
 export class SegmentationContext {
 
-    public readonly hideCreators = new SvelteSet<Creator | Model>();
-    public readonly visibleSegmentations = new SvelteSet<Segmentation>();
+    public readonly hideCreators = new SvelteSet<CreatorMeta | ModelMeta>();
+    public readonly visibleSegmentations = new SvelteSet<SegmentationGET>();
 
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
@@ -18,7 +17,7 @@ export class SegmentationContext {
 
     constructor() { }
 
-    toggleShowCreator(creator: Creator | Model) {
+    toggleShowCreator(creator: CreatorMeta | ModelMeta) {
         if (this.hideCreators.has(creator)) {
             this.hideCreators.delete(creator);
         } else {
@@ -26,7 +25,7 @@ export class SegmentationContext {
         }
     }
         
-    toggleShow(segmentation: Segmentation) {
+    toggleShow(segmentation: SegmentationGET) {
         if (this.visibleSegmentations.has(segmentation)) {
             this.visibleSegmentations.delete(segmentation);
         } else {
@@ -34,7 +33,7 @@ export class SegmentationContext {
         }
     }
 
-    showOnly(segmentation: Segmentation) {
+    showOnly(segmentation: SegmentationGET) {
         this.visibleSegmentations.clear();
         this.visibleSegmentations.add(segmentation);
     }

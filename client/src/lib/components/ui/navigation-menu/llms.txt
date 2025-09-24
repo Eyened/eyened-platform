@@ -1,0 +1,1039 @@
+# Navigation Menu Documentation
+
+A list of links that allow users to navigate between pages of a website.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+Copy Page
+
+```svelte
+<script lang="ts">
+  import { NavigationMenu } from "bits-ui";
+  import CaretDown from "phosphor-svelte/lib/CaretDown";
+  import cn from "clsx";
+  const components: { title: string; href: string; description: string }[] = [
+    {
+      title: "Alert Dialog",
+      href: "/docs/components/alert-dialog",
+      description:
+        "A modal dialog that interrupts the user with important content and expects a response."
+    },
+    {
+      title: "Link Preview",
+      href: "/docs/components/link-preview",
+      description:
+        "For sighted users to preview content available behind a link."
+    },
+    {
+      title: "Progress",
+      href: "/docs/components/progress",
+      description:
+        "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar."
+    },
+    {
+      title: "Scroll Area",
+      href: "/docs/components/scroll-area",
+      description: "Visually or semantically separates content."
+    },
+    {
+      title: "Tabs",
+      href: "/docs/components/tabs",
+      description:
+        "A set of layered sections of contentknown as tab panelsthat are displayed one at a time."
+    },
+    {
+      title: "Tooltip",
+      href: "/docs/components/tooltip",
+      description:
+        "A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it."
+    }
+  ];
+  type ListItemProps = {
+    className?: string;
+    title: string;
+    href: string;
+    content: string;
+  };
+</script>
+{#snippet ListItem({ className, title, content, href }: ListItemProps)}
+  <li>
+    <NavigationMenu.Link
+      class={cn(
+        "hover:bg-muted hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground outline-hidden block select-none space-y-1 rounded-md p-3 leading-none no-underline transition-colors",
+        className
+      )}
+      {href}
+    >
+      <div class="text-sm font-medium leading-none">{title}</div>
+      <p class="text-muted-foreground line-clamp-2 text-sm leading-snug">
+        {content}
+      </p>
+    </NavigationMenu.Link>
+  </li>
+{/snippet}
+<NavigationMenu.Root class="relative z-10 flex w-full justify-center">
+  <NavigationMenu.List
+    class="group flex list-none items-center justify-center p-1"
+  >
+    <NavigationMenu.Item value="getting-started">
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus-visible:bg-muted focus-visible:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus-visible:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Getting started
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left absolute left-0 top-0 w-full sm:w-auto"
+      >
+        <ul
+          class="m-0 grid list-none gap-x-2.5 p-3 sm:w-[600px] sm:grid-flow-col sm:grid-rows-3 sm:p-[22px]"
+        >
+          <li class="row-span-3 mb-2 sm:mb-0">
+            <NavigationMenu.Link
+              href="/"
+              class="from-muted/50 to-muted bg-linear-to-b outline-hidden flex h-full w-full select-none flex-col justify-end rounded-md p-6 no-underline focus:shadow-md"
+            >
+              <div class="mb-2 mt-4 text-lg font-medium">Bits UI</div>
+              <p class="text-muted-foreground text-sm leading-tight">
+                The headless components for Svelte.
+              </p>
+            </NavigationMenu.Link>
+          </li>
+          {@render ListItem({
+            href: "/docs",
+            title: "Introduction",
+            content: "Headless components for Svelte and SvelteKit"
+          })}
+          {@render ListItem({
+            href: "/docs/getting-started",
+            title: "Getting Started",
+            content: "How to install and use Bits UI"
+          })}
+          {@render ListItem({
+            href: "/docs/styling",
+            title: "Styling",
+            content: "How to style Bits UI components"
+          })}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus-visible:bg-muted focus-visible:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus-visible:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Components
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left absolute left-0 top-0 w-full sm:w-auto"
+      >
+        <ul
+          class="grid gap-3 p-3 sm:w-[400px] sm:p-6 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
+        >
+          {#each components as component (component.title)}
+            {@render ListItem({
+              href: component.href,
+              title: component.title,
+              content: component.description
+            })}
+          {/each}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Link
+        class="hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+        href="/docs"
+      >
+        <span class="hidden sm:inline"> Documentation </span>
+        <span class="inline sm:hidden"> Docs </span>
+      </NavigationMenu.Link>
+    </NavigationMenu.Item>
+    <NavigationMenu.Indicator
+      class="data-[state=hidden]:animate-fade-out data-[state=visible]:animate-fade-in top-full z-10 flex h-2.5 items-end justify-center overflow-hidden opacity-100 transition-[all,transform_250ms_ease] duration-200 data-[state=hidden]:opacity-0"
+    >
+      <div
+        class="bg-border relative top-[70%] size-2.5 rotate-[45deg] rounded-tl-[2px]"
+      ></div>
+    </NavigationMenu.Indicator>
+  </NavigationMenu.List>
+  <div
+    class="perspective-[2000px] absolute left-0 top-full flex w-full justify-center"
+  >
+    <NavigationMenu.Viewport
+      class="text-popover-foreground bg-background data-[state=closed]:animate-scale-out data-[state=open]:animate-scale-in relative mt-2.5 h-[var(--bits-navigation-menu-viewport-height)] w-full origin-[top_center] overflow-hidden rounded-md border shadow-lg transition-[width,_height] duration-200 sm:w-[var(--bits-navigation-menu-viewport-width)] "
+    />
+  </div>
+</NavigationMenu.Root>
+```
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { NavigationMenu } from "bits-ui";
+</script>
+<NavigationMenu.Root>
+  <NavigationMenu.List>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger />
+      <NavigationMenu.Content />
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger />
+      <NavigationMenu.Content>
+        <NavigationMenu.Link />
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Link />
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger />
+      <NavigationMenu.Content>
+        <NavigationMenu.Sub>
+          <NavigationMenu.List />
+          <NavigationMenu.Viewport />
+        </NavigationMenu.Sub>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Indicator />
+  </NavigationMenu.List>
+  <NavigationMenu.Viewport />
+</NavigationMenu.Root>
+```
+
+## Usage
+
+### Vertical
+
+You can create a vertical menu by using the `orientation` prop.
+
+```svelte
+<NavigationMenu.Root orientation="vertical">
+</NavigationMenu.Root>
+```
+
+### Flexible Layouts
+
+Use the `Viewport` component when you need extra control over where `Content` is rendered. This can be useful when your design requires an adjusted DOM structure or if you need flexibility to achieve advanced animations. Tab focus will be managed automatically.
+
+```svelte
+<NavigationMenu.Root>
+  <NavigationMenu.List>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item one</NavigationMenu.Trigger>
+      <NavigationMenu.Content>Item one content</NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item two</NavigationMenu.Trigger>
+      <NavigationMenu.Content>Item two content</NavigationMenu.Content>
+    </NavigationMenu.Item>
+  </NavigationMenu.List>
+  <NavigationMenu.Viewport />
+</NavigationMenu.Root>
+```
+
+### With Indicator
+
+You can use the optional `Indicator` component to highlight the currently active `Trigger`, which is useful when you want to provide an animated visual cue such as an arrow or highlight to accompany the `Viewport`.
+
+```svelte
+<NavigationMenu.Root>
+  <NavigationMenu.List>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item one</NavigationMenu.Trigger>
+      <NavigationMenu.Content>Item one content</NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item two</NavigationMenu.Trigger>
+      <NavigationMenu.Content>Item two content</NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Indicator />
+  </NavigationMenu.List>
+  <NavigationMenu.Viewport />
+</NavigationMenu.Root>
+```
+
+### Submenus
+
+You can create a submenu by nesting your navigation menu and using the `Navigation.Sub` component in place of `NavigationMenu.Root`.
+
+```svelte
+<NavigationMenu.Root>
+  <NavigationMenu.List>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item one</NavigationMenu.Trigger>
+      <NavigationMenu.Content>
+        <NavigationMenu.Sub>
+          <NavigationMenu.List>
+            <NavigationMenu.Item>
+              <NavigationMenu.Trigger>Subitem one</NavigationMenu.Trigger>
+              <NavigationMenu.Content
+                >Subitem one content</NavigationMenu.Content
+              >
+            </NavigationMenu.Item>
+          </NavigationMenu.List>
+        </NavigationMenu.Sub>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+  </NavigationMenu.List>
+</NavigationMenu.Root>
+```
+
+### Submenus with Viewport
+
+You can use the `NavigationMenu.Viewport` component inside of a `NavigationMenu.Sub` to create a viewport dedicated to that submenu.
+
+```svelte
+<NavigationMenu.Sub>
+  <NavigationMenu.List>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item one</NavigationMenu.Trigger>
+      <NavigationMenu.Content>
+        <NavigationMenu.Link>Item one content</NavigationMenu.Link>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item two</NavigationMenu.Trigger>
+      <NavigationMenu.Content>
+        <NavigationMenu.Link>Item two content</NavigationMenu.Link>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+  </NavigationMenu.List>
+  <NavigationMenu.Viewport />
+</NavigationMenu.Sub>
+```
+
+### No Viewport
+
+The `NavigationMenu.Viewport` component provides a way to transition between `NavigationMenu.Content` without the need for a full close/open animation between them, however, this is completely optional and you don't need to use it.
+
+```svelte
+<script lang="ts">
+  import { NavigationMenu } from "bits-ui";
+  import CaretDown from "phosphor-svelte/lib/CaretDown";
+  import cn from "clsx";
+  const components: { title: string; href: string; description: string }[] = [
+    {
+      title: "Alert Dialog",
+      href: "/docs/components/alert-dialog",
+      description:
+        "A modal dialog that interrupts the user with important content and expects a response."
+    },
+    {
+      title: "Link Preview",
+      href: "/docs/components/link-preview",
+      description:
+        "For sighted users to preview content available behind a link."
+    },
+    {
+      title: "Progress",
+      href: "/docs/components/progress",
+      description:
+        "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar."
+    },
+    {
+      title: "Scroll Area",
+      href: "/docs/components/scroll-area",
+      description: "Visually or semantically separates content."
+    },
+    {
+      title: "Tabs",
+      href: "/docs/components/tabs",
+      description:
+        "A set of layered sections of contentknown as tab panelsthat are displayed one at a time."
+    },
+    {
+      title: "Tooltip",
+      href: "/docs/components/tooltip",
+      description:
+        "A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it."
+    }
+  ];
+  type ListItemProps = {
+    className?: string;
+    title: string;
+    href: string;
+    content: string;
+  };
+</script>
+{#snippet ListItem({ className, title, content, href }: ListItemProps)}
+  <li>
+    <NavigationMenu.Link
+      class={cn(
+        "hover:bg-muted hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground outline-hidden block select-none space-y-1 rounded-md p-3 leading-none no-underline transition-colors",
+        className
+      )}
+      {href}
+    >
+      <div class="text-sm font-medium leading-none">{title}</div>
+      <p class="text-muted-foreground line-clamp-2 text-sm leading-snug">
+        {content}
+      </p>
+    </NavigationMenu.Link>
+  </li>
+{/snippet}
+<NavigationMenu.Root class="relative z-10 flex w-full justify-center">
+  <NavigationMenu.List
+    class="group flex list-none items-center justify-center p-1"
+  >
+    <NavigationMenu.Item value="getting-started">
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Getting started
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 bg-background absolute left-0 top-full mt-2 w-full rounded-md border shadow-lg sm:w-auto"
+      >
+        <ul
+          class="m-0 grid list-none gap-x-2.5 p-3 sm:w-[600px] sm:grid-flow-col sm:grid-rows-3 sm:p-[22px]"
+        >
+          <li class="row-span-3 mb-2 sm:mb-0">
+            <NavigationMenu.Link
+              href="/"
+              class="from-muted/50 to-muted bg-linear-to-b outline-hidden flex h-full w-full select-none flex-col justify-end rounded-md p-6 no-underline focus:shadow-md"
+            >
+              <div class="mb-2 mt-4 text-lg font-medium">Bits UI</div>
+              <p class="text-muted-foreground text-sm leading-tight">
+                The headless components for Svelte.
+              </p>
+            </NavigationMenu.Link>
+          </li>
+          {@render ListItem({
+            href: "/docs",
+            title: "Introduction",
+            content: "Headless components for Svelte and SvelteKit"
+          })}
+          {@render ListItem({
+            href: "/docs/getting-started",
+            title: "Getting Started",
+            content: "How to install and use Bits UI"
+          })}
+          {@render ListItem({
+            href: "/docs/styling",
+            title: "Styling",
+            content: "How to style Bits UI components"
+          })}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Components
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 bg-background absolute left-0 top-full mt-2 w-full rounded-md border shadow-lg sm:w-auto"
+      >
+        <ul
+          class="grid gap-3 p-3 sm:w-[400px] sm:p-6 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
+        >
+          {#each components as component (component.title)}
+            {@render ListItem({
+              href: component.href,
+              title: component.title,
+              content: component.description
+            })}
+          {/each}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Link
+        class="hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+        href="/docs"
+      >
+        <span class="hidden sm:inline"> Documentation </span>
+        <span class="inline sm:hidden"> Docs </span>
+      </NavigationMenu.Link>
+    </NavigationMenu.Item>
+  </NavigationMenu.List>
+</NavigationMenu.Root>
+```
+
+### Advanced Animation
+
+We expose `--bits-navigation-menu-viewport-[width|height]` and `data-motion['from-start'|'to-start'|'from-end'|'to-end']` to allow you to animate the `NavigationMenu.Viewport` size and `NavigationMenu.Content` position based on the enter/exit direction.
+
+Combining these with `position: absolute;` allows you to create smooth overlapping animation effects when moving between items.
+
+```svelte
+<NavigationMenu.Root>
+  <NavigationMenu.List>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item one</NavigationMenu.Trigger>
+      <NavigationMenu.Content class="NavigationMenuContent">
+        Item one content
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger>Item two</NavigationMenu.Trigger>
+      <NavigationMenu.Content class="NavigationMenuContent">
+        Item two content
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+  </NavigationMenu.List>
+  <NavigationMenu.Viewport class="NavigationMenuViewport" />
+</NavigationMenu.Root>
+```
+
+```css
+/* app.css */
+.NavigationMenuContent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation-duration: 250ms;
+  animation-timing-function: ease;
+}
+.NavigationMenuContent[data-motion="from-start"] {
+  animation-name: enter-from-left;
+}
+.NavigationMenuContent[data-motion="from-end"] {
+  animation-name: enter-from-right;
+}
+.NavigationMenuContent[data-motion="to-start"] {
+  animation-name: exit-to-left;
+}
+.NavigationMenuContent[data-motion="to-end"] {
+  animation-name: exit-to-right;
+}
+.NavigationMenuViewport {
+  position: relative;
+  width: var(--bits-navigation-menu-viewport-width);
+  height: var(--bits-navigation-menu-viewport-height);
+  transition:
+    width,
+    height,
+    250ms ease;
+}
+@keyframes enter-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(200px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes enter-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-200px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes exit-to-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(200px);
+  }
+}
+@keyframes exit-to-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-200px);
+  }
+}
+```
+
+### Force Mounting
+
+You may wish for the links in the Navigation Menu to persist in the DOM, regardless of whether the menu is open or not. This is particularly useful for SEO purposes. You can achieve this by using the `forceMount` prop on the `NavigationMenu.Content` and `NavigationMenu.Viewport` components.
+
+##### Warning
+
+**Note:** Using `forceMount` requires you to manage the visibility of the elements yourself, using the `data-state` attributes on the `NavigationMenu.Content` and `NavigationMenu.Viewport` components.
+
+```svelte
+<NavigationMenu.Content forceMount></NavigationMenu.Content>
+<NavigationMenu.Viewport forceMount></NavigationMenu.Viewport>
+```
+
+```svelte
+<script lang="ts">
+  import { NavigationMenu } from "bits-ui";
+  import CaretDown from "phosphor-svelte/lib/CaretDown";
+  import cn from "clsx";
+  const components: { title: string; href: string; description: string }[] = [
+    {
+      title: "Alert Dialog",
+      href: "/docs/components/alert-dialog",
+      description:
+        "A modal dialog that interrupts the user with important content and expects a response."
+    },
+    {
+      title: "Link Preview",
+      href: "/docs/components/link-preview",
+      description:
+        "For sighted users to preview content available behind a link."
+    },
+    {
+      title: "Progress",
+      href: "/docs/components/progress",
+      description:
+        "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar."
+    },
+    {
+      title: "Scroll Area",
+      href: "/docs/components/scroll-area",
+      description: "Visually or semantically separates content."
+    },
+    {
+      title: "Tabs",
+      href: "/docs/components/tabs",
+      description:
+        "A set of layered sections of contentknown as tab panelsthat are displayed one at a time."
+    },
+    {
+      title: "Tooltip",
+      href: "/docs/components/tooltip",
+      description:
+        "A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it."
+    }
+  ];
+  type ListItemProps = {
+    className?: string;
+    title: string;
+    href: string;
+    content: string;
+  };
+</script>
+{#snippet ListItem({ className, title, content, href }: ListItemProps)}
+  <li>
+    <NavigationMenu.Link
+      class={cn(
+        "hover:bg-muted hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground outline-hidden block select-none space-y-1 rounded-md p-3 leading-none no-underline transition-colors",
+        className
+      )}
+      {href}
+    >
+      <div class="text-sm font-medium leading-none">{title}</div>
+      <p class="text-muted-foreground line-clamp-2 text-sm leading-snug">
+        {content}
+      </p>
+    </NavigationMenu.Link>
+  </li>
+{/snippet}
+<NavigationMenu.Root class="relative z-10 flex w-full justify-center">
+  <NavigationMenu.List
+    class="group flex list-none items-center justify-center p-1"
+  >
+    <NavigationMenu.Item value="getting-started">
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Getting started
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left absolute left-0 top-0 w-full data-[state=closed]:hidden sm:w-auto"
+        forceMount
+      >
+        <ul
+          class="m-0 grid list-none gap-x-2.5 p-3 sm:w-[600px] sm:grid-flow-col sm:grid-rows-3 sm:p-[22px]"
+        >
+          <li class="row-span-3 mb-2 sm:mb-0">
+            <NavigationMenu.Link
+              href="/"
+              class="from-muted/50 to-muted bg-linear-to-b outline-hidden flex h-full w-full select-none flex-col justify-end rounded-md p-6 no-underline focus:shadow-md"
+            >
+              <div class="mb-2 mt-4 text-lg font-medium">Bits UI</div>
+              <p class="text-muted-foreground text-sm leading-tight">
+                The headless components for Svelte.
+              </p>
+            </NavigationMenu.Link>
+          </li>
+          {@render ListItem({
+            href: "/docs",
+            title: "Introduction",
+            content: "Headless components for Svelte and SvelteKit"
+          })}
+          {@render ListItem({
+            href: "/docs/getting-started",
+            title: "Getting Started",
+            content: "How to install and use Bits UI"
+          })}
+          {@render ListItem({
+            href: "/docs/styling",
+            title: "Styling",
+            content: "How to style Bits UI components"
+          })}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Components
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        forceMount
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left absolute left-0 top-0 w-full data-[state=closed]:hidden sm:w-auto"
+      >
+        <ul
+          class="grid gap-3 p-3 sm:w-[400px] sm:p-6 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
+        >
+          {#each components as component (component.title)}
+            {@render ListItem({
+              href: component.href,
+              title: component.title,
+              content: component.description
+            })}
+          {/each}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Link
+        class="hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+        href="/docs"
+      >
+        <span class="hidden sm:inline"> Documentation </span>
+        <span class="inline sm:hidden"> Docs </span>
+      </NavigationMenu.Link>
+    </NavigationMenu.Item>
+    <NavigationMenu.Indicator
+      class="data-[state=hidden]:animate-fade-out data-[state=visible]:animate-fade-in top-full z-10 flex h-2.5 items-end justify-center overflow-hidden opacity-100 transition-[all,transform_250ms_ease] duration-200 data-[state=hidden]:opacity-0"
+    >
+      <div
+        class="bg-border relative top-[70%] size-2.5 rotate-[45deg] rounded-tl-[2px]"
+      ></div>
+    </NavigationMenu.Indicator>
+  </NavigationMenu.List>
+  <div
+    class="perspective-[2000px] absolute left-0 top-full flex w-full justify-center"
+  >
+    <NavigationMenu.Viewport
+      forceMount
+      class="text-popover-foreground bg-background data-[state=closed]:animate-scale-out data-[state=open]:animate-scale-in relative mt-2.5 h-[var(--bits-navigation-menu-viewport-height)] w-full origin-[top_center] overflow-hidden rounded-md border shadow-lg transition-[width,_height] duration-200 data-[state=closed]:hidden sm:w-[var(--bits-navigation-menu-viewport-width)]"
+    />
+  </div>
+</NavigationMenu.Root>
+```
+
+### Open on Hover
+
+By default, the `NavigationMenu.Item` will open its `NavigationMenu.Content` when the `NavigationMenu.Trigger` is hovered. You can disable this by passing `openOnHover={false}` to the `NavigationMenu.Item`.
+
+##### Note
+
+Unlike the default behavior, when `openOnHover` is `false`, the menu will not close when the pointer moves outside of the `NavigationMenu.Content` and will instead require the user to interact outside of the menu or press escape to close it.
+
+```svelte
+<NavigationMenu.Item openOnHover={false}>
+  <NavigationMenu.Trigger>Item one</NavigationMenu.Trigger>
+  <NavigationMenu.Content>Item one content</NavigationMenu.Content>
+</NavigationMenu.Item>
+```
+
+```svelte
+<script lang="ts">
+  import { NavigationMenu } from "bits-ui";
+  import CaretDown from "phosphor-svelte/lib/CaretDown";
+  import cn from "clsx";
+  const components: { title: string; href: string; description: string }[] = [
+    {
+      title: "Alert Dialog",
+      href: "/docs/components/alert-dialog",
+      description:
+        "A modal dialog that interrupts the user with important content and expects a response."
+    },
+    {
+      title: "Link Preview",
+      href: "/docs/components/link-preview",
+      description:
+        "For sighted users to preview content available behind a link."
+    },
+    {
+      title: "Progress",
+      href: "/docs/components/progress",
+      description:
+        "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar."
+    },
+    {
+      title: "Scroll Area",
+      href: "/docs/components/scroll-area",
+      description: "Visually or semantically separates content."
+    },
+    {
+      title: "Tabs",
+      href: "/docs/components/tabs",
+      description:
+        "A set of layered sections of contentknown as tab panelsthat are displayed one at a time."
+    },
+    {
+      title: "Tooltip",
+      href: "/docs/components/tooltip",
+      description:
+        "A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it."
+    }
+  ];
+  type ListItemProps = {
+    className?: string;
+    title: string;
+    href: string;
+    content: string;
+  };
+</script>
+{#snippet ListItem({ className, title, content, href }: ListItemProps)}
+  <li>
+    <NavigationMenu.Link
+      class={cn(
+        "hover:bg-muted hover:text-accent-foreground focus:bg-muted focus:text-accent-foreground outline-hidden block select-none space-y-1 rounded-md p-3 leading-none no-underline transition-colors",
+        className
+      )}
+      {href}
+    >
+      <div class="text-sm font-medium leading-none">{title}</div>
+      <p class="text-muted-foreground line-clamp-2 text-sm leading-snug">
+        {content}
+      </p>
+    </NavigationMenu.Link>
+  </li>
+{/snippet}
+<NavigationMenu.Root class="relative z-10 flex w-full justify-center">
+  <NavigationMenu.List
+    class="group flex list-none items-center justify-center p-1"
+  >
+    <NavigationMenu.Item value="getting-started" openOnHover={false}>
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus-visible:bg-muted focus-visible:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus-visible:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Getting started
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left absolute left-0 top-0 w-full sm:w-auto"
+      >
+        <ul
+          class="m-0 grid list-none gap-x-2.5 p-3 sm:w-[600px] sm:grid-flow-col sm:grid-rows-3 sm:p-[22px]"
+        >
+          <li class="row-span-3 mb-2 sm:mb-0">
+            <NavigationMenu.Link
+              href="/"
+              class="from-muted/50 to-muted bg-linear-to-b outline-hidden flex h-full w-full select-none flex-col justify-end rounded-md p-6 no-underline focus:shadow-md"
+            >
+              <div class="mb-2 mt-4 text-lg font-medium">Bits UI</div>
+              <p class="text-muted-foreground text-sm leading-tight">
+                The headless components for Svelte.
+              </p>
+            </NavigationMenu.Link>
+          </li>
+          {@render ListItem({
+            href: "/docs",
+            title: "Introduction",
+            content: "Headless components for Svelte and SvelteKit"
+          })}
+          {@render ListItem({
+            href: "/docs/getting-started",
+            title: "Getting Started",
+            content: "How to install and use Bits UI"
+          })}
+          {@render ListItem({
+            href: "/docs/styling",
+            title: "Styling",
+            content: "How to style Bits UI components"
+          })}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item openOnHover={false}>
+      <NavigationMenu.Trigger
+        class="hover:text-accent-foreground focus-visible:bg-muted focus-visible:text-accent-foreground data-[state=open]:shadow-mini dark:hover:bg-muted dark:data-[state=open]:bg-muted focus-visible:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-white"
+      >
+        Components
+        <CaretDown
+          class="relative top-[1px] ml-1 size-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content
+        class="data-[motion=from-end]:animate-enter-from-right data-[motion=from-start]:animate-enter-from-left data-[motion=to-end]:animate-exit-to-right data-[motion=to-start]:animate-exit-to-left absolute left-0 top-0 w-full sm:w-auto"
+      >
+        <ul
+          class="grid gap-3 p-3 sm:w-[400px] sm:p-6 md:w-[500px] md:grid-cols-2 lg:w-[600px]"
+        >
+          {#each components as component (component.title)}
+            {@render ListItem({
+              href: component.href,
+              title: component.title,
+              content: component.description
+            })}
+          {/each}
+        </ul>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+    <NavigationMenu.Item>
+      <NavigationMenu.Link
+        class="hover:text-accent-foreground focus-visible:bg-muted focus-visible:text-accent-foreground dark:hover:bg-muted focus-visible:outline-hidden group inline-flex h-8 w-max items-center justify-center rounded-[7px] bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-white disabled:pointer-events-none disabled:opacity-50"
+        href="/docs"
+      >
+        <span class="hidden sm:inline"> Documentation </span>
+        <span class="inline sm:hidden"> Docs </span>
+      </NavigationMenu.Link>
+    </NavigationMenu.Item>
+    <NavigationMenu.Indicator
+      class="data-[state=hidden]:animate-fade-out data-[state=visible]:animate-fade-in top-full z-10 flex h-2.5 items-end justify-center overflow-hidden opacity-100 transition-[all,transform_250ms_ease] duration-200 data-[state=hidden]:opacity-0"
+    >
+      <div
+        class="bg-border relative top-[70%] size-2.5 rotate-[45deg] rounded-tl-[2px]"
+      ></div>
+    </NavigationMenu.Indicator>
+  </NavigationMenu.List>
+  <div
+    class="perspective-[2000px] absolute left-0 top-full flex w-full justify-center"
+  >
+    <NavigationMenu.Viewport
+      class="text-popover-foreground bg-background data-[state=closed]:animate-scale-out data-[state=open]:animate-scale-in relative mt-2.5 h-[var(--bits-navigation-menu-viewport-height)] w-full origin-[top_center] overflow-hidden rounded-md border shadow-lg transition-[width,_height] duration-200 sm:w-[var(--bits-navigation-menu-viewport-width)]"
+    />
+  </div>
+</NavigationMenu.Root>
+```
+
+## API Reference
+
+### NavigationMenu.Root
+
+The root navigation menu component which manages & scopes the state of the navigation menu.
+
+| Property                                                                                      | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value` $bindable | `string`                                                                                                                                                                                                                                         | The value of the currently active menu.`Default:  undefined`                                                                               |                                      |
+| `onValueChange`                                             | `function`- (value: string) =\&gt; void                                                 | A callback function called when the active menu value changes. Called with an empty string when the menu closes.`Default:  undefined`      |                                      |
+| `dir`                                                       | `enum`- 'ltr' \| 'rtl'                                                                  | The reading direction of the app.`Default: 'ltr'`                                                                                             |                                      |
+| `skipDelayDuration`                                         | `number`                                                                                                                                                                                                                                         | How much time a user has to enter another trigger without incurring a delay again.`Default: 300`                                              |                                      |
+| `delayDuration`                                             | `number`                                                                                                                                                                                                                                         | The duration from when the mouse enters a trigger until the content opens.`Default: 200`                                                      |                                      |
+| `orientation`                                               | `enum`- 'horizontal' \| 'vertical'                                                      | The orientation of the menu.`Default: 'horizontal'`                                                                                           |                                      |
+| `ref` $bindable                                | `HTMLNavElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                  | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                     | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.Sub
+
+A sub navigation menu component which manages & scopes the state of a submenu, inside the content of a Root menu.
+
+| Property                                                                                      | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value` $bindable | `string`                                                                                                                                                                                                                                         | The value of the currently active submenu.`Default:  undefined`                                                                            |                                      |
+| `onValueChange`                                             | `function`- (value: string) =\&gt; void                                                 | A callback function called when the active menu value changes.`Default:  undefined`                                                        |                                      |
+| `orientation`                                               | `enum`- 'horizontal' \| 'vertical'                                                      | The orientation of the menu.`Default: 'horizontal'`                                                                                           |                                      |
+| `ref` $bindable                                | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                  | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                     | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.List
+
+A menu within the menubar.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLUListElement`                                                                                                                                                                                                                               | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.Item
+
+A list item within the navigation menu.
+
+| Property                                                               | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                                                                                                                                                        | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value` | `string`                                                                                                                                                                                                                                         | The value of the item.`Default:  undefined`                                                                                                                                                                                                                                       |                                      |
+| `openOnHover`                        | `boolean`                                                                                                                                                                                                                                        | Whether or not the item should open its content when the trigger is hovered. Note: When `false`, the menu will not close when the pointer moves outside of the content and will instead require the user to interact outside of the menu or press escape to close it.`Default: true` |                                      |
+| `ref` $bindable         | `HTMLLiElement`                                                                                                                                                                                                                                  | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                                                    |                                      |
+| `children`                           | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                                                                                                                                                              |                                      |
+| `child`                              | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                                                        |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.Trigger
+
+The button element which toggles the dropdown menu.
+
+| Property                                                                  | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled` | `boolean`                                                                                                                                                                                                                                        | Whether or not the trigger is disabled.`Default: false`                                                                                       |                                      |
+| `ref` $bindable            | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                              | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                 | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.Content
+
+The content displayed when the dropdown menu is open.
+
+| Property                                                                           | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                        | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onInteractOutside` | `function`- (event: PointerEvent) =\&gt; void                                           | Callback fired when an outside interaction event occurs, which is a `pointerdown` event. You can call `event.preventDefault()` to prevent the default behavior of handling the outside interaction.`Default:  undefined`                                                                                                                                                                                                          |                                      |
+| `onFocusOutside`                                 | `function`- (event: FocusEvent) =\&gt; void                                             | Callback fired when focus leaves the dismissible layer. You can call `event.preventDefault()` to prevent the default behavior on focus leaving the layer.`Default:  undefined`                                                                                                                                                                                                                                                    |                                      |
+| `interactOutsideBehavior`                        | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'      | The behavior to use when an interaction occurs outside of the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'`  |                                      |
+| `onEscapeKeydown`                                | `function`- (event: KeyboardEvent) =\&gt; void                                          | Callback fired when an escape keydown event occurs in the floating content. You can call `event.preventDefault()` to prevent the default behavior of handling the escape keydown event.`Default:  undefined`                                                                                                                                                                                                                      |                                      |
+| `escapeKeydownBehavior`                          | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'      | The behavior to use when an escape keydown event occurs in the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'` |                                      |
+| `forceMount`                                     | `boolean`                                                                                                                                                                                                                                        | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false`                                                                                                                                                                                                                                                                   |                                      |
+| `ref` $bindable                     | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                                                                                                                                                                                                    |                                      |
+| `children`                                       | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                                                              |                                      |
+| `child`                                          | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                                                                                                                                                                                                        |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.Link
+
+A link within the navigation menu.
+
+| Property                                                                | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `active` | `boolean`                                                                                                                                                                                                                                        | Whether or not the link is active.`Default: false`                                                                                            |                                      |
+| `onSelect`                            | `function`- () =\&gt; void                                                              | A callback function called when the link is selected.`Default:  undefined`                                                                 |                                      |
+| `ref` $bindable          | `HTMLAnchorElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                            | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                               | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.Viewport
+
+An optional viewport element for the navigation menu, which renders the content of the menu items if it is present. The content is rendered in place without it.
+
+| Property                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                                      | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forceMount` | `boolean`                                                                                                                                                                                                                                        | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false` |                                      |
+| `ref` $bindable              | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                  |                                      |
+| `children`                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                                            |                                      |
+| `child`                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                      |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### NavigationMenu.Indicator
+
+The indicator element for the navigation menu, which is used to indicate the current active item.
+
+| Property                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                                      | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forceMount` | `boolean`                                                                                                                                                                                                                                        | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false` |                                      |
+| `ref` $bindable              | `HTMLSpanElement`                                                                                                                                                                                                                                | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                  |                                      |
+| `children`                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                                            |                                      |
+| `child`                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                      |  | | Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |

@@ -9,7 +9,6 @@
 	import type { GlobalContext } from '$lib/data/globalContext.svelte';
 	import { getContext, onMount, setContext } from 'svelte';
 	import Spinner from '../utils/Spinner.svelte';
-	import MainIcon from '../viewer-window/icons/MainIcon.svelte';
 	import AdvancedFilters from './AdvancedFilters.svelte';
 	import BrowserContent from './BrowserContent.svelte';
 	import { BrowserContext, decodeConditions, type QueryMode } from './browserContext.svelte';
@@ -101,9 +100,9 @@
 {/if}
 
 
-<div id="container" class="h-screen flex flex-col overflow-hidden">
-	<div id="main" class="flex-0 flex flex-row bg-gray-200 font-sm border-b-3 border-gray-200">
-			<div id="browser-header-left" class="flex-5 flex-col min-w-0 p-4">
+<div id="container">
+	<div id="main" class="flex flex-row w-full bg-gray-200 font-sm">
+			<div class="flex-5 flex-col min-w-0 p-4">
 				{#if browserContext.filterMode === 'basic'}
 					<FilterShorcuts bind:condition={browserContext.basicCondition} />
 				{:else}
@@ -139,7 +138,7 @@
 				</Button.Root>
 				
 			</div>
-			<div id="browser-header-right" class="flex-5 min-w-0 p-4">
+			<div class="flex-5 min-w-0 p-4">
 				<Card.Root>
 					
 					<Card.Content class="flex flex-col gap-4">
@@ -203,29 +202,15 @@
 				<!-- <FilterConditions /> -->
 				
 			</div>
-			<div id="user" class="flex-1">
-				<div id="user" class="p-4">
-					<div class="float-right">
-						{#snippet icon()}
-							<span class="flex items-center justify-center p-[0.2em] w-10 h-10 m-auto border border-2 border-gray-500 rounded-full font-bold">{initials}</span>
-						{/snippet}
-						<MainIcon
-							onclick={() => (globalContext.showUserMenu = true)}
-							tooltip={user.username}
-							theme="light"
-							iconSnippet={icon}
-						/>
-					</div>
-				</div>
-			</div>
+	
 	</div>
 
-	<div id="content" class="flex-1 overflow-y-auto p-4">
+	<div id="content" class="p-4">
 		<BrowserContent/>
 	</div>
-	<div id="selection">
+	{#if browserContext.selectedIds.length > 0}
 		<Selection />
-	</div>
+	{/if}
 </div>
 <!-- <OptioWindow /> -->
 <!-- <InstanceInfo /> -->

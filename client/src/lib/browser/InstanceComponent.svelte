@@ -1,24 +1,23 @@
 <script lang="ts">
+    import * as Dialog from '$lib/components/ui/dialog';
     import { getThumbUrl } from "$lib/data-loading/utils";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext } from "svelte";
-    import type { InstanceGET } from "../../types/openapi_types";
+    import type { InstanceMeta } from "../../types/openapi_types";
     import type { BrowserContext } from "./browserContext.svelte";
-    import InstanceInfo from "./InstanceInfo.svelte";
+    import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
 
     const browserContext = getContext<BrowserContext>("browserContext");
     const globalContext = getContext<GlobalContext>("globalContext");
     const { user: creator } = globalContext;
 
     interface Props {
-        instance: InstanceGET;
-        showPatientInfo?: boolean;
+        instance: InstanceMeta;
         showSegmentationInfo?: boolean;
     }
 
     let {
         instance,
-        showPatientInfo = false,
         showSegmentationInfo = false,
     }: Props = $props();
 
@@ -39,7 +38,7 @@
 
     const image_url = getThumbUrl(instance)!;
 
-    const selected = $derived(browserContext.selection.includes(instance.id));
+    const selected = $derived(browserContext.selectedIds.includes(instance.id));
 
     function toggleSelect() {
         browserContext.toggleInstance(instance);
@@ -50,21 +49,11 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="main flex flex-col rounded-[0.1em] p-[0.2em] border-[0.2em] border-transparent"
-    class:border-[#72de80]={selected}
-    class:outline={showPatientInfo}
-    class:outline-1={showPatientInfo}
-    class:outline-[#d0d0d0]={showPatientInfo}
-    class:m-[0.2em]={showPatientInfo}
+    class:bg-emerald-50={selected}
+    class:ring-2={selected}
+    class:ring-emerald-400={selected}
 >
     <div class="title text-sm flex flex-col text-gray-500 cursor-pointer hover:text-black items-center" onclick={()=>{popupOpen=true}}>
-        {#if showPatientInfo}
-            <div class="flex justify-center flex-1">
-                {instance.patient.identifier}
-            </div>
-            <div class="flex justify-center flex-1">
-                {instance.study.date}
-            </div>
-        {/if}
         <div>
             {instance.id}
         </div>
@@ -72,12 +61,6 @@
     <div class="tile flex flex-col flex-1 items-center" onclick={toggleSelect}>
         {#if image_url}
             <img src={image_url} alt="Thumbnail" loading="lazy" style="transform: translateZ(0);" width="144" height="144" class="thumbnail" />
-            <!-- <div
-                class="img bg-black m-px cursor-pointer flex flex-col items-center [flex-flow:column-reverse] bg-contain bg-no-repeat bg-center"
-                style:width={size}
-                style:height={size}
-                style:background-image="url('{image_url}')"
-            > -->
                 <!-- {#if instance.dicom_modality == "OPT"}
                     <div class="oct-info text-[10px] text-white/70">
                         [{instance.anatomic_region}] ({instance.nr_of_frames} x {instance.columns})
@@ -96,7 +79,12 @@
             {/if} -->
         {/if}
     </div>
-    <InstanceInfo {instance} bind:open={popupOpen}/>
+
+    <Dialog.Root bind:open={popupOpen}>
+        <Dialog.Content class="sm:max-w-[85vw] max-h-[85vh]">
+            <InstanceInfoLazy instanceId={instance.id}/>
+        </Dialog.Content>
+    </Dialog.Root>
 </div>
 
 <style>

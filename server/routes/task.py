@@ -63,7 +63,8 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
         task.ContactID = dto.contact_id
     if dto.task_definition_id is not None:
         task.TaskDefinitionID = dto.task_definition_id
-    # dto.task_state intentionally not applied (no persisted column)
+    if dto.task_state is not None:
+        task.TaskState = dto.task_state
 
     db.commit(); db.refresh(task)
     

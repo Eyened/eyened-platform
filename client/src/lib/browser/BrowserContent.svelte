@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+	import PaginatedResults from '../components/PaginatedResults.svelte';
 	import type { BrowserContext } from './browserContext.svelte';
 	import InstanceComponent from './InstanceComponent.svelte';
-	import PaginatedResults from './PaginatedResults.svelte';
 	import StudyBlock from './StudyBlock.svelte';
 
 	const browserContext = getContext<BrowserContext>('browserContext');
@@ -21,7 +21,12 @@
 {#if browserContext.queryMode == "instances"}
 	{#if browserContext.displayMode === 'instance'}
 		{#if browserContext.orderedInstanceIds.length > 0}
-			<PaginatedResults onChange={onPageChange}>
+			<PaginatedResults
+				count={browserContext.count}
+				perPage={browserContext.limit}
+				page={browserContext.page}
+				onPageChange={onPageChange}
+			>
 				<div class="grid gap-2 grid-cols-[repeat(auto-fill,minmax(8em,1fr))]">
 					{#each browserContext.orderedInstanceIds as id (id)}
 						<InstanceComponent instance={browserContext.InstanceRepo.store[id]!} />
@@ -33,7 +38,12 @@
 		{/if}
 	{:else}
 		{#if browserContext.orderedStudyIds.length > 0}
-			<PaginatedResults onChange={onPageChange}>
+			<PaginatedResults
+				count={browserContext.count}
+				perPage={browserContext.limit}
+				page={browserContext.page}
+				onPageChange={onPageChange}
+			>
 				{#each browserContext.orderedStudyIds as sid (sid)}
 					<StudyBlock study={browserContext.StudiesRepo.object(sid)} {mode} />
 				{/each}
@@ -44,7 +54,12 @@
 	{/if}
 {:else if browserContext.queryMode == "studies"}
 	{#if browserContext.orderedStudyIds.length > 0}
-		<PaginatedResults onChange={onPageChange}>
+		<PaginatedResults
+			count={browserContext.count}
+			perPage={browserContext.limit}
+			page={browserContext.page}
+			onPageChange={onPageChange}
+		>
 			{#each browserContext.orderedStudyIds as sid (sid)}		
 				<StudyBlock study={browserContext.StudiesRepo.object(sid)} {mode} />
 			{/each}

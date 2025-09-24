@@ -35,10 +35,12 @@ export abstract class Repo<
 		return (res.data as T[]) ?? [];
 	}
 
-	static async remoteGet<T = unknown>(id: Id): Promise<T> {
+	static async remoteGet<T = unknown>(id: Id, query?: Record<string, any>): Promise<T> {
 		const { api } = await import('../api/client');
 		const itemPath = `${(this as any).path}/{${(this as any).idParam}}`;
-		const res = await api.GET(itemPath as any, { params: { path: { [(this as any).idParam]: Number(id) } } as any });
+		const res = await api.GET(itemPath as any, {
+			params: { path: { [(this as any).idParam]: Number(id) }, query: (query ?? {}) } as any
+		});
 		if (!res.data) throw new Error('No data');
 		return res.data as T;
 	}
@@ -76,9 +78,9 @@ export abstract class Repo<
 	// Optional object factory for subclasses (now takes a row)
 	protected createDataObject?(obj: TGet): TDataObject;
 
-	public object(objOrId: Id): TDataObject {
-		const found = this.get(objOrId as Id);
-		if (!found) throw new Error(`Missing row ${String(objOrId)}`);
+	public object(id: Id): TDataObject {
+		const found = this.get(id as Id);
+		if (!found) throw new Error(`Missing row ${String(id)}`);
 		return this.createDataObject ? this.createDataObject(found) : (new DataObject<TGet, TPatch>(found, this) as TDataObject);
 	}
 
@@ -96,8 +98,8 @@ export abstract class Repo<
 		return (this.constructor as typeof Repo).remoteList<ListParams, TGet>(params as any);
 	}
 
-	protected async remoteGet(id: Id): Promise<TGet> {
-		return (this.constructor as typeof Repo).remoteGet<TGet>(id);
+	protected async remoteGet(id: Id, query?: Record<string, any>): Promise<TGet> {
+		return (this.constructor as typeof Repo).remoteGet<TGet>(id, query);
 	}
 
 	protected async remoteCreate(body: TCreate): Promise<TGet> {
@@ -140,16 +142,16 @@ export abstract class Repo<
 		this.ingest(list);
 	}
 
-	async fetchOne(id: Id): Promise<DataObject<TGet, TPatch>> {
-		const row = await this.remoteGet(id);
+	async fetchOne(id: Id, query?: Record<string, any>): Promise<DataObject<TGet, TPatch>> {
+		const row = await this.remoteGet(id, query);
 		this.upsert(row);
-		return this.object(row);
+		return this.object(row.id);
 	}
 
 	async create(body: TCreate): Promise<DataObject<TGet, TPatch>> {
 		const created = await this.remoteCreate(body);
 		this.upsert(created);
-		return this.object(created);
+		return this.object(created.id);
 	}
 }
 
@@ -169,6 +171,14 @@ export class DataObject<TGet extends { id: Id }, TPatch = Partial<TGet>> {
 		}
 		this.data = $derived(this.repo ? this.repo.store[this.id] : this._local);
 		this.$ = $derived(this.data as TGet);
+	}
+
+	// Static factory method to create instance from ID
+	static async fromId<TGet>(this: (new (obj: TGet, repo?: any) => any) & { DefaultRepo: typeof Repo }, id: Id): Promise<InstanceType<typeof this>> {
+		const RepoClass = (this as any).DefaultRepo as typeof Repo;
+		if (!RepoClass) throw new Error('DefaultRepo not set on object class');
+		const row = await RepoClass.remoteGet<TGet>(id);
+		return new (this as any)(row) as InstanceType<typeof this>;
 	}
 
 	// get $(): TGet {

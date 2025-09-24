@@ -741,6 +741,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/subtasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Subtasks */
+        get: operations["list_subtasks_subtasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subtasks/{subtaskid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Subtask */
+        get: operations["get_subtask_subtasks__subtaskid__get"];
+        put?: never;
+        post?: never;
+        /** Delete Subtask */
+        delete: operations["delete_subtask_subtasks__subtaskid__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Subtask */
+        patch: operations["patch_subtask_subtasks__subtaskid__patch"];
+        trace?: never;
+    };
+    "/subtasks/{subtaskid}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Subtask Image */
+        post: operations["add_subtask_image_subtasks__subtaskid__images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subtasks/{subtaskid}/images/{instance_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Subtask Image */
+        delete: operations["remove_subtask_image_subtasks__subtaskid__images__instance_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/devices": {
         parameters: {
             query?: never;
@@ -805,6 +875,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddImageRequest */
+        AddImageRequest: {
+            /** Instance Id */
+            instance_id: number;
+        };
         /** Body_create_segmentation_segmentations_post */
         Body_create_segmentation_segmentations_post: {
             /**
@@ -868,6 +943,8 @@ export interface components {
             id: number;
             /** Subfeatures */
             subfeatures: string[];
+            /** Subfeature Ids */
+            subfeature_ids: number[];
             /**
              * Date Inserted
              * Format: date-time
@@ -876,11 +953,11 @@ export interface components {
         };
         /**
          * FeaturePATCH
-         * @description Partial update for Feature (same fields as PUT for now).
+         * @description Partial update for Feature with optional fields.
          */
         FeaturePATCH: {
             /** Name */
-            name: string;
+            name?: string | null;
             /** Subfeature Ids */
             subfeature_ids?: number[] | null;
         };
@@ -901,8 +978,6 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
-            /** Creator Id */
-            creator_id: number;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
@@ -920,6 +995,7 @@ export interface components {
             object_type: "patient" | "study" | "image_instance";
             /** Tags */
             tags: components["schemas"]["TagMeta"][];
+            creator: components["schemas"]["CreatorMetadata"];
             /**
              * Date Inserted
              * Format: date-time
@@ -927,6 +1003,30 @@ export interface components {
             date_inserted: string;
             /** Date Modified */
             date_modified?: string | null;
+        };
+        /**
+         * FormAnnotationPATCH
+         * @description Partial update for FormAnnotation with optional fields.
+         */
+        FormAnnotationPATCH: {
+            /** Form Schema Id */
+            form_schema_id?: number | null;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Study Id */
+            study_id?: number | null;
+            /** Image Instance Id */
+            image_instance_id?: number | null;
+            /** Creator Id */
+            creator_id?: number | null;
+            /** Sub Task Id */
+            sub_task_id?: number | null;
+            /** Form Data */
+            form_data?: {
+                [key: string]: unknown;
+            } | null;
+            /** Form Annotation Reference Id */
+            form_annotation_reference_id?: number | null;
         };
         /** FormAnnotationPUT */
         FormAnnotationPUT: {
@@ -938,8 +1038,6 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
-            /** Creator Id */
-            creator_id: number;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
@@ -1143,6 +1241,12 @@ export interface components {
             scan: components["schemas"]["ScanMeta"];
             /** Tags */
             tags: components["schemas"]["TagMeta"][];
+            /** Segmentations */
+            segmentations?: components["schemas"]["SegmentationGET"][] | null;
+            /** Model Segmentations */
+            model_segmentations?: components["schemas"]["ModelSegmentationGET"][] | null;
+            /** Form Annotations */
+            form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
         };
         /** InstanceMeta */
         InstanceMeta: {
@@ -1173,6 +1277,50 @@ export interface components {
          * @enum {string}
          */
         ModalityType: "OP" | "OPT" | "SC";
+        /** ModelMeta */
+        ModelMeta: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
+        };
+        /** ModelSegmentationGET */
+        ModelSegmentationGET: {
+            /** Depth */
+            depth: number;
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
+            /** Sparse Axis */
+            sparse_axis?: number | null;
+            /** Image Projection Matrix */
+            image_projection_matrix?: number[][] | null;
+            /** Scan Indices */
+            scan_indices?: number[] | null;
+            /** Threshold */
+            threshold?: number | null;
+            /** Reference Segmentation Id */
+            reference_segmentation_id?: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
+            /** Id */
+            id: number;
+            model: components["schemas"]["ModelMeta"];
+            feature?: components["schemas"]["FeatureGET"] | null;
+            creator?: components["schemas"]["CreatorMetadata"] | null;
+            /** Tags */
+            tags: components["schemas"]["TagMeta"][];
+            /**
+             * Date Inserted
+             * Format: date-time
+             */
+            date_inserted: string;
+            /** Date Modified */
+            date_modified?: string | null;
+        };
         /** ObjectTagPOST */
         ObjectTagPOST: {
             /** Tag Id */
@@ -1429,7 +1577,7 @@ export interface components {
         SubTaskGET: {
             /** Task Id */
             task_id: number;
-            task_state: components["schemas"]["TaskState"];
+            task_state: components["schemas"]["SubTaskState"];
             /** Comments */
             comments?: string | null;
             /** Id */
@@ -1437,6 +1585,18 @@ export interface components {
             /** Creator Id */
             creator_id?: number | null;
         };
+        /** SubTaskPATCH */
+        SubTaskPATCH: {
+            /** Comments */
+            comments?: string | null;
+            /** Task State */
+            task_state?: string | null;
+        };
+        /**
+         * SubTaskState
+         * @enum {string}
+         */
+        SubTaskState: "NotStarted" | "Busy" | "Ready";
         /**
          * SubTaskWithImagesGET
          * @description SubTask with associated images included.
@@ -1444,7 +1604,7 @@ export interface components {
         SubTaskWithImagesGET: {
             /** Task Id */
             task_id: number;
-            task_state: components["schemas"]["TaskState"];
+            task_state: components["schemas"]["SubTaskState"];
             /** Comments */
             comments?: string | null;
             /** Id */
@@ -1513,14 +1673,14 @@ export interface components {
         };
         /**
          * TagPATCH
-         * @description Partial update for Tag (same as PUT for now).
+         * @description Partial update for Tag with optional fields.
          */
         TagPATCH: {
             /** Name */
-            name: string;
-            tag_type: components["schemas"]["TagType"];
+            name?: string | null;
+            tag_type?: components["schemas"]["TagType"] | null;
             /** Description */
-            description: string;
+            description?: string | null;
         };
         /** TagPUT */
         TagPUT: {
@@ -1891,7 +2051,12 @@ export interface operations {
     };
     get_instance_instances__instance_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                with_segmentations?: boolean;
+                with_form_annotations?: boolean;
+                with_model_segmentations?: boolean;
+                with_tag_metadata?: boolean;
+            };
             header?: {
                 authorization?: string;
             };
@@ -2643,7 +2808,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["FormAnnotationPUT"];
+                "application/json": components["schemas"]["FormAnnotationPATCH"];
             };
         };
         responses: {
@@ -3658,6 +3823,230 @@ export interface operations {
             path: {
                 task_id: number;
                 subtaskid: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subtasks_subtasks_get: {
+        parameters: {
+            query: {
+                task_id: number;
+                with_images?: boolean;
+                limit?: number;
+                page?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTasksWithImagesResponse"] | components["schemas"]["SubTasksResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subtask_subtasks__subtaskid__get: {
+        parameters: {
+            query?: {
+                with_images?: boolean;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                subtaskid: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTaskWithImagesGET"] | components["schemas"]["SubTaskGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_subtask_subtasks__subtaskid__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                subtaskid: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_subtask_subtasks__subtaskid__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                subtaskid: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubTaskPATCH"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTaskGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_subtask_image_subtasks__subtaskid__images_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                subtaskid: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddImageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_subtask_image_subtasks__subtaskid__images__instance_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                subtaskid: number;
+                instance_id: number;
             };
             cookie?: {
                 jwt_token?: string;
