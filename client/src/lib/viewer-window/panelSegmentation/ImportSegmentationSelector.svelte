@@ -1,42 +1,42 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte"
-    import type { AbstractImage } from "$lib/webgl/abstractImage"
-    import { converters } from "$lib/webgl/segmentationConverter"
-    import { getContext } from "svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { converters } from "$lib/webgl/segmentationConverter";
+    import { getContext } from "svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
         image: AbstractImage;
-        segmentation: Segmentation;
+        segmentation: SegmentationGET;
         close: () => void;
-        resolve: (segmentation: Segmentation) => void;
+        resolve: (segmentation: SegmentationGET) => void;
     }
 
     let { image, segmentation, resolve, close }: Props = $props();
-    const segmentationAnnotations = image.instance.segmentations
-        .concat(image.instance.modelSegmentations)
-        .filter(globalContext.segmentationsFilter);
+const segmentationAnnotations = (image.instance.segmentations || [])
+    .concat(image.instance.model_segmentations || [])
+    .filter(globalContext.segmentationsFilter);
 
     const referenceSegmentations = segmentationAnnotations
         .filter((s) => s != segmentation)
         .filter((other) => {
-            const from = segmentation.dataRepresentation;
-            const to = other.dataRepresentation;
+            const from = segmentation.data_representation;
+            const to = other.data_representation;
 
             const key = `${from}->${to}`;
             // filter out conversions that are not supported
             return from == to || key in converters;
         });
 
-    function _resolve(segmentation: Segmentation) {
+    function _resolve(segmentation: SegmentationGET) {
         resolve(segmentation);
         close();
     }
 </script>
 
-{#if $referenceSegmentations.length > 0}
+{#if referenceSegmentations.length > 0}
     <div>Select segmentation to import from:</div>
     <table>
         <thead>
@@ -47,12 +47,12 @@
             </tr>
         </thead>
         <tbody>
-            {#each $referenceSegmentations as segmentation}
+            {#each referenceSegmentations as segmentation}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <tr onclick={() => _resolve(segmentation)}>
                     <td class="annotation-id">[{segmentation.id}]</td>
-                    <td>{segmentation.createdBy.name}</td>
+                    <td>{segmentation.creator.name}</td>
                     <td>{segmentation.feature.name}</td>
                 </tr>
             {/each}

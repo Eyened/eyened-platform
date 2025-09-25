@@ -231,6 +231,7 @@ class Feature(Base):
     FeatureName: Mapped[str] = mapped_column(String(60), unique=True)
 
     Segmentations: Mapped[List["Segmentation"]] = relationship(back_populates="Feature")
+    Models: Mapped[List["Model"]] = relationship(back_populates="Feature")
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # Relationships for parent-child feature hierarchy
@@ -314,6 +315,7 @@ class Model(Base):
     FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     Segmentations: Mapped[List["ModelSegmentation"]] = relationship(back_populates="Model")
+    Feature: Mapped["Feature"] = relationship(back_populates="Models")
 
     
 class ModelSegmentation(SegmentationBase):

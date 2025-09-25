@@ -1,27 +1,28 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte"
-    import type { AbstractImage } from "$lib/webgl/abstractImage"
-    import { getContext } from "svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { getContext } from "svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
         image: AbstractImage;
         segmentation: Segmentation;
-        resolve: (segmentation: Segmentation) => void;
+        resolve: (segmentation: SegmentationGET) => void;
         close: () => void;
     }
 
     let { image, segmentation, resolve, close }: Props = $props();
 
-    const referenceAnnotations = image.instance.segmentations
-        .filter(globalContext.segmentationsFilter)
-        .filter(
-            (a) =>
-                a.dataRepresentation == "Binary" ||
-                a.dataRepresentation == "DualBitMask",
-        );
-    function _resolve(segmentation: Segmentation) {
+    const referenceAnnotations = (image.instance.segmentations || [])
+    .filter(globalContext.segmentationsFilter)
+    .filter(
+        (a) =>
+            a.data_representation == "Binary" ||
+            a.data_representation == "DualBitMask",
+    );
+    function _resolve(segmentation: SegmentationGET) {
         resolve(segmentation);
         close();
     }
@@ -29,11 +30,11 @@
 
 <div>
     <div>Select reference annotation:</div>
-    {#if $referenceAnnotations.length == 0}
+    {#if referenceAnnotations.length == 0}
         <div>No reference annotations found</div>
     {:else}
         <ul>
-            {#each $referenceAnnotations as reference}
+            {#each referenceAnnotations as reference}
                 {@const current = reference.id == segmentation.referenceId}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->

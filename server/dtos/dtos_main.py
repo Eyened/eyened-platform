@@ -70,6 +70,7 @@ class SegmentationPATCH(BaseModel):
 
 class SegmentationGET(SegmentationBase):
     id: int
+    annotation_type: Literal['grader_segmentation']
    
     feature: FeatureGET
     creator: CreatorMeta
@@ -90,10 +91,10 @@ class ModelMeta(BaseModel):
 
 class ModelSegmentationGET(SegmentationBase):
     id: int
+    annotation_type: Literal['model_segmentation']
    
-    model: ModelMeta
-    feature: Optional[FeatureGET] = None
-    creator: Optional[CreatorMeta] = None
+    creator: ModelMeta
+    feature: FeatureGET
     tags: List[TagMeta]
 
     date_inserted: datetime
@@ -136,6 +137,7 @@ class FormAnnotationPUT(FormAnnotationBase):
 
 class FormAnnotationGET(FormAnnotationBase):
     id: int
+    annotation_type: Literal['grader_form']
 
     object_type: Literal['patient', 'study', 'image_instance']
     tags: List[TagMeta]

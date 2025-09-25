@@ -8,7 +8,7 @@ import { BinaryMask } from "$lib/webgl/mask.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import type { SegmentationGET } from "../../../types/openapi_types";
+import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
@@ -27,7 +27,7 @@ export class SegmentationOverlay implements Overlay {
     public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
     public readonly segmentationContext = new SegmentationContext();
     public readonly allSegmentations: SegmentationGET[];
-    public readonly allModelSegmentations: SegmentationGET[];
+    public readonly allModelSegmentations: ModelSegmentationGET[];
 
     constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
         const instance = viewerContext.image.instance;
@@ -80,9 +80,6 @@ export class SegmentationOverlay implements Overlay {
         if (hideOverlays) {
             return;
         }
-        const {
-            hideCreators
-        } = this.segmentationContext;
 
         const baseUniforms = getBaseUniforms(viewerContext);
         const uniforms = {
@@ -104,7 +101,7 @@ export class SegmentationOverlay implements Overlay {
             const mask = segmentationItem.getMask(index);
 
             if (!mask) continue;
-            if (hideCreators.has(segmentation.creator)) continue;
+            if (this.segmentationContext.hiddenCreatorIds.has(segmentation.creator.id)) continue;
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
             uniforms.u_threshold = segmentation.threshold;

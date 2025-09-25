@@ -1,18 +1,18 @@
 <script lang="ts">
-    import type { Creator } from "$lib/datamodel/creator.svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { getContext } from "svelte";
+    import type { CreatorMeta } from "../../../types/openapi_types";
     import SegmentationItem from "./SegmentationItem.svelte";
 
     interface Props {
-        creator: Creator;
+        creator: CreatorMeta;
     }
     let { creator }: Props = $props();
 
     const segmentationOverlay = getContext<SegmentationOverlay>(
         "segmentationOverlay",
     );
-    const hideCreators = segmentationOverlay.segmentationContext.hideCreators;
+    const hideCreators = segmentationOverlay.segmentationContext.hiddenCreators;
     function toggle() {
         if (hideCreators.has(creator)) {
             hideCreators.delete(creator);

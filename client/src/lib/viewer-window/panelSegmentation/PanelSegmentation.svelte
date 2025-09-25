@@ -25,26 +25,31 @@
         segmentationOverlay.active = active;
     });
 
-    const { segmentationContext, allSegmentations } = segmentationOverlay;
+    const { segmentationContext, allSegmentations, allModelSegmentations } = segmentationOverlay;
 
-    const creators = segmentationOverlay.allSegmentations.collectSet(
-        (s) => s.creator,
-    );
-    const models = segmentationOverlay.allModelSegmentations.collectSet(
-        (s) => s.model,
-    );
-    // hide all on load
+
+    // iterate segmentations and add creators and models
     for (const segmentation of allSegmentations) {
-        segmentationContext.hideCreators.add(segmentation.creator);
+        segmentationContext.creators.set(segmentation.creator.id, segmentation.creator);
     }
-    // show own segmentations
-    segmentationContext.hideCreators.delete(creator);
+    const creatorIds = allSegmentations.map(s => s.creator.id);
+    segmentationContext.creatorIds = creatorIds;
+
+    for (const segmentation of allModelSegmentations) {
+        console.log(segmentation);
+        segmentationContext.models.set(segmentation.creator.id, segmentation.creator);
+    }
+    const modelIds = allModelSegmentations.map(s => s.creator.id);
+    segmentationContext.modelIds = modelIds;
+
+    segmentationContext.creatorIds = segmentationContext.creatorIds.filter(id => id !== creator.id);
+
 </script>
 
 <div class="main">
     <div class="models">
         <ul class="users">
-            {#each $models as model}
+            {#each segmentationContext.orderedModels as model}
                 <li>
                     <ModelSegmentations {model} />
                 </li>
@@ -66,14 +71,8 @@
     </div>
 
     <ul class="users">
-        <!-- show own segmentations first -->
-        {#if $creators.has(creator)}
-            <li>
-                <CreatorSegmentations {creator} />
-            </li>
-        {/if}
-        {#each $creators as creator_}
-            {#if creator_ != creator}
+        {#each segmentationContext.orderedCreators as creator_}
+            {#if creator_.id != creator.id}
                 <li>
                     <CreatorSegmentations creator={creator_} />
                 </li>

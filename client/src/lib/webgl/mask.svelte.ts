@@ -1,11 +1,11 @@
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { BlobExtraction } from "$lib/image-processing/connected-component-labelling";
 import type { Position2D } from "$lib/types";
 import { colorsFlat } from "$lib/viewer/overlays/colors";
+import type { SegmentationGET } from "../../types/openapi_types";
 import type { AbstractImage } from "./abstractImage";
 import type { TextureShaderProgram } from "./FragmentShaderProgram";
 import type { Shaders } from "./shaders";
-import { imageToTexture, createTextureR8UI, TextureData, type ImageType, BitMaskTexture } from "./texture";
+import { BitMaskTexture, createTextureR8UI, imageToTexture, TextureData, type ImageType } from "./texture";
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
 
@@ -26,7 +26,7 @@ export interface PaintSettings {
 export abstract class Mask {
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: Segmentation
+        readonly segmentation: SegmentationGET
     ) { }
 
     abstract importData(data: DrawingArray): void;
@@ -45,7 +45,7 @@ export class BinaryMask extends Mask {
     protected shaders: Shaders;
     public pixelArea: number = $state(0);
 
-    constructor(image: AbstractImage, segmentation: Segmentation) {
+    constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
         this.webgl = this.image.webgl;
         this.shaders = this.webgl.shaders;
@@ -176,7 +176,7 @@ export class BinaryMask extends Mask {
 export class QuestionableMask extends BinaryMask {
     _questionableMask: BitMaskTexture | null = null;
 
-    constructor(image: AbstractImage, segmentation: Segmentation) {
+    constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
     }
 
@@ -253,9 +253,9 @@ export class QuestionableMask extends BinaryMask {
 }
 abstract class AbstractDataMask extends Mask {
     textureData: TextureData;
-    constructor(image: AbstractImage, segmentation: Segmentation) {
+    constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
-        const dataType = segmentation.dataType;
+        const dataType = segmentation.data_type;
         this.textureData = new TextureData(image.webgl.gl, image.width, image.height, dataType);
     }
 
@@ -280,7 +280,7 @@ export class ProbabilityMask extends AbstractDataMask {
     public pixelArea: number = $state(0);
 
     u_hard: boolean = true;
-    constructor(image: AbstractImage, segmentation: Segmentation) {
+    constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
     }
 
@@ -333,7 +333,7 @@ export class ProbabilityMask extends AbstractDataMask {
 
 abstract class BaseMultiMask extends AbstractDataMask {
 
-    constructor(image: AbstractImage, segmentation: Segmentation) {
+    constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
     }
 
@@ -351,7 +351,7 @@ abstract class BaseMultiMask extends AbstractDataMask {
             u_drawing: imageToTexture(this.image.webgl.gl, drawing),
             u_paint: paintSettings.paint,
             u_bitmask: bitmask,
-            u_mode: this.segmentation.dataRepresentation == 'MultiLabel'
+            u_mode: this.segmentation.data_representation == 'MultiLabel'
         };
         if (paintSettings.dilateErode) {
             //TODO: implement erodeDilate for multi-label segmentation
@@ -380,7 +380,7 @@ abstract class BaseMultiMask extends AbstractDataMask {
     }
 }
 export class MultiClassMask extends BaseMultiMask {
-    constructor(image: AbstractImage, segmentation: Segmentation) {
+    constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
     }
     getBitmask(activeIndex: number[] | number): number {
@@ -396,7 +396,7 @@ export class MultiClassMask extends BaseMultiMask {
 }
 
 export class MultiLabelMask extends BaseMultiMask {
-    constructor(image: AbstractImage, segmentation: Segmentation) {
+    constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
     }
     getBitmask(activeIndices: number[] | number): number {

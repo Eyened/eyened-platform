@@ -1,12 +1,13 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte"
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
-    import { AbstractImage } from "$lib/webgl/abstractImage"
-    import type { SegmentationItem } from "$lib/webgl/segmentationItem"
-    import { getContext } from "svelte"
-    import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons"
-    import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { AbstractImage } from "$lib/webgl/abstractImage";
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+    import { getContext } from "svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
+    import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons";
+    import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
     interface Props {
         segmentationItem: SegmentationItem;
         segmentation: Segmentation;
@@ -25,7 +26,7 @@
             props: {
                 segmentation,
                 image,
-                resolve: (other: Segmentation) => {
+                resolve: (other: SegmentationGET) => {
                     segmentation.update({
                         referenceId: other.id,
                     });

@@ -1,11 +1,11 @@
 <script lang="ts">
-    import type { Model } from "$lib/datamodel/segmentation.svelte";
-    import { getContext } from "svelte";
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { getContext } from "svelte";
+    import type { ModelMeta } from "../../../types/openapi_types";
     import SegmentationItem from "./SegmentationItem.svelte";
 
     interface Props {
-        model: Model;
+        model: ModelMeta;
     }
     let { model }: Props = $props();
 
@@ -16,10 +16,10 @@
     const allModelSegmentations = segmentationOverlay.allModelSegmentations;
 
     let segmentations = allModelSegmentations
-        .filter((a) => a.model.id == model.id)
+        .filter((a) => a.creator.id == model.id)
         .sort((a, b) => a.id - b.id);
 </script>
 
-{#each $segmentations as segmentation (segmentation.id)}
+{#each segmentations as segmentation (segmentation.id)}
     <SegmentationItem {segmentation} style="AI" />
 {/each}

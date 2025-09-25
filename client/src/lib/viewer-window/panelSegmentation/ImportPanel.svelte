@@ -1,15 +1,15 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
-    import { AbstractImage } from "$lib/webgl/abstractImage"
-    import { SegmentationItem } from "$lib/webgl/segmentationItem"
-    import { getContext } from "svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { AbstractImage } from "$lib/webgl/abstractImage";
+    import { SegmentationItem } from "$lib/webgl/segmentationItem";
+    import { getContext } from "svelte";
 
-    import { Segmentation } from "$lib/datamodel/segmentation.svelte"
-    import ImportSegmentation from "../icons/ImportSegmentation.svelte"
-    import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte"
+    import type { SegmentationGET } from "../../../types/openapi_types";
+    import ImportSegmentation from "../icons/ImportSegmentation.svelte";
+    import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
     interface Props {
-        segmentation: Segmentation;
+        segmentation: SegmentationGET;
         image: AbstractImage;
         segmentationItem: SegmentationItem;
     }
@@ -25,7 +25,7 @@
             props: {
                 segmentation,
                 image,
-                resolve: (other: Segmentation) => {
+                resolve: (other: SegmentationGET) => {
                     const otherSegmentation = image
                         .getSegmentationItem(other)
                         ?.getMask(viewerContext.index);

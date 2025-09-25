@@ -1,9 +1,7 @@
 import { FeaturesRepo, TagsRepo } from '$lib/data/repos.svelte';
-import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
-import { ModelSegmentation, type Segmentation } from '$lib/datamodel/segmentation.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
 import openAPISpec from '../../types/openapi.json';
-import type { FormAnnotationGET, SegmentationGET } from '../../types/openapi_types';
+import type { FormAnnotationGET, ModelSegmentationGET, SegmentationGET } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
 
 export type ComponentDef = {
@@ -53,8 +51,8 @@ export class GlobalContext {
         this.popupComponent = component;
     }
 
-    canEdit(annotation: Segmentation | FormAnnotation | ModelSegmentation) {
-        if (annotation instanceof ModelSegmentation) {
+    canEdit(annotation: SegmentationGET | FormAnnotationGET | ModelSegmentationGET) {
+        if (annotation.annotation_type == 'model_segmentation') {
             return false;
         }
         return annotation.creator.id == this.userManager.user.id;

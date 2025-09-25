@@ -3,11 +3,11 @@
     import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
 
     import { getContext } from "svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
     import PanelIcon from "../icons/PanelIcon.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 
     interface Props {
-        segmentation: Segmentation;
+        segmentation: SegmentationGET;
     }   
     let { segmentation }: Props = $props();
 
@@ -18,8 +18,8 @@
     let currentColor = $state("");
 
     currentColor = toHex(segmentationOverlay.getFeatureColor(segmentation));
-    function handleColorChange(e) {
-        const newColor = e.target.value;
+    function handleColorChange(e: Event) {
+        const newColor = (e.target as HTMLInputElement).value;
         segmentationOverlay.setFeatureColor(segmentation, fromHex(newColor));
         currentColor = newColor;
     }
