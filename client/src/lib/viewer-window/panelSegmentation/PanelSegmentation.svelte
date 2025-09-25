@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { getContext } from "svelte";
     import CreatorSegmentations from "./CreatorSegmentations.svelte";
     import DrawingTools from "./DrawingTools.svelte";
@@ -15,17 +15,17 @@
 
     const { user: creator } = globalContext;
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 
     // This is used to not render when the panel is collapsed
     // Perhaps there is a cleaner solution?
     $effect(() => {
-        segmentationOverlay.active = active;
+        mainViewerContext.active = active;
     });
 
-    const { segmentationContext, allSegmentations, allModelSegmentations } = segmentationOverlay;
+    const { segmentationContext, allSegmentations, allModelSegmentations } = mainViewerContext;
 
 
     // iterate segmentations and add creators and models
@@ -62,7 +62,7 @@
             Opacity:
             <input
                 type="range"
-                bind:value={segmentationOverlay.alpha}
+                bind:value={mainViewerContext.alpha}
                 min="0"
                 max="1"
                 step="0.01"

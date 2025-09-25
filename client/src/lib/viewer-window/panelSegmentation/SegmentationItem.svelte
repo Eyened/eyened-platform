@@ -1,13 +1,13 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
     import StringDialogue from "$lib/StringDialogue.svelte";
-    import { type SegmentationGET } from "../../../types/openapi_types";
+    import { type ModelSegmentationGET, type SegmentationGET } from "../../../types/openapi_types";
     import AI from "../icons/AI.svelte";
     import CCPanel from "./CCPanel.svelte";
     import { duplicate } from "./duplicate_utils";
@@ -20,7 +20,7 @@
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
-        segmentation: SegmentationGET;
+        segmentation: SegmentationGET | ModelSegmentationGET;
         style?: "AI" | "normal";
     }
 
@@ -30,11 +30,11 @@
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
     const image = viewerContext.image;
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 
-    const { segmentationContext } = segmentationOverlay;
+    const { segmentationContext } = mainViewerContext;
     segmentationContext.visibleSegmentations.add(segmentation);
 
     const segmentationItem = image.getSegmentationItem(segmentation);
@@ -81,11 +81,11 @@
     let collapsed = $state(true);
 
     function pointerEnter() {
-        segmentationOverlay.highlightedSegmentationItem = segmentationItem;
+        mainViewerContext.highlightedSegmentationItem = segmentationItem;
     }
 
     function pointerLeave() {
-        segmentationOverlay.highlightedSegmentationItem = undefined;
+        mainViewerContext.highlightedSegmentationItem = undefined;
     }
 
     const segmentationType = {

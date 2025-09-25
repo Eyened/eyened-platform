@@ -90,7 +90,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="tagging-component" onclick={(e) => e.stopPropagation()}>
+<div class="tagging-component border border-gray-300 rounded-md bg-gray-100 p-2" onclick={(e) => e.stopPropagation()}>
     <!-- Dialog with the new tag form -->
     <Dialog bind:open={dialogOpen}>
         <DialogContent>
@@ -172,17 +172,17 @@
     .tags-list {
         display: inline-flex;
         flex-wrap: wrap;
-        margin-top: 1em;
+        /* margin-top: 1em; */
     }
     .tag {
         display: inline-flex;
         align-items: center;
         padding: 0.5em 1em;
-        margin: 0.5em;
+        margin: 0 0.5em;
         border: 1px solid #ccc;
         border-radius: 20px;
         background-color: #f1f1f1;
-        font-size: 0.9em;
+        font-size: 0.7em;
     }
     .plus-tag {
         position: relative;

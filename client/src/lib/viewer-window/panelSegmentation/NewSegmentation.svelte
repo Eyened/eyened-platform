@@ -2,7 +2,7 @@
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { Feature } from "$lib/datamodel/feature.svelte";
     import { data } from "$lib/datamodel/model";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import FeatureSelect from "./FeatureSelect.svelte";
@@ -19,15 +19,17 @@
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
 
+
+
     const featureSubsets: { [name: string]: [number] } =
         taskContext?.task?.definition?.config?.featureSubsets || {};
 
     const { image, axis } = viewerContext;
     const { user: creator } = globalContext;
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const segmentationContext = segmentationOverlay.segmentationContext;
+    const segmentationContext = mainViewerContext.segmentationContext;
     const { features } = data;
 
     const types = ["Q", "B", "P"];
@@ -69,6 +71,7 @@
 
     const availableFeatures = features.filter((f) => true);
     let selectedFeatureId: number | undefined = $state(undefined);
+    
 </script>
 
 <div class="new">

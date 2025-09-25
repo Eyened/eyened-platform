@@ -1,10 +1,12 @@
 import { Matrix } from '$lib/matrix';
-import type { Registration } from '$lib/registration/registration.js';
 import type { Position2D } from '$lib/types';
 import type { AbstractImage } from '$lib/webgl/abstractImage';
 import { BaseImageRenderer } from '$lib/webgl/imageRenderer';
 import type { Shaders } from '$lib/webgl/shaders';
 import { SvelteSet } from 'svelte/reactivity';
+import type { FormAnnotationGET, InstanceGET, ModelSegmentationGET, SegmentationGET } from '../../types/openapi_types';
+import type { Registration } from '../registration/registration';
+import type { ViewerWindowContext } from '../viewer-window/viewerWindowContext.svelte';
 import { HotKeys } from './controls/hotkeys';
 import { ScrollOCT } from './controls/scrollOCT';
 import { UpdatePosition } from './controls/updatePosition';
@@ -60,10 +62,26 @@ export class ViewerContext {
 
     imageRenderer: BaseImageRenderer;
 
+    registration: Registration;
+
+    public instance: InstanceGET;
+    public formAnnotations: FormAnnotationGET[]
+    public Segmentations: SegmentationGET[]
+    public ModelSegmentations: ModelSegmentationGET[]
+
+    
+
     constructor(
         public readonly image: AbstractImage,
-        public readonly registration: Registration,
+        // public readonly registration: Registration,
+        public readonly viewerWindowContext: ViewerWindowContext,
     ) {
+        this.registration = viewerWindowContext.registration;
+        this.instance = image.instance;
+        this.formAnnotations = image.instance.form_annotations || [];
+        this.Segmentations = image.instance.segmentations || [];
+        this.ModelSegmentations = image.instance.model_segmentations || [];
+
         if (image.image_id.endsWith('proj')) {
             // TODO: cleaner implementation of this
             this.axis = 1;
@@ -102,14 +120,14 @@ export class ViewerContext {
     }
 
     setIndex(i: number) {
-        const p = this.registration.getPosition(this.image.image_id);
+        const p = this.viewerWindowContext.registration.getPosition(this.image.image_id);
         let x = 0
         let y = 0;
         if (p) {
             x = p.x;
             y = p.y;
         }
-        this.registration.setPosition(this.image.image_id, { x, y, index: i });
+        this.viewerWindowContext.registration.setPosition(this.image.image_id, { x, y, index: i });
         this.index = i;
     }
 
@@ -247,7 +265,7 @@ export class ViewerContext {
         if (!renderBounds) {
             return;
         }
-        const p = this.registration.getPosition(this.image.image_id);
+        const p = this.viewerWindowContext.registration.getPosition(this.image.image_id);
         if (p) {
             this.index = p.index;
         }

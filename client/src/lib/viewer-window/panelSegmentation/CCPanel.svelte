@@ -1,23 +1,23 @@
 <script lang="ts">
-    import { ConnectedComponents, PanelIcon } from "../icons/icons";
-    import { getContext } from "svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+    import { getContext } from "svelte";
+    import { ConnectedComponents } from "../icons/icons";
 
     interface Props {
         segmentationItem: SegmentationItem;
     }
     let { segmentationItem }: Props = $props();
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 
     let connectedComponentsActive = $derived(
-        segmentationOverlay.applyConnectedComponents.has(segmentationItem),
+        mainViewerContext.applyConnectedComponents.has(segmentationItem),
     );
     function toggleConnectedComponents() {
-        segmentationOverlay.toggleConnectedComponents(segmentationItem);
+        mainViewerContext.toggleConnectedComponents(segmentationItem);
     }
 </script>
 <div class="main">

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { getContext } from "svelte";
     import type { CreatorMeta } from "../../../types/openapi_types";
     import SegmentationItem from "./SegmentationItem.svelte";
@@ -9,10 +9,10 @@
     }
     let { creator }: Props = $props();
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const hideCreators = segmentationOverlay.segmentationContext.hiddenCreators;
+    const hideCreators = mainViewerContext.segmentationContext.hiddenCreators;
     function toggle() {
         if (hideCreators.has(creator)) {
             hideCreators.delete(creator);
@@ -20,7 +20,7 @@
             hideCreators.add(creator);
         }
     }
-    let segmentations = segmentationOverlay.allSegmentations
+    let segmentations = mainViewerContext.allSegmentations
         .filter((a) => a.creator.id == creator.id)
         .sort((a, b) => a.id - b.id);
 </script>
@@ -32,7 +32,7 @@
     {creator.name}
 </span>
 
-{#each segmentationOverlay.allSegmentations as segmentation (segmentation.id)}
+{#each mainViewerContext.allSegmentations as segmentation (segmentation.id)}
     <div class="item" class:hide={hideCreators.has(segmentation.creator)}>
         <SegmentationItem {segmentation} />
     </div>
