@@ -373,3 +373,33 @@ async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = De
     if link:
         db.delete(link); db.commit()
     return Response(status_code=204)
+
+
+@router.get("/model-segmentations/{model_segmentation_id}/data")
+async def get_model_segmentation_data(
+    model_segmentation_id: int,
+    axis: Optional[int] = None,
+    scan_nr: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    model_segmentation = ModelSegmentation.by_id(db, model_segmentation_id)
+    if model_segmentation is None:
+        raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
+
+    try:
+        arr = model_segmentation.read_data(axis=axis, slice_index=scan_nr)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    np_buf = io.BytesIO()
+    np.save(np_buf, arr)
+    raw = np_buf.getvalue()
+    gz = gzip.compress(raw)
+
+    headers = {
+        "Content-Encoding": "gzip",
+        "Content-Disposition": 'inline; filename="model_segmentation.npy.gz"',
+        "Content-Length": str(len(gz)),
+    }
+    return Response(content=gz, media_type="application/octet-stream", headers=headers)

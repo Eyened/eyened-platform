@@ -1,5 +1,5 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { InstancesRepo } from "$lib/data/repos.svelte";
+import { FormAnnotationsRepo, InstancesRepo, ModelSegmentationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -42,6 +42,9 @@ export class ViewerWindowContext {
     private unsubscribe: () => void;
 
     private Instances = new InstancesRepo('viewer-window');
+    private FormAnnotations = new FormAnnotationsRepo('viewer-window');
+    private Segmentations = new SegmentationsRepo('viewer-window');
+    private ModelSegmentations = new ModelSegmentationsRepo('viewer-window');
 
     constructor(
         public readonly webgl: WebGL,
@@ -93,11 +96,14 @@ export class ViewerWindowContext {
         // ensure metadata of all instances is loaded
         const missingIds = ids.filter((id) => !this.Instances.store[id]);
         if (missingIds.length) {
-            await Promise.all(missingIds.map((id) => this.Instances.fetchOne(id, {
+            const instances = await Promise.all(missingIds.map((id) => this.Instances.fetchOne(id, {
                 with_segmentations: true,
                 with_form_annotations: true,
                 with_model_segmentations: true
             })));
+            this.FormAnnotations.ingest(instances.flatMap((instance) => instance.$.form_annotations!));
+            this.Segmentations.ingest(instances.flatMap((instance) => instance.$.segmentations!));
+            this.ModelSegmentations.ingest(instances.flatMap((instance) => instance.$.model_segmentations!));
         }
 
         this._instanceIds.set(ids);
@@ -125,7 +131,7 @@ export class ViewerWindowContext {
 
                 // Create viewer contexts
                 for (const image of loadedImages) {
-                    this.topViewers.set(image, new ViewerContext(image, this.registration));
+                    this.topViewers.set(image, new ViewerContext(image, this));
                 }
 
                 return loadedImages;

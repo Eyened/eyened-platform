@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { colors } from "$lib/viewer/overlays/colors";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import { getContext } from "svelte";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import { colors } from "$lib/viewer/overlays/colors";
+    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { getContext } from "svelte";
 
     interface Props {
         segmentation: Segmentation;
@@ -17,16 +17,16 @@
         MultiClass: "radio",
     }[dataRepresentation as "MultiLabel" | "MultiClass"];
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 
-    const { segmentationContext } = segmentationOverlay;
+    const { segmentationContext } = mainViewerContext;
     function pointerEnter(featureIndex: number) {
-        segmentationOverlay.highlightedFeatureIndex = featureIndex;
+        mainViewerContext.highlightedFeatureIndex = featureIndex;
     }
     function pointerLeave() {
-        segmentationOverlay.highlightedFeatureIndex = undefined;
+        mainViewerContext.highlightedFeatureIndex = undefined;
     }
 
     let activeIndices = $state(0);

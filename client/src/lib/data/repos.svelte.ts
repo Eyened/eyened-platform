@@ -4,7 +4,9 @@ import type {
 	FeaturePATCH,
 	FeaturePUT,
 	FormAnnotationGET, FormAnnotationPUT,
+	FormSchemaGET,
 	InstanceGET,
+	ModelSegmentationGET,
 	SearchQuery, SearchResponse,
 	SegmentationGET, SegmentationPATCH,
 	SeriesGET,
@@ -19,7 +21,7 @@ import type {
 } from '../../types/openapi_types';
 import { api } from '../api/client';
 import { Repo } from './datamodel.svelte';
-import { FeatureObject, FormAnnotationObject, InstanceObject, SegmentationObject, SeriesObject, StudyObject, SubTaskObject, TagObject, TaskObject } from './objects.svelte';
+import { FeatureObject, FormAnnotationObject, FormSchemaObject, InstanceObject, ModelSegmentationObject, SegmentationObject, SeriesObject, StudyObject, SubTaskObject, TagObject, TaskObject } from './objects.svelte';
 
 // Type aliases for backward compatibility
 export type Tag = TagGET;
@@ -135,6 +137,21 @@ export class SegmentationsRepo extends Repo<SegmentationGET, {}, SegmentationPAT
 	}
 }
 
+export class ModelSegmentationsRepo extends Repo<ModelSegmentationGET, never, never, unknown, ModelSegmentationObject> {
+	public static path = '/model-segmentations';
+	protected createDataObject(obj: ModelSegmentationGET): ModelSegmentationObject { return new ModelSegmentationObject(obj, this); }
+
+	async getData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }) {
+		const res = await api.GET('/model-segmentations/{segmentation_id}/data', {
+			params: {
+				path: { segmentation_id },
+				query: { axis: p?.axis, scan_nr: p?.scan_nr }
+			}
+		});
+		return res.data as unknown;
+	}
+}
+
 export type FormAnnotationsListParams = { patient_id?: number; study_id?: number; image_instance_id?: number; form_schema_id?: number; sub_task_id?: number };
 
 export class FormAnnotationsRepo extends Repo<FormAnnotationGET, FormAnnotationPUT, FormAnnotationPUT, FormAnnotationsListParams, FormAnnotationObject> {
@@ -163,6 +180,11 @@ export class FormAnnotationsRepo extends Repo<FormAnnotationGET, FormAnnotationP
 	}
 }
 
+export class FormSchemasRepo extends Repo<FormSchemaGET, never, never, unknown, FormSchemaObject> {
+	public static path = '/form-schemas';
+	protected createDataObject(obj: FormSchemaGET): FormSchemaObject { return new FormSchemaObject(obj, this); }
+}
+
 // Legacy functions and classes for backward compatibility during transition
 export async function searchStudies(query: components['schemas']['StudySearchQuery']): Promise<components['schemas']['StudySearchResponse']> {
 	const res = await api.POST('/studies/search', { body: query });
@@ -186,6 +208,7 @@ StudyObject.DefaultRepo = StudiesRepo;
 SeriesObject.DefaultRepo = SeriesRepo;
 SegmentationObject.DefaultRepo = SegmentationsRepo;
 FormAnnotationObject.DefaultRepo = FormAnnotationsRepo;
+FormSchemaObject.DefaultRepo = FormSchemasRepo;
 TagObject.DefaultRepo = TagsRepo;
 TaskObject.DefaultRepo = TasksRepo;
 FeatureObject.DefaultRepo = FeaturesRepo;

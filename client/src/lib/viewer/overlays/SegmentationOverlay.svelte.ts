@@ -13,7 +13,7 @@ import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
 
-export class SegmentationOverlay implements Overlay {
+export class MainViewerContext implements Overlay {
 
     private featureColors = new SvelteMap<SegmentationGET, Color>();
     
@@ -36,7 +36,9 @@ export class SegmentationOverlay implements Overlay {
                 .filter((s) => s.sparse_axis == viewerContext.axis)
         );
         
-        this.allModelSegmentations = $derived(instance.model_segmentations!.filter((s) => s.sparse_axis == viewerContext.axis));
+        this.allModelSegmentations = $derived(
+            instance.model_segmentations!.filter((s) => s.sparse_axis == viewerContext.axis)
+        );
         // this.allSegmentations = new FilterList<SegmentationGET>(
         //     instance.segmentations!
         //     .filter(globalContext.segmentationsFilter)

@@ -1,22 +1,22 @@
 <script lang="ts">
-    import type { TaskContext } from "$lib/types"
-    import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils"
-    import Viewer from "$lib/viewer/Viewer.svelte"
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte"
-    import type { AbstractImage } from "$lib/webgl/abstractImage"
-    import { getContext, onDestroy, setContext, type Component } from "svelte"
-    import MainIcon from "./icons/MainIcon.svelte"
-    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte"
-    import PanelForm from "./panelForm/PanelForm.svelte"
-    import PanelHeader from "./PanelHeader.svelte"
-    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte"
-    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte"
-    import PanelRendering from "./panelRendering/PanelRendering.svelte"
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte"
+    import type { TaskContext } from "$lib/types";
+    import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
+    import Viewer from "$lib/viewer/Viewer.svelte";
+    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { getContext, onDestroy, setContext, type Component } from "svelte";
+    import MainIcon from "./icons/MainIcon.svelte";
+    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
+    import PanelForm from "./panelForm/PanelForm.svelte";
+    import PanelHeader from "./PanelHeader.svelte";
+    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
+    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
+    import PanelRendering from "./panelRendering/PanelRendering.svelte";
+    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import { data } from "$lib/datamodel/model"
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { data } from "$lib/datamodel/model";
+    import { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import {
         Close,
         Draw,
@@ -25,10 +25,10 @@
         Info,
         Registration,
         Rendering,
-    } from "./icons/icons"
-    import Measure from "./icons/Measure.svelte"
-    import PanelInfo from "./panelInfo/panelInfo.svelte"
-    import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte"
+    } from "./icons/icons";
+    import Measure from "./icons/Measure.svelte";
+    import PanelInfo from "./panelInfo/panelInfo.svelte";
+    import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
     interface Props {
         image: AbstractImage;
     }
@@ -39,15 +39,14 @@
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
-    const { registration } = viewerWindowContext;
     const closePanel = getContext<() => {}>("closePanel");
 
-    const viewerContext = new ViewerContext(image, registration);
+    const viewerContext = new ViewerContext(image, viewerWindowContext);
     setContext("viewerContext", viewerContext);
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = new SegmentationOverlay(viewerContext, globalContext);
-    setContext("segmentationOverlay", segmentationOverlay);    
+    const segmentationOverlay = new MainViewerContext(viewerContext, globalContext);
+    setContext("mainViewerContext", segmentationOverlay);    
     onDestroy(viewerContext.addOverlay(segmentationOverlay));
 
     const { activePanels } = viewerContext;

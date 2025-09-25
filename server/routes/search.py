@@ -249,12 +249,12 @@ def partition_conditions_by_entity(conditions_mapped: List[Dict[str, Any]]) -> D
     return grouped
 
 
-def or_expr(conds: List[Dict[str, Any]]) -> Any:
-    from sqlalchemy import or_, true
+def and_expr(conds: List[Dict[str, Any]]) -> Any:
+    from sqlalchemy import and_, true
 
     if not conds:
         return true()
-    return or_(*[format_condition(c["variable"], c) for c in conds])
+    return and_(*[format_condition(c["variable"], c) for c in conds])
 
 
 # ----------------------------------------
@@ -302,7 +302,7 @@ def exists_forms_for_study(forms_group: Dict[Any, List[Dict[str, Any]]]) -> Any:
     for conds in forms_group.values():
         subconds.extend(conds)
     if subconds:
-        subq = subq.where(or_expr(subconds))
+        subq = subq.where(and_expr(subconds))
 
     return subq.exists()
 
@@ -346,7 +346,7 @@ def exists_forms_for_instance(forms_group: Dict[Any, List[Dict[str, Any]]]) -> A
     for conds in forms_group.values():
         subconds.extend(conds)
     if subconds:
-        subq = subq.where(or_expr(subconds))
+        subq = subq.where(and_expr(subconds))
 
     return subq.exists()
 
@@ -390,7 +390,7 @@ def exists_segs_for_instance(segs_group: Dict[Any, List[Dict[str, Any]]]) -> Any
     for conds in segs_group.values():
         subconds.extend(conds)
     if subconds:
-        subq = subq.where(or_expr(subconds))
+        subq = subq.where(and_expr(subconds))
 
     return subq.exists()
 
@@ -407,7 +407,7 @@ def exists_inst_tags_for_instance(tags_group: Dict[Any, List[Dict[str, Any]]]) -
         .join(InstTag, ImageInstanceTagLink.TagID == InstTag.TagID, isouter=True)
     )
 
-    subq = subq.where(or_expr(tags_group[InstTag]))
+    subq = subq.where(and_expr(tags_group[InstTag]))
     return subq.exists()
 
 
@@ -421,7 +421,7 @@ def exists_study_tags_for_study(tags_group: Dict[Any, List[Dict[str, Any]]]) -> 
         .where(StudyTagLink.StudyID == Study.StudyID)
         .join(StudyTag, StudyTagLink.TagID == StudyTag.TagID, isouter=True)
     )
-    subq = subq.where(or_expr(tags_group[StudyTag]))
+    subq = subq.where(and_expr(tags_group[StudyTag]))
     return subq.exists()
 
 
@@ -509,19 +509,19 @@ def _build_study_select(
         .join_from(Patient, Project)
     )
 
-    or_predicates: List[Any] = []
+    and_predicates: List[Any] = []
     if base_conds:
-        or_predicates.append(or_expr(base_conds))
+        and_predicates.append(and_expr(base_conds))
 
     forms_exists = exists_forms_for_study(form_group)
     if forms_exists is not None:
-        or_predicates.append(forms_exists)
+        and_predicates.append(forms_exists)
 
     study_tags_exists = exists_study_tags_for_study(study_tag_group)
     if study_tags_exists is not None:
-        or_predicates.append(study_tags_exists)
+        and_predicates.append(study_tags_exists)
 
-    where_clause = or_(*or_predicates) if or_predicates else true()
+    where_clause = and_(*and_predicates) if and_predicates else true()
 
     sort_col = study_order_by_fields_map[order_by]
     sort_dir = sort_col.asc() if order == "ASC" else sort_col.desc()
@@ -571,21 +571,21 @@ def _build_instance_select(
         .join_from(ImageInstance, Scan, isouter=True)
     )
 
-    or_predicates: List[Any] = []
+    and_predicates: List[Any] = []
     if base_conds:
-        or_predicates.append(or_expr(base_conds))
+        and_predicates.append(and_expr(base_conds))
 
     seg_exists = exists_segs_for_instance(seg_group)
     if seg_exists is not None:
-        or_predicates.append(seg_exists)
+        and_predicates.append(seg_exists)
     form_exists = exists_forms_for_instance(form_group)
     if form_exists is not None:
-        or_predicates.append(form_exists)
+        and_predicates.append(form_exists)
     tag_exists = exists_inst_tags_for_instance(img_tag_group)
     if tag_exists is not None:
-        or_predicates.append(tag_exists)
+        and_predicates.append(tag_exists)
 
-    where_clause = or_(*or_predicates) if or_predicates else true()
+    where_clause = and_(*and_predicates) if and_predicates else true()
 
     sort_col = instance_order_by_fields_map[order_by]
     sort_dir = sort_col.asc() if order == "ASC" else sort_col.desc()

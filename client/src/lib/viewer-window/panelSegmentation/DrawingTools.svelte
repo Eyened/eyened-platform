@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
-    import { getContext, onDestroy } from "svelte"
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext, onDestroy } from "svelte";
     import {
         Brush,
         Enhance,
@@ -10,27 +10,27 @@
         Questionable,
         Redo,
         Undo,
-    } from "../icons/icons"
+    } from "../icons/icons";
 
-    import Toggle from "$lib/Toggle.svelte"
-    import { BrushTool } from "$lib/viewer/tools/Brush"
-    import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte"
-    import { PolygonTool } from "$lib/viewer/tools/Polygon"
-    import BrushradiusControl from "./BrushradiusControl.svelte"
+    import Toggle from "$lib/Toggle.svelte";
+    import { BrushTool } from "$lib/viewer/tools/Brush";
+    import { EnhanceTool } from "$lib/viewer/tools/Enhance.svelte";
+    import { PolygonTool } from "$lib/viewer/tools/Polygon";
+    import BrushradiusControl from "./BrushradiusControl.svelte";
 
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte"
-    import type { SegmentationTool } from "$lib/viewer/tools/segmentation"
-    import type { PaintSettings } from "$lib/webgl/mask.svelte"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
+    import type { PaintSettings } from "$lib/webgl/mask.svelte";
     
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const globalContext = getContext<GlobalContext>("globalContext");
     const image = viewerContext.image;
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const { segmentationContext } = segmentationOverlay;
+    const { segmentationContext } = mainViewerContext;
 
     let activeTool: undefined | SegmentationTool = $state(undefined);
     let removeTool = () => {};

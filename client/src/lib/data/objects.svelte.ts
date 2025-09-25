@@ -1,7 +1,9 @@
 import type {
 	FeatureGET, FeaturePATCH,
 	FormAnnotationGET, FormAnnotationPUT,
+	FormSchemaGET,
 	InstanceGET, InstanceMeta,
+	ModelSegmentationGET,
 	SegmentationGET, SegmentationPATCH,
 	SeriesGET, SeriesMeta,
 	StudyGET, StudyMeta,
@@ -67,6 +69,23 @@ export class SegmentationObject extends DataObject<SegmentationGET, Segmentation
 	}
 }
 
+export class ModelSegmentationObject extends DataObject<ModelSegmentationGET, never> { 
+	static DefaultRepo: typeof Repo;
+	async tag(tag_id: number) {
+		const {data} = await api.POST('/model-segmentations/{segmentation_id}/tags' as any, {
+			params: { path: { segmentation_id: Number(this.id) } } as any,
+			body: { tag_id } as any
+		});
+		this.updateLocal({ tags: [...(this.$.tags ?? []), data] });
+	}
+	async untag(tag_id: number) {
+		await api.DELETE('/model-segmentations/{segmentation_id}/tags/{tag_id}' as any, {
+			params: { path: { segmentation_id: Number(this.id), tag_id } } as any
+		});
+		this.updateLocal({ tags: this.$.tags.filter((t) => t.id !== tag_id) });
+	}
+}
+
 export class FormAnnotationObject extends DataObject<FormAnnotationGET, FormAnnotationPUT> {
 	static DefaultRepo: typeof Repo;
 	async tag(tag_id: number) {
@@ -106,6 +125,10 @@ export class TaskObject extends DataObject<TaskGET, TaskPATCH> {
 }
 
 export class FeatureObject extends DataObject<FeatureGET, FeaturePATCH> { static DefaultRepo: typeof Repo; }
+
+export class FormSchemaObject extends DataObject<FormSchemaGET, never> {
+	static DefaultRepo: typeof Repo;
+}
 
 export class SubTaskObject extends DataObject<SubTaskGET | SubTaskWithImagesGET, Partial<SubTaskGET | SubTaskWithImagesGET>> {
 	async addImage(instance_id: number) {

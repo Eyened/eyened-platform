@@ -1,17 +1,14 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import type { FormSchema } from "$lib/datamodel/formSchema.svelte";
-    import { data } from "$lib/datamodel/model";
     import type { TaskContext } from "$lib/types";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
+    import { getContext, onMount } from "svelte";
+    import type { FormAnnotationGET, FormSchemaGET } from "../../../types/openapi_types";
     import FormItem from "./FormItem.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const { user: creator, formShortcut } = globalContext;
-    const { formSchemas, formAnnotations } = data;
 
     const {
         image: { instance },
@@ -26,18 +23,22 @@
         "Affine registration",
         "RegistrationSet",
     ]);
+    
+    onMount(async () => {
+        await globalContext.ensureFormSchemasLoaded();
+    });
 
-    const allSchemas = formSchemas.filter(
-        (schema) => !exclude.has(schema.name),
-    );
-    let selectedSchema: FormSchema | undefined = $state();
+    // const allSchemas = formSchemas.filter(
+    //     (schema) => !exclude.has(schema.name),
+    // );
+    let selectedSchema: FormSchemaGET | undefined = $state();
 
     const filters = [
-        (annotation: FormAnnotation) => annotation.patient === instance.patient, //same patient
-        (annotation: FormAnnotation) =>
+        (annotation: FormAnnotationGET) => annotation.patient === instance.patient, //same patient
+        (annotation: FormAnnotationGET) =>
             annotation.instance?.laterality == instance.laterality, // same eye
-        (annotation: FormAnnotation) => annotation.study == instance.study, // same study
-        (annotation: FormAnnotation) =>
+        (annotation: FormAnnotationGET) => annotation.study == instance.study, // same study
+        (annotation: FormAnnotationGET) =>
             !exclude.has(annotation.formSchema.name),
     ];
 
@@ -45,24 +46,24 @@
     if (taskContext) {
         const TaskDefinitionName = taskContext.task.definition.name;
         if (TaskDefinitionName === "Naevi") {
-            selectedSchema = formSchemas.find(
+            selectedSchema = globalContext.formSchemas.all.find(
                 (schema) => schema.name === "Naevi grading",
             );
         } else if (TaskDefinitionName === "ETDRS-grid placement") {
-            selectedSchema = formSchemas.find(
+            selectedSchema = globalContext.formSchemas.all.find(
                 (schema) => schema.name === "ETDRS-grid coordinates",
             );
             filters.push(
-                (annotation: FormAnnotation) => annotation.instance == instance,
+                (annotation: FormAnnotationGET) => annotation.instance == instance,
             );
         } else if (TaskDefinitionName === "Glaucoma grading") {
-            selectedSchema = formSchemas.find(
+            selectedSchema = globalContext.formSchemas.all.find(
                 (schema) => schema.name === "Glaucoma grading",
             );
         }
     }
 
-    const forms = formAnnotations
+    const forms = viewerContext.formAnnotations
         .filter((annotation) => filters.every((filter) => filter(annotation)))
         .filter(globalContext.segmentationsFilter)
         .sort((a, b) => a.id - b.id);
@@ -78,7 +79,7 @@
     }
 
     let formShortcutSchema = $derived(
-        formSchemas.find((schema) => schema.name === formShortcut),
+        globalContext.formSchemas.all.find((schema) => schema.name === formShortcut),
     );
     function addShortcut() {
         FormAnnotation.createFrom(
@@ -90,12 +91,14 @@
     }
 </script>
 
+
+
 <div class="main">
     <div class="new-form">
         <div>
             <select bind:value={selectedSchema}>
                 <option value={undefined} disabled>-- select form type --</option>
-                {#each $allSchemas as schema}
+                {#each globalContext.formSchemas.all as schema}
                     <option value={schema}>{schema.name}</option>
                 {/each}
             </select>
@@ -114,7 +117,7 @@
         {/if}
     </div>
     <div>
-        {#each $forms as form, i (i)}
+        {#each viewerContext.formAnnotations as form, i (i)}
             <FormItem {form} />
         {/each}
     </div>

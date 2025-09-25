@@ -329,6 +329,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/model-segmentations/{model_segmentation_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model Segmentation Data */
+        get: operations["get_model_segmentation_data_model_segmentations__model_segmentation_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/import/image": {
         parameters: {
             query?: never;
@@ -2540,6 +2557,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_model_segmentation_data_model_segmentations__model_segmentation_id__data_get: {
+        parameters: {
+            query?: {
+                axis?: number | null;
+                scan_nr?: number | null;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                model_segmentation_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

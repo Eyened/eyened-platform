@@ -41,12 +41,13 @@
             </div>
             <div class="age m-[0.1em]">({age ? Math.round(age) : ''} years)</div>
 
+            <div class="ml-4">
             <Tagger
                 tagType="Study"
                 tags={study.$.tags ?? []}
                 tag={(id) => study.tag(id)}
-                untag={(id) => study.untag(id)}
-            />
+                untag={(id) => study.untag(id)}/>
+            </div>
         </div>
     </div>
     <div class:hidden={collapse} class="flex flex-col">

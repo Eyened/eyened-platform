@@ -2,7 +2,7 @@ import type { components } from './openapi';
 
 export type Body_create_segmentation_segmentations_post = components['schemas']['Body_create_segmentation_segmentations_post'];
 export type ChangePasswordRequest = components['schemas']['ChangePasswordRequest'];
-export type CreatorMeta = components['schemas']['CreatorMetadata'];
+export type CreatorMeta = components['schemas']['CreatorMeta'];
 export type DeviceMeta = components['schemas']['DeviceMeta'];
 export type DeviceModelGET = components['schemas']['DeviceModelGET'];
 export type ETDRSField = components['schemas']['ETDRSField'];

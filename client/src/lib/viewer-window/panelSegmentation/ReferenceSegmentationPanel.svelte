@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import { AbstractImage } from "$lib/webgl/abstractImage";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem";
     import { getContext } from "svelte";
@@ -16,8 +16,8 @@
     }
     let { segmentation, image, isEditable, segmentationItem }: Props = $props();
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
     const globalContext = getContext<GlobalContext>("globalContext");
     function setAnnotationReference() {
@@ -39,7 +39,7 @@
         segmentation.update({ referenceId: null });
     }
     function toggleApplyMask() {
-        segmentationOverlay.toggleMasking(segmentationItem);
+        mainViewerContext.toggleMasking(segmentationItem);
     }
 </script>
 
@@ -71,7 +71,7 @@
         </div>
 
         <div class="row editable" onclick={toggleApplyMask}>
-            {#if segmentationOverlay.applyMasking.has(segmentationItem)}
+            {#if mainViewerContext.applyMasking.has(segmentationItem)}
                 <Hide size="1.5em" />
                 <span>Showing masked annotation</span>
             {:else}

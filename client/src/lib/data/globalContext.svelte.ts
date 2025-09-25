@@ -1,4 +1,4 @@
-import { FeaturesRepo, TagsRepo } from '$lib/data/repos.svelte';
+import { FeaturesRepo, FormSchemasRepo, TagsRepo } from '$lib/data/repos.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
 import openAPISpec from '../../types/openapi.json';
 import type { FormAnnotationGET, ModelSegmentationGET, SegmentationGET } from '../../types/openapi_types';
@@ -16,6 +16,8 @@ export class GlobalContext {
     public tagsLoaded: boolean = $state(false);
     public features = new FeaturesRepo('features');
     public featuresLoaded: boolean = $state(false);
+    public formSchemas = new FormSchemasRepo('form-schemas');
+    public formSchemasLoaded: boolean = $state(false);
 
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
@@ -66,6 +68,13 @@ export class GlobalContext {
         if (!this.featuresLoaded) {
             await this.features.fetchAll();
             this.featuresLoaded = true;
+        }
+    }
+
+    async ensureFormSchemasLoaded() {
+        if (!this.formSchemasLoaded) {
+            await this.formSchemas.fetchAll();
+            this.formSchemasLoaded = true;
         }
     }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
     import { getContext } from "svelte";
     import SegmentationArea from "./SegmentationArea.svelte";
@@ -10,8 +10,8 @@
 
     let { measureTool }: Props = $props();
 
-    const { allSegmentations } = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const { allSegmentations } = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 </script>
 
