@@ -82,6 +82,8 @@ export class ViewerContext {
         this.Segmentations = image.instance.segmentations || [];
         this.ModelSegmentations = image.instance.model_segmentations || [];
 
+        
+
         if (image.image_id.endsWith('proj')) {
             // TODO: cleaner implementation of this
             this.axis = 1;

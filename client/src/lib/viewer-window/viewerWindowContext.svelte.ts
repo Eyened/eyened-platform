@@ -149,7 +149,7 @@ export class ViewerWindowContext {
 
         for (const locator of photoLocators) {
             for (const key of ['enfaceImageId', 'octImageId']) {
-                const image_id = locator[key as keyof PhotoLocator];
+                const image_id = String(locator[key as keyof PhotoLocator]);
                 if (!this.photoLocators.has(image_id)) {
                     this.photoLocators.set(image_id, []);
                 }
@@ -189,5 +189,8 @@ export class ViewerWindowContext {
         return this.loadImage(instance);
     }
 
+    get formAnnotationsRepo() { 
+        return this.FormAnnotations; 
+    }
 
 }

@@ -153,7 +153,6 @@ class FormAnnotationPATCH(BaseModel):
     patient_id: Optional[int] = None
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
-    creator_id: Optional[int] = None
     sub_task_id: Optional[int] = None
     form_data: Optional[Dict[str, Any]] = None
     form_annotation_reference_id: Optional[int] = None
