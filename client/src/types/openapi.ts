@@ -897,8 +897,8 @@ export interface components {
             /** New Password */
             new_password: string;
         };
-        /** CreatorMetadata */
-        CreatorMetadata: {
+        /** CreatorMeta */
+        CreatorMeta: {
             /** Id */
             id: number;
             /** Name */
@@ -989,13 +989,18 @@ export interface components {
             /** Id */
             id: number;
             /**
+             * Annotation Type
+             * @constant
+             */
+            annotation_type: "grader_form";
+            /**
              * Object Type
              * @enum {string}
              */
             object_type: "patient" | "study" | "image_instance";
             /** Tags */
             tags: components["schemas"]["TagMeta"][];
-            creator: components["schemas"]["CreatorMetadata"];
+            creator: components["schemas"]["CreatorMeta"];
             /**
              * Date Inserted
              * Format: date-time
@@ -1308,9 +1313,13 @@ export interface components {
             data_representation: components["schemas"]["DataRepresentation"];
             /** Id */
             id: number;
-            model: components["schemas"]["ModelMeta"];
-            feature?: components["schemas"]["FeatureGET"] | null;
-            creator?: components["schemas"]["CreatorMetadata"] | null;
+            /**
+             * Annotation Type
+             * @constant
+             */
+            annotation_type: "model_segmentation";
+            creator: components["schemas"]["ModelMeta"];
+            feature: components["schemas"]["FeatureGET"];
             /** Tags */
             tags: components["schemas"]["TagMeta"][];
             /**
@@ -1432,8 +1441,13 @@ export interface components {
             data_representation: components["schemas"]["DataRepresentation"];
             /** Id */
             id: number;
+            /**
+             * Annotation Type
+             * @constant
+             */
+            annotation_type: "grader_segmentation";
             feature: components["schemas"]["FeatureGET"];
-            creator: components["schemas"]["CreatorMetadata"];
+            creator: components["schemas"]["CreatorMeta"];
             /** Tags */
             tags: components["schemas"]["TagMeta"][];
             /**
@@ -1651,7 +1665,7 @@ export interface components {
             description: string;
             /** Id */
             id: number;
-            creator: components["schemas"]["CreatorMetadata"];
+            creator: components["schemas"]["CreatorMeta"];
             /**
              * Date Inserted
              * Format: date-time
@@ -1664,7 +1678,7 @@ export interface components {
             id: number;
             /** Name */
             name: string;
-            tagger: components["schemas"]["CreatorMetadata"];
+            tagger: components["schemas"]["CreatorMeta"];
             /**
              * Date
              * Format: date-time
@@ -1716,7 +1730,7 @@ export interface components {
             num_tasks: number;
             /** Num Tasks Ready */
             num_tasks_ready: number;
-            creator?: components["schemas"]["CreatorMetadata"] | null;
+            creator?: components["schemas"]["CreatorMeta"] | null;
             task_state?: components["schemas"]["TaskState"] | null;
         };
         /** TaskPATCH */

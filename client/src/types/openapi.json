@@ -4464,7 +4464,7 @@
         ],
         "title": "ChangePasswordRequest"
       },
-      "CreatorMetadata": {
+      "CreatorMeta": {
         "properties": {
           "id": {
             "type": "integer",
@@ -4480,7 +4480,7 @@
           "id",
           "name"
         ],
-        "title": "CreatorMetadata"
+        "title": "CreatorMeta"
       },
       "DataRepresentation": {
         "type": "string",
@@ -4727,6 +4727,11 @@
             "type": "integer",
             "title": "Id"
           },
+          "annotation_type": {
+            "type": "string",
+            "const": "grader_form",
+            "title": "Annotation Type"
+          },
           "object_type": {
             "type": "string",
             "enum": [
@@ -4744,7 +4749,7 @@
             "title": "Tags"
           },
           "creator": {
-            "$ref": "#/components/schemas/CreatorMetadata"
+            "$ref": "#/components/schemas/CreatorMeta"
           },
           "date_inserted": {
             "type": "string",
@@ -4769,6 +4774,7 @@
           "form_schema_id",
           "patient_id",
           "id",
+          "annotation_type",
           "object_type",
           "tags",
           "creator",
@@ -5685,28 +5691,16 @@
             "type": "integer",
             "title": "Id"
           },
-          "model": {
+          "annotation_type": {
+            "type": "string",
+            "const": "model_segmentation",
+            "title": "Annotation Type"
+          },
+          "creator": {
             "$ref": "#/components/schemas/ModelMeta"
           },
           "feature": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FeatureGET"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "creator": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CreatorMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/FeatureGET"
           },
           "tags": {
             "items": {
@@ -5741,7 +5735,9 @@
           "data_type",
           "data_representation",
           "id",
-          "model",
+          "annotation_type",
+          "creator",
+          "feature",
           "tags",
           "date_inserted"
         ],
@@ -6092,11 +6088,16 @@
             "type": "integer",
             "title": "Id"
           },
+          "annotation_type": {
+            "type": "string",
+            "const": "grader_segmentation",
+            "title": "Annotation Type"
+          },
           "feature": {
             "$ref": "#/components/schemas/FeatureGET"
           },
           "creator": {
-            "$ref": "#/components/schemas/CreatorMetadata"
+            "$ref": "#/components/schemas/CreatorMeta"
           },
           "tags": {
             "items": {
@@ -6131,6 +6132,7 @@
           "data_type",
           "data_representation",
           "id",
+          "annotation_type",
           "feature",
           "creator",
           "tags",
@@ -6751,7 +6753,7 @@
             "title": "Id"
           },
           "creator": {
-            "$ref": "#/components/schemas/CreatorMetadata"
+            "$ref": "#/components/schemas/CreatorMeta"
           },
           "date_inserted": {
             "type": "string",
@@ -6781,7 +6783,7 @@
             "title": "Name"
           },
           "tagger": {
-            "$ref": "#/components/schemas/CreatorMetadata"
+            "$ref": "#/components/schemas/CreatorMeta"
           },
           "date": {
             "type": "string",
@@ -6922,7 +6924,7 @@
           "creator": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/CreatorMetadata"
+                "$ref": "#/components/schemas/CreatorMeta"
               },
               {
                 "type": "null"

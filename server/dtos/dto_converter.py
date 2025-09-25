@@ -285,6 +285,7 @@ class DTOConverter:
         feature_get = DTOConverter.feature_to_get(feat) if feat is not None else None  # type: ignore[arg-type]
         return ModelSegmentationGET(
             id=ms.ModelSegmentationID,
+            annotation_type="model_segmentation",
             depth=ms.Depth, height=ms.Height, width=ms.Width,
             sparse_axis=ms.SparseAxis,
             image_projection_matrix=ms.ImageProjectionMatrix,
@@ -292,9 +293,8 @@ class DTOConverter:
             threshold=ms.Threshold,
             reference_segmentation_id=ms.ReferenceSegmentationID,
             data_type=ms.DataType, data_representation=ms.DataRepresentation,
-            model=DTOConverter.model_to_meta(ms.Model),
+            creator=DTOConverter.model_to_meta(ms.Model),
             feature=feature_get,  # may be None if not joined
-            creator=None,  # no Creator on ModelSegmentation
             tags=[],       # no tags on ModelSegmentation
             date_inserted=ms.DateInserted,
             date_modified=None,
@@ -347,6 +347,7 @@ class DTOConverter:
         """Convert Segmentation ORM object to SegmentationGET."""
         dto = SegmentationGET(
             id=seg.SegmentationID,
+            annotation_type="grader_segmentation",
             depth=seg.Depth,
             height=seg.Height,
             width=seg.Width,
@@ -385,6 +386,7 @@ class DTOConverter:
 
         dto = FormAnnotationGET(
             id=annotation.FormAnnotationID,
+            annotation_type="grader_form",
             form_schema_id=annotation.FormSchemaID,
             patient_id=annotation.PatientID,
             study_id=annotation.StudyID,

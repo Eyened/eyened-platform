@@ -59,7 +59,7 @@
             taskContext?.subTask
         );
         // show segmentations for this creator
-        segmentationContext.hideCreators.delete(creator);
+        segmentationContext.hiddenCreators.delete(creator);
         const segmentationItem = image.getSegmentationItem(segmentation);
 
         segmentationContext.segmentationItem = segmentationItem

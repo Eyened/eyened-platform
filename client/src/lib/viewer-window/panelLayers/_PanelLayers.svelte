@@ -29,7 +29,7 @@
 	const creatorSegmentations = data.annotations.filter(filter).groupBy((a) => a.creator);
 
 	for (const creator of $creatorSegmentations.keys()) {
-		segmentationContext.hideCreators.add(creator);
+		segmentationContext.hiddenCreators.add(creator);
 	}
 	
 </script>

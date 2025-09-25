@@ -43,7 +43,7 @@
             0.5,
             axis,
         );
-        segmentationContext.hideCreators.delete(creator);
+        segmentationContext.hiddenCreators.delete(creator);
         globalContext.dialogue = null;
     }
     
