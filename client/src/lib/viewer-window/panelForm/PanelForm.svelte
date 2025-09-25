@@ -4,10 +4,13 @@
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext, onMount } from "svelte";
     import type { FormAnnotationGET, FormSchemaGET } from "../../../types/openapi_types";
+    import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import FormItem from "./FormItem.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
+    const formAnnotationRepo = viewerWindowContext.formAnnotationsRepo;
     const { user: creator, formShortcut } = globalContext;
 
     const {
@@ -34,12 +37,14 @@
     let selectedSchema: FormSchemaGET | undefined = $state();
 
     const filters = [
-        (annotation: FormAnnotationGET) => annotation.patient === instance.patient, //same patient
+        (annotation: FormAnnotationGET) => annotation.patient_id === instance.patient.id, //same patient
         (annotation: FormAnnotationGET) =>
-            annotation.instance?.laterality == instance.laterality, // same eye
-        (annotation: FormAnnotationGET) => annotation.study == instance.study, // same study
-        (annotation: FormAnnotationGET) =>
-            !exclude.has(annotation.formSchema.name),
+            annotation.image_instance_id == instance.id, // same eye/laterality via instance
+        (annotation: FormAnnotationGET) => annotation.study_id == instance.study?.id, // same study
+        (annotation: FormAnnotationGET) => {
+            const schema = globalContext.formSchemas.store[annotation.form_schema_id];
+            return schema && !exclude.has(schema.name);
+        },
     ];
 
     // TODO: refactor this, to be used as extension?
@@ -54,7 +59,7 @@
                 (schema) => schema.name === "ETDRS-grid coordinates",
             );
             filters.push(
-                (annotation: FormAnnotationGET) => annotation.instance == instance,
+                (annotation: FormAnnotationGET) => annotation.image_instance_id == instance.id,
             );
         } else if (TaskDefinitionName === "Glaucoma grading") {
             selectedSchema = globalContext.formSchemas.all.find(
@@ -63,31 +68,49 @@
         }
     }
 
+    $effect(() => {
+        console.log(viewerContext.formAnnotations);
+    });
+
     const forms = viewerContext.formAnnotations
         .filter((annotation) => filters.every((filter) => filter(annotation)))
         .filter(globalContext.segmentationsFilter)
         .sort((a, b) => a.id - b.id);
 
-    function addForm() {
+    $effect(() => {
+        console.log(forms);
+    });
+
+    // Convert GET rows to objects
+    const formObjects = $derived(
+        forms.map(a => formAnnotationRepo.object(a.id))
+    );
+
+    async function addForm() {
         if (!selectedSchema) return;
-        FormAnnotation.createFrom(
-            creator,
-            instance,
-            selectedSchema,
-            taskContext?.subTask,
-        );
+        await formAnnotationRepo.create({
+            form_schema_id: selectedSchema.id,
+            patient_id: instance.patient.id,
+            study_id: instance.study?.id ?? undefined,
+            image_instance_id: instance.id,
+            sub_task_id: taskContext?.subTask?.id,
+            form_data: {},
+        });
     }
 
     let formShortcutSchema = $derived(
         globalContext.formSchemas.all.find((schema) => schema.name === formShortcut),
     );
-    function addShortcut() {
-        FormAnnotation.createFrom(
-            creator,
-            instance,
-            formShortcutSchema!,
-            taskContext?.subTask,
-        );
+    async function addShortcut() {
+        if (!formShortcutSchema) return;
+        await formAnnotationRepo.create({
+            form_schema_id: formShortcutSchema.id,
+            patient_id: instance.patient.id,
+            study_id: instance.study?.id ?? undefined,
+            image_instance_id: instance.id,
+            sub_task_id: taskContext?.subTask?.id,
+            form_data: {},
+        });
     }
 </script>
 
@@ -117,8 +140,8 @@
         {/if}
     </div>
     <div>
-        {#each viewerContext.formAnnotations as form, i (i)}
-            <FormItem {form} />
+        {#each formObjects as form, i (i)}
+            <FormItem {form} {formAnnotationRepo} />
         {/each}
     </div>
 </div>

@@ -93,7 +93,7 @@ async def create_segmentation(
     segmentation = Segmentation(
         ImageInstanceID=dto.image_instance_id,
         FeatureID=dto.feature_id,
-        CreatorID=dto.creator_id,
+        CreatorID=current_user.id,
         DataType=dto.data_type,
         DataRepresentation=dto.data_representation,
         Depth=dto.depth,

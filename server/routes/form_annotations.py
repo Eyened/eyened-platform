@@ -29,7 +29,7 @@ async def create_form_annotation(
         PatientID=payload.get("patient_id"),
         StudyID=payload.get("study_id"),
         ImageInstanceID=payload.get("image_instance_id"),
-        CreatorID=payload.get("creator_id"),
+        CreatorID=current_user.id,
         SubTaskID=payload.get("sub_task_id"),
         FormData=payload.get("form_data"),
         FormAnnotationReferenceID=payload.get("form_annotation_reference_id"),
@@ -117,8 +117,6 @@ async def update_form_annotation(
         existing_annotation.StudyID = annotation.study_id
     if annotation.image_instance_id is not None:
         existing_annotation.ImageInstanceID = annotation.image_instance_id
-    if annotation.creator_id is not None:
-        existing_annotation.CreatorID = annotation.creator_id
     if annotation.sub_task_id is not None:
         existing_annotation.SubTaskID = annotation.sub_task_id
     if annotation.form_data is not None:

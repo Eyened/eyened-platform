@@ -1,47 +1,43 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { FormAnnotationObject } from "$lib/data/objects.svelte";
+    import type { FormAnnotationsRepo } from "$lib/data/repos.svelte";
     import SchemaForm from "$lib/forms/SchemaForm.svelte";
     import { getDefault, resolveRefs } from "$lib/forms/schemaType";
-    import { onMount, setContext } from "svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import { browser } from "$app/environment";
+    import { getContext, onMount, setContext } from "svelte";
 
     interface Props {
-        form: FormAnnotation;
+        form: FormAnnotationObject;
+        formAnnotationRepo: FormAnnotationsRepo;
         viewerContext: ViewerContext;
         canEdit: boolean;
     }
-    let { form, viewerContext, canEdit }: Props = $props();
+    let { form, formAnnotationRepo, viewerContext, canEdit }: Props = $props();
     setContext("viewerContext", viewerContext);
+    const globalContext = getContext<GlobalContext>("globalContext");
 
-    const schema = resolveRefs(form.formSchema.schema);
+    // Schema from repo'd store
+    const schemaRow = $derived(globalContext.formSchemas.store[form.$.form_schema_id]);
+    const schema = $derived(resolveRefs(schemaRow?.schema ?? {}));
 
     let value: any = $state();
     let status = $state("loading");
     onMount(async () => {
-        await form.load();
-        value = form.value;
+        value = await formAnnotationRepo.getValue(Number(form.id));
         status = "ready";
-        if (!value) {
-            value = getDefault(schema);
-        }
+        if (!value) value = getDefault(schema);
     });
 
     async function onchange() {
         if (!canEdit) return;
         if (value) {
             status = "saving";
-            await form.update({ value });
+            await formAnnotationRepo.setValue(Number(form.id), value);
             status = "synced";
         }
     }
-
-    const laterality =
-        form.instance?.laterality === "L"
-            ? "OS"
-            : form.instance?.laterality === "R"
-              ? "OD"
-              : "?";
 
     function readLocalStorageBoolean(key: string, defaultValue: boolean) {
         let value: string | null = null;
@@ -70,7 +66,7 @@
 
 <div class="header">
     <span>[{form.id}]</span>
-    <span>{form.creator.name}</span>
+    <span>{form.$.creator.name}</span>
     <span class={status}>{status}</span>
 </div>
 <div class="header">
@@ -78,19 +74,19 @@
         <tbody>
             <tr>
                 <td>Patient identifier</td>
-                <td> {form.patient.identifier}</td>
+                <td>{viewerContext.instance.patient.identifier}</td>
             </tr>
             <tr>
                 <td>Study date</td>
-                <td> {form.study?.date.toLocaleDateString()}</td>
+                <td>{new Date(viewerContext.instance.study?.date ?? "").toLocaleDateString()}</td>
             </tr>
             <tr>
                 <td>Instance identifier</td>
-                <td> {form.instance?.id}</td>
+                <td>{form.$.image_instance_id}</td>
             </tr>
             <tr>
                 <td>Laterality</td>
-                <td> {laterality}</td>
+                <td>{viewerContext.instance.laterality === "L" ? "OS" : viewerContext.instance.laterality === "R" ? "OD" : "?"}</td>
             </tr>
         </tbody>
     </table>
