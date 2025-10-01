@@ -1,5 +1,5 @@
 import { SvelteMap } from "svelte/reactivity";
-import type { SegmentationGET } from "../../types/openapi_types";
+import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import type { AbstractImage } from "./abstractImage";
 import type { Mask, PaintSettings } from "./mask.svelte";
 import { SegmentationState } from "./segmentationState";
@@ -12,7 +12,7 @@ export class SegmentationItem {
 
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: SegmentationGET) {
+        readonly segmentation: SegmentationGET | ModelSegmentationGET) {
 
         for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
             this.getSegmentationState(scanNr, true);

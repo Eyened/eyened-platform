@@ -17,21 +17,22 @@
 
 
 
- 
-<Tabs.Root value="tags">
-  <Tabs.List>
-    <Tabs.Trigger value="tags">Tags</Tabs.Trigger>
-    <Tabs.Trigger value="features">Features</Tabs.Trigger>
-    <Tabs.Trigger value="password">Password</Tabs.Trigger>
-  </Tabs.List>
-  <Tabs.Content value="tags">
-    <TagsEditorJoint/>
-  </Tabs.Content>
-  <Tabs.Content value="features">
-    <FeaturesEditor/>
-  </Tabs.Content>
-  <Tabs.Content value="password">
-    <p>Change your password here.</p>
-    <ChangePasswordForm />
-  </Tabs.Content>
-</Tabs.Root>
+ <div class="h-full w-full">
+  <Tabs.Root value="tags" class="h-full w-full">
+    <Tabs.List class="flex-none">
+      <Tabs.Trigger value="tags">Tags</Tabs.Trigger>
+      <Tabs.Trigger value="features">Features</Tabs.Trigger>
+      <Tabs.Trigger value="password">Password</Tabs.Trigger>
+    </Tabs.List>
+    <Tabs.Content value="tags" class="flex-1 overflow-y-auto">
+      <TagsEditorJoint/>
+    </Tabs.Content>
+    <Tabs.Content value="features" class="flex-1 overflow-y-auto">
+      <FeaturesEditor/>
+    </Tabs.Content>
+    <Tabs.Content value="password" class="flex-1 overflow-y-auto">
+      <p>Change your password here.</p>
+      <ChangePasswordForm />
+    </Tabs.Content>
+  </Tabs.Root>
+</div>

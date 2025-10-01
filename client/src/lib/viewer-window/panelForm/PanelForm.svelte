@@ -20,20 +20,14 @@
     const taskContext = getContext<TaskContext>("taskContext");
 
     //TODO: this should be part of the config?
-    const exclude = new Set([
-        "ETDRS-grid coordinates",
-        "Pointset registration",
-        "Affine registration",
-        "RegistrationSet",
+    const form_schama_ids_to_exclude = new Set([
+        2, 6, 8, 9
     ]);
     
     onMount(async () => {
         await globalContext.ensureFormSchemasLoaded();
     });
 
-    // const allSchemas = formSchemas.filter(
-    //     (schema) => !exclude.has(schema.name),
-    // );
     let selectedSchema: FormSchemaGET | undefined = $state();
 
     const filters = [
@@ -41,10 +35,7 @@
         (annotation: FormAnnotationGET) =>
             annotation.image_instance_id == instance.id, // same eye/laterality via instance
         (annotation: FormAnnotationGET) => annotation.study_id == instance.study?.id, // same study
-        (annotation: FormAnnotationGET) => {
-            const schema = globalContext.formSchemas.store[annotation.form_schema_id];
-            return schema && !exclude.has(schema.name);
-        },
+        (annotation: FormAnnotationGET) => !form_schama_ids_to_exclude.has(annotation.form_schema_id)
     ];
 
     // TODO: refactor this, to be used as extension?
@@ -68,18 +59,14 @@
         }
     }
 
-    $effect(() => {
-        console.log(viewerContext.formAnnotations);
-    });
 
-    const forms = viewerContext.formAnnotations
+    const forms = $derived(
+        formAnnotationRepo.all
         .filter((annotation) => filters.every((filter) => filter(annotation)))
         .filter(globalContext.segmentationsFilter)
-        .sort((a, b) => a.id - b.id);
+        .sort((a, b) => a.id - b.id)
+    )
 
-    $effect(() => {
-        console.log(forms);
-    });
 
     // Convert GET rows to objects
     const formObjects = $derived(

@@ -36,12 +36,14 @@ class FeatureGET(FeatureBase):
     subfeatures: List[str]
     subfeature_ids: List[int]
     date_inserted: datetime
+    segmentation_count: Optional[int] = None
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= SEGMENTATIONS =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 class SegmentationBase(BaseModel):
+    image_instance_id: int
     depth: int
     height: int
     width: int
@@ -59,9 +61,9 @@ class SegmentationPUT(SegmentationBase):
     pass
 
 class SegmentationPOST(SegmentationBase):
-    image_instance_id: int
+    
     feature_id: int
-    creator_id: int
+    subtask_id: Optional[int] = None
 
 class SegmentationPATCH(BaseModel):
     reference_segmentation_id: Optional[int] = None

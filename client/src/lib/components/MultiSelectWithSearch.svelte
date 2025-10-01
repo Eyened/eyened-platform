@@ -8,9 +8,11 @@
     type Props = {
         options: { label: string; value: string }[];
         values?: string[];
+        onselect?: (values: string[]) => void;
     };
 
-    let { options, values = $bindable() }: Props = $props();
+    let { options, values = $bindable(), onselect }: Props = $props();
+
 
     let collapsibleOpen = $state(false);
 	let triggerRef: HTMLButtonElement | null = $state(null);
@@ -27,13 +29,13 @@
     }
 
     function removeValue(valueToRemove: string) {
-        console.log(valueToRemove);
         values = selectedValues.filter(v => v !== valueToRemove);
+        onselect?.(values);
     }
 
     function addValue(valueToAdd: string) {
-        console.log(valueToAdd);
         values = [...selectedValues, valueToAdd];
+        onselect?.(values);
     }
 </script>
 <div class="inline-block">

@@ -4,7 +4,7 @@ import type { AbstractImage } from '$lib/webgl/abstractImage';
 import { BaseImageRenderer } from '$lib/webgl/imageRenderer';
 import type { Shaders } from '$lib/webgl/shaders';
 import { SvelteSet } from 'svelte/reactivity';
-import type { FormAnnotationGET, InstanceGET, ModelSegmentationGET, SegmentationGET } from '../../types/openapi_types';
+import type { InstanceGET } from '../../types/openapi_types';
 import type { Registration } from '../registration/registration';
 import type { ViewerWindowContext } from '../viewer-window/viewerWindowContext.svelte';
 import { HotKeys } from './controls/hotkeys';
@@ -65,9 +65,6 @@ export class ViewerContext {
     registration: Registration;
 
     public instance: InstanceGET;
-    public formAnnotations: FormAnnotationGET[]
-    public Segmentations: SegmentationGET[]
-    public ModelSegmentations: ModelSegmentationGET[]
 
     
 
@@ -78,10 +75,6 @@ export class ViewerContext {
     ) {
         this.registration = viewerWindowContext.registration;
         this.instance = image.instance;
-        this.formAnnotations = image.instance.form_annotations || [];
-        this.Segmentations = image.instance.segmentations || [];
-        this.ModelSegmentations = image.instance.model_segmentations || [];
-
         
 
         if (image.image_id.endsWith('proj')) {

@@ -5,10 +5,16 @@
 	import type { GlobalContext } from '../data/globalContext.svelte';
 
 	const globalContext = getContext<GlobalContext>('globalContext');
+
+	interface Props {
+		maxWidth?: string;
+	}
+
+	let { maxWidth }: Props = $props();
 </script>
 
 <nav class="topnav dark bg-neutral-900 text-white">
-	<div class="container ">
+	<div class="container class={`${maxWidth ? 'max-w-['+maxWidth+']' : 'max-w-none'}`}">
 		<NavigationMenu.Root class="left ">
 			<NavigationMenu.List class="flex items-center gap-1">
 				<NavigationMenu.Item>
@@ -57,12 +63,13 @@
 		z-index: 50;
 	}
 	.topnav .container {
+		width: 100%;
 		height: 100%;
-		max-width: 1440px;
 		margin: 0 auto;
 		padding: 0 16px;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		max-width: none;
 	}
 </style>

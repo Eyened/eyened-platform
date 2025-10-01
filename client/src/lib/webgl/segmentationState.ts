@@ -1,5 +1,5 @@
 import { ModelSegmentationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
-import { encodeNpy } from "$lib/utils/npy_loader";
+import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
@@ -34,13 +34,14 @@ export class SegmentationState {
     }
 
     private async initialize() {
-        const axis = (this.segmentation as any).sparse_axis ?? (this.segmentation as any).sparseAxis ?? 0;
+        const axis = this.segmentation.sparse_axis ?? undefined;
+        let npyArray: NPYArray;
         if (this.segmentation.annotation_type == 'model_segmentation') {
-            const array = await new ModelSegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis, scan_nr: this.scanNr }) as any;
+            npyArray = await new ModelSegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis, scan_nr: this.scanNr }) as any;
         } else {
-            const array = await new SegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis, scan_nr: this.scanNr }) as any;
+            npyArray = await new SegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis, scan_nr: this.scanNr }) as any;
         }
-        this.mask.importData((array.data ?? array) as DrawingArray);
+        this.mask.importData(npyArray.data as DrawingArray);
         this.history.checkpoint(this.mask.exportData());
     }
 

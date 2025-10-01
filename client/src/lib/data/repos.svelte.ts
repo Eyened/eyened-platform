@@ -8,7 +8,10 @@ import type {
 	InstanceGET,
 	ModelSegmentationGET,
 	SearchQuery, SearchResponse,
+	SegmentationDataRepresentation,
+	SegmentationDataType,
 	SegmentationGET, SegmentationPATCH,
+	SegmentationPOST,
 	SeriesGET,
 	StudyGET,
 	SubTaskGET, SubTaskWithImagesGET, SubTasksResponse, SubTasksWithImagesResponse,
@@ -20,6 +23,8 @@ import type {
 	TaskPUT
 } from '../../types/openapi_types';
 import { api } from '../api/client';
+import { decodeNpy, type NPYArray } from '../utils/npy_loader';
+import type { AbstractImage } from '../webgl/abstractImage';
 import { Repo } from './datamodel.svelte';
 import { FeatureObject, FormAnnotationObject, FormSchemaObject, InstanceObject, ModelSegmentationObject, SegmentationObject, SeriesObject, StudyObject, SubTaskObject, TagObject, TaskObject } from './objects.svelte';
 
@@ -111,18 +116,86 @@ export class SeriesRepo extends Repo<SeriesGET, never, never, unknown, SeriesObj
 	protected createDataObject(obj: SeriesGET): SeriesObject { return new SeriesObject(obj, this); }
 }
 
-export class SegmentationsRepo extends Repo<SegmentationGET, {}, SegmentationPATCH, unknown, SegmentationObject> {
+export class SegmentationsRepo extends Repo<SegmentationGET, SegmentationPOST, SegmentationPATCH, unknown, SegmentationObject> {
 	public static path = '/segmentations';
 	protected createDataObject(obj: SegmentationGET): SegmentationObject { return new SegmentationObject(obj, this); }
 
+	async createFrom(
+        image: AbstractImage,
+        feature_id: number,
+        data_representation: SegmentationDataRepresentation,
+        data_type: SegmentationDataType,
+        threshold?: number,
+        sparse_axis?: number,
+        subtask_id?: number,
+    ) : Promise<SegmentationGET> {
+
+        const instance = image.instance;
+        const scan_indices = image.is3D ? [] : null;
+        let shape = {
+            depth: image.depth,
+            height: image.height,
+            width: image.width,
+        }
+        if (sparse_axis == 1) {
+            // projection
+            shape.depth = image.height;
+            shape.height = 1;
+            shape.width = image.width;
+        }
+
+        const item: SegmentationPOST = {
+            image_instance_id: instance.id,
+            ...shape,
+            sparse_axis,
+            image_projection_matrix: null,
+            scan_indices,
+            data_representation,
+            data_type,
+            threshold,
+            reference_segmentation_id: null,
+            feature_id: feature_id,
+            subtask_id: subtask_id ?? null,
+        };
+
+        return this.createSegmentation(item);
+    }
+
+    async createSegmentation(item: SegmentationPOST, np_array?: NPYArray): Promise<SegmentationGET> {
+		const body: any = {metadata: JSON.stringify(item)}
+		if (np_array) {
+			body.np_array = await np_array.toBlob(true)
+		}
+		const res = await api.POST(
+			SegmentationsRepo.path as any, 
+			{ 
+				body,
+				bodySerializer(body: any) {
+					const fd = new FormData();
+					for (const name in body) {
+						fd.append(name, body[name]);
+					}
+					return fd;
+				}
+			} as any
+		);
+
+		this.upsert(res.data);
+
+		return res.data as Promise<SegmentationGET>;
+    }
+
 	async getData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }) {
+
+		const query = {}
 		const res = await api.GET('/segmentations/{segmentation_id}/data', {
 			params: {
 				path: { segmentation_id },
-				query: { axis: p?.axis, scan_nr: p?.scan_nr }
-			}
+				query: query
+			},
+			parseAs: "arrayBuffer"
 		});
-		return res.data as unknown;
+		return decodeNpy(res.data!);
 	}
 
 	async updateData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }, body?: unknown) {
@@ -141,14 +214,17 @@ export class ModelSegmentationsRepo extends Repo<ModelSegmentationGET, never, ne
 	public static path = '/model-segmentations';
 	protected createDataObject(obj: ModelSegmentationGET): ModelSegmentationObject { return new ModelSegmentationObject(obj, this); }
 
-	async getData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }) {
-		const res = await api.GET('/model-segmentations/{segmentation_id}/data', {
+	async getData(model_segmentation_id: number, p?: { axis?: number; scan_nr?: number }) {
+
+		const query = {}
+		const res = await api.GET('/model-segmentations/{model_segmentation_id}/data', {
 			params: {
-				path: { segmentation_id },
-				query: { axis: p?.axis, scan_nr: p?.scan_nr }
-			}
+				path: { model_segmentation_id },
+				query: query
+			},
+			parseAs: "arrayBuffer"
 		});
-		return res.data as unknown;
+		return decodeNpy(res.data!);
 	}
 }
 

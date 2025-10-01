@@ -1,10 +1,10 @@
 <script lang="ts">
     import { browser } from "$app/environment";
     import { page } from "$app/state";
-    import { FormAnnotationsRepo, InstancesRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
+    import { FormAnnotationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
     import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
+    import '../../app.css';
 
-    const Instances = new InstancesRepo('view-route');
 
     function getURLNums(param: string): number[] {
         const params = browser ? page.url.searchParams : new URLSearchParams();

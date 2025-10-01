@@ -16,10 +16,23 @@ def set_subfeatures(db: Session, parent_id: int, sub_ids: list[int] | None) -> N
         db.add(FeatureFeatureLink(ParentFeatureID=parent_id, ChildFeatureID=child_id, FeatureIndex=idx))
 
 @router.get("/features", response_model=list[FeatureGET])
-async def list_features(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+async def list_features(
+    with_counts: bool = False,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
     """Return all features."""
     rows = db.scalars(select(Feature).order_by(Feature.FeatureName.asc())).all()
-    return [DTOConverter.feature_to_get(f) for f in rows]
+    if not with_counts:
+        return [DTOConverter.feature_to_get(f) for f in rows]
+
+    # Compute counts per FeatureID in one query
+    counts_rows = db.execute(
+        select(Segmentation.FeatureID, func.count()).group_by(Segmentation.FeatureID)
+    ).all()
+    counts = {fid: cnt for (fid, cnt) in counts_rows}
+
+    return [DTOConverter.feature_to_get(f, counts.get(f.FeatureID, 0)) for f in rows]
 
 @router.post("/features", response_model=FeatureGET)
 async def create_feature(dto: FeaturePUT, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):

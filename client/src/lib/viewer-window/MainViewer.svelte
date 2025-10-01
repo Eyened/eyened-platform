@@ -16,7 +16,7 @@
 
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { data } from "$lib/datamodel/model";
-    import { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import {
         Close,
         Draw,
@@ -45,7 +45,7 @@
     setContext("viewerContext", viewerContext);
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = new MainViewerContext(viewerContext, globalContext);
+    const segmentationOverlay = new MainViewerContext(viewerContext.instance.id, viewerContext.axis, viewerWindowContext);
     setContext("mainViewerContext", segmentationOverlay);    
     onDestroy(viewerContext.addOverlay(segmentationOverlay));
 

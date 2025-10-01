@@ -41,10 +41,10 @@ export class ViewerWindowContext {
     private frame: number = 0;
     private unsubscribe: () => void;
 
-    private Instances = new InstancesRepo('viewer-window');
-    private FormAnnotations = new FormAnnotationsRepo('viewer-window');
-    private Segmentations = new SegmentationsRepo('viewer-window');
-    private ModelSegmentations = new ModelSegmentationsRepo('viewer-window');
+    Instances = new InstancesRepo('viewer-window');
+    FormAnnotations = new FormAnnotationsRepo('viewer-window');
+    Segmentations = new SegmentationsRepo('viewer-window');
+    ModelSegmentations = new ModelSegmentationsRepo('viewer-window');
 
     constructor(
         public readonly webgl: WebGL,

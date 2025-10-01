@@ -1,6 +1,7 @@
+from datetime import datetime
 import gzip
 import io
-from typing import Optional
+from typing import Annotated, Optional
 
 import numpy as np
 from eyened_orm import (
@@ -82,8 +83,8 @@ def create_empty_array(segmentation: Segmentation, image: ImageInstance) -> np.n
 # but only by data with the same shape as the original annotation
 @router.post("/segmentations", response_model=SegmentationGET)
 async def create_segmentation(
-    np_array: UploadFile = File(default=None),
-    metadata: str = Form(...),
+    metadata: Annotated[str, Form()],
+    np_array: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -94,6 +95,7 @@ async def create_segmentation(
         ImageInstanceID=dto.image_instance_id,
         FeatureID=dto.feature_id,
         CreatorID=current_user.id,
+        SubTaskID=dto.subtask_id,
         DataType=dto.data_type,
         DataRepresentation=dto.data_representation,
         Depth=dto.depth,
@@ -104,6 +106,7 @@ async def create_segmentation(
         ScanIndices=dto.scan_indices,
         Threshold=dto.threshold,
         ReferenceSegmentationID=dto.reference_segmentation_id,
+        DateInserted=datetime.now()
     )
 
     # creator can be different from the current_user and is passed in the params
@@ -261,6 +264,10 @@ async def get_segmentation_data(
         arr = segmentation.read_data(axis=axis, slice_index=scan_nr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+    
+    
 
     buf = io.BytesIO()
     np.save(buf, arr)

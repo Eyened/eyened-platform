@@ -2490,6 +2490,67 @@
         }
       }
     },
+    "/form-schemas": {
+      "get": {
+        "summary": "List Form Schemas",
+        "operationId": "list_form_schemas_form_schemas_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormSchemaGET"
+                  },
+                  "title": "Response List Form Schemas Form Schemas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/form-schemas/{form_schema_id}": {
       "get": {
         "summary": "Get Form Schema",
@@ -2562,6 +2623,16 @@
         "description": "Return all features.",
         "operationId": "list_features_features_get",
         "parameters": [
+          {
+            "name": "with_counts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Counts"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -4526,14 +4597,21 @@
       },
       "Body_create_segmentation_segmentations_post": {
         "properties": {
-          "np_array": {
-            "type": "string",
-            "format": "binary",
-            "title": "Np Array"
-          },
           "metadata": {
             "type": "string",
             "title": "Metadata"
+          },
+          "np_array": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Np Array"
           }
         },
         "type": "object",
@@ -4682,6 +4760,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Date Inserted"
+          },
+          "segmentation_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmentation Count"
           }
         },
         "type": "object",
@@ -4923,17 +5012,6 @@
               }
             ],
             "title": "Image Instance Id"
-          },
-          "creator_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Creator Id"
           },
           "sub_task_id": {
             "anyOf": [
@@ -5701,6 +5779,10 @@
       },
       "ModelSegmentationGET": {
         "properties": {
+          "image_instance_id": {
+            "type": "integer",
+            "title": "Image Instance Id"
+          },
           "depth": {
             "type": "integer",
             "title": "Depth"
@@ -5825,6 +5907,7 @@
         },
         "type": "object",
         "required": [
+          "image_instance_id",
           "depth",
           "height",
           "width",
@@ -6098,6 +6181,10 @@
       },
       "SegmentationGET": {
         "properties": {
+          "image_instance_id": {
+            "type": "integer",
+            "title": "Image Instance Id"
+          },
           "depth": {
             "type": "integer",
             "title": "Depth"
@@ -6222,6 +6309,7 @@
         },
         "type": "object",
         "required": [
+          "image_instance_id",
           "depth",
           "height",
           "width",
@@ -7343,6 +7431,152 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "SegmentationPOST": {
+        "$defs": {
+          "DataRepresentation": {
+            "enum": [
+              "Binary",
+              "DualBitMask",
+              "Probability",
+              "MultiLabel",
+              "MultiClass"
+            ],
+            "title": "DataRepresentation",
+            "type": "string"
+          },
+          "Datatype": {
+            "enum": [
+              "R8",
+              "R8UI",
+              "R16UI",
+              "R32UI",
+              "R32F"
+            ],
+            "title": "Datatype",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "image_instance_id": {
+            "title": "Image Instance Id",
+            "type": "integer"
+          },
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          },
+          "sparse_axis": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sparse Axis"
+          },
+          "image_projection_matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Image Projection Matrix"
+          },
+          "scan_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scan Indices"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Threshold"
+          },
+          "reference_segmentation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reference Segmentation Id"
+          },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
+          "feature_id": {
+            "title": "Feature Id",
+            "type": "integer"
+          },
+          "subtask_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtask Id"
+          }
+        },
+        "required": [
+          "image_instance_id",
+          "depth",
+          "height",
+          "width",
+          "data_type",
+          "data_representation",
+          "feature_id"
+        ],
+        "title": "SegmentationPOST",
+        "type": "object"
       }
     }
   }

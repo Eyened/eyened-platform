@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { getContext } from 'svelte';
 	import type { GlobalContext } from '../data/globalContext.svelte';
@@ -18,11 +17,9 @@
 	open={globalContext.showUserMenu}
 	onOpenChange={(open) => (globalContext.showUserMenu = open)}
 >
-	<Dialog.Content class="min-w-[80vw] min-h-[85vh] align-top">
-		<Dialog.Header class="relative">
-			<Button variant="destructive" onclick={logout} class="absolute top-0 right-10">Log out</Button>
-			<Settings/>
-		</Dialog.Header>
+	<Dialog.Content class="flex h-[85vh] min-w-[80vw]">
+		<!-- <Button variant="destructive" onclick={logout} class="absolute top-0 right-10">Log out</Button> -->
+		<Settings/>
 	</Dialog.Content>
 </Dialog.Root>
 

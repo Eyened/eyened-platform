@@ -3,12 +3,11 @@
 	import SelectWithSearch from '$lib/components/SelectWithSearch.svelte';
 	import * as Button from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import * as Input from '$lib/components/ui/input';
+	import { Input } from '$lib/components/ui/input';
 	import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
-	import { nanoid } from 'nanoid';
 	import Fa from 'svelte-fa';
-
-	// Local type definitions until openapi types are regenerated
+	import DatePicker from '../components/DatePicker.svelte';
+	// Local type definitions (matching OpenAPI types)
 	type ConditionOperator = '>' | '<' | '>=' | '<=' | '==' | '!=' | 'IN';
 	type ConditionValue = string | number | string[] | null;
 	
@@ -23,14 +22,6 @@
 		values: string | string[]; // 'string' | 'int' | 'float' | 'date' | string[]
 	}
 
-	// Internal row state for UI
-	interface FilterRow {
-		id: string;
-		field?: string;
-		operator?: ConditionOperator;
-		value?: string | number | string[];
-	}
-
 	type Props = {
 		signature: SignatureField[];
 		conditions?: Condition[];
@@ -38,8 +29,8 @@
 
 	let { signature, conditions = $bindable() }: Props = $props();
 
-	// Internal rows state
-	let rows: FilterRow[] = $state([{ id: nanoid(), field: undefined, operator: undefined, value: undefined }]);
+	// Ephemeral state for adding new conditions
+	let draftRow: { field?: string; operator?: ConditionOperator; value?: ConditionValue } | null = $state(null);
 
 	// Field options for SelectWithSearch
 	const fieldOptions = $derived(
@@ -93,29 +84,6 @@
 		return Array.isArray(sig.values) ? 'IN' : '==';
 	}
 
-	// Handle field change
-	function onFieldChange(row: FilterRow, newField: string) {
-		row.field = newField;
-		row.operator = getDefaultOperator(newField);
-		
-		const sig = getFieldSignature(newField);
-		if (sig && Array.isArray(sig.values)) {
-			row.value = [];
-		} else {
-			row.value = '';
-		}
-	}
-
-	// Add new row
-	function addRow() {
-		rows = [...rows, { id: nanoid() }];
-	}
-
-	// Remove row
-	function removeRow(rowId: string) {
-		rows = rows.filter(r => r.id !== rowId);
-	}
-
 	// Coerce value based on field type
 	function coerceValue(value: any, fieldType: string | string[]): ConditionValue {
 		if (Array.isArray(fieldType)) {
@@ -134,61 +102,197 @@
 		}
 	}
 
-	const rowsDeps = $derived(
-		rows.map(r => ({ id: r.id, field: r.field, operator: r.operator, value: r.value }))
-	);
+	// Condition update helpers
+	function setConditions(next: Condition[]) {
+		conditions = next;
+	}
 
-	// Derive conditions from rows
-	let derivedConditions = $derived(
-		rowsDeps
-			.filter(row => row.field && row.operator && row.value !== '' && row.value !== undefined)
-			.map(row => {
-				const sig = getFieldSignature(row.field!);
-				return {
-					variable: row.field!,
-					operator: row.operator!,
-					value: coerceValue(row.value, sig?.values || 'string')
-				};
-			})
-	);
+	function updateConditionAt(i: number, patch: Partial<Condition>) {
+		const next = conditions?.slice() || [];
+		const curr = next[i];
+		if (!curr) return;
+		
+		let updated: Condition = { ...curr, ...patch };
+		
+		// Sanitize operator/value against signature
+		const sig = getFieldSignature(updated.variable);
+		const allowedOps = getOperatorOptions(updated.variable);
+		if (!allowedOps.includes(updated.operator as ConditionOperator)) {
+			updated.operator = getDefaultOperator(updated.variable) as any;
+		}
+		updated.value = coerceValue(updated.value, sig?.values ?? 'string');
+		next[i] = updated;
+		setConditions(next);
+	}
 
-	// Update conditions prop
+	function removeConditionAt(i: number) {
+		const next = conditions?.slice() || [];
+		next.splice(i, 1);
+		setConditions(next);
+	}
+
+	// Draft row helpers
+	function startDraft() {
+		draftRow = {};
+	}
+
+	function cancelDraft() {
+		draftRow = null;
+	}
+
+	function commitDraftIfValid() {
+		if (!draftRow?.field || !draftRow?.operator || (draftRow.value === undefined || draftRow.value === '' || (Array.isArray(draftRow.value) && draftRow.value.length === 0))) return;
+		
+		const sig = getFieldSignature(draftRow.field);
+		const value = coerceValue(draftRow.value, sig?.values ?? 'string');
+		setConditions([...(conditions ?? []), { variable: draftRow.field, operator: draftRow.operator as any, value }]);
+		draftRow = null;
+	}
+
+	function updateDraftField(field: string) {
+		if (!draftRow) return;
+		const sig = getFieldSignature(field);
+		draftRow.field = field;
+		draftRow.operator = getDefaultOperator(field);
+		draftRow.value = Array.isArray(sig?.values) ? [] : '';
+		commitDraftIfValid();
+	}
+
+	function updateDraftOperator(operator: ConditionOperator) {
+		if (!draftRow) return;
+		draftRow.operator = operator;
+		commitDraftIfValid();
+	}
+
+	function updateDraftValue(value: ConditionValue) {
+		if (!draftRow) return;
+		console.log('updateDraftValue', value);
+		draftRow.value = value;
+		commitDraftIfValid();
+	}
+
+	// Sanitize conditions when signature or conditions change externally
 	$effect(() => {
-		conditions = derivedConditions;
+		if (!conditions) return;
+		const next: Condition[] = [];
+		for (const c of conditions) {
+			const sig = getFieldSignature(c.variable);
+			if (!sig) continue; // drop unknown fields for current signature
+			const allowedOps = getOperatorOptions(c.variable);
+			const operator = allowedOps.includes(c.operator as ConditionOperator) ? c.operator : getDefaultOperator(c.variable);
+			const value = coerceValue(c.value, sig.values);
+			next.push({ variable: c.variable, operator: operator as any, value });
+		}
+		if (JSON.stringify(next) !== JSON.stringify(conditions)) {
+			conditions = next;
+		}
 	});
+
 </script>
 
 <div class="space-y-4">
-	{#each rows as row (row.id)}
+	{#each (conditions || []) as condition, i (i)}
 		<div class="flex items-center gap-2 p-3 border rounded-lg">
 			<!-- Field Selector -->
 			<div class="flex-1">
 				<SelectWithSearch
 					options={fieldOptions}
-					bind:value={row.field}
+					value={condition.variable}
 					placeholder="Select field..."
-					{...{ onSelect: (value: string) => onFieldChange(row, value) }}
+					{...{ onSelect: (v: string) => {
+						const sig = getFieldSignature(v);
+						updateConditionAt(i, {
+							variable: v,
+							operator: getDefaultOperator(v) as any,
+							value: Array.isArray(sig?.values) ? [] : ''
+						});
+					}}}
 				/>
 			</div>
 
 			<!-- Operator Selector -->
 			<div class="w-20">
-				{#if row.field}
-					{@const operatorOptions = getOperatorOptions(row.field)}
-					{#if operatorOptions.length === 1}
-						<Button.Root variant="outline" disabled class="w-full">
-							{operatorOptions[0]}
-						</Button.Root>
+				{#if true}
+					{@const ops = getOperatorOptions(condition.variable)}
+					{#if ops.length === 1}
+						<Button.Root variant="outline" disabled class="w-full">{ops[0]}</Button.Root>
 					{:else}
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger>
-								<Button.Root variant="outline" class="w-full">
-									{row.operator || '=='}
-								</Button.Root>
+								<Button.Root variant="outline" class="w-full">{condition.operator}</Button.Root>
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content>
-								{#each operatorOptions as op}
-									<DropdownMenu.Item onSelect={() => (row.operator = op)}>
+								{#each ops as op}
+									<DropdownMenu.Item onSelect={() => updateConditionAt(i, { operator: op as any })}>
+										{op}
+									</DropdownMenu.Item>
+								{/each}
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					{/if}
+				{/if}
+			</div>
+
+			<!-- Value Input -->
+			<div class="flex-1">
+				{#if true}
+					{@const sig = getFieldSignature(condition.variable)}
+					{#if sig && Array.isArray(sig.values)}
+						<MultiSelectWithSearch
+							options={getValueOptions(condition.variable)}
+							values={(condition.value as string[]) ?? []}
+							onselect={(values) => updateConditionAt(i, { value: values })}
+						/>
+					{:else if sig?.values === 'date'}
+						<DatePicker value={String(condition.value ?? '')}
+									onchange={(v) => updateConditionAt(i, { value: v })}/>
+					{:else if sig?.values === 'int' || sig?.values === 'float'}
+						<Input type="number" step={sig.values === 'float' ? 'any' : '1'}
+								value={String(condition.value ?? '')}
+								oninput={(e) => updateConditionAt(i, { value: (e.target as HTMLInputElement).value })}/>
+					{:else}
+						<Input type="text"
+								value={String(condition.value ?? '')}
+								placeholder="Enter value..."
+								oninput={(e) => updateConditionAt(i, { value: (e.target as HTMLInputElement).value })}/>
+					{/if}
+				{/if}
+			</div>
+
+			<!-- Remove Button -->
+			<Button.Root variant="outline" size="sm" onclick={() => removeConditionAt(i)} class="p-2">
+				<Fa icon={faTrash} size="sm" />
+			</Button.Root>
+		</div>
+	{/each}
+
+	<!-- Draft Row -->
+	{#if draftRow !== null}
+		<div class="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
+			<!-- Field Selector -->
+			<div class="flex-1">
+				<SelectWithSearch
+					options={fieldOptions}
+					value={draftRow.field}
+					placeholder="Select field..."
+					{...{ onSelect: (v: string) => updateDraftField(v) }}
+				/>
+			</div>
+
+			<!-- Operator Selector -->
+			<div class="w-20">
+				{#if draftRow.field}
+					{@const ops = getOperatorOptions(draftRow.field)}
+					{#if ops.length === 1}
+						<Button.Root variant="outline" disabled class="w-full">{ops[0]}</Button.Root>
+					{:else}
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								<Button.Root variant="outline" class="w-full">{draftRow.operator || '=='}</Button.Root>
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content>
+								{#each ops as op}
+									<DropdownMenu.Item onSelect={() => updateDraftOperator(op)}>
 										{op}
 									</DropdownMenu.Item>
 								{/each}
@@ -202,71 +306,40 @@
 
 			<!-- Value Input -->
 			<div class="flex-1">
-				{#if row.field}
-					{@const sig = getFieldSignature(row.field)}
+				{#if draftRow.field}
+					{@const sig = getFieldSignature(draftRow.field)}
 					{#if sig && Array.isArray(sig.values)}
-						<!-- Multi-select for enum values -->
 						<MultiSelectWithSearch
-							options={getValueOptions(row.field)}
-							bind:values={row.value}
+							options={getValueOptions(draftRow.field)}
+							values={(draftRow.value as string[]) ?? []}
+							onselect={(values) => updateDraftValue(values)}
 						/>
 					{:else if sig?.values === 'date'}
-						<!-- Date input -->
-						<Input.Root>
-							<input
-								type="date"
-								bind:value={row.value}
-								class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-							/>
-						</Input.Root>
+						<DatePicker value={String(draftRow.value ?? '')}
+								onchange={(v) => updateDraftValue(v)}/>
 					{:else if sig?.values === 'int' || sig?.values === 'float'}
-						<!-- Number input -->
-						<Input.Root>
-							<input
-								type="number"
-								step={sig.values === 'float' ? 'any' : '1'}
-								bind:value={row.value}
-								class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-							/>
-						</Input.Root>
+						<Input type="number" step={sig.values === 'float' ? 'any' : '1'}
+								value={String(draftRow.value ?? '')}
+								onchange={(e) => updateDraftValue((e.target as HTMLInputElement).value)}/>
 					{:else}
-						<!-- Text input -->
-						<Input.Root>
-							<input
-								type="text"
-								bind:value={row.value}
+						<Input value={String(draftRow.value ?? '')}
 								placeholder="Enter value..."
-								class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-							/>
-						</Input.Root>
+								onchange={(e) => updateDraftValue((e.target as HTMLInputElement).value)}/>
 					{/if}
 				{:else}
-					<Input.Root>
-						<input
-							type="text"
-							disabled
-							placeholder="Select field first..."
-							class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-						/>
-					</Input.Root>
+					<Input type="text" disabled placeholder="Select field first..."/>
 				{/if}
 			</div>
 
-			<!-- Remove Button -->
-			<Button.Root
-				variant="outline"
-				size="sm"
-				onclick={() => removeRow(row.id)}
-				disabled={rows.length === 1}
-				class="p-2"
-			>
+			<!-- Cancel Button -->
+			<Button.Root variant="outline" size="sm" onclick={cancelDraft} class="p-2">
 				<Fa icon={faTrash} size="sm" />
 			</Button.Root>
 		</div>
-	{/each}
+	{/if}
 
 	<!-- Add Filter Button -->
-	<Button.Root variant="outline" onclick={addRow} class="w-full">
+	<Button.Root variant="outline" onclick={startDraft} disabled={draftRow !== null} class="w-full">
 		<Fa icon={faPlus} class="mr-2" size="sm" />
 		Add Filter
 	</Button.Root>

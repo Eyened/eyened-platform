@@ -128,6 +128,7 @@ export class BrowserContext {
 				: (this.basicCondition ? [this.basicCondition] : []);
 
 		if (!query.length) return;
+		
 		return this.fetch(query);
 	}
 
@@ -163,9 +164,11 @@ export class BrowserContext {
 		params.set('page', page.toString());
 		params.set('limit', limit.toString());
 		params.set('conditions', encodeConditions(query));
-		params.set('query', this.queryMode); // 'studies' | 'instances'
 		params.set('order_by', String(this.sortBy));
 		params.set('order', this.sortDirection);
+		params.set('queryMode', this.queryMode);
+		params.set('displayMode', this.displayMode);
+		params.set('filterMode', this.filterMode);
 		goto(`?${params.toString()}`);
 
 		this.InstanceRepo.clear()
@@ -237,38 +240,37 @@ export class BrowserContext {
 }
 
 // Encoding helpers for URL round-trip
-function encodeValue(value: string | number | string[] | null): string {
-	if (value === null || value === undefined) return '';
-	if (Array.isArray(value)) return value.map(v => encodeURIComponent(String(v))).join(',');
-	return value.toString();
+function serializeValue(value: string | number | string[] | null): string {
+	// JSON string; do NOT pre-encode elements; callers will URI-encode once
+	return JSON.stringify(value);
 }
 
-function decodeValue(value: string): string | number | null {
-	if (value === '') return null;
-	return isNaN(Number(value)) ? value : Number(value);
+function deserializeValue(encoded: string): string | number | string[] | null {
+	// First-level decode of the whole JSON payload
+	const raw = decodeURIComponent(encoded);
+	return JSON.parse(raw);
+
 }
 
 export function encodeConditions(conditions: Condition[]): string {
-	const encodedConditions = conditions.map((condition) => {
+	return conditions.map((condition) => {
 		const encodedVariable = encodeURIComponent(condition.variable);
 		const encodedOperator = encodeURIComponent(condition.operator);
-		const encodedValue = encodeURIComponent(encodeValue(condition.value ?? null));
+		const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
 		return `${encodedVariable}:${encodedOperator}:${encodedValue}`;
-	});
-	return encodedConditions.join(';');
+	}).join(';');
 }
 
 export function decodeConditions(urlString: string): Condition[] {
 	if (urlString === '') return [];
-	const conditions = urlString.split(';').map((conditionString) => {
+	return urlString.split(';').map((conditionString) => {
 		const [variable, operator, value] = conditionString.split(':');
 		return {
 			variable: decodeURIComponent(variable) as Condition['variable'],
 			operator: decodeURIComponent(operator) as Condition['operator'],
-			value: decodeValue(decodeURIComponent(value))
+			value: deserializeValue(value)
 		} as Condition;
 	});
-	return conditions;
 }
 
 // URL param helpers for component compatibility

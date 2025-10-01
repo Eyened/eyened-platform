@@ -5,7 +5,6 @@
     import Dialogue from "$lib/Dialogue.svelte";
     import Popup from "$lib/Popup.svelte";
     import { setContext } from "svelte";
-    import '../app.css';
     
     let { children }: { children: any } = $props();
     
