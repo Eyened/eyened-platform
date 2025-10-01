@@ -85,16 +85,9 @@ export class GlobalContext {
     get segmentationsFilter() {
         return (a: SegmentationGET | FormAnnotationGET) => {
 
+            return true
 
-            if (this.user.username == 'test_user') {
-                // show everything for test user
-                return true;
-            }
 
-            if (a.creator.id == this.user.id) {
-                // always show own annotations
-                return true;
-            }
 
             // if (a.creator.isHuman) {
             //     return this.config.showOtherAnnotationsHuman;

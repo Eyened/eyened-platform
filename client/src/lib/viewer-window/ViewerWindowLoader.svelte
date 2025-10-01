@@ -53,7 +53,7 @@ Used to create the viewerwindow context.
     });
 </script>
 
-<canvas bind:this={mainCanvas} class="editor"></canvas>
+<canvas bind:this={mainCanvas} class="editor" id="mainCanvas"></canvas>
 
 {#await promise then viewerWindowContext}
     <ViewerWindow {viewerWindowContext} />

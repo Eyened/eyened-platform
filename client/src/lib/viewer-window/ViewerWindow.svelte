@@ -78,7 +78,7 @@ Keeps track of the main panels and the top row of images.
     </div>
 {/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div id="main" bind:this={main}>
+<div id="main" bind:this={main} class="dark">
     <div id="top" class="row">
         <div id="top-images">
             <TopRowImages />

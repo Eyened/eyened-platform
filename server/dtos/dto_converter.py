@@ -285,6 +285,7 @@ class DTOConverter:
         feature_get = DTOConverter.feature_to_get(feat) if feat is not None else None  # type: ignore[arg-type]
         return ModelSegmentationGET(
             id=ms.ModelSegmentationID,
+            image_instance_id=ms.ImageInstanceID,
             annotation_type="model_segmentation",
             depth=ms.Depth, height=ms.Height, width=ms.Width,
             sparse_axis=ms.SparseAxis,
@@ -326,7 +327,7 @@ class DTOConverter:
 
     # -------------------- Feature/Segmentation --------------------
     @staticmethod
-    def feature_to_get(feature: "Feature") -> FeatureGET:
+    def feature_to_get(feature: "Feature", segmentation_count: Optional[int] = None) -> FeatureGET:
         """Convert Feature ORM object to FeatureGET."""
         # Prefer a precomputed ORM property if available; otherwise gather from relationship
         child_ids = getattr(feature, "subfeature_ids_list", None)
@@ -340,6 +341,7 @@ class DTOConverter:
             subfeatures=feature.subfeatures_list,
             subfeature_ids=child_ids,
             date_inserted=feature.DateInserted,
+            segmentation_count=segmentation_count,
         )
 
     @staticmethod
@@ -347,6 +349,7 @@ class DTOConverter:
         """Convert Segmentation ORM object to SegmentationGET."""
         dto = SegmentationGET(
             id=seg.SegmentationID,
+            image_instance_id=seg.ImageInstanceID,
             annotation_type="grader_segmentation",
             depth=seg.Depth,
             height=seg.Height,

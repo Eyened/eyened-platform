@@ -566,6 +566,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/form-schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Form Schemas */
+        get: operations["list_form_schemas_form_schemas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/form-schemas/{form_schema_id}": {
         parameters: {
             query?: never;
@@ -899,13 +916,10 @@ export interface components {
         };
         /** Body_create_segmentation_segmentations_post */
         Body_create_segmentation_segmentations_post: {
-            /**
-             * Np Array
-             * Format: binary
-             */
-            np_array?: string;
             /** Metadata */
             metadata: string;
+            /** Np Array */
+            np_array?: string | null;
         };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
@@ -967,6 +981,8 @@ export interface components {
              * Format: date-time
              */
             date_inserted: string;
+            /** Segmentation Count */
+            segmentation_count?: number | null;
         };
         /**
          * FeaturePATCH
@@ -1039,8 +1055,6 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
-            /** Creator Id */
-            creator_id?: number | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
@@ -1310,6 +1324,8 @@ export interface components {
         };
         /** ModelSegmentationGET */
         ModelSegmentationGET: {
+            /** Image Instance Id */
+            image_instance_id: number;
             /** Depth */
             depth: number;
             /** Height */
@@ -1438,6 +1454,8 @@ export interface components {
         };
         /** SegmentationGET */
         SegmentationGET: {
+            /** Image Instance Id */
+            image_instance_id: number;
             /** Depth */
             depth: number;
             /** Height */
@@ -1848,6 +1866,63 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** SegmentationPOST */
+        SegmentationPOST: {
+            /** Image Instance Id */
+            image_instance_id: number;
+            /** Depth */
+            depth: number;
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
+            /**
+             * Sparse Axis
+             * @default null
+             */
+            sparse_axis: number | null;
+            /**
+             * Image Projection Matrix
+             * @default null
+             */
+            image_projection_matrix: number[][] | null;
+            /**
+             * Scan Indices
+             * @default null
+             */
+            scan_indices: number[] | null;
+            /**
+             * Threshold
+             * @default null
+             */
+            threshold: number | null;
+            /**
+             * Reference Segmentation Id
+             * @default null
+             */
+            reference_segmentation_id: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
+            /** Feature Id */
+            feature_id: number;
+            /**
+             * Subtask Id
+             * @default null
+             */
+            subtask_id: number | null;
+            $defs: {
+                /**
+                 * DataRepresentation
+                 * @enum {string}
+                 */
+                DataRepresentation: "Binary" | "DualBitMask" | "Probability" | "MultiLabel" | "MultiClass";
+                /**
+                 * Datatype
+                 * @enum {string}
+                 */
+                Datatype: "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F";
+            };
         };
     };
     responses: never;
@@ -3191,6 +3266,40 @@ export interface operations {
             };
         };
     };
+    list_form_schemas_form_schemas_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSchemaGET"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_form_schema_form_schemas__form_schema_id__get: {
         parameters: {
             query?: never;
@@ -3229,7 +3338,9 @@ export interface operations {
     };
     list_features_features_get: {
         parameters: {
-            query?: never;
+            query?: {
+                with_counts?: boolean;
+            };
             header?: {
                 authorization?: string;
             };

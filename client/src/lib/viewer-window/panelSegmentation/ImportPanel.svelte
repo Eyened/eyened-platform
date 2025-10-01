@@ -5,11 +5,11 @@
     import { SegmentationItem } from "$lib/webgl/segmentationItem";
     import { getContext } from "svelte";
 
-    import type { SegmentationGET } from "../../../types/openapi_types";
+    import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
     import ImportSegmentation from "../icons/ImportSegmentation.svelte";
     import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
     interface Props {
-        segmentation: SegmentationGET;
+        segmentation: SegmentationGET | ModelSegmentationGET;
         image: AbstractImage;
         segmentationItem: SegmentationItem;
     }

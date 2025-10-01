@@ -31,9 +31,7 @@
 		initParamState();
 		await browserContext.loadSignatures();
 		// After signatures are in state, optionally kick off a search if there are pre-existing conditions
-		if (browserContext.advancedConditions.length) {
-			await browserContext.search();
-		}
+		await browserContext.search();
 		initializing = false;
 	});
 
@@ -42,9 +40,6 @@
 		const params = page.url.searchParams;
 		// Retrieve the query parameters from the URL
 		const conds = decodeConditions(params.get('conditions') || '');
-		browserContext.loadConditions(conds);
-		// also prime basicCondition if single condition is present
-		if (conds.length === 1) browserContext.basicCondition = conds[0];
 
 		browserContext.page = parseInt(params.get('page') || '0', 10);
 		const limitParam = params.get('limit');
@@ -54,8 +49,19 @@
 		}
 
 		// new: query mode and sort
-		const qm = params.get('query');
+		const qm = params.get('queryMode');
 		if (qm === 'instances' || qm === 'studies') browserContext.queryMode = qm;
+
+		const dm = params.get('displayMode');
+		if (dm === 'instance' || dm === 'study') browserContext.displayMode = dm;
+
+		const fm = params.get('filterMode');
+		if (fm === 'basic' || fm === 'advanced') browserContext.filterMode = fm;
+		if (conds.length) {
+			if (fm === 'advanced') browserContext.advancedConditions = conds;
+			if (fm === 'basic') browserContext.basicCondition = conds[0];
+		}
+
 
 		const ob = params.get('order_by');
 		if (ob) browserContext.sortBy = ob as any;
@@ -76,6 +82,11 @@
 
 	// Handle limit as string for MySelect component
 	let limitAsString = $state(String(browserContext.limit));
+
+	const handleSearch = () => {
+		browserContext.page = 0;
+		browserContext.search();
+	}
 	
 	$effect(() => {
 		limitAsString = String(browserContext.limit);
@@ -131,7 +142,7 @@
 
 				<Button.Root
 					variant="default"
-					onclick={browserContext.search}
+					onclick={handleSearch}
 					class="text-sm mr-2 w-full"
 				>
 					Search

@@ -12,6 +12,8 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 
 
+
+
 def project_root() -> Path:
     """Return repository root (parent of `eyened_platform`)."""
     return Path(__file__).resolve().parents[1]
@@ -37,6 +39,7 @@ def load_fastapi_app() -> FastAPI:
     return app
 
 
+
 def main() -> None:
     """Generate OpenAPI JSON and write it to the given directory."""
     parser = argparse.ArgumentParser(
@@ -56,6 +59,15 @@ def main() -> None:
 
     app = load_fastapi_app()
     schema = app.openapi()
+
+    from server.dtos.dtos_main import SegmentationPOST
+    # these models are not automatically added by the fastapi openapi generator
+    # so we need to add them manually
+    models_to_add = [
+        SegmentationPOST,
+    ]
+    for model in models_to_add:
+        schema["components"]["schemas"][model.__name__] = model.model_json_schema(ref_template="#/components/schemas/{model}")
 
     out_file.write_text(json.dumps(schema, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"OpenAPI schema written to {out_file}")

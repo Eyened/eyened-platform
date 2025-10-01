@@ -19,7 +19,7 @@
     import BrushradiusControl from "./BrushradiusControl.svelte";
 
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
     import type { PaintSettings } from "$lib/webgl/mask.svelte";
     

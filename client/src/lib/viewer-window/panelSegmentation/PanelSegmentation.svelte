@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { getContext } from "svelte";
     import CreatorSegmentations from "./CreatorSegmentations.svelte";
     import DrawingTools from "./DrawingTools.svelte";
@@ -25,31 +25,16 @@
         mainViewerContext.active = active;
     });
 
-    const { segmentationContext, allSegmentations, allModelSegmentations } = mainViewerContext;
+    const segmentationContext = mainViewerContext.segmentationContext;
 
 
-    // iterate segmentations and add creators and models
-    for (const segmentation of allSegmentations) {
-        segmentationContext.creators.set(segmentation.creator.id, segmentation.creator);
-    }
-    const creatorIds = allSegmentations.map(s => s.creator.id);
-    segmentationContext.creatorIds = creatorIds;
-
-    for (const segmentation of allModelSegmentations) {
-        console.log(segmentation);
-        segmentationContext.models.set(segmentation.creator.id, segmentation.creator);
-    }
-    const modelIds = allModelSegmentations.map(s => s.creator.id);
-    segmentationContext.modelIds = modelIds;
-
-    segmentationContext.creatorIds = segmentationContext.creatorIds.filter(id => id !== creator.id);
 
 </script>
 
 <div class="main">
     <div class="models">
         <ul class="users">
-            {#each segmentationContext.orderedModels as model}
+            {#each segmentationContext.models.values() as model}
                 <li>
                     <ModelSegmentations {model} />
                 </li>
@@ -71,7 +56,12 @@
     </div>
 
     <ul class="users">
-        {#each segmentationContext.orderedCreators as creator_}
+        {#if segmentationContext.creators.has(creator.id)}
+            <li>
+                <CreatorSegmentations creator={segmentationContext.creators.get(creator.id)!} />
+            </li>
+        {/if}
+        {#each segmentationContext.creators.values() as creator_}
             {#if creator_.id != creator.id}
                 <li>
                     <CreatorSegmentations creator={creator_} />

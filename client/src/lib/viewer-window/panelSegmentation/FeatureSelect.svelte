@@ -1,12 +1,12 @@
 <script lang="ts">
-    import type { FilterList } from "$lib/datamodel/itemList";
+    import type { FeatureGET } from "../../../types/openapi_types";
 
     interface Named {
         name: string;
     }
 
     interface Props<T extends Named> {
-        values: FilterList<T>;
+        values: FeatureGET[];
         onselect: (value: T) => void;
     }
     let { values, onselect }: Props<any> = $props();
@@ -33,7 +33,7 @@
     </div>
 
     <ul>
-        {#each $filtered as feature}
+        {#each filtered as feature}
             <li class="item" onclick={() => onselect(feature)}>
                 {feature.name}
             </li>

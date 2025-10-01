@@ -1,13 +1,13 @@
 <script lang="ts">
     import { fromHex, toHex } from "$lib/utils";
-    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 
     import { getContext } from "svelte";
-    import type { SegmentationGET } from "../../../types/openapi_types";
+    import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
     import PanelIcon from "../icons/PanelIcon.svelte";
 
     interface Props {
-        segmentation: SegmentationGET;
+        segmentation: SegmentationGET | ModelSegmentationGET;
     }   
     let { segmentation }: Props = $props();
 

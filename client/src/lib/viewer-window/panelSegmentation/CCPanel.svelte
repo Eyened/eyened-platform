@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem";
     import { getContext } from "svelte";
     import { ConnectedComponents } from "../icons/icons";

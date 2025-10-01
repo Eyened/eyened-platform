@@ -1,4 +1,3 @@
-import type { GlobalContext } from "$lib/data/globalContext.svelte";
 // import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 import { toggleInSet, type Color } from "$lib/utils";
@@ -8,7 +7,8 @@ import { BinaryMask } from "$lib/webgl/mask.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type { SegmentationGET } from "../../../types/openapi_types";
+import type { ViewerWindowContext } from "../../viewer-window/viewerWindowContext.svelte";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
@@ -25,30 +25,15 @@ export class MainViewerContext implements Overlay {
     public highlightedFeatureIndex = $state<number | undefined>(undefined);
     public activeFeatureMask = $state<number | undefined>(undefined);
     public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
-    public readonly segmentationContext = new SegmentationContext();
-    public readonly allSegmentations: SegmentationGET[];
-    public readonly allModelSegmentations: ModelSegmentationGET[];
+    public readonly segmentationContext: SegmentationContext
+    
 
-    constructor(viewerContext: ViewerContext, globalContext: GlobalContext) {
-        const instance = viewerContext.image.instance;
-        this.allSegmentations = $derived(
-            instance.segmentations!.filter(globalContext.segmentationsFilter)
-                .filter((s) => s.sparse_axis == viewerContext.axis)
-        );
-        
-        this.allModelSegmentations = $derived(
-            instance.model_segmentations!.filter((s) => s.sparse_axis == viewerContext.axis)
-        );
-        // this.allSegmentations = new FilterList<SegmentationGET>(
-        //     instance.segmentations!
-        //     .filter(globalContext.segmentationsFilter)
-        //     .filter((s) => s.sparse_axis == viewerContext.axis)
-        // );
-
-        // this.allModelSegmentations = new FilterList<SegmentationGET>(
-        //     instance.model_segmentations!
-        //     .filter((s) => s.sparse_axis == viewerContext.axis)
-        // );
+    constructor(
+        public readonly instanceId: number,
+        public readonly axis: number,
+        public readonly viewerWindowContext: ViewerWindowContext
+    ) {
+        this.segmentationContext = new SegmentationContext(instanceId, axis, viewerWindowContext);
     }
 
     toggleMasking(segmentation: SegmentationItem) {
@@ -93,17 +78,14 @@ export class MainViewerContext implements Overlay {
             activeIndices: this.segmentationContext.activeIndices
         };
 
-        // for (const segmentation of this.segmentations.$) {
         for (const segmentation of this.segmentationContext.visibleSegmentations) {
             
-            // console.log('segmentation', segmentation);
 
             const segmentationItem = image.segmentationItems.get(segmentation);
             if (!segmentationItem) continue;
             const mask = segmentationItem.getMask(index);
 
             if (!mask) continue;
-            if (this.segmentationContext.hiddenCreatorIds.has(segmentation.creator.id)) continue;
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
             uniforms.u_threshold = segmentation.threshold;

@@ -3,9 +3,10 @@
     import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte";
     import { data } from "$lib/datamodel/model";
     import { Segmentation, type Datatype } from "$lib/datamodel/segmentation.svelte";
-    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext, onMount } from "svelte";
+    import * as Select from "../../components/ui/select";
 
     export interface Props {
         dataRepresentation: "MultiLabel" | "MultiClass";
@@ -32,13 +33,6 @@
         globalContext.features.all.filter(f => (f.subfeatures ?? []).length > 0)
     );
 
-    $effect(() => {
-        console.log(globalContext.features.all);
-    });
-
-    $effect(() => {
-        console.log(featuresWithSubfeatures);
-    });
 
     let selectedFeatureId: number | undefined = $state(undefined);
     async function create() {
@@ -65,16 +59,37 @@
     
 </script>
 
+<!-- <Select.Root type="single">
+  <Select.Trigger class="w-[180px]"></Select.Trigger>
+  <Select.Content>
+    <Select.Item value="light">Light</Select.Item>
+    <Select.Item value="dark">Dark</Select.Item>
+    <Select.Item value="system">System</Select.Item>
+  </Select.Content>
+</Select.Root> -->
+
 <div class="multi">
     <div class="header">{dataRepresentation}</div>
     <form onsubmit={create}>
-        <select bind:value={selectedFeatureId}>
+        <Select.Root type="single" bind:value={selectedFeatureId} size="xs">
+            <Select.Trigger class="w-[180px]">
+                {selectedFeatureId ? featuresWithSubfeatures.find(f => f.id === selectedFeatureId)?.name : "Select feature"}
+            </Select.Trigger>
+            <Select.Content>
+                {#each featuresWithSubfeatures as f}
+                    <Select.Item value={f.id}>
+                        {f.name}
+                    </Select.Item>
+                {/each}
+            </Select.Content>
+        </Select.Root>
+        <!-- <select bind:value={selectedFeatureId}>
             {#each featuresWithSubfeatures as f}
                 <option value={f.id}>
-                    {f.name} ({(f.subfeatures ?? []).join(', ')})
+                    {f.name}
                 </option>
             {/each}
-        </select>
+        </select> -->
         <button type="submit" disabled={selectedFeatureId == undefined}>
             Create
         </button>

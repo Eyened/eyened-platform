@@ -1,21 +1,21 @@
 <script lang="ts">
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
     import { colors } from "$lib/viewer/overlays/colors";
-    import type { MainViewerContext } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { getContext } from "svelte";
+    import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 
     interface Props {
-        segmentation: Segmentation;
+        segmentation: SegmentationGET | ModelSegmentationGET;
         active: boolean;
     }
     let { segmentation, active }: Props = $props();
 
-    const { compositeFeatures, dataRepresentation } = segmentation;
+    const { feature, data_representation } = segmentation;
 
     const groupType = {
         MultiLabel: "checkbox",
         MultiClass: "radio",
-    }[dataRepresentation as "MultiLabel" | "MultiClass"];
+    }[data_representation as "MultiLabel" | "MultiClass"];
 
     const mainViewerContext = getContext<MainViewerContext>(
         "mainViewerContext",
@@ -39,19 +39,19 @@
 
 <div class:hidden={!active}>
     <ul>
-        {#each $compositeFeatures as a}
+        {#each feature.subfeatures as subfeatureName, i}
             <li
-                onpointerenter={() => pointerEnter(a.featureIndex)}
+                onpointerenter={() => pointerEnter(i)}
                 onpointerleave={pointerLeave}
             >
                 <div class="feature-container">
                     <div
                         class="color-box"
                         style="background-color: rgb({colors[
-                            a.featureIndex - 1
+                            i - 1
                         ]});"
                     >
-                        {a.featureIndex}
+                        {i}
                     </div>
 
                     <label>
@@ -59,16 +59,16 @@
                             <input
                                 type="radio"
                                 bind:group={activeIndices}
-                                value={a.featureIndex}
+                                value={i}
                             />
-                            {a.childFeature.name}
+                            {subfeatureName}
                         {:else}
                             <input
                                 type="checkbox"
                                 bind:group={activeIndices}
-                                value={a.featureIndex}
+                                value={i}
                             />
-                            {a.childFeature.name}
+                            {subfeatureName}
                         {/if}
                     </label>
                 </div>
