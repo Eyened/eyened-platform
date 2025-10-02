@@ -4,7 +4,7 @@ import { toggleInSet, type Color } from "$lib/utils";
 import { SegmentationContext, type Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import { BinaryMask } from "$lib/webgl/mask.svelte";
-import { SegmentationItem } from "$lib/webgl/segmentationItem";
+import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ViewerWindowContext } from "../../viewer-window/viewerWindowContext.svelte";
