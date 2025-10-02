@@ -32,9 +32,7 @@ app_api.include_router(crud_resources.router)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Starting up with settings:")
-    
-    print(settings)
+    print(f"Starting up with settings:\n{settings}")
 
     if settings.database_root_password is not None:
         try:

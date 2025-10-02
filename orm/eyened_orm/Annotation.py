@@ -189,7 +189,7 @@ class AnnotationData(AnnotationDataBase, table=True):
     def path(self) -> Path:
         if not self.config:
             raise ValueError("Configuration not initialized")
-        return Path(self.config.annotations_path) / self.DatasetIdentifier
+        return self.config.annotations_path / self.DatasetIdentifier
 
     def load_data(self) -> Any:
         """Load the annotation data from the file."""
