@@ -1,5 +1,5 @@
 
-import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import type { CreatorMeta, ModelMeta, ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";

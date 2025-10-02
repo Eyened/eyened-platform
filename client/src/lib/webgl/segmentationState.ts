@@ -1,13 +1,15 @@
 import { ModelSegmentationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
 import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import type { Segmentation } from "../viewer-window/panelSegmentation/segmentationContext.svelte";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
 import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
 
-export const constructors = {
+type MaskConstructor = new (image: AbstractImage, segmentation: Segmentation) => Mask;
+export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'MultiClass' | 'MultiLabel', MaskConstructor> = {
     'Binary': BinaryMask,
     'DualBitMask': QuestionableMask,
     'Probability': ProbabilityMask,
@@ -27,11 +29,16 @@ export class SegmentationState {
         readonly image: AbstractImage,
         readonly segmentation: SegmentationGET | ModelSegmentationGET,
         readonly scanNr: number,
+        initialData?: DrawingArray,
     ) {
-        console.log(segmentation)
         this.mask = new constructors[segmentation.data_representation](image, segmentation);
         this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
-        this.isDrawing = this.initialize();
+        if (initialData) {
+            this.mask.importData(initialData);
+            this.history.checkpoint(this.mask.exportData());
+        } else {
+            this.isDrawing = this.initialize();
+        }
     }
 
     private async initialize() {
@@ -61,8 +68,18 @@ export class SegmentationState {
         const otherType = other.segmentation.data_representation as any;
         const threshold = (255 * (other.segmentation.threshold ?? 0.5));
 
-        const dataConverted = convert(data, otherType, thisType, threshold);
-        this.mask.importData(dataConverted);
+        function isSimpleRepresentation(t: DataRepresentation): t is SimpleDataRepresentation {
+            return t === 'Binary' || t === 'DualBitMask' || t === 'Probability';
+        }
+
+        if (isSimpleRepresentation(thisType) && isSimpleRepresentation(otherType)) {
+            const dataConverted = convert(data, otherType, thisType, threshold);
+            this.mask.importData(dataConverted);
+        } else if (thisType === otherType) {
+            this.mask.importData(data);
+        } else {
+            console.warn("SegmentationState.importOther: conversion not supported", otherType, "->", thisType);
+        }
 
         this.isDrawing = this.checkpoint();
     }

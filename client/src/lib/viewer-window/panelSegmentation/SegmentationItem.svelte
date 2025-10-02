@@ -26,7 +26,7 @@
         segmentation: Segmentation;
         style?: "AI" | "normal";
     }
-
+    
     let { segmentation, style = "normal" }: Props = $props();
     const segmentationObject = 
         segmentation.annotation_type == "grader_segmentation" ? 
@@ -127,6 +127,7 @@
     class="content"
     class:compact={style == "AI"}
     class:normal={style == "normal"}
+    class:loading={segmentationItem.loading}
     class:active
     onpointerenter={pointerEnter}
     onpointerleave={pointerLeave}
@@ -188,6 +189,11 @@
 
     {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
         <MultiFeatureSelector segmentation={segmentation} {active} />
+    {/if}
+    {#if segmentationItem.loading}
+        <div class="row">
+            <div class="loading">Loading segmentation…</div>
+        </div>
     {/if}
     {#if active}
         <div class="open" onclick={() => (collapsed = !collapsed)}>
@@ -256,9 +262,10 @@
     div.content {
         flex-direction: column;
     }
-    div.content.active {
-        /* border: 1px solid rgba(100, 255, 255, 0.3); */
+    div.content.loading {
+        opacity: 0.5;
     }
+    
     div.row {
         flex-direction: row;
         flex: 1;
@@ -300,5 +307,9 @@
     div.segmentationID,
     div.segmentationType {
         align-items: center;
+    }
+    div.loading {
+        font-size: 0.9em;
+        opacity: 0.8;
     }
 </style>

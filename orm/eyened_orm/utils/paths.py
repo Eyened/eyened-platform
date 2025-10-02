@@ -5,7 +5,8 @@ paths = {
     "Series": {"Study", "ImageInstance", "FormAnnotation", "Annotation"},
     "ImageInstance": {
         "Series",
-        "Annotation",
+        "Segmentation",
+        "ModelSegmentation",
         "FormAnnotation",
         "DeviceInstance",
         "Scan",
@@ -16,24 +17,32 @@ paths = {
     },
     "DeviceInstance": {"DeviceModel"},
     "DeviceModel": {"DeviceInstance"},
-    "Annotation": {
+    "Segmentation": {
         "ImageInstance",
-        "Patient",
-        "Study",
-        "Series",
-        "AnnotationData",
-        "AnnotationType",
         "Feature",
         "Creator",
-        "AnnotationTag",
+        "SubTask",
+        "SegmentationTag",
     },
-    "AnnotationData": {"Annotation"},
+    "ModelSegmentation": {
+        "ImageInstance",
+        "Model",
+    },    
+    "Model": {
+        "Feature",
+    },
     "FormAnnotation": {
         "ImageInstance",
         "Study",
         "Patient",
         "FormSchema",
         "Creator",
+    },
+    "Feature": {
+        "CompositeFeature",
+    },
+    "CompositeFeature": {
+        "Feature",
     },
     "Task": {"TaskDefinition", "TaskState", "SubTask"},
     "SubTask": {"Task", "TaskState", "Creator", "SubTaskImageLink"},

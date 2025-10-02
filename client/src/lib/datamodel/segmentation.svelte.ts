@@ -164,7 +164,7 @@ export class Segmentation extends BaseItem {
 
         const response = await api.post(Segmentation.endpoint, formData, 'form');
         const segmentation = await response.json();
-        const imported = importData({ [Segmentation.endpoint]: [segmentation] });
+        const imported = importData({ [Segmentation.endpoint]: [segmentation] }) as Record<string, any[]>;
 
         return imported[Segmentation.endpoint][0] as Segmentation;
     }
@@ -204,18 +204,24 @@ export class Segmentation extends BaseItem {
         if (scanNr != null) {
             params.append('scan_nr', scanNr.toString());
         }
-        const url = `${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
+        const endpoint = (this.constructor as typeof Segmentation).endpoint;
+        const url = `${endpoint}/${this.id}/data?${params.toString()}`;
 
         const response = await api.put(url, data, 'binary');
         const updatedSegmentation = await response.json();
         this.updateFields(updatedSegmentation);
     }
 
-    async loadData(scanNr: number): Promise<NPYArray> {
+    async loadData(scanNr?: number): Promise<NPYArray> {
         const params = new URLSearchParams();
-        params.append('axis', (this.sparseAxis ?? 0).toString());
-        params.append('scan_nr', scanNr.toString());
-        const url = `${Segmentation.endpoint}/${this.id}/data?${params.toString()}`;
+        if (this.sparseAxis != null && scanNr != undefined) {
+            params.append('axis', this.sparseAxis.toString());
+        }
+        if (scanNr != null) {
+            params.append('scan_nr', scanNr.toString());
+        }
+        const endpoint = (this.constructor as typeof Segmentation).endpoint;
+        const url = `${endpoint}/${this.id}/data?${params.toString()}`;
         const response = await api.get(url);
         return decodeNpy(await response.arrayBuffer());
     }
@@ -307,15 +313,6 @@ export class ModelSegmentation extends Segmentation {
 
     get feature(): Feature {
         return this.model.feature;
-    }
-
-    async loadData(scanNr: number): Promise<NPYArray> {
-        const params = new URLSearchParams();
-        params.append('axis', (this.sparseAxis ?? 0).toString());
-        params.append('scan_nr', scanNr.toString());
-        const url = `${ModelSegmentation.endpoint}/${this.id}/data?${params.toString()}`;
-        const response = await api.get(url);
-        return decodeNpy(await response.arrayBuffer());
     }
 }
 registerConstructor('model-segmentations', ModelSegmentation);

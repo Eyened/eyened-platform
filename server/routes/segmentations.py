@@ -265,14 +265,17 @@ async def get_segmentation_data(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
+    np_buf = io.BytesIO()
+    np.save(np_buf, arr)
+    raw = np_buf.getvalue()
+    gz = gzip.compress(raw)
 
-    
-    
-
-    buf = io.BytesIO()
-    np.save(buf, arr)
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="application/octet-stream")
+    headers = {
+        "Content-Encoding": "gzip",
+        "Content-Disposition": 'inline; filename="segmentation.npy.gz"',
+        "Content-Length": str(len(gz)),
+    }
+    return Response(content=gz, media_type="application/octet-stream", headers=headers)
 
 
 

@@ -2,7 +2,7 @@
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { SegmentationItem } from "$lib/webgl/segmentationItem";
+    import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
 
     import ImportSegmentation from "../icons/ImportSegmentation.svelte";

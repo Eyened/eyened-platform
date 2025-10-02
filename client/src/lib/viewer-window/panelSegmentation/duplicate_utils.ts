@@ -8,7 +8,7 @@ import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { DrawingArray } from "$lib/webgl/mask.svelte";
 import { convert } from "$lib/webgl/segmentationConverter";
-import type { SegmentationItem } from "$lib/webgl/segmentationItem";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
