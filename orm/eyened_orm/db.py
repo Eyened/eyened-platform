@@ -3,8 +3,7 @@ import os
 from pathlib import Path
 from typing import Generator, Optional
 
-from dotenv import load_dotenv
-from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig
+from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig, load_config_from_env_file, load_config_from_environ
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
@@ -42,14 +41,14 @@ class Database:
         if None, initialize with default values (taken from environment variables)
         """
         if isinstance(config, (Path, str)):
-            # load from .env file
+            # load from .env file without polluting process env
             if not Path(config).exists():
                 raise FileNotFoundError(f"File not found: {str(config)}")
-            load_dotenv(dotenv_path=config)
-            config = EyenedORMConfig()
+            print("loading from .env file", config)
+            config = load_config_from_env_file(config)
         elif config is None:
-            # initializes config with default values
-            config = EyenedORMConfig()
+            # initializes config from current process environment
+            config = load_config_from_environ(os.environ)
         elif isinstance(config, EyenedORMConfig):
             pass
         else:
@@ -59,7 +58,7 @@ class Database:
 
         conn_string = create_connection_string(self.config.database)
 
-        print("creating engine with connection string", conn_string)
+        # print("creating engine with connection string", conn_string)
         self.engine = create_engine(conn_string, pool_pre_ping=True)
 
         # Create session factory with custom session class

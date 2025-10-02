@@ -18,6 +18,7 @@
 
     const segmentations = $derived(segmentationContext.segmentations.filter((a) => a.creator.id == creator.id).sort((a, b) => a.id - b.id));
     const hidden = $derived(segmentationContext.creatorHidden.get(creator.id) ?? false);
+    // TODO: make all segmentations hidden by default
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

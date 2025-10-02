@@ -3,7 +3,7 @@ import { Matrix } from "$lib/matrix";
 import { SvelteMap } from "svelte/reactivity";
 import type { InstanceGET } from "../../types/openapi_types";
 import type { Segmentation } from "../viewer-window/panelSegmentation/segmentationContext.svelte";
-import { SegmentationItem } from "./segmentationItem";
+import { SegmentationItem } from "./segmentationItem.svelte";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 
