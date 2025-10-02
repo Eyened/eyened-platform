@@ -3,7 +3,7 @@
     import { page } from "$app/state";
     import { FormAnnotationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
     import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
-    import '../../app.css';
+    
 
 
     function getURLNums(param: string): number[] {

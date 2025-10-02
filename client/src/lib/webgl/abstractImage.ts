@@ -1,7 +1,8 @@
 // import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { Matrix } from "$lib/matrix";
 import { SvelteMap } from "svelte/reactivity";
-import type { InstanceGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import type { InstanceGET } from "../../types/openapi_types";
+import type { Segmentation } from "../viewer-window/panelSegmentation/segmentationContext.svelte";
 import { SegmentationItem } from "./segmentationItem";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
@@ -11,7 +12,8 @@ export abstract class AbstractImage {
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-    public readonly segmentationItems = new SvelteMap<SegmentationGET | ModelSegmentationGET, SegmentationItem>();
+    // mapping of segmentation gid to segmentation item
+    public readonly segmentationItems = new SvelteMap<string, SegmentationItem>();
     abstract texture: WebGLTexture;
 
     // in micrometers / pixel
@@ -41,15 +43,15 @@ export abstract class AbstractImage {
     abstract is3D: boolean;
     abstract is2D: boolean;
 
-    getSegmentationItem(segmentation: SegmentationGET | ModelSegmentationGET): SegmentationItem {
+    getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         // If the segmentationItem is already created, return it
-        if (this.segmentationItems.has(segmentation)) {
-            return this.segmentationItems.get(segmentation)!;
+        if (this.segmentationItems.has(segmentation.gid)) {
+            return this.segmentationItems.get(segmentation.gid)!;
         }
 
         // Create new segmentation item
         const segmentationItem = new SegmentationItem(this, segmentation);
-        this.segmentationItems.set(segmentation, segmentationItem);
+        this.segmentationItems.set(segmentation.gid, segmentationItem);
         return segmentationItem;
     }
 

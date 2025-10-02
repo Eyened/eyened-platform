@@ -3,24 +3,27 @@
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { converters } from "$lib/webgl/segmentationConverter";
     import { getContext } from "svelte";
-    import type { SegmentationGET } from "../../../types/openapi_types";
+    import type { MainViewerContext } from "../../viewer/overlays/MainViewerContext.svelte";
+    import { type Segmentation } from "./segmentationContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
+    const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+    const segmentationContext = mainViewerContext.segmentationContext;
+
     interface Props {
         image: AbstractImage;
-        segmentation: SegmentationGET;
+        segmentation: Segmentation;
         close: () => void;
-        resolve: (segmentation: SegmentationGET) => void;
+        resolve: (segmentation: Segmentation) => void;
     }
 
     let { image, segmentation, resolve, close }: Props = $props();
-const segmentationAnnotations = (image.instance.segmentations || [])
-    .concat(image.instance.model_segmentations || [])
-    .filter(globalContext.segmentationsFilter);
+    const segmentationAnnotations = segmentationContext.segmentations
+        .filter(globalContext.segmentationsFilter);
 
     const referenceSegmentations = segmentationAnnotations
-        .filter((s) => s != segmentation)
+        .filter((s) => s.gid != segmentation.gid)
         .filter((other) => {
             const from = segmentation.data_representation;
             const to = other.data_representation;
@@ -30,7 +33,7 @@ const segmentationAnnotations = (image.instance.segmentations || [])
             return from == to || key in converters;
         });
 
-    function _resolve(segmentation: SegmentationGET) {
+    function _resolve(segmentation: Segmentation) {
         resolve(segmentation);
         close();
     }

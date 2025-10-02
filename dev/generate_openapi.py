@@ -60,11 +60,12 @@ def main() -> None:
     app = load_fastapi_app()
     schema = app.openapi()
 
-    from server.dtos.dtos_main import SegmentationPOST
+    from server.dtos.dtos_main import SegmentationPOST, SegmentationBase
     # these models are not automatically added by the fastapi openapi generator
     # so we need to add them manually
     models_to_add = [
         SegmentationPOST,
+        SegmentationBase,
     ]
     for model in models_to_add:
         schema["components"]["schemas"][model.__name__] = model.model_json_schema(ref_template="#/components/schemas/{model}")

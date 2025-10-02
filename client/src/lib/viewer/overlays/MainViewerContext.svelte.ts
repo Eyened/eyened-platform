@@ -1,13 +1,12 @@
 // import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
 
 import { toggleInSet, type Color } from "$lib/utils";
-import { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+import { SegmentationContext, type Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import { BinaryMask } from "$lib/webgl/mask.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import type { SegmentationGET } from "../../../types/openapi_types";
 import type { ViewerWindowContext } from "../../viewer-window/viewerWindowContext.svelte";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
@@ -15,7 +14,7 @@ import { colors } from "./colors";
 
 export class MainViewerContext implements Overlay {
 
-    private featureColors = new SvelteMap<SegmentationGET, Color>();
+    private featureColors = new SvelteMap<Segmentation, Color>();
     
     public readonly applyConnectedComponents = new SvelteSet<SegmentationItem>();
     public readonly applyMasking = new SvelteSet<SegmentationItem>();
@@ -44,12 +43,12 @@ export class MainViewerContext implements Overlay {
         toggleInSet(this.applyConnectedComponents, segmentationItem);
     }
 
-    setFeatureColor(segmentation: SegmentationGET, color: Color) {
+    setFeatureColor(segmentation: Segmentation, color: Color) {
         this.featureColors.set(segmentation, color);
     }
 
     private _colorIndex = 0;
-    getFeatureColor(segmentation: SegmentationGET): Color {
+    getFeatureColor(segmentation: Segmentation): Color {
         let color = this.featureColors.get(segmentation);
         if (!color) {
             color = colors[(this._colorIndex++) % colors.length];
@@ -80,12 +79,16 @@ export class MainViewerContext implements Overlay {
 
         for (const segmentation of this.segmentationContext.visibleSegmentations) {
             
-
-            const segmentationItem = image.segmentationItems.get(segmentation);
+            const segmentationItem = image.segmentationItems.get(segmentation.gid);
             if (!segmentationItem) continue;
+
+            
             const mask = segmentationItem.getMask(index);
 
             if (!mask) continue;
+            // console.log(image.segmentationItems)
+
+            
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
             uniforms.u_threshold = segmentation.threshold;

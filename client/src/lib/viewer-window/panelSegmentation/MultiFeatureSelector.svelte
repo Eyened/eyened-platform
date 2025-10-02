@@ -2,10 +2,10 @@
     import { colors } from "$lib/viewer/overlays/colors";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { getContext } from "svelte";
-    import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+    import { type Segmentation } from "./segmentationContext.svelte";
 
     interface Props {
-        segmentation: SegmentationGET | ModelSegmentationGET;
+        segmentation: Segmentation;
         active: boolean;
     }
     let { segmentation, active }: Props = $props();

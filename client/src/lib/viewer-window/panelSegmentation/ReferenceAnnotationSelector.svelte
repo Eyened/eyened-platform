@@ -1,9 +1,9 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { getContext } from "svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
+    import { type Segmentation } from "./segmentationContext.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -35,7 +35,7 @@
     {:else}
         <ul>
             {#each referenceAnnotations as reference}
-                {@const current = reference.id == segmentation.referenceId}
+                {@const current = reference.id == segmentation.reference_segmentation_id}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <li onclick={() => _resolve(reference)} class:current>

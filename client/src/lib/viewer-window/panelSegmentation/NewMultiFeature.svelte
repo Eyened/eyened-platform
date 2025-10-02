@@ -1,18 +1,18 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte";
-    import { data } from "$lib/datamodel/model";
-    import { Segmentation, type Datatype } from "$lib/datamodel/segmentation.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext, onMount } from "svelte";
     import * as Select from "../../components/ui/select";
+    import { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
     export interface Props {
         dataRepresentation: "MultiLabel" | "MultiClass";
     }
 
     const { dataRepresentation }: Props = $props();
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
         const { image, axis } = viewerContext;
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -22,7 +22,6 @@
     const segmentationContext = mainViewerContext.segmentationContext;
     const { user: creator } = globalContext;
     const compositeFeatures = getCompositeFeatures();
-    const features = data.features;
 
     onMount(async () => {
         await globalContext.ensureFeaturesLoaded();
@@ -42,18 +41,17 @@
         globalContext.dialogue = `Creating annotation...`;
 
         let dataType: Datatype = "R8UI";
-        const feature = features.get(selectedFeatureId)!; // datamodel Feature instance
 
-        await Segmentation.createFrom(
+        await viewerWindowContext.Segmentations.createFrom(
             image,
-            feature,
-            creator,
+            selectedFeatureId,
             dataRepresentation,
             dataType,
             0.5,
             axis,
         );
-        segmentationContext.hiddenCreators.delete(creator);
+        segmentationContext.creatorHidden.set(creator.id, false);
+
         globalContext.dialogue = null;
     }
     

@@ -3,11 +3,11 @@
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 
     import { getContext } from "svelte";
-    import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
     import PanelIcon from "../icons/PanelIcon.svelte";
+    import { type Segmentation } from "./segmentationContext.svelte";
 
     interface Props {
-        segmentation: SegmentationGET | ModelSegmentationGET;
+        segmentation: Segmentation;
     }   
     let { segmentation }: Props = $props();
 

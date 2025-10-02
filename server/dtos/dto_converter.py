@@ -195,12 +195,12 @@ class DTOConverter:
         if with_segmentations:
             dto.segmentations = [
                 DTOConverter.segmentation_to_get(s, with_tag_metadata=with_tag_metadata)
-                for s in (getattr(image_instance, "Segmentations", []) or [])
+                for s in (getattr(image_instance, "Segmentations", []) or []) if not s.Inactive
             ]
         if with_form_annotations:
             dto.form_annotations = [
                 DTOConverter.form_annotation_to_get(fa, with_tag_metadata=with_tag_metadata)
-                for fa in (getattr(image_instance, "FormAnnotations", []) or [])
+                for fa in (getattr(image_instance, "FormAnnotations", []) or []) if not fa.Inactive
             ]
         if with_model_segmentations:
             dto.model_segmentations = [

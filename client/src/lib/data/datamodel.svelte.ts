@@ -163,8 +163,8 @@ export class DataObject<TGet extends { id: Id }, TPatch = Partial<TGet>> {
 	public readonly id: Id;
 	private _local: TGet | undefined = $state(undefined);
 
-	constructor( obj: TGet, _repo?: Repo<TGet, any, TPatch, any, any>) {
-		this.repo = _repo;
+	constructor( obj: TGet, repo?: Repo<TGet, any, TPatch, any, any>) {
+		this.repo = repo;
 		this.id = obj.id;
 		if (!this.repo) {
 			this._local = obj;

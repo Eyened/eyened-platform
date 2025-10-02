@@ -3,11 +3,11 @@
     import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import { PanelIcon, Show, Trash } from "../icons/icons";
+    import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
     import StringDialogue from "$lib/StringDialogue.svelte";
-    import type { ModelSegmentationObject, SegmentationObject } from "../../data/objects.svelte";
+    import { ModelSegmentationObject, SegmentationObject } from "../../data/objects.svelte";
     import AI from "../icons/AI.svelte";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import CCPanel from "./CCPanel.svelte";
@@ -17,18 +17,23 @@
     import ImportPanel from "./ImportPanel.svelte";
     import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
     import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
+    import type { Segmentation } from "./segmentationContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
 
     interface Props {
-        segmentation: SegmentationObject | ModelSegmentationObject;
+        segmentation: Segmentation;
         style?: "AI" | "normal";
     }
 
     let { segmentation, style = "normal" }: Props = $props();
-    const feature = segmentation.$.feature;
-    const dataRepresentation = segmentation.$.data_representation;
+    const segmentationObject = 
+        segmentation.annotation_type == "grader_segmentation" ? 
+        new SegmentationObject(segmentation, viewerWindowContext.Segmentations) : 
+        new ModelSegmentationObject(segmentation, viewerWindowContext.ModelSegmentations);
+    const feature = segmentation.feature;
+    const dataRepresentation = segmentation.data_representation;
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
@@ -39,9 +44,9 @@
 
     const { segmentationContext } = mainViewerContext;
 
-    // segmentationContext.visibleSegmentations.add(segmentation);
+    const visible = $derived(segmentationContext.segmentationsVisible.get(segmentation.gid) ?? true);
 
-    const segmentationItem = image.getSegmentationItem(segmentation.$);
+    const segmentationItem = image.getSegmentationItem(segmentation);
     let segmentationState = $derived(
         segmentationItem.getSegmentationState(viewerContext.index),
     );
@@ -49,9 +54,9 @@
     async function removeAnnotation() {
         const resolve = () => {
             // remove from database on server
-            segmentation.destroy();
+            segmentationObject.destroy();
             segmentationContext.toggleActive(undefined);
-            segmentationItem.dispose();
+            // segmentationItem.dispose();
         };
 
         globalContext.dialogue = {
@@ -66,22 +71,14 @@
     }
 
     function toggleShow() {
-        if (segmentation.objectType == "Segmentation") {
-            segmentationContext.toggleShowSegmentation(segmentation.$.id);
-        } else {
-            segmentationContext.toggleShowModelSegmentation(segmentation.$.id);
-        }
+        segmentationContext.toggleShowSegmentation(segmentation.gid);
     }
 
     function showOnly() {
-        if (segmentation.objectType == "Segmentation") {
-            segmentationContext.showOnlySegmentation(segmentation.$.id);
-        } else {
-            segmentationContext.showOnlyModelSegmentation(segmentation.$.id);
-        }
+        segmentationContext.showOnlySegmentation(segmentation.gid);
     }
 
-    const isEditable = globalContext.canEdit(segmentation.$);
+    const isEditable = globalContext.canEdit(segmentation);
     function activate() {
         segmentationContext.toggleActive(segmentationItem);
     }
@@ -111,7 +108,7 @@
     function applyDuplicate() {
         duplicate(
             globalContext,
-            segmentation.$,
+            segmentation,
             segmentationItem,
             image,
             viewerContext,
@@ -136,17 +133,26 @@
 >
     <div class="row">
         <div>
-            <PanelIcon
-                onclick={toggleShow}
-                onrightclick={showOnly}
-                tooltip="Hide"
-                Icon={Show}
-            />
+            {#if visible}
+                <PanelIcon
+                    onclick={toggleShow}
+                    onrightclick={showOnly}
+                    tooltip="Hide"
+                    Icon={Show}
+                />
+            {:else}
+                <PanelIcon
+                    onclick={toggleShow}
+                    onrightclick={showOnly}
+                    tooltip="Show"
+                    Icon={Hide}
+                />
+            {/if}
             
         </div>
 
         {#if !(dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass")}
-            <FeatureColorPicker segmentation={segmentation.$} />
+            <FeatureColorPicker segmentation={segmentation} />
         {/if}
 
         <div class="expand" onclick={activate}>
@@ -170,7 +176,7 @@
     {#if dataRepresentation == "Probability"}
         {#if active}
             <div class="row">
-                <ThresholdSlider segmentation={segmentation.$} />
+                <ThresholdSlider segmentation={segmentation} />
             </div>
         {/if}
     {/if}
@@ -181,7 +187,7 @@
     {/if}
 
     {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
-        <MultiFeatureSelector segmentation={segmentation.$} {active} />
+        <MultiFeatureSelector segmentation={segmentation} {active} />
     {/if}
     {#if active}
         <div class="open" onclick={() => (collapsed = !collapsed)}>
@@ -197,7 +203,7 @@
                 {#if isEditable}
                     <div class="row">
                         <ImportPanel
-                            segmentation={segmentation.$}
+                            segmentation={segmentation}
                             {image}
                             {segmentationItem}
                         />
@@ -206,7 +212,7 @@
                 <div class="row">
                     {#if segmentationState}
                         <DuplicateAnnotationPanel
-                            segmentation={segmentation.$}
+                            segmentation={segmentation}
                             {image}
                             {segmentationItem}
                         />
@@ -215,7 +221,7 @@
 
                 <div class="row">
                     <ReferenceSegmentationPanel
-                        segmentation={viewerWindowContext.Segmentations.object(segmentation.$.id)}
+                        segmentation={viewerWindowContext.Segmentations.object(segmentation.id)}
                         {image}
                         {isEditable}
                         {segmentationItem}

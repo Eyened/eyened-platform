@@ -4,10 +4,13 @@ import { SvelteMap } from "svelte/reactivity";
 import type { CreatorMeta, ModelMeta, ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
+export type Segmentation = (SegmentationGET | ModelSegmentationGET) & {
+    gid: string
+}
+
 export class SegmentationContext {
 
-    public segmentations: SegmentationGET[];
-    public modelSegmentations: ModelSegmentationGET[];
+    public segmentations: Segmentation[];
     
     public creators: SvelteMap<number, CreatorMeta>;
     public models: SvelteMap<number, ModelMeta>;
@@ -16,10 +19,10 @@ export class SegmentationContext {
     public modelHidden: SvelteMap<number, boolean>;
 
     // public readonly visibleSegmentations = new SvelteSet<SegmentationGET>();
-    public readonly segmentationsVisible: SvelteMap<number, boolean>;
-    public readonly modelSegmentationsVisible: SvelteMap<number, boolean>;
+    public readonly segmentationsVisible: SvelteMap<string, boolean>;
+    // public readonly modelSegmentationsVisible: SvelteMap<number, boolean>;
 
-    public readonly visibleSegmentations: (SegmentationGET | ModelSegmentationGET)[];
+    public readonly visibleSegmentations: Segmentation[];
 
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
@@ -34,24 +37,31 @@ export class SegmentationContext {
         public readonly viewerWindowContext: ViewerWindowContext,
     ) { 
         // this.segmentations = $derived(instance.segmentations!.filter((s) => s.sparse_axis == axis));
-        this.segmentations = $derived(viewerWindowContext.Segmentations.all.filter((s) => s.image_instance_id == instanceId && s.sparse_axis == axis));
-        this.modelSegmentations = $derived(viewerWindowContext.ModelSegmentations.all.filter((s) => s.image_instance_id == instanceId && s.sparse_axis == axis));
+        this.segmentations = $derived(
+            [...viewerWindowContext.Segmentations.all, ...viewerWindowContext.ModelSegmentations.all]
+            .filter((s) => s.image_instance_id == instanceId && s.sparse_axis == axis)
+            .map(s => ({
+                ...s,
+                id: s.id,
+                gid: `${s.annotation_type}-${s.id}`,
+        })));
 
-        // this.modelSegmentations = $derived(instance.model_segmentations!.filter((s) => s.sparse_axis == axis));
+        this.creators = $derived(new SvelteMap<number, CreatorMeta>(
+            this.segmentations.filter(s => s.annotation_type == "grader_segmentation")
+            .map(s => [s.creator.id, s.creator])));
 
-        this.creators = $derived(new SvelteMap<number, CreatorMeta>(this.segmentations.map(s => [s.creator.id, s.creator])));
+        this.models = $derived(new SvelteMap<number, ModelMeta>(
+            this.segmentations.filter(s => s.annotation_type == "model_segmentation")
+            .map(s => [s.creator.id, s.creator])));
 
-        this.models = $derived(new SvelteMap<number, ModelMeta>(this.modelSegmentations.map(s => [s.creator.id, s.creator])));
 
-        this.creatorHidden = new SvelteMap<number, boolean>(this.segmentations.map(s => [s.creator.id, false]));
-        this.modelHidden = new SvelteMap<number, boolean>(this.modelSegmentations.map(s => [s.creator.id, false]));
+        this.creatorHidden = new SvelteMap<number, boolean>(this.creators.keys().map(id => [id, false]));
+        this.modelHidden = new SvelteMap<number, boolean>(this.models.keys().map(id => [id, false]));
         
-        this.segmentationsVisible = new SvelteMap<number, boolean>(this.segmentations.map(s => [s.id, true]));
-        this.modelSegmentationsVisible = new SvelteMap<number, boolean>(this.modelSegmentations.map(s => [s.id, true]));
+        this.segmentationsVisible = new SvelteMap<string, boolean>(this.segmentations.map(s => [s.gid, true]));
 
-        this.visibleSegmentations = $derived(Array.from(this.segmentationsVisible.entries()).filter(([id, visible]) => visible).map(([id, visible]) => viewerWindowContext.Segmentations.store[id]));
+        this.visibleSegmentations = $derived(this.segmentations.filter(s => this.segmentationsVisible.get(s.gid) ?? true));
 
-        console.log(this.visibleSegmentations);
     }
 
     toggleShowCreator(creatorId: number) {
@@ -64,40 +74,23 @@ export class SegmentationContext {
         this.modelHidden.set(modelId, !currentValue);
     }
         
-    toggleShowSegmentation(segmentationId: number) {
-        const currentValue = this.segmentationsVisible.get(segmentationId) ?? true;
-        this.segmentationsVisible.set(segmentationId, !currentValue);
-    }
-
-    toggleShowModelSegmentation(modelSegmentationId: number) {
-        const currentValue = this.modelSegmentationsVisible.get(modelSegmentationId) ?? true;
-        this.modelSegmentationsVisible.set(modelSegmentationId, !currentValue);
+    toggleShowSegmentation(gid: string) {
+        const currentValue = this.segmentationsVisible.get(gid) ?? true;
+        this.segmentationsVisible.set(gid, !currentValue);
     }
 
     hideAll() {
         // Hide all segmentations
-        for (const [id] of this.segmentationsVisible) {
-            this.segmentationsVisible.set(id, false);
-        }
-        
-        // Hide all model segmentations
-        for (const [id] of this.modelSegmentationsVisible) {
-            this.modelSegmentationsVisible.set(id, false);
+        for (const [gid] of this.segmentationsVisible) {
+            this.segmentationsVisible.set(gid, false);
         }
     }
 
-    showOnlySegmentation(segmentationId: number) {
+    showOnlySegmentation(gid: string) {
         this.hideAll();
         
         // Show only the specified segmentation
-        this.segmentationsVisible.set(segmentationId, true);
-    }
-
-    showOnlyModelSegmentation(modelSegmentationId: number) {
-
-        this.hideAll();
-        
-        this.modelSegmentationsVisible.set(modelSegmentationId, true);
+        this.segmentationsVisible.set(gid, true);
     }
 
     toggleActive(segmentationItem: SegmentationItem | undefined) {

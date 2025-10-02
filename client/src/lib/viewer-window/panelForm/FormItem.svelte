@@ -5,7 +5,7 @@
     import { openNewWindow } from "$lib/newWindow";
     import type { TaskContext } from "$lib/types";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
+    import { getContext, type ComponentProps } from "svelte";
     import Duplicate from "../icons/Duplicate.svelte";
     import { PanelIcon, Trash } from "../icons/icons";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
@@ -63,7 +63,7 @@
         if (window) {
             window.close();
         }
-        const props = { form, formAnnotationRepo, viewerContext, canEdit: canEditForm } as const;
+        const props: ComponentProps<typeof FormItemContent> = { form, formAnnotationRepo, globalContext, viewerContext, canEdit: canEditForm };
 
         window = openNewWindow(
             FormItemContent,

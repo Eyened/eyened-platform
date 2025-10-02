@@ -27,7 +27,9 @@
 
     const segmentationContext = mainViewerContext.segmentationContext;
 
-
+    $effect(() => {
+        console.log(segmentationContext.visibleSegmentations);
+    });
 
 </script>
 

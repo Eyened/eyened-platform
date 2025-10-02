@@ -6,25 +6,30 @@
     import SchemaForm from "$lib/forms/SchemaForm.svelte";
     import { getDefault, resolveRefs } from "$lib/forms/schemaType";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext, onMount, setContext } from "svelte";
+    import { onMount, setContext } from "svelte";
 
     interface Props {
+        globalContext: GlobalContext;
+        viewerContext: ViewerContext;
         form: FormAnnotationObject;
         formAnnotationRepo: FormAnnotationsRepo;
-        viewerContext: ViewerContext;
         canEdit: boolean;
     }
-    let { form, formAnnotationRepo, viewerContext, canEdit }: Props = $props();
+    let { form, formAnnotationRepo, viewerContext, canEdit, globalContext }: Props = $props();
     setContext("viewerContext", viewerContext);
-    const globalContext = getContext<GlobalContext>("globalContext");
 
     // Schema from repo'd store
     const schemaRow = $derived(globalContext.formSchemas.store[form.$.form_schema_id]);
     const schema = $derived(resolveRefs(schemaRow?.schema ?? {}));
 
+    $effect(() => {
+        console.log(schema);
+    });
+
     let value: any = $state();
     let status = $state("loading");
     onMount(async () => {
+        await globalContext.ensureFormSchemasLoaded();
         value = await formAnnotationRepo.getValue(Number(form.id));
         status = "ready";
         if (!value) value = getDefault(schema);
