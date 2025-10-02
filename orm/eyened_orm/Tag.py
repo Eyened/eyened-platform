@@ -1,59 +1,170 @@
-from typing import ClassVar
-from sqlalchemy import Index
-from sqlmodel import Field
-from .base import Base
+from __future__ import annotations
 
-class TagBase(Base):
-    TagName: str = Field(max_length=256, unique=True)
+import enum
+from datetime import datetime
+from typing import TYPE_CHECKING, List
 
-class Tag(TagBase, table=True):
+from sqlalchemy import Column, ForeignKey, String, Table, func, select, Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, Session, relationship
+
+from eyened_orm.base import Base, ForeignKeyIndex, CompositeUniqueConstraint
+
+if TYPE_CHECKING:
+    from eyened_orm import Study, ImageInstance, Annotation, Segmentation, FormAnnotation, Creator
+
+class TagType(enum.Enum):
+    Study = "Study"
+    ImageInstance = "ImageInstance"
+    Annotation = "Annotation"
+    Segmentation = "Segmentation"
+    FormAnnotation = "FormAnnotation"
+
+
+class CreatorTagLink(Base):
+    __tablename__ = "CreatorTag"
+    __table_args__ = (
+        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+    )
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID", ondelete="CASCADE"), primary_key=True)
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Tag: Mapped["Tag"] = relationship(back_populates="CreatorTagLinks")
+    Creator: Mapped["Creator"] = relationship(back_populates="StarredTags")
+
+
+class Tag(Base):
     __tablename__ = "Tag"
-    _name_column: ClassVar[str] = "TagName"
-
-    TagID: int = Field(primary_key=True)
-
-
-class SegmentationTag(Base, table=True):
-    __tablename__ = "SegmentationTag"
     __table_args__ = (
-        Index("fk_SegmentationTag_Tag1_idx", "TagID"),
-        Index("fk_SegmentationTag_Segmentation1_idx", "SegmentationID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
-    
-    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
-    SegmentationID: int = Field(foreign_key="Segmentation.SegmentationID", primary_key=True)   
+    TagID: Mapped[int] = mapped_column(primary_key=True)
+    TagName: Mapped[str] = mapped_column(String(256), unique=True)
+    TagType: Mapped[TagType] = mapped_column(SAEnum(TagType))
 
+    TagDescription: Mapped[str] = mapped_column(String(256))
 
-class FormAnnotationTag(Base, table=True):
-    __tablename__ = "FormAnnotationTag"
-    __table_args__ = (
-        Index("fk_FormAnnotationTag_Tag1_idx", "TagID"),
-        Index("fk_FormAnnotationTag_FormAnnotation1_idx", "FormAnnotationID"),
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    CreatorTagLinks: Mapped[List["CreatorTagLink"]] = relationship(
+        back_populates="Tag",
+        passive_deletes=True,
+        lazy="selectin"
     )
 
-    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
-    FormAnnotationID: int = Field(foreign_key="FormAnnotation.FormAnnotationID", primary_key=True)
+    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
+    )
+    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
+    )
+    AnnotationTagLinks: Mapped[List["AnnotationTagLink"]] = relationship(
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
+    )
+    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
+    )
+    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(
+        back_populates="Tag", 
+        passive_deletes=True, 
+        lazy="selectin"
+    )
+
+    Creator: Mapped["Creator"] = relationship(back_populates="Tags")
 
 
-class StudyTag(Base, table=True):
+class StudyTagLink(Base):
     __tablename__ = "StudyTag"
     __table_args__ = (
-        Index("fk_StudyTag_Tag1_idx", "TagID"),
-        Index("fk_StudyTag_Study1_idx", "StudyID"),
+        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+        ForeignKeyIndex(__tablename__, "Study", "StudyID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    StudyID: Mapped[int] = mapped_column(ForeignKey("Study.StudyID", ondelete="CASCADE"), primary_key=True)
 
-    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
-    StudyID: int = Field(foreign_key="Study.StudyID", primary_key=True)
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
+    Tag: Mapped["Tag"] = relationship(back_populates="StudyTagLinks")
+    Study: Mapped["Study"] = relationship(back_populates="StudyTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
 
-class ImageInstanceTag(Base, table=True):
+class ImageInstanceTagLink(Base):
     __tablename__ = "ImageInstanceTag"
     __table_args__ = (
-        Index("fk_ImageInstanceTag_Tag1_idx", "TagID"),
-        Index("fk_ImageInstanceTag_ImageInstance1_idx", "ImageInstanceID"),
+        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+        ForeignKeyIndex(__tablename__, "ImageInstance", "ImageInstanceID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    ImageInstanceID: Mapped[int] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"), primary_key=True)
 
-    TagID: int = Field(foreign_key="Tag.TagID", primary_key=True)
-    ImageInstanceID: int = Field(
-        foreign_key="ImageInstance.ImageInstanceID", primary_key=True
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Tag: Mapped["Tag"] = relationship(back_populates="ImageInstanceTagLinks")
+    ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="ImageInstanceTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+
+class AnnotationTagLink(Base):
+    __tablename__ = "AnnotationTag"
+    __table_args__ = (
+        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+        ForeignKeyIndex(__tablename__, "Annotation", "AnnotationID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    AnnotationID: Mapped[int] = mapped_column(ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True)
+
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Tag: Mapped["Tag"] = relationship(back_populates="AnnotationTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+
+
+class SegmentationTagLink(Base):
+    __tablename__ = "SegmentationTag"
+    __table_args__ = (
+        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+        ForeignKeyIndex(__tablename__, "Segmentation", "SegmentationID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+    )
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    SegmentationID: Mapped[int] = mapped_column(ForeignKey("Segmentation.SegmentationID", ondelete="CASCADE"), primary_key=True)
+
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Tag: Mapped["Tag"] = relationship(back_populates="SegmentationTagLinks")
+    Segmentation: Mapped["Segmentation"] = relationship(back_populates="SegmentationTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+
+
+class FormAnnotationTagLink(Base):
+    __tablename__ = "FormAnnotationTag"
+    __table_args__ = (
+        ForeignKeyIndex(__tablename__, "Tag", "TagID"),
+        ForeignKeyIndex(__tablename__, "FormAnnotation", "FormAnnotationID"),
+        ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+    )
+    TagID: Mapped[int] = mapped_column(ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True)
+    FormAnnotationID: Mapped[int] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"), primary_key=True)
+
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Tag: Mapped["Tag"] = relationship(back_populates="FormAnnotationTagLinks")
+    FormAnnotation: Mapped["FormAnnotation"] = relationship(back_populates="FormAnnotationTagLinks")
+    Creator: Mapped["Creator"] = relationship(lazy="selectin")

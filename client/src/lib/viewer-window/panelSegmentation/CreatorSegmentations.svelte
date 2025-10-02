@@ -1,45 +1,38 @@
 <script lang="ts">
-    import type { Creator } from "$lib/datamodel/creator.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { getContext } from "svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { CreatorMeta } from "../../../types/openapi_types";
+    import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import SegmentationItem from "./SegmentationItem.svelte";
-    import { data } from "$lib/datamodel/model";
 
     interface Props {
-        creator: Creator;
+        creator: CreatorMeta;
     }
     let { creator }: Props = $props();
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const { creators } = data;
-    const hideCreators = segmentationOverlay.segmentationContext.hideCreators;
-    for (const c of $creators) {
-        hideCreators.add(c);
-    }
-    function toggle() {
-        if (hideCreators.has(creator)) {
-            hideCreators.delete(creator);
-        } else {
-            hideCreators.add(creator);
-        }
-    }
-    let segmentations = segmentationOverlay.allSegmentations
-        .filter((a) => a.creator.id == creator.id)
-        .sort((a, b) => a.id - b.id);
+    const segmentationContext = mainViewerContext.segmentationContext;
+
+    const segmentations = $derived(segmentationContext.segmentations.filter((a) => a.creator.id == creator.id).sort((a, b) => a.id - b.id));
+    const hidden = $derived(segmentationContext.creatorHidden.get(creator.id) ?? false);
+    // TODO: make all segmentations hidden by default
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<span class="creator-name" onclick={toggle}>
-    {hideCreators.has(creator) ? "►" : "▼"}
+<span class="creator-name" onclick={() => segmentationContext.toggleShowCreator(creator.id)}>
+    {hidden ? "►" : "▼"}
     {creator.name}
 </span>
 
-{#each $segmentations as segmentation (segmentation.id)}
-    <div class="item" class:hide={hideCreators.has(segmentation.creator)}>
-        <SegmentationItem {segmentation} />
+
+
+{#each segmentations as segmentation (segmentation.id)}
+    <div class="item" class:hide={hidden}>
+        <SegmentationItem segmentation={segmentation} />
     </div>
 {/each}
 

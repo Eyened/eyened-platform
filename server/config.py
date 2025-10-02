@@ -1,5 +1,8 @@
 from dataclasses import asdict
 from typing import Optional
+import os
+from dataclasses import asdict, dataclass
+from typing import Literal, Optional
 from pathlib import Path
 
 import yaml
@@ -18,6 +21,10 @@ class Settings(EyenedORMConfig):
     admin_username: str = env_field("ADMIN_USERNAME", required=False, default="")
     admin_password: str = env_field("ADMIN_PASSWORD", required=False, default="")
     database_root_password: Optional[str] = env_field("DATABASE_ROOT_PASSWORD", required=False, default=None)
+    
+    # Authentication bypass for development (reads from PUBLIC_AUTH_DISABLED env var)
+    public_auth_disabled: bool = False
+    environment: Literal['development', 'production']
 
     # Print settings for debugging purposes - hide password and secret key
     def __str__(self):

@@ -2,6 +2,7 @@ export interface UserResponse {
     id: number;
     username: string;
     role: string | null;
+    starred_tags: number[];
 }
 
 interface UserLogin {
@@ -22,7 +23,7 @@ class AuthClient {
         this.baseUrl = baseUrl;
     }
 
-    async getProfile(): Promise<UserResponse | null> {
+    async me(): Promise<UserResponse | null> {
         const response = await fetch(`${this.baseUrl}/me`, {
             method: 'GET',
             credentials: 'include'

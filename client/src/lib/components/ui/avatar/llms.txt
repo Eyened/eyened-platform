@@ -1,0 +1,239 @@
+# Avatar Documentation
+
+Represents a user or entity with a recognizable image or placeholder in UI elements.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+Copy Page
+
+```svelte
+<script lang="ts">
+  import { Avatar } from "bits-ui";
+</script>
+<Avatar.Root
+  delayMs={200}
+  class="data-[status=loaded]:border-foreground bg-muted text-muted-foreground h-12 w-12 rounded-full border text-[17px] font-medium uppercase data-[status=loading]:border-transparent"
+>
+  <div
+    class="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-transparent"
+  >
+    <Avatar.Image src="/avatar-1.png" alt="@huntabyte" />
+    <Avatar.Fallback class="border-muted border">HB</Avatar.Fallback>
+  </div>
+</Avatar.Root>
+```
+
+## Overview
+
+The Avatar component provides a consistent way to display user or entity images throughout your application. It handles image loading states gracefully and offers fallback options when images fail to load, ensuring your UI remains resilient.
+
+## Features
+
+- **Smart Image Loading**: Automatically detects and handles image loading states  
+- **Fallback System**: Displays alternatives when images are unavailable or slow to load  
+- **Compound Structure**: Flexible primitives that can be composed and customized  
+- **Customizable**: Choose to show the image immediately without a load check when you're certain the image will load. ## Architecture
+
+The Avatar component follows a compound component pattern with three key parts:
+
+- **Avatar.Root**: Container that manages the state of the image and its fallback  
+- **Avatar.Image**: Displays user or entity image  
+- **Avatar.Fallback**: Shows when the image is loading or fails to load ## Quick Start
+
+To get started with the Avatar component, you can use the `Avatar.Root`, `Avatar.Image`, and `Avatar.Fallback` primitives to create a basic avatar component:
+
+```svelte
+<script lang="ts">
+  import { Avatar } from "bits-ui";
+</script>
+<Avatar.Root>
+  <Avatar.Image
+    src="https://github.com/huntabyte.png"
+    alt="Huntabyte's avatar"
+  />
+  <Avatar.Fallback>HB</Avatar.Fallback>
+</Avatar.Root>
+```
+
+## Reusable Components
+
+You can create your own reusable Avatar component to maintain consistent styling and behavior throughout your application:
+
+UserAvatar.svelte
+
+```svelte
+<script lang="ts">
+  import { Avatar, type WithoutChildrenOrChild } from "bits-ui";
+  let {
+    src,
+    alt,
+    fallback,
+    ref = $bindable(null),
+    imageRef = $bindable(null),
+    fallbackRef = $bindable(null),
+    ...restProps
+  }: WithoutChildrenOrChild<Avatar.RootProps> & {
+    src: string;
+    alt: string;
+    fallback: string;
+    imageRef?: HTMLImageElement | null;
+    fallbackRef?: HTMLElement | null;
+  } = $props();
+</script>
+<Avatar.Root {...restProps} bind:ref>
+  <Avatar.Image {src} {alt} bind:ref={imageRef} />
+  <Avatar.Fallback bind:ref={fallbackRef}>
+    {fallback}
+  </Avatar.Fallback>
+</Avatar.Root>
+```
+
+Then use it throughout your application:
+
++page.svelte
+
+```svelte
+<script lang="ts">
+  import UserAvatar from "$lib/components/UserAvatar.svelte";
+  const users = [
+    { handle: "huntabyte", initials: "HJ" },
+    { handle: "pavelstianko", initials: "PS" },
+    { handle: "adriangonz97", initials: "AG" },
+  ];
+</script>
+{#each users as user}
+  <UserAvatar
+    src="https://github.com/{user.handle}.png"
+    alt="{user.name}'s avatar"
+    fallback={user.initials}
+  />
+{/each}
+```
+
+## Customization
+
+### Skip Loading Check
+
+When you're confident that an image will load (such as local assets), you can bypass the loading check:
+
+```svelte
+<script lang="ts">
+  import { Avatar } from "bits-ui";
+  // local asset that's guaranteed to be available
+  import localAvatar from "/avatar.png";
+</script>
+<Avatar.Root loadingStatus="loaded">
+  <Avatar.Image src={localAvatar} alt="User avatar" />
+  <Avatar.Fallback>HB</Avatar.Fallback>
+</Avatar.Root>
+```
+
+## Examples
+
+### Clickable with Link Preview
+
+This example demonstrates how to create a clickable avatar composed with a [Link Preview](/docs/components/link-preview):
+
+```svelte
+<script lang="ts">
+  import { Avatar, LinkPreview } from "bits-ui";
+  import CalendarBlank from "phosphor-svelte/lib/CalendarBlank";
+  import MapPin from "phosphor-svelte/lib/MapPin";
+</script>
+<LinkPreview.Root>
+  <LinkPreview.Trigger
+    href="https://x.com/huntabyte"
+    target="_blank"
+    rel="noreferrer noopener"
+    class="rounded-xs underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-black"
+  >
+    <Avatar.Root
+      class="data-[status=loaded]:border-foreground bg-muted text-muted-foreground h-12 w-12 rounded-full border border-transparent text-[17px] font-medium uppercase"
+    >
+      <div
+        class="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-transparent"
+      >
+        <Avatar.Image src="/avatar-1.png" alt="@huntabyte" />
+        <Avatar.Fallback class="border-muted border">HB</Avatar.Fallback>
+      </div>
+    </Avatar.Root>
+  </LinkPreview.Trigger>
+  <LinkPreview.Content
+    class="border-muted bg-background shadow-popover w-[331px] rounded-xl border p-[17px]"
+    sideOffset={8}
+  >
+    <div class="flex space-x-4">
+      <Avatar.Root
+        class="data-[status=loaded]:border-foreground bg-muted text-muted-foreground h-12 w-12 rounded-full border border-transparent text-[17px] font-medium uppercase"
+      >
+        <div
+          class="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-transparent"
+        >
+          <Avatar.Image src="/avatar-1.png" alt="@huntabyte" />
+          <Avatar.Fallback class="border-muted border">HB</Avatar.Fallback>
+        </div>
+      </Avatar.Root>
+      <div class="space-y-1 text-sm">
+        <h4 class="font-medium">@huntabyte</h4>
+        <p>I do things on the internet.</p>
+        <div
+          class="text-muted-foreground flex items-center gap-[21px] pt-2 text-xs"
+        >
+          <div class="flex items-center text-xs">
+            <MapPin class="mr-1 size-4" />
+            <span> FL, USA </span>
+          </div>
+          <div class="flex items-center text-xs">
+            <CalendarBlank class="mr-1 size-4" />
+            <span> Joined May 2020</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </LinkPreview.Content>
+</LinkPreview.Root>
+```
+
+## API Reference
+
+### Avatar.Root
+
+The root component used to set and manage the state of the avatar.
+
+| Property                                                                                              | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                                                                         | Details                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `loadingStatus` $bindable | `enum`- 'loading' \| 'loaded' \| 'error'                                                | The loading status of the avatars source image. You can bind a variable to track the status outside of the component and use it to show a loading indicator or error message.`Default:  undefined` |                                      |
+| `onLoadingStatusChange`                                             | `function`- (status: LoadingStatus) =\&gt; void                                         | A callback function called when the loading status of the image changes.`Default:  undefined`                                                                                                      |                                      |
+| `delayMs`                                                           | `number`                                                                                                                                                                                                                                       | How long to wait before showing the image after it has loaded. This can be useful to prevent a harsh flickering effect when the image loads quickly.`Default: 0`                                      |                                      |
+| `ref` $bindable                                        | `HTMLDivElement`                                                                                                                                                                                                                               | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                     |                                      |
+| `children`                                                          | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                                                                               |                                      |
+| `child`                                                             | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                         |  | | Data Attribute                      | Value                                                                                                                                                                                                            | Description                             | Details                                                                                                                                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-status` | `enum`- 'loading' \| 'loaded' \| 'error' | The loading status of the image. |                                      |
+| `data-avatar-root`                         | `''`                                                                                                                                                                                            | Present on the root element.     |  |
+
+### Avatar.Image
+
+The avatar image displayed once it has loaded.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLImageElement`                                                                                                                                                                                                                             | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                      | Value                                                                                                                                                                                                            | Description                             | Details                                                                                                                                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-status` | `enum`- 'loading' \| 'loaded' \| 'error' | The loading status of the image. |                                      |
+| `data-avatar-image`                        | `''`                                                                                                                                                                                            | Present on the root element.     |  |
+
+### Avatar.Fallback
+
+The fallback displayed while the avatar image is loading or if it fails to load
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLSpanElement`                                                                                                                                                                                                                                | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                      | Value                                                                                                                                                                                                              | Description                             | Details                                                                                                                                                                                        |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-status` | `enum`- 'loading' \| 'loaded' \| 'error' | The loading status of the image. |                                      |
+| `data-avatar-fallback`                     | `''`                                                                                                                                                                                              | Present on the fallback element. |  |

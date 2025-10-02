@@ -1,32 +1,36 @@
 <script lang="ts">
-    import FormItemContent from "./FormItemContent.svelte";
-    import { PanelIcon, Trash } from "../icons/icons";
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { FormAnnotationObject } from "$lib/data/objects.svelte";
+    import type { FormAnnotationsRepo } from "$lib/data/repos.svelte";
     import { openNewWindow } from "$lib/newWindow";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import Duplicate from "../icons/Duplicate.svelte";
     import type { TaskContext } from "$lib/types";
+    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext, type ComponentProps } from "svelte";
+    import Duplicate from "../icons/Duplicate.svelte";
+    import { PanelIcon, Trash } from "../icons/icons";
+    import { ViewerWindowContext } from "../viewerWindowContext.svelte";
+    import FormItemContent from "./FormItemContent.svelte";
 
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");   
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
     interface Props {
-        form: FormAnnotation;
+        form: FormAnnotationObject;
+        formAnnotationRepo: FormAnnotationsRepo;
         theme?: "light" | "dark";
     }
 
-    let { form, theme = "dark" }: Props = $props();
+    let { form, formAnnotationRepo, theme = "dark" }: Props = $props();
 
-    const dt = new Date().getTime() - (form.created?.getTime() ?? 0);
-    const daysSinceCreation = dt / (1000 * 60 * 60 * 24);
-    const canEditForm = globalContext.canEdit(form);
+    // Compute permissions and schema/date display from form.$
+    const canEditForm = globalContext.canEdit(form.$);
+    const schemaName = $derived(globalContext.formSchemas.store[form.$.form_schema_id]?.name ?? `#${form.$.form_schema_id}`);
+    const date = form.$.date_inserted ?? "";
 
-    let removing: number | undefined = $state();
-    let timeout: ReturnType<typeof setTimeout> | undefined = $state();
+    let removing: ReturnType<typeof setInterval> | undefined = $state();
     let progress = $state(0);
     let maxTime = 3000; // 3 seconds
 
@@ -37,25 +41,34 @@
             if (progress >= maxTime) {
                 clearInterval(removing);
                 removing = undefined;
-                form.delete();
+                form.destroy();
             }
         }, 10);
     }
-    function duplicate() {
-        FormAnnotation.createFrom(creator, form.instance, form.formSchema, taskContext?.subTask, form);
+    
+    async function duplicate() {
+        await formAnnotationRepo.create({
+            form_schema_id: form.$.form_schema_id,
+            patient_id: form.$.patient_id,
+            study_id: form.$.study_id,
+            image_instance_id: form.$.image_instance_id,
+            sub_task_id: taskContext?.subTask?.id ?? form.$.sub_task_id,
+            form_data: form.$.form_data,
+            form_annotation_reference_id: Number(form.id),
+        });
     }
 
     let window: Window | null = null;
-    function openInNewWindow(form: FormAnnotation) {
+    function openInNewWindow(form: FormAnnotationObject) {
         if (window) {
             window.close();
         }
-        const props = { form, viewerContext, canEdit: canEditForm } as const;
+        const props: ComponentProps<typeof FormItemContent> = { form, formAnnotationRepo, globalContext, viewerContext, canEdit: canEditForm };
 
         window = openNewWindow(
             FormItemContent,
             props,
-            `${form.formSchema.name} ${form.id}`,
+            `${schemaName} ${form.id}`,
         );
     }
 
@@ -69,14 +82,12 @@
             minute: "2-digit",
         });
     }
-
-    const date = form.created?.toISOString() ?? "";
 </script>
 
 <div id="main" class={theme}>
     <div class="header">
-        {#if form.reference}
-            <span>[{form.reference.id} → {form.id}]</span>
+        {#if form.$.form_annotation_reference_id}
+            <span>[{form.$.form_annotation_reference_id} → {form.id}]</span>
         {:else}
             <span>[{form.id}]</span>
         {/if}
@@ -84,11 +95,11 @@
         <span>{formatDateTime(date)}</span>
     </div>
     <div class="header" id="buttons" class:removing>
-        <div>{form.creator.name}</div>
+        <div>{form.$.creator.name}</div>
 
         <div id="button">
             <button onclick={() => openInNewWindow(form)}>
-                Open {form.formSchema.name}
+                Open {schemaName}
             </button>
         </div>
 

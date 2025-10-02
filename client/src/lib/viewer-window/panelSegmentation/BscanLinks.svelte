@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { getContext } from "svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { getContext } from "svelte";
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const segmentationContext = segmentationOverlay.segmentationContext;
+    const segmentationContext = mainViewerContext.segmentationContext;
     let segmentation = $derived(
         segmentationContext.segmentationItem?.segmentation,
     );

@@ -1,275 +1,72 @@
-from typing import Dict, List, Optional
-
 from eyened_orm import (
-    Creator,
-    DeviceInstance,
-    DeviceModel,
-    Feature,
-    FormAnnotation,
-    FormSchema,
-    ImageInstance,
-    Patient,
-    Project,
-    Scan,
-    Series,
-    SourceInfo,
-    Study,
-    Segmentation,
-    ModelSegmentation,
+    ImageInstance, Tag, ImageInstanceTagLink,
+    Series, Study, Patient, Project, DeviceInstance, DeviceModel, Scan,
+    Segmentation, ModelSegmentation, Model, Feature, FormAnnotation,
 )
-from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel, Field
+from eyened_orm.Tag import SegmentationTagLink, FormAnnotationTagLink
+from eyened_orm.Tag import TagType
+from fastapi import APIRouter, Depends, HTTPException, Response
 
-from sqlalchemy import or_, select
-from sqlalchemy.orm import Session, defer
+from sqlalchemy.orm import Session, selectinload
+
+from ..dtos.dto_converter import DTOConverter
+from ..dtos.dtos_instances import InstanceGET
+from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
-from .utils import collect_rows
-from .query_utils import decode_params, sqlalchemy_operators
 
 router = APIRouter()
 
-
-# Pydantic models for response schemas
-class DataResponse(BaseModel):
-
-    instances: List[ImageInstance]
-    series: List[Series]
-    studies: List[Study]
-    patients: List[Patient]
-    segmentations: List[Segmentation]
-    form_annotations: List[FormAnnotation] = Field(alias="form-annotations")
-    model_segmentations: List[ModelSegmentation] = Field(alias="model-segmentations")
-
-    class Config:
-        arbitrary_types_allowed = True
-
-
-class InstanceResponse(BaseModel):
-    entities: DataResponse
-    next_cursor: Optional[str] = None
-
-
-def join_tables(query):
-    return (
-        query.join(Project, Project.ProjectID == Patient.ProjectID)
-        .outerjoin(SourceInfo)
-        .outerjoin(Scan)
-        .outerjoin(DeviceInstance)
-        .outerjoin(DeviceModel)
-    )
-
-
-base_query = join_tables(
-    select(ImageInstance, Series, Study, Patient)
-    .select_from(ImageInstance)
-    .filter(~ImageInstance.Inactive)
-    .join(Series, Series.SeriesID == ImageInstance.SeriesID)
-    .join(Study, Study.StudyID == Series.StudyID)
-    .join(Patient, Patient.PatientID == Study.PatientID)
-)
-
-segmentation_sub_query = join_tables(
-    select(Segmentation.ImageInstanceID)
-    .select_from(Segmentation)
-    .filter(~Segmentation.Inactive)
-    .join(Feature)
-    .join(Creator)
-    .join(ImageInstance, ImageInstance.ImageInstanceID == Segmentation.ImageInstanceID)
-    .join(Series, Series.SeriesID == ImageInstance.SeriesID)
-    .join(Study, Study.StudyID == Series.StudyID)
-    .join(Patient, Patient.PatientID == Study.PatientID)
-)
-
-form_sub_query = join_tables(
-    select(FormAnnotation.PatientID)
-    .select_from(FormAnnotation)
-    .filter(~FormAnnotation.Inactive)
-    .join(FormSchema)
-    .join(Creator)
-    .join(Patient, Patient.PatientID == FormAnnotation.PatientID)
-    .outerjoin(Study, Study.PatientID == Patient.PatientID)
-    .outerjoin(Series, Series.StudyID == Study.StudyID)
-    .outerjoin(ImageInstance, ImageInstance.SeriesID == Series.SeriesID)
-)
-
-segmentation_query = (
-    select(Segmentation).select_from(Segmentation).filter(~Segmentation.Inactive)
-)
-
-# optimization: skipping FormData, viewer will load on demand
-form_query = (
-    select(FormAnnotation)
-    .options(defer(FormAnnotation.FormData))
-    .filter(~FormAnnotation.Inactive)
-)
-
-
-base_tables = [
-    ImageInstance,
-    Series,
-    Study,
-    Patient,
-    Project,
-    DeviceInstance,
-    DeviceModel,
-    SourceInfo,
-    Scan,
-]
-segmentation_tables = [Segmentation, Feature, Creator]
-form_tables = [FormAnnotation, FormSchema, Creator]
-
-
-def get_mappings(tables, base_name):
-    all_mappings = {}
-
-    for table in tables:
-
-        table_name = table.__table__.name
-
-        for column in table.__table__.columns:
-            if column.name == "Password" or column.name == "DateInserted":
-                continue
-            # Skip foreign keys
-            if column.foreign_keys:
-                continue
-
-            col = getattr(table, column.key)
-
-            all_mappings[f"{table_name}.{column.name}"] = col
-            all_mappings[f"{base_name}.{column.name}"] = col
-            if column.name not in all_mappings:
-                all_mappings[column.name] = col
-            else:
-                print(f"Duplicate column {column.name} in {table_name}")
-    return all_mappings
-
-
-base_mappings = get_mappings(base_tables, "base")
-segmentation_mappings = get_mappings(segmentation_tables, "Segmentation")
-form_mappings = get_mappings(form_tables, "Form")
-
-
-def apply_filters(query, mappings, params):
-    for (field, operator), value in params.items():
-        if field not in mappings:
-            continue
-        column = mappings[field]
-        query = query.where(sqlalchemy_operators[operator](column, value))
-    return query
-
-
-def run_queries(session, params, cursor, limit):
-    params_decoded = decode_params(params)
-
-    query = apply_filters(base_query, base_mappings, params_decoded)
-    if cursor:
-        query = query.filter(Study.StudyDate <= cursor)
-
-    query = query.distinct(ImageInstance.ImageInstanceID).order_by(Study.StudyDate)
-
-    filter_instance_ids = set()
-    filter_patient_ids = set()
-    filter_applied = False
-    if any(field in segmentation_mappings for field, operator in params_decoded):
-        sub_query = apply_filters(
-            segmentation_sub_query,
-            {**segmentation_mappings, **base_mappings},
-            params_decoded,
-        )
-        filter_instance_ids = set(session.execute(sub_query).scalars().all())
-        filter_applied = True
-
-    if any(field in form_mappings for field, operator in params_decoded):
-        sub_query = apply_filters(
-            form_sub_query, {**form_mappings, **base_mappings}, params_decoded
-        )
-        filter_patient_ids = set(session.execute(sub_query).scalars().all())
-        filter_applied = True
-
-    if filter_applied:
-        query = query.filter(
-            or_(
-                ImageInstance.ImageInstanceID.in_(filter_instance_ids),
-                Patient.PatientID.in_(filter_patient_ids),
-            )
-        )
-
-    query = query.order_by(Study.StudyDate).limit(limit + 1)
-
-    instances = session.execute(query).all()
-    if len(instances) > limit:
-        _, _, last_study, _ = instances[-1]
-        next_cursor = last_study.StudyDate
-        # run again, but with cursor for max date instead of limit
-        query = (
-            query.filter(Study.StudyDate <= next_cursor)
-            .distinct(ImageInstance.ImageInstanceID)
-            .order_by(Study.StudyDate)
-        )
-        instances = session.execute(query).all()
-
-    else:
-        next_cursor = None
-
-    image_ids = {instance.ImageInstanceID for instance, *_ in instances}
-
-    segmentations = session.scalars(
-        segmentation_query.where(Segmentation.ImageInstanceID.in_(image_ids))
-    ).all()
-
-    patient_ids = {patient.PatientID for _, _, _, patient in instances}    
-    form_annotations = session.scalars(form_query.where(FormAnnotation.PatientID.in_(patient_ids))).all()
-
-    model_segmentations = session.scalars(
-        select(ModelSegmentation).where(
-            ModelSegmentation.ImageInstanceID.in_(image_ids)
-        )
-    ).all()
-
-    return next_cursor, instances, segmentations, form_annotations, model_segmentations
-
-
-@router.get("/instances", response_model=InstanceResponse)
-async def get_instances(
-    request: Request,
-    session: Session = Depends(get_db),
+@router.get("/instances/{instance_id}", response_model=InstanceGET)
+async def get_instance(
+    instance_id: int,
+    with_segmentations: bool = False,
+    with_form_annotations: bool = False,
+    with_model_segmentations: bool = False,
+    with_tag_metadata: bool = False,
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    opts = [
+        # base graph
+        selectinload(ImageInstance.Series).selectinload(Series.Study).selectinload(Study.Patient).selectinload(Patient.Project),
+        selectinload(ImageInstance.DeviceInstance).selectinload(DeviceInstance.DeviceModel),
+        selectinload(ImageInstance.Scan),
+        # instance tags
+        selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
+        selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Creator),
+    ]
+    if with_segmentations:
+        opts += [
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.Feature),
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.Creator),
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.SegmentationTagLinks).selectinload(SegmentationTagLink.Tag),
+            selectinload(ImageInstance.Segmentations).selectinload(Segmentation.SegmentationTagLinks).selectinload(SegmentationTagLink.Creator),
+        ]
+    if with_form_annotations:
+        opts += [
+            selectinload(ImageInstance.FormAnnotations).selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
+            selectinload(ImageInstance.FormAnnotations).selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
+        ]
+    if with_model_segmentations:
+        opts += [
+            selectinload(ImageInstance.ModelSegmentations).selectinload(ModelSegmentation.Model),
+            # optional if Model.Feature relationship is added later:
+            # selectinload(ImageInstance.ModelSegmentations).selectinload(ModelSegmentation.Model).selectinload(Model.Feature),
+        ]
 
-    cursor = request.query_params.get("cursor")
-    limit = int(request.query_params.get("limit", 200))
+    item = db.get(ImageInstance, instance_id, options=tuple(opts))
+    if not item:
+        raise HTTPException(404, "ImageInstance not found")
 
-    multiparams = request.query_params.multi_items()
-
-    next_cursor, i, segmentations, form_annotations, model_segmentations = run_queries(
-        session, multiparams, cursor, limit
+    return DTOConverter.image_instance_to_get(
+        item,
+        with_tag_metadata=with_tag_metadata,
+        with_segmentations=with_segmentations,
+        with_form_annotations=with_form_annotations,
+        with_model_segmentations=with_model_segmentations,
     )
-
-    instances = {instance for instance, _, _, _ in i}
-    series = {series for _, series, _, _ in i}
-    studies = {study for _, _, study, _ in i}
-    patients = {patient for _, _, _, patient in i}
-
-    response = {
-        "entities": {
-            k: collect_rows(v)
-            for k, v in {
-                "instances": instances,
-                "series": series,
-                "studies": studies,
-                "patients": patients,
-                "segmentations": segmentations,
-                "form-annotations": form_annotations,
-                "model-segmentations": model_segmentations,
-            }.items()
-        }
-    }
-    
-    if next_cursor:
-        response["next_cursor"] = next_cursor.isoformat()
-    return response
 
 
 @router.get("/instances/images/{dataset_identifier:path}")
@@ -291,3 +88,35 @@ async def get_thumb(
     response = Response()
     response.headers["X-Accel-Redirect"] = "/thumbnails/" + thumbnail_identifier
     return response
+
+
+@router.post("/instances/{instance_id}/tags", response_model=TagMeta)
+async def tag_instance(instance_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
+    """Attach a Tag to an ImageInstance by tag ID (idempotent)."""
+    instance = db.get(ImageInstance, instance_id)
+    if not instance:
+        raise HTTPException(404, "ImageInstance not found")
+    tag = db.get(Tag, body.tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    if tag.TagType != TagType.ImageInstance:
+        raise HTTPException(400, "Tag type must be ImageInstance")
+
+    link = db.get(ImageInstanceTagLink, {"TagID": tag.TagID, "ImageInstanceID": instance_id})
+    if not link:
+        link = ImageInstanceTagLink(TagID=tag.TagID, ImageInstanceID=instance_id, CreatorID=current_user.id)
+        db.add(link); db.commit(); db.refresh(link)
+        link.Tag = tag  # optional: avoid Tag lazy-load
+
+    return DTOConverter.link_to_tag_metadata(link)
+
+@router.delete("/instances/{instance_id}/tags/{tag_id}", status_code=204)
+async def untag_instance(instance_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    """Remove a Tag from an ImageInstance (idempotent)."""
+    instance = db.get(ImageInstance, instance_id)
+    if not instance:
+        raise HTTPException(404, "ImageInstance not found")
+    link = db.get(ImageInstanceTagLink, {"TagID": tag_id, "ImageInstanceID": instance_id})
+    if link:
+        db.delete(link); db.commit()
+    return Response(status_code=204)

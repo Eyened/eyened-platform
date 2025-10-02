@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext } from "svelte";
+    import type { Segmentation } from "./segmentationContext.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -10,7 +10,7 @@
     let { segmentation }: Props = $props();
 
     let threshold = $state(0.5);
-    threshold = segmentation.threshold;
+    threshold = segmentation.threshold ?? 0.5;
     const canEdit = globalContext.canEdit(segmentation);
 
 

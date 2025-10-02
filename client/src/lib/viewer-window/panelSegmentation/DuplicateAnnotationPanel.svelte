@@ -1,24 +1,15 @@
 <script lang="ts">
-    import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { Duplicate } from "../icons/icons";
-    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-
-    interface Props {
-        segmentation: Segmentation;
-        image: AbstractImage;
-        segmentationItem: SegmentationItem;
-    }
+    import { getContext } from "svelte";
+    import { Duplicate } from "../icons/icons";
     import { duplicate, types } from "./duplicate_utils";
 
     let { segmentation, image, segmentationItem }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
     let duplicateVolume = $state(false);
 

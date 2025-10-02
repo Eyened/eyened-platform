@@ -14,9 +14,9 @@
     import PanelRendering from "./panelRendering/PanelRendering.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { data } from "$lib/datamodel/model";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import {
         Close,
         Draw,
@@ -39,15 +39,14 @@
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
-    const { registration } = viewerWindowContext;
     const closePanel = getContext<() => {}>("closePanel");
 
-    const viewerContext = new ViewerContext(image, registration);
+    const viewerContext = new ViewerContext(image, viewerWindowContext);
     setContext("viewerContext", viewerContext);
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = new SegmentationOverlay(viewerContext, globalContext);
-    setContext("segmentationOverlay", segmentationOverlay);    
+    const segmentationOverlay = new MainViewerContext(viewerContext.instance.id, viewerContext.axis, viewerWindowContext);
+    setContext("mainViewerContext", segmentationOverlay);    
     onDestroy(viewerContext.addOverlay(segmentationOverlay));
 
     const { activePanels } = viewerContext;

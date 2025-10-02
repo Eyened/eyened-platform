@@ -1,17 +1,19 @@
+// import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import { Matrix } from "$lib/matrix";
+import { SvelteMap } from "svelte/reactivity";
+import type { InstanceGET } from "../../types/openapi_types";
+import type { Segmentation } from "../viewer-window/panelSegmentation/segmentationContext.svelte";
+import { SegmentationItem } from "./segmentationItem.svelte";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
-import type { Instance } from "$lib/datamodel/instance.svelte";
-import { Matrix } from "$lib/matrix";
-import { SegmentationItem } from "./segmentationItem.svelte";
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import { SvelteMap } from "svelte/reactivity";
 
 export abstract class AbstractImage {
 
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-    public readonly segmentationItems = new SvelteMap<Segmentation, SegmentationItem>();
+    // mapping of segmentation gid to segmentation item
+    public readonly segmentationItems = new SvelteMap<string, SegmentationItem>();
     abstract texture: WebGLTexture;
 
     // in micrometers / pixel
@@ -19,7 +21,7 @@ export abstract class AbstractImage {
     transform: Matrix = Matrix.identity;
 
     constructor(
-        public readonly instance: Instance,
+        public readonly instance: InstanceGET,
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
@@ -43,13 +45,13 @@ export abstract class AbstractImage {
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         // If the segmentationItem is already created, return it
-        if (this.segmentationItems.has(segmentation)) {
-            return this.segmentationItems.get(segmentation)!;
+        if (this.segmentationItems.has(segmentation.gid)) {
+            return this.segmentationItems.get(segmentation.gid)!;
         }
 
         // Create new segmentation item
         const segmentationItem = new SegmentationItem(this, segmentation);
-        this.segmentationItems.set(segmentation, segmentationItem);
+        this.segmentationItems.set(segmentation.gid, segmentationItem);
         return segmentationItem;
     }
 

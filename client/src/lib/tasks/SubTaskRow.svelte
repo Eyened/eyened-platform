@@ -1,137 +1,115 @@
 <script lang="ts">
-    import { page } from "$app/state";
-    import { BrowserContext } from "$lib/browser/browserContext.svelte";
-    import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
-    import { data } from "$lib/datamodel/model";
+  import { page } from "$app/state";
+  import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
+  import * as Button from "$lib/components/ui/button";
+  import * as Input from "$lib/components/ui/input";
+  import * as Table from "$lib/components/ui/table";
+  import type { SubTaskObject } from "$lib/data/objects.svelte";
+  import { toast } from "svelte-sonner";
 
-    import {
-        SubTaskImageLink,
-        type SubTask,
-    } from "$lib/datamodel/subTask.svelte";
-    import { setContext } from "svelte";
+  type Props = {
+    obj: SubTaskObject;
+    taskId: number;
+    index: number;
+    start: number;
+  };
+  let { obj, taskId, index, start }: Props = $props();
 
-    interface Props {
-        i: number;
-        subTask: SubTask;
+  const row = $derived(obj.$);
+  let newInstanceId = $state<string>("");
+
+  function handleGrade() {
+    const suffix_string = `?${page.url.searchParams.toString()}`;
+    const absoluteIndex = index + start;
+    const url = new URL(`${window.location.origin}/tasks/${taskId}/grade/${absoluteIndex}${suffix_string}`);
+    window.location.href = url.href;
+  }
+
+  async function addImage() {
+    try {
+      const id = Number(newInstanceId);
+      if (!id) {
+        toast.error("Please enter a valid instance id");
+        return;
+      }
+      await obj.addImage(id);
+      await obj.refresh();
+      newInstanceId = "";
+    } catch (e) {
+      toast.error(String(e));
     }
+  }
 
-    let { i, subTask }: Props = $props();
-    const { state: taskState, instances } = subTask;
-
-    const browserContext = new BrowserContext([]);
-    browserContext.thumbnailSize = 4;
-    setContext("browserContext", browserContext);
-
-    let comments = $state(subTask.comments ?? "");
-
-    function updateComments() {
-        subTask.update({ comments });
+  async function removeImage(instance_id: number) {
+    try {
+      await obj.removeImage(instance_id);
+      await obj.refresh();
+    } catch (e) {
+      toast.error(String(e));
     }
+  }
 
-    async function handleGrade(index: number) {
-        const suffix_string = `?${page.url.searchParams.toString()}`;
-        const url = new URL(
-            `${window.location.origin}/tasks/${subTask.task.id}/grade/${index}${suffix_string}`,
-        );
-        window.location.href = url.href;
+  async function updateComments(comments: string) {
+    try {
+      await obj.setComments(comments);
+    } catch (e) {
+      toast.error(String(e));
     }
-    let newInstanceId: number | undefined = $state();
-    function addImage() {
-        SubTaskImageLink.create({
-            subTaskId: subTask.id,
-            instanceId: newInstanceId,
-        });
-    }
-
-    function removeSelectedImages() {
-        const imageIds = browserContext.selection.slice();
-        for (const id of imageIds) {
-            const link = data.subTaskImageLinks.get(`${subTask.id}_${id}`);
-            if (link) {
-                link.delete();
-            } else {
-                console.warn(`Link ${subTask.id}_${id} not found`);
-            }
-            browserContext.selection.splice(
-                browserContext.selection.indexOf(id),
-                1,
-            );
-        }
-    }
+  }
 </script>
 
-<tr>
-    <td>{i}</td>
-    <td
-        class:unknown={taskState.name == "Unknown"}
-        class:ready={taskState.name == "Ready"}
-        class:busy={taskState.name == "Busy"}
+<Table.Row>
+  <Table.Cell>{row.id}</Table.Cell>
+  <Table.Cell>{row.task_state ?? "-"}</Table.Cell>
+  <Table.Cell>
+    <button
+      onclick={handleGrade}
+      class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
     >
-        {taskState.name}
-    </td>
-    <td>
-        <button onclick={() => handleGrade(i)}>View</button>
-    </td>
-    <td>
-        <div class="instances">
-            {#each $instances as instance}
-                <InstanceComponent {instance} />
-            {/each}
-        </div>
+      View
+    </button>
+  </Table.Cell>
+  <Table.Cell>
+    <div class="instances flex flex-wrap gap-1">
+      {#if (row as any).images?.length > 0}
+        {#each (row as any).images as img}
+          <div class="relative inline-block">
+            <InstanceComponent instance={img} />
+            <button
+              class="absolute -top-1 -right-1 z-10 h-6 w-6 rounded-full bg-red-600 text-white text-xs leading-6 text-center shadow hover:bg-red-700"
+              onclick={(e) => { e.stopPropagation(); removeImage(img.id); }}
+              aria-label="Remove image"
+              title="Remove image"
+            >
+              ×
+            </button>
+          </div>
+        {/each}
+      {:else}
+        -
+      {/if}
 
-        <input type="number" bind:value={newInstanceId} />
-        <button onclick={addImage} disabled={newInstanceId == undefined}>
-            Add image
-        </button>
-
-        <button
-            onclick={removeSelectedImages}
-            disabled={browserContext.selection.length == 0}
-        >
-            Remove {browserContext.selection.length} images from sub-task
-        </button>
-    </td>
-    <td>
-        <textarea bind:value={comments} onchange={updateComments} rows={3}>
-        </textarea>
-    </td>
-</tr>
+      <div class="flex items-center gap-2 mt-1 w-full">
+        <Input.Root type="number" bind:value={newInstanceId} placeholder="Instance ID" class="w-36" />
+        <Button.Root onclick={addImage}>
+          Add Image
+        </Button.Root>
+      </div>
+    </div>
+  </Table.Cell>
+  <Table.Cell>
+    <textarea
+      value={row.comments || ""}
+      onchange={async (e) => {
+        const target = e.target as HTMLTextAreaElement;
+        await updateComments(target.value);
+      }}
+      class="w-full min-h-[60px] p-2 border rounded"
+      placeholder="Add comments..."
+    ></textarea>
+  </Table.Cell>
+</Table.Row>
 
 <style>
-    div.instances {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4em;
-    }
-    td {
-        padding-left: 0.8em;
-        padding-right: 0.8em;
-        padding-top: 0.4em;
-        padding-bottom: 0.4em;
-        border: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    tr:nth-child(even) {
-        background-color: #f8f8f8;
-    }
-
-    tr:nth-child(odd) {
-        background-color: #fdfdfd;
-    }
-
-    tr:hover {
-        background-color: #e0e0e0;
-    }
-
-    td.ready {
-        background-color: greenyellow;
-    }
-
-    td.busy {
-        background-color: orange;
-    }
-
-    td.unknown {
-        background-color: lightgray;
-    }
+  .instances { display: flex; flex-wrap: wrap; gap: 4px; }
 </style>

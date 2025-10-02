@@ -1,11 +1,11 @@
 <script lang="ts">
-    import type { Study } from "$lib/datamodel/study";
-    import SeriesComponent from "./SeriesComponent.svelte";
     import { getContext } from "svelte";
+    import type { StudyObject } from "../data/objects.svelte";
     import type { BrowserContext } from "./browserContext.svelte";
+    import SeriesComponent from "./SeriesComponent.svelte";
 
     interface Props {
-        study: Study;
+        study: StudyObject;
         laterality: "L" | "R" | null;
     }
 
@@ -13,37 +13,32 @@
 
     const eye = laterality ? { L: "OS", R: "OD" }[laterality] : "OD/OS?";
 
-    const filtered = study.instances.filter(
-        (instance) => instance.laterality == laterality,
-    );
-    const bySeries = filtered.collectSet((instance) => instance.series);
     const browserContext = getContext<BrowserContext>("browserContext");
 
+    const eyeSeries = study.$.series!.filter((series) => series.laterality == laterality);
+
     function open() {
-        const numbers = [...$bySeries]
-        
+        const numbers = eyeSeries
             .sort((a, b) => a.id - b.id)
             .flatMap((series) =>
-                series.instances
-                .filter((instance) => instance.laterality == laterality)
-                .map((instance) => instance.id).$.sort(),
-            );
+                series.instance_ids
+            ) ?? [];
         browserContext.openTab(numbers);
     }
 </script>
 
-{#if $filtered.length}
-    <div class="outer">
-        <h3>
+{#if study.$.series!.length}
+    <div class="outer flex flex-1 flex-col p-2">
+        <h3 class="m-0 text-base flex items-center gap-4">
             {eye}
-            {#if $bySeries.size > 0}
-                <button class="link" onclick={open}>
+            {#if eyeSeries.length > 0}
+                <button class="link bg-transparent border border-black/20 rounded-[2px] text-inherit cursor-pointer hover:bg-black/5" onclick={open}>
                     Open all {eye} images</button
                 >
             {/if}
         </h3>
-        <div class="series-container">
-            {#each [...$bySeries].sort((a, b) => a.id - b.id) as series (series.id)}
+        <div class="series-container flex flex-row flex-wrap content-start flex-1">
+            {#each [...eyeSeries].sort((a, b) => a.id - b.id) as series (series.id)}
                 <SeriesComponent {series} {laterality} />
             {/each}
         </div>
@@ -51,36 +46,5 @@
 {/if}
 
 <style>
-    div {
-        display: flex;
-    }
-    h3 {
-        margin: 0;
-        font-size: normal;
-        display: flex;
-        align-items: center;
-        gap: 1em;
-    }
-    button.link {
-        background: none;
-        border: 1px solid rgba(0, 0, 0, 0.2);
-        border-radius: 2px;
-        color: inherit;
-        font: normal;
-        cursor: pointer;
-    }
-    button.link:hover {
-        background: rgba(0, 0, 0, 0.05);
-    }
-    .outer {
-        flex: 1;
-        flex-direction: column;
-        padding: 0.5em;
-    }
-    .series-container {
-        flex-wrap: wrap;
-        align-content: flex-start;
-        flex: 1;
-        flex-direction: row;
-    }
+
 </style>

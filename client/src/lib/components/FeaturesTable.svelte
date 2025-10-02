@@ -1,0 +1,88 @@
+<script lang="ts">
+  import { createSvelteTable, FlexRender, renderComponent } from "$lib/components/ui/data-table";
+  import * as Table from "$lib/components/ui/table";
+  import type { GlobalContext } from "$lib/data/globalContext.svelte";
+  import { getCoreRowModel, getSortedRowModel, type ColumnDef, type SortingState } from "@tanstack/table-core";
+  import { getContext } from "svelte";
+  import FeatureRow from "./FeatureRow.svelte";
+  import SortHeader from "./SortHeader.svelte";
+
+  const globalContext = getContext<GlobalContext>("globalContext");
+
+  let sorting = $state<SortingState>([]);
+
+  const columns: ColumnDef<any>[] = [
+    {
+      accessorKey: "name",
+      header: ({ column }) => {
+        const onclick = column.getToggleSortingHandler() ?? (() => {});
+        return renderComponent(SortHeader, { label: "Feature", onclick });
+      },
+      cell: ({ row }) => row.original.name ?? "-"
+    },
+    {
+      id: "count",
+      accessorFn: () => 0,
+      header: ({ column }) => {
+        const onclick = column.getToggleSortingHandler() ?? (() => {});
+        return renderComponent(SortHeader, { label: "Count", onclick });
+      },
+      cell: () => 0
+    },
+    {
+      id: "browser",
+      header: "Browser",
+      cell: () => ""
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => {
+        const feature = globalContext.features.object(row.original.id);
+        return renderComponent(FeatureRow, { feature });
+      }
+    }
+  ];
+
+  const table = createSvelteTable({
+    get data() { return globalContext.features.all; },
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: (updater) => sorting = typeof updater === "function" ? updater(sorting) : updater,
+    state: { get sorting() { return sorting; } }
+  });
+</script>
+
+<div class="rounded-md border">
+  <Table.Root>
+    <Table.Header>
+      {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+        <Table.Row>
+          {#each headerGroup.headers as header (header.id)}
+            <Table.Head colspan={header.colSpan}>
+              {#if !header.isPlaceholder}
+                <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
+              {/if}
+            </Table.Head>
+          {/each}
+        </Table.Row>
+      {/each}
+    </Table.Header>
+    <Table.Body>
+      {#each table.getRowModel().rows as row (row.id)}
+        <Table.Row>
+          {#each row.getVisibleCells() as cell (cell.id)}
+            <Table.Cell>
+              <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+            </Table.Cell>
+          {/each}
+        </Table.Row>
+      {:else}
+        <Table.Row>
+          <Table.Cell colspan={columns.length} class="h-24 text-center">No results.</Table.Cell>
+        </Table.Row>
+      {/each}
+    </Table.Body>
+  </Table.Root>
+</div>

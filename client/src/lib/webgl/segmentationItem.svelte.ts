@@ -1,8 +1,10 @@
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import type { AbstractImage } from "./abstractImage";
-import { SegmentationState } from "./segmentationState";
-import type { Mask, PaintSettings } from "./mask.svelte";
 import { SvelteMap } from "svelte/reactivity";
+import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import { ModelSegmentationsRepo, SegmentationsRepo } from "../data/repos.svelte";
+import type { NPYArray } from "../utils/npy_loader";
+import type { AbstractImage } from "./abstractImage";
+import type { Mask, PaintSettings } from "./mask.svelte";
+import { SegmentationState } from "./segmentationState";
 
 // manages the segmentation states (one per scan) for a single segmentation
 export class SegmentationItem {
@@ -14,10 +16,10 @@ export class SegmentationItem {
 
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: Segmentation) {
+        readonly segmentation: SegmentationGET | ModelSegmentationGET) {
 
-        if (Array.isArray(this.segmentation.scanIndices) && this.segmentation.scanIndices.length < 5) {
-            for (const scanNr of this.segmentation.scanIndices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
+        if (Array.isArray(this.segmentation.scan_indices) && this.segmentation.scan_indices.length < 5) {
+            for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
                 this.getSegmentationState(scanNr, true);
             }
         } else {
@@ -28,7 +30,14 @@ export class SegmentationItem {
     private async loadFull(): Promise<void> {
         try {
             this.loading = true;
-            const array = await this.segmentation.loadData();
+
+            let array: NPYArray;
+            if (this.segmentation.annotation_type == 'model_segmentation') {
+                array = await new ModelSegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis: this.segmentation.sparse_axis }) as any;
+            } else {
+                array = await new SegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis: this.segmentation.sparse_axis }) as any;
+            }
+            // const array = await this.segmentation.loadData();
             const shape = array.shape as number[];
             // Expecting [depth, height, width]
             const depth = shape[0] ?? this.image.depth;
@@ -36,7 +45,7 @@ export class SegmentationItem {
             const width = shape[2] ?? this.image.width;
             const planeSize = height * width;
 
-            const scanIndices = this.segmentation.scanIndices ?? Array.from({ length: depth }, (_, i) => i);
+            const scanIndices = this.segmentation.scan_indices ?? Array.from({ length: depth }, (_, i) => i);
             for (const scanNr of scanIndices) {
                 const start = scanNr * planeSize;
                 const end = start + planeSize;

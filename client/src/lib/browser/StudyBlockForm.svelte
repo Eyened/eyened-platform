@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { Study } from "$lib/datamodel/study";
     import type { Instance } from "$lib/datamodel/instance.svelte";
+    import type { Study } from "$lib/datamodel/study";
 
-    import { data } from "$lib/datamodel/model";
-    import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { data } from "$lib/datamodel/model";
     import type { TaskContext } from "$lib/types";
+    import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
+    import { getContext } from "svelte";
 
     interface Props {
         title: string;
@@ -20,7 +20,7 @@
         $props();
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
     const taskContext = getContext<TaskContext | undefined>("taskContext");
 
     const { formAnnotations, formSchemas } = data;
@@ -85,21 +85,21 @@
 
     {#each forms as form}
         <div>
-            <div class="form-item">
+            <div class="form-item flex flex-col w-[20em]">
                 <FormItem {form} theme="light" />
             </div>
         </div>
     {/each}
 {/snippet}
 {#if formSchema}
-    <div id="main">
-        <h4>{title}</h4>
+    <div id="main" class="flex flex-col px-2">
+        <h4 class="p-0 m-0 mt-2 mb-2">{title}</h4>
         {#if split_laterality}
-            <div id="eyes">
-                <div>
+            <div id="eyes" class="flex flex-row">
+                <div class="flex flex-col flex-1">
                     {@render form_item(right_instance, $right, "OD")}
                 </div>
-                <div>
+                <div class="flex flex-col flex-1">
                     {@render form_item(left_instance, $left, "OS")}
                 </div>
             </div>
@@ -110,29 +110,5 @@
 {/if}
 
 <style>
-    div {
-        display: flex;
-    }
-    h4 {
-        padding: 0;
-        margin: 0;
-        margin-top: 0.5em;
-        margin-bottom: 0.5em;
-    }
-    div#main {
-        flex-direction: column;
-        padding-left: 0.5em;
-        padding-right: 0.5em;
-    }
-    div#eyes {
-        flex-direction: row;
-    }
-    div#eyes > div {
-        flex-direction: column;
-        flex: 1;
-    }
-    div.form-item {
-        flex-direction: column;
-        width: 20em;
-    }
+
 </style>

@@ -1,43 +1,89 @@
 <script lang="ts">
-    import InstancesTable from "./InstancesTable.svelte";
-    import type { Instance } from "$lib/datamodel/instance.svelte.ts";
-    import type { Patient } from "$lib/datamodel/patient.ts";
-    import PatientComponent from "./PatientComponent.svelte";
+	import { getContext } from 'svelte';
+	import PaginatedResults from '../components/PaginatedResults.svelte';
+	import type { BrowserContext } from './browserContext.svelte';
+	import InstanceComponent from './InstanceComponent.svelte';
+	import StudyBlock from './StudyBlock.svelte';
 
-    interface Props {
-        instances: Instance[];
-        patients: Patient[];
-        renderMode?: "studies" | "images";
-        mode?: "full" | "overlay";
-    }
+	const browserContext = getContext<BrowserContext>('browserContext');
 
-    let {
-        instances,
-        patients,
-        renderMode = "studies",
-        mode = "full",
-    }: Props = $props();
-    
+	// export let renderMode: 'studies' | 'instances' = 'studies';
+	let { mode = 'full' }: { mode?: 'full' | 'overlay' } = $props();
+
+	function onPageChange(pageNum: number) {
+		browserContext.page = pageNum;
+		// Re-run search with whichever mode is active
+		browserContext.search();
+	}
+
 </script>
 
-{#if renderMode == "images"}
-    {#if instances.length}
-        <InstancesTable {instances} />
-    {:else}
-        <div class="no-content">No images found</div>
-    {/if}
-{:else if patients.length}
-    {#each patients as patient}
-        <PatientComponent {patient} {mode} />
-    {/each}
+{#if browserContext.queryMode == "instances"}
+	{#if browserContext.displayMode === 'instance'}
+		{#if browserContext.orderedInstanceIds.length > 0}
+			<PaginatedResults
+				count={browserContext.count}
+				perPage={browserContext.limit}
+				page={browserContext.page}
+				onPageChange={onPageChange}
+			>
+				<div class="grid gap-2 grid-cols-[repeat(auto-fill,minmax(8em,1fr))]">
+					{#each browserContext.orderedInstanceIds as id (id)}
+						<InstanceComponent instance={browserContext.InstanceRepo.store[id]!} />
+					{/each}
+				</div>
+			</PaginatedResults>
+		{:else}
+			<div class="flex flex-col flex-1">No results</div>
+		{/if}
+	{:else}
+		{#if browserContext.orderedStudyIds.length > 0}
+			<PaginatedResults
+				count={browserContext.count}
+				perPage={browserContext.limit}
+				page={browserContext.page}
+				onPageChange={onPageChange}
+			>
+				{#each browserContext.orderedStudyIds as sid (sid)}
+					<StudyBlock study={browserContext.StudiesRepo.object(sid)} {mode} />
+				{/each}
+			</PaginatedResults>
+		{:else}
+			<div class="flex flex-col flex-1">No results</div>
+		{/if}
+	{/if}
+{:else if browserContext.queryMode == "studies"}
+	{#if browserContext.orderedStudyIds.length > 0}
+		<PaginatedResults
+			count={browserContext.count}
+			perPage={browserContext.limit}
+			page={browserContext.page}
+			onPageChange={onPageChange}
+		>
+			{#each browserContext.orderedStudyIds as sid (sid)}		
+				<StudyBlock study={browserContext.StudiesRepo.object(sid)} {mode} />
+			{/each}
+		</PaginatedResults>
+	{:else}
+		<div class="flex flex-col flex-1">No results</div>
+	{/if}
 {:else}
     <div class="no-content">No studies found</div>
 {/if}
 
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<!-- <div class="optio">
+	<h3>All optio forms:</h3>
+	<ul class="forms">
+		{#each optio_list as { tag, values }}
+			<li on:click={() => ($selectedOptio = { tag, values })}>
+				{tag}
+			</li>
+		{/each}
+	</ul>
+</div> -->
+
 <style>
-    div.no-content {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-    }
+
 </style>

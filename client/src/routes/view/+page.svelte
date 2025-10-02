@@ -1,44 +1,80 @@
 <script lang="ts">
-    import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
-    import { loadInstances } from "$lib/utils/api";
-    import { page } from "$app/state";
-    import { data } from "$lib/datamodel/model";
     import { browser } from "$app/environment";
+    import { page } from "$app/state";
+    import { FormAnnotationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
+    import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
+    
 
-    const { annotations } = data;
-    // load instances and annotations from URL
+
     function getURLNums(param: string): number[] {
         const params = browser ? page.url.searchParams : new URLSearchParams();
-
-        return (
-            params
-                .get(param)
-                ?.split(",")
-                .map((num) => parseInt(num)) || []
-        );
+        return params.get(param)?.split(",").map((num) => parseInt(num)).filter((n) => !isNaN(n)) || [];
     }
-    const urlInstanceIDs = getURLNums("instances");
-    const urlAnnotationIDs = getURLNums("annotations");
 
-    // collect all instance IDs
-    const instanceIDs = [
-        ...new Set([
-            ...urlInstanceIDs,
-            ...urlAnnotationIDs
-                .map((a) => annotations.get(a))
-                .filter((a) => a && a.instance)
-                .map((a) => a!.instance!.id),
-        ]),
-    ];
+    const urlInstanceIDs = getURLNums("instances");
+    const urlFormAnnotationIDs = getURLNums("form_annotation_ids");
+    const urlSegmentationIDs = getURLNums("segmentation_ids");
+    const urlDeprecatedAnnotationIDs = getURLNums("annotations");
+
+    async function resolveInstanceIDs(): Promise<number[]> {
+        const ids = new Set<number>(urlInstanceIDs);
+
+        for (const id of urlFormAnnotationIDs) {
+            try {
+                const fa = await FormAnnotationsRepo.remoteGet(id);
+                if ((fa as any)?.image_instance_id != null) ids.add((fa as any).image_instance_id as number);
+            } catch {}
+        }
+
+        for (const id of urlDeprecatedAnnotationIDs) {
+            let resolved = false;
+            try {
+                const fa = await FormAnnotationsRepo.remoteGet(id);
+                if ((fa as any)?.image_instance_id != null) { ids.add((fa as any).image_instance_id as number); resolved = true; }
+            } catch {}
+            if (!resolved) {
+                try {
+                    const seg = await SegmentationsRepo.remoteGet(id);
+                    if ((seg as any)?.image_instance_id != null) ids.add((seg as any).image_instance_id as number);
+                } catch {}
+            }
+        }
+
+        for (const id of urlSegmentationIDs) {
+            try {
+                const seg = await SegmentationsRepo.remoteGet(id);
+                if ((seg as any)?.image_instance_id != null) ids.add((seg as any).image_instance_id as number);
+            } catch {}
+        }
+
+        return Array.from(ids);
+    }
+
+    const instanceIDsPromise = resolveInstanceIDs();
 </script>
 
 <svelte:head>
     <title>Eyened viewer</title>
 </svelte:head>
-{#await loadInstances(instanceIDs)}
+{#await instanceIDsPromise}
     <div>Loading:</div>
-{:then _}
+{:then instanceIDs}
     <ViewerWindowLoader {instanceIDs} />
+    <!-- {#await Promise.all(
+        instanceIDs.map((id) =>
+            Instances.fetchOne(id, {
+                with_segmentations: true,
+                with_form_annotations: true,
+                with_model_segmentations: true
+            })
+        )
+    )}
+        <div>Loading:</div>
+    {:then _}
+        <ViewerWindowLoader {instanceIDs} />
+    {:catch error}
+        <div>Error: {error.message}</div>
+    {/await} -->
 {:catch error}
     <div>Error: {error.message}</div>
 {/await}
