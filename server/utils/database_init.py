@@ -36,7 +36,7 @@ def create_database():
     
     # Now create tables using the correct database
     print(settings)
-    database = Database(EyenedORMConfig(database=settings.database))
+    database = Database(settings)
     
     Base.metadata.create_all(database.engine)
 

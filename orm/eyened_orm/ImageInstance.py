@@ -258,6 +258,10 @@ class ImageInstance(ImageInstanceBase, table=True):
         return self.Series.Study
 
     @property
+    def date(self):
+        return self.Study.StudyDate
+
+    @property
     def Patient(self):
         return self.Study.Patient
 
@@ -267,10 +271,10 @@ class ImageInstance(ImageInstanceBase, table=True):
 
     @property
     def path(self) -> Path:
-        return Path(self.config.images_basepath) / self.DatasetIdentifier
+        return self.config.images_basepath / self.DatasetIdentifier
 
     def get_thumbnail_path(self, size: int) -> Path:
-        return Path(self.config.thumbnails_path) / f"{self.ThumbnailPath}_{size}.jpg"
+        return self.config.thumbnails_path / f"{self.ThumbnailPath}_{size}.jpg"
 
     @property
     def url(self):
@@ -292,7 +296,7 @@ class ImageInstance(ImageInstanceBase, table=True):
         elif self.DatasetIdentifier.startswith("[png_series_"):
             prefix, filename = self.DatasetIdentifier.split("]", 1)
             n_files = int(prefix[len("[png_series_") :])
-            base_path = Path(self.config.images_basepath) / filename
+            base_path = self.config.images_basepath / filename
             return np.array(
                 [
                     np.array(Image.open(base_path.parent / f"{base_path.stem}_{i}.png"))

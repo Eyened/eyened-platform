@@ -149,6 +149,11 @@ def run_inference_for_images(
     ids = df_bounds[
         df_bounds["success"]
     ].index.tolist()  # only run on successfully preprocessed images
+
+    if not ids:
+        print("No images to process")
+        return
+
     fpaths = [
         (
             cfi_cache_path / "rgb" / f"{id}.png",
