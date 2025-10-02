@@ -5,17 +5,16 @@ from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
 
 import numpy as np
 from PIL import Image
-from sqlalchemy import Column, Index, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, Index, UniqueConstraint, String, func
 from sqlalchemy.dialects.mysql import LONGBLOB
-from sqlalchemy.orm import Session
-from sqlmodel import Field, Relationship
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
     from eyened_orm import (
-        AnnotationData,
-        AnnotationType,
+        AnnotationData as AnnotationDataType,
+        AnnotationType as AnnotationTypeType,
         Creator,
         Feature,
         ImageInstance,
@@ -25,30 +24,9 @@ if TYPE_CHECKING:
     )
 
 
-class AnnotationBase(Base):
-    """
-    Used for segmentation (i.e. masks)
-    """
+class Annotation(Base):
+    """Annotation metadata and references; actual data lives in AnnotationData."""
 
-    # Patient is required, Study, Series and ImageInstance are optional
-    # TODO: perhaps only ImageInstance is required and the others should be removed
-    PatientID: int = Field(foreign_key="Patient.PatientID")
-
-    StudyID: int | None = Field(foreign_key="Study.StudyID", default=None)
-    SeriesID: int | None = Field(foreign_key="Series.SeriesID", default=None)
-    ImageInstanceID: int | None = Field(
-        foreign_key="ImageInstance.ImageInstanceID", ondelete="CASCADE", default=None
-    )
-    CreatorID: int = Field(foreign_key="Creator.CreatorID")
-    FeatureID: int = Field(foreign_key="Feature.FeatureID")
-    AnnotationTypeID: int = Field(foreign_key="AnnotationType.AnnotationTypeID")
-    AnnotationReferenceID: int | None = Field(
-        foreign_key="Annotation.AnnotationID", default=None
-    )
-    Inactive: bool = False
-
-
-class Annotation(AnnotationBase, table=True):
     __tablename__ = "Annotation"
 
     __table_args__ = (
@@ -61,31 +39,47 @@ class Annotation(AnnotationBase, table=True):
         Index("fk_Annotation_Series1_idx", "SeriesID"),
     )
 
-    AnnotationID: int | None = Field(default=None, primary_key=True)
+    AnnotationID: Mapped[int] = mapped_column(primary_key=True)
 
-    DateInserted: datetime = Field(default_factory=datetime.now)
+    # Patient is required, Study, Series and ImageInstance are optional
+    PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
+    StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
+    SeriesID: Mapped[Optional[int]] = mapped_column(ForeignKey("Series.SeriesID"))
+    ImageInstanceID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE")
+    )
+    CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
+    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
+    AnnotationTypeID: Mapped[int] = mapped_column(
+        ForeignKey("AnnotationType.AnnotationTypeID")
+    )
+    AnnotationReferenceID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("Annotation.AnnotationID", ondelete="CASCADE")
+    )
+    Inactive: Mapped[bool] = mapped_column(default=False)
 
-    Patient: Optional["Patient"] = Relationship(back_populates="Annotations")
-    Study: Optional["Study"] = Relationship(back_populates="Annotations")
-    Series: Optional["Series"] = Relationship(back_populates="Annotations")
-    ImageInstance: Optional["ImageInstance"] = Relationship(
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    Patient: Mapped[Optional["Patient"]] = relationship(back_populates="Annotations")
+    Study: Mapped[Optional["Study"]] = relationship(back_populates="Annotations")
+    Series: Mapped[Optional["Series"]] = relationship(back_populates="Annotations")
+    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
         back_populates="Annotations"
     )
-    Creator: "Creator" = Relationship(back_populates="Annotations")
+    Creator: Mapped["Creator"] = relationship(back_populates="Annotations")
 
-    AnnotationType: "AnnotationType" = Relationship(back_populates="Annotations")
-    AnnotationReference: Optional["Annotation"] = Relationship(
-        back_populates="ChildAnnotations",
-        sa_relationship_kwargs={"remote_side": "Annotation.AnnotationID"},
+    AnnotationType: Mapped["AnnotationType"] = relationship(back_populates="Annotations")
+    AnnotationReference: Mapped[Optional["Annotation"]] = relationship(
+        back_populates="ChildAnnotations", remote_side="Annotation.AnnotationID"
     )
 
-    ChildAnnotations: List["Annotation"] = Relationship(
+    ChildAnnotations: Mapped[List["Annotation"]] = relationship(
         back_populates="AnnotationReference",
-        cascade_delete=True,
+        passive_deletes=True,
     )
     # Actual data is stored in AnnotationData
-    AnnotationData: List["AnnotationData"] = Relationship(
-        back_populates="Annotation", cascade_delete=True
+    AnnotationData: Mapped[List["AnnotationData"]] = relationship(
+        back_populates="Annotation", passive_deletes=True
     )
 
     def __repr__(self):
@@ -126,35 +120,28 @@ def load_binary(filepath: Path, shape) -> np.ndarray:
     return raw.reshape(shape, order="C")
 
 
-class AnnotationDataBase(Base):
-    """
-    This is used for storing the actual data of the annotation
-    """
+class AnnotationData(Base):
+    """Stores the actual data of the annotation (e.g., segmentation)."""
 
-    AnnotationID: int = Field(
-        foreign_key="Annotation.AnnotationID",
-        ondelete="CASCADE",
-        primary_key=True,
-    )
-    # use -1 for all scans (e.g. enface OCT)
-    ScanNr: int = Field(primary_key=True)
-
-    ValueInt: int | None
-    ValueFloat: float | None
-    ValueBlob: bytes | None = Field(sa_column=Column(LONGBLOB))
-
-
-class AnnotationData(AnnotationDataBase, table=True):
     __tablename__ = "AnnotationData"
 
     __table_args__ = (Index("fk_AnnotationData_Annotation1_idx", "AnnotationID"),)
-    Annotation: "Annotation" = Relationship(back_populates="AnnotationData")
 
-    DatasetIdentifier: str = Field(max_length=45, unique=True)
-    DateModified: datetime | None = Field(
-        default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now}
+    AnnotationID: Mapped[int] = mapped_column(
+        ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True
     )
-    MediaType: str = Field(max_length=45)
+    # use -1 for all scans (e.g. enface OCT)
+    ScanNr: Mapped[int] = mapped_column(primary_key=True)
+
+    ValueInt: Mapped[Optional[int]]
+    ValueFloat: Mapped[Optional[float]]
+    ValueBlob: Mapped[Optional[bytes]] = mapped_column(LONGBLOB)
+
+    DatasetIdentifier: Mapped[str] = mapped_column(String(45), unique=True)
+    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+    MediaType: Mapped[str] = mapped_column(String(45))
+
+    Annotation: Mapped["Annotation"] = relationship(back_populates="AnnotationData")
 
     @classmethod
     def create(
@@ -241,12 +228,7 @@ class AnnotationData(AnnotationDataBase, table=True):
         return self.get_mask("questionable")
 
 
-class AnnotationTypeBase(Base):
-    AnnotationTypeName: str = Field(max_length=45)
-    Interpretation: str = Field(max_length=45)
-
-
-class AnnotationType(AnnotationTypeBase, table=True):
+class AnnotationType(Base):
     __tablename__ = "AnnotationType"
 
     __table_args__ = (
@@ -259,6 +241,8 @@ class AnnotationType(AnnotationTypeBase, table=True):
 
     _name_column: ClassVar[str] = "AnnotationTypeName"
 
-    AnnotationTypeID: int = Field(primary_key=True)
+    AnnotationTypeID: Mapped[int] = mapped_column(primary_key=True)
+    AnnotationTypeName: Mapped[str] = mapped_column(String(45))
+    Interpretation: Mapped[str] = mapped_column(String(45))
 
-    Annotations: List["Annotation"] = Relationship(back_populates="AnnotationType")
+    Annotations: Mapped[List["Annotation"]] = relationship(back_populates="AnnotationType")

@@ -15,20 +15,20 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div>
 			<h4>Segmentations:</h4>
-			<table>
+			<table class="bg-white text-sm">
 				<thead>
 					<tr>
-						<th>ID</th>
-						<th>Creator</th>
-						<th>Feature</th>
+						<th class="px-[0.2em] text-left whitespace-nowrap overflow-hidden text-ellipsis">ID</th>
+						<th class="px-[0.2em] text-left whitespace-nowrap overflow-hidden text-ellipsis">Creator</th>
+						<th class="px-[0.2em] text-left whitespace-nowrap overflow-hidden text-ellipsis">Feature</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each $segmentations as segmentation}
 						<tr>
-							<td>{segmentation.id}</td>
-							<td>{segmentation.creator.name}</td>
-							<td>{segmentation.feature.name}</td>
+							<td class="px-[0.2em] text-left whitespace-nowrap overflow-hidden text-ellipsis">{segmentation.id}</td>
+							<td class="px-[0.2em] text-left whitespace-nowrap overflow-hidden text-ellipsis">{segmentation.creator.name}</td>
+							<td class="px-[0.2em] text-left whitespace-nowrap overflow-hidden text-ellipsis">{segmentation.feature.name}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -38,18 +38,5 @@
 </div>
 
 <style>
-	table {
-		background-color: white;
 
-		font-size: small;
-	}
-	td,
-	th {
-		padding: 0.2em;
-		text-align: left;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-    
 </style>

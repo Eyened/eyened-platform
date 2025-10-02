@@ -1,13 +1,13 @@
 <script lang="ts">
-    import { getContext, onDestroy } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { PanelIcon, Trash } from "../icons/icons";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
     import {
         RegistrationTool,
         type PointList,
-    } from "$lib/viewer/tools/Registration";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    } from "$lib/viewer/tools/Registration"
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
+    import { getContext, onDestroy } from "svelte"
+    import { PanelIcon, Trash } from "../icons/icons"
 
     interface Props {
         formAnnotation: FormAnnotation;

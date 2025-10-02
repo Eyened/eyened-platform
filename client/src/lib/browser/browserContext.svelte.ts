@@ -1,97 +1,312 @@
-import { browser } from "$app/environment";
-import { goto } from "$app/navigation";
-import { page } from "$app/state";
-import { loadSearchParams } from "$lib/utils/api";
-import type { Instance } from "$lib/datamodel/instance.svelte";
-import { clearData } from "$lib/datamodel/model";
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import type { InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
+import { getInstancesSignature, getStudiesSignature, InstancesRepo, searchStudies, StudiesRepo } from '../data/repos.svelte';
+
+export type QueryMode = 'studies' | 'instances';
+export type DisplayMode = 'instance' | 'study';
+export type FilterMode = 'basic' | 'advanced';
+
+export type Condition = SearchConditionT;
+export type SignatureField = SignatureFieldT;
+export type InstancesSortBy = SearchQuery['order_by'];
+export type StudiesSortBy = StudySearchQuery['order_by'];
+export type SortDirection = 'ASC' | 'DESC';
+
 
 export class BrowserContext {
+	// Default smallest per current mode
+	getDefaultLimit(): number {
+		return (this.queryMode === 'instances' && this.displayMode === 'instance') ? 100 : 10;
+	}
 
-    selection: number[] = $state([]);
-    loading: boolean = $state(false);
-    next_cursor: string | null = $state(null);
-    no_params_set: boolean = $derived(page.url.searchParams.size === 0);
-    thumbnailSize: number = $state(6);
+	limitOptionsStudies = [10, 20, 30, 40, 50];
+	limitOptionsInstances = [100, 200, 500, 1000];
 
-    constructor(selection: number[]) {
-        this.selection = selection;
-    }
+	selectedIds: number[] = $state([]);
+	queryMode: QueryMode = $state('studies');
+	displayMode: DisplayMode = $state('study');
+	loading: boolean = $state(false);
+	filterMode: FilterMode = $state('basic');
 
-    toggleInstance(instance: Instance) {
-        if (this.selection.includes(instance.id)) {
-            this.selection.splice(this.selection.indexOf(instance.id), 1);
-        } else {
-            this.selection.push(instance.id);
-        }
-    }
+	page: number = $state(0);
+	limit: number = $state(10);
+	count: number = $state(0);
+	sortBy: InstancesSortBy | StudiesSortBy = $state('Study Date');
+	sortDirection: SortDirection = $state('ASC');
 
-    openTab(instances: number[]) {
+	resultIds: Set<number> = $state(new Set());
+
+	// NEW: ordered arrays for rendering
+	orderedInstanceIds: number[] = $state([]);
+	orderedStudyIds: number[] = $state([]);
+
+	// renamed
+	advancedConditions: Condition[] = $state([]);
+
+	// new
+	basicCondition: Condition | null = $state(null);
+
+	// Signature state for dynamic filters
+	instancesSignature: SignatureField[] = $state([]);
+	studiesSignature: SignatureField[] = $state([]);
+
+	StudiesRepo = new StudiesRepo('studies');
+
+	InstanceRepo = new InstancesRepo('instances');
+
+	thumbnailSize: number = $state(6);
+
+	// Derived: depends on queryMode + signatures
+	activeSignature: SignatureField[] = $derived(
+		this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
+	);
+
+	// Derived: selected instances from repo
+	selectedInstances = $derived(
+		this.selectedIds
+			.map(id => this.InstanceRepo.store[id])
+			.filter((x): x is NonNullable<typeof x> => Boolean(x))
+	);
+
+	toggleFilterMode = () => {
+		this.filterMode = this.filterMode === 'basic' ? 'advanced' : 'basic';
+	};
+
+	// Helper to get allowed values (returns [] if type marker)
+	getValueOptions(fieldName: string): string[] {
+		const f = this.activeSignature.find(s => s.name === fieldName);
+		return Array.isArray(f?.values) ? (f!.values as string[]) : [];
+	}
+
+	// Load both signatures
+	loadSignatures = async () => {
+		this.loading = true;
+		try {
+			const [inst, stud] = await Promise.all([getInstancesSignature(), getStudiesSignature()]);
+			this.instancesSignature = inst ?? [];
+			this.studiesSignature = stud ?? [];
+		} finally {
+			this.loading = false;
+		}
+	}
+
+	// Reset state when queryMode changes
+	resetForQueryModeChange = (queryMode: QueryMode) => {
+		this.advancedConditions = [];
+		this.basicCondition = null;
+
+		this.page = 0;
+		this.limit = this.getDefaultLimit();
+		this.count = 0;
+
+		this.sortBy = 'Study Date';
+		this.sortDirection = 'ASC';
+
+		this.resultIds = new Set();
+		this.orderedInstanceIds = [];
+		this.orderedStudyIds = [];
+		this.selectedIds = [];
+
+		if(queryMode == 'instances') {
+			this.displayMode = 'instance';
+			this.limit = this.limitOptionsInstances[0];
+		} else {
+			this.displayMode = 'study';
+			this.limit = this.limitOptionsStudies[0];
+		}
+
+		this.InstanceRepo.clear();
+		this.StudiesRepo.clear();
+	}
+
+	// Compatibility method for search with current conditions
+	search = async () => {
+		const query =
+			this.filterMode === 'advanced'
+				? this.advancedConditions
+				: (this.basicCondition ? [this.basicCondition] : []);
+
+		if (!query.length) return;
+		
+		return this.fetch(query);
+	}
+
+	// Method to load conditions from external source (like URL)
+	loadConditions = (conds: Condition[]) => { 
+		// Preserve legacy callers; default these into advanced
+		this.advancedConditions = conds ?? []; 
+		// If it looks like a single basic condition, also set basic
+		this.basicCondition = conds?.length === 1 ? conds[0] : this.basicCondition;
+	}
+
+	toggleInstance(instance: InstanceMeta) {
+		const i = this.selectedIds.indexOf(instance.id);
+		if (i !== -1) {
+			this.selectedIds.splice(i, 1);
+		} else {
+			this.selectedIds.push(instance.id);
+		}
+	}
+
+	fetch = async (query: Condition[]) => {
+		if (!query.length) {
+			return;
+		}
+
+		// persist conditions for pagination
+		this.advancedConditions = query;
+
+		// reflect in URL
+		const params = new URLSearchParams();
+		const page = this.page;
+		const limit = this.limit;
+		params.set('page', page.toString());
+		params.set('limit', limit.toString());
+		params.set('conditions', encodeConditions(query));
+		params.set('order_by', String(this.sortBy));
+		params.set('order', this.sortDirection);
+		params.set('queryMode', this.queryMode);
+		params.set('displayMode', this.displayMode);
+		params.set('filterMode', this.filterMode);
+		goto(`?${params.toString()}`);
+
+		this.InstanceRepo.clear()
+		this.StudiesRepo.clear()
+		this.loading = true;
+		try {
+			let result_ids: number[] = [];
+			let count = 0;
+
+			if (this.queryMode === 'instances') {
+				const body: SearchQuery = {
+					conditions: query,
+					limit,
+					page,
+					order_by: this.sortBy,
+					order: this.sortDirection ?? 'ASC',
+					include_count: true
+				};
+				
+
+				const res = await InstancesRepo.search(body);
+				this.StudiesRepo.ingest(res.studies ?? []);
+				this.InstanceRepo.ingest(res.instances as any[] ?? []);
+				result_ids = res.result_ids ?? [];
+				count = res.count ?? 0;
+				this.resultIds = new Set(result_ids);
+				this.count = count;
+
+				// NEW: ordered ids for rendering
+				this.orderedInstanceIds = res.result_ids ?? [];
+				this.orderedStudyIds = (res.studies ?? []).map(s => s.id);
+
+				return res;
+			} else {
+				const body: StudySearchQuery = {
+					conditions: query as unknown as StudySearchCondition[],
+					limit,
+					page,
+					order_by: this.sortBy,
+					order: this.sortDirection ?? 'ASC',
+					include_count: true
+				};
+
+				const res = await searchStudies(body);
+				this.StudiesRepo.ingest(res.studies ?? []);
+				this.InstanceRepo.ingest(res.instances as any[] ?? []);
+				result_ids = res.result_ids ?? [];
+				count = res.count ?? 0;
+				this.resultIds = new Set(result_ids);
+				this.count = count;
+
+				// NEW: ordered ids for rendering
+				this.orderedStudyIds = res.result_ids ?? [];
+				this.orderedInstanceIds = [];
+
+				return res;
+			}
+		} finally {
+			this.loading = false;
+		}
+	}
+
+	openTab(instances: number[]) {
 
         const suffix_string = `?instances=${instances}`;
         const url = `${window.location.origin}/view${suffix_string}`;
         window.open(url, '_blank')?.focus();
     }
-
-    async loadDataFromServer() {
-        if (!browser) {
-            return;
-        }
-        if (this.no_params_set) {
-            console.log("no params set");
-            return;
-        }
-
-        this.loading = true;
-        this.selection = [];
-        // removes existing entities from the model
-        clearData();
-
-
-        const next_cursor = await loadSearchParams(page.url.searchParams);
-        this.next_cursor = next_cursor;
-        this.loading = false;
-    }
 }
 
-export async function toggleParam(variable: string, value: string) {
-    if (!browser) return;
-
-    const params = page.url.searchParams;
-    const values = params.getAll(variable);
-    if (values.includes(value)) {
-        values.splice(values.indexOf(value), 1);
-    } else {
-        values.push(value);
-    }
-    params.delete(variable);
-    values.forEach(v => params.append(variable, v));
-    await goto(`?${params.toString()}`);
+// Encoding helpers for URL round-trip
+function serializeValue(value: string | number | string[] | null): string {
+	// JSON string; do NOT pre-encode elements; callers will URI-encode once
+	return JSON.stringify(value);
 }
 
-export async function removeParam(variable: string, value: string) {
-    if (!browser) return;
+function deserializeValue(encoded: string): string | number | string[] | null {
+	// First-level decode of the whole JSON payload
+	const raw = decodeURIComponent(encoded);
+	return JSON.parse(raw);
 
-    const params = page.url.searchParams;
-    const values = params.getAll(variable);
-    const index = values.indexOf(value);
-    if (index >= 0) {
-        values.splice(index, 1);
-        params.delete(variable);
-        values.forEach(v => params.append(variable, v));
-        await goto(`?${params.toString()}`);
-    }
-}
-export async function setParam(variable: string, value: string) {
-    if (!browser) return;
-
-    const params = page.url.searchParams;
-    params.set(variable, value);
-    await goto(`?${params.toString()}`);
 }
 
-export function getParam(variable: string) {
-    if (!browser) return;
+export function encodeConditions(conditions: Condition[]): string {
+	return conditions.map((condition) => {
+		const encodedVariable = encodeURIComponent(condition.variable);
+		const encodedOperator = encodeURIComponent(condition.operator);
+		const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
+		return `${encodedVariable}:${encodedOperator}:${encodedValue}`;
+	}).join(';');
+}
 
-    const params = page.url.searchParams;
-    return params.get(variable);
+export function decodeConditions(urlString: string): Condition[] {
+	if (urlString === '') return [];
+	return urlString.split(';').map((conditionString) => {
+		const [variable, operator, value] = conditionString.split(':');
+		return {
+			variable: decodeURIComponent(variable) as Condition['variable'],
+			operator: decodeURIComponent(operator) as Condition['operator'],
+			value: deserializeValue(value)
+		} as Condition;
+	});
+}
+
+// URL param helpers for component compatibility
+export function getSearchParams(): URLSearchParams {
+	const src = browser ? window.location.search : '';
+	return new URLSearchParams(src);
+}
+
+export async function setParam(key: string, value: string | null) {
+	const params = getSearchParams();
+	params.delete(key);
+	if (value !== null && value !== '') params.set(key, value);
+	await goto(`?${params.toString()}`);
+}
+
+export async function removeParam(key: string, value?: string) {
+	const params = getSearchParams();
+	if (value === undefined) {
+		params.delete(key);
+	} else {
+		const values = params.getAll(key).filter((v) => v !== value);
+		params.delete(key);
+		values.forEach((v) => params.append(key, v));
+	}
+	await goto(`?${params.toString()}`);
+}
+
+export async function toggleParam(key: string, value: string) {
+	const params = getSearchParams();
+	const values = new Set(params.getAll(key));
+	if (values.has(value)) {
+		values.delete(value);
+	} else {
+		values.add(value);
+	}
+	params.delete(key);
+	Array.from(values).forEach((v) => params.append(key, v));
+	await goto(`?${params.toString()}`);
 }

@@ -1,23 +1,28 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import Popup from "$lib/Popup.svelte";
+    import { Toaster } from "$lib/components/ui/sonner";
+    import { GlobalContext } from "$lib/data/globalContext.svelte";
     import Dialogue from "$lib/Dialogue.svelte";
+    import Popup from "$lib/Popup.svelte";
     import { setContext } from "svelte";
-
+    import '../app.css';
+    
     let { children }: { children: any } = $props();
-
+    
     function closePopup() {
         globalContext.popupComponent = null;
     }
+    
     function closeDialogue() {
         globalContext.dialogue = null;
     }
-
+    
     const globalContext = new GlobalContext();
-
+    
     setContext("globalContext", globalContext);
+    
     let ready = $state(false);
+    
     globalContext.init(page.url.pathname).then(() => {
         ready = true;
     });
@@ -33,6 +38,7 @@
 {#if ready}
     {@render children()}
 {/if}
+<Toaster />
 
 <style>
     :global(body) {

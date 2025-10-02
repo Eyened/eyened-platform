@@ -1,11 +1,11 @@
 <script lang="ts">
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { getContext } from "svelte";
-    import NewSegmentation from "./NewSegmentation.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import CreatorSegmentations from "./CreatorSegmentations.svelte";
     import DrawingTools from "./DrawingTools.svelte";
     import ModelSegmentations from "./ModelSegmentations.svelte";
+    import NewSegmentation from "./NewSegmentation.svelte";
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -13,38 +13,30 @@
     }
     let { active }: Props = $props();
 
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 
     // This is used to not render when the panel is collapsed
     // Perhaps there is a cleaner solution?
     $effect(() => {
-        segmentationOverlay.active = active;
+        mainViewerContext.active = active;
     });
 
-    const { segmentationContext, allSegmentations } = segmentationOverlay;
+    const segmentationContext = mainViewerContext.segmentationContext;
 
-    const creators = segmentationOverlay.allSegmentations.collectSet(
-        (s) => s.creator,
-    );
-    const models = segmentationOverlay.allModelSegmentations.collectSet(
-        (s) => s.model,
-    );
-    // hide all on load
-    for (const segmentation of $allSegmentations) {
-        segmentationContext.hideCreators.add(segmentation.creator);
-    }
-    // show own segmentations
-    segmentationContext.hideCreators.delete(creator);
+    $effect(() => {
+        console.log(segmentationContext.visibleSegmentations);
+    });
+
 </script>
 
 <div class="main">
     <div class="models">
         <ul class="users">
-            {#each $models as model}
+            {#each segmentationContext.models.values() as model}
                 <li>
                     <ModelSegmentations {model} />
                 </li>
@@ -57,7 +49,7 @@
             Opacity:
             <input
                 type="range"
-                bind:value={segmentationOverlay.alpha}
+                bind:value={mainViewerContext.alpha}
                 min="0"
                 max="1"
                 step="0.01"
@@ -66,14 +58,13 @@
     </div>
 
     <ul class="users">
-        <!-- show own segmentations first -->
-        {#if $creators.has(creator)}
+        {#if segmentationContext.creators.has(creator.id)}
             <li>
-                <CreatorSegmentations {creator} />
+                <CreatorSegmentations creator={segmentationContext.creators.get(creator.id)!} />
             </li>
         {/if}
-        {#each $creators as creator_}
-            {#if creator_ != creator}
+        {#each segmentationContext.creators.values() as creator_}
+            {#if creator_.id != creator.id}
                 <li>
                     <CreatorSegmentations creator={creator_} />
                 </li>

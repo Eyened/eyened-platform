@@ -1,0 +1,21 @@
+source:
+  host: eyened-server
+  port: 22111
+  user: eyened_du
+  password: oSyn0DQ7hkG986VuNwAfFYSsF
+  database: eyened_database
+
+target:
+  host: eyened-gpu
+  port: 22111
+  user: root
+  password: niGmaqnYuaKO
+  database: eyened_database
+
+copy_objects:
+  - table: Patient
+    clause:
+      PatientIdentifier: '1'
+  - table: Patient
+    clause:
+      PatientIdentifier: '2'

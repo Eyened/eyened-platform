@@ -1,0 +1,10 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+shadcn components are in the components subdirectory (eyened_platform/client/src/lib/components/ui)
+
+When working with shadcn components, always open the documentation in the llms.txt file in the component folder. For example for alert-dialog open eyened_platform/client/src/lib/components/ui/alert-dialog/llms.txt
+
+Note that this documentation is for base bits-ui components. The shadcn-svelte components may include additional props or prop interface changes, so also look at the component files to understand the actual props. The way to import the shadcn components is also different.

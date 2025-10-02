@@ -1,11 +1,11 @@
 <script lang="ts">
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
-    import { BinaryMask, ProbabilityMask } from "$lib/webgl/mask.svelte";
     import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { BinaryMask, ProbabilityMask } from "$lib/webgl/mask.svelte";
+    import { getContext } from "svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
     export interface Props {
-        segmentation: Segmentation;
+        segmentation: SegmentationGET;
         measureTool: MeasureTool;
     }
     let { segmentation, measureTool }: Props = $props();

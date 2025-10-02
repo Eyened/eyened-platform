@@ -1,13 +1,19 @@
 <script lang="ts">
 	import Browser from '$lib/browser/Browser.svelte';
-
+	import Main from '../lib/components/Main.svelte';
 </script>
 
 <svelte:head>
 	<title>Eyened browser</title>
 </svelte:head>
 
-<Browser />
+
+<Main>
+	{#snippet children()}
+		<Browser />
+	{/snippet}
+</Main>
+<!-- <Browser /> -->
 
 <style>
 	:global(body) {

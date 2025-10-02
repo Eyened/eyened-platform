@@ -1,16 +1,14 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { loadInstances } from "$lib/utils/api";
-import type { Creator } from "$lib/datamodel/creator.svelte";
-import type { Instance } from "$lib/datamodel/instance.svelte";
-import { data } from "$lib/datamodel/model";
+import { FormAnnotationsRepo, InstancesRepo, ModelSegmentationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
-import MainViewer from './MainViewer.svelte';
 import { readonly, writable, type Readable } from "svelte/store";
+import type { InstanceGET } from "../../types/openapi_types";
+import MainViewer from './MainViewer.svelte';
 
 export type MainPanelType = {
     component: any;
@@ -43,10 +41,15 @@ export class ViewerWindowContext {
     private frame: number = 0;
     private unsubscribe: () => void;
 
+    Instances = new InstancesRepo('viewer-window');
+    FormAnnotations = new FormAnnotationsRepo('viewer-window');
+    Segmentations = new SegmentationsRepo('viewer-window');
+    ModelSegmentations = new ModelSegmentationsRepo('viewer-window');
+
     constructor(
         public readonly webgl: WebGL,
         public readonly registration: Registration,
-        public readonly creator: Creator,
+        public readonly creator: unknown,
         instanceIDs: number[] = [],
     ) {
         this.imageLoader = new ImageLoader(webgl);
@@ -59,7 +62,7 @@ export class ViewerWindowContext {
         loop();
         this.unsubscribe = this._instanceIds.subscribe((ids) => {
             for (const id of ids) {
-                const instance = data.instances.get(id);
+                const instance = this.Instances.store[id] as InstanceGET | undefined;
                 if (instance) {
                     this.loadImage(instance);
                 } else {
@@ -91,8 +94,18 @@ export class ViewerWindowContext {
 
     async setInstanceIDs(ids: number[]) {
         // ensure metadata of all instances is loaded
-        const missingIds = ids.filter((id) => !data.instances.has(id));
-        await loadInstances(missingIds);
+        const missingIds = ids.filter((id) => !this.Instances.store[id]);
+        if (missingIds.length) {
+            const instances = await Promise.all(missingIds.map((id) => this.Instances.fetchOne(id, {
+                with_segmentations: true,
+                with_form_annotations: true,
+                with_model_segmentations: true
+            })));
+            this.FormAnnotations.ingest(instances.flatMap((instance) => instance.$.form_annotations!));
+            this.Segmentations.ingest(instances.flatMap((instance) => instance.$.segmentations!));
+            this.ModelSegmentations.ingest(instances.flatMap((instance) => instance.$.model_segmentations!));
+        }
+
         this._instanceIds.set(ids);
     }
 
@@ -102,7 +115,7 @@ export class ViewerWindowContext {
         cancelAnimationFrame(this.frame)
     }
 
-    async loadImage(instance: Instance): Promise<LoadedImages> {
+    async loadImage(instance: InstanceGET): Promise<LoadedImages> {
         // Start loading if not already in progress
         if (!this.imagesIndex.has(instance.id)) {
             const loadPromise = this.imageLoader.load(instance).then(loadedImages => {
@@ -113,12 +126,12 @@ export class ViewerWindowContext {
                 }
 
                 // Set up indices
-                this.byDatasetIdentifier.set(instance.datasetIdentifier, loadedImages);
-                this.bySOPInstanceUID.set(instance.SOPInstanceUid, loadedImages);
+                this.byDatasetIdentifier.set(instance.dataset_identifier, loadedImages);
+                this.bySOPInstanceUID.set(instance.sop_instance_uid, loadedImages);
 
                 // Create viewer contexts
                 for (const image of loadedImages) {
-                    this.topViewers.set(image, new ViewerContext(image, this.registration));
+                    this.topViewers.set(image, new ViewerContext(image, this));
                 }
 
                 return loadedImages;
@@ -136,7 +149,7 @@ export class ViewerWindowContext {
 
         for (const locator of photoLocators) {
             for (const key of ['enfaceImageId', 'octImageId']) {
-                const image_id = locator[key as keyof PhotoLocator];
+                const image_id = String(locator[key as keyof PhotoLocator]);
                 if (!this.photoLocators.has(image_id)) {
                     this.photoLocators.set(image_id, []);
                 }
@@ -169,12 +182,15 @@ export class ViewerWindowContext {
     }
 
     getImages(instanceID: number): Promise<LoadedImages> {
-        const instance = data.instances.get(instanceID);
+        const instance = this.Instances.store[instanceID] as InstanceGET | undefined;
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);
         }
         return this.loadImage(instance);
     }
 
+    get formAnnotationsRepo() { 
+        return this.FormAnnotations; 
+    }
 
 }

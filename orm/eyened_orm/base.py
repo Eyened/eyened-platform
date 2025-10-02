@@ -11,34 +11,8 @@ from typing import (
 )
 
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
-from pydantic import create_model
-from sqlalchemy import Column, select
-from sqlalchemy.orm import Session
-from sqlmodel import Field, SQLModel
-
-
-
-
-def create_patch_model(name: str, base_model: type[SQLModel]) -> type[SQLModel]:
-    """Create a Pydantic model with all fields optional useful for patching"""
-
-    def get_field_type(field: Field) -> Any:
-        if isinstance(field.annotation, type) and issubclass(
-            field.annotation, enum.Enum
-        ):
-            # for enums, accept string values
-            return Optional[str]
-        return Optional[field.annotation]
-
-    return create_model(
-        name,
-        __base__=SQLModel,
-        **{
-            field_name: (get_field_type(field), None)
-            for field_name, field in base_model.model_fields.items()
-            if not (field.json_schema_extra or {}).get("private", False)
-        },
-    )
+from sqlalchemy import Column, Index, UniqueConstraint, select
+from sqlalchemy.orm import DeclarativeBase, Session
 
 
 def _convert_property_name(name: str) -> str:
@@ -64,15 +38,12 @@ def _convert_property_name(name: str) -> str:
 def _get_attribute_with_conversion(obj, name: str) -> Any:
     """Helper function to get attribute with name conversion."""
     try:
-        # First try to get the attribute directly
         return super(type(obj), obj).__getattribute__(name)
     except AttributeError:
-        # If not found, try converting the name
         converted_name = _convert_property_name(name)
         try:
             return super(type(obj), obj).__getattribute__(converted_name)
         except AttributeError:
-            # If still not found, raise the original AttributeError
             obj_name = obj.__name__ if isinstance(obj, type) else obj.__class__.__name__
             raise AttributeError(
                 f"'{obj_name}' has no attribute '{name}' or '{converted_name}'"
@@ -82,20 +53,26 @@ def _get_attribute_with_conversion(obj, name: str) -> Any:
 T = TypeVar("T", bound="Base")
 
 
-class Base(SQLModel):
-    """Base class for all ORM models with common functionality."""
+def ForeignKeyIndex(src_table: str, ref_table: str, column_name: str) -> Index:
+    """Convenience helper to create a standard FK index name and definition."""
+    return Index(f"fk_{src_table}_{ref_table}1_idx", column_name)
 
-    # Common class variables
+
+def CompositeUniqueConstraint(name: str, *column_names: str) -> UniqueConstraint:
+    """Convenience helper to define a composite unique constraint."""
+    return UniqueConstraint(*column_names, name=name)
+
+
+class Base(DeclarativeBase):
+    """SQLAlchemy Declarative base with common helpers and utilities."""
+
     _name_column: ClassVar[str | None] = None
-
-    class Config:
-        use_enum_values = False  # This tells Pydantic NOT to convert Enum to .value
-        json_encoders = {enum.Enum: lambda x: x.name if isinstance(x, enum.Enum) else x}
 
     @property
     def session(self):
-        """Get the session this object is attached to"""
+        """Get the session this object is attached to."""
         from sqlalchemy.orm import object_session
+
         session = object_session(self)
         if not session:
             raise ValueError("Object not attached to a session")
@@ -103,22 +80,20 @@ class Base(SQLModel):
 
     @property
     def config(self):
-        """Get config from session"""
-        if not hasattr(self.session, 'config'):
+        """Get config from the attached session."""
+        if not hasattr(self.session, "config"):
             raise ValueError("Session not properly configured")
         return self.session.config
 
     @property
     def storage_manager(self) -> ZarrStorageManager:
-        """Get storage manager from session"""
-        if not hasattr(self.session, 'storage_manager'):
+        """Get storage manager from the attached session."""
+        if not hasattr(self.session, "storage_manager"):
             raise ValueError("Session not properly configured")
         return self.session.storage_manager
 
     def __getattr__(self, name: str) -> Any:
-        """Override attribute access to handle property name conversion.
-        python style attribute names are converted to capitalized camel case SQL column names.
-        """
+        """Resolve missing attributes by converting snake_case to CamelCase column names."""
         return _get_attribute_with_conversion(self, name)
 
     @classmethod
@@ -215,50 +190,34 @@ class Base(SQLModel):
 
     @classmethod
     def _base_joins(cls, statement):
-        """Override this method to add custom joins to queries. """
+        """Override this method to add custom joins to queries."""
         return statement
     
     @classmethod
     def where(cls: Type[T], session: Session, condition, include_inactive=False, **kwargs) -> List[T]:
-        """Query objects with a custom condition and optional joins.
-        
-        Args:
-            session: SQLAlchemy session
-            condition: SQLAlchemy condition
-            include_inactive: Whether to include inactive records (if model has Inactive column)
-            **kwargs: Additional keyword arguments to pass to session.scalars()
-        
-        Returns:
-            List of objects matching the condition
-        """
+        """Query objects with a custom condition and optional joins."""
         statement = select(cls)
-        
-        # Add inactive filter if model has Inactive column and include_inactive is False
-        if not include_inactive and hasattr(cls, 'Inactive'):
+
+        if not include_inactive and hasattr(cls, "Inactive"):
             statement = statement.where(~cls.Inactive)
-        
-        # Apply custom joins
+
         statement = cls._base_joins(statement)
-        
-        # Add the main condition
         statement = statement.where(condition)
-        
+
         return session.scalars(statement, **kwargs).all()
 
     def get_value(self, column: Column):
         val = getattr(self, column.name)
         if isinstance(val, enum.Enum):
-            return val.name
+            return val.value
         return val
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert the object to a dictionary."""
+        """Convert the object to a dictionary, skipping columns marked private."""
         return {
             c.name: self.get_value(c)
             for c in self.columns()
-            if not (self.__class__.model_fields[c.name].json_schema_extra or {}).get(
-                "private", False
-            )
+            if not (getattr(c, "info", None) or {}).get("private", False)
         }
 
     def to_list(self) -> List[Any]:

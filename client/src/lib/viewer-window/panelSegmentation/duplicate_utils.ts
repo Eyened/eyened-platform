@@ -1,16 +1,15 @@
 import type { Datatype } from "$lib/datamodel/segmentation.svelte";
 
+import type { GlobalContext } from "$lib/data/globalContext.svelte";
+import type { DataRepresentation, SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
 import { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import type { DataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import { convert } from "$lib/webgl/segmentationConverter";
-import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 import { NPYArray } from "$lib/utils/npy_loader";
-import type { DrawingArray } from "$lib/webgl/mask.svelte";
-import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { DrawingArray } from "$lib/webgl/mask.svelte";
+import { convert } from "$lib/webgl/segmentationConverter";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
     Q: "DualBitMask",
@@ -65,27 +64,27 @@ function copyMaskData(
 }
 
 export async function duplicate(globalContext: GlobalContext,
-    segmentation: Segmentation, segmentationItem: SegmentationItem,
+    segmentation: SegmentationGET | ModelSegmentationGET, segmentationItem: SegmentationItem,
     image: AbstractImage,
     viewerContext: ViewerContext,
     duplicateVolume: boolean,
     type: "Q" | "B" | "P",
-    creator: Creator) {
+    creatorId: number) {
     globalContext.dialogue = `Duplicating segmentation ${segmentation.id}...`;
 
     let dataRepresentation: DataRepresentation;
     if (
-        segmentation.dataRepresentation == "MultiClass" ||
-        segmentation.dataRepresentation == "MultiLabel"
+        segmentation.data_representation == "MultiClass" ||
+        segmentation.data_representation == "MultiLabel"
     ) {
         // same as original annotation type
-        dataRepresentation = segmentation.dataRepresentation;
+        dataRepresentation = segmentation.data_representation;
     } else {
         // new annotation can be of different type
         dataRepresentation = types[type];
     }
 
-    let dataType = segmentation.dataType;
+    let dataType = segmentation.data_type;
     if (dataRepresentation == "Probability") {
         dataType = "R8";
     }
@@ -94,21 +93,21 @@ export async function duplicate(globalContext: GlobalContext,
         dataRepresentation,
         dataType,
         // properties that need to be mentioned explicitly, because they're marked with $state and hence not enumerable
-        referenceId: segmentation.referenceId,
-        scanIndices: segmentation.scanIndices,
+        referenceId: segmentation.reference_segmentation_id,
+        scanIndices: segmentation.scan_indices,
         threshold: segmentation.threshold,
 
         // overwrite creatorId to current user
-        creatorId: creator.id,
+        creatorId: creatorId,
     };
 
     const scanNr = viewerContext.index;
 
     let depth = 1;
     if (duplicateVolume) {
-        if (segmentation.scanIndices) {
+        if (segmentation.scan_indices) {
             // only upload the data for active scan indices
-            depth = segmentation.scanIndices.length;
+            depth = segmentation.scan_indices.length;
         } else {
             // upload the full volume
             depth = image.depth;
@@ -120,7 +119,7 @@ export async function duplicate(globalContext: GlobalContext,
 
     const array = createArray(
         [depth, image.height, image.width],
-        segmentation.dataType,
+        segmentation.data_type,
     );
     if (image.image_id.endsWith("proj")) {
         array.shape = [image.height, 1, image.width];

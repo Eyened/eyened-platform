@@ -3,18 +3,16 @@
 Some UI components on the top right of the viewer window.
 -->
 <script lang="ts">
-	import { getContext, onMount } from 'svelte';
-	import type { ViewerWindowContext } from './viewerWindowContext.svelte';
-	import MainIcon from './icons/MainIcon.svelte';
-	import MultiImageViewer from './MultiImageViewer.svelte';
+	import type { GlobalContext } from '$lib/data/globalContext.svelte';
 	import { data } from '$lib/datamodel/model';
 	import { Image2D } from '$lib/webgl/image2D';
-	import UserMenu from '$lib/UserMenu.svelte';
-	import type { GlobalContext } from '$lib/data-loading/globalContext.svelte';
+	import { getContext, onMount } from 'svelte';
+	import MainIcon from './icons/MainIcon.svelte';
+	import MultiImageViewer from './MultiImageViewer.svelte';
+	import type { ViewerWindowContext } from './viewerWindowContext.svelte';
 	
     const globalContext = getContext<GlobalContext>('globalContext');
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
-	const { creator } = viewerWindowContext;
 	const { instances } = data;
 
 	let firstCFIImage: undefined | Image2D = $state(undefined);
@@ -25,13 +23,12 @@ Some UI components on the top right of the viewer window.
 		}
 	});
 
-	const initials = creator.name
+	const initials = globalContext.user.username
 		.split(' ')
 		.map((name) => name[0])
 		.join('');
 
 	function showUserMenu() {
-		globalContext.popupComponent = { component: UserMenu };
 	}
 	function browse() {
 		viewerWindowContext.browserOverlay = true;
@@ -46,7 +43,7 @@ Some UI components on the top right of the viewer window.
 </script>
 
 <div id="main">
-	<MainIcon onclick={showUserMenu} tooltip={creator.name}>
+	<MainIcon onclick={showUserMenu} tooltip={globalContext.user.username}>
 		{#snippet iconSnippet()}
 			<span class="icon">{initials}</span>
 		{/snippet}
@@ -56,14 +53,6 @@ Some UI components on the top right of the viewer window.
 			<span class="icon">+</span>
 		{/snippet}
 	</MainIcon>
-	<!-- 
-	{#if firstCFIImage}
-		<MainIcon onclick={addMultiImageRendering} tooltip={'?'}>
-			{#snippet icon()}
-				<span class="icon">?</span>
-			{/snippet}
-		</MainIcon>
-	{/if} -->
 </div>
 
 <style>

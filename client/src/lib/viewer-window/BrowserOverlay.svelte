@@ -1,43 +1,25 @@
 <script lang="ts">
-    import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
-    import { getContext, setContext } from "svelte";
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
-    import { data } from "$lib/datamodel/model";
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import { BrowserContext } from "$lib/browser/browserContext.svelte";
     import BrowserContent from "$lib/browser/BrowserContent.svelte";
-    import { loadParams } from "$lib/utils/api";
+    import { BrowserContext } from "$lib/browser/browserContext.svelte";
+    import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
+    import { SubTasksRepo } from "$lib/data/repos.svelte";
     import type { TaskContext } from "$lib/types";
-    import { SubTaskImageLink } from "$lib/datamodel/subTask.svelte";
+    import { getContext, setContext } from "svelte";
+    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     interface Props {
         viewerWindowContext: ViewerWindowContext;
     }
 
     let { viewerWindowContext }: Props = $props();
-    const { subTaskImageLinks } = data;
     const instanceIds = viewerWindowContext.instanceIds;
     const initialInstanceIds = $instanceIds.slice();
 
     const browserContext = new BrowserContext(initialInstanceIds);
 
     setContext("browserContext", browserContext);
-
-    const patientIdentifiers = [
-        ...new Set(
-            initialInstanceIds.map(
-                (i) => data.instances.get(i)!.patient.identifier,
-            ),
-        ),
-    ];
-    const loading = loadParams({ PatientIdentifier: patientIdentifiers });
-    const patients = data.patients.filter((patient) =>
-        patientIdentifiers.includes(patient.identifier),
-    );
-    const instances = data.instances.filter((instance) =>
-        patientIdentifiers.includes(instance.patient.identifier),
-    );
 
     const taskContext = getContext<TaskContext>("taskContext");
     const subTask = taskContext?.subTask;
@@ -48,7 +30,7 @@
     function close() {
         viewerWindowContext.closeBrowserOverlay();
 
-        const currentInstanceIds = [...browserContext.selection];
+        const currentInstanceIds = [...browserContext.selectedIds];
         if (subTask) {
             if (updateImageLinks) {
                 updateSubTaskImageLinks(currentInstanceIds);
@@ -62,7 +44,7 @@
         viewerWindowContext.setInstanceIDs(currentInstanceIds);
     }
 
-    function updateSubTaskImageLinks(currentInstanceIds: number[]) {
+    async function updateSubTaskImageLinks(currentInstanceIds: number[]) {
         const newInstanceIds = currentInstanceIds.filter(
             (id) => !initialInstanceIds.includes(id),
         );
@@ -70,20 +52,13 @@
             (id) => !currentInstanceIds.includes(id),
         );
 
+        const SubTasks = new SubTasksRepo('browser-overlay');
+        const subTaskObj = SubTasks.object(subTask!.id);
         for (const instanceId of newInstanceIds) {
-            SubTaskImageLink.create({ subTaskId: subTask.id, instanceId });
+            await subTaskObj.addImage(instanceId);
         }
         for (const instanceId of removedInstanceIds) {
-            const link = subTaskImageLinks.find(
-                (link) =>
-                    link.subTaskId == subTask.id &&
-                    link.instanceId == instanceId,
-            );
-            if (link) {
-                link.delete();
-            } else {
-                console.error("Could not find link to delete");
-            }
+            await subTaskObj.removeImage(instanceId);
         }
     }
 </script>
@@ -101,20 +76,12 @@
         <button class="close-button" onclick={close}>Close</button>
     </div>
     <div id="selection">
-        {#each browserContext.selection.map((i) => data.instances.get(i)!) as instance (instance.id)}
+        {#each browserContext.selectedInstances as instance (instance.id)}
             <InstanceComponent {instance} />
         {/each}
     </div>
     <div id="content">
-        {#await loading}
-            <div class="loader">Loading...</div>
-        {:then}
-            <BrowserContent
-                mode="overlay"
-                instances={$instances}
-                patients={$patients}
-            />
-        {/await}
+        <BrowserContent mode="overlay" />
     </div>
 </div>
 

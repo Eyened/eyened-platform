@@ -1,27 +1,36 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte";
-    import { data } from "$lib/datamodel/model";
-    import { Segmentation, type Datatype } from "$lib/datamodel/segmentation.svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
+    import { getContext, onMount } from "svelte";
+    import * as Select from "../../components/ui/select";
+    import { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
     export interface Props {
         dataRepresentation: "MultiLabel" | "MultiClass";
     }
 
     const { dataRepresentation }: Props = $props();
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
         const { image, axis } = viewerContext;
     const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const segmentationContext = segmentationOverlay.segmentationContext;
-    const { creator } = globalContext;
+    const segmentationContext = mainViewerContext.segmentationContext;
+    const { user: creator } = globalContext;
     const compositeFeatures = getCompositeFeatures();
-    const features = data.features;
+
+    onMount(async () => {
+        await globalContext.ensureFeaturesLoaded();
+    });
+
+    // Use repo to drive the UI list of parents-with-subfeatures
+    const featuresWithSubfeatures = $derived(
+        globalContext.features.all.filter(f => (f.subfeatures ?? []).length > 0)
+    );
 
 
     let selectedFeatureId: number | undefined = $state(undefined);
@@ -32,33 +41,53 @@
         globalContext.dialogue = `Creating annotation...`;
 
         let dataType: Datatype = "R8UI";
-        const feature = features.get(selectedFeatureId)!;
 
-        await Segmentation.createFrom(
+        await viewerWindowContext.Segmentations.createFrom(
             image,
-            feature,
-            creator,
+            selectedFeatureId,
             dataRepresentation,
             dataType,
             0.5,
             axis,
         );
-        segmentationContext.hideCreators.delete(creator);
+        segmentationContext.creatorHidden.set(creator.id, false);
+
         globalContext.dialogue = null;
     }
     
 </script>
 
+<!-- <Select.Root type="single">
+  <Select.Trigger class="w-[180px]"></Select.Trigger>
+  <Select.Content>
+    <Select.Item value="light">Light</Select.Item>
+    <Select.Item value="dark">Dark</Select.Item>
+    <Select.Item value="system">System</Select.Item>
+  </Select.Content>
+</Select.Root> -->
+
 <div class="multi">
     <div class="header">{dataRepresentation}</div>
     <form onsubmit={create}>
-        <select bind:value={selectedFeatureId}>
-            {#each $compositeFeatures.keys() as parentFeatureId}
-                <option value={parentFeatureId}>
-                    {features.get(parentFeatureId)!.name}
+        <Select.Root type="single" bind:value={selectedFeatureId} size="xs">
+            <Select.Trigger class="w-[180px]">
+                {selectedFeatureId ? featuresWithSubfeatures.find(f => f.id === selectedFeatureId)?.name : "Select feature"}
+            </Select.Trigger>
+            <Select.Content>
+                {#each featuresWithSubfeatures as f}
+                    <Select.Item value={f.id}>
+                        {f.name}
+                    </Select.Item>
+                {/each}
+            </Select.Content>
+        </Select.Root>
+        <!-- <select bind:value={selectedFeatureId}>
+            {#each featuresWithSubfeatures as f}
+                <option value={f.id}>
+                    {f.name}
                 </option>
             {/each}
-        </select>
+        </select> -->
         <button type="submit" disabled={selectedFeatureId == undefined}>
             Create
         </button>

@@ -11,87 +11,104 @@ import numpy as np
 import pandas as pd
 import pydicom
 from PIL import Image
-from sqlalchemy import Column, Index, select
+from sqlalchemy import Column, ForeignKey, Index, String, Text, select, func, Enum as SAEnum
 from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
-from sqlalchemy.orm import Session
-from sqlmodel import Field, Relationship
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, Creator, Series
+    from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series
 
 
 class Laterality(Enum):
-    L = 1
-    R = 2
+    L = "L"
+    R = "R"
 
 
 class ModalityType(Enum):
     # thus far only encountered OP, OPT, SC
     # should perhaps be extended (https://dicom.nema.org/medical/Dicom/2024d/output/chtml/part16/chapter_D.html)
     # Ophthalmic Photography
-    OP = 1
+    OP = "OP"
     # Ophthalmic Photography Tomography (used for OCT)
-    OPT = 2
+    OPT = "OPT"
     # Secondary Capture
-    SC = 3
+    SC = "SC"
 
 
 class Modality(Enum):
     # custom selection of commonly used ophthalmic modalities
 
-    AdaptiveOptics = 1
-    ColorFundus = 2
-    ColorFundusStereo = 3
-    RedFreeFundus = 4
-    ExternalEye = 5
-    LensPhotograph = 6
-    Ophthalmoscope = 7
+    AdaptiveOptics = "AdaptiveOptics"
+    ColorFundus = "ColorFundus"
+    ColorFundusStereo = "ColorFundusStereo"
+    RedFreeFundus = "RedFreeFundus"
+    ExternalEye = "ExternalEye"
+    LensPhotograph = "LensPhotograph"
+    Ophthalmoscope = "Ophthalmoscope"
 
-    Autofluorescence = 8
-    FluoresceinAngiography = 9
-    ICGA = 10
+    Autofluorescence = "Autofluorescence"
+    FluoresceinAngiography = "FluoresceinAngiography"
+    ICGA = "ICGA"
 
-    InfraredReflectance = 11
-    BlueReflectance = 12
-    GreenReflectance = 13
+    InfraredReflectance = "InfraredReflectance"
+    BlueReflectance = "BlueReflectance"
+    GreenReflectance = "GreenReflectance"
 
-    OCT = 14
-    OCTA = 15
+    OCT = "OCT"
+    OCTA = "OCTA"
 
 
 class ETDRSField(Enum):
-    F1 = 1
-    F2 = 2
-    F3 = 3
-    F4 = 4
-    F5 = 5
-    F6 = 6
-    F7 = 7
-
-class AxisEnum(Enum):
-    WIDTH = 0
-    HEIGHT = 1
-    DEPTH = 2
+    F1 = "F1"
+    F2 = "F2"
+    F3 = "F3"
+    F4 = "F4"
+    F5 = "F5"
+    F6 = "F6"
+    F7 = "F7"
 
 
-class ImageInstanceBase(Base):
-    SeriesID: int | None = Field(foreign_key="Series.SeriesID", ondelete="CASCADE", default=None)
-    SourceInfoID: int | None = Field(foreign_key="SourceInfo.SourceInfoID", default=None)
-    DeviceInstanceID: int | None = Field(foreign_key="DeviceInstance.DeviceInstanceID", default=None)
+class ImageInstance(Base):
+    __tablename__ = "ImageInstance"
+    __table_args__ = (
+        Index("fk_ImageInstance_Series1_idx", "SeriesID"),
+        Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
+        Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
+        Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
+        Index("fk_ImageInstance_Scan1_idx", "ScanID"),
+        Index(
+            "SOPInstanceUid_UNIQUE",
+            "SOPInstanceUid",
+            unique=True,
+        ),
+        Index(
+            "SourceInfoIDDatasetIdentifier_UNIQUE",
+            "DatasetIdentifier",
+            "SourceInfoID",
+            unique=True,
+        ),
+    )
+
+    ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
+
+    # repeating field, but non-nullable
+    SeriesID: Mapped[int] = mapped_column(ForeignKey("Series.SeriesID", ondelete="CASCADE"))
+    SourceInfoID: Mapped[int] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"))
+    DeviceInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("DeviceInstance.DeviceInstanceID"))
     # TODO: redundant with Modality enum
-    ModalityID: int | None = Field(foreign_key="Modality.ModalityID", default=None)
-    ScanID: int | None = Field(foreign_key="Scan.ScanID", default=None)
+    ModalityID: Mapped[int] = mapped_column(ForeignKey("Modality.ModalityID"))
+    ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
 
     # Image modality
-    Modality: Optional[Modality]
+    Modality: Mapped[Optional[Modality]] = mapped_column(SAEnum(Modality))
     
     # DICOM metadata
-    SOPInstanceUid: str | None = Field(max_length=64, default=None)
-    SOPClassUid: str | None = Field(max_length=64, default=None)
-    PhotometricInterpretation: str | None = Field(max_length=64, default=None)
-    SamplesPerPixel: int | None
+    SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64))
+    SOPClassUid: Mapped[Optional[str]] = mapped_column(String(64))
+    PhotometricInterpretation: Mapped[Optional[str]] = mapped_column(String(64))
+    SamplesPerPixel: Mapped[Optional[int]]
 
     # image dimensions
     # Note on image orientation conventions:
@@ -107,139 +124,87 @@ class ImageInstanceBase(Base):
     #     - Columns: width of the B-scan (lateral <-> temporal)
     #     - NrOfFrames: number of B-scans (superior <-> inferior for horizontal B-scan)
     
-    Rows_y: int | None  # Height of the image (in pixels)
-    Columns_x: int | None  # Width of the image (in pixels)
-    NrOfFrames: int | None  # Used to for number of B-scans in OCT
+    Rows_y: Mapped[Optional[int]]  # Height of the image (in pixels)
+    Columns_x: Mapped[Optional[int]]  # Width of the image (in pixels)
+    NrOfFrames: Mapped[Optional[int]]  # Used to for number of B-scans in OCT
 
     # resolution (all in millimeters)
-    SliceThickness: float | None  # Nominal slice thickness for raster OCT scans
-    ResolutionAxial: float | None  # OCT-depth resolution (vitreous <-> choroid)
-    ResolutionHorizontal: float | None  # Enface resolution (lateral <-> temporal)
-    ResolutionVertical: float | None  # Enface resolution (superior <-> inferior)
+    SliceThickness: Mapped[Optional[float]]  # Nominal slice thickness for raster OCT scans
+    ResolutionAxial: Mapped[Optional[float]]  # OCT-depth resolution (vitreous <-> choroid)
+    ResolutionHorizontal: Mapped[Optional[float]]  # Enface resolution (lateral <-> temporal)
+    ResolutionVertical: Mapped[Optional[float]]  # Enface resolution (superior <-> inferior)
 
-    HorizontalFieldOfView: float | None  # in degrees
+    HorizontalFieldOfView: Mapped[Optional[float]]  # in degrees
 
-    Laterality: Optional[Laterality]  # L or R
-    DICOMModality: Optional[ModalityType]  # OP, OPT, SC
-    AnatomicRegion: int | None  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
-    ETDRSField: Optional[ETDRSField]  # F1-F7
-    Angiography: int | None  # 0 = non-angiography, 1 = angiography
+    Laterality: Mapped[Optional[Laterality]] = mapped_column(SAEnum(Laterality))  # L or R
+    DICOMModality: Mapped[Optional[ModalityType]] = mapped_column(SAEnum(ModalityType))  # OP, OPT, SC
+    AnatomicRegion: Mapped[Optional[int]]  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
+    ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(SAEnum(ETDRSField))  # F1-F7
+    Angiography: Mapped[Optional[int]]  # 0 = non-angiography, 1 = angiography
 
     AcquisitionDateTime: (
-        datetime | None
+        Mapped[Optional[datetime]]
     )  # Date and time the acquisition of data started
-    PupilDilated: bool | None
+    PupilDilated: Mapped[Optional[bool]]
 
     # Relative filepath to the image file
-    DatasetIdentifier: str = Field(max_length=256)
+    DatasetIdentifier: Mapped[str] = mapped_column(String(256))
 
     # identifier for the thumbnail (project_id/thumbnail_name), needs suffix for different sizes
-    ThumbnailPath: str | None = Field(max_length=256)
+    ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(256))
 
     # Used to link to IDs of the image in the source database
-    OldPath: str | None = Field(max_length=256)
-    FDAIdentifier: int | None
+    OldPath: Mapped[Optional[str]] = mapped_column(String(256))
+    FDAIdentifier: Mapped[Optional[int]]
 
     # Considered removed from the database
-    Inactive: bool = False
+    Inactive: Mapped[bool] = mapped_column(default=False)
 
     # Fundus-specific columns
-    # CFROI contains the fundus bounds, eg.
-    # {
-    #     "lines": {},
-    #     "max_x": 2048,
-    #     "max_y": 1536,
-    #     "min_x": 0,
-    #     "min_y": 0,
-    #     "center": [1021.7938260323712, 751.6328910976617],
-    #     "radius": 688.1397816206166,
-    # }
-    # Can be read by CFIBounds from rtnls_fundusprep
-
-    CFROI: Optional[Dict[str, Any]] = Field(sa_column=Column(JSON))
-    # CFKeypoints holds fundus keypoint data
-    # {
-    #     "fovea_xy": [525.3117339804495, 781.470218347899],
-    #     "disc_edge_xy": [1038.7284831576292, 778.7821723259435],
-    #     "prep_fovea_xy": [142.60000610351562, 534.2000122070312],
-    #     "prep_disc_edge_xy": [524.5999755859375, 532.2000122070312]
-    # }
-    # keys prefixed with prep are keypoint locations in the preprocessed image
-    CFKeypoints: Optional[Dict[str, Any]] = Field(sa_column=Column(JSON))
-    # Model assessment of fundus quality
-    CFQuality: float | None
+    CFROI: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    CFKeypoints: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    CFQuality: Mapped[Optional[float]]
 
     # File checksum and data hash
-    # FileChecksum is an MD5 hash of the file.
-    # stored in case we want to someday implement file integrity checks
-    # not meant to be used for duplicate checks
-    FileChecksum: bytes | None = Field(sa_column=Column(TINYBLOB))
-    # DataHash is the hash of the raw, uncompressed and decoded image information
-    # used to prevent the insertion of duplicate images
-    # and detect duplicates even when the metadata might be different
-    DataHash: bytes | None = Field(sa_column=Column(TINYBLOB))
+    FileChecksum: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
+    DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
 
-
-class ImageInstance(ImageInstanceBase, table=True):
-    __tablename__ = "ImageInstance"
-    __table_args__ = (
-        Index("fk_ImageInstance_Series1_idx", "SeriesID"),
-        Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
-        Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
-        Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
-        Index("fk_ImageInstance_Scan1_idx", "ScanID"),
-        Index("SOPInstanceUid_UNIQUE", "SOPInstanceUid", unique=True),
-        Index(
-            "SourceInfoIDDatasetIdentifier_UNIQUE",
-            "DatasetIdentifier",
-            "SourceInfoID",
-            unique=True,
-        ),
-    )
-    ImageInstanceID: int | None = Field(default=None, primary_key=True)
-
-    # repeating field, but non-nullable
-    SeriesID: int = Field(foreign_key="Series.SeriesID", ondelete="CASCADE")
-    SourceInfoID: int = Field(foreign_key="SourceInfo.SourceInfoID")
-    DeviceInstanceID: int = Field(foreign_key="DeviceInstance.DeviceInstanceID")
-    # TODO: redundant with Modality enum
-    ModalityID: int = Field(foreign_key="Modality.ModalityID")
-    
     # relationships:
-    Series: "Series" = Relationship(back_populates="ImageInstances")
-    SourceInfo: "SourceInfo" = Relationship(back_populates="ImageInstances")
-    DeviceInstance: "DeviceInstance" = Relationship(back_populates="ImageInstances")
-    _Modality: "ModalityTable" = Relationship(back_populates="ImageInstances")
-    Scan: Optional["Scan"] = Relationship(back_populates="ImageInstances")
+    Series: Mapped["Series"] = relationship(back_populates="ImageInstances")
+    SourceInfo: Mapped["SourceInfo"] = relationship(back_populates="ImageInstances")
+    DeviceInstance: Mapped["DeviceInstance"] = relationship(back_populates="ImageInstances")
+    _Modality: Mapped["ModalityTable"] = relationship(back_populates="ImageInstances")
+    Scan: Mapped[Optional["Scan"]] = relationship(back_populates="ImageInstances")
 
     # Datetimes - automatically filled
-    DateInserted: datetime = Field(default_factory=datetime.now)
-    DateModified: datetime | None = Field(
-        default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now}
-    )
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
     # DatePreprocessed is the date and time the image was last preprocessed
-    DatePreprocessed: datetime | None
+    DatePreprocessed: Mapped[Optional[datetime]]
 
     # relationships:
-    Annotations: List["Annotation"] = Relationship(
-        back_populates="ImageInstance", cascade_delete=True
+    Annotations: Mapped[List["Annotation"]] = relationship(
+        back_populates="ImageInstance", passive_deletes=True
     )
 
-    Segmentations: List["Segmentation"] = Relationship(
-        back_populates="ImageInstance", cascade_delete=True
+    Segmentations: Mapped[List["Segmentation"]] = relationship(
+        back_populates="ImageInstance", passive_deletes=True
     )
     
-    ModelSegmentations: List["ModelSegmentation"] = Relationship(
-        back_populates="ImageInstance", cascade_delete=True
+    ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(
+        back_populates="ImageInstance", passive_deletes=True
     )
 
-    FormAnnotations: List["FormAnnotation"] = Relationship(
-        back_populates="ImageInstance", cascade_delete=True
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
+        back_populates="ImageInstance", passive_deletes=True
     )
 
-    SubTaskImageLinks: List["SubTaskImageLink"] = Relationship(
-        back_populates="ImageInstance"
+    SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(
+        back_populates="ImageInstance",
+        passive_deletes=True,
     )
+
+    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(back_populates="ImageInstance", lazy="selectin")
 
     @property
     def shape(self) -> tuple[int, int, int]:
@@ -378,11 +343,8 @@ class ImageInstance(ImageInstanceBase, table=True):
         """
         return [a for a in self.Annotations if a.CreatorID == creator.CreatorID]
 
-class DeviceModelBase(Base):
-    Manufacturer: str = Field(max_length=45)
-    ManufacturerModelName: str = Field(max_length=45)
 
-class DeviceModel(DeviceModelBase, table=True):
+class DeviceModel(Base):
     __tablename__ = "DeviceModel"
     __table_args__ = (
         Index(
@@ -394,9 +356,11 @@ class DeviceModel(DeviceModelBase, table=True):
     )
     _name_column: ClassVar[str] = "ManufacturerModelName"
 
-    DeviceModelID: int = Field(primary_key=True)
+    DeviceModelID: Mapped[int] = mapped_column(primary_key=True)
+    Manufacturer: Mapped[str] = mapped_column(String(45))
+    ManufacturerModelName: Mapped[str] = mapped_column(String(45))
 
-    DeviceInstances: List["DeviceInstance"] = Relationship(back_populates="DeviceModel")
+    DeviceInstances: Mapped[List["DeviceInstance"]] = relationship(back_populates="DeviceModel")
 
     @classmethod
     def by_manufacturer(
@@ -410,13 +374,7 @@ class DeviceModel(DeviceModelBase, table=True):
         )
 
 
-class DeviceInstanceBase(Base):
-    DeviceModelID: int = Field(foreign_key="DeviceModel.DeviceModelID")
-    SerialNumber: str | None = Field(sa_column=Column(TEXT))
-    Description: str = Field(max_length=256)
-
-
-class DeviceInstance(DeviceInstanceBase, table=True):
+class DeviceInstance(Base):
     __tablename__ = "DeviceInstance"
     __table_args__ = (
         Index(
@@ -427,51 +385,53 @@ class DeviceInstance(DeviceInstanceBase, table=True):
         ),
     )
 
-    DeviceInstanceID: int = Field(primary_key=True)
-    DeviceModel: "DeviceModel" = Relationship(back_populates="DeviceInstances")
+    DeviceInstanceID: Mapped[int] = mapped_column(primary_key=True)
+    DeviceModelID: Mapped[int] = mapped_column(ForeignKey("DeviceModel.DeviceModelID"))
+    SerialNumber: Mapped[Optional[str]] = mapped_column(TEXT)
+    Description: Mapped[str] = mapped_column(String(256))
 
-    ImageInstances: List["ImageInstance"] = Relationship(
+    DeviceModel: Mapped["DeviceModel"] = relationship(back_populates="DeviceInstances")
+
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         back_populates="DeviceInstance"
     )
 
 
-class SourceInfo(Base, table=True):
+class SourceInfo(Base):
     __tablename__ = "SourceInfo"
     _name_column: ClassVar[str] = "SourceName"
 
-    SourceInfoID: int = Field(primary_key=True)
-    SourceName: str = Field(max_length=64, unique=True)
+    SourceInfoID: Mapped[int] = mapped_column(primary_key=True)
+    SourceName: Mapped[str] = mapped_column(String(64), unique=True)
 
-    SourcePath: str = Field(max_length=250, unique=True)
-    ThumbnailPath: str = Field(max_length=250, unique=True)
+    SourcePath: Mapped[str] = mapped_column(String(250), unique=True)
+    ThumbnailPath: Mapped[str] = mapped_column(String(250), unique=True)
 
-    ImageInstances: List["ImageInstance"] = Relationship(back_populates="SourceInfo")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="SourceInfo")
 
 
-class ModalityTable(Base, table=True):
+class ModalityTable(Base):
     __tablename__ = "Modality"
     _name_column: ClassVar[str] = "ModalityTag"
 
-    ModalityID: int = Field(primary_key=True)
-    ModalityTag: str = Field(max_length=40, unique=True)
+    ModalityID: Mapped[int] = mapped_column(primary_key=True)
+    ModalityTag: Mapped[str] = mapped_column(String(40), unique=True)
 
-    ImageInstances: List["ImageInstance"] = Relationship(back_populates="_Modality")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="_Modality")
 
     @classmethod
     def by_tag(cls, ModalityTag: str, session: Session) -> Optional["ModalityTable"]:
         return cls.by_column(session, ModalityTag=ModalityTag)
 
 
-class ScanBase(Base):
-    ScanMode: str = Field(max_length=40, unique=True)
-
-class Scan(ScanBase, table=True):
+class Scan(Base):
     __tablename__ = "Scan"
     _name_column: ClassVar[str] = "ScanMode"
 
-    ScanID: int = Field(primary_key=True)
+    ScanID: Mapped[int] = mapped_column(primary_key=True)
+    ScanMode: Mapped[str] = mapped_column(String(40), unique=True)
     
-    ImageInstances: List["ImageInstance"] = Relationship(back_populates="Scan")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="Scan")
 
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:

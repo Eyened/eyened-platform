@@ -1,22 +1,23 @@
 <script lang="ts">
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { Intersection, PanelIcon, Hide, Show, Trash } from "../icons/icons";
-    import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
-    import { getContext } from "svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { getContext } from "svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
+    import type { ModelSegmentationObject, SegmentationObject } from "../../data/objects.svelte";
+    import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons";
+    import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
     interface Props {
         segmentationItem: SegmentationItem;
-        segmentation: Segmentation;
+        segmentation: SegmentationObject | ModelSegmentationObject;
         image: AbstractImage;
         isEditable: boolean;
     }
     let { segmentation, image, isEditable, segmentationItem }: Props = $props();
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
     const globalContext = getContext<GlobalContext>("globalContext");
     function setAnnotationReference() {
@@ -25,9 +26,9 @@
             props: {
                 segmentation,
                 image,
-                resolve: (other: Segmentation) => {
-                    segmentation.update({
-                        referenceId: other.id,
+                resolve: (other: SegmentationGET) => {
+                    segmentation.save({
+                        reference_segmentation_id: other.id,
                     });
                 },
             },
@@ -35,10 +36,10 @@
     }
 
     function removeReference() {
-        segmentation.update({ referenceId: null });
+        segmentation.save({ reference_segmentation_id: null });
     }
     function toggleApplyMask() {
-        segmentationOverlay.toggleMasking(segmentationItem);
+        mainViewerContext.toggleMasking(segmentationItem);
     }
 </script>
 
@@ -55,11 +56,11 @@
             <span> Update reference mask</span>
         </div>
     {/if}
-    {#if segmentation.referenceId}
+    {#if segmentation.$.reference_segmentation_id}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="row">
-            Mask ID: [{segmentation.referenceId}]
+            Mask ID: [{segmentation.$.reference_segmentation_id}]
             {#if isEditable}
                 <PanelIcon
                     onclick={removeReference}
@@ -70,7 +71,7 @@
         </div>
 
         <div class="row editable" onclick={toggleApplyMask}>
-            {#if segmentationOverlay.applyMasking.has(segmentationItem)}
+            {#if mainViewerContext.applyMasking.has(segmentationItem)}
                 <Hide size="1.5em" />
                 <span>Showing masked annotation</span>
             {:else}

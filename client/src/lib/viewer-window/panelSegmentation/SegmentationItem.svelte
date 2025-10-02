@@ -1,23 +1,26 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
+    import StringDialogue from "$lib/StringDialogue.svelte";
+    import { ModelSegmentationObject, SegmentationObject } from "../../data/objects.svelte";
+    import AI from "../icons/AI.svelte";
+    import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import CCPanel from "./CCPanel.svelte";
+    import { duplicate } from "./duplicate_utils";
     import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte";
     import FeatureColorPicker from "./FeatureColorPicker.svelte";
     import ImportPanel from "./ImportPanel.svelte";
     import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
     import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import StringDialogue from "$lib/StringDialogue.svelte";
-    import AI from "../icons/AI.svelte";
-    import { duplicate } from "./duplicate_utils";
+    import type { Segmentation } from "./segmentationContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
 
     interface Props {
         segmentation: Segmentation;
@@ -25,20 +28,23 @@
     }
     
     let { segmentation, style = "normal" }: Props = $props();
-
-    const { feature, dataRepresentation } = segmentation;
+    const segmentationObject = 
+        segmentation.annotation_type == "grader_segmentation" ? 
+        new SegmentationObject(segmentation, viewerWindowContext.Segmentations) : 
+        new ModelSegmentationObject(segmentation, viewerWindowContext.ModelSegmentations);
+    const feature = segmentation.feature;
+    const dataRepresentation = segmentation.data_representation;
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
     const image = viewerContext.image;
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 
-    const { segmentationContext } = segmentationOverlay;
-    if (style == "normal") {
-        segmentationContext.visibleSegmentations.add(segmentation);
-    }
+    const { segmentationContext } = mainViewerContext;
+
+    const visible = $derived(segmentationContext.segmentationsVisible.get(segmentation.gid) ?? true);
 
     const segmentationItem = image.getSegmentationItem(segmentation);
     let segmentationState = $derived(
@@ -48,9 +54,9 @@
     async function removeAnnotation() {
         const resolve = () => {
             // remove from database on server
-            segmentation.delete();
+            segmentationObject.destroy();
             segmentationContext.toggleActive(undefined);
-            segmentationItem.dispose();
+            // segmentationItem.dispose();
         };
 
         globalContext.dialogue = {
@@ -65,11 +71,11 @@
     }
 
     function toggleShow() {
-        segmentationContext.toggleShow(segmentation);
+        segmentationContext.toggleShowSegmentation(segmentation.gid);
     }
 
     function showOnly() {
-        segmentationContext.showOnly(segmentation);
+        segmentationContext.showOnlySegmentation(segmentation.gid);
     }
 
     const isEditable = globalContext.canEdit(segmentation);
@@ -84,11 +90,11 @@
     let collapsed = $state(true);
 
     function pointerEnter() {
-        segmentationOverlay.highlightedSegmentationItem = segmentationItem;
+        mainViewerContext.highlightedSegmentationItem = segmentationItem;
     }
 
     function pointerLeave() {
-        segmentationOverlay.highlightedSegmentationItem = undefined;
+        mainViewerContext.highlightedSegmentationItem = undefined;
     }
 
     const segmentationType = {
@@ -97,7 +103,7 @@
         Probability: "P",
         MultiClass: "MC",
         MultiLabel: "ML",
-    }[segmentation.dataRepresentation];
+    }[dataRepresentation];
 
     function applyDuplicate() {
         duplicate(
@@ -108,10 +114,11 @@
             viewerContext,
             false,
             "Q",
-            globalContext.creator,
+            globalContext.user.id,
         );
     }
-    console.log(feature);
+
+    
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -127,7 +134,7 @@
 >
     <div class="row">
         <div>
-            {#if segmentationContext.visibleSegmentations.has(segmentation)}
+            {#if visible}
                 <PanelIcon
                     onclick={toggleShow}
                     onrightclick={showOnly}
@@ -142,10 +149,11 @@
                     Icon={Hide}
                 />
             {/if}
+            
         </div>
 
         {#if !(dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass")}
-            <FeatureColorPicker {segmentation} />
+            <FeatureColorPicker segmentation={segmentation} />
         {/if}
 
         <div class="expand" onclick={activate}>
@@ -169,7 +177,7 @@
     {#if dataRepresentation == "Probability"}
         {#if active}
             <div class="row">
-                <ThresholdSlider {segmentation} />
+                <ThresholdSlider segmentation={segmentation} />
             </div>
         {/if}
     {/if}
@@ -180,7 +188,7 @@
     {/if}
 
     {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
-        <MultiFeatureSelector {segmentation} {active} />
+        <MultiFeatureSelector segmentation={segmentation} {active} />
     {/if}
     {#if segmentationItem.loading}
         <div class="row">
@@ -201,7 +209,7 @@
                 {#if isEditable}
                     <div class="row">
                         <ImportPanel
-                            {segmentation}
+                            segmentation={segmentation}
                             {image}
                             {segmentationItem}
                         />
@@ -210,7 +218,7 @@
                 <div class="row">
                     {#if segmentationState}
                         <DuplicateAnnotationPanel
-                            {segmentation}
+                            segmentation={segmentation}
                             {image}
                             {segmentationItem}
                         />
@@ -219,7 +227,7 @@
 
                 <div class="row">
                     <ReferenceSegmentationPanel
-                        {segmentation}
+                        segmentation={viewerWindowContext.Segmentations.object(segmentation.id)}
                         {image}
                         {isEditable}
                         {segmentationItem}

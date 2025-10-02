@@ -1,26 +1,26 @@
 <script lang="ts">
     import { fromHex, toHex } from "$lib/utils";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 
     import { getContext } from "svelte";
     import PanelIcon from "../icons/PanelIcon.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import { type Segmentation } from "./segmentationContext.svelte";
 
     interface Props {
         segmentation: Segmentation;
     }   
     let { segmentation }: Props = $props();
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
 
     let currentColor = $state("");
 
-    currentColor = toHex(segmentationOverlay.getFeatureColor(segmentation));
-    function handleColorChange(e) {
-        const newColor = e.target.value;
-        segmentationOverlay.setFeatureColor(segmentation, fromHex(newColor));
+    currentColor = toHex(mainViewerContext.getFeatureColor(segmentation));
+    function handleColorChange(e: Event) {
+        const newColor = (e.target as HTMLInputElement).value;
+        mainViewerContext.setFeatureColor(segmentation, fromHex(newColor));
         currentColor = newColor;
     }
 </script>

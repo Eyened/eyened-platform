@@ -1,11 +1,15 @@
 <script lang="ts">
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import { converters } from "$lib/webgl/segmentationConverter";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import { getContext } from "svelte";
+    import type { MainViewerContext } from "../../viewer/overlays/MainViewerContext.svelte";
+    import { type Segmentation } from "./segmentationContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
+
+    const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+    const segmentationContext = mainViewerContext.segmentationContext;
 
     interface Props {
         image: AbstractImage;
@@ -15,15 +19,14 @@
     }
 
     let { image, segmentation, resolve, close }: Props = $props();
-    const segmentationAnnotations = image.instance.segmentations
-        .concat(image.instance.modelSegmentations)
+    const segmentationAnnotations = segmentationContext.segmentations
         .filter(globalContext.segmentationsFilter);
 
     const referenceSegmentations = segmentationAnnotations
-        .filter((s) => s != segmentation)
+        .filter((s) => s.gid != segmentation.gid)
         .filter((other) => {
-            const from = segmentation.dataRepresentation;
-            const to = other.dataRepresentation;
+            const from = segmentation.data_representation;
+            const to = other.data_representation;
 
             const key = `${from}->${to}`;
             // filter out conversions that are not supported
@@ -36,7 +39,7 @@
     }
 </script>
 
-{#if $referenceSegmentations.length > 0}
+{#if referenceSegmentations.length > 0}
     <div>Select segmentation to import from:</div>
     <table>
         <thead>
@@ -47,12 +50,12 @@
             </tr>
         </thead>
         <tbody>
-            {#each $referenceSegmentations as segmentation}
+            {#each referenceSegmentations as segmentation}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <tr onclick={() => _resolve(segmentation)}>
                     <td class="annotation-id">[{segmentation.id}]</td>
-                    <td>{segmentation.createdBy.name}</td>
+                    <td>{segmentation.creator.name}</td>
                     <td>{segmentation.feature.name}</td>
                 </tr>
             {/each}

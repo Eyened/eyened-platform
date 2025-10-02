@@ -23,12 +23,12 @@
     import { data } from "$lib/datamodel/model";
     import ImportSegmentation from "../icons/ImportSegmentation.svelte";
 
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import {
         MulticlassSegmentation,
         MultilabelSegmentation,
     } from "$lib/webgl/layerSegmentation";
     import type { SegmentationContext } from "../panelSegmentation/segmentationContext.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
     const globalContext = getContext<GlobalContext>('globalContext');
 
@@ -43,7 +43,7 @@
         "segmentationContext",
     );
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
     const { image, registration } = viewerContext;
     const { segmentationController } = image;
 
@@ -150,7 +150,7 @@
     let selectedLabelNames: string[] = $state([]);
 
     function toggleShow() {
-        segmentationContext.toggleShow(segmentation);
+        segmentationContext.toggleShowSegmentation(segmentation);
     }
     function toggleActive() {
         segmentationContext.toggleActive(segmentation);

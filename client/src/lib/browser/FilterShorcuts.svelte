@@ -1,105 +1,87 @@
 <script lang="ts">
-    import { browser } from "$app/environment";
-    import { page } from "$app/state";
-    import { data } from "$lib/datamodel/model";
-    import { onMount } from "svelte";
-    import { getContext } from "svelte";
-    import { BrowserContext } from "./browserContext.svelte";
-    import { goto } from "$app/navigation";
+	import SelectWithSearch from '$lib/components/SelectWithSearch.svelte';
+	import * as Input from '$lib/components/ui/input';
+	import { getContext, onMount, tick } from 'svelte';
+	import DatePicker from '../components/DatePicker.svelte';
+	import { BrowserContext, type Condition } from './browserContext.svelte';
 
-    const { projects } = data;
-    const projectNames = projects.map((project) => project.name);
+	const browserContext = getContext<BrowserContext>('browserContext');
 
-    const params = browser ? page.url.searchParams : new URLSearchParams();
+	// bindable single basic condition
+	let { condition = $bindable<Condition | null>(null) } = $props();
 
-    const browserContext = getContext<BrowserContext>("browserContext");
+	let patientIdentifier = $state('');
+	let studyDate = $state('');
+	let projectName = $state('');
 
-    let patientIdentifier: string | null = $state(
-        params.get("PatientIdentifier"),
-    );
-    let date: string | null = $state(params.get("StudyDate"));
-    let projectName: string | null = $state(params.get("ProjectName"));
+	function setCondition(c: Condition | null) { condition = c; }
 
-    async function submitFilter(key: string, value: string | null) {
-        // Reset all state variables
-        patientIdentifier = key === "PatientIdentifier" ? value : null;
-        date = key === "StudyDate" ? value : null;
-        projectName = key === "ProjectName" ? value : null;
+	// NEW: ref and key handler
+	let patientInputRef: HTMLInputElement | null = null;
+	function onPatientIdentifierKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			browserContext.search();
+		}
+	}
 
-        // Update URL params
-        params.forEach((_, k) => params.delete(k));
-        if (value) {
-            params.set(key, value);
-        }
-        await goto(`?${params.toString()}`);
-        browserContext.loadDataFromServer();
-    }
+	// Focus on page load
+	onMount(async () => {
+		await tick();
+		patientInputRef?.focus();
+	});
 
-    async function submitPatientIdentifier(e: Event) {
-        e.preventDefault();
-        await submitFilter("PatientIdentifier", patientIdentifier);
-    }
+	// Mutually exclusive setters
+	$effect(() => {
+		if (patientIdentifier) {
+			studyDate = '';
+			projectName = '';
+			setCondition({ variable: 'Patient Identifier', operator: '==', value: patientIdentifier });
+		} else if (!studyDate && !projectName) {
+			setCondition(null);
+		}
+	});
+	$effect(() => {
+		if (studyDate) {
+			patientIdentifier = '';
+			projectName = '';
+			setCondition({ variable: 'Study Date', operator: '==', value: studyDate });
+		} else if (!patientIdentifier && !projectName) {
+			setCondition(null);
+		}
+	});
+	$effect(() => {
+		if (projectName) {
+			patientIdentifier = '';
+			studyDate = '';
+			setCondition({ variable: 'Project Name', operator: '==', value: projectName });
+		} else if (!patientIdentifier && !studyDate) {
+			setCondition(null);
+		}
+	});
 
-    async function submitDate(e: Event) {
-        e.preventDefault();
-        await submitFilter("StudyDate", date);
-    }
-
-    async function submitProjectName(e: Event) {
-        e.preventDefault();
-        await submitFilter("ProjectName", projectName);
-    }
-
-    let patientIdentifierInput: HTMLInputElement | undefined = $state(undefined );
-    onMount(() => patientIdentifierInput?.focus());
+	const projectOptions = $derived(
+		browserContext.getValueOptions('Project Name').map(v => ({ label: v, value: v }))
+	);
 </script>
 
-<!-- svelte-ignore a11y_label_has_associated_control -->
 <div>
-    <form onsubmit={submitPatientIdentifier}>
-        <label> PatientIdentifier: </label>
-        <input
-            type="text"
-            bind:this={patientIdentifierInput}
-            bind:value={patientIdentifier}
-            placeholder="PatientIdentifier"
-        />
-        <button type="submit" disabled={!patientIdentifier}>Search</button>
-    </form>
+	<div class="w-full grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 items-center">
+		<!-- No submit buttons; inputs only set the bindable condition -->
+		<label>Patient Identifier:</label>
+		<Input.Input bind:value={patientIdentifier} placeholder="Patient Identifier" bind:ref={patientInputRef} on:keydown={onPatientIdentifierKeydown} />
 
-    <form onsubmit={submitDate}>
-        <label> Study date: </label>
-        <input type="date" bind:value={date} />
-        <button type="submit" disabled={!date}>Search</button>
-    </form>
+		<label>Study Date:</label>
+		<DatePicker bind:value={studyDate} />
+		<!-- <Input.Input type="date" bind:value={studyDate} /> -->
 
-    <form onsubmit={submitProjectName}>
-        <label> Project Name: </label>
-        <select bind:value={projectName}>
-            <option></option>
-            {#each $projectNames as value}
-                <option {value}>{value}</option>
-            {/each}
-        </select>
-        <button type="submit" disabled={!projectName}>Search</button>
-    </form>
+		<label>Project Name:</label>
+		<SelectWithSearch 
+			options={projectOptions} 
+			bind:value={projectName} 
+			placeholder="Project Name" 
+		/>
+	</div>
 </div>
 
 <style>
-    div {
-        display: grid;
-        grid-template-columns: 0fr 16em 0fr;
-    }
-    label {
-        display: flex;
-        padding-right: 1em;
-        align-items: center;
-    }
-    input, select {
-        margin-right: 1em;
-    }
-    form {
-        display: contents;
-    }
-    
 </style>
