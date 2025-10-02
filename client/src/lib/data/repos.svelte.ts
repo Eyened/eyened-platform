@@ -23,6 +23,7 @@ import type {
 	TaskPUT
 } from '../../types/openapi_types';
 import { api } from '../api/client';
+import { apiUrl } from '../config';
 import { decodeNpy, type NPYArray } from '../utils/npy_loader';
 import type { AbstractImage } from '../webgl/abstractImage';
 import { Repo } from './datamodel.svelte';
@@ -198,15 +199,17 @@ export class SegmentationsRepo extends Repo<SegmentationGET, SegmentationPOST, S
 		return decodeNpy(res.data!);
 	}
 
-	async updateData(segmentation_id: number, p?: { axis?: number; scan_nr?: number }, body?: unknown) {
-		const res = await api.PUT('/segmentations/{segmentation_id}/data', {
-			params: {
-				path: { segmentation_id },
-				query: { axis: p?.axis, scan_nr: p?.scan_nr }
-			},
-			body: body as any
-		});
-		return res.data as unknown;
+	async updateData(segmentation_id: number, data: ArrayBuffer, p?: { axis?: number; scan_nr?: number }) {
+		const url = `${apiUrl}${SegmentationsRepo.path}/${segmentation_id}/data?axis=${p?.axis}&scan_nr=${p?.scan_nr}`;
+		const requestInit: RequestInit = {
+			method: 'PUT',
+			credentials: 'include',
+		};
+		requestInit.headers = {
+                    'Content-Type': 'application/octet-stream',
+                };
+        requestInit.body = data;
+		return fetch(url, requestInit);
 	}
 }
 

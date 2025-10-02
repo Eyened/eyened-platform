@@ -31,7 +31,7 @@
 
 {#each segmentations as segmentation (segmentation.id)}
     <div class="item" class:hide={hidden}>
-        <SegmentationItem segmentation={viewerWindowContext.Segmentations.object(segmentation.id)} />
+        <SegmentationItem segmentation={segmentation} />
     </div>
 {/each}
 

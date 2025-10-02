@@ -3,6 +3,7 @@ import { UserManager } from '$lib/usermanager.svelte';
 import openAPISpec from '../../types/openapi.json';
 import type { FormAnnotationGET, ModelSegmentationGET, SegmentationGET } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
+import type { Segmentation } from '../viewer-window/panelSegmentation/segmentationContext.svelte';
 
 export type ComponentDef = {
     component: any,
@@ -83,7 +84,7 @@ export class GlobalContext {
     }
 
     get segmentationsFilter() {
-        return (a: SegmentationGET | FormAnnotationGET) => {
+        return (a: Segmentation | FormAnnotationGET) => {
 
             return true
 

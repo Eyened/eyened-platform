@@ -12,6 +12,7 @@ export type FeaturePUT = components['schemas']['FeaturePUT'];
 export type SegmentationGET = components['schemas']['SegmentationGET'];
 export type SegmentationPATCH = components['schemas']['SegmentationPATCH'];
 export type SegmentationPOST = components['schemas']['SegmentationPOST'];
+export type SegmentationBase = components['schemas']['SegmentationBase'];
 export type SegmentationDataType = components['schemas']['Datatype'];
 export type SegmentationDataRepresentation = components['schemas']['DataRepresentation'];
 export type ModelSegmentationGET = components['schemas']['ModelSegmentationGET'];

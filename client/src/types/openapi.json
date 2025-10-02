@@ -7577,6 +7577,135 @@
         ],
         "title": "SegmentationPOST",
         "type": "object"
+      },
+      "SegmentationBase": {
+        "$defs": {
+          "DataRepresentation": {
+            "enum": [
+              "Binary",
+              "DualBitMask",
+              "Probability",
+              "MultiLabel",
+              "MultiClass"
+            ],
+            "title": "DataRepresentation",
+            "type": "string"
+          },
+          "Datatype": {
+            "enum": [
+              "R8",
+              "R8UI",
+              "R16UI",
+              "R32UI",
+              "R32F"
+            ],
+            "title": "Datatype",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "image_instance_id": {
+            "title": "Image Instance Id",
+            "type": "integer"
+          },
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          },
+          "sparse_axis": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sparse Axis"
+          },
+          "image_projection_matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Image Projection Matrix"
+          },
+          "scan_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scan Indices"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Threshold"
+          },
+          "reference_segmentation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reference Segmentation Id"
+          },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          }
+        },
+        "required": [
+          "image_instance_id",
+          "depth",
+          "height",
+          "width",
+          "data_type",
+          "data_representation"
+        ],
+        "title": "SegmentationBase",
+        "type": "object"
       }
     }
   }

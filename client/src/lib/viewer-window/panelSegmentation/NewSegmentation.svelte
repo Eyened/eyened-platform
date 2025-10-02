@@ -13,6 +13,7 @@
     import type { FeatureGET } from "../../../types/openapi_types";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import NewMultiFeature from "./NewMultiFeature.svelte";
+    import type { Segmentation } from "./segmentationContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -57,8 +58,10 @@
             0.5,
             axis,
             taskContext?.subTask?.id
-        )
+        ) as Segmentation
 
+        // TODO: find a cleaner way to do this
+        segmentation.gid = `${segmentation.annotation_type}-${segmentation.id}` 
         const segmentationItem = image.getSegmentationItem(segmentation);
 
         segmentationContext.segmentationItem = segmentationItem

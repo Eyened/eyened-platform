@@ -150,7 +150,7 @@
     let selectedLabelNames: string[] = $state([]);
 
     function toggleShow() {
-        segmentationContext.toggleShow(segmentation);
+        segmentationContext.toggleShowSegmentation(segmentation);
     }
     function toggleActive() {
         segmentationContext.toggleActive(segmentation);

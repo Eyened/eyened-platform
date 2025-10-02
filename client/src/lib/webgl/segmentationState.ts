@@ -28,6 +28,7 @@ export class SegmentationState {
         readonly segmentation: SegmentationGET | ModelSegmentationGET,
         readonly scanNr: number,
     ) {
+        console.log(segmentation)
         this.mask = new constructors[segmentation.data_representation](image, segmentation);
         this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
         this.isDrawing = this.initialize();
@@ -100,7 +101,7 @@ export class SegmentationState {
         const data = this.mask.exportData();
         const buffer = encodeNpy(data, [this.image.height, this.image.width]);
         const axis = (this.segmentation as any).sparse_axis ?? (this.segmentation as any).sparseAxis ?? 0;
-        return new SegmentationsRepo('segmentation-state').updateData(this.segmentation.id, { axis, scan_nr: this.image.image_id.endsWith('proj') ? undefined as any : this.scanNr }, buffer);
+        return new SegmentationsRepo('segmentation-state').updateData(this.segmentation.id, buffer, { axis, scan_nr: this.image.image_id.endsWith('proj') ? undefined as any : this.scanNr });
 
     }
 

@@ -1924,6 +1924,56 @@ export interface components {
                 Datatype: "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F";
             };
         };
+        /** SegmentationBase */
+        SegmentationBase: {
+            /** Image Instance Id */
+            image_instance_id: number;
+            /** Depth */
+            depth: number;
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
+            /**
+             * Sparse Axis
+             * @default null
+             */
+            sparse_axis: number | null;
+            /**
+             * Image Projection Matrix
+             * @default null
+             */
+            image_projection_matrix: number[][] | null;
+            /**
+             * Scan Indices
+             * @default null
+             */
+            scan_indices: number[] | null;
+            /**
+             * Threshold
+             * @default null
+             */
+            threshold: number | null;
+            /**
+             * Reference Segmentation Id
+             * @default null
+             */
+            reference_segmentation_id: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
+            $defs: {
+                /**
+                 * DataRepresentation
+                 * @enum {string}
+                 */
+                DataRepresentation: "Binary" | "DualBitMask" | "Probability" | "MultiLabel" | "MultiClass";
+                /**
+                 * Datatype
+                 * @enum {string}
+                 */
+                Datatype: "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F";
+            };
+        };
     };
     responses: never;
     parameters: never;

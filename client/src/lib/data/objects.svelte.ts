@@ -54,7 +54,6 @@ export class SeriesObject extends DataObject<SeriesGET, never> { static DefaultR
 
 export class SegmentationObject extends DataObject<SegmentationGET, SegmentationPATCH> { 
 	static DefaultRepo: typeof Repo;
-	objectType = "Segmentation";
 	async tag(tag_id: number) {
 		const {data} = await api.POST('/segmentations/{segmentation_id}/tags' as any, {
 			params: { path: { segmentation_id: Number(this.id) } } as any,
@@ -72,7 +71,6 @@ export class SegmentationObject extends DataObject<SegmentationGET, Segmentation
 
 export class ModelSegmentationObject extends DataObject<ModelSegmentationGET, never> { 
 	static DefaultRepo: typeof Repo;
-	objectType = "ModelSegmentation";
 	async tag(tag_id: number) {
 		const {data} = await api.POST('/model-segmentations/{segmentation_id}/tags' as any, {
 			params: { path: { segmentation_id: Number(this.id) } } as any,
