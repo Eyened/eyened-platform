@@ -170,11 +170,11 @@ class ImageInstance(Base):
     DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
 
     # relationships:
-    Series: Mapped["Series"] = relationship(back_populates="ImageInstances")
-    SourceInfo: Mapped["SourceInfo"] = relationship(back_populates="ImageInstances")
-    DeviceInstance: Mapped["DeviceInstance"] = relationship(back_populates="ImageInstances")
+    Series: Mapped["Series"] = relationship(back_populates="ImageInstances", lazy="selectin")
+    SourceInfo: Mapped["SourceInfo"] = relationship(back_populates="ImageInstances", lazy="selectin")
+    DeviceInstance: Mapped["DeviceInstance"] = relationship(back_populates="ImageInstances", lazy="selectin")
     _Modality: Mapped["ModalityTable"] = relationship(back_populates="ImageInstances")
-    Scan: Mapped[Optional["Scan"]] = relationship(back_populates="ImageInstances")
+    Scan: Mapped[Optional["Scan"]] = relationship(back_populates="ImageInstances", lazy="selectin")
 
     # Datetimes - automatically filled
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())

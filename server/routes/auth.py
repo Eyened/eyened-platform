@@ -126,6 +126,36 @@ def verify_token(token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
+def _try_decode_token(token: str) -> dict | None:
+    """Decode JWT safely; return payload or None."""
+    try:
+        return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+
+async def is_authenticated(
+    authorization: str = Header(None),
+    jwt_token: str = Cookie(None),
+) -> bool:
+    """Return True if a valid access token is present (header or cookie)."""
+    if settings.public_auth_disabled:
+        return True
+
+    if authorization and authorization.startswith("Bearer "):
+        payload = _try_decode_token(authorization[7:])
+        if payload and payload.get("type") == "access":
+            return True
+
+    if jwt_token:
+        payload = _try_decode_token(jwt_token)
+        if payload and payload.get("type") == "access":
+            return True
+
+    return False
+
 # Replace the existing get_current_user function with this merged version
 async def get_current_user(
     authorization: str = Header(None),

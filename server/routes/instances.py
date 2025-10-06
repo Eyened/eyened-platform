@@ -13,7 +13,7 @@ from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_instances import InstanceGET
 from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
-from .auth import CurrentUser, get_current_user
+from .auth import CurrentUser, get_current_user, is_authenticated
 from ..db import get_db
 
 router = APIRouter()
@@ -72,7 +72,7 @@ async def get_instance(
 @router.get("/instances/images/{dataset_identifier:path}")
 async def get_file(
     dataset_identifier: str,
-    current_user: CurrentUser = Depends(get_current_user),
+    _: bool = Depends(is_authenticated),
 ):
     # Set X-Accel-Redirect header to tell NGINX to serve the file
     response = Response()
@@ -83,7 +83,7 @@ async def get_file(
 @router.get("/instances/thumbnails/{thumbnail_identifier:path}")
 async def get_thumb(
     thumbnail_identifier: str,
-    current_user: CurrentUser = Depends(get_current_user),
+    _: bool = Depends(is_authenticated),
 ):
     response = Response()
     response.headers["X-Accel-Redirect"] = "/thumbnails/" + thumbnail_identifier

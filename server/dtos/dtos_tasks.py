@@ -25,6 +25,7 @@ class TaskDefinitionPUT(TaskDefinitionBase):
 
 class TaskDefinitionGET(TaskDefinitionBase):
     id: int
+    config: Dict[str, Any]
     date_inserted: datetime
 
 
@@ -54,6 +55,7 @@ class TaskGET(TaskBase):
     num_tasks_ready: int
     creator: Optional[CreatorMeta] = None
     task_state: Optional[TaskState] = None
+    task_definition: TaskDefinitionGET
 
 
 # === SUB TASK ===
