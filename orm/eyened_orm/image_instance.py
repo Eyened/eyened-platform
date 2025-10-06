@@ -388,8 +388,8 @@ class DeviceInstance(Base):
 
     DeviceModel: Mapped["DeviceModel"] = relationship(back_populates="DeviceInstances")
 
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
-        back_populates="DeviceInstance"
+    ImageInstances: Mapped[List[ImageInstance]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="DeviceInstance"
     )
 
 
