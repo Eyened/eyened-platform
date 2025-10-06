@@ -5,8 +5,8 @@ Manages the layout of the viewer window.
 Keeps track of the main panels and the top row of images.
 -->
 <script lang="ts">
+    import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import TaskTopBar from "$lib/tasks/TaskTopBar.svelte";
-    import type { TaskContext } from "$lib/types";
     import { getContext, onDestroy, onMount, setContext } from "svelte";
     import MainPanel from "./MainPanel.svelte";
     import MainViewer from "./MainViewer.svelte";

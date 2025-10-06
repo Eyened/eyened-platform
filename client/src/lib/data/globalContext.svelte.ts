@@ -1,6 +1,6 @@
 import { FeaturesRepo, FormSchemasRepo, TagsRepo } from '$lib/data/repos.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
-import openAPISpec from '../../types/openapi.json';
+
 import type { FormAnnotationGET, ModelSegmentationGET, SegmentationGET } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
 import type { Segmentation } from '../viewer-window/panelSegmentation/segmentationContext.svelte';
@@ -77,10 +77,6 @@ export class GlobalContext {
             await this.formSchemas.fetchAll();
             this.formSchemasLoaded = true;
         }
-    }
-
-    get openAPISpec() {
-        return openAPISpec;
     }
 
     get segmentationsFilter() {

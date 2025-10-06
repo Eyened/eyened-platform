@@ -39,9 +39,15 @@ async def list_subtasks(
     rows = db.execute(q.limit(limit).offset(offset)).scalars().all()
     count = db.scalar(select(func.count()).select_from(SubTask).where(SubTask.TaskID == task_id)) or 0
     if with_images:
-        subtasks = [DTOConverter.subtask_with_images_to_get(st) for st in rows]
+        subtasks = [
+            DTOConverter.subtask_with_images_to_get(st).copy(update={'index': offset + i})
+            for i, st in enumerate(rows)
+        ]
         return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
-    subtasks = [DTOConverter.subtask_to_get(st) for st in rows]
+    subtasks = [
+        DTOConverter.subtask_to_get(st).copy(update={'index': offset + i})
+        for i, st in enumerate(rows)
+    ]
     return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
 
 @router.get("/subtasks/{subtaskid}", response_model=Union[SubTaskWithImagesGET, SubTaskGET])

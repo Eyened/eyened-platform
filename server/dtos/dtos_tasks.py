@@ -1,5 +1,7 @@
 
 
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
@@ -68,6 +70,9 @@ class SubTaskPUT(SubTaskBase):
 class SubTaskGET(SubTaskBase):
     id: int
     creator_id: Optional[int] = None
+    # New optional metadata
+    index: Optional[int] = None
+    next_task: Optional["SubTaskGET"] = None
 
 
 class SubTaskWithImagesGET(SubTaskGET):

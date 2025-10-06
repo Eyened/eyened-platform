@@ -1,18 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { data } from '$lib/datamodel/model';
-	import type { TaskState } from '$lib/datamodel/taskState';
-	import type { TaskContext } from '$lib/types';
+	import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
 	import { getContext } from 'svelte';
+	import { subTaskStates } from '../../types/openapi_constants';
+	import type { SubTaskState } from '../../types/openapi_types';
 
-	const { taskStates } = data;
-	const stateNames = ['Not started', 'Busy', 'Ready'];
-	const states = stateNames.map((name) => taskStates.find((state) => state.name === name)!);
 	const { task, subTask, subTaskIndex } = getContext<TaskContext>('taskContext');
 
-	const subtasks = task.subTasks;
-
-	function setState(state: TaskState) {
+	function setState(state: SubTaskState) {
 		subTask.update({ taskStateId: state.id });
 	}
 
@@ -49,22 +44,22 @@
 <div id="main">
 	<div class="spacer"></div>
 	<div class="main">
-		Task {task.name}. Set {subTaskIndex} of {$subtasks.length}.
+		Task {task.name}. Set {subTaskIndex} of {task.num_tasks}.
 	</div>
 	<div class="controls">
 		Set status:
-		{#each states as state}
-			{#if subTask.state == state}
-				<button class="set">{state.name}</button>
+		{#each subTaskStates as state}
+			{#if subTask.task_state == state}
+				<button class="set">{state}</button>
 			{:else}
-				<button onclick={() => setState(state)}>{state.name}</button>
+				<button onclick={() => setState(state)}>{state}</button>
 			{/if}
 		{/each}
 	</div>
 	<div class="controls">
 		<button onclick={handleViewTask}>Overview</button>
 		<button onclick={prev} disabled={subTaskIndex == 0}>Previous</button>
-		<button onclick={next} disabled={subTaskIndex == $subtasks.length - 1}>Next</button>
+		<button onclick={next} disabled={subTaskIndex == task.num_tasks - 1}>Next</button>
 	</div>
 	<div class="spacer"></div>
 </div>

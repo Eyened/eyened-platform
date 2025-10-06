@@ -15,7 +15,7 @@ class Settings(EyenedORMConfig):
     
     # Authentication bypass for development (reads from PUBLIC_AUTH_DISABLED env var)
     public_auth_disabled: bool = False
-    environment: Literal['development', 'production']
+    environment: Literal['development', 'production'] = 'production'
 
     # Print settings for debugging purposes - hide password and secret key
     def __str__(self):
@@ -58,6 +58,8 @@ def load_settings(env_file: Optional[str | Path] = None) -> Settings:
         admin_username=os.getenv("ADMIN_USERNAME", ""),
         admin_password=os.getenv("ADMIN_PASSWORD", ""),
         database_root_password=os.getenv("DATABASE_ROOT_PASSWORD"),
+        environment=os.getenv("EYENED_ENV", "production"),
+        public_auth_disabled=os.getenv("VITE_PUBLIC_AUTH_DISABLED", "1") == "1",
     )
     
     # Handle database fallback logic
