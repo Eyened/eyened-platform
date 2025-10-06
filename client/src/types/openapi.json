@@ -3841,76 +3841,10 @@
                       "$ref": "#/components/schemas/SubTaskGET"
                     }
                   ],
-                  "title": "Response Get Subtask Task  Task Id  Subtask  Subtaskid  Get"
+                  "title": "Response Get Subtask Task  Task Id  Subtask  Subtask Index  Get"
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete Subtask",
-        "operationId": "delete_subtask_task__task_id__subtask__subtaskid__delete",
-        "parameters": [
-          {
-            "name": "task_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Task Id"
-            }
-          },
-          {
-            "name": "subtaskid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Subtaskid"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "jwt_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Jwt Token"
-            }
-          },
-          {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -6785,8 +6719,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Next Task"
+            ]
           }
         },
         "type": "object",
@@ -6868,6 +6801,27 @@
               }
             ],
             "title": "Creator Id"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          },
+          "next_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubTaskGET"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "images": {
             "items": {
@@ -7088,6 +7042,36 @@
         ],
         "title": "TagType"
       },
+      "TaskDefinitionGET": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          },
+          "date_inserted": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Date Inserted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id",
+          "config",
+          "date_inserted"
+        ],
+        "title": "TaskDefinitionGET"
+      },
       "TaskGET": {
         "properties": {
           "name": {
@@ -7156,6 +7140,9 @@
                 "type": "null"
               }
             ]
+          },
+          "task_definition": {
+            "$ref": "#/components/schemas/TaskDefinitionGET"
           }
         },
         "type": "object",
@@ -7165,7 +7152,8 @@
           "id",
           "date_inserted",
           "num_tasks",
-          "num_tasks_ready"
+          "num_tasks_ready",
+          "task_definition"
         ],
         "title": "TaskGET"
       },

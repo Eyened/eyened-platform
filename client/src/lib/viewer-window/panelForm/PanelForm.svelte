@@ -40,7 +40,7 @@
 
     // TODO: refactor this, to be used as extension?
     if (taskContext) {
-        const TaskDefinitionName = taskContext.task.definition.name;
+        const TaskDefinitionName = taskContext.task.task_definition.name;
         if (TaskDefinitionName === "Naevi") {
             selectedSchema = globalContext.formSchemas.all.find(
                 (schema) => schema.name === "Naevi grading",

@@ -23,8 +23,16 @@ async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user:
         TaskDefinitionID=dto.task_definition_id,
         CreatorID=current_user.id,
     )
-    db.add(task); db.commit(); db.refresh(task)
+    db.add(task); db.commit()
+    # Reload with relationships
+    task = db.execute(
+        select(Task)
+        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
+        .where(Task.TaskID == task.TaskID)
+    ).scalars().first()
     return DTOConverter.task_to_get(task)
+
+
 
 @router.get("/task", response_model=List[TaskGET])
 async def list_tasks(
@@ -34,21 +42,27 @@ async def list_tasks(
     """List all tasks (no pagination)."""
     rows = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks), selectinload(Task.Creator))
+        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
         .order_by(Task.TaskID)
     ).scalars().all()
     return [DTOConverter.task_to_get(t) for t in rows]
+
+
+
 
 @router.get("/task/{task_id}", response_model=TaskGET)
 async def get_task(task_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     task = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks), selectinload(Task.Creator))
+        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
         .where(Task.TaskID == task_id)
     ).scalars().first()
     if not task:
         raise HTTPException(404, "Task not found")
     return DTOConverter.task_to_get(task)
+
+
+
 
 @router.patch("/task/{task_id}", response_model=TaskGET)
 async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -71,7 +85,7 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
     # Reload with SubTasks for consistency
     task = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks), selectinload(Task.Creator))
+        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
         .where(Task.TaskID == task_id)
     ).scalars().first()
     

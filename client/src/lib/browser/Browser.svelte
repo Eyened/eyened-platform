@@ -9,7 +9,7 @@
 	import type { GlobalContext } from '$lib/data/globalContext.svelte';
 	import { getContext, onMount, setContext } from 'svelte';
 	import { searchOrderBy, studiesSearchOrderBy } from '../../types/openapi_constants';
-	import Spinner from '../utils/Spinner.svelte';
+	import FixedSpinner from '../components/FixedSpinner.svelte';
 	import AdvancedFilters from './AdvancedFilters.svelte';
 	import BrowserContent from './BrowserContent.svelte';
 	import { BrowserContext, decodeConditions, type QueryMode } from './browserContext.svelte';
@@ -103,11 +103,7 @@
 </script>
 
 {#if browserContext.loading}
-	<div class="fixed inset-0 z-10 h-screen w-screen bg-white/70 backdrop-blur-sm">
-		<div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-			<Spinner />
-		</div>
-	</div>
+	<FixedSpinner />
 {/if}
 
 

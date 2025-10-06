@@ -15,7 +15,7 @@
 <Main>
 	{#snippet children()}
 		<div style="display:flex; justify-content:center; padding: 40px;">
-			<div style="width: 100%; max-width: 1080px;">
+			<div style="width: 100%; max-width: 1440px;">
 				<h2 class="text-2xl font-bold mb-6">Tasks</h2>
 				<Tooltip.Provider>
 					<TasksTable rows={repo.all} {repo} />

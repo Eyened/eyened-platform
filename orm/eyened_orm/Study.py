@@ -31,7 +31,7 @@ class Study(Base):
 
     DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
 
-    Patient: Mapped["Patient"] = relationship(back_populates="Studies")
+    Patient: Mapped["Patient"] = relationship(back_populates="Studies", lazy="selectin")
     Series: Mapped[List["Series"]] = relationship(back_populates="Study", passive_deletes=True)
     Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Study")
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Study")
@@ -78,7 +78,7 @@ class Series(Base):
     SeriesNumber: Mapped[Optional[int]]
     SeriesInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
 
-    Study: Mapped["Study"] = relationship(back_populates="Series")
+    Study: Mapped["Study"] = relationship(back_populates="Series", lazy="selectin")
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="Series")
     Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Series")
 
