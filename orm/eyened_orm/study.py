@@ -31,12 +31,12 @@ class Study(Base):
 
     DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
 
-    Patient: Mapped["Patient"] = relationship(back_populates="Studies", lazy="selectin")
-    Series: Mapped[List["Series"]] = relationship(back_populates="Study", passive_deletes=True)
-    Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Study")
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Study")
+    Patient: Mapped["Patient"] = relationship("eyened_orm.patient.Patient", back_populates="Studies", lazy="selectin")
+    Series: Mapped[List["Series"]] = relationship("eyened_orm.series.Series", back_populates="Study", passive_deletes=True)
+    Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Study")
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Study")
 
-    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(back_populates="Study", lazy="selectin")
+    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship("eyened_orm.tag.StudyTagLink", back_populates="Study", lazy="selectin")
 
     @classmethod
     def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
@@ -61,30 +61,6 @@ class Study(Base):
     def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
         from eyened_orm import ImageInstance
         q = select(ImageInstance).join(Series).where(Series.StudyID == self.StudyID)
-        if not include_inactive:
-            q = q.where(~ImageInstance.Inactive)
-        if where is not None:
-            q = q.where(where)
-        session = Session.object_session(self)
-        return session.scalars(q).all()
-
-
-class Series(Base):
-    __tablename__ = "Series"
-    __table_args__ = (Index("fk_Series_Study1_idx", "StudyID"),)
-
-    SeriesID: Mapped[int] = mapped_column(primary_key=True)
-    StudyID: Mapped[int] = mapped_column(ForeignKey("Study.StudyID", ondelete="CASCADE"))
-    SeriesNumber: Mapped[Optional[int]]
-    SeriesInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
-
-    Study: Mapped["Study"] = relationship(back_populates="Series", lazy="selectin")
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="Series")
-    Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Series")
-
-    def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
-        from eyened_orm import ImageInstance
-        q = select(ImageInstance).where(ImageInstance.SeriesID == self.SeriesID)
         if not include_inactive:
             q = q.where(~ImageInstance.Inactive)
         if where is not None:

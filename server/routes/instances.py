@@ -3,8 +3,7 @@ from eyened_orm import (
     Series, Study, Patient, Project, DeviceInstance, DeviceModel, Scan,
     Segmentation, ModelSegmentation, Model, Feature, FormAnnotation,
 )
-from eyened_orm.Tag import SegmentationTagLink, FormAnnotationTagLink
-from eyened_orm.Tag import TagType
+from eyened_orm.tag import SegmentationTagLink, FormAnnotationTagLink, TagType
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from sqlalchemy.orm import Session, selectinload

@@ -28,7 +28,7 @@ class TaskDefinition(Base):
     TaskDefinitionName: Mapped[str] = mapped_column(String(256))
     TaskConfig: Mapped[dict | None] = mapped_column(JSON)
 
-    Tasks: Mapped[List["Task"]] = relationship(back_populates="TaskDefinition")
+    Tasks: Mapped[List["Task"]] = relationship("eyened_orm.task.Task", back_populates="TaskDefinition")
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
@@ -63,13 +63,14 @@ class Task(Base):
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Contact: Mapped[Optional["Contact"]] = relationship(back_populates="Tasks")
+    Contact: Mapped[Optional["Contact"]] = relationship("eyened_orm.project.Contact", back_populates="Tasks")
 
-    Creator: Mapped["Creator"] = relationship(back_populates="Tasks")
-    TaskDefinition: Mapped["TaskDefinition"] = relationship(back_populates="Tasks")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Tasks")
+    TaskDefinition: Mapped["TaskDefinition"] = relationship("eyened_orm.task.TaskDefinition", back_populates="Tasks")
     TaskState: Mapped["TaskState"] 
     
     SubTasks: Mapped[List["SubTask"]] = relationship(
+        "eyened_orm.task.SubTask",
         back_populates="Task",
         passive_deletes=True,
     )
@@ -126,8 +127,8 @@ class SubTaskImageLink(Base):
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"), primary_key=True
     )
 
-    SubTask: Mapped["SubTask"] = relationship(back_populates="SubTaskImageLinks")
-    ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="SubTaskImageLinks")
+    SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="SubTaskImageLinks")
+    ImageInstance: Mapped["ImageInstance"] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="SubTaskImageLinks")
 
 
 class SubTask(Base):
@@ -143,14 +144,15 @@ class SubTask(Base):
     Comments: Mapped[Optional[str]] = mapped_column(Text)
     TaskState: Mapped["SubTaskState"] = mapped_column(default=SubTaskState.NotStarted)
 
-    Task: Mapped["Task"] = relationship(back_populates="SubTasks")
-    Creator: Mapped[Optional["Creator"]] = relationship(back_populates="SubTasks")
+    Task: Mapped["Task"] = relationship("eyened_orm.task.Task", back_populates="SubTasks")
+    Creator: Mapped[Optional["Creator"]] = relationship("eyened_orm.creator.Creator", back_populates="SubTasks")
     SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(
+        "eyened_orm.task.SubTaskImageLink",
         back_populates="SubTask",
         passive_deletes=True,
     )
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="SubTask")
-    Segmentations: Mapped[List["Segmentation"]] = relationship(back_populates="SubTask")
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="SubTask")
+    Segmentations: Mapped[List["Segmentation"]] = relationship("eyened_orm.segmentation.Segmentation", back_populates="SubTask")
 
     @classmethod
     def create_from_image_ids(

@@ -18,20 +18,6 @@ class ExternalEnum(enum.Enum):
     N = "N"
     M = "M"
 
-class Contact(Base):
-    __tablename__ = "Contact"
-    __table_args__ = (CompositeUniqueConstraintMulti(
-        ("Name", "Email", "Institute")),)
-
-    ContactID: Mapped[int] = mapped_column(primary_key=True)
-    Name = mapped_column(String(256), unique=False, nullable=False)
-    Email = mapped_column(String(256), unique=False, nullable=False)
-    Institute = mapped_column(String(256), unique=False)
-
-    # relationships
-    Projects: List[Project] = relationship("eyened_orm.project.Project", back_populates="Contact")
-    Tasks: List[Task] = relationship("eyened_orm.task.Task", back_populates="Contact")
-
 
 
 class Project(Base):
@@ -54,9 +40,10 @@ class Project(Base):
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Contact: Mapped[Optional["Contact"]] = relationship(back_populates="Projects")
+    Contact: Mapped[Optional["Contact"]] = relationship("eyened_orm.project.Contact", back_populates="Projects")
 
     Patients: Mapped[List["Patient"]] = relationship(
+        "eyened_orm.patient.Patient",
         back_populates="Project", passive_deletes=True
     )
 
@@ -104,5 +91,5 @@ class Contact(Base):
     Institute: Mapped[Optional[str]] = mapped_column(String(255))
     Orcid: Mapped[Optional[str]] = mapped_column(String(255))
 
-    Projects: Mapped[List["Project"]] = relationship(back_populates="Contact")
-    Tasks: Mapped[List["Task"]] = relationship(back_populates="Contact")
+    Projects: Mapped[List["Project"]] = relationship("eyened_orm.project.Project", back_populates="Contact")
+    Tasks: Mapped[List["Task"]] = relationship("eyened_orm.task.Task", back_populates="Contact")

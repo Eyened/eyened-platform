@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import FormAnnotation, Tag, FormAnnotationTagLink, Study, StudyTagLink, ImageInstance, ImageInstanceTagLink
-from eyened_orm.Tag import TagType
+from eyened_orm.tag import TagType
 
 from ..db import get_db
 from .auth import CurrentUser, get_current_user

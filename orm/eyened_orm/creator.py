@@ -36,11 +36,11 @@ class Creator(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # Relationships
-    Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Creator")
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Creator")
-    SubTasks: Mapped[List["SubTask"]] = relationship(back_populates="Creator")
-    Segmentations: Mapped[List["Segmentation"]] = relationship(back_populates="Creator")
-    Tags: Mapped[List["Tag"]] = relationship(back_populates="Creator")
-    Tasks: Mapped[List["Task"]] = relationship(back_populates="Creator")
+    Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Creator")
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Creator")
+    SubTasks: Mapped[List["SubTask"]] = relationship("eyened_orm.task.SubTask", back_populates="Creator")
+    Segmentations: Mapped[List["Segmentation"]] = relationship("eyened_orm.segmentation.Segmentation", back_populates="Creator")
+    Tags: Mapped[List["Tag"]] = relationship("eyened_orm.tag.Tag", back_populates="Creator")
+    Tasks: Mapped[List["Task"]] = relationship("eyened_orm.task.Task", back_populates="Creator")
     # Tags that this creator starred
-    StarredTags: Mapped[List["CreatorTagLink"]] = relationship("CreatorTagLink", back_populates="Creator", viewonly=True, lazy="selectin")
+    StarredTags: Mapped[List["CreatorTagLink"]] = relationship("eyened_orm.tag.CreatorTagLink", back_populates="Creator", viewonly=True, lazy="selectin")

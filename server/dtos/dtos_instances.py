@@ -12,8 +12,8 @@ from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel, create_model, Field
 
-from eyened_orm.ImageInstance import Laterality, ModalityType, Modality, ETDRSField
-from eyened_orm.Patient import SexEnum as Sex
+from eyened_orm.image_instance import Laterality, ModalityType, Modality, ETDRSField
+from eyened_orm.patient import SexEnum as Sex
 from .dtos_main import FormAnnotationGET, ModelSegmentationGET, SegmentationGET
 from .dtos_aux import TagMeta
 
