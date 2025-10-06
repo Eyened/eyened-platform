@@ -121,43 +121,56 @@ async def list_subtasks(
     count = db.scalar(select(func.count()).select_from(SubTask).where(SubTask.TaskID == task_id)) or 0
 
     if with_images:
-        subtasks = [DTOConverter.subtask_with_images_to_get(st) for st in rows]
+        subtasks = [
+            DTOConverter.subtask_with_images_to_get(st).copy(update={'index': offset + i})
+            for i, st in enumerate(rows)
+        ]
         return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
 
-    subtasks = [DTOConverter.subtask_to_get(st) for st in rows]
+    subtasks = [
+        DTOConverter.subtask_to_get(st).copy(update={'index': offset + i})
+        for i, st in enumerate(rows)
+    ]
     return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
 
 
+
 @router.get(
-    "/task/{task_id}/subtask/{subtaskid}",
-    response_model=Union[SubTaskWithImagesGET,SubTaskGET],
+    "/task/{task_id}/subtask/{subtask_index}",
+    response_model=Union[SubTaskWithImagesGET, SubTaskGET],
 )
 async def get_subtask(
     task_id: int,
-    subtaskid: int,
+    subtask_index: int,
     with_images: bool = False,
+    with_next: bool = False,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Get a single subtask with optional image inclusion."""
-    q = select(SubTask).where(SubTask.SubTaskID == subtaskid, SubTask.TaskID == task_id)
+    """Get a single subtask by index with optional image inclusion and next task."""
+    base_q = select(SubTask).where(SubTask.TaskID == task_id).order_by(SubTask.SubTaskID)
     if with_images:
-        q = q.options(
+        base_q = base_q.options(
             selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance)
         )
-    subtask = db.execute(q).scalars().first()
-    if not subtask:
+    q = base_q.offset(subtask_index).limit(2 if with_next else 1)
+    rows = db.execute(q).scalars().all()
+    if not rows:
         raise HTTPException(404, "SubTask not found")
 
-    if with_images:
-        return DTOConverter.subtask_with_images_to_get(subtask)
-    return DTOConverter.subtask_to_get(subtask)
+    main = rows[0]
+    main_dto = (
+        DTOConverter.subtask_with_images_to_get(main)
+        if with_images else DTOConverter.subtask_to_get(main)
+    ).copy(update={'index': subtask_index})
 
+    if with_next and len(rows) > 1:
+        nxt = rows[1]
+        next_dto = (
+            DTOConverter.subtask_with_images_to_get(nxt)
+            if with_images else DTOConverter.subtask_to_get(nxt)
+        ).copy(update={'index': subtask_index + 1})
+        main_dto = main_dto.copy(update={'next_task': next_dto})
 
-@router.delete("/task/{task_id}/subtask/{subtaskid}", status_code=204)
-async def delete_subtask(task_id: int, subtaskid: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
-    res = db.execute(delete(SubTask).where(SubTask.SubTaskID == subtaskid, SubTask.TaskID == task_id))
-    if res.rowcount == 0:
-        raise HTTPException(404, "SubTask not found")
-    db.commit()
-    return Response(status_code=204)
+    return main_dto
+

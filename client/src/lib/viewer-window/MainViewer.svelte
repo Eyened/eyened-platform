@@ -1,18 +1,18 @@
 <script lang="ts">
-    import type { TaskContext } from "$lib/types";
-    import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
-    import Viewer from "$lib/viewer/Viewer.svelte";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext, onDestroy, setContext, type Component } from "svelte";
-    import MainIcon from "./icons/MainIcon.svelte";
-    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
-    import PanelForm from "./panelForm/PanelForm.svelte";
-    import PanelHeader from "./PanelHeader.svelte";
-    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
-    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
-    import PanelRendering from "./panelRendering/PanelRendering.svelte";
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
+        import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
+        import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
+        import Viewer from "$lib/viewer/Viewer.svelte";
+        import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+        import type { AbstractImage } from "$lib/webgl/abstractImage";
+        import { getContext, onDestroy, setContext, type Component } from "svelte";
+        import MainIcon from "./icons/MainIcon.svelte";
+        import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
+        import PanelForm from "./panelForm/PanelForm.svelte";
+        import PanelHeader from "./PanelHeader.svelte";
+        import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
+        import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
+        import PanelRendering from "./panelRendering/PanelRendering.svelte";
+        import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { data } from "$lib/datamodel/model";

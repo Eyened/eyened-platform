@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { getContext, onDestroy } from 'svelte';
-	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
+	import { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
+	import type { FormSchema } from '$lib/datamodel/formSchema.svelte';
 	import { data } from '$lib/datamodel/model';
-	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
+	import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
 	import {
-		ETDRSGridOverlay,
-		type etdrsFormAnnotationType
+	    ETDRSGridOverlay,
+	    type etdrsFormAnnotationType
 	} from '$lib/viewer/overlays/ETDRSGridOverlay.svelte';
 	import { ETDRSGridTool } from '$lib/viewer/tools/ETDRSGrid.svelte';
+	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
+	import { getContext, onDestroy } from 'svelte';
+	import { Hide, Show } from '../icons/icons';
+	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import ETDRSGridItem from './ETDRSGridItem.svelte';
-	import { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
-	import type { TaskContext } from '$lib/types';
-	import { Hide, PanelIcon, Show } from '../icons/icons';
-	import type { FormSchema } from '$lib/datamodel/formSchema.svelte';
 
 	interface Props {
 		active: boolean;

@@ -9,7 +9,7 @@
         type DataRepresentation,
         type Datatype
     } from "$lib/datamodel/segmentation.svelte";
-    import type { TaskContext } from "$lib/types";
+    import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import type { FeatureGET } from "../../../types/openapi_types";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import NewMultiFeature from "./NewMultiFeature.svelte";

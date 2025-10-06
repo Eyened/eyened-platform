@@ -3755,11 +3755,11 @@
         }
       }
     },
-    "/task/{task_id}/subtask/{subtaskid}": {
+    "/task/{task_id}/subtask/{subtask_index}": {
       "get": {
         "summary": "Get Subtask",
-        "description": "Get a single subtask with optional image inclusion.",
-        "operationId": "get_subtask_task__task_id__subtask__subtaskid__get",
+        "description": "Get a single subtask by index with optional image inclusion and next task.",
+        "operationId": "get_subtask_task__task_id__subtask__subtask_index__get",
         "parameters": [
           {
             "name": "task_id",
@@ -3771,12 +3771,12 @@
             }
           },
           {
-            "name": "subtaskid",
+            "name": "subtask_index",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Subtaskid"
+              "title": "Subtask Index"
             }
           },
           {
@@ -3787,6 +3787,16 @@
               "type": "boolean",
               "default": false,
               "title": "With Images"
+            }
+          },
+          {
+            "name": "with_next",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Next"
             }
           },
           {
@@ -6755,6 +6765,28 @@
               }
             ],
             "title": "Creator Id"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          },
+          "next_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubTaskGET"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Task"
           }
         },
         "type": "object",

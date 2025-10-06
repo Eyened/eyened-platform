@@ -48,6 +48,7 @@ export type SubTaskGET = components['schemas']['SubTaskGET'];
 export type SubTaskWithImagesGET = components['schemas']['SubTaskWithImagesGET'];
 export type SubTasksResponse = components['schemas']['SubTasksResponse'];
 export type SubTasksWithImagesResponse = components['schemas']['SubTasksWithImagesResponse'];
+export type SubTaskState = components['schemas']['SubTaskState'];
 export type TagGET = components['schemas']['TagGET'];
 export type TagPATCH = components['schemas']['TagPATCH'];
 export type TagPUT = components['schemas']['TagPUT'];

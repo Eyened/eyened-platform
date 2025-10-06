@@ -110,10 +110,10 @@ export class TaskObject extends DataObject<TaskGET, TaskPATCH> {
 	
 	async subtasks(p?: { with_images?: boolean; limit?: number; page?: number }) {
 		const { api } = await import('../api/client');
-		const res = await api.GET('/subtasks' as any, {
+		const res = await api.GET('/task/{task_id}/subtasks' as any, {
 			params: {
+				path: { task_id: Number(this.id) } as any,
 				query: {
-					task_id: Number(this.id),
 					with_images: p?.with_images ?? true,
 					limit: p?.limit ?? 200,
 					page: p?.page ?? 0
