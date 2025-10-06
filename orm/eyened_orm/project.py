@@ -18,6 +18,21 @@ class ExternalEnum(enum.Enum):
     N = "N"
     M = "M"
 
+class Contact(Base):
+    __tablename__ = "Contact"
+    __table_args__ = (CompositeUniqueConstraintMulti(
+        ("Name", "Email", "Institute")),)
+
+    ContactID: Mapped[int] = mapped_column(primary_key=True)
+    Name = mapped_column(String(256), unique=False, nullable=False)
+    Email = mapped_column(String(256), unique=False, nullable=False)
+    Institute = mapped_column(String(256), unique=False)
+
+    # relationships
+    Projects: List[Project] = relationship("eyened_orm.project.Project", back_populates="Contact")
+    Tasks: List[Task] = relationship("eyened_orm.task.Task", back_populates="Contact")
+
+
 
 class Project(Base):
     """Projects group patients and images; hold metadata and contact."""
