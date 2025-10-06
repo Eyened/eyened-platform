@@ -11,7 +11,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
 from pydantic import BaseModel, create_model
-from eyened_orm.Tag import TagType
+from eyened_orm.tag import TagType
 
 # Type aliases matching TypeScript types
 AnnotationTypeInterpretation = Literal[

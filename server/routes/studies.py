@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from eyened_orm import Study, Tag, StudyTagLink
-from eyened_orm.Tag import TagType
+from eyened_orm.tag import TagType
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dto_converter import DTOConverter

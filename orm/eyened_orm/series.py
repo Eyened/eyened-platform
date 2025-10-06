@@ -26,12 +26,12 @@ class Series(Base):
     SeriesInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
 
 
-    Study: Study = relationship("eyened_orm.study.Study", back_populates="Series")
-    ImageInstances: List[ImageInstance] = relationship(
+    Study: Mapped[Study] = relationship("eyened_orm.study.Study", back_populates="Series")
+    ImageInstances: Mapped[List[ImageInstance]] = relationship(
         "eyened_orm.image_instance.ImageInstance",
         back_populates="Series", cascade="all,delete-orphan"
     )
-    Annotations: List[Annotation] = relationship("eyened_orm.annotation.Annotation", back_populates="Series")
+    Annotations: Mapped[List[Annotation]] = relationship("eyened_orm.annotation.Annotation", back_populates="Series")
 
     def __repr__(self):
         return f"Series({self.SeriesID}, {self.SeriesNumber}, {self.SeriesInstanceUid})"

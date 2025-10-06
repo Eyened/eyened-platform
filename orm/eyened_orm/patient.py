@@ -39,10 +39,10 @@ class Patient(Base):
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Project: Mapped["Project"] = relationship(back_populates="Patients", lazy="selectin")
-    Studies: Mapped[List["Study"]] = relationship(back_populates="Patient", passive_deletes=True)
-    Annotations: Mapped[List["Annotation"]] = relationship(back_populates="Patient")
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="Patient")
+    Project: Mapped["Project"] = relationship("eyened_orm.project.Project", back_populates="Patients", lazy="selectin")
+    Studies: Mapped[List["Study"]] = relationship("eyened_orm.study.Study", back_populates="Patient", passive_deletes=True)
+    Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Patient")
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Patient")
 
     @classmethod
     def by_project_and_identifier(

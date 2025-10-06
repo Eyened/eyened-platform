@@ -10,7 +10,7 @@ This file contains DTOs that represent:
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
-from eyened_orm.Segmentation import DataRepresentation, Datatype
+from eyened_orm.segmentation import DataRepresentation, Datatype
 from .dtos_aux import CreatorMeta, TagMeta
 from pydantic import BaseModel
 

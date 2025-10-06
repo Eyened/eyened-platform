@@ -170,11 +170,11 @@ class ImageInstance(Base):
     DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
 
     # relationships:
-    Series: Mapped["Series"] = relationship(back_populates="ImageInstances", lazy="selectin")
-    SourceInfo: Mapped["SourceInfo"] = relationship(back_populates="ImageInstances", lazy="selectin")
-    DeviceInstance: Mapped["DeviceInstance"] = relationship(back_populates="ImageInstances", lazy="selectin")
-    _Modality: Mapped["ModalityTable"] = relationship(back_populates="ImageInstances")
-    Scan: Mapped[Optional["Scan"]] = relationship(back_populates="ImageInstances", lazy="selectin")
+    Series: Mapped["Series"] = relationship("eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin")
+    SourceInfo: Mapped["SourceInfo"] = relationship("eyened_orm.image_instance.SourceInfo", back_populates="ImageInstances", lazy="selectin")
+    DeviceInstance: Mapped["DeviceInstance"] = relationship("eyened_orm.image_instance.DeviceInstance", back_populates="ImageInstances", lazy="selectin")
+    _Modality: Mapped["ModalityTable"] = relationship("eyened_orm.image_instance.ModalityTable", back_populates="ImageInstances")
+    Scan: Mapped[Optional["Scan"]] = relationship("eyened_orm.image_instance.Scan", back_populates="ImageInstances", lazy="selectin")
 
     # Datetimes - automatically filled
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -184,27 +184,32 @@ class ImageInstance(Base):
 
     # relationships:
     Annotations: Mapped[List["Annotation"]] = relationship(
+        "eyened_orm.annotation.Annotation",
         back_populates="ImageInstance", passive_deletes=True
     )
 
     Segmentations: Mapped[List["Segmentation"]] = relationship(
+        "eyened_orm.segmentation.Segmentation",
         back_populates="ImageInstance", passive_deletes=True
     )
     
     ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(
+        "eyened_orm.segmentation.ModelSegmentation",
         back_populates="ImageInstance", passive_deletes=True
     )
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
+        "eyened_orm.form_annotation.FormAnnotation",
         back_populates="ImageInstance", passive_deletes=True
     )
 
     SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(
+        "eyened_orm.task.SubTaskImageLink",
         back_populates="ImageInstance",
         passive_deletes=True,
     )
 
-    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(back_populates="ImageInstance", lazy="selectin")
+    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship("eyened_orm.tag.ImageInstanceTagLink", back_populates="ImageInstance", lazy="selectin")
 
     @property
     def shape(self) -> tuple[int, int, int]:
@@ -356,7 +361,7 @@ class DeviceModel(Base):
     Manufacturer: Mapped[str] = mapped_column(String(45))
     ManufacturerModelName: Mapped[str] = mapped_column(String(45))
 
-    DeviceInstances: Mapped[List["DeviceInstance"]] = relationship(back_populates="DeviceModel")
+    DeviceInstances: Mapped[List["DeviceInstance"]] = relationship("eyened_orm.image_instance.DeviceInstance", back_populates="DeviceModel")
 
     @classmethod
     def by_manufacturer(
@@ -386,7 +391,7 @@ class DeviceInstance(Base):
     SerialNumber: Mapped[Optional[str]] = mapped_column(TEXT)
     Description: Mapped[str] = mapped_column(String(256))
 
-    DeviceModel: Mapped["DeviceModel"] = relationship(back_populates="DeviceInstances")
+    DeviceModel: Mapped["DeviceModel"] = relationship("eyened_orm.image_instance.DeviceModel", back_populates="DeviceInstances")
 
     ImageInstances: Mapped[List[ImageInstance]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="DeviceInstance"
@@ -403,7 +408,7 @@ class SourceInfo(Base):
     SourcePath: Mapped[str] = mapped_column(String(250), unique=True)
     ThumbnailPath: Mapped[str] = mapped_column(String(250), unique=True)
 
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="SourceInfo")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo")
 
 
 class ModalityTable(Base):
@@ -413,7 +418,7 @@ class ModalityTable(Base):
     ModalityID: Mapped[int] = mapped_column(primary_key=True)
     ModalityTag: Mapped[str] = mapped_column(String(40), unique=True)
 
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="_Modality")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="_Modality")
 
     @classmethod
     def by_tag(cls, ModalityTag: str, session: Session) -> Optional["ModalityTable"]:
@@ -427,7 +432,7 @@ class Scan(Base):
     ScanID: Mapped[int] = mapped_column(primary_key=True)
     ScanMode: Mapped[str] = mapped_column(String(40), unique=True)
     
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship(back_populates="Scan")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="Scan")
 
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
