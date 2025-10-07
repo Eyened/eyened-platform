@@ -60,25 +60,29 @@ class Annotation(Base):
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Patient: Mapped[Optional["Patient"]] = relationship(back_populates="Annotations")
-    Study: Mapped[Optional["Study"]] = relationship(back_populates="Annotations")
-    Series: Mapped[Optional["Series"]] = relationship(back_populates="Annotations")
+    Patient: Mapped[Optional["Patient"]] = relationship("eyened_orm.patient.Patient", back_populates="Annotations")
+    Study: Mapped[Optional["Study"]] = relationship("eyened_orm.study.Study", back_populates="Annotations")
+    Series: Mapped[Optional["Series"]] = relationship("eyened_orm.series.Series", back_populates="Annotations")
     ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance",
         back_populates="Annotations"
     )
-    Creator: Mapped["Creator"] = relationship(back_populates="Annotations")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Annotations")
 
-    AnnotationType: Mapped["AnnotationType"] = relationship(back_populates="Annotations")
+    AnnotationType: Mapped["AnnotationType"] = relationship("eyened_orm.annotation.AnnotationType", back_populates="Annotations")
     AnnotationReference: Mapped[Optional["Annotation"]] = relationship(
+        "eyened_orm.annotation.Annotation",
         back_populates="ChildAnnotations", remote_side="Annotation.AnnotationID"
     )
 
     ChildAnnotations: Mapped[List["Annotation"]] = relationship(
+        "eyened_orm.annotation.Annotation",
         back_populates="AnnotationReference",
         passive_deletes=True,
     )
     # Actual data is stored in AnnotationData
     AnnotationData: Mapped[List["AnnotationData"]] = relationship(
+        "eyened_orm.annotation.AnnotationData",
         back_populates="Annotation", passive_deletes=True
     )
 
@@ -141,7 +145,7 @@ class AnnotationData(Base):
     DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
     MediaType: Mapped[str] = mapped_column(String(45))
 
-    Annotation: Mapped["Annotation"] = relationship(back_populates="AnnotationData")
+    Annotation: Mapped["Annotation"] = relationship("eyened_orm.annotation.Annotation", back_populates="AnnotationData")
 
     @classmethod
     def create(
@@ -245,4 +249,4 @@ class AnnotationType(Base):
     AnnotationTypeName: Mapped[str] = mapped_column(String(45))
     Interpretation: Mapped[str] = mapped_column(String(45))
 
-    Annotations: Mapped[List["Annotation"]] = relationship(back_populates="AnnotationType")
+    Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="AnnotationType")

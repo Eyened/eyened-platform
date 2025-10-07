@@ -41,7 +41,7 @@
 		flex-direction: column;
 	}
 	.page-container {
-		padding-top: 56px; /* matches --topmenu-height */
+		margin-top: 56px; /* matches --topmenu-height */
 		overflow-y: scroll;
 	}
 </style>

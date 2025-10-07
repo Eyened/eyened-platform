@@ -8,33 +8,32 @@
   import type { SubTaskGET, SubTaskWithImagesGET } from "../../types/openapi_types";
 
   type SubTaskAny = SubTaskGET | SubTaskWithImagesGET;
-  let { rows, repo, taskId }: { rows: SubTaskAny[]; repo: SubTasksRepo; taskId: number } = $props();
+
+  let {
+    rows,
+    repo,
+    taskId,
+    count,
+    page,
+    perPage = 100,
+    onPageChange
+  }: {
+    rows: SubTaskAny[];
+    repo: SubTasksRepo;
+    taskId: number;
+    count: number;
+    page: number;
+    perPage?: number;
+    onPageChange: (p: number) => void;
+  } = $props();
 
   const browserContext = new BrowserContext();
-  browserContext.thumbnailSize = 4;
   setContext("browserContext", browserContext);
 
-  let currentPage = $state(0);
-  const perPage = 100;
-
-  const count = $derived(rows.length);
-  const start = $derived(currentPage * perPage);
-  const end = $derived(Math.min(start + perPage, count));
-  const paginatedRows = $derived(rows.slice(start, end));
-
-  // Clamp page if rows change and current page is now out of range
-  $effect(() => {
-    if (currentPage > 0 && start >= count) {
-      currentPage = Math.max(0, Math.ceil(count / perPage) - 1);
-    }
-  });
-
-  function onPageChange(p: number) {
-    currentPage = p;
-  }
+  const start = $derived(page * perPage);
 </script>
 
-<PaginatedResults {count} {perPage} page={currentPage} {onPageChange}>
+<PaginatedResults {count} {perPage} {page} {onPageChange}>
   <div class="rounded-md border">
     <Table.Root>
       <Table.Header>
@@ -47,8 +46,8 @@
         </Table.Row>
       </Table.Header>
       <Table.Body>
-        {#each paginatedRows as row, index (row.id)}
-          <SubTaskRow obj={repo.object(row.id)} taskId={taskId} index={index} start={start} />
+        {#each rows as row, index (row.id)}
+          <SubTaskRow obj={repo.object(row.id)} taskId={taskId} {index} {start} />
         {:else}
           <Table.Row>
             <Table.Cell colspan="5" class="h-24 text-center">No results.</Table.Cell>

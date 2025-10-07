@@ -3,7 +3,7 @@
     import type { FormAnnotationObject } from "$lib/data/objects.svelte";
     import type { FormAnnotationsRepo } from "$lib/data/repos.svelte";
     import { openNewWindow } from "$lib/newWindow";
-    import type { TaskContext } from "$lib/types";
+    import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext, type ComponentProps } from "svelte";
     import Duplicate from "../icons/Duplicate.svelte";

@@ -30,8 +30,8 @@ class CreatorTagLink(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID", ondelete="CASCADE"), primary_key=True)
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Tag: Mapped["Tag"] = relationship(back_populates="CreatorTagLinks")
-    Creator: Mapped["Creator"] = relationship(back_populates="StarredTags")
+    Tag: Mapped["Tag"] = relationship("eyened_orm.tag.Tag", back_populates="CreatorTagLinks")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="StarredTags")
 
 
 class Tag(Base):
@@ -49,38 +49,44 @@ class Tag(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     CreatorTagLinks: Mapped[List["CreatorTagLink"]] = relationship(
+        "eyened_orm.tag.CreatorTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin"
     )
 
     StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
+        "eyened_orm.tag.StudyTagLink",
         back_populates="Tag", 
         passive_deletes=True, 
         lazy="selectin"
     )
     ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
+        "eyened_orm.tag.ImageInstanceTagLink",
         back_populates="Tag", 
         passive_deletes=True, 
         lazy="selectin"
     )
     AnnotationTagLinks: Mapped[List["AnnotationTagLink"]] = relationship(
+        "eyened_orm.tag.AnnotationTagLink",
         back_populates="Tag", 
         passive_deletes=True, 
         lazy="selectin"
     )
     SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+        "eyened_orm.tag.SegmentationTagLink",
         back_populates="Tag", 
         passive_deletes=True, 
         lazy="selectin"
     )
     FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(
+        "eyened_orm.tag.FormAnnotationTagLink",
         back_populates="Tag", 
         passive_deletes=True, 
         lazy="selectin"
     )
 
-    Creator: Mapped["Creator"] = relationship(back_populates="Tags")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Tags")
 
 
 class StudyTagLink(Base):
@@ -96,9 +102,9 @@ class StudyTagLink(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Tag: Mapped["Tag"] = relationship(back_populates="StudyTagLinks")
-    Study: Mapped["Study"] = relationship(back_populates="StudyTagLinks")
-    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+    Tag: Mapped["Tag"] = relationship("eyened_orm.tag.Tag", back_populates="StudyTagLinks")
+    Study: Mapped["Study"] = relationship("eyened_orm.study.Study", back_populates="StudyTagLinks")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", lazy="selectin")
 
 class ImageInstanceTagLink(Base):
     __tablename__ = "ImageInstanceTag"
@@ -113,9 +119,9 @@ class ImageInstanceTagLink(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Tag: Mapped["Tag"] = relationship(back_populates="ImageInstanceTagLinks")
-    ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="ImageInstanceTagLinks")
-    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+    Tag: Mapped["Tag"] = relationship("eyened_orm.tag.Tag", back_populates="ImageInstanceTagLinks")
+    ImageInstance: Mapped["ImageInstance"] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="ImageInstanceTagLinks")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", lazy="selectin")
 
 class AnnotationTagLink(Base):
     __tablename__ = "AnnotationTag"
@@ -130,8 +136,8 @@ class AnnotationTagLink(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Tag: Mapped["Tag"] = relationship(back_populates="AnnotationTagLinks")
-    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+    Tag: Mapped["Tag"] = relationship("eyened_orm.tag.Tag", back_populates="AnnotationTagLinks")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", lazy="selectin")
 
 
 class SegmentationTagLink(Base):
@@ -147,9 +153,9 @@ class SegmentationTagLink(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Tag: Mapped["Tag"] = relationship(back_populates="SegmentationTagLinks")
-    Segmentation: Mapped["Segmentation"] = relationship(back_populates="SegmentationTagLinks")
-    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+    Tag: Mapped["Tag"] = relationship("eyened_orm.tag.Tag", back_populates="SegmentationTagLinks")
+    Segmentation: Mapped["Segmentation"] = relationship("eyened_orm.segmentation.Segmentation", back_populates="SegmentationTagLinks")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", lazy="selectin")
 
 
 class FormAnnotationTagLink(Base):
@@ -165,6 +171,6 @@ class FormAnnotationTagLink(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Tag: Mapped["Tag"] = relationship(back_populates="FormAnnotationTagLinks")
-    FormAnnotation: Mapped["FormAnnotation"] = relationship(back_populates="FormAnnotationTagLinks")
-    Creator: Mapped["Creator"] = relationship(lazy="selectin")
+    Tag: Mapped["Tag"] = relationship("eyened_orm.tag.Tag", back_populates="FormAnnotationTagLinks")
+    FormAnnotation: Mapped["FormAnnotation"] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="FormAnnotationTagLinks")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", lazy="selectin")

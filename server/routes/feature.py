@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, delete, func
 from sqlalchemy.orm import Session
 from eyened_orm import Feature
-from eyened_orm.Segmentation import FeatureFeatureLink, Segmentation
+from eyened_orm.segmentation import FeatureFeatureLink, Segmentation
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import FeaturePUT, FeaturePATCH, FeatureGET

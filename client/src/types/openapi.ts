@@ -754,7 +754,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/task/{task_id}/subtask/{subtaskid}": {
+    "/task/{task_id}/subtask/{subtask_index}": {
         parameters: {
             query?: never;
             header?: never;
@@ -763,13 +763,12 @@ export interface paths {
         };
         /**
          * Get Subtask
-         * @description Get a single subtask with optional image inclusion.
+         * @description Get a single subtask by index with optional image inclusion and next task.
          */
-        get: operations["get_subtask_task__task_id__subtask__subtaskid__get"];
+        get: operations["get_subtask_task__task_id__subtask__subtask_index__get"];
         put?: never;
         post?: never;
-        /** Delete Subtask */
-        delete: operations["delete_subtask_task__task_id__subtask__subtaskid__delete"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1633,6 +1632,9 @@ export interface components {
             id: number;
             /** Creator Id */
             creator_id?: number | null;
+            /** Index */
+            index?: number | null;
+            next_task?: components["schemas"]["SubTaskGET"] | null;
         };
         /** SubTaskPATCH */
         SubTaskPATCH: {
@@ -1660,6 +1662,9 @@ export interface components {
             id: number;
             /** Creator Id */
             creator_id?: number | null;
+            /** Index */
+            index?: number | null;
+            next_task?: components["schemas"]["SubTaskGET"] | null;
             /** Images */
             images: components["schemas"]["InstanceGET"][];
         };
@@ -1744,6 +1749,22 @@ export interface components {
          * @enum {string}
          */
         TagType: "Study" | "ImageInstance" | "Annotation" | "Segmentation" | "FormAnnotation";
+        /** TaskDefinitionGET */
+        TaskDefinitionGET: {
+            /** Name */
+            name: string;
+            /** Id */
+            id: number;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Date Inserted
+             * Format: date-time
+             */
+            date_inserted: string;
+        };
         /** TaskGET */
         TaskGET: {
             /** Name */
@@ -1767,6 +1788,7 @@ export interface components {
             num_tasks_ready: number;
             creator?: components["schemas"]["CreatorMeta"] | null;
             task_state?: components["schemas"]["TaskState"] | null;
+            task_definition: components["schemas"]["TaskDefinitionGET"];
         };
         /** TaskPATCH */
         TaskPATCH: {
@@ -4006,17 +4028,18 @@ export interface operations {
             };
         };
     };
-    get_subtask_task__task_id__subtask__subtaskid__get: {
+    get_subtask_task__task_id__subtask__subtask_index__get: {
         parameters: {
             query?: {
                 with_images?: boolean;
+                with_next?: boolean;
             };
             header?: {
                 authorization?: string;
             };
             path: {
                 task_id: number;
-                subtaskid: number;
+                subtask_index: number;
             };
             cookie?: {
                 jwt_token?: string;
@@ -4033,41 +4056,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SubTaskWithImagesGET"] | components["schemas"]["SubTaskGET"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_subtask_task__task_id__subtask__subtaskid__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                task_id: number;
-                subtaskid: number;
-            };
-            cookie?: {
-                jwt_token?: string;
-                refresh_token?: string;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

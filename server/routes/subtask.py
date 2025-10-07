@@ -10,6 +10,7 @@ from ..dtos.dtos_tasks import (
     SubTasksResponse, SubTasksWithImagesResponse,
     SubTaskGET, SubTaskWithImagesGET,
 )
+from ..dtos.dtos_instances import InstanceGET
 from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
@@ -21,28 +22,6 @@ class SubTaskPATCH(BaseModel):
 class AddImageRequest(BaseModel):
     instance_id: int
 
-@router.get("/subtasks", response_model=Union[SubTasksWithImagesResponse, SubTasksResponse])
-async def list_subtasks(
-    task_id: int,
-    with_images: bool = False,
-    limit: int = 200,
-    page: int = 0,
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
-):
-    offset = limit * page
-    q = select(SubTask).where(SubTask.TaskID == task_id).order_by(SubTask.SubTaskID)
-    if with_images:
-        q = q.options(
-            selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance)
-        )
-    rows = db.execute(q.limit(limit).offset(offset)).scalars().all()
-    count = db.scalar(select(func.count()).select_from(SubTask).where(SubTask.TaskID == task_id)) or 0
-    if with_images:
-        subtasks = [DTOConverter.subtask_with_images_to_get(st) for st in rows]
-        return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
-    subtasks = [DTOConverter.subtask_to_get(st) for st in rows]
-    return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
 
 @router.get("/subtasks/{subtaskid}", response_model=Union[SubTaskWithImagesGET, SubTaskGET])
 async def get_subtask(
@@ -92,7 +71,7 @@ async def delete_subtask(
     db.commit()
     return Response(status_code=204)
 
-@router.post("/subtasks/{subtaskid}/images", status_code=204)
+@router.post("/subtasks/{subtaskid}/images", response_model=InstanceGET)
 async def add_subtask_image(
     subtaskid: int,
     body: AddImageRequest,
@@ -107,7 +86,7 @@ async def add_subtask_image(
         raise HTTPException(404, "ImageInstance not found")
     link = SubTaskImageLink(SubTaskID=subtaskid, ImageInstanceID=body.instance_id)
     db.add(link); db.commit()
-    return Response(status_code=204)
+    return DTOConverter.image_instance_to_get(inst)
 
 @router.delete("/subtasks/{subtaskid}/images/{instance_id}", status_code=204)
 async def remove_subtask_image(

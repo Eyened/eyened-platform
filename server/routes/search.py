@@ -24,8 +24,8 @@ from eyened_orm import (
     Segmentation,
     SegmentationTagLink,
 )
-from eyened_orm.ImageInstance import Laterality as ImgLaterality, Modality as ImgModality, ETDRSField as ImgETDRS
-from eyened_orm.Patient import SexEnum as PatientSex
+from eyened_orm.image_instance import Laterality as ImgLaterality, Modality as ImgModality, ETDRSField as ImgETDRS
+from eyened_orm.patient import SexEnum as PatientSex
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 

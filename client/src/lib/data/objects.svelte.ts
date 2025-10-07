@@ -110,10 +110,10 @@ export class TaskObject extends DataObject<TaskGET, TaskPATCH> {
 	
 	async subtasks(p?: { with_images?: boolean; limit?: number; page?: number }) {
 		const { api } = await import('../api/client');
-		const res = await api.GET('/subtasks' as any, {
+		const res = await api.GET('/task/{task_id}/subtasks' as any, {
 			params: {
+				path: { task_id: Number(this.id) } as any,
 				query: {
-					task_id: Number(this.id),
 					with_images: p?.with_images ?? true,
 					limit: p?.limit ?? 200,
 					page: p?.page ?? 0
@@ -133,16 +133,36 @@ export class FormSchemaObject extends DataObject<FormSchemaGET, never> {
 export class SubTaskObject extends DataObject<SubTaskGET | SubTaskWithImagesGET, Partial<SubTaskGET | SubTaskWithImagesGET>> {
 	async addImage(instance_id: number) {
 		const { api } = await import('../api/client');
-		await api.POST('/subtasks/{subtaskid}/images' as any, {
+		const { data } = await api.POST('/subtasks/{subtaskid}/images' as any, {
 			params: { path: { subtaskid: Number(this.id) } } as any,
 			body: { instance_id } as any
 		});
+		if (this.repo) {
+			const curr = this.repo.store[this.id];
+			const imgs = (curr as any)?.images;
+			if (!Array.isArray(imgs)) throw new Error('SubTask images not loaded. Fetch with with_images=true first.');
+			this.repo.store[this.id] = { ...(curr as any), images: [...imgs, data] } as any;
+			return;
+		}
+		const imgs = (this.$ as any)?.images;
+		if (!Array.isArray(imgs)) throw new Error('SubTask images not loaded. Fetch with with_images=true first.');
+		this.replace({ ...(this.$ as any), images: [...imgs, data] } as any);
 	}
 	async removeImage(instance_id: number) {
 		const { api } = await import('../api/client');
 		await api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
 			params: { path: { subtaskid: Number(this.id), instance_id } } as any
 		});
+		if (this.repo) {
+			const curr = this.repo.store[this.id];
+			const imgs = (curr as any)?.images;
+			if (!Array.isArray(imgs)) throw new Error('SubTask images not loaded. Fetch with with_images=true first.');
+			this.repo.store[this.id] = { ...(curr as any), images: imgs.filter((i: any) => i.id !== instance_id) } as any;
+			return;
+		}
+		const imgs = (this.$ as any)?.images;
+		if (!Array.isArray(imgs)) throw new Error('SubTask images not loaded. Fetch with with_images=true first.');
+		this.replace({ ...(this.$ as any), images: imgs.filter((i: any) => i.id !== instance_id) } as any);
 	}
 	async setComments(comments: string) {
 		const { api } = await import('../api/client');
