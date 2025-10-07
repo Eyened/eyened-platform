@@ -8,14 +8,15 @@
 	import * as Card from "$lib/components/ui/card";
 	import type { GlobalContext } from '$lib/data/globalContext.svelte';
 	import { getContext, onMount, setContext } from 'svelte';
-	import Spinner from '../utils/Spinner.svelte';
+	import { searchOrderBy, studiesSearchOrderBy } from '../../types/openapi_constants';
+	import FixedSpinner from '../components/FixedSpinner.svelte';
 	import AdvancedFilters from './AdvancedFilters.svelte';
 	import BrowserContent from './BrowserContent.svelte';
 	import { BrowserContext, decodeConditions, type QueryMode } from './browserContext.svelte';
 	import FilterShorcuts from './FilterShorcuts.svelte';
 	
 	const globalContext = getContext<GlobalContext>('globalContext');
-	const { user, openAPISpec } = globalContext;
+	const { user } = globalContext;
 	const initials = user.username
 		.split(' ')
 		.map((name) => name[0])
@@ -77,8 +78,7 @@
 			: browserContext.limitOptionsStudies
 	);
 
-	// let sortByColumns = $derived((browserContext.displayMode === 'instance') ? ['CFQuality', 'StudyDate', 'PatientIdentifier', 'BirthDate', 'DateInserted', 'DateModified'] : ['StudyDate', 'PatientIdentifier', 'BirthDate'])
-	let sortByColumns = $derived((browserContext.displayMode === 'instance') ? openAPISpec.components.schemas.SearchQuery.properties.order_by.enum : openAPISpec.components.schemas.StudySearchQuery.properties.order_by.enum);
+	let sortByColumns = $derived((browserContext.displayMode === 'instance') ? searchOrderBy : studiesSearchOrderBy);
 
 	// Handle limit as string for MySelect component
 	let limitAsString = $state(String(browserContext.limit));
@@ -103,11 +103,7 @@
 </script>
 
 {#if browserContext.loading}
-	<div class="fixed inset-0 z-10 h-screen w-screen bg-white/70 backdrop-blur-sm">
-		<div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-			<Spinner />
-		</div>
-	</div>
+	<FixedSpinner />
 {/if}
 
 

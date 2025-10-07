@@ -1,5 +1,7 @@
 
 
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
@@ -23,6 +25,7 @@ class TaskDefinitionPUT(TaskDefinitionBase):
 
 class TaskDefinitionGET(TaskDefinitionBase):
     id: int
+    config: Dict[str, Any]
     date_inserted: datetime
 
 
@@ -52,6 +55,7 @@ class TaskGET(TaskBase):
     num_tasks_ready: int
     creator: Optional[CreatorMeta] = None
     task_state: Optional[TaskState] = None
+    task_definition: TaskDefinitionGET
 
 
 # === SUB TASK ===
@@ -68,6 +72,9 @@ class SubTaskPUT(SubTaskBase):
 class SubTaskGET(SubTaskBase):
     id: int
     creator_id: Optional[int] = None
+    # New optional metadata
+    index: Optional[int] = None
+    next_task: Optional["SubTaskGET"] = None
 
 
 class SubTaskWithImagesGET(SubTaskGET):

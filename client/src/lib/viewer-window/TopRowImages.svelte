@@ -1,8 +1,8 @@
 <script lang="ts">
+	import Spinner from '$lib/components/Spinner.svelte';
 	import { getContext } from 'svelte';
 	import TopViewer from './TopViewer.svelte';
 	import type { ViewerWindowContext } from './viewerWindowContext.svelte';
-	import Spinner from '$lib/utils/Spinner.svelte';
 
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
 	const { instanceIds } = viewerWindowContext;

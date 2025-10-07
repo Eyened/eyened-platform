@@ -5,7 +5,7 @@
     import { BrowserContext } from "$lib/browser/browserContext.svelte";
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
     import { SubTasksRepo } from "$lib/data/repos.svelte";
-    import type { TaskContext } from "$lib/types";
+    import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import { getContext, setContext } from "svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 

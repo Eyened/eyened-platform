@@ -33,7 +33,6 @@
         return;
       }
       await obj.addImage(id);
-      await obj.refresh();
       newInstanceId = "";
     } catch (e) {
       toast.error(String(e));
@@ -43,7 +42,6 @@
   async function removeImage(instance_id: number) {
     try {
       await obj.removeImage(instance_id);
-      await obj.refresh();
     } catch (e) {
       toast.error(String(e));
     }

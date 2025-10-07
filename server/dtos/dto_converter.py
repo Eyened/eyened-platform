@@ -414,6 +414,7 @@ class DTOConverter:
         return TaskDefinitionGET(
             id=taskdef.TaskDefinitionID,
             name=taskdef.TaskDefinitionName,
+            config=taskdef.TaskConfig or {},
             date_inserted=taskdef.DateInserted,
         )
 
@@ -435,6 +436,7 @@ class DTOConverter:
             num_tasks_ready=num_tasks_ready,
             creator=DTOConverter.creator_to_meta(task.Creator) if getattr(task, "Creator", None) else None,
             task_state=getattr(task, "TaskState", None),
+            task_definition=DTOConverter.task_definition_to_get(task.TaskDefinition),
         )
 
     @staticmethod

@@ -35,6 +35,26 @@ export type Tag = TagGET;
 export class TasksRepo extends Repo<TaskGET, TaskPUT, TaskPATCH, unknown, TaskObject> {
 	public static path = '/task';
 	protected createDataObject(obj: TaskGET): TaskObject { return new TaskObject(obj, this); }
+
+	async listSubtasks(p: { task_id: number; with_images?: boolean; limit?: number; page?: number }) {
+		const { api } = await import('../api/client');
+		const res = await api.GET('/task/{task_id}/subtasks' as any, {
+			params: { path: { task_id: p.task_id }, query: {
+				with_images: p?.with_images ?? true,
+				limit: p?.limit ?? 200,
+				page: p?.page ?? 0
+			} } as any
+		});
+		return (res.data ?? {}) as SubTasksWithImagesResponse | SubTasksResponse;
+	}
+
+	async fetch_subtask(task_id: number, subtask_index: number, with_images = true, with_next = false) {
+		const { api } = await import('../api/client');
+		const res = await api.GET('/task/{task_id}/subtask/{subtask_index}' as any, {
+			params: { path: { task_id, subtask_index }, query: { with_images, with_next } } as any
+		});
+		return res.data as (SubTaskWithImagesGET | SubTaskGET);
+	}
 }
 
 type SubTaskAny = SubTaskGET | SubTaskWithImagesGET;

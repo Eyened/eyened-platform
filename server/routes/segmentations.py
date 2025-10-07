@@ -14,7 +14,7 @@ from eyened_orm import (
     Tag,
     SegmentationTagLink,
 )
-from eyened_orm.Tag import TagType
+from eyened_orm.tag import TagType
 from fastapi import (
     APIRouter,
     Depends,

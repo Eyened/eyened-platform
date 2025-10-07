@@ -29,7 +29,7 @@ class FormSchema(Base):
     SchemaName: Mapped[str] = mapped_column(String(255), unique=True)
     Schema: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
 
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(back_populates="FormSchema")
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="FormSchema")
 
 
 class FormAnnotation(Base):
@@ -50,13 +50,13 @@ class FormAnnotation(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    FormSchema: Mapped["FormSchema"] = relationship(back_populates="FormAnnotations")
-    Patient: Mapped["Patient"] = relationship(back_populates="FormAnnotations")
-    Study: Mapped["Study"] = relationship(back_populates="FormAnnotations")
-    ImageInstance: Mapped["ImageInstance"] = relationship(back_populates="FormAnnotations")
-    Creator: Mapped["Creator"] = relationship(back_populates="FormAnnotations")
-    SubTask: Mapped["SubTask"] = relationship(back_populates="FormAnnotations")
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
+    FormSchema: Mapped["FormSchema"] = relationship("eyened_orm.form_annotation.FormSchema", back_populates="FormAnnotations")
+    Patient: Mapped["Patient"] = relationship("eyened_orm.patient.Patient", back_populates="FormAnnotations")
+    Study: Mapped["Study"] = relationship("eyened_orm.study.Study", back_populates="FormAnnotations")
+    ImageInstance: Mapped["ImageInstance"] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="FormAnnotations")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="FormAnnotations")
+    SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="FormAnnotations")
+    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship("eyened_orm.tag.FormAnnotationTagLink", back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
 
     @classmethod
     def by_schema_and_creator(
