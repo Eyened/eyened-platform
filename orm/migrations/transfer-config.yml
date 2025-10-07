@@ -11,6 +11,7 @@ target:
   user: root
   password: t8S3sBPyxTFfDEsfucFBKDU2S7G7Xtm5
   database: eyened_database
+  
 
 copy_objects:
   - table: Patient
@@ -19,3 +20,6 @@ copy_objects:
   - table: Patient
     clause:
       PatientIdentifier: '2'
+
+copy_segmentation_data: true
+segmentations_zarr_store: /home/bart/eyened-platform/25/eyened-platform/storage/segmentations.zarr
