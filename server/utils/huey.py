@@ -25,17 +25,16 @@ def task_run_inference():
     Run inference on images in a background task.
     
     Args:
-        config: Configuration dictionary
         device: Device to run inference on (None for auto-selection)
     """
-    from eyened_orm.utils.config import EyenedORMConfig
     from eyened_orm.inference.inference import run_inference
+    from eyened_orm.utils.config import load_config
+    from eyened_orm import Database
+    
     logger.info(f"Starting inference task")
 
-    from eyened_orm import Database
-
-    # Initialize database
-    database = Database()
+    config = load_config()
+    database = Database(config)
 
     with database.get_session() as session:
         # Use session for database operations
@@ -49,23 +48,21 @@ def task_run_inference():
 def task_update_thumbnails(print_errors=False):
     """
     Update thumbnails for images in a background task.
-    
-    Args:
-        config: Configuration dictionary
     """
-    from eyened_orm.utils.config import EyenedORMConfig
     from eyened_orm.importer.thumbnails import update_thumbnails
+    from eyened_orm.utils.config import load_config
     from eyened_orm import Database
+    
     logger.info(f"Starting thumbnail update task")
 
-    # Initialize database
-    database = Database()
+    config = load_config()
+    database = Database(config)
     
     with database.get_session() as session:
         update_thumbnails(
             session, 
             thumbnails_path='/storage/thumbnails', 
-            secret_key= config.secret_key,
+            secret_key=config.secret_key,
             print_errors=True
         )
     session.close()
