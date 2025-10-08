@@ -72,7 +72,7 @@ searchable_fields = Literal[
     'Project Name',
     'Device Model ID',
 
-    'SegmentationFeature Name',  # backward-compat
+    'Segmentation Feature Name',  # backward-compat
     'Segmentation Creator Name',
     'Segmentation Tag Name',
     'Form Schema Name',

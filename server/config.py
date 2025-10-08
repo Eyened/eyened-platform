@@ -1,17 +1,15 @@
 from dataclasses import asdict, dataclass
 from typing import Literal, Optional
 from pathlib import Path, PurePath
-import os
+import os, PurePath
 
 import yaml
 from eyened_orm.utils.config import EyenedORMConfig, load_config
 
 # Ensure pathlib.Path objects are serialized as plain strings in YAML output
-def _path_representer(dumper, data):
+def _path_representer(dumper, data: PurePath):
     return dumper.represent_scalar('tag:yaml.org,2002:str', str(data))
 
-# Register for PurePath which is the base class for all Path types (PosixPath, WindowsPath, etc.)
-yaml.SafeDumper.add_representer(PurePath, _path_representer)
 yaml.SafeDumper.add_multi_representer(PurePath, _path_representer)
 
 
