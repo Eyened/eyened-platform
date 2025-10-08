@@ -14,20 +14,28 @@
     const eye = laterality ? { L: "OS", R: "OD" }[laterality] : "OD/OS?";
 
     const browserContext = getContext<BrowserContext>("browserContext");
-
-    const eyeSeries = study.$.series!.filter((series) => series.laterality == laterality);
-
+    
+    // Get all instances from all series, then filter by instance laterality
+    const eyeImages = study.$.series!
+        .flatMap((series) => series.instance_ids ?? [])
+        .map((id) => browserContext.InstanceRepo.store[id])
+        .filter((instance) => instance && instance.laterality == laterality);
+    
+    // Group images back into series for display
+    const eyeSeries = study.$.series!.filter((series) => 
+        series.instance_ids?.some((id) => 
+            eyeImages.some((img) => img.id === id)
+        )
+    );
+    
     function open() {
-        const numbers = eyeSeries
-            .sort((a, b) => a.id - b.id)
-            .flatMap((series) =>
-                series.instance_ids
-            ) ?? [];
+        const numbers = eyeImages.map((img) => img.id);
         browserContext.openTab(numbers);
     }
 </script>
 
-{#if study.$.series!.length}
+{#if eyeSeries.length}
+
     <div class="outer flex flex-1 flex-col p-2">
         <h3 class="m-0 text-base flex items-center gap-4">
             {eye}
@@ -44,7 +52,3 @@
         </div>
     </div>
 {/if}
-
-<style>
-
-</style>

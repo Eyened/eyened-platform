@@ -14,7 +14,7 @@
 
 	let { series, laterality, showSegmentationInfo = true }: Props = $props();
 
-	const instances = (series.instance_ids ?? []).map((id) => InstanceRepo.store[id]!);
+	const instances = (series.instance_ids ?? []).map((id) => InstanceRepo.store[id]!).filter((instance) => instance && instance.laterality == laterality);
     
 
 </script>
