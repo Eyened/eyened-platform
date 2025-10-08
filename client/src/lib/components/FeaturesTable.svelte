@@ -3,9 +3,10 @@
   import * as Table from "$lib/components/ui/table";
   import type { GlobalContext } from "$lib/data/globalContext.svelte";
   import { getCoreRowModel, getSortedRowModel, type ColumnDef, type SortingState } from "@tanstack/table-core";
-  import { getContext } from "svelte";
+  import { createRawSnippet, getContext } from "svelte";
   import FeatureRow from "./FeatureRow.svelte";
   import SortHeader from "./SortHeader.svelte";
+  import Button from "./ui/button/button.svelte";
 
   const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -32,7 +33,19 @@
     {
       id: "browser",
       header: "Browser",
-      cell: () => ""
+      cell: ({row}) => {
+        const children = createRawSnippet(() => ({ render: () => "Open in Browser" }));
+        return renderComponent(Button, { 
+          children,
+          class: "button-xs",
+          size: "sm",
+          variant: "link",
+          href: globalContext.makeInstancesBrowserURL({
+          variable: "Segmentation Feature Name",
+          operator: "IN",
+          value: [row.original.name]
+        }) });
+      }
     },
     {
       id: "actions",
@@ -43,6 +56,8 @@
       }
     }
   ];
+
+
 
   const table = createSvelteTable({
     get data() { return globalContext.features.all; },
