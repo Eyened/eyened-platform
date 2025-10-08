@@ -20,6 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    '''
     # CompositeFeature table: new table for feature hierarchy
     op.create_table('CompositeFeature',
         sa.Column('ParentFeatureID', sa.Integer(), nullable=False),
@@ -122,9 +123,9 @@ def upgrade() -> None:
     
     # Drop AnnotationTag table
     op.drop_table('AnnotationTag')
-    
+    '''
     # Annotation: add self-referencing foreign key
-    op.create_foreign_key(None, 'Annotation', 'Annotation', ['AnnotationReferenceID'], ['AnnotationID'])
+    # op.create_foreign_key(None, 'Annotation', 'Annotation', ['AnnotationReferenceID'], ['AnnotationID'])
 
     # Contact: add Orcid, change Name/Email/Institute to AutoString(255)
     op.add_column('Contact', sa.Column('Orcid', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True))

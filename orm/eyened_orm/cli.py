@@ -8,8 +8,6 @@ from tqdm import tqdm
 from .utils.config import (
     DatabaseSettings,
     EyenedORMConfig,
-    load_config_from_env_file,
-    load_config_from_environ,
 )
 
 """
@@ -27,27 +25,30 @@ Important: import packages that are not dependencies of the ORM within the funct
 """
 
 
-def load_orm_config(env: Optional[str] = None) -> EyenedORMConfig:
-    if env is not None:
-        return load_config_from_env_file(env)
-
-    import os
-
-    return load_config_from_environ(os.environ)
-
-
 @click.group(name="eorm")
 def eorm():
     pass
 
 
 def transfer_db(config_file):
-
     with open(config_file, "r") as f:
         config = yaml.safe_load(f)
 
-    source = DatabaseSettings(**config["source"]["database"])
-    target = DatabaseSettings(**config["target"]["database"])
+    # Convert YAML config to environment-like dict for declarative loading
+    def yaml_to_env_dict(yaml_db_config):
+        return {
+            "DATABASE_USER": yaml_db_config["user"],
+            "DATABASE_PASSWORD": yaml_db_config["password"],
+            "DATABASE_HOST": yaml_db_config["host"],
+            "DATABASE_NAME": yaml_db_config["database"],
+            "DATABASE_PORT": str(yaml_db_config["port"]),
+            "DATABASE_RAISE_ON_WARNINGS": str(
+                yaml_db_config.get("raise_on_warnings", True)
+            ),
+        }
+
+    source = DatabaseSettings.from_env(yaml_to_env_dict(config["source"]["database"]))
+    target = DatabaseSettings.from_env(yaml_to_env_dict(config["target"]["database"]))
 
     print("Transferring from:")
     print(f"{source.host}:{source.port}/{source.database} ({source.user})")
@@ -75,13 +76,13 @@ def database_mirror_test(config_file):
         from eyened_orm import Database, ModelSegmentation
 
         target_db = Database(
-            EyenedORMConfig(
+            EyenedORMConfig.create(
                 database=transfer.test_db,
                 segmentations_zarr_store=config["target"]["segmentations_zarr_store"],
             )
         )
         source_db = Database(
-            EyenedORMConfig(
+            EyenedORMConfig.create(
                 database=transfer.source_db,
                 segmentations_zarr_store=config["source"]["segmentations_zarr_store"],
             )
@@ -138,7 +139,7 @@ def update_thumbnails(env, failed):
         get_missing_thumbnail_images,
     )
 
-    config = load_orm_config(env)
+    config = EyenedORMConfig.create(env)
     database = Database(config)
 
     with database.get_session() as session:
@@ -159,7 +160,7 @@ def run_models(env, device):
     from eyened_orm.inference.inference import run_inference
     from eyened_orm.inference.utils import auto_device
 
-    config = load_orm_config(env)
+    config = EyenedORMConfig.create(env)
     database = Database(config)
     with database.get_session() as session:
         if device is None:
@@ -196,7 +197,7 @@ def validate_forms(env, print_errors):
     from eyened_orm import Database
     from .form_validation import validate_all
 
-    config = load_orm_config(env)
+    config = EyenedORMConfig.create(env)
     database = Database(config)
 
     with database.get_session() as session:
@@ -211,7 +212,7 @@ def zarr_tree(env):
     """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
 
-    config = load_orm_config(env)
+    config = EyenedORMConfig.create(env)
 
     # Open the zarr store
     try:
@@ -278,7 +279,7 @@ def defragment_zarr(env, new_store_path):
 
     from orm.eyened_orm.utils.zarr.manager import ZarrStorageManager
 
-    config = load_orm_config(env)
+    config = EyenedORMConfig.create(env)
 
     # Create new store path if it doesn't exist
     new_store_path = Path(new_store_path)
@@ -327,7 +328,7 @@ def update_hashes(env, print_errors):
     from eyened_orm import Database, ImageInstance
     from sqlalchemy import select
 
-    config = load_orm_config(env)
+    config = EyenedORMConfig.create(env)
     database = Database(config)
 
     with database.get_session() as session:
@@ -381,3 +382,46 @@ def update_hashes(env, print_errors):
 
         session.commit()
         print(f"Completed: Updated hashes for {processed} images with {errors} errors")
+
+
+@eorm.command()
+@click.option(
+    "-e", "--env", type=str, help="Path to .env file for environment configuration"
+)
+@click.option(
+    "--patient", type=str, required=False, help="Patient identifier to run registration for"
+)
+@click.option(
+    "--project", type=int, required=False, help="Project ID to run registration for"
+)
+@click.option(
+    "--schema", type=str, required=False, default="RegistrationSet", help="SchemaName to run registration for"
+)
+@click.option(
+    "--creator", type=str, required=False, default="registration model", help="CreatorName to run registration for"
+)
+@click.option(
+    "--replace", is_flag=True, required=False, default=False, help="Replace existing registration"
+)
+def run_registration(env, patient, project, schema, creator, replace):
+    from eyened_orm import Database, Patient, Project
+    from eyened_orm.utils.registration import get_or_create_schema, get_or_create_creator, run_patient
+
+    config = EyenedORMConfig.create(env)
+    database = Database(config)
+    with database.get_session() as session:
+            
+        schema = get_or_create_schema(session, schema)
+        creator = get_or_create_creator(session, creator)
+        if patient:
+            patients = Patient.where(session, Patient.PatientIdentifier == patient)
+            for patient in patients:
+                run_patient(session, patient, schema, creator, replace)
+        elif project:
+            project = Project.by_id(session, project)
+            patients = Patient.where(session, Patient.ProjectID == project.ProjectID)
+            for patient in patients:
+                run_patient(session, patient, schema, creator, replace)
+        else:
+            print("No patient or project provided")
+        

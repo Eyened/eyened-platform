@@ -80,8 +80,8 @@ async def general_exception_handler(request: Request, exc: Exception):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up with settings:")
-    
     print(settings)
+    
     if settings.public_auth_disabled:
         print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
 
