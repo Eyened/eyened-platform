@@ -14,11 +14,8 @@ export class GlobalContext {
 
     public userManager: UserManager;
     public tags = new TagsRepo('tags');
-    public tagsLoaded: boolean = $state(false);
     public features = new FeaturesRepo('features');
-    public featuresLoaded: boolean = $state(false);
     public formSchemas = new FormSchemasRepo('form-schemas');
-    public formSchemasLoaded: boolean = $state(false);
 
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
@@ -41,9 +38,12 @@ export class GlobalContext {
     }
 
     async init(pathname: string) {
-        await this.userManager.init(pathname);
-        await this.tags.fetchAll();
-        this.tagsLoaded = true;
+        await Promise.all([
+            this.userManager.init(pathname),
+            this.tags.fetchAll(),
+            this.formSchemas.fetchAll(),
+            this.features.fetchAll({ with_counts: true })
+        ]);
     }
 
     get user() {
@@ -63,20 +63,6 @@ export class GlobalContext {
 
     updateConfig(config: any) {
         this.config = { ...this.config, ...config };
-    }
-
-    async ensureFeaturesLoaded() {
-        if (!this.featuresLoaded) {
-            await this.features.fetchAll({ with_counts: true });
-            this.featuresLoaded = true;
-        }
-    }
-
-    async ensureFormSchemasLoaded() {
-        if (!this.formSchemasLoaded) {
-            await this.formSchemas.fetchAll();
-            this.formSchemasLoaded = true;
-        }
     }
 
     get segmentationsFilter() {
