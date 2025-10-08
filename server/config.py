@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import Literal, Optional
 from pathlib import Path, PurePath
-import os, PurePath
+import os
 
 import yaml
 from eyened_orm.utils.config import EyenedORMConfig, load_config
