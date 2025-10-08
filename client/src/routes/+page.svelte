@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Browser from '$lib/browser/Browser.svelte';
 	import Main from '../lib/components/Main.svelte';
+	
 </script>
 
 <svelte:head>

@@ -442,15 +442,6 @@
               "type": "string",
               "title": "Jwt Token"
             }
-          },
-          {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
-            }
           }
         ],
         "responses": {
@@ -505,15 +496,6 @@
             "schema": {
               "type": "string",
               "title": "Jwt Token"
-            }
-          },
-          {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
             }
           }
         ],
@@ -3653,7 +3635,7 @@
     "/task/{task_id}/subtasks": {
       "get": {
         "summary": "List Subtasks",
-        "description": "List subtasks of a task with optional pagination and image inclusion.",
+        "description": "List subtasks of a task with optional pagination, image inclusion, and status filter.\n\nindex is the 0-based position within all subtasks for the task ordered by SubTaskID \n(computed before any subtask_status filtering).",
         "operationId": "list_subtasks_task__task_id__subtasks_get",
         "parameters": [
           {
@@ -3693,6 +3675,22 @@
               "type": "integer",
               "default": 0,
               "title": "Page"
+            }
+          },
+          {
+            "name": "subtask_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SubTaskState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subtask Status"
             }
           },
           {
@@ -3842,110 +3840,6 @@
                     }
                   ],
                   "title": "Response Get Subtask Task  Task Id  Subtask  Subtask Index  Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/subtasks": {
-      "get": {
-        "summary": "List Subtasks",
-        "operationId": "list_subtasks_subtasks_get",
-        "parameters": [
-          {
-            "name": "task_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Task Id"
-            }
-          },
-          {
-            "name": "with_images",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "With Images"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 200,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 0,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "jwt_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Jwt Token"
-            }
-          },
-          {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/SubTasksWithImagesResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SubTasksResponse"
-                    }
-                  ],
-                  "title": "Response List Subtasks Subtasks Get"
                 }
               }
             }
@@ -4231,8 +4125,15 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceGET"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -6439,6 +6340,12 @@
             ],
             "title": "Study Instance Uid"
           },
+          "project": {
+            "$ref": "#/components/schemas/ProjectMeta"
+          },
+          "patient": {
+            "$ref": "#/components/schemas/PatientMeta"
+          },
           "series": {
             "anyOf": [
               {
@@ -6465,6 +6372,8 @@
         "required": [
           "id",
           "date",
+          "project",
+          "patient",
           "tags"
         ],
         "title": "StudyGET"

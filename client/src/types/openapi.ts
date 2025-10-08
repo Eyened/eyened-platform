@@ -743,7 +743,10 @@ export interface paths {
         };
         /**
          * List Subtasks
-         * @description List subtasks of a task with optional pagination and image inclusion.
+         * @description List subtasks of a task with optional pagination, image inclusion, and status filter.
+         *
+         *     index is the 0-based position within all subtasks for the task ordered by SubTaskID
+         *     (computed before any subtask_status filtering).
          */
         get: operations["list_subtasks_task__task_id__subtasks_get"];
         put?: never;
@@ -766,23 +769,6 @@ export interface paths {
          * @description Get a single subtask by index with optional image inclusion and next task.
          */
         get: operations["get_subtask_task__task_id__subtask__subtask_index__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/subtasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Subtasks */
-        get: operations["list_subtasks_subtasks_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1543,6 +1529,8 @@ export interface components {
             age?: number | null;
             /** Study Instance Uid */
             study_instance_uid?: string | null;
+            project: components["schemas"]["ProjectMeta"];
+            patient: components["schemas"]["PatientMeta"];
             /** Series */
             series?: components["schemas"]["SeriesGET"][] | null;
             /** Tags */
@@ -2279,7 +2267,6 @@ export interface operations {
             };
             cookie?: {
                 jwt_token?: string;
-                refresh_token?: string;
             };
         };
         requestBody?: never;
@@ -2315,7 +2302,6 @@ export interface operations {
             };
             cookie?: {
                 jwt_token?: string;
-                refresh_token?: string;
             };
         };
         requestBody?: never;
@@ -3994,6 +3980,7 @@ export interface operations {
                 with_images?: boolean;
                 limit?: number;
                 page?: number;
+                subtask_status?: components["schemas"]["SubTaskState"] | null;
             };
             header?: {
                 authorization?: string;
@@ -4055,45 +4042,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubTaskWithImagesGET"] | components["schemas"]["SubTaskGET"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_subtasks_subtasks_get: {
-        parameters: {
-            query: {
-                task_id: number;
-                with_images?: boolean;
-                limit?: number;
-                page?: number;
-            };
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: {
-                jwt_token?: string;
-                refresh_token?: string;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubTasksWithImagesResponse"] | components["schemas"]["SubTasksResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4240,11 +4188,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["InstanceGET"];
+                };
             };
             /** @description Validation Error */
             422: {

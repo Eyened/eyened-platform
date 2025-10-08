@@ -1,8 +1,9 @@
 <script lang="ts">
+    import type { GlobalContext } from '$lib/data/globalContext.svelte';
     import { StudyObject } from "$lib/data/objects.svelte";
     import extensions from "$lib/extensions";
-    import Icon from "$lib/gui/Icon.svelte";
     import Tagger from "$lib/tags/Tagger.svelte";
+    import { getContext } from 'svelte';
     import Eye from "./Eye.svelte";
     import StudyBlockForms from "./StudyBlockForms.svelte";
 
@@ -14,7 +15,29 @@
     let { study, mode = "full" }: Props = $props();
     let collapse = $state(false);
 
+    const globalContext = getContext<GlobalContext>('globalContext');
+
     const age = study.$?.age
+
+    const desc = study.$?.description ?? '(no name)';
+    const patientId = study.$.patient.identifier;
+    const dateStr = new Date(study.$?.date).toISOString().slice(0, 10);
+
+    const urlByDesc = globalContext.makeStudiesBrowserURL({
+        variable: 'Study Description',
+        operator: '==',
+        value: desc === '(no name)' ? '' : desc
+    });
+
+    const urlByPatient = patientId
+        ? globalContext.makeStudiesBrowserURL({ variable: 'Patient Identifier', operator: '==', value: patientId })
+        : '';
+
+    const urlByDate = globalContext.makeStudiesBrowserURL({
+        variable: 'Study Date',
+        operator: '==',
+        value: dateStr
+    });
 
     // const context = {
     //     study,
@@ -36,10 +59,18 @@
         {/if}
         <div class="date-age m-[0.1em] items-center flex">
             <div class="date text-base">
-                <Icon icon="calendar" />
-                {new Date(study.$?.date).toISOString().slice(0, 10)}
+                <!-- <Icon icon="calendar" /> -->
+                <span>{study.$.project.name}</span>
+                &nbsp;/&nbsp;
+                {#if urlByPatient}
+                    <a href={urlByPatient} onclick={(e) => e.stopPropagation()}>{patientId}</a>
+                {:else}
+                    <span>{patientId}</span>
+                {/if}
+                &nbsp;/&nbsp;
+                <a href={urlByDate} onclick={(e) => e.stopPropagation()}>{dateStr}</a>
+                <span class="ml-1">({age ? Math.round(age) : ''} years)</span>
             </div>
-            <div class="age m-[0.1em]">({age ? Math.round(age) : ''} years)</div>
 
             <div class="ml-4">
             <Tagger

@@ -41,21 +41,23 @@
 	<Popover.Content class="p-0">
 		<Command.Root>
 			<Command.Input placeholder={placeholder} />
-			<Command.Empty>No results found.</Command.Empty>
-			<Command.Group>
-				{#each options as option}
-					<Command.Item
-						value={option.value}
-						onSelect={() => {
-							value = option.value;
-							onSelect?.(option.value);
-							closeAndFocusTrigger();
-						}}
-					>
-						{option.label}
-					</Command.Item>
-				{/each}
-			</Command.Group>
+			<Command.List class="max-h-[280px] overflow-y-auto overflow-x-hidden px-2 pb-2">
+				<Command.Empty>No results found.</Command.Empty>
+				<Command.Group>
+					{#each options as option}
+						<Command.Item
+							value={option.value}
+							onSelect={() => {
+								value = option.value;
+								onSelect?.(option.value);
+								closeAndFocusTrigger();
+							}}
+						>
+							{option.label}
+						</Command.Item>
+					{/each}
+				</Command.Group>
+			</Command.List>
 		</Command.Root>
 	</Popover.Content>
 </Popover.Root>

@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
 	import * as NavigationMenu from '$lib/components/ui/navigation-menu';
 	import { getContext } from 'svelte';
 	import type { GlobalContext } from '../data/globalContext.svelte';
+	import { Button } from './ui/button';
+	
 
 	const globalContext = getContext<GlobalContext>('globalContext');
 
@@ -45,6 +46,7 @@
 				{globalContext.userManager.user?.username}
 			</Button>
 		</div>
+
 	</div>
 </nav>
 

@@ -1,8 +1,9 @@
-from typing import Union, List
+from typing import Union, List, Optional
+import bisect
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
-from eyened_orm import Task, SubTask, SubTaskImageLink, ImageInstance
+from eyened_orm import Task, SubTask, SubTaskImageLink, ImageInstance, SubTaskState
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_tasks import (
@@ -112,38 +113,63 @@ async def list_subtasks(
     with_images: bool = False,
     limit: int = 200,
     page: int = 0,
+    subtask_status: Optional[SubTaskState] = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """List subtasks of a task with optional pagination and image inclusion."""
+    """List subtasks of a task with optional pagination, image inclusion, and status filter.
+    
+    index is the 0-based position within all subtasks for the task ordered by SubTaskID 
+    (computed before any subtask_status filtering).
+    """
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(404, "Task not found")
 
-    offset = limit * page
-    q = (
-        select(SubTask)
+    # Build absolute index map across all subtasks (before any status filtering)
+    all_ids = db.execute(
+        select(SubTask.SubTaskID)
         .where(SubTask.TaskID == task_id)
         .order_by(SubTask.SubTaskID)
-    )
+    ).scalars().all()
+    id_to_abs_idx = {sid: i for i, sid in enumerate(all_ids)}
+    
+    def abs_index_for(sid: int) -> int:
+        i = id_to_abs_idx.get(sid)
+        if i is not None:
+            return i
+        i = bisect.bisect_left(all_ids, sid)
+        id_to_abs_idx[sid] = i
+        return i
+
+    offset = limit * page
+    base_q = select(SubTask).where(SubTask.TaskID == task_id)
+    if subtask_status is not None:
+        base_q = base_q.where(SubTask.TaskState == subtask_status)
+
+    q = base_q.order_by(SubTask.SubTaskID)
     if with_images:
         q = q.options(
             selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance)
         )
 
     rows = db.execute(q.limit(limit).offset(offset)).scalars().all()
-    count = db.scalar(select(func.count()).select_from(SubTask).where(SubTask.TaskID == task_id)) or 0
+
+    count_q = select(func.count()).select_from(SubTask).where(SubTask.TaskID == task_id)
+    if subtask_status is not None:
+        count_q = count_q.where(SubTask.TaskState == subtask_status)
+    count = db.scalar(count_q) or 0
 
     if with_images:
         subtasks = [
-            DTOConverter.subtask_with_images_to_get(st).copy(update={'index': offset + i})
-            for i, st in enumerate(rows)
+            DTOConverter.subtask_with_images_to_get(st).copy(update={'index': abs_index_for(st.SubTaskID)})
+            for st in rows
         ]
         return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
 
     subtasks = [
-        DTOConverter.subtask_to_get(st).copy(update={'index': offset + i})
-        for i, st in enumerate(rows)
+        DTOConverter.subtask_to_get(st).copy(update={'index': abs_index_for(st.SubTaskID)})
+        for st in rows
     ]
     return {"subtasks": subtasks, "limit": limit, "page": page, "count": count}
 

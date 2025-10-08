@@ -6,22 +6,35 @@
 	import { SubTasksRepo, TasksRepo } from '$lib/data/repos.svelte';
 	import SubtasksTable from '$lib/tasks/SubtasksTable.svelte';
 	import { onMount } from 'svelte';
+// Status filter UI
+	import { ButtonGroup } from '$lib/components/ui/button-group';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import Label from '../../../lib/components/ui/label/label.svelte';
+	import { TaskObject } from '../../../lib/data/objects.svelte';
+	import { subTaskStates } from '../../../types/openapi_constants';
+	import type { SubTaskState, TaskGET } from '../../../types/openapi_types';
 
 	let { data } = $props();
 
-	let task: any = $state(null);
+	// let task: any = $state(null);
 	let isLoading: boolean = $state(true);
 	const subtasksRepo =new SubTasksRepo(`subtasks`);
 	let subtasks = $derived(subtasksRepo?.all || []);
+
+	let task: TaskObject
 
 	// Pagination metadata state
 	let subtasksCount: number = $state(0);
 	let subtasksLimit: number = $state(200);
 	let subtasksPage: number = $state(0);
 
+	// Status filter state
+	let subtasksStatus: SubTaskState | null = $state(null);
+
 	async function loadPage(p: number): Promise<void> {
 		isLoading = true;
 		try {
+			task = await TaskObject.fromId<TaskGET>(data.taskid);
 			const tasksRepo = new TasksRepo('tasks');
 			const nextPage = Math.max(0, Number.isFinite(p) ? p : 0);
 
@@ -29,7 +42,8 @@
 				task_id: data.taskid,
 				with_images: true,
 				limit: subtasksLimit,
-				page: nextPage
+				page: nextPage,
+				subtask_status: subtasksStatus ?? undefined
 			});
 
 			subtasksRepo.clear();
@@ -41,6 +55,8 @@
 			const url = new URL(window.location.href);
 			url.searchParams.set('page', String(subtasksPage));
 			url.searchParams.set('limit', String(subtasksLimit));
+			if (subtasksStatus) url.searchParams.set('status', String(subtasksStatus));
+			else url.searchParams.delete('status');
 			await goto(url.pathname + '?' + url.searchParams.toString(), {
 				replaceState: true,
 				noScroll: true,
@@ -56,19 +72,25 @@
 			const sp = appPage.url.searchParams;
 			const qpLimit = Number(sp.get('limit'));
 			const qpPage = Number(sp.get('page'));
+			const qpStatus = sp.get('status');
 
 			if (Number.isFinite(qpLimit) && qpLimit > 0) subtasksLimit = qpLimit;
 			if (Number.isFinite(qpPage) && qpPage >= 0) subtasksPage = qpPage;
+			if (qpStatus && (subTaskStates as readonly string[]).includes(qpStatus)) {
+				subtasksStatus = qpStatus as SubTaskState;
+			}
 
 			await loadPage(subtasksPage);
-			
-			// For now, create a simple task object with the basic info
-			task = { $: { name: `Task ${data.taskid}`, task_state: 'Loading...' } };
 		} catch (error) {
 			console.error('Error loading task page:', error);
 			isLoading = false;
 		}
 	});
+
+	function selectStatus(s: SubTaskState | null) {
+		subtasksStatus = s;
+		loadPage(0);
+	}
 
 	function deselect() {
 		const currentUrl = window.location.href;
@@ -83,35 +105,56 @@
 
 {#if isLoading}
 	<FixedSpinner />
+{:else}
+	<Main>
+		{#snippet children()}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div id="main">
+				<h3><span onclick={deselect} onkeypress={deselect}> ... </span></h3>
+				{#if !task}
+					Task not found
+				{:else}
+					<h1>{task.$.name}</h1>
+					{#if task.$.task_state}
+						<h3>Status: {task.$.task_state}</h3>
+					{/if}
+					    <Label>Status:</Label>
+						<ButtonGroup class="mb-4">
+							<Button
+								variant={subtasksStatus === null ? 'default' : 'outline'}
+								aria-pressed={subtasksStatus === null}
+								onclick={() => selectStatus(null)}
+							>
+								All
+							</Button>
+							{#each subTaskStates as s}
+								<Button
+									variant={subtasksStatus === s ? 'default' : 'outline'}
+									aria-pressed={subtasksStatus === s}
+									onclick={() => selectStatus(s)}
+								>
+									{s}
+								</Button>
+							{/each}
+						</ButtonGroup>
+					{#if subtasksRepo}
+						<SubtasksTable
+							rows={subtasks}
+							repo={subtasksRepo}
+							taskId={data.taskid}
+							count={subtasksCount}
+							page={subtasksPage}
+							perPage={subtasksLimit}
+							onPageChange={loadPage}
+						/>
+					{/if}
+				{/if}
+			</div>
+		{/snippet}
+	</Main>
 {/if}
 
-<Main>
-	{#snippet children()}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div id="main">
-			<h3><span onclick={deselect} onkeypress={deselect}> ... </span></h3>
-			{#if !task}
-				Task not found
-			{:else}
-				<h1>{task.$.name}</h1>
-				{#if task.$.task_state}
-					<h3>Status: {task.$.task_state}</h3>
-				{/if}
-				{#if subtasksRepo}
-					<SubtasksTable
-						rows={subtasks}
-						repo={subtasksRepo}
-						taskId={data.taskid}
-						count={subtasksCount}
-						page={subtasksPage}
-						perPage={subtasksLimit}
-						onPageChange={loadPage}
-					/>
-				{/if}
-			{/if}
-		</div>
-	{/snippet}
-</Main>
+
 
 <style>
 	span {

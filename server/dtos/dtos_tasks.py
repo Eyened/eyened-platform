@@ -64,6 +64,8 @@ class SubTaskBase(BaseModel):
     task_state: SubTaskState
     comments: Optional[str] = None
 
+class SubTaskPOST(BaseModel):
+    comments: Optional[str] = None
 
 class SubTaskPUT(SubTaskBase):
     pass

@@ -33,7 +33,9 @@
 	}
 </script>
 
-<div class="inline-block">
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="inline-block" onclick={(e) => e.stopPropagation()}>
 	<div class="inline-block">
 		{#each values as value}
 			<div class="inline-block bg-gray-200 rounded-full px-2 py-1 m-1">

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/state";
   import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
-  import * as Button from "$lib/components/ui/button";
+  import { Button } from "$lib/components/ui/button";
   import * as Input from "$lib/components/ui/input";
   import * as Table from "$lib/components/ui/table";
   import type { SubTaskObject } from "$lib/data/objects.svelte";
@@ -60,12 +60,12 @@
   <Table.Cell>{row.id}</Table.Cell>
   <Table.Cell>{row.task_state ?? "-"}</Table.Cell>
   <Table.Cell>
-    <button
-      onclick={handleGrade}
+    <Button
+      href={`${window.location.origin}/tasks/${taskId}/grade/${row.index}`}
       class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
     >
       View
-    </button>
+    </Button>
   </Table.Cell>
   <Table.Cell>
     <div class="instances flex flex-wrap gap-1">
@@ -89,9 +89,9 @@
 
       <div class="flex items-center gap-2 mt-1 w-full">
         <Input.Root type="number" bind:value={newInstanceId} placeholder="Instance ID" class="w-36" />
-        <Button.Root onclick={addImage}>
+        <Button onclick={addImage}>
           Add Image
-        </Button.Root>
+        </Button>
       </div>
     </div>
   </Table.Cell>
