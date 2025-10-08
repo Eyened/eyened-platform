@@ -141,8 +141,8 @@ class ImageInstance(Base):
     AnatomicRegion: Mapped[Optional[int]]  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
     ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(SAEnum(ETDRSField))  # F1-F7
     Angiography: Mapped[Optional[int]]  # 0 = non-angiography, 1 = angiography
-    RetinalImageQuality: Mapped[Optional[int]] # Range 0-100 
-    ChoroidalImageQuality: Mapped[Optional[int]] # Range 0-100
+    RetinalImageQuality: Mapped[Optional[float]] # Range 0-100 
+    ChoroidalImageQuality: Mapped[Optional[float]] # Range 0-100
 
     AcquisitionDateTime: (
         Mapped[Optional[datetime]]
