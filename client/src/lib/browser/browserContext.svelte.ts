@@ -55,7 +55,7 @@ export class BrowserContext {
 
     InstanceRepo = new InstancesRepo('instances');
 
-    thumbnailSize: number = $state(6);
+    thumbnailSize: string = $state('8em');
 
     // Derived: depends on queryMode + signatures
     activeSignature: SignatureField[] = $derived(
@@ -160,9 +160,10 @@ export class BrowserContext {
         // reflect in URL
         this.updateURL(query);
 
+        this.loading = true;
         this.InstanceRepo.clear()
         this.StudiesRepo.clear()
-        this.loading = true;
+        
 
         try {
             const res = await this.executeSearch(query);
@@ -210,7 +211,6 @@ export class BrowserContext {
         // Ingest data into repositories
         this.StudiesRepo.ingest(res.studies ?? []);
         this.InstanceRepo.ingest(res.instances as any[] ?? []);
-
         // Update result metadata
         this.resultIds = new Set(res.result_ids ?? []);
         this.count = res.count ?? 0;
@@ -219,14 +219,13 @@ export class BrowserContext {
         let studyIds;
         if (this.queryMode === 'instances') {
             this.orderedInstanceIds = res.result_ids ?? [];
-
             studyIds = (res.studies ?? []).map((s: any) => s.id);
         } else {
             studyIds = res.result_ids ?? [];
             this.orderedInstanceIds = [];
         }
         const get_date = (studyId: number) => {
-            return new Date(this.StudiesRepo.object(studyId)!.$.date);
+            return new Date(this.StudiesRepo.object(studyId)!.$.date).getTime();
         }
         this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
     }
