@@ -3,14 +3,14 @@ import { page } from "$app/state";
 import { authClient, type UserResponse } from "../auth";
 
 export class UserManager {
-    public loggedIn = $state(false);
-    // private _user: UserResponse | null = null;
+
     public user = $state<UserResponse>({
-        id: 0,
+        id: -1,
         username: '',
         role: null,
         starred_tags: []
     });
+    public loggedIn = $derived(this.user.id !== -1);
     public starredTagIds = $state<number[]>([]);
 
 
@@ -56,7 +56,7 @@ export class UserManager {
     async logout() {
         await authClient.logout();
         this.user = {
-            id: 0,
+            id: -1,
             username: '',
             role: null,
             starred_tags: []
@@ -67,7 +67,7 @@ export class UserManager {
 
     async changePassword(oldPassword: string, newPassword: string) {
         const user = await authClient.changePassword(oldPassword, newPassword);
-        this.user = user; 
+        this.user = user;
         this.starredTagIds = user.starred_tags ?? this.starredTagIds;
     }
 
@@ -79,7 +79,7 @@ export class UserManager {
 
     async signup(username: string, password: string) {
         const user = await authClient.register(username, password);
-        this.user = user; 
+        this.user = user;
         this.starredTagIds = user.starred_tags ?? [];
     }
 }

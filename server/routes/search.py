@@ -561,6 +561,7 @@ def _build_instance_select(
 
     q = (
         select(ImageInstance)
+        .filter(~ImageInstance.Inactive)
         .join_from(ImageInstance, Series, ImageInstance.SeriesID == Series.SeriesID, isouter=True)
         .join_from(Series, Study, isouter=True)
         .join_from(Study, Patient, isouter=True)
@@ -638,7 +639,7 @@ async def search_instances(
     studies_dtos: list[StudyGET] = []
     if study_ids_ordered:
         studies_stmt = select(Study).where(Study.StudyID.in_(study_ids_ordered)).options(
-            selectinload(Study.Series).selectinload(Series.ImageInstances)
+            selectinload(Study.Series).selectinload(Series.ImageInstances.and_(~ImageInstance.Inactive))
         )
         studies = db.execute(studies_stmt).scalars().all()
         s_order = {sid: i for i, sid in enumerate(study_ids_ordered)}
@@ -674,7 +675,7 @@ async def search_studies(
     offset = limit * page
 
     studies_stmt = _build_study_select(conditions, params["order_by"], params["order"]).options(
-        selectinload(Study.Series).selectinload(Series.ImageInstances)
+        selectinload(Study.Series).selectinload(Series.ImageInstances.and_(~ImageInstance.Inactive))
     )
 
     studies = db.execute(studies_stmt.limit(limit + 1).offset(offset)).scalars().all()
@@ -688,6 +689,7 @@ async def search_studies(
     study_ids = [s.StudyID for s in studies]
     instances_q = (
         select(ImageInstance)
+        .where(~ImageInstance.Inactive)
         .join(Series, ImageInstance.SeriesID == Series.SeriesID)
         .where(Series.StudyID.in_(study_ids))
         .options(

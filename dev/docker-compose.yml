@@ -1,6 +1,6 @@
 version: "3.1"
 
-name: eyened-platform-dev
+name: eyened-platform-dev-bart
 
 services:
   
@@ -22,8 +22,6 @@ services:
     image: mysql:8.0.27
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
-    volumes:
-      - ${DATABASE_PATH}:/var/lib/mysql 
     ports:
       - "${DATABASE_PORT}:3306"
     healthcheck:

@@ -1,9 +1,8 @@
 from contextlib import contextmanager
-import os
 from pathlib import Path
 from typing import Generator, Optional
 
-from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig, load_config_from_env_file, load_config_from_environ
+from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
@@ -40,19 +39,14 @@ class Database:
         if Path, load from .env file
         if None, initialize with default values (taken from environment variables)
         """
-        if isinstance(config, (Path, str)):
-            # load from .env file without polluting process env
-            if not Path(config).exists():
-                raise FileNotFoundError(f"File not found: {str(config)}")
-            print("loading from .env file", config)
-            config = load_config_from_env_file(config)
-        elif config is None:
-            # initializes config from current process environment
-            config = load_config_from_environ(os.environ)
-        elif isinstance(config, EyenedORMConfig):
+        if isinstance(config, EyenedORMConfig):
+            # Already a config object, use as-is
             pass
         else:
-            raise ValueError(f"Invalid config type: {type(config)}")
+            # Use the declarative create method for all other cases
+            if isinstance(config, (Path, str)):
+                print("loading from .env file", config)
+            config = EyenedORMConfig.create(config)
 
         self.config = config
 
