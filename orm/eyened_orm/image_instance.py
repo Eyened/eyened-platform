@@ -96,7 +96,7 @@ class ImageInstance(Base):
     # repeating field, but non-nullable
     SeriesID: Mapped[int] = mapped_column(ForeignKey("Series.SeriesID", ondelete="CASCADE"))
     SourceInfoID: Mapped[int] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"))
-    DeviceInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("DeviceInstance.DeviceInstanceID"))
+    DeviceInstanceID: Mapped[int] = mapped_column(ForeignKey("DeviceInstance.DeviceInstanceID"))
     # TODO: redundant with Modality enum
     ModalityID: Mapped[int] = mapped_column(ForeignKey("Modality.ModalityID"))
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))

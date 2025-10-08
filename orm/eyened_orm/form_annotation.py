@@ -44,7 +44,7 @@ class FormAnnotation(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="SET NULL"))
     FormData: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    FormAnnotationReferenceID: Mapped[Optional[int]] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"))
+    FormAnnotationReferenceID: Mapped[Optional[int]] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"), index=True)
     Inactive: Mapped[bool] = mapped_column(default=False)
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
