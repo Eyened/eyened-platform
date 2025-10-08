@@ -1,7 +1,7 @@
 import { FeaturesRepo, FormSchemasRepo, TagsRepo } from '$lib/data/repos.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
 
-import type { FormAnnotationGET, ModelSegmentationGET, SegmentationGET } from '../../types/openapi_types';
+import type { FormAnnotationGET, ModelSegmentationGET, SearchCondition, SegmentationGET, StudySearchCondition } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
 import type { Segmentation } from '../viewer-window/panelSegmentation/segmentationContext.svelte';
 
@@ -67,7 +67,7 @@ export class GlobalContext {
 
     async ensureFeaturesLoaded() {
         if (!this.featuresLoaded) {
-            await this.features.fetchAll();
+            await this.features.fetchAll({ with_counts: true });
             this.featuresLoaded = true;
         }
     }
@@ -92,5 +92,48 @@ export class GlobalContext {
             //     return this.config.showOtherAnnotationsMachine;
             // }
         }
+    }
+
+    /**
+     * Build a Browser URL for a studies query using a single StudySearchCondition.
+     */
+    makeStudiesBrowserURL(condition: StudySearchCondition): string {
+        const params = new URLSearchParams();
+        params.set('page', '0');
+        params.set('limit', '10');
+        params.set('conditions', this._encodeSingleCondition(condition));
+        params.set('order_by', 'Study Date');
+        params.set('order', 'ASC');
+        params.set('queryMode', 'studies');
+        params.set('displayMode', 'study');
+        params.set('filterMode', 'basic');
+        return `/?${params.toString()}`;
+    }
+
+    /**
+     * Build a Browser URL for an instances query using a single SearchCondition.
+     */
+    makeInstancesBrowserURL(condition: SearchCondition): string {
+        const params = new URLSearchParams();
+        params.set('page', '0');
+        params.set('limit', '100');
+        params.set('conditions', this._encodeSingleCondition(condition));
+        params.set('order_by', 'Study Date');
+        params.set('order', 'ASC');
+        params.set('queryMode', 'instances');
+        params.set('displayMode', 'instance');
+        params.set('filterMode', 'basic');
+        return `/?${params.toString()}`;
+    }
+
+    // Private helper, compatible with both condition types
+    private _encodeSingleCondition(
+        condition: { variable: string; operator: string; value: string | number | string[] | null }
+    ): string {
+        const serializeValue = (v: string | number | string[] | null) => JSON.stringify(v);
+        const encodedVariable = encodeURIComponent(condition.variable);
+        const encodedOperator = encodeURIComponent(condition.operator);
+        const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
+        return `${encodedVariable}:${encodedOperator}:${encodedValue}`;
     }
 }

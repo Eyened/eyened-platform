@@ -44,6 +44,8 @@ class StudyGET(BaseModel):
     date: datetime
     age: Optional[float] = None # patient age in years
     study_instance_uid: Optional[str] = None
+    project: "ProjectMeta"
+    patient: "PatientMeta"
     series: Optional[List["SeriesGET"]] = None
     tags: List[TagMeta]
 

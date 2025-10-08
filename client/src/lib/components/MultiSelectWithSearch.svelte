@@ -42,7 +42,7 @@
     <div class="inline-block">
         {#each selectedValues as value}
             <div class="inline-block bg-gray-200 rounded-full px-2 py-1 m-1">
-                <button onclick={() => removeValue(value)}>
+                <button type="button" onclick={() => removeValue(value)}>
                     <Fa class="inline-block hover:cursor-pointer" icon={faXmark} />
                 </button>
                 {valueToOption[value]?.label || value}
@@ -51,7 +51,7 @@
     </div>
     <Popover.Root bind:open={collapsibleOpen}>
         <Popover.Trigger bind:ref={triggerRef}>
-            <button class="inline-block bg-gray-200 rounded-full px-2 py-1 m-1">
+            <button type="button" class="inline-block bg-gray-200 rounded-full px-2 py-1 m-1">
             +
             </button>
         </Popover.Trigger>

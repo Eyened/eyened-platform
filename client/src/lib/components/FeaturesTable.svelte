@@ -27,7 +27,7 @@
         const onclick = column.getToggleSortingHandler() ?? (() => {});
         return renderComponent(SortHeader, { label: "Count", onclick });
       },
-      cell: () => 0
+      cell: ({ row }) => row.original.segmentation_count ?? "-"
     },
     {
       id: "browser",

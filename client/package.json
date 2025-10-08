@@ -9,7 +9,8 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "verify:runes": "rg -n \"export let \" src --glob \"**/*.svelte\" && echo \"Found legacy export let (should be 0)\" && exit 1 || exit 0"
+    "verify:runes": "rg -n \"export let \" src --glob \"**/*.svelte\" && echo \"Found legacy export let (should be 0)\" && exit 1 || exit 0",
+    "check:unused": "unimported"
   },
   "devDependencies": {
     "@iconify/json": "^2.2.142",
@@ -39,6 +40,7 @@
     "tslib": "^2.4.1",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5.0.0",
+    "unimported": "^1.31.0",
     "unplugin-icons": "^22.1.0",
     "vite": "^6.2.5",
     "vite-plugin-glsl": "^1.4.0"

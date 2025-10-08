@@ -91,14 +91,27 @@ class DTOConverter:
     @staticmethod
     def study_to_get(study: "Study", include_series: bool = False, with_tag_metadata: bool = False) -> StudyGET:
         """Convert Study ORM object to StudyGET."""
+        project_meta = ProjectMeta(
+            id=study.Patient.Project.ProjectID,
+            name=study.Patient.Project.ProjectName,
+        )
+        patient_meta = PatientMeta(
+            id=study.Patient.PatientID,
+            identifier=study.Patient.PatientIdentifier or "",
+            birth_date=study.Patient.BirthDate,
+        )
+
         dto = StudyGET(
             id=study.StudyID,
             description=study.StudyDescription,
             date=study.StudyDate,
             age=study.age_years,
             study_instance_uid=study.StudyInstanceUid,
+            project=project_meta,
+            patient=patient_meta,
             tags=[],
         )
+
         if include_series:
             dto.series = [DTOConverter.series_to_get(s) for s in (getattr(study, "Series", []) or [])]
         if with_tag_metadata:

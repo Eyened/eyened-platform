@@ -1,26 +1,26 @@
 import type { components } from '../../types/openapi';
 import type {
-	FeatureGET,
-	FeaturePATCH,
-	FeaturePUT,
-	FormAnnotationGET, FormAnnotationPUT,
-	FormSchemaGET,
-	InstanceGET,
-	ModelSegmentationGET,
-	SearchQuery, SearchResponse,
-	SegmentationDataRepresentation,
-	SegmentationDataType,
-	SegmentationGET, SegmentationPATCH,
-	SegmentationPOST,
-	SeriesGET,
-	StudyGET,
-	SubTaskGET, SubTaskWithImagesGET, SubTasksResponse, SubTasksWithImagesResponse,
-	TagGET,
-	TagPATCH,
-	TagPUT,
-	TaskGET,
-	TaskPATCH,
-	TaskPUT
+    FeatureGET,
+    FeaturePATCH,
+    FeaturePUT,
+    FormAnnotationGET, FormAnnotationPUT,
+    FormSchemaGET,
+    InstanceGET,
+    ModelSegmentationGET,
+    SearchQuery, SearchResponse,
+    SegmentationDataRepresentation,
+    SegmentationDataType,
+    SegmentationGET, SegmentationPATCH,
+    SegmentationPOST,
+    SeriesGET,
+    StudyGET,
+    SubTaskGET, SubTaskWithImagesGET, SubTasksResponse, SubTasksWithImagesResponse,
+    TagGET,
+    TagPATCH,
+    TagPUT,
+    TaskGET,
+    TaskPATCH,
+    TaskPUT
 } from '../../types/openapi_types';
 import { api } from '../api/client';
 import { apiUrl } from '../config';
@@ -36,13 +36,14 @@ export class TasksRepo extends Repo<TaskGET, TaskPUT, TaskPATCH, unknown, TaskOb
 	public static path = '/task';
 	protected createDataObject(obj: TaskGET): TaskObject { return new TaskObject(obj, this); }
 
-	async listSubtasks(p: { task_id: number; with_images?: boolean; limit?: number; page?: number }) {
+	async listSubtasks(p: { task_id: number; with_images?: boolean; limit?: number; page?: number; subtask_status?: string }) {
 		const { api } = await import('../api/client');
 		const res = await api.GET('/task/{task_id}/subtasks' as any, {
 			params: { path: { task_id: p.task_id }, query: {
 				with_images: p?.with_images ?? true,
 				limit: p?.limit ?? 200,
-				page: p?.page ?? 0
+				page: p?.page ?? 0,
+				subtask_status: p?.subtask_status
 			} } as any
 		});
 		return (res.data ?? {}) as SubTasksWithImagesResponse | SubTasksResponse;
@@ -67,7 +68,7 @@ export class SubTasksRepo extends Repo<SubTaskAny, never, Partial<SubTaskAny>, {
 
 	protected createDataObject(obj: SubTaskAny): SubTaskObject { return new SubTaskObject(obj, this as any); }
 
-	protected async remoteList(params?: { task_id: number; with_images?: boolean; limit?: number; page?: number }): Promise<SubTaskAny[]> {
+	protected async remoteList(params?: { task_id: number; with_images?: boolean; limit?: number; page?: number; subtask_status?: string }): Promise<SubTaskAny[]> {
 		const { api } = await import('../api/client');
 		if (!params?.task_id) throw new Error('task_id is required');
 		const res = await api.GET('/subtasks' as any, {
@@ -76,7 +77,8 @@ export class SubTasksRepo extends Repo<SubTaskAny, never, Partial<SubTaskAny>, {
 					task_id: params.task_id,
 					with_images: params?.with_images ?? true,
 					limit: params?.limit ?? this.paging.limit,
-					page: params?.page ?? this.paging.page
+					page: params?.page ?? this.paging.page,
+					subtask_status: params?.subtask_status
 				}
 			}
 		});

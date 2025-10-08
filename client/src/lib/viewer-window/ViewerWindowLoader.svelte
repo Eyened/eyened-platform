@@ -13,6 +13,12 @@ Used to create the viewerwindow context.
     import ViewerWindow from "./ViewerWindow.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
+    // dark mode
+    onMount(() => {
+        document.documentElement.classList.add('dark');
+    });
+    
+
     interface Props {
         instanceIDs: number[];
     }
