@@ -3,16 +3,16 @@ from typing import Optional
 import os
 from dataclasses import asdict, dataclass
 from typing import Literal, Optional
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import yaml
 from eyened_orm.utils.config import EyenedORMConfig, env_field, configurable
 
 # Ensure pathlib.Path objects are serialized as plain strings in YAML output
-def _path_representer(dumper, data: Path):
+def _path_representer(dumper, data: PurePath):
     return dumper.represent_scalar('tag:yaml.org,2002:str', str(data))
 
-yaml.SafeDumper.add_representer(Path, _path_representer)
+yaml.SafeDumper.add_multi_representer(PurePath, _path_representer)
 
 
 @configurable
@@ -23,8 +23,8 @@ class Settings(EyenedORMConfig):
     database_root_password: Optional[str] = env_field("DATABASE_ROOT_PASSWORD", required=False, default=None)
     
     # Authentication bypass for development (reads from PUBLIC_AUTH_DISABLED env var)
-    public_auth_disabled: bool = False
-    environment: Literal['development', 'production'] = 'production'
+    public_auth_disabled: bool = env_field("VITE_PUBLIC_AUTH_DISABLED", required=False, default=True)
+    environment: Literal['development', 'production'] = env_field("EYENED_ENV", required=False, default="production")
 
     # Print settings for debugging purposes - hide password and secret key
     def __str__(self):
