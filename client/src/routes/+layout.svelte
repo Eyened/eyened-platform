@@ -21,11 +21,8 @@
     
     setContext("globalContext", globalContext);
     
-    let ready = $state(false);
     
-    globalContext.init(page.url.pathname).then(() => {
-        ready = true;
-    });
+    const init = globalContext.init(page.url.pathname)
 </script>
 
 {#if globalContext.popupComponent}
@@ -35,9 +32,9 @@
     <Dialogue content={globalContext.dialogue} close={closeDialogue} />
 {/if}
 
-{#if ready}
+{#await init then _}
     {@render children()}
-{/if}
+{/await}
 <Toaster />
 
 <style>
