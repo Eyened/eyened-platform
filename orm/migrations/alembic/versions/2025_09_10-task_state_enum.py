@@ -20,7 +20,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # op.add_column('SubTask', sa.Column('TaskState', sa.Enum('NotStarted', 'Busy', 'Ready', name='taskstate'), nullable=False))
+    
+    op.add_column('SubTask', sa.Column('TaskState', sa.Enum('NotStarted', 'Busy', 'Ready', name='taskstate'), nullable=False))
 
     # task state update values
     op.execute("UPDATE SubTask SET TaskState = 'NotStarted' WHERE TaskStateID = 1")
