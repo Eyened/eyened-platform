@@ -86,7 +86,7 @@ export class MainViewerContext implements Overlay {
             
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-            uniforms.u_threshold = segmentationItem.threshold ?? segmentation.threshold;
+            uniforms.u_threshold = segmentation.threshold ?? 0.5;
             
             if (this.highlightedSegmentationItem == segmentationItem) {
                 uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;
@@ -126,7 +126,7 @@ export class MainViewerContext implements Overlay {
             if (!mask) continue;
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-            uniforms.u_threshold = segmentationItem.threshold ?? segmentation.threshold;
+            uniforms.u_threshold = segmentationItem.threshold ?? segmentation.threshold ?? 0.5;
             
             if (this.highlightedSegmentationItem == segmentationItem) {
                 uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;

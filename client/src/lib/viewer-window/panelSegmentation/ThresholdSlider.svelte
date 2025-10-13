@@ -16,7 +16,7 @@
     const canEdit = globalContext.canEdit(segmentation);
 
     async function onUpdateThreshold() {
-        if (canEdit && segmentation.annotation_type === 'grader_segmentation') {
+        if (canEdit) {
             await updateSegmentation(segmentation.id, { threshold: segmentationItem.threshold });
         }
     }

@@ -124,8 +124,8 @@
         values={features.map(f => f)}
         onselect={(feature) => create(feature)}
     />
-    <NewMultiFeature dataRepresentation="MultiLabel" />
-    <NewMultiFeature dataRepresentation="MultiClass" />
+    <hr />
+    <NewMultiFeature/>
 </div>
 
 <style>
@@ -134,5 +134,10 @@
     }
     div.new {
         flex-direction: column;
+    }
+    hr {
+        margin: 0.5em 0;
+        color: rgba(255, 255, 255, 0.5);
+        height: 0.2em;
     }
 </style>

@@ -899,13 +899,6 @@ export interface components {
             /** Instance Id */
             instance_id: number;
         };
-        /** Body_create_segmentation_segmentations_post */
-        Body_create_segmentation_segmentations_post: {
-            /** Metadata */
-            metadata: string;
-            /** Np Array */
-            np_array?: string | null;
-        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Old Password */
@@ -999,9 +992,7 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: {
-                [key: string]: unknown;
-            } | null;
+            form_data?: Record<string, never> | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
             /** Id */
@@ -1043,9 +1034,7 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: {
-                [key: string]: unknown;
-            } | null;
+            form_data?: Record<string, never> | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1062,9 +1051,7 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: {
-                [key: string]: unknown;
-            } | null;
+            form_data?: Record<string, never> | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1073,9 +1060,7 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Schema */
-            schema?: {
-                [key: string]: unknown;
-            } | null;
+            schema?: Record<string, never> | null;
             /** Id */
             id: number;
         };
@@ -1104,9 +1089,7 @@ export interface components {
              * @description Optional key-value properties for new patient
              * @default {}
              */
-            patient_props: {
-                [key: string]: unknown;
-            } | null;
+            patient_props: Record<string, never> | null;
             /**
              * Study Date
              * @description Study date (can be a date object or ISO format string)
@@ -1117,9 +1100,7 @@ export interface components {
              * @description Optional key-value properties for new study
              * @default {}
              */
-            study_props: {
-                [key: string]: unknown;
-            } | null;
+            study_props: Record<string, never> | null;
             /**
              * Series Id
              * @description Optional series identifier
@@ -1130,9 +1111,7 @@ export interface components {
              * @description Optional key-value properties for new series
              * @default {}
              */
-            series_props: {
-                [key: string]: unknown;
-            } | null;
+            series_props: Record<string, never> | null;
             /**
              * Image
              * @description Path to the image file (required)
@@ -1143,9 +1122,7 @@ export interface components {
              * @description Optional key-value properties for new image
              * @default {}
              */
-            image_props: {
-                [key: string]: unknown;
-            } | null;
+            image_props: Record<string, never> | null;
         };
         /**
          * ImportOptions
@@ -1195,9 +1172,7 @@ export interface components {
             /** Message */
             message: string;
             /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
+            data?: Record<string, never> | null;
             /** Error */
             error?: string | null;
             /** Stack Trace */
@@ -1234,13 +1209,9 @@ export interface components {
             /** Resolution Axial */
             resolution_axial: number;
             /** Cf Roi */
-            cf_roi?: {
-                [key: string]: unknown;
-            } | null;
+            cf_roi?: Record<string, never> | null;
             /** Cf Keypoints */
-            cf_keypoints?: {
-                [key: string]: unknown;
-            } | null;
+            cf_keypoints?: Record<string, never> | null;
             /** Cf Quality */
             cf_quality?: number | null;
             /**
@@ -1380,7 +1351,7 @@ export interface components {
              * Variable
              * @enum {string}
              */
-            variable: "Image DBID" | "Laterality" | "Modality" | "ETDRS Field" | "Color Fundus Quality" | "Study Date" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Device Model ID" | "SegmentationFeature Name" | "Segmentation Creator Name" | "Segmentation Tag Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Image Tag Name";
+            variable: "Image DBID" | "Laterality" | "Modality" | "ETDRS Field" | "Color Fundus Quality" | "Study Date" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Device Model ID" | "Segmentation Feature Name" | "Segmentation Creator Name" | "Segmentation Tag Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Image Tag Name";
             /**
              * Operator
              * @enum {string}
@@ -1436,6 +1407,51 @@ export interface components {
             result_ids: number[];
             /** Has More */
             has_more: boolean;
+        };
+        /**
+         * SegmentationCreateMetadata
+         * @description Metadata for creating a new segmentation
+         */
+        SegmentationCreateMetadata: {
+            /** Image Instance Id */
+            image_instance_id: number;
+            /** Feature Id */
+            feature_id: number;
+            data_representation: components["schemas"]["DataRepresentation"];
+            data_type: components["schemas"]["Datatype"];
+            /** Depth */
+            depth: number;
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
+            /**
+             * Annotation Type
+             * @default grader_segmentation
+             * @constant
+             */
+            annotation_type: "grader_segmentation";
+            /** Subtask Id */
+            subtask_id?: number | null;
+            /** Sparse Axis */
+            sparse_axis?: number | null;
+            /** Image Projection Matrix */
+            image_projection_matrix?: number[][] | null;
+            /** Scan Indices */
+            scan_indices?: number[] | null;
+            /** Threshold */
+            threshold?: number | null;
+            /** Reference Segmentation Id */
+            reference_segmentation_id?: number | null;
+        };
+        /**
+         * SegmentationCreateRequest
+         * @description Structured request body for creating a segmentation
+         */
+        SegmentationCreateRequest: {
+            metadata: components["schemas"]["SegmentationCreateMetadata"];
+            /** Np Array */
+            np_array?: string | null;
         };
         /** SegmentationGET */
         SegmentationGET: {
@@ -1744,9 +1760,7 @@ export interface components {
             /** Id */
             id: number;
             /** Config */
-            config: {
-                [key: string]: unknown;
-            };
+            config: Record<string, never>;
             /**
              * Date Inserted
              * Format: date-time
@@ -2415,7 +2429,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_create_segmentation_segmentations_post"];
+                "application/json": components["schemas"]["SegmentationCreateRequest"];
             };
         };
         responses: {

@@ -703,9 +703,9 @@
         "requestBody": {
           "required": true,
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_create_segmentation_segmentations_post"
+                "$ref": "#/components/schemas/SegmentationCreateRequest"
               }
             }
           }
@@ -4440,31 +4440,6 @@
         ],
         "title": "AddImageRequest"
       },
-      "Body_create_segmentation_segmentations_post": {
-        "properties": {
-          "metadata": {
-            "type": "string",
-            "title": "Metadata"
-          },
-          "np_array": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "binary"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Np Array"
-          }
-        },
-        "type": "object",
-        "required": [
-          "metadata"
-        ],
-        "title": "Body_create_segmentation_segmentations_post"
-      },
       "ChangePasswordRequest": {
         "properties": {
           "old_password": {
@@ -4733,7 +4708,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4872,7 +4846,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4943,7 +4916,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4987,7 +4959,6 @@
           "schema": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5042,7 +5013,6 @@
           "patient_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5072,7 +5042,6 @@
           "study_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5098,7 +5067,6 @@
           "series_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5117,7 +5085,6 @@
           "image_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5203,7 +5170,6 @@
           "data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5335,7 +5301,6 @@
           "cf_roi": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5347,7 +5312,6 @@
           "cf_keypoints": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5857,7 +5821,7 @@
               "Patient Birthdate",
               "Project Name",
               "Device Model ID",
-              "SegmentationFeature Name",
+              "Segmentation Feature Name",
               "Segmentation Creator Name",
               "Segmentation Tag Name",
               "Form Schema Name",
@@ -6023,6 +5987,154 @@
           "has_more"
         ],
         "title": "SearchResponse"
+      },
+      "SegmentationCreateMetadata": {
+        "properties": {
+          "image_instance_id": {
+            "type": "integer",
+            "title": "Image Instance Id"
+          },
+          "feature_id": {
+            "type": "integer",
+            "title": "Feature Id"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "annotation_type": {
+            "type": "string",
+            "const": "grader_segmentation",
+            "title": "Annotation Type",
+            "default": "grader_segmentation"
+          },
+          "subtask_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtask Id"
+          },
+          "sparse_axis": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sparse Axis"
+          },
+          "image_projection_matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Projection Matrix"
+          },
+          "scan_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Indices"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "reference_segmentation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Segmentation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_instance_id",
+          "feature_id",
+          "data_representation",
+          "data_type",
+          "depth",
+          "height",
+          "width"
+        ],
+        "title": "SegmentationCreateMetadata",
+        "description": "Metadata for creating a new segmentation"
+      },
+      "SegmentationCreateRequest": {
+        "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/SegmentationCreateMetadata"
+          },
+          "np_array": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Np Array"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata"
+        ],
+        "title": "SegmentationCreateRequest",
+        "description": "Structured request body for creating a segmentation"
       },
       "SegmentationGET": {
         "properties": {
@@ -6962,7 +7074,6 @@
             "title": "Id"
           },
           "config": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           },

@@ -3,6 +3,7 @@
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { createFormAnnotation, formAnnotations } from "$lib/data";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+	import type { etdrsGridType } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
 	import { ETDRSGridItemOverlay } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
 	import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 	import { getContext } from "svelte";
@@ -17,11 +18,13 @@
 	}
 	let { active, etdrsSchema }: Props = $props();
 
-	const { creator, registration } = getContext<ViewerWindowContext>(
+	const viewerWindowContext = getContext<ViewerWindowContext>(
 		"viewerWindowContext",
 	);
+
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 	const taskContext = getContext<TaskContext>("taskContext");
+	const registration = viewerWindowContext.registration;
 
 	const image = viewerContext.image;
 	const instance = image.instance;
@@ -56,18 +59,19 @@
 		});
 	}
 
-let autoItem: { image_id: string; form_data: { fovea: { x: number; y: number }; disc_edge: { x: number; y: number } } } | undefined = $state(undefined);
-	if (instance.cf_keypoints) {
+	const autoItem: etdrsGridType | undefined = $derived.by(() => {
+		if (!instance.cf_keypoints) return undefined;
 		const [fx, fy] = instance.cf_keypoints.fovea_xy as [number, number];
 		const [odx, ody] = instance.cf_keypoints.disc_edge_xy as [number, number];
-		autoItem = {
-			image_id: String(image_id),
+		return {
+			image_instance_id: String(image_id),
 			form_data: {
 				fovea: { x: fx, y: fy },
 				disc_edge: { x: odx, y: ody },
 			},
 		};
-	}
+	});
+
 	// Manage an overlay instance for the auto item
 	let removeAutoOverlay: (() => void) | undefined = $state(undefined);
 	function toggleVisisble() {
@@ -76,17 +80,15 @@ let autoItem: { image_id: string; form_data: { fovea: { x: number; y: number }; 
 			removeAutoOverlay();
 			removeAutoOverlay = undefined;
 		} else {
-            const itemOverlay = new ETDRSGridItemOverlay(
-                registration,
-                settings,
-                () => autoItem!.image_id,
-                () => autoItem!.form_data.fovea,
-                () => autoItem!.form_data.disc_edge,
-            );
+			const itemOverlay = new ETDRSGridItemOverlay(
+				autoItem,
+				registration,
+				settings,
+			);
 			removeAutoOverlay = viewerContext.addOverlay(itemOverlay);
 		}
 	}
-    let showHide = $derived(removeAutoOverlay ? Show : Hide);
+	let showHide = $derived(removeAutoOverlay ? Show : Hide);
 </script>
 
 <div class="main">
