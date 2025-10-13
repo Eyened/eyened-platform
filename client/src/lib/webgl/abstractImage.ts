@@ -1,9 +1,9 @@
 import { Matrix } from "$lib/matrix";
-import type { InstanceGET } from "../../types/openapi_types";
+import type { InstanceGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 import { SvelteMap } from "svelte/reactivity";
-import type { SegmentationItem } from "./segmentationItem.svelte";
+import { SegmentationItem } from "./segmentationItem.svelte";
 
 export abstract class AbstractImage {
 
@@ -111,6 +111,19 @@ export abstract class AbstractImage {
         }
         this._ioContext.clearRect(0, 0, this.width, this.height);
         return this._ioContext;
+    }
+
+    getOrCreateSegmentationItem(segmentation: SegmentationGET | ModelSegmentationGET): SegmentationItem {
+        // Use id as key (unique per segmentation)
+        const cached = this.segmentationItems.get(segmentation.id);
+        if (cached) {
+            return cached;
+        }
+
+        // Create new segmentation item
+        const segmentationItem = new SegmentationItem(this, segmentation);
+        this.segmentationItems.set(segmentation.id, segmentationItem);
+        return segmentationItem;
     }
 
 }

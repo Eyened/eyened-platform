@@ -22,7 +22,7 @@
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 	const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
 	const segmentationContext = mainViewerContext.segmentationContext;
-    
+
 	interface Props {
 		segmentation: Segmentation;
 		style?: "AI" | "normal";
@@ -40,9 +40,12 @@
 
 	const segmentationItem =
 		segmentationContext.getSegmentationItem(segmentation);
-	let segmentationState = $derived(
+
+	const segmentationState = $derived(
 		segmentationItem.getSegmentationState(viewerContext.index),
 	);
+	const isEditable = globalContext.canEdit(segmentation);
+	let collapsed = $state(true);
 
 	async function removeAnnotation() {
 		const resolve = async () => {
@@ -73,16 +76,13 @@
 		segmentationContext.showOnlySegmentation(segmentation);
 	}
 
-	const isEditable = globalContext.canEdit(segmentation);
 	function activate() {
 		segmentationContext.toggleActive(segmentationItem);
 	}
 
-	let active = $derived(
+	const active = $derived(
 		segmentationContext.segmentationItem == segmentationItem,
 	);
-
-	let collapsed = $state(true);
 
 	function pointerEnter() {
 		mainViewerContext.highlightedSegmentationItem = segmentationItem;
@@ -165,7 +165,7 @@
 	{#if dataRepresentation == "Probability"}
 		{#if active}
 			<div class="row">
-				<ThresholdSlider {segmentation} />
+				<ThresholdSlider {segmentation} {segmentationItem} />
 			</div>
 		{/if}
 	{/if}

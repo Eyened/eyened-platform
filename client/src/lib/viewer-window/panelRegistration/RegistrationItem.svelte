@@ -1,72 +1,62 @@
 <script lang="ts">
-    import { deleteFormAnnotation } from "$lib/data";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { FormAnnotationGET } from "../../../types/openapi_types"
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import {
-        RegistrationTool,
-        type PointList,
-    } from "$lib/viewer/tools/Registration"
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte"
-    import { getContext, onDestroy } from "svelte"
-    import { PanelIcon, Trash } from "../icons/icons"
+    	type PointList
+    } from "$lib/viewer/tools/Registration";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext } from "svelte";
+    import type { FormAnnotationGET } from "../../../types/openapi_types";
+    import { PanelIcon, Trash } from "../icons/icons";
 
     interface Props {
         formAnnotation: FormAnnotationGET;
         active: boolean;
-        activeID: number | undefined;
+        onactivate: (annotation: FormAnnotationGET) => void;
+        onremove: (annotation: FormAnnotationGET) => void;
     }
     let {
         formAnnotation,
-        active: panelActive,
-        activeID = $bindable(),
+        active,
+        onactivate,
+        onremove
     }: Props = $props();
     const globalContext = getContext<GlobalContext>("globalContext");
     const canEditForm = globalContext.canEdit(formAnnotation);
-
+    
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const instance = viewerContext.image.instance;
 
-    const tool = new RegistrationTool(formAnnotation as any, instance as any);
-
-    let removeTool = () => {};
-    onDestroy(() => removeTool());
-    let active = $derived(panelActive && activeID === formAnnotation.id);
-    $effect(() => {
-        if (active) {
-            removeTool = viewerContext.addOverlay(tool);
-        } else {
-            removeTool();
-        }
+    // Create a reactive derived value that will update when form_data changes
+    const formDataEntries = $derived(() => {
+        return Object.entries(formAnnotation.form_data || {}).map(([instanceID, pointSet]) => [
+            instanceID, 
+            (pointSet as PointList).map(point => point ? { ...point } : point)
+        ]);
     });
 
-    function remove() {
-        activeID = undefined;
-        // TODO: should remove from registration?
-        deleteFormAnnotation(formAnnotation.id);
-    }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<li class="outer" class:active onclick={() => (activeID = formAnnotation.id)}>
+<li class="outer" class:active onclick={() => onactivate(formAnnotation)}>
     <div class="info">
         <span class="creator">
             {formAnnotation.creator.name}
         </span>
         <span class="annotationID">[{formAnnotation.id}]</span>
         {#if canEditForm}
-            <PanelIcon onclick={remove} tooltip="Remove" Icon={Trash} />
+            <PanelIcon onclick={() => onremove(formAnnotation)} tooltip="Remove" Icon={Trash} />
         {/if}
     </div>
     {#if active}
-        {#each Object.entries(formAnnotation.form_data || {}) as [instanceID, pointSet]}
+        {#each formDataEntries() as [instanceID, pointSet]}
             <div>{instanceID}:</div>
             {#if instanceID === `${instance.id}`}
                 <ol>
-                    {#each pointSet as PointList as point}
+                    {#each pointSet as PointList as point, index}
                         {#if point}
                             <li class="point">
-                                {point.x.toFixed(2)}, {point.y.toFixed(2)}
+                                [{index + 1}]: [{point.x.toFixed(2)}, {point.y.toFixed(2)}]
                             </li>
                         {:else}
                             <li class="point">No point</li>
@@ -104,9 +94,12 @@
         margin-bottom: 0.1em;
         border-radius: 1px;
     }
-
     li.outer.active {
         background-color: rgb(57, 158, 165);
         color: white;
+    }
+    li.point {
+        font-size: 0.8em;
+        padding-left: 1em;
     }
 </style>

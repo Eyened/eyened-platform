@@ -29,6 +29,7 @@
     import Measure from "./icons/Measure.svelte";
     import PanelInfo from "./panelInfo/panelInfo.svelte";
     import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
+	import { formSchemas } from '$lib/data/stores.svelte';
     interface Props {
         image: AbstractImage;
     }
@@ -82,7 +83,6 @@
 
     let minimize = $state(viewerWindowContext.mainPanels.length > 1);
 
-    const { formSchemas } = data;
     const etdrsSchema = formSchemas.find(
         (schema) => schema.name === "ETDRS-grid coordinates",
     )!;

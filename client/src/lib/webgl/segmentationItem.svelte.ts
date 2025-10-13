@@ -13,10 +13,16 @@ export class SegmentationItem {
     segmentationStates: SvelteMap<number, SegmentationState> = new SvelteMap();
     loading: boolean = $state(false);
     ready: Promise<void> | null = null;
+    
+    // Reactive threshold state for immediate UI updates
+    threshold: number = $state(0.5);
 
     constructor(
         readonly image: AbstractImage,
         readonly segmentation: SegmentationGET | ModelSegmentationGET) {
+        
+        // Initialize threshold from segmentation or default to 0.5
+        this.threshold = this.segmentation.threshold ?? 0.5;
 
         if (Array.isArray(this.segmentation.scan_indices) && this.segmentation.scan_indices.length < 5) {
             for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
@@ -100,6 +106,7 @@ export class SegmentationItem {
     }
 
     dispose() {
+        // Note: not called currently
         for (const segmentationState of this.segmentationStates.values()) {
             segmentationState.dispose();
         }
