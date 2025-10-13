@@ -1,4 +1,3 @@
-// import { FeaturesRepo, FormSchemasRepo, TagsRepo } from '$lib/data/repos.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
 
 import type { FormAnnotationGET, ModelSegmentationGET, SearchCondition, SegmentationGET, StudySearchCondition } from '../../types/openapi_types';

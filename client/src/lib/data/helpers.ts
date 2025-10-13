@@ -238,14 +238,14 @@ export async function getFormAnnotationValue(annotationId: number) {
 	return res.data as unknown;
 }
 
-export async function setFormAnnotationValue(annotationId: number, value: unknown) {
+export async function setFormAnnotationValue(annotationId: number, form_data: unknown) {
 	const { api } = await import('../api/client');
 	const { formAnnotations } = await import('./stores.svelte');
 	
 	// Save to server first (server is source of truth)
 	await api.PUT('/form-annotations/{form_annotation_id}/value', {
 		params: { path: { form_annotation_id: annotationId } },
-		body: value as any
+		body: form_data as any
 	});
 	
 	// Then update local store so other components see the change
@@ -253,7 +253,7 @@ export async function setFormAnnotationValue(annotationId: number, value: unknow
 	if (existing) {
 		formAnnotations.set(annotationId, {
 			...existing,
-			form_data: value as any
+			form_data: form_data as any
 		});
 	} else {
         console.error(`Form annotation ${annotationId} not found`);

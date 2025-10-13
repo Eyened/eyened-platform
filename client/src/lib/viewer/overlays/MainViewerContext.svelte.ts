@@ -86,7 +86,7 @@ export class MainViewerContext implements Overlay {
             
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-            uniforms.u_threshold = segmentation.threshold;
+            uniforms.u_threshold = segmentationItem.threshold ?? segmentation.threshold;
             
             if (this.highlightedSegmentationItem == segmentationItem) {
                 uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;
@@ -101,7 +101,7 @@ export class MainViewerContext implements Overlay {
             uniforms.u_mask = null;
             uniforms.u_mask_bitmask = 0;
             if (applyMask && segmentation.reference_segmentation_id) {
-                const referenceSegmentationItem = this.segmentationContext.segmentationItems.get(segmentation.reference_segmentation_id);
+                const referenceSegmentationItem = this.segmentationContext.getSegmentationItemById(segmentation.reference_segmentation_id);
                 if (referenceSegmentationItem) {
                     const referenceMask = referenceSegmentationItem.getMask(index);
                     if (referenceMask instanceof BinaryMask) {
@@ -126,7 +126,7 @@ export class MainViewerContext implements Overlay {
             if (!mask) continue;
 
             uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-            uniforms.u_threshold = segmentation.threshold;
+            uniforms.u_threshold = segmentationItem.threshold ?? segmentation.threshold;
             
             if (this.highlightedSegmentationItem == segmentationItem) {
                 uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;

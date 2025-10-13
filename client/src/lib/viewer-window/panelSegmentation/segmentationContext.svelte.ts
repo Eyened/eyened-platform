@@ -29,7 +29,6 @@ export class SegmentationContext {
     public creatorHidden = new SvelteMap<number, boolean>();
     public modelHidden = new SvelteMap<number, boolean>();
 
-    // Use SvelteSet with raw objects - works because same references from global stores!
     public hiddenSegmentations = new SvelteSet<Segmentation>();
 
     public visibleGraderSegmentations: SegmentationGET[] = $derived(
@@ -55,21 +54,14 @@ export class SegmentationContext {
     ) {}
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
-        // Use id as key (unique per segmentation)
-        // Cache in AbstractImage for persistence across context recreations
-        if (this.image.segmentationItems.has(segmentation.id)) {
-            return this.image.segmentationItems.get(segmentation.id)!;
-        }
-
-        // Create new segmentation item
-        const segmentationItem = new SegmentationItem(this.image, segmentation);
-        this.image.segmentationItems.set(segmentation.id, segmentationItem);
-        return segmentationItem;
+        return this.image.getOrCreateSegmentationItem(segmentation);
     }
 
-    dispose() {
-        // Note: We don't dispose segmentationItems here anymore since they're cached in AbstractImage
-        // They will be disposed when the image itself is disposed
+    getSegmentationItemById(segmentationId: number): SegmentationItem | undefined {
+        const segmentation = this.graderSegmentations.find(s => s.id === segmentationId) 
+            || this.modelSegmentations.find(s => s.id === segmentationId);
+        
+        return segmentation ? this.image.getOrCreateSegmentationItem(segmentation) : undefined;
     }
 
     toggleShowCreator(creatorId: number) {

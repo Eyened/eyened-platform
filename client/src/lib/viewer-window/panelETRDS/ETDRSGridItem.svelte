@@ -1,132 +1,151 @@
 <script lang="ts">
-    import { deleteFormAnnotation } from "$lib/data";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { FormAnnotationGET } from "../../../types/openapi_types"
-    import type { Position2D } from "$lib/types"
-    import type { ETDRSGridOverlay } from "$lib/viewer/overlays/ETDRSGridOverlay.svelte"
-    import type { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte"
-    import { getContext } from "svelte"
-    import { Edit, Hide, PanelIcon, Show, Trash } from "../icons/icons"
+	import { deleteFormAnnotation } from "$lib/data";
+	import type { GlobalContext } from "$lib/data/globalContext.svelte";
+	import type { Position2D } from "$lib/types";
+	import { ETDRSGridItemOverlay } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
+	import { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte";
+	import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+	import { getContext, onDestroy } from "svelte";
+	import type { FormAnnotationGET } from "../../../types/openapi_types";
+	import { Edit, Hide, PanelIcon, Show, Trash } from "../icons/icons";
 
-    const globalContext = getContext<GlobalContext>("globalContext");
+	const globalContext = getContext<GlobalContext>("globalContext");
+	const viewerContext = getContext<ViewerContext>("viewerContext");
 
-    interface Props {
-        overlay: ETDRSGridOverlay;
-        tool: ETDRSGridTool;
-        formAnnotation: FormAnnotationGET;
-    }
-    let { overlay, tool, formAnnotation }: Props = $props();
+	interface Props {
+		formAnnotation: FormAnnotationGET;
+		settings: { radiusFraction: number };
+	}
+	let { formAnnotation, settings }: Props = $props();
 
-    let fovea: Position2D | undefined = $derived(formAnnotation.form_data?.fovea as Position2D | undefined);
-    let disc_edge: Position2D | undefined = $derived(
-        formAnnotation.form_data?.disc_edge as Position2D | undefined,
-    );
+	const tool = new ETDRSGridTool(formAnnotation);
+	const fovea: Position2D | undefined = $derived(
+		formAnnotation.form_data?.fovea as Position2D | undefined,
+	);
+	const disc_edge: Position2D | undefined = $derived(
+		formAnnotation.form_data?.disc_edge as Position2D | undefined,
+	);
 
-    // Note: overlay/tool expect old FormAnnotation type, will be fixed when overlays are refactored
-    let show = $derived(overlay.visible.has(formAnnotation as any));
-    let active = $derived(tool.annotation?.id == formAnnotation.id);
+	const overlay = new ETDRSGridItemOverlay(
+		formAnnotation,
+		viewerContext.registration,
+		settings,
+	);
+	// No effect needed; overlay reads latest values via getters during repaint
+	let removeTool: (() => void) | undefined = $state(undefined);
+	let removeOverlay: (() => void) | undefined = $state(undefined);
+	onDestroy(() => removeTool?.());
+	onDestroy(() => removeOverlay?.());
+	const toolActive = $derived(removeTool != undefined);
+	const overlayActive = $derived(removeOverlay != undefined);
 
-    const canEditForm = globalContext.canEdit(formAnnotation);
+	const canEditForm = globalContext.canEdit(formAnnotation);
 
-    function toggleVisisble() {
-        if (overlay.visible.has(formAnnotation as any)) {
-            overlay.visible.delete(formAnnotation as any);
-        } else {
-            overlay.visible.add(formAnnotation as any);
-        }
-    }
+	function toggleOverlay() {
+		if (removeOverlay) {
+			removeOverlay();
+			removeOverlay = undefined;
+		} else {
+			removeOverlay = viewerContext.addOverlay(overlay);
+		}
+	}
 
-    function edit() {
-        if (tool.annotation?.id == formAnnotation.id) {
-            tool.annotation = undefined;
-        } else {
-            overlay.visible.add(formAnnotation as any);
-            tool.annotation = formAnnotation as any;
-        }
-    }
+	function toggleTool() {
+		if (removeTool) {
+			removeTool();
+			removeTool = undefined;
+		} else {
+			removeTool = viewerContext.addOverlay(tool);
+		}
+	}
 
-    function remove() {
-        overlay.visible.delete(formAnnotation as any);
-        if (tool.annotation?.id == formAnnotation.id) {
-            tool.annotation = undefined;
-        }
-        deleteFormAnnotation(formAnnotation.id);
-    }
+	function remove() {
+		removeOverlay?.();
+		removeOverlay = undefined;
+		removeTool?.();
+		removeTool = undefined;
+		deleteFormAnnotation(formAnnotation.id);
+	}
 
-    let showHide = $derived(show ? Show : Hide);
+	let showHide = $derived(overlayActive ? Show : Hide);
 </script>
 
 {#snippet coordinate(label: string, property: Position2D)}
-    <li>
-        <span>{label}:</span>
-        <span>
-            [{Math.round(property.x)}, {Math.round(property.y)}]
-        </span>
-    </li>
+	<li>
+		<span>{label}:</span>
+		<span>
+			[{Math.round(property.x)}, {Math.round(property.y)}]
+		</span>
+	</li>
 {/snippet}
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="info">
-    <span class="annotation-id">[{formAnnotation.id}]</span>
-    <div class="top">
-        <PanelIcon
-            active={show}
-            onclick={toggleVisisble}
-            tooltip="show/hide"
-            Icon={showHide}
-        />
+	<span class="annotation-id">[{formAnnotation.id}]</span>
+	<div class="top">
+		<PanelIcon
+			active={overlayActive}
+			onclick={toggleOverlay}
+			tooltip="show/hide"
+			Icon={showHide}
+		/>
 
-        {#if canEditForm}
-            <PanelIcon {active} onclick={edit} tooltip="edit" Icon={Edit} />
-        {/if}
-        {#if canEditForm}
-            <div class="spacer"></div>
-            <PanelIcon onclick={remove} tooltip="delete" Icon={Trash} />
-        {/if}
-    </div>
-    <ul>
-        {#if fovea}
-            {@render coordinate("fovea", fovea)}
-        {/if}
-        {#if disc_edge}
-            {@render coordinate("disc_edge", disc_edge)}
-        {/if}
-    </ul>
+		{#if canEditForm}
+			<PanelIcon
+				active={toolActive}
+				onclick={toggleTool}
+				tooltip="edit"
+				Icon={Edit}
+			/>
+		{/if}
+		{#if canEditForm}
+			<div class="spacer"></div>
+			<PanelIcon onclick={remove} tooltip="delete" Icon={Trash} />
+		{/if}
+	</div>
+	<ul>
+		{#if fovea}
+			{@render coordinate("fovea", fovea)}
+		{/if}
+		{#if disc_edge}
+			{@render coordinate("disc_edge", disc_edge)}
+		{/if}
+	</ul>
 </div>
 
 <style>
-    .info {
-        display: flex;
-        background-color: rgba(255, 255, 255, 0.1);
-        flex-direction: column;
-        border: 1px solid black;
-        border-radius: 2px;
-        padding: 0.2em;
-    }
-    .info:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-    }
-    div.top {
-        display: flex;
-    }
-    span.annotation-id {
-        font-size: x-small;
-    }
-    div.spacer {
-        flex: 1;
-    }
-    ul {
-        list-style-type: none;
-        padding: 0;
-        margin: 0;
-        font-size: small;
-    }
-    li {
-        display: flex;
-        align-items: center;
-    }
-    li * {
-        flex: 1;
-    }
+	.info {
+		display: flex;
+		background-color: rgba(255, 255, 255, 0.1);
+		flex-direction: column;
+		border: 1px solid black;
+		border-radius: 2px;
+		padding: 0.2em;
+	}
+	.info:hover {
+		background-color: rgba(255, 255, 255, 0.2);
+	}
+	div.top {
+		display: flex;
+	}
+	span.annotation-id {
+		font-size: x-small;
+	}
+	div.spacer {
+		flex: 1;
+	}
+	ul {
+		list-style-type: none;
+		padding: 0;
+		margin: 0;
+		font-size: small;
+	}
+	li {
+		display: flex;
+		align-items: center;
+	}
+	li * {
+		flex: 1;
+	}
 </style>
