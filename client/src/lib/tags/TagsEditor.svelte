@@ -34,8 +34,7 @@
 	let dialogOpen = $derived(tagToDelete !== null);
 
 	let filtered_tags = $derived(
-		Array.from(tags.values())
-			.filter((t) => t.tag_type === tagType)
+		tags.filter((t) => t.tag_type === tagType)
 			.sort((a, b) => a.name.localeCompare(b.name))
 	);
 	let favouriteTagIDs = $derived(new Set(ctx.userManager.starredTagIds));

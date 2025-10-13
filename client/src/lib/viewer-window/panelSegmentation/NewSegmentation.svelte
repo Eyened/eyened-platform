@@ -68,7 +68,7 @@
         globalContext.dialogue = null;
     }
 
-    const availableFeatures = Array.from(features.values()).filter((f) => true);
+    const availableFeatures = features.filter((f) => true);
     let selectedFeatureId: number | undefined = $state(undefined);
     
 </script>
@@ -121,7 +121,7 @@
         {/each}
     </div>
     <FeatureSelect
-        values={Array.from(features.values())}
+        values={features.map(f => f)}
         onselect={(feature) => create(feature)}
     />
     <NewMultiFeature dataRepresentation="MultiLabel" />

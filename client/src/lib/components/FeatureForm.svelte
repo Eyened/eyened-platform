@@ -17,8 +17,7 @@
 	);
 
 	const options = $derived(
-		Array.from(features.values())
-			.filter(f => f.id !== feature?.id)
+		features.filter(f => f.id !== feature?.id)
 			.map(f => ({ label: f.name, value: String(f.id) }))
 	);
 

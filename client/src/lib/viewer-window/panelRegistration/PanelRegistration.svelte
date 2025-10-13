@@ -21,8 +21,7 @@
 
     //filter all registrations for the same eye
     const filtered = $derived(
-        Array.from(formAnnotations.values())
-            .filter(formAnnotation => {
+        formAnnotations.filter(formAnnotation => {
                 if (formAnnotation.form_schema_id !== registrationSchema.id) return false;
                 if (formAnnotation.patient_id !== instance.patient.id) return false;
                 // Check laterality - look up full instance if needed

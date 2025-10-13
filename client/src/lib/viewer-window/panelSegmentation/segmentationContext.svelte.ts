@@ -10,19 +10,13 @@ export type Segmentation = SegmentationGET | ModelSegmentationGET;
 
 export class SegmentationContext {
 
-    // Keep grader and model segmentations separate - cleaner!
     public graderSegmentations: SegmentationGET[] = $derived(
-        Array.from(segmentations.values())
-            .filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+        segmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
     );
     
     public modelSegmentations: ModelSegmentationGET[] = $derived(
-        Array.from(modelSegmentations.values())
-            .filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+        modelSegmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
     );
-    
-    // Manage segmentation items (moved from AbstractImage)
-    public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
     
     public creators: SvelteMap<number, CreatorMeta> = $derived(
         new SvelteMap(this.graderSegmentations.map(s => [s.creator.id, s.creator]))
@@ -62,21 +56,20 @@ export class SegmentationContext {
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         // Use id as key (unique per segmentation)
-        if (this.segmentationItems.has(segmentation.id)) {
-            return this.segmentationItems.get(segmentation.id)!;
+        // Cache in AbstractImage for persistence across context recreations
+        if (this.image.segmentationItems.has(segmentation.id)) {
+            return this.image.segmentationItems.get(segmentation.id)!;
         }
 
         // Create new segmentation item
         const segmentationItem = new SegmentationItem(this.image, segmentation);
-        this.segmentationItems.set(segmentation.id, segmentationItem);
+        this.image.segmentationItems.set(segmentation.id, segmentationItem);
         return segmentationItem;
     }
 
     dispose() {
-        for (const segmentationItem of this.segmentationItems.values()) {
-            segmentationItem.dispose();
-        }
-        this.segmentationItems.clear();
+        // Note: We don't dispose segmentationItems here anymore since they're cached in AbstractImage
+        // They will be disposed when the image itself is disposed
     }
 
     toggleShowCreator(creatorId: number) {

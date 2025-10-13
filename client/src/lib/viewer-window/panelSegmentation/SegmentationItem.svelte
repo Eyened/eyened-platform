@@ -9,7 +9,6 @@
 
 	import StringDialogue from "$lib/StringDialogue.svelte";
 	import AI from "../icons/AI.svelte";
-	import { ViewerWindowContext } from "../viewerWindowContext.svelte";
 	import CCPanel from "./CCPanel.svelte";
 	import { duplicate } from "./duplicate_utils";
 	import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte";
@@ -20,35 +19,27 @@
 	import type { Segmentation } from "./segmentationContext.svelte";
 
 	const globalContext = getContext<GlobalContext>("globalContext");
-	const viewerWindowContext = getContext<ViewerWindowContext>(
-		"viewerWindowContext",
-	);
-
+	const viewerContext = getContext<ViewerContext>("viewerContext");
+	const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+	const segmentationContext = mainViewerContext.segmentationContext;
+    
 	interface Props {
 		segmentation: Segmentation;
 		style?: "AI" | "normal";
 	}
 
 	let { segmentation, style = "normal" }: Props = $props();
-	// const segmentationObject =
-	//     segmentation.annotation_type == "grader_segmentation" ?
-	//     new SegmentationObject(segmentation, viewerWindowContext.Segmentations) :
-	//     new ModelSegmentationObject(segmentation, viewerWindowContext.ModelSegmentations);
+
 	const feature = segmentation.feature;
 	const dataRepresentation = segmentation.data_representation;
-
-	const viewerContext = getContext<ViewerContext>("viewerContext");
-
 	const image = viewerContext.image;
-	const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
-
-	const { segmentationContext } = mainViewerContext;
 
 	const visible = $derived(
 		!segmentationContext.hiddenSegmentations.has(segmentation),
 	);
 
-	const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
+	const segmentationItem =
+		segmentationContext.getSegmentationItem(segmentation);
 	let segmentationState = $derived(
 		segmentationItem.getSegmentationState(viewerContext.index),
 	);
@@ -56,7 +47,7 @@
 	async function removeAnnotation() {
 		const resolve = async () => {
 			// remove from database on server
-			if (segmentation.annotation_type === 'grader_segmentation') {
+			if (segmentation.annotation_type === "grader_segmentation") {
 				await deleteSegmentation(segmentation.id);
 			}
 			segmentationContext.toggleActive(undefined);

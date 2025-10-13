@@ -27,7 +27,7 @@
 
     // Use repo to drive the UI list of parents-with-subfeatures
     const featuresWithSubfeatures = $derived(
-        Array.from(features.values()).filter(f => (f.subfeatures ?? []).length > 0)
+        features.filter(f => (f.subfeatures ?? []).length > 0)
     );
 
 

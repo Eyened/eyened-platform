@@ -14,23 +14,92 @@ import type {
 	SubTaskWithImagesGET
 } from '../../types/openapi_types';
 
+// ReactiveMap extends SvelteMap with array-like iteration methods
+class ReactiveMap<K, V> extends SvelteMap<K, V> {
+	// Returns array of filtered values
+	filter(predicate: (value: V, key: K, map: this) => boolean): V[] {
+		const result: V[] = [];
+		for (const [key, value] of this.entries()) {
+			if (predicate(value, key, this)) {
+				result.push(value);
+			}
+		}
+		return result;
+	}
+
+	// Returns array of mapped values
+	map<U>(callback: (value: V, key: K, map: this) => U): U[] {
+		const result: U[] = [];
+		for (const [key, value] of this.entries()) {
+			result.push(callback(value, key, this));
+		}
+		return result;
+	}
+
+	// Returns first matching value or undefined
+	find(predicate: (value: V, key: K, map: this) => boolean): V | undefined {
+		for (const [key, value] of this.entries()) {
+			if (predicate(value, key, this)) {
+				return value;
+			}
+		}
+		return undefined;
+	}
+
+	// Returns true if any value matches
+	some(predicate: (value: V, key: K, map: this) => boolean): boolean {
+		for (const [key, value] of this.entries()) {
+			if (predicate(value, key, this)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Returns true if all values match
+	every(predicate: (value: V, key: K, map: this) => boolean): boolean {
+		for (const [key, value] of this.entries()) {
+			if (!predicate(value, key, this)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// Reduce over values
+	reduce<U>(callback: (acc: U, value: V, key: K, map: this) => U, initial: U): U {
+		let acc = initial;
+		for (const [key, value] of this.entries()) {
+			acc = callback(acc, value, key, this);
+		}
+		return acc;
+	}
+
+	// Execute function for each value
+	forEach(callback: (value: V, key: K, map: this) => void): void {
+		for (const [key, value] of this.entries()) {
+			callback(value, key, this);
+		}
+	}
+}
+
 // Simple stores - just maps of plain data by ID
-export const instances = new SvelteMap<number, InstanceGET>();
-export const instanceMetas = new SvelteMap<number, InstanceMeta>();  // Lightweight references
-export const studies = new SvelteMap<number, StudyGET>();
-export const tags = new SvelteMap<number, TagGET>();
-export const features = new SvelteMap<number, FeatureGET>();
-export const formSchemas = new SvelteMap<number, FormSchemaGET>();
-export const segmentations = new SvelteMap<number, SegmentationGET>();
-export const modelSegmentations = new SvelteMap<number, ModelSegmentationGET>();
-export const formAnnotations = new SvelteMap<number, FormAnnotationGET>();
-export const tasks = new SvelteMap<number, TaskGET>();
-export const subtasks = new SvelteMap<number, SubTaskGET | SubTaskWithImagesGET>();
+export const instances = new ReactiveMap<number, InstanceGET>();
+export const instanceMetas = new ReactiveMap<number, InstanceMeta>();  // Lightweight references
+export const studies = new ReactiveMap<number, StudyGET>();
+export const tags = new ReactiveMap<number, TagGET>();
+export const features = new ReactiveMap<number, FeatureGET>();
+export const formSchemas = new ReactiveMap<number, FormSchemaGET>();
+export const segmentations = new ReactiveMap<number, SegmentationGET>();
+export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>();
+export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>();
+export const tasks = new ReactiveMap<number, TaskGET>();
+export const subtasks = new ReactiveMap<number, SubTaskGET | SubTaskWithImagesGET>();
 
 // Secondary indexes for common lookups
-export const formSchemasByName = new SvelteMap<string, FormSchemaGET>();
-export const featuresByName = new SvelteMap<string, FeatureGET>();
-export const tagsByName = new SvelteMap<string, TagGET>();
+export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>();
+export const featuresByName = new ReactiveMap<string, FeatureGET>();
+export const tagsByName = new ReactiveMap<string, TagGET>();
 
 // Ingest functions handle embedded data extraction
 export function ingestStudies(studiesData: StudyGET[]) {

@@ -39,8 +39,7 @@
 	const first_instanceId = instanceIds[0];
 
 	const forms = $derived(
-		Array.from(formAnnotations.values())
-			.filter(
+		formAnnotations.filter(
 				(annotation) =>
 					annotation.study_id === study.id &&
 					annotation.form_schema_id === formSchema.id,
