@@ -7,6 +7,8 @@
     import { Duplicate } from "../icons/icons";
     import { duplicate, types } from "./duplicate_utils";
     import type { Segmentation } from "./segmentationContext.svelte";
+    import { Button } from "$lib/components/ui/button/index.js";
+	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
     interface Props {
         segmentation: Segmentation;
@@ -18,7 +20,7 @@
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const globalContext = getContext<GlobalContext>("globalContext");
-    const creator = globalContext.user;
+    const taskContext = getContext<TaskContext>("taskContext");
 
     let duplicateVolume = $state(false);
 
@@ -36,7 +38,9 @@
             viewerContext,
             duplicateVolume,
             type,
-            creator.id,
+            segmentationItem.threshold ?? segmentation.threshold ?? 0.5, //original threshold
+            0.5, //new threshold
+            taskContext
         );
     }
 </script>
@@ -76,7 +80,7 @@
             </label>
         </div>
     {/if}
-    <button onclick={applyDuplicate}>Create copy</button>
+    <Button variant="outline" onclick={applyDuplicate}>Create copy</Button>
 </div>
 
 <style>

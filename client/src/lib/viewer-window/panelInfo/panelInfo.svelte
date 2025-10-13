@@ -10,7 +10,7 @@
 
     const instanceProperties = {
         "Patient ID": instance.patient.identifier,
-        Date: instance.study.date,
+        Date: instance.study.date.split('T')[0],
         Laterality: instance.laterality,
         Camera: instance.device?.model,
         "Scan mode": instance.scan?.mode,

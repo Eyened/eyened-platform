@@ -15,21 +15,20 @@
         import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { data } from "$lib/datamodel/model";
+    import { formSchemas } from '$lib/data/stores.svelte';
     import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import {
-        Close,
-        Draw,
-        ETDRS,
-        Form,
-        Info,
-        Registration,
-        Rendering,
+    	Close,
+    	Draw,
+    	ETDRS,
+    	Form,
+    	Info,
+    	Registration,
+    	Rendering,
     } from "./icons/icons";
     import Measure from "./icons/Measure.svelte";
     import PanelInfo from "./panelInfo/panelInfo.svelte";
     import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
-	import { formSchemas } from '$lib/data/stores.svelte';
     interface Props {
         image: AbstractImage;
     }
@@ -45,10 +44,9 @@
     const viewerContext = new ViewerContext(image, viewerWindowContext);
     setContext("viewerContext", viewerContext);
 
-    const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = new MainViewerContext(viewerContext.instance.id, viewerContext.axis, viewerWindowContext, viewerContext.image);
-    setContext("mainViewerContext", segmentationOverlay);    
-    onDestroy(viewerContext.addOverlay(segmentationOverlay));
+    const mainViewerContext = new MainViewerContext(viewerContext.instance.id, viewerContext.axis, viewerWindowContext, viewerContext.image);
+    setContext("mainViewerContext", mainViewerContext);    
+    onDestroy(viewerContext.addOverlay(mainViewerContext));
 
     const { activePanels } = viewerContext;
     activePanels.add("Segmentation");

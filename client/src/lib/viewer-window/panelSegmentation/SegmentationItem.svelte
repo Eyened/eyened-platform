@@ -17,10 +17,12 @@
 	import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
 	import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
 	import type { Segmentation } from "./segmentationContext.svelte";
+	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
 	const globalContext = getContext<GlobalContext>("globalContext");
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 	const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+	const taskContext = getContext<TaskContext>("taskContext");
 	const segmentationContext = mainViewerContext.segmentationContext;
 
 	interface Props {
@@ -100,7 +102,7 @@
 		MultiLabel: "ML",
 	}[dataRepresentation];
 
-	function applyDuplicate() {
+	function applyDuplicateAI() {
 		duplicate(
 			globalContext,
 			segmentation,
@@ -109,7 +111,9 @@
 			viewerContext,
 			false,
 			"Q",
-			globalContext.user.id,
+			segmentationItem.threshold ?? segmentation.threshold ?? 0.5, //original threshold
+			0.5, //new threshold
+			taskContext,
 		);
 	}
 </script>
@@ -171,7 +175,7 @@
 	{/if}
 	{#if active && style == "AI"}
 		<div class="row">
-			<button onclick={applyDuplicate}>Duplicate</button>
+			<div class="button" onclick={applyDuplicateAI}>Duplicate</div>
 		</div>
 	{/if}
 
@@ -208,16 +212,16 @@
 						/>
 					{/if}
 				</div>
-
-				<div class="row">
-					<ReferenceSegmentationPanel
-						{segmentation}
-						{image}
-						{isEditable}
-						{segmentationItem}
-					/>
-				</div>
-
+				{#if isEditable}
+					<div class="row">
+						<ReferenceSegmentationPanel
+							{segmentation}
+							{image}
+							{isEditable}
+							{segmentationItem}
+						/>
+					</div>
+				{/if}
 				{#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
 					<div class="row">
 						<CCPanel {segmentationItem} />
@@ -295,5 +299,17 @@
 	div.loading {
 		font-size: 0.9em;
 		opacity: 0.8;
+	}
+
+	div.button {
+		cursor: pointer;
+		padding: 0.2em;
+		border-radius: 2px;
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		margin: 0.2em;
+		text-wrap-mode: nowrap;
+	}
+	div.button:hover {
+		background-color: rgba(255, 255, 255, 0.3);
 	}
 </style>

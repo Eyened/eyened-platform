@@ -1,18 +1,23 @@
 import type { Registration } from "$lib/registration/registration";
 import type { Position, Position2D } from "$lib/types";
-import type { FormAnnotationGET } from "../../../types/openapi_types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
 const [C, I, O] = [1, 3, 6];
-
+export type etdrsGridType = {
+    image_instance_id: string;
+    form_data: {
+        fovea: { x: number; y: number };
+        disc_edge: { x: number; y: number };
+    };
+}
 export class ETDRSGridItemOverlay implements Overlay {
     lineWidth = 1;
     strokeStyle = 'rgba(255,255,255, 1)';
     name: string = 'ETRDR grid item';
 
     constructor(
-        private readonly annotation: FormAnnotationGET,
+        private readonly annotation: etdrsGridType,
         private readonly registration: Registration,
         private readonly settings: { radiusFraction: number }
 

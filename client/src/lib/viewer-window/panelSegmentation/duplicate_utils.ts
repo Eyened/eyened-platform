@@ -10,6 +10,8 @@ import type { DrawingArray } from "$lib/webgl/mask.svelte";
 import { convert } from "$lib/webgl/segmentationConverter";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+import { createSegmentation } from "$lib/data/api";
 
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
     Q: "DualBitMask",
@@ -39,19 +41,20 @@ function createArray(
 function copyMaskData(
     indices: number[],
     segmentationItem: SegmentationItem,
-    segmentation: Segmentation,
+    segmentation: SegmentationGET | ModelSegmentationGET,
     dataRepresentation: DataRepresentation,
     array: NPYArray,
-    image: AbstractImage
+    image: AbstractImage,
+    originalThreshold: number
 ) {
     for (let i = 0; i < indices.length; i++) {
         const mask = segmentationItem.getMask(indices[i]);
         if (mask) {
             const data = mask.exportData();
-            const threshold = 255 * (segmentation.threshold ?? 0.5);
+            const threshold = 255 * originalThreshold;
             const dataConverted = convert(
                 data,
-                segmentation.dataRepresentation as SimpleDataRepresentation,
+                segmentation.data_representation as SimpleDataRepresentation,
                 dataRepresentation as SimpleDataRepresentation,
                 threshold,
             );
@@ -64,41 +67,40 @@ function copyMaskData(
 }
 
 export async function duplicate(globalContext: GlobalContext,
-    segmentation: SegmentationGET | ModelSegmentationGET, segmentationItem: SegmentationItem,
+    segmentation: SegmentationGET | ModelSegmentationGET,
+    segmentationItem: SegmentationItem,
     image: AbstractImage,
     viewerContext: ViewerContext,
     duplicateVolume: boolean,
     type: "Q" | "B" | "P",
-    creatorId: number) {
+    originalThreshold: number,
+    newThreshold: number, 
+    taskContext?: TaskContext) {
     globalContext.dialogue = `Duplicating segmentation ${segmentation.id}...`;
 
-    let dataRepresentation: DataRepresentation;
+    let data_representation: DataRepresentation;
     if (
         segmentation.data_representation == "MultiClass" ||
         segmentation.data_representation == "MultiLabel"
     ) {
         // same as original annotation type
-        dataRepresentation = segmentation.data_representation;
+        data_representation = segmentation.data_representation;
     } else {
         // new annotation can be of different type
-        dataRepresentation = types[type];
+        data_representation = types[type];
     }
 
-    let dataType = segmentation.data_type;
-    if (dataRepresentation == "Probability") {
-        dataType = "R8";
+    let data_type = segmentation.data_type;
+    if (data_representation == "Probability") {
+        data_type = "R8";
     }
     const item = {
         ...segmentation,
-        dataRepresentation,
-        dataType,
-        // properties that need to be mentioned explicitly, because they're marked with $state and hence not enumerable
-        referenceId: segmentation.reference_segmentation_id,
-        scanIndices: segmentation.scan_indices,
-        threshold: segmentation.threshold,
-
-        // overwrite creatorId to current user
-        creatorId: creatorId,
+        threshold: newThreshold,
+        feature_id: segmentation.feature.id,        
+        data_representation,
+        data_type,
+        subtask_id: taskContext?.subTask.id ?? null,
     };
 
     const scanNr = viewerContext.index;
@@ -114,7 +116,7 @@ export async function duplicate(globalContext: GlobalContext,
         }
     } else if (image.is3D) {
         // only duplicate the current scan
-        item.scanIndices = [scanNr];
+        item.scan_indices = [scanNr];
     }
 
     const array = createArray(
@@ -125,15 +127,16 @@ export async function duplicate(globalContext: GlobalContext,
         array.shape = [image.height, 1, image.width];
     }
 
-    if (item.scanIndices) {
+    if (item.scan_indices) {
         // sparse volume
         copyMaskData(
-            item.scanIndices,
+            item.scan_indices,
             segmentationItem,
             segmentation,
-            dataRepresentation,
+            data_representation,
             array,
-            image
+            image,
+            originalThreshold
         );
     } else {
         // full volume
@@ -142,13 +145,14 @@ export async function duplicate(globalContext: GlobalContext,
             indices,
             segmentationItem,
             segmentation,
-            dataRepresentation,
+            data_representation,
             array,
-            image
+            image,
+            originalThreshold
         );
     }
-    const newSegmentation = await Segmentation.create(item, array);
-    console.log("newSegmentation", newSegmentation);
+    const newSegmentation = await createSegmentation(item, array);
 
     globalContext.dialogue = null;
+    return newSegmentation;
 }

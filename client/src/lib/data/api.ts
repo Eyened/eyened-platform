@@ -140,19 +140,15 @@ export async function getStudiesSignature() {
 // ===== Segmentation Creation (specialized) =====
 
 export async function createSegmentation(item: any, np_array?: any) {
-	const body: any = { metadata: JSON.stringify(item) };
+	const formData = new FormData();
+	formData.append('metadata', JSON.stringify(item));
+	
 	if (np_array) {
-		body.np_array = await np_array.toBlob(true);
+		formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
 	}
+	
 	const res = await api.POST('/segmentations' as any, {
-		body,
-		bodySerializer(body: any) {
-			const fd = new FormData();
-			for (const name in body) {
-				fd.append(name, body[name]);
-			}
-			return fd;
-		}
+		body: formData
 	} as any);
 	
 	if (res.data) {

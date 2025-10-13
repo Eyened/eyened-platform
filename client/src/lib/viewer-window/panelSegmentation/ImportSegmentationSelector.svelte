@@ -1,24 +1,22 @@
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { converters } from "$lib/webgl/segmentationConverter";
     import { getContext } from "svelte";
-    import type { MainViewerContext } from "../../viewer/overlays/MainViewerContext.svelte";
-    import { type Segmentation } from "./segmentationContext.svelte";
+    import { type Segmentation, type SegmentationContext } from "./segmentationContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
-
-    const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
-    const segmentationContext = mainViewerContext.segmentationContext;
 
     interface Props {
         image: AbstractImage;
         segmentation: Segmentation;
+        segmentationContext: SegmentationContext;
         close: () => void;
         resolve: (segmentation: Segmentation) => void;
     }
 
-    let { image, segmentation, resolve, close }: Props = $props();
+    let { image, segmentation, segmentationContext, resolve, close }: Props = $props();
     
     const allSegmentations = $derived([
         ...segmentationContext.graderSegmentations, 
@@ -71,7 +69,7 @@
 {:else}
     <div>No segmentations found to import from</div>
 {/if}
-<button onclick={close}>Cancel</button>
+<Button onclick={close}>Cancel</Button>
 
 <style>
     table {
@@ -86,7 +84,7 @@
         padding: 8px;
         border-bottom: 2px solid rgba(0, 0, 0, 0.3);
         font-weight: bold;
-        background-color: #f5f5f5;
+        /* background-color: #f5f5f5; */
     }
 
     td {
