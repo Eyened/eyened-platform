@@ -1,45 +1,50 @@
 <script lang="ts">
     import { browser } from "$app/environment";
+	import { fetchInstance, formAnnotations, formSchemas, getInstance, instances, setFormAnnotationValue } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { FormAnnotationObject } from "$lib/data/objects.svelte";
-    import type { FormAnnotationsRepo } from "$lib/data/repos.svelte";
     import SchemaForm from "$lib/forms/SchemaForm.svelte";
-    import { getDefault, resolveRefs } from "$lib/forms/schemaType";
+    import { getDefault, resolveRefs, type JSONSchema } from "$lib/forms/schemaType";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { onMount, setContext } from "svelte";
 
     interface Props {
         globalContext: GlobalContext;
-        viewerContext: ViewerContext;
-        form: FormAnnotationObject;
-        formAnnotationRepo: FormAnnotationsRepo;
+        // viewerContext: ViewerContext;
+        formId: number;
+        // formAnnotationRepo: FormAnnotationsRepo;
         canEdit: boolean;
     }
-    let { form, formAnnotationRepo, viewerContext, canEdit, globalContext }: Props = $props();
-    setContext("viewerContext", viewerContext);
+    let { formId,  canEdit, globalContext }: Props = $props();
+    
+    const form = $derived(formAnnotations.get(formId)!);
+    const instance = $derived(instances.get(form.image_instance_id!));
+    const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
+    const schema = $derived(resolveRefs(formSchema.schema as JSONSchema));
 
-    // Schema from repo'd store
-    const schemaRow = $derived(globalContext.formSchemas.store[form.$.form_schema_id]);
-    const schema = $derived(resolveRefs(schemaRow?.schema ?? {}));
-
-    $effect(() => {
-        console.log(schema);
-    });
-
-    let value: any = $state();
+    // Keep value as independent $state (not derived from form.form_data) to:
+    // 1. Prevent reactivity loops when updating the store
+    // 2. Allow future throttling/debouncing of save operations
+    // Value initializes from form ONCE on mount, then becomes independent for editing
+    let value: any = $state(undefined);
     let status = $state("loading");
-    onMount(async () => {
-        await globalContext.ensureFormSchemasLoaded();
-        value = await formAnnotationRepo.getValue(Number(form.id));
-        status = "ready";
-        if (!value) value = getDefault(schema);
+    
+    onMount(() => {
+        // Initialize value from form data once
+        value = form.form_data || getDefault(schema);
+        
+        // Debug logging
+        console.log('Form:', form);
+        if (!instance) {
+            console.error(`Instance ${form.image_instance_id} not found`);
+        }
     });
+
 
     async function onchange() {
         if (!canEdit) return;
         if (value) {
             status = "saving";
-            await formAnnotationRepo.setValue(Number(form.id), value);
+            await setFormAnnotationValue(form.id, value);
             status = "synced";
         }
     }
@@ -71,7 +76,7 @@
 
 <div class="header">
     <span>[{form.id}]</span>
-    <span>{form.$.creator.name}</span>
+    <span>{form.creator?.name}</span>
     <span class={status}>{status}</span>
 </div>
 <div class="header">
@@ -79,19 +84,19 @@
         <tbody>
             <tr>
                 <td>Patient identifier</td>
-                <td>{viewerContext.instance.patient.identifier}</td>
+                <td>{instance?.patient.identifier}</td>
             </tr>
             <tr>
                 <td>Study date</td>
-                <td>{new Date(viewerContext.instance.study?.date ?? "").toLocaleDateString()}</td>
+                <td>{new Date(instance?.study?.date ?? "").toLocaleDateString()}</td>
             </tr>
             <tr>
                 <td>Instance identifier</td>
-                <td>{form.$.image_instance_id}</td>
+                <td>{form.image_instance_id}</td>
             </tr>
             <tr>
                 <td>Laterality</td>
-                <td>{viewerContext.instance.laterality === "L" ? "OS" : viewerContext.instance.laterality === "R" ? "OD" : "?"}</td>
+                <td>{instance?.laterality === "L" ? "OS" : instance?.laterality === "R" ? "OD" : "?"}</td>
             </tr>
         </tbody>
     </table>

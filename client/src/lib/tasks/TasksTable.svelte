@@ -2,14 +2,13 @@
   import { createSvelteTable, FlexRender, renderComponent } from "$lib/components/ui/data-table";
   import { Progress } from "$lib/components/ui/progress/index.js";
   import * as Table from "$lib/components/ui/table";
-  import type { TasksRepo } from "$lib/data/repos.svelte";
   import type { ColumnDef } from "@tanstack/table-core";
   import { getCoreRowModel } from "@tanstack/table-core";
   import type { TaskGET } from "../../types/openapi_types";
   import TaskActionsCell from "./TaskActionsCell.svelte";
   import TaskNameCell from "./TaskNameCell.svelte";
 
-  let { rows, repo }: { rows: TaskGET[]; repo: TasksRepo } = $props();
+  let { rows }: { rows: TaskGET[] } = $props();
 
   const columns: ColumnDef<TaskGET>[] = [
     {
@@ -52,8 +51,7 @@
       header: "",
       cell: ({ row }) => {
         return renderComponent(TaskActionsCell, { 
-          task: row.original,
-          repo: repo 
+          task: row.original
         });
       }
     }

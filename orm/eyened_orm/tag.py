@@ -38,9 +38,10 @@ class Tag(Base):
     __tablename__ = "Tag"
     __table_args__ = (
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        CompositeUniqueConstraint(__tablename__, "TagName", "TagType"),
     )
     TagID: Mapped[int] = mapped_column(primary_key=True)
-    TagName: Mapped[str] = mapped_column(String(256), unique=True)
+    TagName: Mapped[str] = mapped_column(String(256))
     TagType: Mapped[TagType] = mapped_column(SAEnum(TagType))
 
     TagDescription: Mapped[str] = mapped_column(String(256))

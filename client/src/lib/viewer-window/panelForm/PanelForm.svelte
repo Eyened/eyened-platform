@@ -1,8 +1,9 @@
 <script lang="ts">
+    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext, onMount } from "svelte";
+    import { getContext } from "svelte";
     import type { FormAnnotationGET, FormSchemaGET } from "../../../types/openapi_types";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import FormItem from "./FormItem.svelte";
@@ -10,8 +11,7 @@
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
-    const formAnnotationRepo = viewerWindowContext.formAnnotationsRepo;
-    const { user: creator, formShortcut } = globalContext;
+    const { formShortcut } = globalContext;
 
     const {
         image: { instance },
@@ -20,14 +20,11 @@
     const taskContext = getContext<TaskContext>("taskContext");
 
     //TODO: this should be part of the config?
-    const form_schama_ids_to_exclude = new Set([
+    const form_schema_ids_to_exclude = new Set([
         2, 6, 8, 9
     ]);
     
-    onMount(async () => {
-        await globalContext.ensureFormSchemasLoaded();
-    });
-
+    
     let selectedSchema: FormSchemaGET | undefined = $state();
 
     const filters = [
@@ -35,63 +32,40 @@
         (annotation: FormAnnotationGET) =>
             annotation.image_instance_id == instance.id, // same eye/laterality via instance
         (annotation: FormAnnotationGET) => annotation.study_id == instance.study?.id, // same study
-        (annotation: FormAnnotationGET) => !form_schama_ids_to_exclude.has(annotation.form_schema_id)
+        (annotation: FormAnnotationGET) => !form_schema_ids_to_exclude.has(annotation.form_schema_id)
     ];
 
     // TODO: refactor this, to be used as extension?
     if (taskContext) {
         const TaskDefinitionName = taskContext.task.task_definition.name;
         if (TaskDefinitionName === "Naevi") {
-            selectedSchema = globalContext.formSchemas.all.find(
-                (schema) => schema.name === "Naevi grading",
-            );
+            selectedSchema = formSchemasByName.get("Naevi grading");
         } else if (TaskDefinitionName === "ETDRS-grid placement") {
-            selectedSchema = globalContext.formSchemas.all.find(
-                (schema) => schema.name === "ETDRS-grid coordinates",
-            );
+            selectedSchema = formSchemasByName.get("ETDRS-grid coordinates");
             filters.push(
                 (annotation: FormAnnotationGET) => annotation.image_instance_id == instance.id,
             );
         } else if (TaskDefinitionName === "Glaucoma grading") {
-            selectedSchema = globalContext.formSchemas.all.find(
-                (schema) => schema.name === "Glaucoma grading",
-            );
+            selectedSchema = formSchemasByName.get("Glaucoma grading");
         }
     }
 
 
     const forms = $derived(
-        formAnnotationRepo.all
+        Array.from(formAnnotations.values())
         .filter((annotation) => filters.every((filter) => filter(annotation)))
         .filter(globalContext.segmentationsFilter)
         .sort((a, b) => a.id - b.id)
     )
 
-
-    // Convert GET rows to objects
-    const formObjects = $derived(
-        forms.map(a => formAnnotationRepo.object(a.id))
+    const formShortcutSchema = $derived(
+        formShortcut ? formSchemasByName.get(formShortcut) : undefined
     );
 
-    async function addForm() {
-        if (!selectedSchema) return;
-        await formAnnotationRepo.create({
-            form_schema_id: selectedSchema.id,
-            patient_id: instance.patient.id,
-            study_id: instance.study?.id ?? undefined,
-            image_instance_id: instance.id,
-            sub_task_id: taskContext?.subTask?.id,
-            form_data: {},
-        });
-    }
-
-    let formShortcutSchema = $derived(
-        globalContext.formSchemas.all.find((schema) => schema.name === formShortcut),
-    );
-    async function addShortcut() {
-        if (!formShortcutSchema) return;
-        await formAnnotationRepo.create({
-            form_schema_id: formShortcutSchema.id,
+    async function addFormWithSchema(schema: FormSchemaGET | undefined) {
+        if (!schema) return;
+        await createFormAnnotation({
+            form_schema_id: schema.id,
             patient_id: instance.patient.id,
             study_id: instance.study?.id ?? undefined,
             image_instance_id: instance.id,
@@ -108,27 +82,29 @@
         <div>
             <select bind:value={selectedSchema}>
                 <option value={undefined} disabled>-- select form type --</option>
-                {#each globalContext.formSchemas.all as schema}
+                {#each formSchemas.values() as schema}
                     <option value={schema}>{schema.name}</option>
                 {/each}
             </select>
         </div>
 
         <div>
-            <button onclick={addForm} disabled={!selectedSchema}>
+            <button onclick={() => addFormWithSchema(selectedSchema)} disabled={!selectedSchema}>
                 Create new form
             </button>
         </div>
 
         {#if formShortcutSchema}
             <div>
-                <button onclick={addShortcut}> Create {formShortcut} </button>
+                <button onclick={() => addFormWithSchema(formShortcutSchema)}> 
+                    Create {formShortcut} 
+                </button>
             </div>
         {/if}
     </div>
     <div>
-        {#each formObjects as form, i (i)}
-            <FormItem {form} {formAnnotationRepo} />
+        {#each forms as form (form.id)}
+            <FormItem {form} />
         {/each}
     </div>
 </div>

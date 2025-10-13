@@ -1,9 +1,5 @@
-// import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { Matrix } from "$lib/matrix";
-import { SvelteMap } from "svelte/reactivity";
 import type { InstanceGET } from "../../types/openapi_types";
-import type { Segmentation } from "../viewer-window/panelSegmentation/segmentationContext.svelte";
-import { SegmentationItem } from "./segmentationItem.svelte";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 
@@ -12,8 +8,6 @@ export abstract class AbstractImage {
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-    // mapping of segmentation gid to segmentation item
-    public readonly segmentationItems = new SvelteMap<string, SegmentationItem>();
     abstract texture: WebGLTexture;
 
     // in micrometers / pixel
@@ -42,18 +36,6 @@ export abstract class AbstractImage {
 
     abstract is3D: boolean;
     abstract is2D: boolean;
-
-    getSegmentationItem(segmentation: Segmentation): SegmentationItem {
-        // If the segmentationItem is already created, return it
-        if (this.segmentationItems.has(segmentation.gid)) {
-            return this.segmentationItems.get(segmentation.gid)!;
-        }
-
-        // Create new segmentation item
-        const segmentationItem = new SegmentationItem(this, segmentation);
-        this.segmentationItems.set(segmentation.gid, segmentationItem);
-        return segmentationItem;
-    }
 
     getAspectRatio() {
         const { width, height, width_mm, height_mm } = this.dimensions;
@@ -124,13 +106,6 @@ export abstract class AbstractImage {
         }
         this._ioContext.clearRect(0, 0, this.width, this.height);
         return this._ioContext;
-    }
-
-    dispose() {
-        for (const segmentationItem of this.segmentationItems.values()) {
-            segmentationItem.dispose();
-        }
-        this.segmentationItems.clear();
     }
 
 }

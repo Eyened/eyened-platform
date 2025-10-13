@@ -1,6 +1,7 @@
 <script lang="ts">
+    import { deleteFormAnnotation } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
+    import type { FormAnnotationGET } from "../../../types/openapi_types"
     import {
         RegistrationTool,
         type PointList,
@@ -10,7 +11,7 @@
     import { PanelIcon, Trash } from "../icons/icons"
 
     interface Props {
-        formAnnotation: FormAnnotation;
+        formAnnotation: FormAnnotationGET;
         active: boolean;
         activeID: number | undefined;
     }
@@ -25,7 +26,7 @@
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const instance = viewerContext.image.instance;
 
-    const tool = new RegistrationTool(formAnnotation, instance);
+    const tool = new RegistrationTool(formAnnotation as any, instance as any);
 
     let removeTool = () => {};
     onDestroy(() => removeTool());
@@ -41,7 +42,7 @@
     function remove() {
         activeID = undefined;
         // TODO: should remove from registration?
-        formAnnotation.delete();
+        deleteFormAnnotation(formAnnotation.id);
     }
 </script>
 
@@ -58,7 +59,7 @@
         {/if}
     </div>
     {#if active}
-        {#each Object.entries(formAnnotation.value || {}) as [instanceID, pointSet]}
+        {#each Object.entries(formAnnotation.form_data || {}) as [instanceID, pointSet]}
             <div>{instanceID}:</div>
             {#if instanceID === `${instance.id}`}
                 <ol>

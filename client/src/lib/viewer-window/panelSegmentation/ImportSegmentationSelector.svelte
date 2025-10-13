@@ -19,19 +19,26 @@
     }
 
     let { image, segmentation, resolve, close }: Props = $props();
-    const segmentationAnnotations = segmentationContext.segmentations
-        .filter(globalContext.segmentationsFilter);
+    
+    const allSegmentations = $derived([
+        ...segmentationContext.graderSegmentations, 
+        ...segmentationContext.modelSegmentations
+    ]);
+    
+    const segmentationAnnotations = $derived(
+        allSegmentations.filter(globalContext.segmentationsFilter)
+    );
 
-    const referenceSegmentations = segmentationAnnotations
-        .filter((s) => s.gid != segmentation.gid)
-        .filter((other) => {
-            const from = segmentation.data_representation;
-            const to = other.data_representation;
-
-            const key = `${from}->${to}`;
-            // filter out conversions that are not supported
-            return from == to || key in converters;
-        });
+    const referenceSegmentations = $derived(
+        segmentationAnnotations
+            .filter((s) => !(s.id === segmentation.id && s.annotation_type === segmentation.annotation_type))
+            .filter((other) => {
+                const from = segmentation.data_representation;
+                const to = other.data_representation;
+                const key = `${from}->${to}`;
+                return from == to || key in converters;
+            })
+    );
 
     function _resolve(segmentation: Segmentation) {
         resolve(segmentation);

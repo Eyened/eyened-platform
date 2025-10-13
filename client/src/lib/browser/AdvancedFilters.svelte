@@ -192,21 +192,21 @@
 
 <div class="space-y-4">
 	{#each (conditions || []) as condition, i (i)}
-		<div class="flex items-center gap-2 p-3 border rounded-lg">
+		<div class="flex items-center gap-2 p-0 border rounded-lg">
 			<!-- Field Selector -->
 			<div class="flex-1">
 				<SelectWithSearch
 					options={fieldOptions}
 					value={condition.variable}
 					placeholder="Select field..."
-					{...{ onSelect: (v: string) => {
+					onSelect={(v: string) => {
 						const sig = getFieldSignature(v);
 						updateConditionAt(i, {
 							variable: v,
 							operator: getDefaultOperator(v) as any,
 							value: Array.isArray(sig?.values) ? [] : ''
 						});
-					}}}
+					}}
 				/>
 			</div>
 
@@ -268,7 +268,7 @@
 
 	<!-- Draft Row -->
 	{#if draftRow !== null}
-		<div class="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
+		<div class="flex items-center gap-2 p-0 border rounded-lg bg-muted/50">
 			<!-- Field Selector -->
 			<div class="flex-1">
 				<SelectWithSearch

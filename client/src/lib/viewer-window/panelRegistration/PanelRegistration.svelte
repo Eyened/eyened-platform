@@ -1,46 +1,51 @@
 <script lang="ts">
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import type { FormSchema } from "$lib/datamodel/formSchema.svelte";
-    import { data } from "$lib/datamodel/model";
+    import { formAnnotations, createFormAnnotation, instances } from '$lib/data';
+    import type { FormSchemaGET } from '../../../types/openapi_types';
     import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import RegistrationItem from "./RegistrationItem.svelte";
 
     interface props {
         active: boolean;
-        registrationSchema: FormSchema;
+        registrationSchema: FormSchemaGET;
     }
     const { active, registrationSchema }: props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
 
-    const { creator } = getContext<ViewerWindowContext>("viewerWindowContext");
     const {
         image: { instance },
     } = viewerContext;
 
-    const { formAnnotations } = data;
-
     //filter all registrations for the same eye
-    const filter = (formAnnotation: FormAnnotation) => {
-        if (formAnnotation.formSchema !== registrationSchema) return false;
-        if (formAnnotation.patient !== instance.patient) return false;
-        if (formAnnotation.instance?.laterality !== instance.laterality)
-            return false;
-        return true;
-    };
-    const filtered = formAnnotations.filter(filter);
+    const filtered = $derived(
+        Array.from(formAnnotations.values())
+            .filter(formAnnotation => {
+                if (formAnnotation.form_schema_id !== registrationSchema.id) return false;
+                if (formAnnotation.patient_id !== instance.patient.id) return false;
+                // Check laterality - look up full instance if needed
+                const formInstance = formAnnotation.image_instance_id 
+                    ? instances.get(formAnnotation.image_instance_id)
+                    : null;
+                if (formInstance && formInstance.laterality !== instance.laterality) {
+                    return false;
+                }
+                return true;
+            })
+            .sort((a, b) => a.id - b.id)
+    );
 
     async function create() {
-        await FormAnnotation.createFrom(
-            creator,
-            instance,
-            registrationSchema,
-            taskContext?.subTask,
-        );
+        await createFormAnnotation({
+            form_schema_id: registrationSchema.id,
+            patient_id: instance.patient.id,
+            study_id: instance.study?.id ?? undefined,
+            image_instance_id: instance.id,
+            sub_task_id: taskContext?.subTask?.id,
+            form_data: {},
+        });
     }
 
     let activeID: number | undefined = $state(undefined);
@@ -48,17 +53,13 @@
 </script>
 
 <div class="main">
-    <div class="available">
-        <ul>
-            {#each $filtered.sort((a, b) => a.id - b.id) as formAnnotation (formAnnotation.id)}
-                {#await formAnnotation.load()}
-                    <div>Loading [{formAnnotation.id}]</div>
-                {:then}
-                    <RegistrationItem {formAnnotation} {active} bind:activeID={activeID} />
-                {/await}
-            {/each}
-        </ul>
-    </div>
+	<div class="available">
+		<ul>
+			{#each filtered as formAnnotation (formAnnotation.id)}
+				<RegistrationItem {formAnnotation} {active} bind:activeID={activeID} />
+			{/each}
+		</ul>
+	</div>
     <div class="new">
         <button onclick={create}> Create new registration set </button>
     </div>

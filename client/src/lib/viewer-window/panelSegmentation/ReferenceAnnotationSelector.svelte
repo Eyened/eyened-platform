@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { segmentations } from "$lib/data/stores.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { getContext } from "svelte";
@@ -15,13 +16,17 @@
 
     let { image, segmentation, resolve, close }: Props = $props();
 
-    const referenceAnnotations = (image.instance.segmentations || [])
-    .filter(globalContext.segmentationsFilter)
-    .filter(
-        (a) =>
-            a.data_representation == "Binary" ||
-            a.data_representation == "DualBitMask",
+    const referenceAnnotations = $derived(
+        Array.from(segmentations.values())
+            .filter(s => s.image_instance_id === image.instance.id)
+            .filter(globalContext.segmentationsFilter)
+            .filter(
+                (a) =>
+                    a.data_representation == "Binary" ||
+                    a.data_representation == "DualBitMask",
+            )
     );
+    
     function _resolve(segmentation: SegmentationGET) {
         resolve(segmentation);
         close();

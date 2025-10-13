@@ -4,20 +4,22 @@
     import BrowserContent from "$lib/browser/BrowserContent.svelte";
     import { BrowserContext } from "$lib/browser/browserContext.svelte";
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
-    import { SubTasksRepo } from "$lib/data/repos.svelte";
+    import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
     import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import { getContext, setContext } from "svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
-
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    
     interface Props {
         viewerWindowContext: ViewerWindowContext;
     }
 
     let { viewerWindowContext }: Props = $props();
-    const instanceIds = viewerWindowContext.instanceIds;
-    const initialInstanceIds = $instanceIds.slice();
+    const initialInstanceIds = viewerWindowContext.instanceIds.slice();
 
-    const browserContext = new BrowserContext(initialInstanceIds);
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const browserContext = new BrowserContext();
+    browserContext.selectedIds = initialInstanceIds;
 
     setContext("browserContext", browserContext);
 
@@ -52,13 +54,14 @@
             (id) => !currentInstanceIds.includes(id),
         );
 
-        const SubTasks = new SubTasksRepo('browser-overlay');
-        const subTaskObj = SubTasks.object(subTask!.id);
+        const taskId = subTask!.task_id;
+        const subtaskIndex = subTask!.index ?? 0;
+        
         for (const instanceId of newInstanceIds) {
-            await subTaskObj.addImage(instanceId);
+            await addSubTaskImage(taskId, subtaskIndex, instanceId);
         }
         for (const instanceId of removedInstanceIds) {
-            await subTaskObj.removeImage(instanceId);
+            await removeSubTaskImage(taskId, subtaskIndex, instanceId);
         }
     }
 </script>

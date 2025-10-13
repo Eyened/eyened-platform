@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { updateSegmentation } from "$lib/data/api";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext } from "svelte";
     import type { Segmentation } from "./segmentationContext.svelte";
@@ -9,26 +10,24 @@
     }
     let { segmentation }: Props = $props();
 
-    let threshold = $state(0.5);
-    threshold = segmentation.threshold ?? 0.5;
+    let threshold = $state(segmentation.threshold ?? 0.5);
     const canEdit = globalContext.canEdit(segmentation);
 
-
-    function onUpdateThreshold() {
-        if (canEdit) {
-            segmentation.update({ threshold: segmentation.threshold });
+    async function onUpdateThreshold() {
+        if (canEdit && segmentation.annotation_type === 'grader_segmentation') {
+            await updateSegmentation(segmentation.id, { threshold });
         }
     }
 </script>
 
 <label>
-    <span>Threshold: {segmentation.threshold}</span>
+    <span>Threshold: {threshold}</span>
     <input
         type="range"
         min="0"
         max="1"
         step="0.01"
-        bind:value={segmentation.threshold}        
+        bind:value={threshold}        
         onchange={onUpdateThreshold}
     />
 </label>

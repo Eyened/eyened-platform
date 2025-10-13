@@ -6,7 +6,8 @@
     import { getContext, onMount } from "svelte";
     import * as Select from "../../components/ui/select";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
-
+    import { createSegmentationFrom, features } from "$lib/data";
+	import type { Datatype } from "$lib/datamodel/segmentation.svelte";
     export interface Props {
         dataRepresentation: "MultiLabel" | "MultiClass";
     }
@@ -23,13 +24,10 @@
     const { user: creator } = globalContext;
     const compositeFeatures = getCompositeFeatures();
 
-    onMount(async () => {
-        await globalContext.ensureFeaturesLoaded();
-    });
 
     // Use repo to drive the UI list of parents-with-subfeatures
     const featuresWithSubfeatures = $derived(
-        globalContext.features.all.filter(f => (f.subfeatures ?? []).length > 0)
+        Array.from(features.values()).filter(f => (f.subfeatures ?? []).length > 0)
     );
 
 
@@ -42,7 +40,7 @@
 
         let dataType: Datatype = "R8UI";
 
-        await viewerWindowContext.Segmentations.createFrom(
+        await createSegmentationFrom(
             image,
             selectedFeatureId,
             dataRepresentation,
@@ -56,15 +54,6 @@
     }
     
 </script>
-
-<!-- <Select.Root type="single">
-  <Select.Trigger class="w-[180px]"></Select.Trigger>
-  <Select.Content>
-    <Select.Item value="light">Light</Select.Item>
-    <Select.Item value="dark">Dark</Select.Item>
-    <Select.Item value="system">System</Select.Item>
-  </Select.Content>
-</Select.Root> -->
 
 <div class="multi">
     <div class="header">{dataRepresentation}</div>
@@ -81,13 +70,6 @@
                 {/each}
             </Select.Content>
         </Select.Root>
-        <!-- <select bind:value={selectedFeatureId}>
-            {#each featuresWithSubfeatures as f}
-                <option value={f.id}>
-                    {f.name}
-                </option>
-            {/each}
-        </select> -->
         <button type="submit" disabled={selectedFeatureId == undefined}>
             Create
         </button>

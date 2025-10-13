@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { BinaryMask, ProbabilityMask } from "$lib/webgl/mask.svelte";
     import { getContext } from "svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
@@ -10,10 +11,11 @@
     }
     let { segmentation, measureTool }: Props = $props();
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const { image } = viewerContext;
+    const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+    const { segmentationContext } = mainViewerContext;
 
     let area = $derived.by(() => {
-        const segmentationItem = image.segmentationItems.get(segmentation);
+        const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
         const mask = segmentationItem?.getMask(viewerContext.index);
         if (mask instanceof BinaryMask || mask instanceof ProbabilityMask) {
             if (mask.pixelArea == undefined) return undefined;

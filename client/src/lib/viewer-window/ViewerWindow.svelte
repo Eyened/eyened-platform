@@ -24,9 +24,9 @@ Keeps track of the main panels and the top row of images.
     const taskContext = getContext<TaskContext>("taskContext");
 
     // open first image
-    const { instanceIds } = viewerWindowContext;
-    if ($instanceIds.length) {
-        const openInstance = $instanceIds[0];
+    const instanceIds = viewerWindowContext.instanceIds;
+    if (instanceIds.length) {
+        const openInstance = instanceIds[0];
         viewerWindowContext.getImages(openInstance).then((images) => {
             // images is normally a single image
             // for OCT it is an array: enface projection + oct image

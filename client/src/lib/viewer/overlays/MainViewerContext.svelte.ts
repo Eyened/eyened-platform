@@ -1,10 +1,9 @@
-// import type { ModelSegmentation, Segmentation } from "$lib/datamodel/segmentation.svelte";
-
 import { toggleInSet, type Color } from "$lib/utils";
 import { SegmentationContext, type Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import { BinaryMask } from "$lib/webgl/mask.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { RenderTarget } from "$lib/webgl/types";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ViewerWindowContext } from "../../viewer-window/viewerWindowContext.svelte";
@@ -30,9 +29,10 @@ export class MainViewerContext implements Overlay {
     constructor(
         public readonly instanceId: number,
         public readonly axis: number,
-        public readonly viewerWindowContext: ViewerWindowContext
+        public readonly viewerWindowContext: ViewerWindowContext,
+        public readonly image: AbstractImage
     ) {
-        this.segmentationContext = new SegmentationContext(instanceId, axis, viewerWindowContext);
+        this.segmentationContext = new SegmentationContext(instanceId, axis, viewerWindowContext, image);
     }
 
     toggleMasking(segmentation: SegmentationItem) {
@@ -77,16 +77,11 @@ export class MainViewerContext implements Overlay {
             activeIndices: this.segmentationContext.activeIndices
         };
 
-        for (const segmentation of this.segmentationContext.visibleSegmentations) {
-            
-            const segmentationItem = image.segmentationItems.get(segmentation.gid);
-            if (!segmentationItem) continue;
-
-            
+        // Render grader segmentations
+        for (const segmentation of this.segmentationContext.visibleGraderSegmentations) {
+            const segmentationItem = this.segmentationContext.getSegmentationItem(segmentation);
             const mask = segmentationItem.getMask(index);
-
             if (!mask) continue;
-            // console.log(image.segmentationItems)
 
             
 
@@ -105,20 +100,45 @@ export class MainViewerContext implements Overlay {
             uniforms.u_has_mask = false;
             uniforms.u_mask = null;
             uniforms.u_mask_bitmask = 0;
-            if (applyMask) {
-                const reference = segmentation.reference;
-                if (reference) {
-                    const referenceSegmentationItem = image.segmentationItems.get(reference);
-                    if (!referenceSegmentationItem) continue;
-                    const mask = referenceSegmentationItem.getMask(index);
-                    if (mask instanceof BinaryMask) {
+            if (applyMask && segmentation.reference_segmentation_id) {
+                const referenceSegmentationItem = this.segmentationContext.segmentationItems.get(segmentation.reference_segmentation_id);
+                if (referenceSegmentationItem) {
+                    const referenceMask = referenceSegmentationItem.getMask(index);
+                    if (referenceMask instanceof BinaryMask) {
                         uniforms.u_has_mask = true;
-                        uniforms.u_mask = mask.bitMaskTexture.texture;
-                        uniforms.u_mask_bitmask = mask.bitMaskTexture.bitmask;
+                        uniforms.u_mask = referenceMask.bitMaskTexture.texture;
+                        uniforms.u_mask_bitmask = referenceMask.bitMaskTexture.bitmask;
                     }
                 }
             }
 
+            if (this.applyConnectedComponents.has(segmentationItem)) {
+                (mask as BinaryMask).renderConnectedComponents(renderTarget, uniforms);
+            } else {
+                mask.render(renderTarget, uniforms);
+            }
+        }
+        
+        // Render model segmentations
+        for (const segmentation of this.segmentationContext.visibleModelSegmentations) {
+            const segmentationItem = this.segmentationContext.getSegmentationItem(segmentation);
+            const mask = segmentationItem.getMask(index);
+            if (!mask) continue;
+
+            uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
+            uniforms.u_threshold = segmentation.threshold;
+            
+            if (this.highlightedSegmentationItem == segmentationItem) {
+                uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;
+                uniforms.u_active_feature_mask = this.activeFeatureMask ?? 0;
+            } else {
+                uniforms.u_highlighted_feature_index = 0;
+                uniforms.u_active_feature_mask = 0; 
+            }
+
+            uniforms.u_has_mask = false;
+            uniforms.u_mask = null;
+            uniforms.u_mask_bitmask = 0;
 
             if (this.applyConnectedComponents.has(segmentationItem)) {
                 (mask as BinaryMask).renderConnectedComponents(renderTarget, uniforms);

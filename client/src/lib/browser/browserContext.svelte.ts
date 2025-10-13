@@ -1,7 +1,8 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import type { InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
-import { getInstancesSignature, getStudiesSignature, InstancesRepo, searchStudies, StudiesRepo } from '../data/repos.svelte';
+import { ingestInstances, ingestInstanceMetas, ingestStudies, instances, instanceMetas, studies } from '$lib/data/stores.svelte';
+import { getInstance } from '$lib/data/helpers';
+import type { InstanceGET, StudyGET, InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
 
 export type QueryMode = 'studies' | 'instances';
 export type DisplayMode = 'instance' | 'study';
@@ -15,6 +16,7 @@ export type SortDirection = 'ASC' | 'DESC';
 
 
 export class BrowserContext {
+
     // Default smallest per current mode
     getDefaultLimit(): number {
         return (this.queryMode === 'instances' && this.displayMode === 'instance') ? 100 : 10;
@@ -41,6 +43,7 @@ export class BrowserContext {
     orderedInstanceIds: number[] = $state([]);
     orderedStudyIds: number[] = $state([]);
 
+
     // renamed
     advancedConditions: Condition[] = $state([]);
 
@@ -51,10 +54,6 @@ export class BrowserContext {
     instancesSignature: SignatureField[] = $state([]);
     studiesSignature: SignatureField[] = $state([]);
 
-    StudiesRepo = new StudiesRepo('studies');
-
-    InstanceRepo = new InstancesRepo('instances');
-
     thumbnailSize: string = $state('8em');
 
     // Derived: depends on queryMode + signatures
@@ -62,12 +61,26 @@ export class BrowserContext {
         this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
     );
 
-    // Derived: selected instances from repo
-    selectedInstances = $derived(
-        this.selectedIds
-            .map(id => this.InstanceRepo.store[id])
-            .filter((x): x is NonNullable<typeof x> => Boolean(x))
-    );
+	// Derived: selected instances from repo (checks both instances and instanceMetas)
+	selectedInstances = $derived(
+		this.selectedIds
+			.map(id => getInstance(id))
+			.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+	);
+
+	// Derived: ordered instances for rendering
+	orderedInstances = $derived(
+		this.orderedInstanceIds
+			.map(id => getInstance(id))
+			.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+	);
+
+	// Derived: ordered studies for rendering
+	orderedStudies = $derived(
+		this.orderedStudyIds
+			.map(id => studies.get(id))
+			.filter((x): x is StudyGET => x !== undefined)
+	);
 
     toggleFilterMode = () => {
         this.filterMode = this.filterMode === 'basic' ? 'advanced' : 'basic';
@@ -83,18 +96,36 @@ export class BrowserContext {
     loadSignatures = async () => {
         this.loading = true;
         try {
-            const [inst, stud] = await Promise.all([getInstancesSignature(), getStudiesSignature()]);
-            this.instancesSignature = inst ?? [];
-            this.studiesSignature = stud ?? [];
+            const { api } = await import('../api/client');
+            const [instRes, studRes] = await Promise.all([
+                api.GET('/instances/search/signature', {}),
+                api.GET('/studies/search/signature', {})
+            ]);
+            this.instancesSignature = (instRes.data ?? []) as SignatureField[];
+            this.studiesSignature = (studRes.data ?? []) as SignatureField[];
         } finally {
             this.loading = false;
         }
     }
+    
+    // Refresh signatures (e.g., after creating/modifying tags)
+    refreshSignatures = async () => {
+        const { api } = await import('../api/client');
+        const [instRes, studRes] = await Promise.all([
+            api.GET('/instances/search/signature', {}),
+            api.GET('/studies/search/signature', {})
+        ]);
+        this.instancesSignature = (instRes.data ?? []) as SignatureField[];
+        this.studiesSignature = (studRes.data ?? []) as SignatureField[];
+    }
+
 
     // Reset state when queryMode changes
-    resetForQueryModeChange = (queryMode: QueryMode) => {
-        this.advancedConditions = [];
-        this.basicCondition = null;
+    resetForQueryModeChange = async (queryMode: QueryMode) => {
+        // Keep current conditions - they may work with both modes
+        const currentConditions = this.filterMode === 'advanced'
+            ? this.advancedConditions
+            : (this.basicCondition ? [this.basicCondition] : []);
 
         this.page = 0;
         this.limit = this.getDefaultLimit();
@@ -116,8 +147,10 @@ export class BrowserContext {
             this.limit = this.limitOptionsStudies[0];
         }
 
-        this.InstanceRepo.clear();
-        this.StudiesRepo.clear();
+        // Auto-search with previous conditions if we had any
+        if (currentConditions.length > 0) {
+            await this.fetch(currentConditions);
+        }
     }
 
     // Compatibility method for search with current conditions
@@ -161,9 +194,12 @@ export class BrowserContext {
         this.updateURL(query);
 
         this.loading = true;
-        this.InstanceRepo.clear()
-        this.StudiesRepo.clear()
-        
+
+        // Clear selection when performing new search
+        this.selectedIds = [];
+
+        // Repos are global and persistent - search results are added via upsert
+        // resultIds will track which items are current search results
 
         try {
             const res = await this.executeSearch(query);
@@ -188,6 +224,7 @@ export class BrowserContext {
     }
 
     private async executeSearch(query: Condition[]) {
+        const { api } = await import('../api/client');
         const baseBody = {
             conditions: query,
             limit: this.limit,
@@ -198,37 +235,54 @@ export class BrowserContext {
         };
 
         if (this.queryMode === 'instances') {
-            return await InstancesRepo.search(baseBody as SearchQuery);
+            const res = await api.POST('/instances/search', { body: baseBody as SearchQuery });
+            return res.data;
         } else {
-            return await searchStudies({
-                ...baseBody,
-                conditions: query as unknown as StudySearchCondition[]
-            } as StudySearchQuery);
+            const res = await api.POST('/studies/search', {
+                body: {
+                    ...baseBody,
+                    conditions: query as unknown as StudySearchCondition[]
+                } as StudySearchQuery
+            });
+            return res.data;
         }
     }
 
-    private processSearchResults(res: any) {
-        // Ingest data into repositories
-        this.StudiesRepo.ingest(res.studies ?? []);
-        this.InstanceRepo.ingest(res.instances as any[] ?? []);
-        // Update result metadata
-        this.resultIds = new Set(res.result_ids ?? []);
-        this.count = res.count ?? 0;
+	private processSearchResults(res: any) {
+		console.log('processSearchResults', res);
+		// Add/update search results in GLOBAL repos
+		ingestStudies(res.studies ?? []);
+		
+		// Important: Instance type depends on query mode!
+		if (this.queryMode === 'instances') {
+			// SearchResponse has instances: InstanceGET[] (full data)
+			ingestInstances(res.instances ?? []);
+		} else {
+			// StudySearchResponse has instances: InstanceMeta[] (lightweight references)
+			ingestInstanceMetas(res.instances ?? []);
+		}
 
-        // Set ordered IDs based on query mode
-        let studyIds;
-        if (this.queryMode === 'instances') {
-            this.orderedInstanceIds = res.result_ids ?? [];
-            studyIds = (res.studies ?? []).map((s: any) => s.id);
-        } else {
-            studyIds = res.result_ids ?? [];
-            this.orderedInstanceIds = [];
-        }
-        const get_date = (studyId: number) => {
-            return new Date(this.StudiesRepo.object(studyId)!.$.date).getTime();
-        }
-        this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
-    }
+		// Track which items are current search results
+		this.resultIds = new Set(res.result_ids ?? []);
+		this.count = res.count ?? 0;
+
+		// Set ordered IDs based on query mode
+		let studyIds;
+		if (this.queryMode === 'instances') {
+			this.orderedInstanceIds = res.result_ids ?? [];
+			studyIds = (res.studies ?? []).map((s: any) => s.id);
+		} else {
+			studyIds = res.result_ids ?? [];
+			this.orderedInstanceIds = [];
+		}
+
+		// Sort studies by date
+		const get_date = (studyId: number) => {
+			const study = studies.get(studyId);
+			return study ? new Date(study.date).getTime() : 0;
+		}
+		this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
+	}
 
     openTab(instances: number[]) {
 

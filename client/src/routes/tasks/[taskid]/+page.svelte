@@ -3,29 +3,30 @@
 	import { page as appPage } from '$app/state';
 	import FixedSpinner from '$lib/components/FixedSpinner.svelte';
 	import Main from '$lib/components/Main.svelte';
-	import { SubTasksRepo, TasksRepo } from '$lib/data/repos.svelte';
 	import SubtasksTable from '$lib/tasks/SubtasksTable.svelte';
 	import { onMount } from 'svelte';
-// Status filter UI
+	// Status filter UI
 	import { ButtonGroup } from '$lib/components/ui/button-group';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Label from '../../../lib/components/ui/label/label.svelte';
-	import { TaskObject } from '../../../lib/data/objects.svelte';
 	import { subTaskStates } from '../../../types/openapi_constants';
 	import type { SubTaskState, TaskGET } from '../../../types/openapi_types';
+	import { fetchTask, fetchSubTasks } from '$lib/data/api';
+	import { tasks, subtasks } from '$lib/data/stores.svelte';
 
 	let { data } = $props();
 
-	// let task: any = $state(null);
 	let isLoading: boolean = $state(true);
-	const subtasksRepo =new SubTasksRepo(`subtasks`);
-	let subtasks = $derived(subtasksRepo?.all || []);
-
-	let task: TaskObject
+	
+	// Derive task from global store
+	let task = $derived(tasks.get(data.taskid));
+	
+	// Derive subtasks array from global store
+	let subtasksArray = $derived(Array.from(subtasks.values()));
 
 	// Pagination metadata state
 	let subtasksCount: number = $state(0);
-	let subtasksLimit: number = $state(200);
+	let subtasksLimit: number = $state(20);
 	let subtasksPage: number = $state(0);
 
 	// Status filter state
@@ -34,11 +35,10 @@
 	async function loadPage(p: number): Promise<void> {
 		isLoading = true;
 		try {
-			task = await TaskObject.fromId<TaskGET>(data.taskid);
-			const tasksRepo = new TasksRepo('tasks');
+			await fetchTask(data.taskid);
 			const nextPage = Math.max(0, Number.isFinite(p) ? p : 0);
 
-			const res = await tasksRepo.listSubtasks({
+			const res = await fetchSubTasks({
 				task_id: data.taskid,
 				with_images: true,
 				limit: subtasksLimit,
@@ -46,8 +46,6 @@
 				subtask_status: subtasksStatus ?? undefined
 			});
 
-			subtasksRepo.clear();
-			subtasksRepo.ingest(res.subtasks);
 			subtasksCount = res.count;
 			subtasksLimit = res.limit;
 			subtasksPage = res.page;
@@ -114,9 +112,9 @@
 				{#if !task}
 					Task not found
 				{:else}
-					<h1>{task.$.name}</h1>
-					{#if task.$.task_state}
-						<h3>Status: {task.$.task_state}</h3>
+					<h1>{task.name}</h1>
+					{#if task.task_state}
+						<h3>Status: {task.task_state}</h3>
 					{/if}
 					    <Label>Status:</Label>
 						<ButtonGroup class="mb-4">
@@ -137,17 +135,14 @@
 								</Button>
 							{/each}
 						</ButtonGroup>
-					{#if subtasksRepo}
-						<SubtasksTable
-							rows={subtasks}
-							repo={subtasksRepo}
-							taskId={data.taskid}
-							count={subtasksCount}
-							page={subtasksPage}
-							perPage={subtasksLimit}
-							onPageChange={loadPage}
-						/>
-					{/if}
+					<SubtasksTable
+						rows={subtasksArray}
+						taskId={data.taskid}
+						count={subtasksCount}
+						page={subtasksPage}
+						perPage={subtasksLimit}
+						onPageChange={loadPage}
+					/>
 				{/if}
 			</div>
 		{/snippet}

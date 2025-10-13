@@ -3,11 +3,11 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import * as Select from "$lib/components/ui/select";
-  import type { TasksRepo } from "$lib/data/repos.svelte";
   import type { TaskGET, TaskState } from "../../types/openapi_types";
   import { TASK_STATE_OPTIONS } from "$lib/openapi/enums";
+  import { updateTask, deleteTask } from "$lib/data/helpers";
 
-  let { task, repo }: { task: TaskGET; repo: TasksRepo } = $props();
+  let { task }: { task: TaskGET } = $props();
 
   let openEdit = $state(false);
   let openDelete = $state(false);
@@ -15,15 +15,13 @@
   let description = $state(task.description ?? "");
   let task_state = $state<TaskState | undefined>(task.task_state ?? undefined);
 
-  const obj = repo.object(task.id);
-
   async function doSave() {
-    await obj.save({ name, description, task_state: task_state ?? null });
+    await updateTask(task.id, { name, description, task_state: task_state ?? null });
     openEdit = false;
   }
 
   async function doDelete() {
-    await obj.destroy();
+    await deleteTask(task.id);
     openDelete = false;
   }
 

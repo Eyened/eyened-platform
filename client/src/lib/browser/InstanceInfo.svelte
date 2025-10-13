@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { getThumbUrl } from '$lib/data-loading/utils';
+	import { instances } from '$lib/data/stores.svelte';
 	import { getContext } from 'svelte';
-	import type { InstanceGET } from '../../types/openapi_types';
-	import type { GlobalContext } from '../data/globalContext.svelte';
-	import { InstanceObject } from '../data/objects.svelte';
+	import { tagInstance, untagInstance } from '../data/helpers';
 	import Tagger from '../tags/Tagger.svelte';
-
-	const { userManager } = getContext<GlobalContext>('globalContext');
+	import type { BrowserContext } from './browserContext.svelte';
 
 	interface Props {
-		instance: InstanceGET;
+		instanceId: number;
 	}
-	let { instance }: Props = $props();
-
-	const instanceObject = new InstanceObject(instance);
+	let { instanceId }: Props = $props();
+	
+	// Reactive: updates when instance in store changes!
+	const instance = $derived(instances.get(instanceId)!);
+	const browserContext = getContext<BrowserContext | undefined>("browserContext");
 
 	const flattenToDotPaths = (
 		input: Record<string, unknown> | unknown[]
@@ -58,9 +58,11 @@
 		</h2>
 		<Tagger
 			tagType="ImageInstance"
-			tags={instanceObject.$.tags ?? []}
-			tag={(id) => instanceObject.tag(id)}
-			untag={(id) => instanceObject.untag(id)}/>
+			tags={instance.tags ?? []}
+			tag={(id) => tagInstance(instance, id)}
+			untag={(id) => untagInstance(instance, id)}
+			onUpdate={browserContext?.refreshSignatures}
+		/>
 	</div>
 
 	<div class="flex-1 flex min-h-0">
@@ -98,7 +100,3 @@
 		</div>
 	</div>
 </div>
-
-<style>
-
-</style>

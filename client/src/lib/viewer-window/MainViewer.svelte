@@ -45,7 +45,7 @@
     setContext("viewerContext", viewerContext);
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = new MainViewerContext(viewerContext.instance.id, viewerContext.axis, viewerWindowContext);
+    const segmentationOverlay = new MainViewerContext(viewerContext.instance.id, viewerContext.axis, viewerWindowContext, viewerContext.image);
     setContext("mainViewerContext", segmentationOverlay);    
     onDestroy(viewerContext.addOverlay(segmentationOverlay));
 
@@ -134,6 +134,7 @@
             Icon: Draw,
         },
     );
+    
 </script>
 
 
