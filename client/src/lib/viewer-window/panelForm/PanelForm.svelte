@@ -52,8 +52,7 @@
 
 
     const forms = $derived(
-        Array.from(formAnnotations.values())
-        .filter((annotation) => filters.every((filter) => filter(annotation)))
+        formAnnotations.filter((annotation) => filters.every((filter) => filter(annotation)))
         .filter(globalContext.segmentationsFilter)
         .sort((a, b) => a.id - b.id)
     )

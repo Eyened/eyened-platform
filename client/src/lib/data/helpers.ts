@@ -50,13 +50,13 @@ export function getInstancesForSeries(seriesData: SeriesGET): InstanceGET[] {
 }
 
 export function getSegmentationsForInstance(instance: InstanceGET): SegmentationGET[] {
-	return Array.from(segmentations.values()).filter(
+	return segmentations.filter(
 		seg => seg.image_instance_id === instance.id
 	);
 }
 
 export function getModelSegmentationsForInstance(instance: InstanceGET): ModelSegmentationGET[] {
-	return Array.from(modelSegmentations.values()).filter(
+	return modelSegmentations.filter(
 		seg => seg.image_instance_id === instance.id
 	);
 }

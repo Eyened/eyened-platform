@@ -34,7 +34,7 @@
 	const etdrsSchema = formSchemasByName.get('ETDRS-grid coordinates')!;
 
 	const filtered = $derived(
-		Array.from(formAnnotations.values()).filter(formAnnotation => {
+		formAnnotations.filter(formAnnotation => {
 			if (formAnnotation.form_schema_id !== etdrsSchema?.id) return false;
 			if (formAnnotation.image_instance_id == image.instance.id) return true;
 			// TODO: this should be reactive?

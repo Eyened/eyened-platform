@@ -17,8 +17,7 @@
     let { image, segmentation, resolve, close }: Props = $props();
 
     const referenceAnnotations = $derived(
-        Array.from(segmentations.values())
-            .filter(s => s.image_instance_id === image.instance.id)
+        segmentations.filter(s => s.image_instance_id === image.instance.id)
             .filter(globalContext.segmentationsFilter)
             .filter(
                 (a) =>

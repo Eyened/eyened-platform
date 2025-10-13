@@ -23,7 +23,6 @@
 
 	let sorting = $state<SortingState>([]);
 
-	const featuresData = $derived(Array.from(features.values()));
 
 	const columns: ColumnDef<FeatureGET>[] = [
 		{
@@ -74,7 +73,7 @@
 
 	const table = createSvelteTable({
 		get data() {
-			return featuresData;
+			return Array.from(features.values());
 		},
 		columns,
 		getCoreRowModel: getCoreRowModel(),

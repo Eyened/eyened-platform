@@ -2,6 +2,8 @@ import { Matrix } from "$lib/matrix";
 import type { InstanceGET } from "../../types/openapi_types";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
+import { SvelteMap } from "svelte/reactivity";
+import type { SegmentationItem } from "./segmentationItem.svelte";
 
 export abstract class AbstractImage {
 
@@ -13,6 +15,9 @@ export abstract class AbstractImage {
     // in micrometers / pixel
     public readonly resolution: { x: number, y: number, z: number };
     transform: Matrix = Matrix.identity;
+    
+    // Cache segmentation items per segmentation ID
+    public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
 
     constructor(
         public readonly instance: InstanceGET,

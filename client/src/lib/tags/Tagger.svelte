@@ -47,17 +47,9 @@
 		untag?: (id: number) => void;
 		onUpdate?: () => void | Promise<void>;
 	} = $props();
-
-	// Get all tags from store (reactive - updates when tags map changes)
-	const allTagsArray = $derived(Array.from(tags.values()));
-	
-	// Filter by type
-	const apiTagType = $derived(
-		tagType === "Annotation" ? "FormAnnotation" : tagType
-	);
 	
 	const allTags = $derived(
-		allTagsArray.filter(t => t.tag_type === apiTagType)
+		tags.filter(t => t.tag_type === (tagType === "Annotation" ? "FormAnnotation" : tagType))
 	);
 
 	// Build dropdown candidates (ids already in itemTags are excluded)
