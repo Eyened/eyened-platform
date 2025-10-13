@@ -14,6 +14,7 @@
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import NewMultiFeature from "./NewMultiFeature.svelte";
     import type { Segmentation } from "./segmentationContext.svelte";
+    import { createSegmentationFrom, features } from "$lib/data";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -50,7 +51,7 @@
             dataType = "R8";
         }
 
-        const segmentation = await viewerWindowContext.Segmentations.createFrom(
+        const segmentation = await createSegmentationFrom(
             image,
             feature.id,
             dataRepresentations[selectedType],
@@ -58,18 +59,16 @@
             0.5,
             axis,
             taskContext?.subTask?.id
-        ) as Segmentation
+        );
 
-        // TODO: find a cleaner way to do this
-        segmentation.gid = `${segmentation.annotation_type}-${segmentation.id}` 
-        const segmentationItem = image.getSegmentationItem(segmentation);
+        const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
 
         segmentationContext.segmentationItem = segmentationItem
 
         globalContext.dialogue = null;
     }
 
-    const availableFeatures = globalContext.features.all.filter((f) => true);
+    const availableFeatures = Array.from(features.values()).filter((f) => true);
     let selectedFeatureId: number | undefined = $state(undefined);
     
 </script>
@@ -122,7 +121,7 @@
         {/each}
     </div>
     <FeatureSelect
-        values={globalContext.features.all}
+        values={Array.from(features.values())}
         onselect={(feature) => create(feature)}
     />
     <NewMultiFeature dataRepresentation="MultiLabel" />

@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
-	import type { FormSchema } from '$lib/datamodel/formSchema.svelte';
-	import { data } from '$lib/datamodel/model';
+	import { formAnnotations, createFormAnnotation } from '$lib/data';
+	import type { FormSchemaGET } from '../../../types/openapi_types';
 	import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
 	import {
 	    ETDRSGridOverlay,
@@ -10,13 +9,13 @@
 	import { ETDRSGridTool } from '$lib/viewer/tools/ETDRSGrid.svelte';
 	import type { ViewerContext } from '$lib/viewer/viewerContext.svelte';
 	import { getContext, onDestroy } from 'svelte';
-	import { Hide, Show } from '../icons/icons';
+	import { Hide, Show, PanelIcon } from '../icons/icons';
 	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import ETDRSGridItem from './ETDRSGridItem.svelte';
 
 	interface Props {
 		active: boolean;
-		etdrsSchema: FormSchema;
+		etdrsSchema: FormSchemaGET;
 	}
 	let { active, etdrsSchema }: Props = $props();
 
@@ -36,27 +35,34 @@
 	const viewerContext = getContext<ViewerContext>('viewerContext');
 	const taskContext = getContext<TaskContext>('taskContext');
 
-	const { formAnnotations } = data;
 	const { image } = viewerContext;
 	const { instance } = image;
 
-	const filter = (formAnnotation: FormAnnotation) => {
-		if (formAnnotation.formSchemaId !== etdrsSchema.id) return false;
-        
-		if (formAnnotation.instanceId == image.instance.id) return true;
+	const filtered = $derived(
+		Array.from(formAnnotations.values()).filter(formAnnotation => {
+			if (formAnnotation.form_schema_id !== etdrsSchema.id) return false;
+			
+			if (formAnnotation.image_instance_id == image.instance.id) return true;
 
-		// also show annotations on linked images
-		// TODO: this should be reactive?
-		const linkedIDs = registration.getLinkedImgIds(image.image_id);
-		if (linkedIDs.has(`${formAnnotation.instance?.id}`)) return true;
-		if (linkedIDs.has(`${formAnnotation.instance?.id}_proj`)) return true;
-		return false;
-	};
-	const filtered = formAnnotations.filter(filter);
+			// also show annotations on linked images
+			// TODO: this should be reactive?
+			const linkedIDs = registration.getLinkedImgIds(image.image_id);
+			if (linkedIDs.has(`${formAnnotation.image_instance_id}`)) return true;
+			if (linkedIDs.has(`${formAnnotation.image_instance_id}_proj`)) return true;
+			return false;
+		})
+	);
 
 
 	async function create() {
-        await FormAnnotation.createFrom(creator, instance, etdrsSchema, taskContext?.subTask);
+		await createFormAnnotation({
+			form_schema_id: etdrsSchema.id,
+			patient_id: instance.patient.id,
+			study_id: instance.study?.id ?? undefined,
+			image_instance_id: instance.id,
+			sub_task_id: taskContext?.subTask?.id,
+			form_data: {},
+		});
 	}
 
 	const overlay = new ETDRSGridOverlay(registration);
@@ -64,12 +70,12 @@
 	onDestroy(viewerContext.addOverlay(overlay));
 	onDestroy(viewerContext.addOverlay(tool));
 
-	let autoItem: etdrsFormAnnotationType;
-	if (instance.cfKeypoints) {
-		const [fx, fy] = instance.cfKeypoints.fovea_xy;
-		const [odx, ody] = instance.cfKeypoints.disc_edge_xy;
+	let autoItem: etdrsFormAnnotationType | undefined = $state(undefined);
+	if (instance.cf_keypoints) {
+		const [fx, fy] = instance.cf_keypoints.fovea_xy as [number, number];
+		const [odx, ody] = instance.cf_keypoints.disc_edge_xy as [number, number];
 		autoItem = {
-			instance,
+			instance: instance as any,
 			value: {
 				fovea: { x: fx, y: fy },
 				disc_edge: { x: odx, y: ody }
@@ -77,14 +83,14 @@
 		};        
 	}
 	function toggleVisisble() {
-		if (overlay.visible.has(autoItem)) {
+		if (autoItem && overlay.visible.has(autoItem)) {
 			overlay.visible.delete(autoItem);
-		} else {
+		} else if (autoItem) {
 			overlay.visible.add(autoItem);
 		}
 	}
     let autoToggleIcon = $derived.by(() => {
-        if (overlay.visible.has(autoItem)) {
+        if (autoItem && overlay.visible.has(autoItem)) {
             return Show;
         } else {
             return Hide;
@@ -117,12 +123,8 @@
 			</div>
 		{/if}
 
-		{#each $filtered as formAnnotation (formAnnotation.id)}
-            {#await formAnnotation.load()}
-                <div>Loading [{formAnnotation.id}]§</div>
-            {:then}
-                <ETDRSGridItem {overlay} {tool} {formAnnotation} />
-            {/await}
+		{#each filtered as formAnnotation (formAnnotation.id)}
+			<ETDRSGridItem {overlay} {tool} formAnnotation={formAnnotation as any} />
 		{/each}
 	</div>
 	<div class="new">

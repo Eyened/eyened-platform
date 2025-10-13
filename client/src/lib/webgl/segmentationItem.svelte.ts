@@ -1,6 +1,6 @@
 import { SvelteMap } from "svelte/reactivity";
 import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
-import { ModelSegmentationsRepo, SegmentationsRepo } from "../data/repos.svelte";
+import { getSegmentationData, getModelSegmentationData } from "../data/helpers";
 import type { NPYArray } from "../utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
 import type { Mask, PaintSettings } from "./mask.svelte";
@@ -31,13 +31,12 @@ export class SegmentationItem {
         try {
             this.loading = true;
 
-            let array: NPYArray;
-            if (this.segmentation.annotation_type == 'model_segmentation') {
-                array = await new ModelSegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis: this.segmentation.sparse_axis }) as any;
-            } else {
-                array = await new SegmentationsRepo('segmentation-state').getData(this.segmentation.id, { axis: this.segmentation.sparse_axis }) as any;
-            }
-            // const array = await this.segmentation.loadData();
+            // Don't pass axis/scan_nr when loading full volume
+            // API requires both axis AND scan_nr together, or neither
+            const array: NPYArray = this.segmentation.annotation_type === 'model_segmentation'
+                ? await getModelSegmentationData(this.segmentation.id)
+                : await getSegmentationData(this.segmentation.id);
+            
             const shape = array.shape as number[];
             // Expecting [depth, height, width]
             const depth = shape[0] ?? this.image.depth;

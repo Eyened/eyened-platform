@@ -2,6 +2,7 @@
     import { getContext } from "svelte";
     import InstanceComponent from "./InstanceComponent.svelte";
     import type { BrowserContext } from "./browserContext.svelte";
+    import { Button } from "$lib/components/ui/button";
 
     const browserContext = getContext<BrowserContext>("browserContext");
 
@@ -21,20 +22,20 @@
                 {browserContext.selectedIds.length}
                 {browserContext.selectedIds.length != 1 ? "images" : "image"} selected
             </div>
-            <button
-                class="p-2 disabled:opacity-50"
+            <Button
+                variant="outline"
                 disabled={browserContext.selectedIds.length === 0}
                 onclick={openSelectionTab}
             >
                 Open selected images
-            </button>
-            <button
-                class="p-2 disabled:opacity-50"
+            </Button>
+            <Button
+                variant="outline"
                 disabled={browserContext.selectedIds.length === 0}
                 onclick={clear}
             >
                 Clear selection
-            </button>
+            </Button>
         </div>
 
         <div class="flex overflow-x-auto gap-2">
@@ -44,7 +45,3 @@
         </div>
     </div>
 </div>
-
-<style>
-
-</style>

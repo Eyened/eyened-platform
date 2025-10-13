@@ -4,18 +4,19 @@
   import { Button } from "$lib/components/ui/button";
   import * as Input from "$lib/components/ui/input";
   import * as Table from "$lib/components/ui/table";
-  import type { SubTaskObject } from "$lib/data/objects.svelte";
+  import type { SubTaskGET, SubTaskWithImagesGET } from "../../types/openapi_types";
   import { toast } from "svelte-sonner";
+  import { addSubTaskImage, removeSubTaskImage, updateSubTaskComments } from "$lib/data/helpers";
 
   type Props = {
-    obj: SubTaskObject;
+    subtask: SubTaskGET | SubTaskWithImagesGET;
     taskId: number;
     index: number;
     start: number;
   };
-  let { obj, taskId, index, start }: Props = $props();
+  let { subtask, taskId, index, start }: Props = $props();
 
-  const row = $derived(obj.$);
+  const row = $derived(subtask);
   let newInstanceId = $state<string>("");
 
   function handleGrade() {
@@ -32,7 +33,7 @@
         toast.error("Please enter a valid instance id");
         return;
       }
-      await obj.addImage(id);
+      await addSubTaskImage(taskId, row.index ?? 0, id);
       newInstanceId = "";
     } catch (e) {
       toast.error(String(e));
@@ -41,7 +42,7 @@
 
   async function removeImage(instance_id: number) {
     try {
-      await obj.removeImage(instance_id);
+      await removeSubTaskImage(taskId, row.index ?? 0, instance_id);
     } catch (e) {
       toast.error(String(e));
     }
@@ -49,7 +50,7 @@
 
   async function updateComments(comments: string) {
     try {
-      await obj.setComments(comments);
+      await updateSubTaskComments(taskId, row.index ?? 0, comments);
     } catch (e) {
       toast.error(String(e));
     }

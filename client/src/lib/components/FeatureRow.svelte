@@ -1,27 +1,28 @@
 <script lang="ts">
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Dialog from "$lib/components/ui/dialog";
-  import type { FeatureObject } from "$lib/data/objects.svelte";
-  import type { FeaturePATCH } from "../../types/openapi_types";
+  import { Button } from "$lib/components/ui/button";
+  import type { FeatureGET, FeaturePATCH } from "../../types/openapi_types";
+  import { updateFeature, deleteFeature } from "$lib/data/helpers";
   import FeatureForm from "./FeatureForm.svelte";
 
-  let { feature }: { feature: FeatureObject } = $props();
+  let { feature }: { feature: FeatureGET } = $props();
   let editOpen = $state(false);
   let deleteOpen = $state(false);
 
   async function handleEditSubmit(payload: FeaturePATCH) {
-    await feature.save(payload);
+    await updateFeature(feature.id, payload);
     editOpen = false;
   }
   async function confirmDelete() {
-    await feature.destroy();
+    await deleteFeature(feature.id);
     deleteOpen = false;
   }
 </script>
 
 <div class="flex gap-2">
-  <button class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700" onclick={() => (editOpen = true)}>Edit</button>
-  <button class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700" onclick={() => (deleteOpen = true)}>Delete</button>
+  <Button variant="outline" size="sm" onclick={() => (editOpen = true)}>Edit</Button>
+  <Button variant="destructive" size="sm" onclick={() => (deleteOpen = true)}>Delete</Button>
 </div>
 
 <Dialog.Root bind:open={editOpen}>
@@ -30,9 +31,9 @@
       <Dialog.Title>Edit Feature</Dialog.Title>
       <Dialog.Description>Update this feature.</Dialog.Description>
     </Dialog.Header>
-    <FeatureForm feature={feature} onsubmit={handleEditSubmit} />
+    <FeatureForm {feature} onsubmit={handleEditSubmit} />
     <Dialog.Footer>
-      <Dialog.Close class="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">Close</Dialog.Close>
+      <Button variant="outline" onclick={() => (editOpen = false)}>Close</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
@@ -42,12 +43,12 @@
     <AlertDialog.Header>
       <AlertDialog.Title>Delete Feature</AlertDialog.Title>
       <AlertDialog.Description>
-        Delete "{feature.$.name}"? This action cannot be undone.
+        Delete "{feature.name}"? This action cannot be undone.
       </AlertDialog.Description>
     </AlertDialog.Header>
     <AlertDialog.Footer>
-      <AlertDialog.Cancel onclick={() => (deleteOpen = false)}>Cancel</AlertDialog.Cancel>
-      <AlertDialog.Action onclick={confirmDelete}>Delete</AlertDialog.Action>
+      <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+      <Button variant="destructive" onclick={confirmDelete}>Delete</Button>
     </AlertDialog.Footer>
   </AlertDialog.Content>
 </AlertDialog.Root>

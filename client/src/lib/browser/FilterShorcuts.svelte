@@ -13,16 +13,53 @@
 	let patientIdentifier = $state('');
 	let studyDate = $state('');
 	let projectName = $state('');
+	
+	// Track previous values to detect which field changed
+	let prev = $state({ patient: '', date: '', project: '' });
 
-	function setCondition(c: Condition | null) { condition = c; }
-
-	// NEW: ref and key handler
-	let patientInputRef: HTMLInputElement | null = null;
-	function onPatientIdentifierKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			browserContext.search();
+	// Single effect: clear other fields when one changes, and set condition
+	$effect(() => {
+		// Check which field changed
+		if (patientIdentifier !== prev.patient) {
+			if (patientIdentifier) {
+				studyDate = '';
+				projectName = '';
+			}
+			prev.patient = patientIdentifier;
+		} else if (studyDate !== prev.date) {
+			if (studyDate) {
+				patientIdentifier = '';
+				projectName = '';
+			}
+			prev.date = studyDate;
+		} else if (projectName !== prev.project) {
+			if (projectName) {
+				patientIdentifier = '';
+				studyDate = '';
+			}
+			prev.project = projectName;
 		}
+		
+		// Set condition based on which field has a value
+		if (patientIdentifier) {
+			condition = { variable: 'Patient Identifier', operator: '==', value: patientIdentifier };
+		} else if (studyDate) {
+			condition = { variable: 'Study Date', operator: '==', value: studyDate };
+		} else if (projectName) {
+			condition = { variable: 'Project Name', operator: '==', value: projectName };
+		} else {
+			condition = null;
+		}
+	});
+
+	// Form submit handler
+	function handleSubmit(e: Event) {
+		e.preventDefault();
+		browserContext.search();
 	}
+
+	// Input ref for auto-focus
+	let patientInputRef = $state<HTMLInputElement | null>(null);
 
 	// Focus on page load
 	onMount(async () => {
@@ -30,58 +67,29 @@
 		patientInputRef?.focus();
 	});
 
-	// Mutually exclusive setters
-	$effect(() => {
-		if (patientIdentifier) {
-			studyDate = '';
-			projectName = '';
-			setCondition({ variable: 'Patient Identifier', operator: '==', value: patientIdentifier });
-		} else if (!studyDate && !projectName) {
-			setCondition(null);
-		}
-	});
-	$effect(() => {
-		if (studyDate) {
-			patientIdentifier = '';
-			projectName = '';
-			setCondition({ variable: 'Study Date', operator: '==', value: studyDate });
-		} else if (!patientIdentifier && !projectName) {
-			setCondition(null);
-		}
-	});
-	$effect(() => {
-		if (projectName) {
-			patientIdentifier = '';
-			studyDate = '';
-			setCondition({ variable: 'Project Name', operator: '==', value: projectName });
-		} else if (!patientIdentifier && !studyDate) {
-			setCondition(null);
-		}
-	});
-
 	const projectOptions = $derived(
 		browserContext.getValueOptions('Project Name').map(v => ({ label: v, value: v }))
 	);
 </script>
 
-<div>
+<form onsubmit={handleSubmit}>
 	<div class="w-full grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 items-center">
-		<!-- No submit buttons; inputs only set the bindable condition -->
+		<!-- Inputs bind to state, single effect derives condition -->
 		<label>Patient Identifier:</label>
-		<Input.Input bind:value={patientIdentifier} placeholder="Patient Identifier" bind:ref={patientInputRef} on:keydown={onPatientIdentifierKeydown} />
+		<Input.Input 
+			bind:value={patientIdentifier} 
+			placeholder="Patient Identifier" 
+			bind:ref={patientInputRef}
+		/>
 
 		<label>Study Date:</label>
 		<DatePicker bind:value={studyDate} />
-		<!-- <Input.Input type="date" bind:value={studyDate} /> -->
 
 		<label>Project Name:</label>
 		<SelectWithSearch 
 			options={projectOptions} 
 			bind:value={projectName} 
-			placeholder="Project Name" 
+			placeholder="Project Name"
 		/>
 	</div>
-</div>
-
-<style>
-</style>
+</form>

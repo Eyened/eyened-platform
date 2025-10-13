@@ -1,9 +1,10 @@
-import { FeaturesRepo, FormSchemasRepo, TagsRepo } from '$lib/data/repos.svelte';
+// import { FeaturesRepo, FormSchemasRepo, TagsRepo } from '$lib/data/repos.svelte';
 import { UserManager } from '$lib/usermanager.svelte';
 
 import type { FormAnnotationGET, ModelSegmentationGET, SearchCondition, SegmentationGET, StudySearchCondition } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
 import type { Segmentation } from '../viewer-window/panelSegmentation/segmentationContext.svelte';
+import { fetchFeatures, fetchFormSchemas, fetchTags } from './api';
 
 export type ComponentDef = {
     component: any,
@@ -13,9 +14,9 @@ export type ComponentDef = {
 export class GlobalContext {
 
     public userManager: UserManager;
-    public tags = new TagsRepo('tags');
-    public features = new FeaturesRepo('features');
-    public formSchemas = new FormSchemasRepo('form-schemas');
+    // public tags = new TagsRepo('tags');
+    // public features = new FeaturesRepo('features');
+    // public formSchemas = new FormSchemasRepo('form-schemas');
 
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
@@ -39,10 +40,10 @@ export class GlobalContext {
 
     async init(pathname: string) {
         await Promise.all([
-            this.userManager.init(pathname),
-            this.tags.fetchAll(),
-            this.formSchemas.fetchAll(),
-            this.features.fetchAll({ with_counts: true })
+            this.userManager.init(pathname),            
+            fetchTags(),
+            fetchFormSchemas(),
+            fetchFeatures({ with_counts: true })
         ]);
     }
 

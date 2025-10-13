@@ -15,10 +15,11 @@
     );
     const segmentationContext = mainViewerContext.segmentationContext;
 
-    let segmentations = segmentationContext.segmentations
-        .filter((a) => a.annotation_type == "model_segmentation")
-        .filter((a) => a.creator.id == model.id)
-        .sort((a, b) => a.id - b.id);
+    let segmentations = $derived(
+        segmentationContext.modelSegmentations
+            .filter((a) => a.creator.id == model.id)
+            .sort((a, b) => a.id - b.id)
+    );
 </script>
 
 {#each segmentations as segmentation (segmentation.id)}

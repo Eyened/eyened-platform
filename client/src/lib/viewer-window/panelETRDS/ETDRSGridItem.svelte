@@ -1,6 +1,7 @@
 <script lang="ts">
+    import { deleteFormAnnotation } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte"
+    import type { FormAnnotationGET } from "../../../types/openapi_types"
     import type { Position2D } from "$lib/types"
     import type { ETDRSGridOverlay } from "$lib/viewer/overlays/ETDRSGridOverlay.svelte"
     import type { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte"
@@ -12,25 +13,26 @@
     interface Props {
         overlay: ETDRSGridOverlay;
         tool: ETDRSGridTool;
-        formAnnotation: FormAnnotation;
+        formAnnotation: FormAnnotationGET;
     }
     let { overlay, tool, formAnnotation }: Props = $props();
 
-    let fovea: Position2D | undefined = $derived(formAnnotation.value?.fovea);
+    let fovea: Position2D | undefined = $derived(formAnnotation.form_data?.fovea as Position2D | undefined);
     let disc_edge: Position2D | undefined = $derived(
-        formAnnotation.value?.disc_edge,
+        formAnnotation.form_data?.disc_edge as Position2D | undefined,
     );
 
-    let show = $derived(overlay.visible.has(formAnnotation));
+    // Note: overlay/tool expect old FormAnnotation type, will be fixed when overlays are refactored
+    let show = $derived(overlay.visible.has(formAnnotation as any));
     let active = $derived(tool.annotation?.id == formAnnotation.id);
 
     const canEditForm = globalContext.canEdit(formAnnotation);
 
     function toggleVisisble() {
-        if (overlay.visible.has(formAnnotation)) {
-            overlay.visible.delete(formAnnotation);
+        if (overlay.visible.has(formAnnotation as any)) {
+            overlay.visible.delete(formAnnotation as any);
         } else {
-            overlay.visible.add(formAnnotation);
+            overlay.visible.add(formAnnotation as any);
         }
     }
 
@@ -38,17 +40,17 @@
         if (tool.annotation?.id == formAnnotation.id) {
             tool.annotation = undefined;
         } else {
-            overlay.visible.add(formAnnotation);
-            tool.annotation = formAnnotation;
+            overlay.visible.add(formAnnotation as any);
+            tool.annotation = formAnnotation as any;
         }
     }
 
     function remove() {
-        overlay.visible.delete(formAnnotation);
+        overlay.visible.delete(formAnnotation as any);
         if (tool.annotation?.id == formAnnotation.id) {
             tool.annotation = undefined;
         }
-        formAnnotation.delete();
+        deleteFormAnnotation(formAnnotation.id);
     }
 
     let showHide = $derived(show ? Show : Hide);

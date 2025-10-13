@@ -1,28 +1,50 @@
 
-import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
-import { SvelteMap } from "svelte/reactivity";
+import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
+import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+import type { AbstractImage } from "$lib/webgl/abstractImage";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { CreatorMeta, ModelMeta, ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
-export type Segmentation = (SegmentationGET | ModelSegmentationGET) & {
-    gid: string
-}
+export type Segmentation = SegmentationGET | ModelSegmentationGET;
 
 export class SegmentationContext {
 
-    public segmentations: Segmentation[];
+    // Keep grader and model segmentations separate - cleaner!
+    public graderSegmentations: SegmentationGET[] = $derived(
+        Array.from(segmentations.values())
+            .filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+    );
     
-    public creators: SvelteMap<number, CreatorMeta>;
-    public models: SvelteMap<number, ModelMeta>;
+    public modelSegmentations: ModelSegmentationGET[] = $derived(
+        Array.from(modelSegmentations.values())
+            .filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+    );
+    
+    // Manage segmentation items (moved from AbstractImage)
+    public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
+    
+    public creators: SvelteMap<number, CreatorMeta> = $derived(
+        new SvelteMap(this.graderSegmentations.map(s => [s.creator.id, s.creator]))
+    );
 
-    public creatorHidden: SvelteMap<number, boolean>;
-    public modelHidden: SvelteMap<number, boolean>;
+    public models: SvelteMap<number, ModelMeta> = $derived(
+        new SvelteMap(this.modelSegmentations.map(s => [s.creator.id, s.creator]))
+    );
 
-    // public readonly visibleSegmentations = new SvelteSet<SegmentationGET>();
-    public readonly segmentationsVisible: SvelteMap<string, boolean>;
-    // public readonly modelSegmentationsVisible: SvelteMap<number, boolean>;
+    public creatorHidden = new SvelteMap<number, boolean>();
+    public modelHidden = new SvelteMap<number, boolean>();
 
-    public readonly visibleSegmentations: Segmentation[];
+    // Use SvelteSet with raw objects - works because same references from global stores!
+    public hiddenSegmentations = new SvelteSet<Segmentation>();
+
+    public visibleGraderSegmentations: SegmentationGET[] = $derived(
+        this.graderSegmentations.filter(s => !this.hiddenSegmentations.has(s))
+    );
+
+    public visibleModelSegmentations: ModelSegmentationGET[] = $derived(
+        this.modelSegmentations.filter(s => !this.hiddenSegmentations.has(s))
+    );
 
     public flipDrawErase = $state(false);
     public erodeDilateActive = $state(false);
@@ -35,33 +57,26 @@ export class SegmentationContext {
         public readonly instanceId: number,
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
-    ) { 
-        // this.segmentations = $derived(instance.segmentations!.filter((s) => s.sparse_axis == axis));
-        this.segmentations = $derived(
-            [...viewerWindowContext.Segmentations.all, ...viewerWindowContext.ModelSegmentations.all]
-            .filter((s) => s.image_instance_id == instanceId && s.sparse_axis == axis)
-            .map(s => ({
-                ...s,
-                id: s.id,
-                gid: `${s.annotation_type}-${s.id}`,
-        })));
+        public readonly image: AbstractImage,
+    ) {}
 
-        this.creators = $derived(new SvelteMap<number, CreatorMeta>(
-            this.segmentations.filter(s => s.annotation_type == "grader_segmentation")
-            .map(s => [s.creator.id, s.creator])));
+    getSegmentationItem(segmentation: Segmentation): SegmentationItem {
+        // Use id as key (unique per segmentation)
+        if (this.segmentationItems.has(segmentation.id)) {
+            return this.segmentationItems.get(segmentation.id)!;
+        }
 
-        this.models = $derived(new SvelteMap<number, ModelMeta>(
-            this.segmentations.filter(s => s.annotation_type == "model_segmentation")
-            .map(s => [s.creator.id, s.creator])));
+        // Create new segmentation item
+        const segmentationItem = new SegmentationItem(this.image, segmentation);
+        this.segmentationItems.set(segmentation.id, segmentationItem);
+        return segmentationItem;
+    }
 
-
-        this.creatorHidden = new SvelteMap<number, boolean>(this.creators.keys().map(id => [id, false]));
-        this.modelHidden = new SvelteMap<number, boolean>(this.models.keys().map(id => [id, false]));
-        
-        this.segmentationsVisible = new SvelteMap<string, boolean>(this.segmentations.map(s => [s.gid, true]));
-
-        this.visibleSegmentations = $derived(this.segmentations.filter(s => this.segmentationsVisible.get(s.gid) ?? true));
-
+    dispose() {
+        for (const segmentationItem of this.segmentationItems.values()) {
+            segmentationItem.dispose();
+        }
+        this.segmentationItems.clear();
     }
 
     toggleShowCreator(creatorId: number) {
@@ -74,23 +89,27 @@ export class SegmentationContext {
         this.modelHidden.set(modelId, !currentValue);
     }
         
-    toggleShowSegmentation(gid: string) {
-        const currentValue = this.segmentationsVisible.get(gid) ?? true;
-        this.segmentationsVisible.set(gid, !currentValue);
+    toggleShowSegmentation(segmentation: Segmentation) {
+        if (this.hiddenSegmentations.has(segmentation)) {
+            this.hiddenSegmentations.delete(segmentation);
+        } else {
+            this.hiddenSegmentations.add(segmentation);
+        }
     }
 
     hideAll() {
         // Hide all segmentations
-        for (const [gid] of this.segmentationsVisible) {
-            this.segmentationsVisible.set(gid, false);
+        for (const seg of this.graderSegmentations) {
+            this.hiddenSegmentations.add(seg);
+        }
+        for (const seg of this.modelSegmentations) {
+            this.hiddenSegmentations.add(seg);
         }
     }
 
-    showOnlySegmentation(gid: string) {
+    showOnlySegmentation(segmentation: Segmentation) {
         this.hideAll();
-        
-        // Show only the specified segmentation
-        this.segmentationsVisible.set(gid, true);
+        this.hiddenSegmentations.delete(segmentation);
     }
 
     toggleActive(segmentationItem: SegmentationItem | undefined) {

@@ -1,16 +1,18 @@
 <script lang="ts">
+    import { updateSegmentation } from "$lib/data/api";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { AbstractImage } from "$lib/webgl/abstractImage";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
-    import type { ModelSegmentationObject, SegmentationObject } from "../../data/objects.svelte";
     import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons";
     import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
+    import type { Segmentation } from "./segmentationContext.svelte";
+    
     interface Props {
         segmentationItem: SegmentationItem;
-        segmentation: SegmentationObject | ModelSegmentationObject;
+        segmentation: Segmentation;
         image: AbstractImage;
         isEditable: boolean;
     }
@@ -20,24 +22,30 @@
         "mainViewerContext",
     );
     const globalContext = getContext<GlobalContext>("globalContext");
-    function setAnnotationReference() {
+    
+    async function setAnnotationReference() {
         globalContext.dialogue = {
             component: ReferenceAnnotationSelector,
             props: {
                 segmentation,
                 image,
-                resolve: (other: SegmentationGET) => {
-                    segmentation.save({
-                        reference_segmentation_id: other.id,
-                    });
+                resolve: async (other: SegmentationGET) => {
+                    if (segmentation.annotation_type === 'grader_segmentation') {
+                        await updateSegmentation(segmentation.id, {
+                            reference_segmentation_id: other.id,
+                        });
+                    }
                 },
             },
         };
     }
 
-    function removeReference() {
-        segmentation.save({ reference_segmentation_id: null });
+    async function removeReference() {
+        if (segmentation.annotation_type === 'grader_segmentation') {
+            await updateSegmentation(segmentation.id, { reference_segmentation_id: null });
+        }
     }
+    
     function toggleApplyMask() {
         mainViewerContext.toggleMasking(segmentationItem);
     }
@@ -56,11 +64,11 @@
             <span> Update reference mask</span>
         </div>
     {/if}
-    {#if segmentation.$.reference_segmentation_id}
+    {#if segmentation.reference_segmentation_id}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="row">
-            Mask ID: [{segmentation.$.reference_segmentation_id}]
+            Mask ID: [{segmentation.reference_segmentation_id}]
             {#if isEditable}
                 <PanelIcon
                     onclick={removeReference}

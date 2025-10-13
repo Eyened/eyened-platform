@@ -1,12 +1,12 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { FormAnnotationsRepo, InstancesRepo, ModelSegmentationsRepo, SegmentationsRepo } from "$lib/data/repos.svelte";
+import { fetchInstance } from "$lib/data/api";
+import { instances } from "$lib/data/stores.svelte";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
-import { readonly, writable, type Readable } from "svelte/store";
 import type { InstanceGET } from "../../types/openapi_types";
 import MainViewer from './MainViewer.svelte';
 
@@ -27,8 +27,7 @@ export class ViewerWindowContext {
 
     private viewers = new Set<ViewerContext>();
 
-    private _instanceIds = writable<number[]>([]);
-    public instanceIds: Readable<number[]> = readonly(this._instanceIds);
+    public instanceIds: number[] = $state([]);
 
     public mainPanels: MainPanelType[] = $state([]);
 
@@ -39,12 +38,6 @@ export class ViewerWindowContext {
     photoLocatorSets: PhotoLocator[][] = $state([]);
 
     private frame: number = 0;
-    private unsubscribe: () => void;
-
-    Instances = new InstancesRepo('viewer-window');
-    FormAnnotations = new FormAnnotationsRepo('viewer-window');
-    Segmentations = new SegmentationsRepo('viewer-window');
-    ModelSegmentations = new ModelSegmentationsRepo('viewer-window');
 
     constructor(
         public readonly webgl: WebGL,
@@ -52,6 +45,7 @@ export class ViewerWindowContext {
         public readonly creator: unknown,
         instanceIDs: number[] = [],
     ) {
+        console.log('ViewerWindowContext constructor', instanceIDs);
         this.imageLoader = new ImageLoader(webgl);
 
         // start rendering loop
@@ -60,17 +54,7 @@ export class ViewerWindowContext {
             this.repaint();
         }
         loop();
-        this.unsubscribe = this._instanceIds.subscribe((ids) => {
-            for (const id of ids) {
-                const instance = this.Instances.store[id] as InstanceGET | undefined;
-                if (instance) {
-                    this.loadImage(instance);
-                } else {
-                    // should not happen (instance is loaded in setInstanceIDs)
-                    console.warn(`Instance with id ${id} not found`);
-                }
-            }
-        });
+        
         this.setInstanceIDs(instanceIDs);
     }
 
@@ -94,25 +78,31 @@ export class ViewerWindowContext {
 
     async setInstanceIDs(ids: number[]) {
         // ensure metadata of all instances is loaded
-        const missingIds = ids.filter((id) => !this.Instances.store[id]);
+        const missingIds = ids.filter((id) => !instances.get(id));
         if (missingIds.length) {
-            const instances = await Promise.all(missingIds.map((id) => this.Instances.fetchOne(id, {
+            await Promise.all(missingIds.map((id) => fetchInstance(id, {
                 with_segmentations: true,
                 with_form_annotations: true,
                 with_model_segmentations: true
             })));
-            this.FormAnnotations.ingest(instances.flatMap((instance) => instance.$.form_annotations!));
-            this.Segmentations.ingest(instances.flatMap((instance) => instance.$.segmentations!));
-            this.ModelSegmentations.ingest(instances.flatMap((instance) => instance.$.model_segmentations!));
+            // Data is automatically ingested into global stores by fetchInstance
         }
 
-        this._instanceIds.set(ids);
+        this.instanceIds = ids;
+        
+        // Load images for all instances
+        for (const id of ids) {
+            const instance = instances.get(id);
+            if (instance) {
+                this.loadImage(instance);
+            } else {
+                console.warn(`Instance with id ${id} not found after fetch`);
+            }
+        }
     }
 
     destroy() {
-        this.unsubscribe();
-
-        cancelAnimationFrame(this.frame)
+        cancelAnimationFrame(this.frame);
     }
 
     async loadImage(instance: InstanceGET): Promise<LoadedImages> {
@@ -182,15 +172,11 @@ export class ViewerWindowContext {
     }
 
     getImages(instanceID: number): Promise<LoadedImages> {
-        const instance = this.Instances.store[instanceID] as InstanceGET | undefined;
+        const instance = instances.get(instanceID);
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);
         }
         return this.loadImage(instance);
-    }
-
-    get formAnnotationsRepo() { 
-        return this.FormAnnotations; 
     }
 
 }

@@ -2,7 +2,6 @@
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { getContext } from "svelte";
     import type { CreatorMeta } from "../../../types/openapi_types";
-    import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import SegmentationItem from "./SegmentationItem.svelte";
 
     interface Props {
@@ -10,13 +9,16 @@
     }
     let { creator }: Props = $props();
 
-    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
     const mainViewerContext = getContext<MainViewerContext>(
         "mainViewerContext",
     );
     const segmentationContext = mainViewerContext.segmentationContext;
 
-    const segmentations = $derived(segmentationContext.segmentations.filter((a) => a.creator.id == creator.id).sort((a, b) => a.id - b.id));
+    const segmentations = $derived(
+        segmentationContext.graderSegmentations
+            .filter((a) => a.creator.id == creator.id)
+            .sort((a, b) => a.id - b.id)
+    );
     const hidden = $derived(segmentationContext.creatorHidden.get(creator.id) ?? false);
     // TODO: make all segmentations hidden by default
 </script>
