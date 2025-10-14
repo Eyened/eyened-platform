@@ -129,8 +129,8 @@
         align-items: center;
         cursor: pointer;
         color: var(--icon-color);
-        margin: 0.2em;
-        padding: 0.2em;
+        margin: 0em;
+        padding: 0.1em;
         border-radius: 50%;
         transition: all 0.3s ease;
     }

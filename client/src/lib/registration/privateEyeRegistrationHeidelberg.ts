@@ -1,9 +1,10 @@
-import type { Instance } from "$lib/datamodel/instance.svelte";
+import { instances } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
+import type { InstanceGET } from "../../types/openapi_types";
 import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 
-function getSourceID(instance: Instance) {
-    return instance.datasetIdentifier.split('/').pop()!;
+function getSourceID(instance: InstanceGET) {
+    return instance.dataset_identifier.split('/').pop()!;
 }
 export function getPrivateEyeRegistrationHeidelberg(image: AbstractImage): PhotoLocator[] {
     const { instance, meta } = image;
@@ -23,7 +24,8 @@ export function getPrivateEyeRegistrationHeidelberg(image: AbstractImage): Photo
     });
     if (!linked_image) return [];
 
-    const enfaceInstance = instance.series.instances.find$(instance => getSourceID(instance) == linked_image.source_id);
+    const instance_series = instances.filter(i => i.series.id == instance.series.id);
+    const enfaceInstance = instance_series.find(i => getSourceID(i) == linked_image.source_id);
     if (!enfaceInstance) return [];
     const enfaceID = `${enfaceInstance.id}`;
     const octID = `${instance.id}`;

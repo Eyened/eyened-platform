@@ -263,6 +263,8 @@ export class ViewerContext {
         const p = this.viewerWindowContext.registration.getPosition(this.image.image_id);
         if (p) {
             this.index = p.index;
+        } else {
+            this.index = Math.round(this.image.depth / 2);
         }
 
         const renderTarget = { ...renderBounds, framebuffer: null };

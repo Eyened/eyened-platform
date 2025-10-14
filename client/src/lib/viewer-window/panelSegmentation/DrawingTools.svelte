@@ -197,7 +197,7 @@
 		<PanelIcon
 			onclick={() => activate(brush)}
 			active={activeTool == brush}
-			disabled={!canEdit}
+            disabled={!canEdit && activeTool != brush}
 			tooltip={canEdit
 				? "Brush"
 				: "Select an editable segmentation to use the brush"}
@@ -207,7 +207,7 @@
 		<PanelIcon
 			onclick={() => activate(polygon)}
 			active={activeTool == polygon}
-			disabled={!canEdit}
+			disabled={!canEdit && activeTool != polygon}
 			tooltip={canEdit
 				? "Polygon"
 				: "Select an editable segmentation to use the polygon tool"}
@@ -218,7 +218,7 @@
 			<PanelIcon
 				onclick={() => activate(enhance)}
 				active={activeTool == enhance}
-				disabled={!canEdit}
+				disabled={!canEdit && activeTool != enhance}
 				tooltip={canEdit
 					? "Enhance"
 					: "Select an editable segmentation to use the enhance tool"}
@@ -228,7 +228,7 @@
 			<PanelIcon
 				active={segmentationContext.erodeDilateActive}
 				onclick={() => toggle("erodeDilateActive")}
-				disabled={!canEdit}
+				disabled={!canEdit && ! segmentationContext.erodeDilateActive}
 				tooltip={canEdit
 					? "Dilate / Erode"
 					: "Select an editable segmentation to use dilate/erode"}
@@ -238,7 +238,7 @@
 		<PanelIcon
 			active={segmentationContext.questionableActive}
 			onclick={() => toggle("questionableActive")}
-			disabled={!canEdit}
+			disabled={!canEdit && ! segmentationContext.questionableActive}
 			tooltip={canEdit
 				? "Questionable"
 				: "Select an editable segmentation to mark as questionable"}
