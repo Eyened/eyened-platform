@@ -1,20 +1,15 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-	import { fetchInstance, formAnnotations, formSchemas, getInstance, instances, setFormAnnotationValue } from "$lib/data";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { formAnnotations, formSchemas, instances, setFormAnnotationValue } from "$lib/data";
     import SchemaForm from "$lib/forms/SchemaForm.svelte";
     import { getDefault, resolveRefs, type JSONSchema } from "$lib/forms/schemaType";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { onMount, setContext } from "svelte";
+    import { onMount } from "svelte";
 
     interface Props {
-        globalContext: GlobalContext;
-        // viewerContext: ViewerContext;
         formId: number;
-        // formAnnotationRepo: FormAnnotationsRepo;
         canEdit: boolean;
     }
-    let { formId,  canEdit, globalContext }: Props = $props();
+    let { formId,  canEdit }: Props = $props();
     
     const form = $derived(formAnnotations.get(formId)!);
     const instance = $derived(instances.get(form.image_instance_id!));

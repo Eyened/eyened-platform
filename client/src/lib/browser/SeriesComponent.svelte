@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getInstance } from "$lib/data";
+	import { instanceMetas } from "$lib/data";
 	import type { SeriesGET } from "../../types/openapi_types";
 	import InstanceComponent from "./InstanceComponent.svelte";
 
@@ -8,14 +8,11 @@
 		laterality: "L" | "R" | null;
 		showSegmentationInfo?: boolean;
 	}
-
-	// const {InstanceRepo} = getContext<BrowserContext>("browserContext");
-
 	let { series, laterality, showSegmentationInfo = true }: Props = $props();
 
 	const instances =
 		series.instance_ids
-			?.map((id) => getInstance(id))
+			?.map((id) => instanceMetas.get(id))
 			.filter((inst) => inst && inst.laterality == laterality)
 			.filter((inst): inst is NonNullable<typeof inst> => inst !== undefined) ?? [];
 </script>

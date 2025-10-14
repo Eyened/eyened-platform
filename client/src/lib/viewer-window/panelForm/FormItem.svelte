@@ -2,25 +2,20 @@
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
 	// import type { FormAnnotationObject } from "$lib/data/objects.svelte";
 	// import type { FormAnnotationsRepo } from "$lib/data/repos.svelte";
+	import { createFormAnnotation, deleteFormAnnotation, fetchInstance } from "$lib/data";
+	import {
+		formSchemas
+	} from "$lib/data/stores.svelte";
 	import { openNewWindow } from "$lib/newWindow";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-	import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 	import { getContext } from "svelte";
+	import type { FormAnnotationGET } from "../../../types/openapi_types";
 	import Duplicate from "../icons/Duplicate.svelte";
 	import { PanelIcon, Trash } from "../icons/icons";
-	import { ViewerWindowContext } from "../viewerWindowContext.svelte";
 	import FormItemContent from "./FormItemContent.svelte";
-	import {
-		formAnnotations,
-		formSchemas,
-		instances,
-	} from "$lib/data/stores.svelte";
-	import type { FormAnnotationGET } from "../../../types/openapi_types";
-	import { fetchInstance, createFormAnnotation, deleteFormAnnotation } from "$lib/data";
 	
 	const taskContext = getContext<TaskContext>("taskContext");
 	const globalContext = getContext<GlobalContext>("globalContext");
-	const { user: creator } = globalContext;
 
 	interface Props {
 		form: FormAnnotationGET;
@@ -75,7 +70,6 @@
 
 		const props = {
 			formId: form.id,
-			globalContext,
 			canEdit: canEditForm,
 		};
 

@@ -15,7 +15,7 @@
     }
 </script>
 
-<div class="fixed bottom-0 left-0 right-0 w-full z-50 bg-black/90 text-white">
+<div class="fixed bottom-0 left-0 right-0 w-full z-50 bg-black/90">
     <div class="flex gap-4 items-start p-2">
         <div class="button-container flex flex-col gap-1">
             <div>

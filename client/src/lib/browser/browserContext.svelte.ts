@@ -1,8 +1,7 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import { ingestInstances, ingestInstanceMetas, ingestStudies, instances, instanceMetas, studies } from '$lib/data/stores.svelte';
-import { getInstance } from '$lib/data/helpers';
-import type { InstanceGET, StudyGET, InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
+import { ingestInstanceMetas, ingestInstances, ingestStudies, instanceMetas, studies } from '$lib/data/stores.svelte';
+import type { InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
 
 export type QueryMode = 'studies' | 'instances';
 export type DisplayMode = 'instance' | 'study';
@@ -61,18 +60,17 @@ export class BrowserContext {
         this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
     );
 
-	// Derived: selected instances from repo (checks both instances and instanceMetas)
 	selectedInstances = $derived(
 		this.selectedIds
-			.map(id => getInstance(id))
-			.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+			.map(id => instanceMetas.get(id))
+			.filter((x): x is InstanceMeta => x !== undefined)
 	);
 
 	// Derived: ordered instances for rendering
 	orderedInstances = $derived(
 		this.orderedInstanceIds
-			.map(id => getInstance(id))
-			.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+			.map(id => instanceMetas.get(id))
+			.filter((x): x is InstanceMeta => x !== undefined)
 	);
 
 	// Derived: ordered studies for rendering
@@ -82,7 +80,7 @@ export class BrowserContext {
 			.filter((x): x is StudyGET => x !== undefined)
 	);
 
-    toggleFilterMode = () => {
+    toggleFilterMode() {
         this.filterMode = this.filterMode === 'basic' ? 'advanced' : 'basic';
     };
 
@@ -93,7 +91,7 @@ export class BrowserContext {
     }
 
     // Load both signatures
-    loadSignatures = async () => {
+    async loadSignatures() {
         this.loading = true;
         try {
             const { api } = await import('../api/client');
@@ -109,7 +107,7 @@ export class BrowserContext {
     }
     
     // Refresh signatures (e.g., after creating/modifying tags)
-    refreshSignatures = async () => {
+    async refreshSignatures() {
         const { api } = await import('../api/client');
         const [instRes, studRes] = await Promise.all([
             api.GET('/instances/search/signature', {}),
@@ -121,7 +119,7 @@ export class BrowserContext {
 
 
     // Reset state when queryMode changes
-    resetForQueryModeChange = async (queryMode: QueryMode) => {
+    async resetForQueryModeChange(queryMode: QueryMode) {
         // Keep current conditions - they may work with both modes
         const currentConditions = this.filterMode === 'advanced'
             ? this.advancedConditions
@@ -154,7 +152,7 @@ export class BrowserContext {
     }
 
     // Compatibility method for search with current conditions
-    search = async () => {
+    async search() {
         const query =
             this.filterMode === 'advanced'
                 ? this.advancedConditions
@@ -166,7 +164,7 @@ export class BrowserContext {
     }
 
     // Method to load conditions from external source (like URL)
-    loadConditions = (conds: Condition[]) => {
+    loadConditions(conds: Condition[]) {
         // Preserve legacy callers; default these into advanced
         this.advancedConditions = conds ?? [];
         // If it looks like a single basic condition, also set basic
@@ -182,7 +180,7 @@ export class BrowserContext {
         }
     }
 
-    fetch = async (query: Condition[]) => {
+    async fetch(query: Condition[], updateUrl: boolean = true) {
         if (!query.length) {
             return;
         }
@@ -191,7 +189,9 @@ export class BrowserContext {
         this.advancedConditions = query;
 
         // reflect in URL
-        this.updateURL(query);
+        if (updateUrl) {
+            this.updateURL(query);
+        }
 
         this.loading = true;
 
@@ -249,7 +249,6 @@ export class BrowserContext {
     }
 
 	private processSearchResults(res: any) {
-		console.log('processSearchResults', res);
 		// Add/update search results in GLOBAL repos
 		ingestStudies(res.studies ?? []);
 		
@@ -285,7 +284,6 @@ export class BrowserContext {
 	}
 
     openTab(instances: number[]) {
-
         const suffix_string = `?instances=${instances}`;
         const url = `${window.location.origin}/view${suffix_string}`;
         window.open(url, '_blank')?.focus();

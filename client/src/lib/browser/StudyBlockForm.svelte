@@ -1,9 +1,7 @@
 <script lang="ts">
 	import type { FormAnnotationGET, FormSchemaGET, StudyGET } from "../../types/openapi_types";
-
-	import { getInstance } from "$lib/data";
 	import { createFormAnnotation } from "$lib/data/api";
-	import { formAnnotations } from "$lib/data/stores.svelte";
+	import { formAnnotations, instanceMetas } from "$lib/data/stores.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 	import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
 	import { Button } from "$lib/components/ui/button";
@@ -31,10 +29,10 @@
 	const instanceIds =
 		study?.series?.flatMap((series) => series.instance_ids as number[]) ?? [];
 	const left_instanceId = instanceIds.find(
-		(id) => getInstance(id)?.laterality === "L",
+		(id) => instanceMetas.get(id)?.laterality === "L",
 	);
 	const right_instanceId = instanceIds.find(
-		(id) => getInstance(id)?.laterality === "R",
+		(id) => instanceMetas.get(id)?.laterality === "R",
 	);
 	const first_instanceId = instanceIds[0];
 
@@ -49,13 +47,13 @@
 
 	const leftForms = $derived(
 		forms.filter(
-			(form) => getInstance(form.image_instance_id ?? 0)?.laterality === "L",
+			(form) => instanceMetas.get(form.image_instance_id ?? 0)?.laterality === "L",
 		),
 	);
 
 	const rightForms = $derived(
 		forms.filter(
-			(form) => getInstance(form.image_instance_id ?? 0)?.laterality === "R",
+			(form) => instanceMetas.get(form.image_instance_id ?? 0)?.laterality === "R",
 		),
 	);
 
