@@ -353,3 +353,29 @@ export async function fetchSubTasks(params: {
 	return data;
 }
 
+// ===== SubTask Update Functions =====
+
+export async function updateSubTask(
+    subtask_id: number,
+    patch: { task_state?: any; comments?: string | null }
+) {
+    const res = await api.PATCH('/subtasks/{subtaskid}' as any, {
+        params: { path: { subtaskid: Number(subtask_id) } } as any,
+        body: patch as any
+    });
+    if (res.data) {
+        ingestSubTasks([res.data as any]);
+    }
+    return res.data as any;
+}
+
+export async function fetchSubTask(subtask_id: number) {
+    const res = await api.GET('/subtasks/{subtaskid}' as any, {
+        params: { path: { subtaskid: Number(subtask_id) } } as any
+    });
+    if (res.data) {
+        ingestSubTasks([res.data as any]);
+    }
+    return res.data as any;
+}
+
