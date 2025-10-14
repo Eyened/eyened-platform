@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { getInstance } from "$lib/data";
 	import { getContext } from "svelte";
 	import type { SeriesGET, StudyGET } from "../../types/openapi_types";
 	import type { BrowserContext } from "./browserContext.svelte";
 	import SeriesComponent from "./SeriesComponent.svelte";
 	import { Button } from "$lib/components/ui/button";
+	import { instanceMetas } from "$lib/data";
 
 	interface Props {
 		study: StudyGET;
@@ -20,7 +20,7 @@
 	function open() {
 		const allInstanceIds =
 			study.series?.flatMap((series) => series.instance_ids ?? []) ?? [];
-		const allInstances = allInstanceIds.map(getInstance);
+		const allInstances = allInstanceIds.map((id) => instanceMetas.get(id));
 		const eyeInstanceIds = allInstances
 			.filter((instance) => instance?.laterality == laterality)
 			.map((instance) => instance!.id);
@@ -28,7 +28,7 @@
 		browserContext.openTab(eyeInstanceIds);
 	}
 	function hasLaterality(series: SeriesGET) {
-		const instances = series.instance_ids?.map(getInstance);
+		const instances = series.instance_ids?.map((id) => instanceMetas.get(id));
 		return instances?.some((instance) => instance?.laterality == laterality);
 	}
 

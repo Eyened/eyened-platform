@@ -1,65 +1,6 @@
-import type { InstanceGET, InstanceMeta, StudyGET, SeriesGET, SegmentationGET, ModelSegmentationGET, TaskGET, TaskPUT, TaskPATCH, FeaturePATCH } from '../../types/openapi_types';
-import { instances, instanceMetas, studies, segmentations, modelSegmentations, tasks, ingestTasks } from './stores.svelte';
+import type { FeaturePATCH, InstanceGET, SegmentationGET, StudyGET, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
+import { ingestTasks, instances, segmentations, studies, tasks } from './stores.svelte';
 
-// ===== Relationship Helpers =====
-
-/**
- * Get full InstanceGET from either store
- * Checks instances (full data) first, falls back to instanceMetas
- */
-export function getInstance(id: number): InstanceGET | InstanceMeta | undefined {
-	return instances.get(id) ?? instanceMetas.get(id);
-}
-
-/**
- * Get full InstanceGET only (not Meta)
- */
-export function getFullInstance(id: number): InstanceGET | undefined {
-	return instances.get(id);
-}
-
-/**
- * Get InstanceMeta only (lightweight)
- */
-export function getInstanceMeta(id: number): InstanceMeta | undefined {
-	return instanceMetas.get(id);
-}
-
-export function getStudy(instance: InstanceGET | InstanceMeta): StudyGET | undefined {
-	// Both InstanceGET and InstanceMeta can reference studies
-	// InstanceGET has study: StudyMeta, InstanceMeta doesn't have it
-	if ('study' in instance) {
-		return studies.get(instance.study.id);
-	}
-	return undefined;
-}
-
-export function getPatient(instance: InstanceGET | InstanceMeta) {
-	return getStudy(instance)?.patient;
-}
-
-export function getProject(instance: InstanceGET | InstanceMeta) {
-	return getStudy(instance)?.project;
-}
-
-export function getInstancesForSeries(seriesData: SeriesGET): InstanceGET[] {
-	const ids = seriesData.instance_ids ?? [];
-	return ids
-		.map(id => instances.get(id))
-		.filter((inst): inst is InstanceGET => inst !== undefined);
-}
-
-export function getSegmentationsForInstance(instance: InstanceGET): SegmentationGET[] {
-	return segmentations.filter(
-		seg => seg.image_instance_id === instance.id
-	);
-}
-
-export function getModelSegmentationsForInstance(instance: InstanceGET): ModelSegmentationGET[] {
-	return modelSegmentations.filter(
-		seg => seg.image_instance_id === instance.id
-	);
-}
 
 // ===== Tag Helpers =====
 

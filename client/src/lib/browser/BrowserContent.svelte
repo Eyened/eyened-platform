@@ -15,6 +15,7 @@
 		// Re-run search with whichever mode is active
 		browserContext.search();
 	}
+    console.log("BrowserContent", browserContext.orderedInstances);
 </script>
 
 {#if browserContext.queryMode === "instances" && browserContext.displayMode === "instance"}
