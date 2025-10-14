@@ -160,10 +160,10 @@ export class Instance extends BaseItem {
 }
 registerConstructor('instances', Instance);
 
-export function getInstanceByDataSetIdentifier(datasetIdentifier: string): Instance | undefined {
-    return data.instances.find(instance => instance.datasetIdentifier == datasetIdentifier);
-}
+// export function getInstanceByDataSetIdentifier(datasetIdentifier: string): Instance | undefined {
+//     return data.instances.find(instance => instance.datasetIdentifier == datasetIdentifier);
+// }
 
-export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): Instance | undefined {
-    return data.instances.find(instance => instance.SOPInstanceUid == SOPInstanceUid);
-}
+// export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): Instance | undefined {
+//     return data.instances.find(instance => instance.SOPInstanceUid == SOPInstanceUid);
+// }

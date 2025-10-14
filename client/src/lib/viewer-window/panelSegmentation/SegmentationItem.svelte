@@ -258,6 +258,7 @@
 		flex-direction: row;
 		flex: 1;
 		width: 100%;
+        align-items: center;
 	}
 	div.open {
 		border-top: 1px solid rgba(100, 255, 255, 0.3);

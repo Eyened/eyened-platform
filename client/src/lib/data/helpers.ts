@@ -431,3 +431,9 @@ export async function updateSubTaskComments(taskId: number, subtaskIndex: number
 	return res.data;
 }
 
+export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): InstanceGET | undefined {
+	return instances.find(inst => inst.sop_instance_uid === SOPInstanceUid);
+}
+export function getInstanceByDataSetIdentifier(datasetIdentifier: string): InstanceGET | undefined {
+	return instances.find(inst => inst.dataset_identifier === datasetIdentifier);
+}

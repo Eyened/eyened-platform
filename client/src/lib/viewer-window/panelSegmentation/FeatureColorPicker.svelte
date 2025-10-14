@@ -40,7 +40,6 @@
 		cursor: pointer;
 		width: 1.2em;
 		height: 1.2em;
-		margin: 0.1em;
 		border-radius: 50%;
 		display: flex;
 	}
