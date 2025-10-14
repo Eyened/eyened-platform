@@ -15,6 +15,8 @@ Keeps track of the main panels and the top row of images.
 	import ViewerWindowInfoPanel from "./ViewerWindowInfoPanel.svelte";
 	import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
 	import { formAnnotations } from "$lib/data";
+	import { subtasks } from "$lib/data/stores.svelte";
+	import { fetchSubTask } from "$lib/data/api";
 
 	interface Props {
 		viewerWindowContext: ViewerWindowContext;
@@ -24,6 +26,14 @@ Keeps track of the main panels and the top row of images.
 	setContext("viewerWindowContext", viewerWindowContext);
 	const registration = viewerWindowContext.registration;
 	const taskContext = getContext<TaskContext>("taskContext");
+
+	async function ensureSubTaskLoaded() {
+		if (!taskContext) return;
+		const id = taskContext.subTask.id;
+		if (!subtasks.get(id)) {
+			await fetchSubTask(id);
+		}
+	}
 
 	// open first image
 	const instanceIds = viewerWindowContext.instanceIds;
@@ -40,7 +50,7 @@ Keeps track of the main panels and the top row of images.
 		});
 	}
 
-	let main: HTMLDivElement = $state();
+let main: HTMLDivElement | undefined = $state();
 	let isResizing = false;
 
 	function startResize(event: PointerEvent) {
@@ -70,18 +80,25 @@ Keeps track of the main panels and the top row of images.
 		if (!isResizing) {
 			return;
 		}
-		main.style["grid-template-rows"] = `${e.clientY}px 1px 1fr`;
+    if (!main) return;
+    main.style.setProperty('grid-template-rows', `${e.clientY}px 1px 1fr`);
 	}
 </script>
 
-{#each formAnnotations.values() as formAnnotation}
+
+{#each Array.from(formAnnotations.values()) as formAnnotation}
 	<RegistrationItemLoader {registration} {formAnnotation} />
 {/each}
 
+
 {#if taskContext}
-	<div id="task-row">
-		<TaskTopBar />
-	</div>
+	{#await ensureSubTaskLoaded()}
+		<!-- loading subtask for top bar -->
+	{:then}
+		<div id="task-row">
+			<TaskTopBar task={taskContext.task} subTask={taskContext.subTask} subTaskIndex={taskContext.subTaskIndex} />
+		</div>
+	{/await}
 {/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div id="main" bind:this={main} class="dark">
