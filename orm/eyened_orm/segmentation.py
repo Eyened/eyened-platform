@@ -234,7 +234,7 @@ class Feature(Base):
     FeatureName: Mapped[str] = mapped_column(String(60), unique=True)
 
     Segmentations: Mapped[List["Segmentation"]] = relationship("eyened_orm.segmentation.Segmentation", back_populates="Feature")
-    Models: Mapped[List["Model"]] = relationship("eyened_orm.segmentation.Model", back_populates="Feature")
+    SegmentationModels: Mapped[List["SegmentationModel"]] = relationship("eyened_orm.segmentation.SegmentationModel", back_populates="Feature")
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # Relationships for parent-child feature hierarchy
@@ -311,17 +311,30 @@ class Model(Base):
     __tablename__ = "Model"
 
     __table_args__ = (UniqueConstraint("ModelName", "Version"),)
+    __mapper_args__ = {
+        "polymorphic_on": "ModelType"
+    }
 
     ModelID: Mapped[int] = mapped_column(primary_key=True)
     ModelName: Mapped[str] = mapped_column(String(255), unique=True)
     Version: Mapped[str] = mapped_column(String(255))
-    # ModelType: Mapped[str] = mapped_column(String(255))
+    ModelType: Mapped[str] = mapped_column(String(255)) # to distinguish between segmentation and attribute models
+    # segmentation models have a feature and segmentations
+    # attribute models have only attributes
     Description: Mapped[Optional[str]] = mapped_column(String(255))
-    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    Segmentations: Mapped[List["ModelSegmentation"]] = relationship("eyened_orm.segmentation.ModelSegmentation", back_populates="Model")
-    Feature: Mapped["Feature"] = relationship("eyened_orm.segmentation.Feature", back_populates="Models")
 
+
+class SegmentationModel(Model):
+    __tablename__ = "SegmentationModel"
+
+    ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID", ondelete="CASCADE"), primary_key=True)
+    FeatureID: Mapped[Optional[int]] = mapped_column(ForeignKey("Feature.FeatureID"))
+
+    Feature: Mapped[Optional["Feature"]] = relationship("eyened_orm.segmentation.Feature", back_populates="SegmentationModels")
+    Segmentations: Mapped[List["ModelSegmentation"]] = relationship("eyened_orm.segmentation.ModelSegmentation", back_populates="Model")
+
+    __mapper_args__ = {"polymorphic_identity": "segmentation"}
     
 class ModelSegmentation(SegmentationBase):
     __tablename__ = "ModelSegmentation"   
@@ -332,7 +345,7 @@ class ModelSegmentation(SegmentationBase):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
-    Model: Mapped["Model"] = relationship("eyened_orm.segmentation.Model", back_populates="Segmentations")    
+    Model: Mapped["Model"] = relationship("eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations")    
     ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance",
         back_populates="ModelSegmentations"
