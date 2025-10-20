@@ -899,6 +899,32 @@ export interface components {
             /** Instance Id */
             instance_id: number;
         };
+        /** AttributeCondition */
+        AttributeCondition: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "attribute";
+            /** Model */
+            model: string;
+            /** Variable */
+            variable: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            /** Value */
+            value: number | string | string[] | null;
+        };
+        /** Body_create_segmentation_segmentations_post */
+        Body_create_segmentation_segmentations_post: {
+            /** Metadata */
+            metadata: string;
+            /** Np Array */
+            np_array?: string | null;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Old Password */
@@ -923,6 +949,26 @@ export interface components {
          * @enum {string}
          */
         Datatype: "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F";
+        /** DefaultCondition */
+        DefaultCondition: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "default";
+            /**
+             * Variable
+             * @enum {string}
+             */
+            variable: "Image DBID" | "Laterality" | "Modality" | "ETDRS Field" | "Color Fundus Quality" | "Study Date" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Device Model ID" | "Segmentation Feature Name" | "Segmentation Creator Name" | "Segmentation Tag Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Image Tag Name";
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            /** Value */
+            value: string | number | string[] | null;
+        };
         /** DeviceMeta */
         DeviceMeta: {
             /** Manufacturer */
@@ -992,7 +1038,9 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: {
+                [key: string]: unknown;
+            } | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
             /** Id */
@@ -1034,7 +1082,9 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: {
+                [key: string]: unknown;
+            } | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1051,7 +1101,9 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: {
+                [key: string]: unknown;
+            } | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1060,7 +1112,9 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Schema */
-            schema?: Record<string, never> | null;
+            schema?: {
+                [key: string]: unknown;
+            } | null;
             /** Id */
             id: number;
         };
@@ -1089,7 +1143,9 @@ export interface components {
              * @description Optional key-value properties for new patient
              * @default {}
              */
-            patient_props: Record<string, never> | null;
+            patient_props: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Study Date
              * @description Study date (can be a date object or ISO format string)
@@ -1100,7 +1156,9 @@ export interface components {
              * @description Optional key-value properties for new study
              * @default {}
              */
-            study_props: Record<string, never> | null;
+            study_props: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Series Id
              * @description Optional series identifier
@@ -1111,7 +1169,9 @@ export interface components {
              * @description Optional key-value properties for new series
              * @default {}
              */
-            series_props: Record<string, never> | null;
+            series_props: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Image
              * @description Path to the image file (required)
@@ -1122,7 +1182,9 @@ export interface components {
              * @description Optional key-value properties for new image
              * @default {}
              */
-            image_props: Record<string, never> | null;
+            image_props: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ImportOptions
@@ -1172,7 +1234,9 @@ export interface components {
             /** Message */
             message: string;
             /** Data */
-            data?: Record<string, never> | null;
+            data?: {
+                [key: string]: unknown;
+            } | null;
             /** Error */
             error?: string | null;
             /** Stack Trace */
@@ -1209,9 +1273,13 @@ export interface components {
             /** Resolution Axial */
             resolution_axial: number;
             /** Cf Roi */
-            cf_roi?: Record<string, never> | null;
+            cf_roi?: {
+                [key: string]: unknown;
+            } | null;
             /** Cf Keypoints */
-            cf_keypoints?: Record<string, never> | null;
+            cf_keypoints?: {
+                [key: string]: unknown;
+            } | null;
             /** Cf Quality */
             cf_quality?: number | null;
             /**
@@ -1239,6 +1307,12 @@ export interface components {
             model_segmentations?: components["schemas"]["ModelSegmentationGET"][] | null;
             /** Form Annotations */
             form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
+            /** Attributes */
+            attributes: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
         };
         /** InstanceMeta */
         InstanceMeta: {
@@ -1345,25 +1419,10 @@ export interface components {
             /** Mode */
             mode: string;
         };
-        /** SearchCondition */
-        SearchCondition: {
-            /**
-             * Variable
-             * @enum {string}
-             */
-            variable: "Image DBID" | "Laterality" | "Modality" | "ETDRS Field" | "Color Fundus Quality" | "Study Date" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Device Model ID" | "Segmentation Feature Name" | "Segmentation Creator Name" | "Segmentation Tag Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Image Tag Name";
-            /**
-             * Operator
-             * @enum {string}
-             */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
-            /** Value */
-            value: string | number | string[] | null;
-        };
         /** SearchQuery */
         SearchQuery: {
             /** Conditions */
-            conditions: components["schemas"]["SearchCondition"][];
+            conditions: (components["schemas"]["DefaultCondition"] | components["schemas"]["AttributeCondition"])[];
             /**
              * Limit
              * @default 200
@@ -1407,51 +1466,6 @@ export interface components {
             result_ids: number[];
             /** Has More */
             has_more: boolean;
-        };
-        /**
-         * SegmentationCreateMetadata
-         * @description Metadata for creating a new segmentation
-         */
-        SegmentationCreateMetadata: {
-            /** Image Instance Id */
-            image_instance_id: number;
-            /** Feature Id */
-            feature_id: number;
-            data_representation: components["schemas"]["DataRepresentation"];
-            data_type: components["schemas"]["Datatype"];
-            /** Depth */
-            depth: number;
-            /** Height */
-            height: number;
-            /** Width */
-            width: number;
-            /**
-             * Annotation Type
-             * @default grader_segmentation
-             * @constant
-             */
-            annotation_type: "grader_segmentation";
-            /** Subtask Id */
-            subtask_id?: number | null;
-            /** Sparse Axis */
-            sparse_axis?: number | null;
-            /** Image Projection Matrix */
-            image_projection_matrix?: number[][] | null;
-            /** Scan Indices */
-            scan_indices?: number[] | null;
-            /** Threshold */
-            threshold?: number | null;
-            /** Reference Segmentation Id */
-            reference_segmentation_id?: number | null;
-        };
-        /**
-         * SegmentationCreateRequest
-         * @description Structured request body for creating a segmentation
-         */
-        SegmentationCreateRequest: {
-            metadata: components["schemas"]["SegmentationCreateMetadata"];
-            /** Np Array */
-            np_array?: string | null;
         };
         /** SegmentationGET */
         SegmentationGET: {
@@ -1529,6 +1543,14 @@ export interface components {
             name: string;
             /** Values */
             values: string | string[];
+            /**
+             * Type
+             * @default default
+             * @enum {string}
+             */
+            type: "default" | "attribute";
+            /** Model */
+            model?: string | null;
         };
         /** StudyGET */
         StudyGET: {
@@ -1760,7 +1782,9 @@ export interface components {
             /** Id */
             id: number;
             /** Config */
-            config: Record<string, never>;
+            config: {
+                [key: string]: unknown;
+            };
             /**
              * Date Inserted
              * Format: date-time
@@ -2429,7 +2453,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SegmentationCreateRequest"];
+                "multipart/form-data": components["schemas"]["Body_create_segmentation_segmentations_post"];
             };
         };
         responses: {

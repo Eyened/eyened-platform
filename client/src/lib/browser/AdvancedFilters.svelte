@@ -6,21 +6,14 @@
 	import { Input } from '$lib/components/ui/input';
 	import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 	import Fa from 'svelte-fa';
+	import type { AttributeCondition, DefaultCondition, SearchCondition as SearchConditionT, SignatureField as SignatureFieldT } from '../../types/openapi_types';
 	import DatePicker from '../components/DatePicker.svelte';
-	// Local type definitions (matching OpenAPI types)
-	type ConditionOperator = '>' | '<' | '>=' | '<=' | '==' | '!=' | 'IN';
-	type ConditionValue = string | number | string[] | null;
-	
-	interface Condition {
-		variable: string;
-		operator: ConditionOperator;
-		value: ConditionValue;
-	}
 
-	interface SignatureField {
-		name: string;
-		values: string | string[]; // 'string' | 'int' | 'float' | 'date' | string[]
-	}
+    // Use OpenAPI-generated types
+    type Condition = SearchConditionT;
+    type SignatureField = SignatureFieldT;
+    type ConditionOperator = Condition['operator'];
+    type ConditionValue = Condition['value'];
 
 	type Props = {
 		signature: SignatureField[];
@@ -32,13 +25,21 @@
 	// Ephemeral state for adding new conditions
 	let draftRow: { field?: string; operator?: ConditionOperator; value?: ConditionValue } | null = $state(null);
 
-	// Field options for SelectWithSearch
-	const fieldOptions = $derived(
-		signature.map(s => ({ label: s.name, value: s.name }))
-	);
+    // Field options for SelectWithSearch (grouped)
+    const fieldOptions = $derived(
+        signature.map(s => ({
+            label: s.name,
+            value: s.name,
+            group: (s.type ?? 'default') === 'attribute' ? (s.model ?? 'Attributes') : 'Fields'
+        }))
+    );
+
+	$effect(() => {
+		console.log('fieldOptions', fieldOptions, signature);
+	});
 
 	// Get signature info for a field
-	function getFieldSignature(fieldName: string): SignatureField | undefined {
+    function getFieldSignature(fieldName: string): SignatureField | undefined {
 		return signature.find(s => s.name === fieldName);
 	}
 
@@ -112,7 +113,7 @@
 		const curr = next[i];
 		if (!curr) return;
 		
-		let updated: Condition = { ...curr, ...patch };
+        let updated: Condition = { ...curr, ...(patch as any) } as Condition;
 		
 		// Sanitize operator/value against signature
 		const sig = getFieldSignature(updated.variable);
@@ -140,12 +141,15 @@
 		draftRow = null;
 	}
 
-	function commitDraftIfValid() {
+    function commitDraftIfValid() {
 		if (!draftRow?.field || !draftRow?.operator || (draftRow.value === undefined || draftRow.value === '' || (Array.isArray(draftRow.value) && draftRow.value.length === 0))) return;
 		
 		const sig = getFieldSignature(draftRow.field);
 		const value = coerceValue(draftRow.value, sig?.values ?? 'string');
-		setConditions([...(conditions ?? []), { variable: draftRow.field, operator: draftRow.operator as any, value }]);
+        const newCond: Condition = (sig && (sig.type ?? 'default') === 'attribute')
+            ? ({ type: 'attribute', model: sig?.model || '', variable: draftRow.field as any, operator: draftRow.operator as any, value } as AttributeCondition)
+            : ({ type: 'default', variable: draftRow.field as any, operator: draftRow.operator as any, value } as DefaultCondition);
+        setConditions([...(conditions ?? []), newCond]);
 		draftRow = null;
 	}
 
@@ -172,16 +176,20 @@
 	}
 
 	// Sanitize conditions when signature or conditions change externally
-	$effect(() => {
+    $effect(() => {
 		if (!conditions) return;
-		const next: Condition[] = [];
+        const next: Condition[] = [];
 		for (const c of conditions) {
 			const sig = getFieldSignature(c.variable);
 			if (!sig) continue; // drop unknown fields for current signature
 			const allowedOps = getOperatorOptions(c.variable);
-			const operator = allowedOps.includes(c.operator as ConditionOperator) ? c.operator : getDefaultOperator(c.variable);
-			const value = coerceValue(c.value, sig.values);
-			next.push({ variable: c.variable, operator: operator as any, value });
+            const operator = allowedOps.includes(c.operator as ConditionOperator) ? c.operator : getDefaultOperator(c.variable);
+            const value = coerceValue(c.value, sig.values);
+            if ((c as any).type === 'attribute') {
+                next.push({ type: 'attribute', model: (c as any).model || '', variable: c.variable as any, operator: operator as any, value } as AttributeCondition);
+            } else {
+                next.push({ type: 'default', variable: c.variable as any, operator: operator as any, value } as DefaultCondition);
+            }
 		}
 		if (JSON.stringify(next) !== JSON.stringify(conditions)) {
 			conditions = next;
@@ -195,17 +203,25 @@
 		<div class="flex items-center gap-2 p-0 border rounded-lg">
 			<!-- Field Selector -->
 			<div class="flex-1">
-				<SelectWithSearch
-					options={fieldOptions}
-					value={condition.variable}
+                <SelectWithSearch
+                    options={fieldOptions}
+                    value={condition.variable}
 					placeholder="Select field..."
 					onSelect={(v: string) => {
 						const sig = getFieldSignature(v);
-						updateConditionAt(i, {
-							variable: v,
-							operator: getDefaultOperator(v) as any,
-							value: Array.isArray(sig?.values) ? [] : ''
-						});
+                        const patch: Partial<Condition> = {
+                            variable: v,
+                            operator: getDefaultOperator(v) as any,
+                            value: Array.isArray(sig?.values) ? [] : ''
+                        } as any;
+                        if (sig && (sig.type ?? 'default') === 'attribute') {
+                            (patch as any).type = 'attribute';
+                            (patch as any).model = sig.model || '';
+                        } else {
+                            (patch as any).type = 'default';
+                            delete (patch as any).model;
+                        }
+                        updateConditionAt(i, patch);
 					}}
 				/>
 			</div>
@@ -237,7 +253,7 @@
 			<div class="flex-1">
 				{#if true}
 					{@const sig = getFieldSignature(condition.variable)}
-					{#if sig && Array.isArray(sig.values)}
+                    {#if sig && Array.isArray(sig.values)}
 						<MultiSelectWithSearch
 							options={getValueOptions(condition.variable)}
 							values={(condition.value as string[]) ?? []}
@@ -249,12 +265,12 @@
 					{:else if sig?.values === 'int' || sig?.values === 'float'}
 						<Input type="number" step={sig.values === 'float' ? 'any' : '1'}
 								value={String(condition.value ?? '')}
-								oninput={(e) => updateConditionAt(i, { value: (e.target as HTMLInputElement).value })}/>
+                                    oninput={(e: Event) => updateConditionAt(i, { value: (e.target as HTMLInputElement).value })}/>
 					{:else}
 						<Input type="text"
 								value={String(condition.value ?? '')}
 								placeholder="Enter value..."
-								oninput={(e) => updateConditionAt(i, { value: (e.target as HTMLInputElement).value })}/>
+								oninput={(e: Event) => updateConditionAt(i, { value: (e.target as HTMLInputElement).value })}/>
 					{/if}
 				{/if}
 			</div>
@@ -320,11 +336,11 @@
 					{:else if sig?.values === 'int' || sig?.values === 'float'}
 						<Input type="number" step={sig.values === 'float' ? 'any' : '1'}
 								value={String(draftRow.value ?? '')}
-								onchange={(e) => updateDraftValue((e.target as HTMLInputElement).value)}/>
+                                onchange={(e: Event) => updateDraftValue((e.target as HTMLInputElement).value)}/>
 					{:else}
 						<Input value={String(draftRow.value ?? '')}
 								placeholder="Enter value..."
-								onchange={(e) => updateDraftValue((e.target as HTMLInputElement).value)}/>
+                                onchange={(e: Event) => updateDraftValue((e.target as HTMLInputElement).value)}/>
 					{/if}
 				{:else}
 					<Input type="text" disabled placeholder="Select field first..."/>

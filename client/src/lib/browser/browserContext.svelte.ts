@@ -1,7 +1,9 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import { ingestInstanceMetas, ingestInstances, ingestStudies, instanceMetas, studies } from '$lib/data/stores.svelte';
-import type { InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
+
+
+import { ingestInstanceMetas, ingestInstances, ingestStudies, instanceMetas, instances, studies } from '$lib/data/stores.svelte';
+import type { InstanceGET, InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
 
 export type QueryMode = 'studies' | 'instances';
 export type DisplayMode = 'instance' | 'study';
@@ -68,10 +70,10 @@ export class BrowserContext {
 
 	// Derived: ordered instances for rendering
 	orderedInstances = $derived(
-		this.orderedInstanceIds
-			.map(id => instanceMetas.get(id))
-			.filter((x): x is InstanceMeta => x !== undefined)
-	);
+	    this.orderedInstanceIds
+		.map(id => instances.get(id) ?? instanceMetas.get(id))
+		.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+);
 
 	// Derived: ordered studies for rendering
 	orderedStudies = $derived(
@@ -305,22 +307,29 @@ function deserializeValue(encoded: string): string | number | string[] | null {
 
 export function encodeConditions(conditions: Condition[]): string {
     return conditions.map((condition) => {
-        const encodedVariable = encodeURIComponent(condition.variable);
-        const encodedOperator = encodeURIComponent(condition.operator);
-        const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
-        return `${encodedVariable}:${encodedOperator}:${encodedValue}`;
+        const encodedVariable = encodeURIComponent((condition as any).variable);
+        const encodedOperator = encodeURIComponent((condition as any).operator);
+        const encodedValue = encodeURIComponent(serializeValue((condition as any).value ?? null));
+        const encodedType = encodeURIComponent((condition as any).type ?? 'default');
+        const encodedModel = encodeURIComponent(((condition as any).type === 'attribute' ? (condition as any).model ?? '' : ''));
+        return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}`;
     }).join(';');
 }
 
 export function decodeConditions(urlString: string): Condition[] {
     if (urlString === '') return [];
     return urlString.split(';').map((conditionString) => {
-        const [variable, operator, value] = conditionString.split(':');
-        return {
-            variable: decodeURIComponent(variable) as Condition['variable'],
-            operator: decodeURIComponent(operator) as Condition['operator'],
-            value: deserializeValue(value)
-        } as Condition;
+        const parts = conditionString.split(':');
+        const [v, o, val, t, m] = parts;
+        const variable = decodeURIComponent(v);
+        const operator = decodeURIComponent(o) as Condition['operator'];
+        const value = deserializeValue(val);
+        const type = t ? (decodeURIComponent(t) as any) : 'default';
+        const model = m ? decodeURIComponent(m) : undefined;
+        if (type === 'attribute') {
+            return { type: 'attribute', variable, operator: operator as any, value, model } as any;
+        }
+        return { type: 'default', variable: variable as any, operator: operator as any, value } as any;
     });
 }
 

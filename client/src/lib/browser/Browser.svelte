@@ -113,14 +113,11 @@
 		<div class="flex-5 flex-col min-w-0 p-4">
 			{#if browserContext.filterMode === "basic"}
 				<FilterShorcuts bind:condition={browserContext.basicCondition} />
-			{:else if browserContext.activeSignature.length}
-				<AdvancedFilters
-					signature={browserContext.activeSignature.map((s) => ({
-						name: s.name,
-						values: typeof s.values === "number" ? String(s.values) : s.values,
-					}))}
-					bind:conditions={browserContext.advancedConditions}
-				/>
+            {:else if browserContext.activeSignature.length}
+                <AdvancedFilters
+                    signature={browserContext.activeSignature}
+                    bind:conditions={browserContext.advancedConditions}
+                />
 			{/if}
 
 			<div class="">

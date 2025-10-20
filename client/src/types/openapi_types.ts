@@ -33,7 +33,10 @@ export type ModalityType = components['schemas']['ModalityType'];
 export type PatientMeta = components['schemas']['PatientMeta'];
 export type ProjectMeta = components['schemas']['ProjectMeta'];
 export type ScanMeta = components['schemas']['ScanMeta'];
-export type SearchCondition = components['schemas']['SearchCondition'];
+
+export type AttributeCondition = components['schemas']['AttributeCondition'];
+export type DefaultCondition = components['schemas']['DefaultCondition'];
+export type SearchCondition = AttributeCondition | DefaultCondition;
 export type SearchQuery = components['schemas']['SearchQuery'];
 export type SearchResponse = components['schemas']['SearchResponse'];
 export type SeriesGET = components['schemas']['SeriesGET'];
