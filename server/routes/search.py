@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date
-from typing import Any, Dict, List, Literal, Optional, Union, Tuple, cast
+from typing import Any, Dict, List, Literal, Optional, Union, Tuple, cast, Annotated
 
 from eyened_orm import (
     DeviceModel,
@@ -29,7 +29,7 @@ from eyened_orm.segmentation import Model as MLModel
 from eyened_orm.image_instance import Laterality as ImgLaterality, Modality as ImgModality, ETDRSField as ImgETDRS
 from eyened_orm.patient import SexEnum as PatientSex
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from sqlalchemy import select, func, and_, or_, true
 from sqlalchemy.orm import Session, aliased, selectinload
@@ -464,11 +464,23 @@ class SignatureField(BaseModel):
     name: str
     # Either a primitive type marker or an enum of allowed values
     values: str | list[str]  # 'string' | 'int' | 'float' | 'date' | string[]
+    type: Literal['default', 'attribute'] = 'default'
+    model: Optional[str] = None
 
-class SearchCondition(BaseModel):
+class DefaultCondition(BaseModel):
+    type: Literal['default'] = 'default'
     variable: searchable_fields
     operator: operators
-    value: Union[date, int, float, str, list[str], None]  # add list[str]
+    value: Union[date, int, float, str, list[str], None]
+
+class AttributeCondition(BaseModel):
+    type: Literal['attribute']
+    model: str
+    variable: str
+    operator: operators
+    value: Union[int, float, str, list[str], None]
+
+SearchCondition = Annotated[Union[DefaultCondition, AttributeCondition], Field(discriminator='type')]
 
 class SearchQuery(BaseModel):
     conditions: List[SearchCondition]
@@ -571,16 +583,27 @@ def _build_instance_select(
     """
     Build the base ImageInstance select using correlated EXISTS and apply ordering.
     """
-    # Split conditions into static (predefined) and attribute-based variables
+    # Split conditions into default and attribute-based based on discriminator
     static_conds_raw: List[Dict[str, Any]] = []
-    attr_conds_raw: List[Tuple[Tuple[str, str], Dict[str, Any]]] = []
+    attr_conds_raw: List[Tuple[str, str, Dict[str, Any]]] = []  # (model_name, attr_name, cond)
     for c in conditions:
-        var = c.get("variable")
-        pa = parse_attribute_var(var) if isinstance(var, str) else None
-        if pa is None:
-            static_conds_raw.append(c)
+        if c.get("type") == "attribute":
+            model_name = c.get("model")
+            attr_name = c.get("variable")
+            if not model_name or not isinstance(attr_name, str):
+                # Skip malformed attribute condition
+                continue
+            attr_conds_raw.append((model_name, attr_name, c))
         else:
-            attr_conds_raw.append((pa, c))
+            # Backward-compat: support legacy "Model[Attr]" variables with no type
+            var = c.get("variable")
+            if isinstance(var, str):
+                pa = parse_attribute_var(var)
+                if pa is not None:
+                    model_name, attr_name = pa
+                    attr_conds_raw.append((model_name, attr_name, c))
+                    continue
+            static_conds_raw.append(c)
 
     mapped = map_conditions_to_attrs(static_conds_raw, fields_map=instance_search_fields_map)
     by_entity = partition_conditions_by_entity(mapped)
@@ -633,7 +656,7 @@ def _build_instance_select(
 
     # Attribute EXISTS filters
     from sqlalchemy import select as sa_select
-    for (model_name, attr_name), c in attr_conds_raw:
+    for (model_name, attr_name, c) in attr_conds_raw:
         # Determine correct value column based on the provided value
         val_col = value_column_for(c.get("value"))
         subq = (
@@ -857,7 +880,7 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
         if dtype in (AttributeDataType.JSON,):
             continue
         val = "string" if dtype == AttributeDataType.String else ("int" if dtype == AttributeDataType.Int else "float")
-        items.append(SignatureField(name=f"{model_name}[{name}]", values=val))
+        items.append(SignatureField(name=name, values=val, type='attribute', model=model_name))
 
     # Free-text/number defaults
     items.append(SignatureField(name="Image DBID", values="int"))

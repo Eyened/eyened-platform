@@ -103,7 +103,7 @@ export class GlobalContext {
         const params = new URLSearchParams();
         params.set('page', '0');
         params.set('limit', '100');
-        params.set('conditions', this._encodeSingleCondition(condition));
+        params.set('conditions', this._encodeSingleConditionExtended(condition as any));
         params.set('order_by', 'Study Date');
         params.set('order', 'ASC');
         params.set('queryMode', 'instances');
@@ -121,5 +121,17 @@ export class GlobalContext {
         const encodedOperator = encodeURIComponent(condition.operator);
         const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
         return `${encodedVariable}:${encodedOperator}:${encodedValue}`;
+    }
+
+    private _encodeSingleConditionExtended(
+        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default'|'attribute'; model?: string }
+    ): string {
+        const serializeValue = (v: string | number | string[] | null) => JSON.stringify(v);
+        const encodedVariable = encodeURIComponent(condition.variable);
+        const encodedOperator = encodeURIComponent(condition.operator);
+        const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
+        const encodedType = encodeURIComponent(condition.type ?? 'default');
+        const encodedModel = encodeURIComponent((condition.type === 'attribute' ? condition.model ?? '' : ''));
+        return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}`;
     }
 }
