@@ -8,7 +8,6 @@ Some UI components on the top right of the viewer window.
 	import { Image2D } from '$lib/webgl/image2D';
 	import { getContext, onMount } from 'svelte';
 	import MainIcon from './icons/MainIcon.svelte';
-	import MultiImageViewer from './MultiImageViewer.svelte';
 	import type { ViewerWindowContext } from './viewerWindowContext.svelte';
 	
     const globalContext = getContext<GlobalContext>('globalContext');
@@ -32,13 +31,6 @@ Some UI components on the top right of the viewer window.
 	}
 	function browse() {
 		viewerWindowContext.browserOverlay = true;
-	}
-	function addMultiImageRendering() {
-		const panel = {
-			component: MultiImageViewer,
-			props: { image: firstCFIImage }
-		};
-		viewerWindowContext.addPanel(panel);
 	}
 </script>
 

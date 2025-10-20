@@ -211,6 +211,14 @@ class ImageInstance(Base):
 
     ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship("eyened_orm.tag.ImageInstanceTagLink", back_populates="ImageInstance", lazy="selectin")
 
+    # attributes relationship
+    ImageAttributes: Mapped[List["ImageAttribute"]] = relationship(
+        "eyened_orm.attributes.ImageAttribute",
+        back_populates="ImageInstance",
+        lazy="selectin",
+        cascade="all, delete-orphan"
+    )
+
     @property
     def shape(self) -> tuple[int, int, int]:
         return (self.NrOfFrames or 1, self.Rows_y, self.Columns_x)

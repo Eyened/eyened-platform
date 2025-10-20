@@ -146,5 +146,8 @@ class InstanceGET(InstanceBase):
     date_modified: Optional[datetime] = None
     date_preprocessed: Optional[datetime] = None
 
+    # Nested attributes by model name then attribute name
+    attributes: Dict[str, Dict[str, Any]]
+
 
 

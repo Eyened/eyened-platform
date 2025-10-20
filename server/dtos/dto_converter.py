@@ -202,6 +202,7 @@ class DTOConverter:
             device=device_meta,
             scan=scan_meta,
             tags=[],
+            attributes={},
         )
         if with_tag_metadata:
             dto.tags = DTOConverter._tags_from_image_instance(image_instance)
@@ -220,6 +221,33 @@ class DTOConverter:
                 DTOConverter.model_segmentation_to_get(ms, with_tag_metadata=with_tag_metadata)
                 for ms in (getattr(image_instance, "ModelSegmentations", []) or [])
             ]
+        # Populate attributes grouped by model name
+        try:
+            attrs_by_model: dict[str, dict[str, object]] = {}
+            for ia in getattr(image_instance, "ImageAttributes", []) or []:
+                attr = getattr(ia, "Attribute", None)
+                if not attr or not getattr(attr, "Model", None):
+                    continue
+                model_name = attr.Model.ModelName
+                value = None
+                if ia.ValueInt is not None:
+                    value = ia.ValueInt
+                elif ia.ValueFloat is not None:
+                    value = ia.ValueFloat
+                elif ia.ValueText is not None:
+                    value = ia.ValueText
+                elif ia.ValueJSON is not None:
+                    value = ia.ValueJSON
+                if value is None:
+                    continue
+                if model_name not in attrs_by_model:
+                    attrs_by_model[model_name] = {}
+                attrs_by_model[model_name][attr.AttributeName] = value
+            dto.attributes = attrs_by_model
+        except Exception:
+            # Fail-safe: leave attributes empty if relationships not loaded
+            dto.attributes = {}
+
         return dto
 
     @staticmethod

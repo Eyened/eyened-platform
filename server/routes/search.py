@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union, Tuple, cast
 
 from eyened_orm import (
     DeviceModel,
@@ -24,6 +24,8 @@ from eyened_orm import (
     Segmentation,
     SegmentationTagLink,
 )
+from eyened_orm.attributes import Attribute as Attr, ImageAttribute as ImgAttr, AttributeDataType
+from eyened_orm.segmentation import Model as MLModel
 from eyened_orm.image_instance import Laterality as ImgLaterality, Modality as ImgModality, ETDRSField as ImgETDRS
 from eyened_orm.patient import SexEnum as PatientSex
 from fastapi import APIRouter, Depends
@@ -209,6 +211,38 @@ def create_condition(conditions: List[Dict[str, Any]], fields_map: Optional[Dict
     # OR all conditions globally (no per-variable grouping)
     exprs: List[Any] = [format_condition(c["variable"], c) for c in conditions]
     return or_(*exprs) if exprs else true()
+ATTRIBUTE_VAR_RE = r"^(?P<model>[^\[]+)\[(?P<attr>[^\]]+)\]$"
+
+def parse_attribute_var(name: str) -> Optional[Tuple[str, str]]:
+    import re
+    m = re.match(ATTRIBUTE_VAR_RE, name)
+    if not m:
+        return None
+    return m.group("model"), m.group("attr")
+
+def value_column_for(op_value: Any):
+    # Choose ImageAttribute value column based on provided value
+    if isinstance(op_value, list):
+        if all(isinstance(v, str) for v in op_value):
+            return ImgAttr.ValueText
+        if all(isinstance(v, int) for v in op_value):
+            return ImgAttr.ValueInt
+        if all(isinstance(v, float) for v in op_value):
+            return ImgAttr.ValueFloat
+        # mixed types fall back to text comparison
+        return ImgAttr.ValueText
+    if isinstance(op_value, str):
+        return ImgAttr.ValueText
+    if isinstance(op_value, int):
+        return ImgAttr.ValueInt
+    if isinstance(op_value, float):
+        return ImgAttr.ValueFloat
+    # None or otherwise
+    return ImgAttr.ValueText
+
+def format_attr_condition(value_column: Any, condition: Dict[str, Any]) -> Any:
+    cond = {**condition, "variable": value_column}
+    return format_condition(value_column, cond)
 
 
 # ----------------------------------------
@@ -537,7 +571,18 @@ def _build_instance_select(
     """
     Build the base ImageInstance select using correlated EXISTS and apply ordering.
     """
-    mapped = map_conditions_to_attrs(conditions, fields_map=instance_search_fields_map)
+    # Split conditions into static (predefined) and attribute-based variables
+    static_conds_raw: List[Dict[str, Any]] = []
+    attr_conds_raw: List[Tuple[Tuple[str, str], Dict[str, Any]]] = []
+    for c in conditions:
+        var = c.get("variable")
+        pa = parse_attribute_var(var) if isinstance(var, str) else None
+        if pa is None:
+            static_conds_raw.append(c)
+        else:
+            attr_conds_raw.append((pa, c))
+
+    mapped = map_conditions_to_attrs(static_conds_raw, fields_map=instance_search_fields_map)
     by_entity = partition_conditions_by_entity(mapped)
 
     base_entities = {
@@ -586,6 +631,23 @@ def _build_instance_select(
     if tag_exists is not None:
         and_predicates.append(tag_exists)
 
+    # Attribute EXISTS filters
+    from sqlalchemy import select as sa_select
+    for (model_name, attr_name), c in attr_conds_raw:
+        # Determine correct value column based on the provided value
+        val_col = value_column_for(c.get("value"))
+        subq = (
+            sa_select(1)
+            .select_from(ImgAttr)
+            .join(Attr, ImgAttr.AttributeID == Attr.AttributeID)
+            .join(MLModel, Attr.ModelID == MLModel.ModelID)
+            .where(ImgAttr.ImageInstanceID == ImageInstance.ImageInstanceID)
+            .where(MLModel.ModelName == model_name)
+            .where(Attr.AttributeName == attr_name)
+        )
+        subq = subq.where(format_attr_condition(val_col, c))
+        and_predicates.append(subq.exists())
+
     where_clause = and_(*and_predicates) if and_predicates else true()
 
     sort_col = instance_order_by_fields_map[order_by]
@@ -617,6 +679,8 @@ async def search_instances(
         selectinload(ImageInstance.SourceInfo),
         selectinload(ImageInstance.Scan),
         selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
+        # attributes
+        selectinload(ImageInstance.ImageAttributes).selectinload(ImgAttr.Attribute).selectinload(Attr.Model),
     )
 
     instances = db.execute(instances_stmt.limit(limit + 1).offset(offset)).scalars().all()
@@ -698,6 +762,7 @@ async def search_studies(
             selectinload(ImageInstance.SourceInfo),
             selectinload(ImageInstance.Scan),
             selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
+            selectinload(ImageInstance.ImageAttributes).selectinload(ImgAttr.Attribute).selectinload(Attr.Model),
         )
         .distinct()
     )
@@ -782,6 +847,17 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
         .distinct()
     ).scalars().all()
     items.append(SignatureField(name="Image Tag Name", values=sorted(image_tag_names)))
+
+    # Attributes signature (non-JSON only)
+    attr_rows = db.execute(
+        select(Attr.AttributeName, Attr.AttributeDataType, MLModel.ModelName)
+        .join(MLModel, Attr.ModelID == MLModel.ModelID)
+    ).all()
+    for name, dtype, model_name in attr_rows:
+        if dtype in (AttributeDataType.JSON,):
+            continue
+        val = "string" if dtype == AttributeDataType.String else ("int" if dtype == AttributeDataType.Int else "float")
+        items.append(SignatureField(name=f"{model_name}[{name}]", values=val))
 
     # Free-text/number defaults
     items.append(SignatureField(name="Image DBID", values="int"))
