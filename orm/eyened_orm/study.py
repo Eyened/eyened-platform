@@ -26,7 +26,6 @@ class Study(Base):
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID", ondelete="CASCADE"))
     StudyRound: Mapped[Optional[int]]
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))
-    StudyInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
     StudyDate: Mapped[datetime.date]
 
     DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())

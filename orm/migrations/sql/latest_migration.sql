@@ -1,6 +1,7 @@
 -- Running upgrade 62b55e9c9e70 -> 5ffd55a02beb
 
-DROP INDEX `ix_FormAnnotation_FormAnnotationReferenceID` ON `FormAnnotation`;
+-- This is an issue from the last migration #TODO: check if this is still needed
+-- DROP INDEX `ix_FormAnnotation_FormAnnotationReferenceID` ON `FormAnnotation`;
 
 ALTER TABLE `ImageInstance` ADD COLUMN `AltDatasetIdentifier` VARCHAR(256);
 
