@@ -1,3 +1,7 @@
+# Not all pinned packages in the list below support pre-built packages with newer Python versions.
+# To be sure, use Python <=3.12 for now.
+# TODO #1: Apply pinning best practices (range pinning, add security hashes)
+# TODO #2: Support newer Python versions
 fastapi==0.115.8
 fastapi-cli==0.0.7
 uvicorn==0.34.0
