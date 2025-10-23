@@ -8,3 +8,8 @@ repos:
     -   id: end-of-file-fixer
     -   id: check-yaml
     -   id: check-added-large-files
+# TODO: check-json5 is very slow, consider using pre-commit-hooks:check-json and ignore/remove comments in tsconfig.json
+-   repo: https://gitlab.com/bmares/check-json5
+    rev: v1.0.0
+    hooks:
+    -   id: check-json5
