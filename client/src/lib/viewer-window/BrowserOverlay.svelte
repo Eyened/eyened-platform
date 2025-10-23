@@ -96,14 +96,11 @@
 			(id) => !currentInstanceIds.includes(id),
 		);
 
-		const taskId = subTask!.task_id;
-		const subtaskIndex = subTask!.index ?? 0;
-
 		for (const instanceId of newInstanceIds) {
-			await addSubTaskImage(taskId, subtaskIndex, instanceId);
+			await addSubTaskImage(subTask!.id, instanceId);
 		}
 		for (const instanceId of removedInstanceIds) {
-			await removeSubTaskImage(taskId, subtaskIndex, instanceId);
+			await removeSubTaskImage(subTask!.id, instanceId);
 		}
 	}
 </script>
