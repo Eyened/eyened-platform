@@ -4490,6 +4490,17 @@
               }
             ],
             "title": "Value"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature"
           }
         },
         "type": "object",
@@ -4876,7 +4887,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5015,7 +5025,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5086,7 +5095,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5130,7 +5138,6 @@
           "schema": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5185,7 +5192,6 @@
           "patient_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5215,7 +5221,6 @@
           "study_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5241,7 +5246,6 @@
           "series_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5260,7 +5264,6 @@
           "image_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5346,7 +5349,6 @@
           "data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5478,7 +5480,6 @@
           "cf_roi": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5490,7 +5491,6 @@
           "cf_keypoints": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5612,7 +5612,6 @@
           },
           "attributes": {
             "additionalProperties": {
-              "additionalProperties": true,
               "type": "object"
             },
             "type": "object",
@@ -6397,6 +6396,17 @@
               }
             ],
             "title": "Model"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature"
           }
         },
         "type": "object",
@@ -7073,7 +7083,6 @@
             "title": "Id"
           },
           "config": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           },

@@ -11,7 +11,7 @@ from sqlalchemy import select, inspect as sa_inspect
 
 from eyened_orm import ImageInstance
 from eyened_orm.segmentation import Model
-from eyened_orm.attributes import Attribute, ImageAttribute, AttributeDataType
+from eyened_orm.attributes import AttributeDefinition, AttributeValue, AttributeDataType, AttributesModelOutput
 
 
 def _is_nullish(value: Any) -> bool:
@@ -35,8 +35,8 @@ def _infer_column_type(col: pd.Series) -> AttributeDataType:
     return AttributeDataType.String
 
 
-def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version: str) -> List[ImageAttribute]:
-    """Convert a DataFrame to Attribute and ImageAttribute objects for a model; return the ImageAttribute objects touched."""
+def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version: str) -> List[AttributeValue]:
+    """Convert a DataFrame to AttributeDefinition and AttributeValue objects for a model; return the AttributeValue objects touched."""
     model = db.scalar(select(Model).where(Model.ModelName == model_name, Model.Version == version))
     if not model:
         raise ValueError(f"Model not found: {model_name} / {version}")
@@ -48,24 +48,36 @@ def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version:
     # infer types using pandas dtype
     col_types = {col: _infer_column_type(df[col]) for col in cols}
 
-    # upsert Attributes (no flush)
+    # upsert AttributeDefinitions (globally, not per-model)
     existing_attrs = {
         a.AttributeName: a
-        for a in db.scalars(select(Attribute).where(Attribute.ModelID == model.ModelID)).all()
+        for a in db.scalars(select(AttributeDefinition)).all()
     }
-    attrs_by_name: Dict[str, Attribute] = {}
+    attrs_by_name: Dict[str, AttributeDefinition] = {}
     for col in cols:
         if col in existing_attrs:
-            # validate type reuse
+            # validate type consistency
             if existing_attrs[col].AttributeDataType != col_types[col]:
                 raise ValueError(
                     f"Attribute type mismatch for {col}: existing={existing_attrs[col].AttributeDataType} new={col_types[col]}"
                 )
             attrs_by_name[col] = existing_attrs[col]
         else:
-            a = Attribute(AttributeName=col, AttributeDataType=col_types[col], ModelID=model.ModelID)
+            a = AttributeDefinition(AttributeName=col, AttributeDataType=col_types[col])
             db.add(a)
             attrs_by_name[col] = a  # pending
+
+    # Ensure AttributesModelOutput entries exist for this model
+    db.flush()  # Get AttributeIDs for pending attributes
+    for attr in attrs_by_name.values():
+        existing_link = db.scalar(
+            select(AttributesModelOutput).where(
+                AttributesModelOutput.ModelID == model.ModelID,
+                AttributesModelOutput.AttributeID == attr.AttributeID
+            )
+        )
+        if not existing_link:
+            db.add(AttributesModelOutput(ModelID=model.ModelID, AttributeID=attr.AttributeID))
 
     # load images
     image_ids: List[int] = []
@@ -78,18 +90,19 @@ def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version:
         image_ids.append(iid)
         idx_values.append(idx)
 
-    # preload existing ImageAttributes for persistent Attributes only
+    # preload existing AttributeValues for persistent AttributeDefinitions only
     persistent_attr_ids = [a.AttributeID for a in attrs_by_name.values() if not sa_inspect(a).pending]
-    existing_ia: Dict[Tuple[int, int], ImageAttribute] = {}
+    existing_av: Dict[Tuple[int, int, int], AttributeValue] = {}  # (ImageInstanceID, AttributeID, ModelID)
     if persistent_attr_ids and image_ids:
-        q = select(ImageAttribute).where(
-            ImageAttribute.ImageInstanceID.in_(set(image_ids)),
-            ImageAttribute.AttributeID.in_(set(persistent_attr_ids)),
+        q = select(AttributeValue).where(
+            AttributeValue.ImageInstanceID.in_(set(image_ids)),
+            AttributeValue.AttributeID.in_(set(persistent_attr_ids)),
+            AttributeValue.ModelID == model.ModelID
         )
-        for ia in db.scalars(q).all():
-            existing_ia[(ia.ImageInstanceID, ia.AttributeID)] = ia
+        for av in db.scalars(q).all():
+            existing_av[(av.ImageInstanceID, av.AttributeID, av.ModelID)] = av
 
-    touched: List[ImageAttribute] = []
+    touched: List[AttributeValue] = []
     for idx, image_id in zip(idx_values, image_ids):
         for col, attr in attrs_by_name.items():
             if col not in df.columns:
@@ -100,45 +113,54 @@ def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version:
 
             dtype = attr.AttributeDataType
             if sa_inspect(attr).pending:
-                ia = ImageAttribute(ImageInstanceID=image_id, Attribute=attr)
+                av = AttributeValue(
+                    ImageInstanceID=image_id,
+                    AttributeID=attr.AttributeID,
+                    ModelID=model.ModelID
+                )
             else:
-                key = (image_id, attr.AttributeID)
-                ia = existing_ia.get(key)
-                if ia is None:
-                    ia = ImageAttribute(ImageInstanceID=image_id, AttributeID=attr.AttributeID)
+                key = (image_id, attr.AttributeID, model.ModelID)
+                av = existing_av.get(key)
+                if av is None:
+                    av = AttributeValue(
+                        ImageInstanceID=image_id,
+                        AttributeID=attr.AttributeID,
+                        ModelID=model.ModelID
+                    )
 
             # assign per dtype
             if dtype == AttributeDataType.Int:
-                ia.ValueInt = int(raw_val) if not isinstance(raw_val, bool) else (1 if raw_val else 0)
-                ia.ValueFloat = None
-                ia.ValueText = None
-                ia.ValueJSON = None
+                av.ValueInt = int(raw_val) if not isinstance(raw_val, bool) else (1 if raw_val else 0)
+                av.ValueFloat = None
+                av.ValueText = None
+                av.ValueJSON = None
             elif dtype == AttributeDataType.Float:
-                ia.ValueFloat = float(raw_val)
-                ia.ValueInt = None
-                ia.ValueText = None
-                ia.ValueJSON = None
+                av.ValueFloat = float(raw_val)
+                av.ValueInt = None
+                av.ValueText = None
+                av.ValueJSON = None
             else:
-                ia.ValueText = str(raw_val)
-                ia.ValueInt = None
-                ia.ValueFloat = None
-                ia.ValueJSON = None
+                av.ValueText = str(raw_val)
+                av.ValueInt = None
+                av.ValueFloat = None
+                av.ValueJSON = None
 
-            if sa_inspect(ia).transient:
-                db.add(ia)
-            touched.append(ia)
+            if sa_inspect(av).transient:
+                db.add(av)
+            touched.append(av)
 
     return touched
 
 
-def print_import_summary(attributes: List[Attribute], image_attributes: List[ImageAttribute]) -> None:
-    """Print a summary grouped by Attribute: new vs existing, and per-attribute new vs updated ImageAttributes."""
-    # group by Attribute
-    groups: Dict[Attribute, List[ImageAttribute]] = defaultdict(list)
-    for ia in image_attributes:
-        if ia.Attribute is None:
+def print_import_summary(attributes: List[AttributeDefinition], attribute_values: List[AttributeValue]) -> None:
+    """Print a summary grouped by AttributeDefinition: new vs existing, and per-attribute new vs updated AttributeValues."""
+    # group by AttributeDefinition
+    groups: Dict[AttributeDefinition, List[AttributeValue]] = defaultdict(list)
+    for av in attribute_values:
+        attr_def = getattr(av, "AttributeDefinition", None)
+        if attr_def is None:
             continue
-        groups[ia.Attribute].append(ia)
+        groups[attr_def].append(av)
 
     # partition attributes by new vs existing
     new_attrs = []
@@ -153,23 +175,23 @@ def print_import_summary(attributes: List[Attribute], image_attributes: List[Ima
     if new_attrs:
         print("New Attributes:")
         for attr, items in sorted(new_attrs, key=lambda x: x[0].AttributeName):
-            new_ias = sum(1 for ia in items if sa_inspect(ia).pending or sa_inspect(ia).transient)
-            print(f"  - {attr.AttributeName}: {new_ias} inserted")
+            new_avs = sum(1 for av in items if sa_inspect(av).pending or sa_inspect(av).transient)
+            print(f"  - {attr.AttributeName}: {new_avs} inserted")
 
     # print existing attributes
     if existing_attrs:
         print("Existing Attributes:")
         for attr, items in sorted(existing_attrs, key=lambda x: x[0].AttributeName):
-            new_ias = sum(1 for ia in items if sa_inspect(ia).pending or sa_inspect(ia).transient)
+            new_avs = sum(1 for av in items if sa_inspect(av).pending or sa_inspect(av).transient)
             
-            def is_updated(ia: ImageAttribute) -> bool:
-                st = sa_inspect(ia)
+            def is_updated(av: AttributeValue) -> bool:
+                st = sa_inspect(av)
                 if st.transient or st.pending:
                     return False
                 keys = ("ValueInt", "ValueFloat", "ValueText", "ValueJSON")
-                return any(st.attrs[k].history.has_changes() for k in keys if hasattr(ia, k))
+                return any(st.attrs[k].history.has_changes() for k in keys if hasattr(av, k))
             
-            upd_ias = sum(1 for ia in items if is_updated(ia))
-            print(f"  - {attr.AttributeName}: {new_ias} new, {upd_ias} updated")
+            upd_avs = sum(1 for av in items if is_updated(av))
+            print(f"  - {attr.AttributeName}: {new_avs} new, {upd_avs} updated")
 
 

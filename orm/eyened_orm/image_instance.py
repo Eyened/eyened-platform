@@ -212,8 +212,8 @@ class ImageInstance(Base):
     ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship("eyened_orm.tag.ImageInstanceTagLink", back_populates="ImageInstance", lazy="selectin")
 
     # attributes relationship
-    ImageAttributes: Mapped[List["ImageAttribute"]] = relationship(
-        "eyened_orm.attributes.ImageAttribute",
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship(
+        "eyened_orm.attributes.AttributeValue",
         back_populates="ImageInstance",
         lazy="selectin",
         cascade="all, delete-orphan"
