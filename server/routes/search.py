@@ -25,13 +25,14 @@ from eyened_orm import (
     SegmentationTagLink,
 )
 from eyened_orm.attributes import AttributeDefinition as AttrDef, AttributeValue as AttrVal, AttributeDataType, AttributesModelOutput
-from eyened_orm.segmentation import Model as MLModel, ModelSegmentation
+from eyened_orm.segmentation import ModelSegmentation, SegmentationModel
+from eyened_orm.attributes import AttributesModel
 from eyened_orm.image_instance import Laterality as ImgLaterality, Modality as ImgModality, ETDRSField as ImgETDRS
 from eyened_orm.patient import SexEnum as PatientSex
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from sqlalchemy import select, func, and_, or_, true
+from sqlalchemy import select, func, and_, or_, true, union_all, literal
 from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.dialects import mysql
@@ -509,6 +510,7 @@ class SignatureField(BaseModel):
     values: str | list[str]  # 'string' | 'int' | 'float' | 'date' | string[]
     type: Literal['default', 'attribute'] = 'default'
     model: Optional[str] = None
+    feature: Optional[str] = None  # NEW: feature name for segmentation-based attributes
 
 class DefaultCondition(BaseModel):
     type: Literal['default'] = 'default'
@@ -522,6 +524,7 @@ class AttributeCondition(BaseModel):
     variable: str
     operator: operators
     value: Union[int, float, str, list[str], None]
+    feature: Optional[str] = None  # NEW: filter by feature name
 
 SearchCondition = Annotated[Union[DefaultCondition, AttributeCondition], Field(discriminator='type')]
 
@@ -630,14 +633,16 @@ def _build_instance_select(
     
     # Split conditions into default and attribute-based based on discriminator
     static_conds_raw: List[Dict[str, Any]] = []
-    attr_conds_raw: List[Tuple[str, str, Dict[str, Any]]] = []  # (model_name, attr_name, cond)
+    attr_conds_raw: List[Tuple[str, str, Optional[str], Dict[str, Any]]] = []  # (model_name, attr_name, feature_name, cond)
+
     for c in conditions:
         if c.get("type") == "attribute":
             model_name = c.get("model")
             attr_name = c.get("variable")
+            feature_name = c.get("feature")  # NEW: extract feature (can be None)
             if not model_name or not isinstance(attr_name, str):
                 continue
-            attr_conds_raw.append((model_name, attr_name, c))
+            attr_conds_raw.append((model_name, attr_name, feature_name, c))
         else:
             # Backward-compat: support legacy "Model[Attr]" variables with no type
             var = c.get("variable")
@@ -645,7 +650,7 @@ def _build_instance_select(
                 pa = parse_attribute_var(var)
                 if pa is not None:
                     model_name, attr_name = pa
-                    attr_conds_raw.append((model_name, attr_name, c))
+                    attr_conds_raw.append((model_name, attr_name, None, c))
                     continue
             static_conds_raw.append(c)
 
@@ -703,20 +708,21 @@ def _build_instance_select(
     
     # First, collect all unique attribute definitions we need to look up
     attr_lookups = {}
-    for (model_name, attr_name, c) in attr_conds_raw:
-        key = (model_name, attr_name)
+    for (model_name, attr_name, feature_name, c) in attr_conds_raw:
+        key = (model_name, attr_name, feature_name)
         if key not in attr_lookups:
             attr_lookups[key] = []
         attr_lookups[key].append(c)
-    
+
     # Look up attribute definitions for all unique model/attribute combinations
+    # Note: feature doesn't affect which AttributeDefinition to use, only filtering
     attr_defs = {}
-    for (model_name, attr_name) in attr_lookups.keys():
+    for (model_name, attr_name, feature_name) in attr_lookups.keys():
         attr_def_stmt = (
             select(AttrDef)
             .join(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID)
-            .join(MLModel, AttributesModelOutput.ModelID == MLModel.ModelID)
-            .where(MLModel.ModelName == model_name)
+            .join(AttributesModel, AttributesModelOutput.ModelID == AttributesModel.ModelID)
+            .where(AttributesModel.ModelName == model_name)
             .where(AttrDef.AttributeName == attr_name)
         )
         attr_def = db.execute(attr_def_stmt).scalar_one_or_none()
@@ -724,11 +730,12 @@ def _build_instance_select(
         if not attr_def:
             continue
         
-        attr_defs[(model_name, attr_name)] = attr_def
+        # Store with full key including feature for later lookup
+        attr_defs[(model_name, attr_name, feature_name)] = attr_def
     
     # Build EXISTS subqueries using the correct attribute definitions
-    for (model_name, attr_name, c) in attr_conds_raw:
-        attr_def = attr_defs.get((model_name, attr_name))
+    for (model_name, attr_name, feature_name, c) in attr_conds_raw:
+        attr_def = attr_defs.get((model_name, attr_name, feature_name))
         if not attr_def:
             continue
         
@@ -737,11 +744,13 @@ def _build_instance_select(
             sa_select(1)
             .select_from(AttrVal)
             .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
-            .join(MLModel, AttrVal.ModelID == MLModel.ModelID)
+            .join(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
             # Outer join to Segmentation (will be NULL if AttributeValue is not for a Segmentation)
             .outerjoin(Segmentation, AttrVal.SegmentationID == Segmentation.SegmentationID)
             # Outer join to ModelSegmentation (will be NULL if AttributeValue is not for a ModelSegmentation)
             .outerjoin(ModelSegmentation, AttrVal.ModelSegmentationID == ModelSegmentation.ModelSegmentationID)
+            # ROBUST: Join SegmentationModel early to get its Feature
+            .outerjoin(SegmentationModel, ModelSegmentation.ModelID == SegmentationModel.ModelID)
             .where(
                 # Match if ANY of the three paths lead to this ImageInstance
                 or_(
@@ -750,10 +759,22 @@ def _build_instance_select(
                     ModelSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID
                 )
             )
-            .where(MLModel.ModelName == model_name)
+            .where(AttributesModel.ModelName == model_name)
             .where(AttrDef.AttributeName == attr_name)
             .where(format_attr_condition_with_definition(attr_def, c))
         )
+        
+        # ROBUST: Add feature filter if specified - simpler join logic
+        if feature_name:
+            subq = subq.outerjoin(
+                Feature,
+                or_(
+                    # Direct Segmentation path
+                    Segmentation.FeatureID == Feature.FeatureID,
+                    # ModelSegmentation path through SegmentationModel (already joined above)
+                    SegmentationModel.FeatureID == Feature.FeatureID
+                )
+            ).where(Feature.FeatureName == feature_name)
         
         and_predicates.append(subq.exists())
 
@@ -961,17 +982,79 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
     ).scalars().all()
     items.append(SignatureField(name="Image Tag Name", values=sorted(image_tag_names)))
 
-    # Attributes signature (non-JSON only)
-    attr_rows = db.execute(
-        select(AttrDef.AttributeName, AttrDef.AttributeDataType, MLModel.ModelName)
-        .join(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID)
-        .join(MLModel, AttributesModelOutput.ModelID == MLModel.ModelID)
-    ).all()
-    for name, dtype, model_name in attr_rows:
-        if dtype in (AttributeDataType.JSON,):
+    # Attributes signature with feature context
+    # Query existing AttributeValues to find which model+feature combinations exist
+
+    # Query 1: AttributeValues linked to Segmentation
+    seg_query = (
+        select(
+            AttrDef.AttributeName,
+            AttrDef.AttributeDataType,
+            AttributesModel.ModelName,
+            Feature.FeatureName
+        )
+        .select_from(AttrVal)
+        .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
+        .join(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
+        .join(Segmentation, AttrVal.SegmentationID == Segmentation.SegmentationID)
+        .join(Feature, Segmentation.FeatureID == Feature.FeatureID)
+        .where(AttrDef.AttributeDataType != AttributeDataType.JSON)
+    )
+
+    # Query 2: AttributeValues linked to ModelSegmentation
+    modelseg_query = (
+        select(
+            AttrDef.AttributeName,
+            AttrDef.AttributeDataType,
+            AttributesModel.ModelName,
+            Feature.FeatureName
+        )
+        .select_from(AttrVal)
+        .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
+        .join(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
+        .join(ModelSegmentation, AttrVal.ModelSegmentationID == ModelSegmentation.ModelSegmentationID)
+        .join(SegmentationModel, ModelSegmentation.ModelID == SegmentationModel.ModelID)
+        .join(Feature, SegmentationModel.FeatureID == Feature.FeatureID)
+        .where(AttrDef.AttributeDataType != AttributeDataType.JSON)
+    )
+
+    # Query 3: AttributeValues directly linked to ImageInstance (no feature)
+    # Use literal(None) for better cross-database compatibility
+    direct_query = (
+        select(
+            AttrDef.AttributeName,
+            AttrDef.AttributeDataType,
+            AttributesModel.ModelName,
+            literal(None).label('FeatureName')  # NULL as FeatureName
+        )
+        .select_from(AttrVal)
+        .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
+        .join(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
+        .where(AttrVal.ImageInstanceID.is_not(None))
+        .where(AttrDef.AttributeDataType != AttributeDataType.JSON)
+    )
+
+    # Combine all three with UNION and get distinct results
+    combined_query = union_all(seg_query, modelseg_query, direct_query).subquery()
+    distinct_query = select(combined_query).distinct()
+    attr_rows = db.execute(distinct_query).all()
+
+    # Convert to SignatureFields with deduplication
+    seen = set()
+    for name, dtype, model_name, feature_name in attr_rows:
+        key = (name, model_name, feature_name)
+        if key in seen:
             continue
+        seen.add(key)
+        
         val = "string" if dtype == AttributeDataType.String else ("int" if dtype == AttributeDataType.Int else "float")
-        items.append(SignatureField(name=name, values=val, type='attribute', model=model_name))
+        items.append(SignatureField(
+            name=name, 
+            values=val, 
+            type='attribute', 
+            model=model_name,
+            feature=feature_name  # Will be None for direct image attributes
+        ))
 
     # Free-text/number defaults
     items.append(SignatureField(name="Image DBID", values="int"))
