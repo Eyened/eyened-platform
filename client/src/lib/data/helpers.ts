@@ -312,15 +312,33 @@ export async function deleteTask(id: number) {
 
 // ===== SubTask Helpers =====
 
-export async function addSubTaskImage(taskId: number, subtaskIndex: number, instanceId: number) {
+export async function addSubTaskImage(subtaskId: number, instanceId: number) {
 	const { api } = await import('../api/client');
 	const { ingestSubTasks } = await import('./stores.svelte');
 	
-	const res = await api.POST('/task/{task_id}/subtask/{subtask_index}/images/{instance_id}' as any, {
+	const res = await api.POST('/subtasks/{subtaskid}/images' as any, {
 		params: {
 			path: {
-				task_id: taskId,
-				subtask_index: subtaskIndex,
+				subtaskid: subtaskId
+			}
+		} as any,
+		body: { instance_id: instanceId } as any
+	});
+	
+	if (res.data) {
+		ingestSubTasks([res.data as any]);
+	}
+	return res.data;
+}
+
+export async function removeSubTaskImage(subtaskId: number, instanceId: number) {
+	const { api } = await import('../api/client');
+	const { ingestSubTasks } = await import('./stores.svelte');
+	
+	const res = await api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
+		params: {
+			path: {
+				subtaskid: subtaskId,
 				instance_id: instanceId
 			}
 		} as any
@@ -332,35 +350,14 @@ export async function addSubTaskImage(taskId: number, subtaskIndex: number, inst
 	return res.data;
 }
 
-export async function removeSubTaskImage(taskId: number, subtaskIndex: number, instanceId: number) {
+export async function updateSubTaskComments(subtaskId: number, comments: string) {
 	const { api } = await import('../api/client');
 	const { ingestSubTasks } = await import('./stores.svelte');
 	
-	const res = await api.DELETE('/task/{task_id}/subtask/{subtask_index}/images/{instance_id}' as any, {
+	const res = await api.PATCH('/subtasks/{subtaskid}' as any, {
 		params: {
 			path: {
-				task_id: taskId,
-				subtask_index: subtaskIndex,
-				instance_id: instanceId
-			}
-		} as any
-	});
-	
-	if (res.data) {
-		ingestSubTasks([res.data as any]);
-	}
-	return res.data;
-}
-
-export async function updateSubTaskComments(taskId: number, subtaskIndex: number, comments: string) {
-	const { api } = await import('../api/client');
-	const { ingestSubTasks } = await import('./stores.svelte');
-	
-	const res = await api.PATCH('/task/{task_id}/subtask/{subtask_index}' as any, {
-		params: {
-			path: {
-				task_id: taskId,
-				subtask_index: subtaskIndex
+				subtaskid: subtaskId
 			}
 		} as any,
 		body: { comments } as any
