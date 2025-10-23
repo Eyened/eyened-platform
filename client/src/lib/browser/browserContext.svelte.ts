@@ -62,16 +62,21 @@ export class BrowserContext {
         this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
     );
 
+	// Helper: Get instance from either store (full InstanceGET or lightweight InstanceMeta)
+	private getInstance(id: number): InstanceGET | InstanceMeta | undefined {
+		return instances.get(id) ?? instanceMetas.get(id);
+	}
+
 	selectedInstances = $derived(
 		this.selectedIds
-			.map(id => instanceMetas.get(id))
-			.filter((x): x is InstanceMeta => x !== undefined)
+			.map(id => this.getInstance(id))
+			.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
 	);
 
 	// Derived: ordered instances for rendering
 	orderedInstances = $derived(
 	    this.orderedInstanceIds
-		.map(id => instances.get(id) ?? instanceMetas.get(id))
+		.map(id => this.getInstance(id))
 		.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
 );
 
