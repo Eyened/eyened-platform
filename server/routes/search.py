@@ -24,8 +24,8 @@ from eyened_orm import (
     Segmentation,
     SegmentationTagLink,
 )
-from eyened_orm.attributes import Attribute as Attr, ImageAttribute as ImgAttr, AttributeDataType
-from eyened_orm.segmentation import Model as MLModel
+from eyened_orm.attributes import AttributeDefinition as AttrDef, AttributeValue as AttrVal, AttributeDataType, AttributesModelOutput
+from eyened_orm.segmentation import Model as MLModel, ModelSegmentation
 from eyened_orm.image_instance import Laterality as ImgLaterality, Modality as ImgModality, ETDRSField as ImgETDRS
 from eyened_orm.patient import SexEnum as PatientSex
 from fastapi import APIRouter, Depends
@@ -220,27 +220,70 @@ def parse_attribute_var(name: str) -> Optional[Tuple[str, str]]:
         return None
     return m.group("model"), m.group("attr")
 
-def value_column_for(op_value: Any):
-    # Choose ImageAttribute value column based on provided value
-    if isinstance(op_value, list):
-        if all(isinstance(v, str) for v in op_value):
-            return ImgAttr.ValueText
-        if all(isinstance(v, int) for v in op_value):
-            return ImgAttr.ValueInt
-        if all(isinstance(v, float) for v in op_value):
-            return ImgAttr.ValueFloat
-        # mixed types fall back to text comparison
-        return ImgAttr.ValueText
-    if isinstance(op_value, str):
-        return ImgAttr.ValueText
-    if isinstance(op_value, int):
-        return ImgAttr.ValueInt
-    if isinstance(op_value, float):
-        return ImgAttr.ValueFloat
-    # None or otherwise
-    return ImgAttr.ValueText
+def get_value_column_for_attribute(attr_def: AttrDef) -> Any:
+    """Get the correct value column based on the attribute's data type."""
+    if attr_def.AttributeDataType == AttributeDataType.Int:
+        return AttrVal.ValueInt
+    elif attr_def.AttributeDataType == AttributeDataType.Float:
+        return AttrVal.ValueFloat
+    elif attr_def.AttributeDataType == AttributeDataType.String:
+        return AttrVal.ValueText
+    elif attr_def.AttributeDataType == AttributeDataType.JSON:
+        return AttrVal.ValueJSON
+    else:
+        # Fallback to text for unknown types
+        return AttrVal.ValueText
+
+def convert_search_value_to_attribute_type(value: Any, attr_def: AttrDef) -> Any:
+    """Convert search value to match the attribute's data type."""
+    if value is None:
+        return None
+    
+    # Handle list values (for IN operations)
+    if isinstance(value, list):
+        try:
+            if attr_def.AttributeDataType == AttributeDataType.Int:
+                return [int(v) if not isinstance(v, bool) else (1 if v else 0) for v in value]
+            elif attr_def.AttributeDataType == AttributeDataType.Float:
+                return [float(v) for v in value]
+            elif attr_def.AttributeDataType == AttributeDataType.String:
+                return [str(v) for v in value]
+            elif attr_def.AttributeDataType == AttributeDataType.JSON:
+                return value  # Keep as-is for JSON
+            else:
+                return [str(v) for v in value]
+        except (ValueError, TypeError):
+            # If conversion fails, return as string list for text comparison
+            return [str(v) for v in value]
+    
+    # Handle single values
+    try:
+        if attr_def.AttributeDataType == AttributeDataType.Int:
+            return int(value) if not isinstance(value, bool) else (1 if value else 0)
+        elif attr_def.AttributeDataType == AttributeDataType.Float:
+            return float(value)
+        elif attr_def.AttributeDataType == AttributeDataType.String:
+            return str(value)
+        elif attr_def.AttributeDataType == AttributeDataType.JSON:
+            # For JSON, we might need special handling
+            return value
+        else:
+            return str(value)
+    except (ValueError, TypeError):
+        # If conversion fails, return as string for text comparison
+        return str(value)
+
+def format_attr_condition_with_definition(attr_def: AttrDef, condition: Dict[str, Any]) -> Any:
+    """Format attribute condition using the correct value column based on attribute definition."""
+    value_column = get_value_column_for_attribute(attr_def)
+    converted_value = convert_search_value_to_attribute_type(condition["value"], attr_def)
+    
+    # Create a new condition with the converted value
+    converted_condition = {**condition, "value": converted_value}
+    return format_condition(value_column, converted_condition)
 
 def format_attr_condition(value_column: Any, condition: Dict[str, Any]) -> Any:
+    """Legacy function - use format_attr_condition_with_definition instead."""
     cond = {**condition, "variable": value_column}
     return format_condition(value_column, cond)
 
@@ -579,10 +622,12 @@ def _build_instance_select(
     conditions: List[Dict[str, Any]],
     order_by: instance_order_by_fields,
     order: Literal["ASC", "DESC"],
+    db: Session,
 ):
     """
     Build the base ImageInstance select using correlated EXISTS and apply ordering.
     """
+    
     # Split conditions into default and attribute-based based on discriminator
     static_conds_raw: List[Dict[str, Any]] = []
     attr_conds_raw: List[Tuple[str, str, Dict[str, Any]]] = []  # (model_name, attr_name, cond)
@@ -591,7 +636,6 @@ def _build_instance_select(
             model_name = c.get("model")
             attr_name = c.get("variable")
             if not model_name or not isinstance(attr_name, str):
-                # Skip malformed attribute condition
                 continue
             attr_conds_raw.append((model_name, attr_name, c))
         else:
@@ -656,19 +700,61 @@ def _build_instance_select(
 
     # Attribute EXISTS filters
     from sqlalchemy import select as sa_select
+    
+    # First, collect all unique attribute definitions we need to look up
+    attr_lookups = {}
     for (model_name, attr_name, c) in attr_conds_raw:
-        # Determine correct value column based on the provided value
-        val_col = value_column_for(c.get("value"))
+        key = (model_name, attr_name)
+        if key not in attr_lookups:
+            attr_lookups[key] = []
+        attr_lookups[key].append(c)
+    
+    # Look up attribute definitions for all unique model/attribute combinations
+    attr_defs = {}
+    for (model_name, attr_name) in attr_lookups.keys():
+        attr_def_stmt = (
+            select(AttrDef)
+            .join(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID)
+            .join(MLModel, AttributesModelOutput.ModelID == MLModel.ModelID)
+            .where(MLModel.ModelName == model_name)
+            .where(AttrDef.AttributeName == attr_name)
+        )
+        attr_def = db.execute(attr_def_stmt).scalar_one_or_none()
+        
+        if not attr_def:
+            continue
+        
+        attr_defs[(model_name, attr_name)] = attr_def
+    
+    # Build EXISTS subqueries using the correct attribute definitions
+    for (model_name, attr_name, c) in attr_conds_raw:
+        attr_def = attr_defs.get((model_name, attr_name))
+        if not attr_def:
+            continue
+        
+        # Single subquery with outer joins to handle all three entity types
         subq = (
             sa_select(1)
-            .select_from(ImgAttr)
-            .join(Attr, ImgAttr.AttributeID == Attr.AttributeID)
-            .join(MLModel, Attr.ModelID == MLModel.ModelID)
-            .where(ImgAttr.ImageInstanceID == ImageInstance.ImageInstanceID)
+            .select_from(AttrVal)
+            .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
+            .join(MLModel, AttrVal.ModelID == MLModel.ModelID)
+            # Outer join to Segmentation (will be NULL if AttributeValue is not for a Segmentation)
+            .outerjoin(Segmentation, AttrVal.SegmentationID == Segmentation.SegmentationID)
+            # Outer join to ModelSegmentation (will be NULL if AttributeValue is not for a ModelSegmentation)
+            .outerjoin(ModelSegmentation, AttrVal.ModelSegmentationID == ModelSegmentation.ModelSegmentationID)
+            .where(
+                # Match if ANY of the three paths lead to this ImageInstance
+                or_(
+                    AttrVal.ImageInstanceID == ImageInstance.ImageInstanceID,
+                    Segmentation.ImageInstanceID == ImageInstance.ImageInstanceID,
+                    ModelSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID
+                )
+            )
             .where(MLModel.ModelName == model_name)
-            .where(Attr.AttributeName == attr_name)
+            .where(AttrDef.AttributeName == attr_name)
+            .where(format_attr_condition_with_definition(attr_def, c))
         )
-        subq = subq.where(format_attr_condition(val_col, c))
+        
         and_predicates.append(subq.exists())
 
     where_clause = and_(*and_predicates) if and_predicates else true()
@@ -676,11 +762,12 @@ def _build_instance_select(
     sort_col = instance_order_by_fields_map[order_by]
     sort_dir = sort_col.asc() if order == "ASC" else sort_col.desc()
 
-    return (
+    final_query = (
         q.filter(ImageInstance.Modality.is_not(None))
          .where(where_clause)
          .order_by(sort_dir, ImageInstance.ImageInstanceID.asc())
     )
+    return final_query
 
 
 @router.post("/instances/search", response_model=SearchResponse, response_model_exclude_none=True)
@@ -696,17 +783,19 @@ async def search_instances(
     page = params.get("page", 0)
     offset = limit * page
 
-    instances_stmt = _build_instance_select(conditions, params["order_by"], params["order"]).options(
+    instances_stmt = _build_instance_select(conditions, params["order_by"], params["order"], db).options(
         selectinload(ImageInstance.Series).selectinload(Series.Study).selectinload(Study.Patient).selectinload(Patient.Project),
         selectinload(ImageInstance.DeviceInstance).selectinload(DeviceInstance.DeviceModel),
         selectinload(ImageInstance.SourceInfo),
         selectinload(ImageInstance.Scan),
         selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
         # attributes
-        selectinload(ImageInstance.ImageAttributes).selectinload(ImgAttr.Attribute).selectinload(Attr.Model),
+        selectinload(ImageInstance.AttributeValues).selectinload(AttrVal.AttributeDefinition),
+        selectinload(ImageInstance.AttributeValues).selectinload(AttrVal.ProducingModel),
     )
 
     instances = db.execute(instances_stmt.limit(limit + 1).offset(offset)).scalars().all()
+    
     has_more = len(instances) > limit
     if has_more:
         instances = instances[:limit]
@@ -785,7 +874,8 @@ async def search_studies(
             selectinload(ImageInstance.SourceInfo),
             selectinload(ImageInstance.Scan),
             selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
-            selectinload(ImageInstance.ImageAttributes).selectinload(ImgAttr.Attribute).selectinload(Attr.Model),
+            selectinload(ImageInstance.AttributeValues).selectinload(AttrVal.AttributeDefinition),
+            selectinload(ImageInstance.AttributeValues).selectinload(AttrVal.ProducingModel),
         )
         .distinct()
     )
@@ -873,8 +963,9 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
 
     # Attributes signature (non-JSON only)
     attr_rows = db.execute(
-        select(Attr.AttributeName, Attr.AttributeDataType, MLModel.ModelName)
-        .join(MLModel, Attr.ModelID == MLModel.ModelID)
+        select(AttrDef.AttributeName, AttrDef.AttributeDataType, MLModel.ModelName)
+        .join(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID)
+        .join(MLModel, AttributesModelOutput.ModelID == MLModel.ModelID)
     ).all()
     for name, dtype, model_name in attr_rows:
         if dtype in (AttributeDataType.JSON,):
