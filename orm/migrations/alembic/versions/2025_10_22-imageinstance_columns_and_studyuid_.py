@@ -30,6 +30,15 @@ def upgrade() -> None:
                existing_type=mysql.ENUM('L', 'R'),
                nullable=False)
     op.add_column('Series', sa.Column('StudyInstanceUid', sa.String(length=64), nullable=True))
+    # Migrate existing StudyInstanceUid values from Study to Series
+    op.execute(
+        """
+        UPDATE `Series` AS s
+        JOIN `Study` AS st ON s.StudyID = st.StudyID
+        SET s.StudyInstanceUid = st.StudyInstanceUid
+        WHERE st.StudyInstanceUid IS NOT NULL
+        """
+    )
     op.create_index('StudyInstanceUidSeriesInstanceUid_UNIQUE', 'Series', ['StudyInstanceUid', 'SeriesInstanceUid'], unique=True)
     op.drop_index('StudyInstanceUid_UNIQUE', table_name='Study')
     op.drop_column('Study', 'StudyInstanceUid')
