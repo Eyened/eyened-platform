@@ -58,7 +58,6 @@ export class MainViewerContext implements Overlay {
     }
 
     repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-        
         if (!this.active) {
             return;
         }
