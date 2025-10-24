@@ -264,7 +264,8 @@ export class ViewerContext {
         if (p) {
             this.index = p.index;
         } else {
-            this.index = Math.round(this.image.depth / 2);
+            // this.index = Math.round(this.image.depth / 2);
+            this.index = this.image.depth === 1 ? 0 : Math.round(this.image.depth / 2);
         }
 
         const renderTarget = { ...renderBounds, framebuffer: null };
