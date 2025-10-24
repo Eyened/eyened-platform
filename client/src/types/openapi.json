@@ -4130,7 +4130,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InstanceGET"
+                  "$ref": "#/components/schemas/SubTaskWithImagesGET"
                 }
               }
             }
@@ -4200,8 +4200,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubTaskWithImagesGET"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -6450,17 +6457,6 @@
             ],
             "title": "Age"
           },
-          "study_instance_uid": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Study Instance Uid"
-          },
           "project": {
             "$ref": "#/components/schemas/ProjectMeta"
           },
@@ -6526,7 +6522,6 @@
               "Study Date",
               "Study Description",
               "Study Round",
-              "Study Instance UID",
               "Patient Identifier",
               "Patient Sex",
               "Patient Birthdate",
