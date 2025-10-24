@@ -106,7 +106,6 @@ class DTOConverter:
             description=study.StudyDescription,
             date=study.StudyDate,
             age=study.age_years,
-            study_instance_uid=study.StudyInstanceUid,
             project=project_meta,
             patient=patient_meta,
             tags=[],

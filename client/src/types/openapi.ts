@@ -1545,8 +1545,6 @@ export interface components {
             date: string;
             /** Age */
             age?: number | null;
-            /** Study Instance Uid */
-            study_instance_uid?: string | null;
             project: components["schemas"]["ProjectMeta"];
             patient: components["schemas"]["PatientMeta"];
             /** Series */
@@ -1570,7 +1568,7 @@ export interface components {
              * Variable
              * @enum {string}
              */
-            variable: "Study Date" | "Study Description" | "Study Round" | "Study Instance UID" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Study Tag Name";
+            variable: "Study Date" | "Study Description" | "Study Round" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Study Tag Name";
             /**
              * Operator
              * @enum {string}
@@ -4209,7 +4207,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InstanceGET"];
+                    "application/json": components["schemas"]["SubTaskWithImagesGET"];
                 };
             };
             /** @description Validation Error */
@@ -4241,11 +4239,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SubTaskWithImagesGET"];
+                };
             };
             /** @description Validation Error */
             422: {

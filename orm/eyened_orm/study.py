@@ -38,10 +38,6 @@ class Study(Base):
     StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship("eyened_orm.tag.StudyTagLink", back_populates="Study", lazy="selectin")
 
     @classmethod
-    def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
-        return cls.by_column(session, StudyInstanceUid=StudyInstanceUid)
-
-    @classmethod
     def by_patient_and_date(
         cls, session: Session, patient_id: int, study_date: datetime.date
     ) -> Optional["Study"]:
