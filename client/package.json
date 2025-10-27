@@ -10,7 +10,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "verify:runes": "rg -n \"export let \" src --glob \"**/*.svelte\" && echo \"Found legacy export let (should be 0)\" && exit 1 || exit 0",
-    "check:unused": "unimported"
+    "check:unused": "unimported",
+    "prettier": "prettier --check ."
   },
   "devDependencies": {
     "@iconify/json": "^2.2.142",

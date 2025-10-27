@@ -4,3 +4,11 @@ profile = "black"
 [tool.ruff]
 # Allow lines to be as long as 120.
 line-length = 320
+extend-exclude = [
+    "notebooks",
+]
+
+[tool.ruff.lint]
+# TODO: it would be good for code quality to resolve most of the ignored issues below too
+ignore = [
+]
