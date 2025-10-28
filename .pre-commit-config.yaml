@@ -1,0 +1,42 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+# TODO: check-json5 is very slow, consider using pre-commit-hooks:check-json and ignore/remove comments in tsconfig.json
+-   repo: https://gitlab.com/bmares/check-json5
+    rev: v1.0.0
+    hooks:
+    -   id: check-json5
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.1
+    hooks:
+    -   id: ruff-check
+        types_or: [ python, pyi ]
+        args: [ "--fix" ]
+    -   id: ruff-format
+        types_or: [ python, pyi ]
+-   repo: https://github.com/pycqa/isort
+    rev: 7.0.0
+    hooks:
+    -   id: isort
+        name: isort (python)
+-   repo: local
+    hooks:
+    -   id: prettier
+        name: prettier
+        language: system
+        pass_filenames: false
+        entry: |
+          bash -c 'cd client && npm run fix:prettier .'
+    -   id: svelte-check
+        name: svelte-check
+        language: system
+        pass_filenames: false
+        entry: |
+          bash -c 'cd client && npm run check'

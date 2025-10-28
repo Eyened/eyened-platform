@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date
-from typing import Any, Dict, List, Literal, Optional, Union, Tuple, cast, Annotated
+from typing import Any, Dict, List, Literal, Optional, Union, Tuple, Annotated
 
 from eyened_orm import (
     DeviceModel,
@@ -18,7 +18,6 @@ from eyened_orm import (
     Study,
     FormSchema,
     Tag,
-    Annotation,
     StudyTagLink,
     Creator,
     Segmentation,
@@ -35,7 +34,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, or_, true, union_all, literal
 from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy.dialects import mysql
 
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
@@ -63,104 +61,102 @@ StudyTag = aliased(Tag, name="study_tag")
 
 # list of properties that are searchable with identifier and mapped ORM property
 searchable_fields = Literal[
-    'Image DBID',
-    'Laterality',
-    'Modality',
-    'ETDRS Field',
-    'Color Fundus Quality',
-    'Study Date',
-    'Patient Identifier',
-    'Patient Sex',
-    'Patient Birthdate',
-    'Project Name',
-    'Device Model ID',
-
-    'Segmentation Feature Name',  # backward-compat
-    'Segmentation Creator Name',
-    'Segmentation Tag Name',
-    'Form Schema Name',
-    'Form Creator Name',
-    'Form Tag Name',
-    'Image Tag Name',
+    "Image DBID",
+    "Laterality",
+    "Modality",
+    "ETDRS Field",
+    "Color Fundus Quality",
+    "Study Date",
+    "Patient Identifier",
+    "Patient Sex",
+    "Patient Birthdate",
+    "Project Name",
+    "Device Model ID",
+    "Segmentation Feature Name",  # backward-compat
+    "Segmentation Creator Name",
+    "Segmentation Tag Name",
+    "Form Schema Name",
+    "Form Creator Name",
+    "Form Tag Name",
+    "Image Tag Name",
 ]
 
 operators = Literal[">", "<", ">=", "<=", "==", "!=", "IN"]
 
 instance_search_fields_map: Dict[searchable_fields, Any] = {
-    'Image DBID': ImageInstance.ImageInstanceID,
-    'Laterality': ImageInstance.Laterality,
-    'Modality': ImageInstance.Modality,
-    'ETDRS Field': ImageInstance.ETDRSField,
-    'Color Fundus Quality': ImageInstance.CFQuality,
-    'Study Date': Study.StudyDate,
-    'Patient Identifier': Patient.PatientIdentifier,
-    'Patient Sex': Patient.Sex,
-    'Patient Birthdate': Patient.BirthDate,
-    'Project Name': Project.ProjectName,
-    'Device Model ID': DeviceModel.DeviceModelID,
-
-    'Segmentation Feature Name': Feature.FeatureName,
-    'Segmentation Creator Name': SegCreator.CreatorName,
-    'Segmentation Tag Name': SegTag.TagName,
-    'Form Schema Name': FormSchema.SchemaName,
-    'Form Creator Name': FormCreator.CreatorName,
-    'Form Tag Name': FormTag.TagName,
-    'Image Tag Name': InstTag.TagName,
+    "Image DBID": ImageInstance.ImageInstanceID,
+    "Laterality": ImageInstance.Laterality,
+    "Modality": ImageInstance.Modality,
+    "ETDRS Field": ImageInstance.ETDRSField,
+    "Color Fundus Quality": ImageInstance.CFQuality,
+    "Study Date": Study.StudyDate,
+    "Patient Identifier": Patient.PatientIdentifier,
+    "Patient Sex": Patient.Sex,
+    "Patient Birthdate": Patient.BirthDate,
+    "Project Name": Project.ProjectName,
+    "Device Model ID": DeviceModel.DeviceModelID,
+    "Segmentation Feature Name": Feature.FeatureName,
+    "Segmentation Creator Name": SegCreator.CreatorName,
+    "Segmentation Tag Name": SegTag.TagName,
+    "Form Schema Name": FormSchema.SchemaName,
+    "Form Creator Name": FormCreator.CreatorName,
+    "Form Tag Name": FormTag.TagName,
+    "Image Tag Name": InstTag.TagName,
 }
 
 # Study search
 study_searchable_fields = Literal[
-    'Study Date',
-    'Study Description',
-    'Study Round',
-    'Patient Identifier',
-    'Patient Sex',
-    'Patient Birthdate',
-    'Project Name',
-    'Form Schema Name',
-    'Form Creator Name',
-    'Form Tag Name',
-    'Study Tag Name',
+    "Study Date",
+    "Study Description",
+    "Study Round",
+    "Patient Identifier",
+    "Patient Sex",
+    "Patient Birthdate",
+    "Project Name",
+    "Form Schema Name",
+    "Form Creator Name",
+    "Form Tag Name",
+    "Study Tag Name",
 ]
 
 study_search_fields_map: Dict[study_searchable_fields, Any] = {
-    'Study Date': Study.StudyDate,
-    'Study Description': Study.StudyDescription,
-    'Study Round': Study.StudyRound,
-    'Patient Identifier': Patient.PatientIdentifier,
-    'Patient Sex': Patient.Sex,
-    'Patient Birthdate': Patient.BirthDate,
-    'Project Name': Project.ProjectName,
-    'Form Schema Name': FormSchema.SchemaName,
-    'Form Creator Name': FormCreator.CreatorName,
-    'Form Tag Name': FormTag.TagName,
-    'Study Tag Name': StudyTag.TagName,
+    "Study Date": Study.StudyDate,
+    "Study Description": Study.StudyDescription,
+    "Study Round": Study.StudyRound,
+    "Patient Identifier": Patient.PatientIdentifier,
+    "Patient Sex": Patient.Sex,
+    "Patient Birthdate": Patient.BirthDate,
+    "Project Name": Project.ProjectName,
+    "Form Schema Name": FormSchema.SchemaName,
+    "Form Creator Name": FormCreator.CreatorName,
+    "Form Tag Name": FormTag.TagName,
+    "Study Tag Name": StudyTag.TagName,
 }
 
 # Order-by options for instances
 instance_order_by_fields = Literal[
-    'Study Date',
-    'Patient Birthdate',
-    'Date Inserted',
+    "Study Date",
+    "Patient Birthdate",
+    "Date Inserted",
 ]
 
 instance_order_by_fields_map: Dict[instance_order_by_fields, Any] = {
-    'Study Date': Study.StudyDate,
-    'Patient Birthdate': Patient.BirthDate,
-    'Date Inserted': ImageInstance.DateInserted,
+    "Study Date": Study.StudyDate,
+    "Patient Birthdate": Patient.BirthDate,
+    "Date Inserted": ImageInstance.DateInserted,
 }
 
 # Order-by options for studies
 study_order_by_fields = Literal[
-    'Study Date',
-    'Patient Birthdate',
-    'Date Inserted',
+    "Study Date",
+    "Patient Birthdate",
+    "Date Inserted",
 ]
 
 study_order_by_fields_map: Dict[study_order_by_fields, Any] = {
-    'Study Date': Study.StudyDate,
-    'Patient Birthdate': Patient.BirthDate,
-    'Date Inserted': Study.DateInserted,
+    "Study Date": Study.StudyDate,
+    "Patient Birthdate": Patient.BirthDate,
+    "Date Inserted": Study.DateInserted,
 }
 
 
@@ -210,14 +206,19 @@ def create_condition(conditions: List[Dict[str, Any]], fields_map: Optional[Dict
     # OR all conditions globally (no per-variable grouping)
     exprs: List[Any] = [format_condition(c["variable"], c) for c in conditions]
     return or_(*exprs) if exprs else true()
+
+
 ATTRIBUTE_VAR_RE = r"^(?P<model>[^\[]+)\[(?P<attr>[^\]]+)\]$"
+
 
 def parse_attribute_var(name: str) -> Optional[Tuple[str, str]]:
     import re
+
     m = re.match(ATTRIBUTE_VAR_RE, name)
     if not m:
         return None
     return m.group("model"), m.group("attr")
+
 
 def get_value_column_for_attribute(attr_def: AttrDef) -> Any:
     """Get the correct value column based on the attribute's data type."""
@@ -233,11 +234,12 @@ def get_value_column_for_attribute(attr_def: AttrDef) -> Any:
         # Fallback to text for unknown types
         return AttrVal.ValueText
 
+
 def convert_search_value_to_attribute_type(value: Any, attr_def: AttrDef) -> Any:
     """Convert search value to match the attribute's data type."""
     if value is None:
         return None
-    
+
     # Handle list values (for IN operations)
     if isinstance(value, list):
         try:
@@ -254,7 +256,7 @@ def convert_search_value_to_attribute_type(value: Any, attr_def: AttrDef) -> Any
         except (ValueError, TypeError):
             # If conversion fails, return as string list for text comparison
             return [str(v) for v in value]
-    
+
     # Handle single values
     try:
         if attr_def.AttributeDataType == AttributeDataType.Int:
@@ -272,14 +274,16 @@ def convert_search_value_to_attribute_type(value: Any, attr_def: AttrDef) -> Any
         # If conversion fails, return as string for text comparison
         return str(value)
 
+
 def format_attr_condition_with_definition(attr_def: AttrDef, condition: Dict[str, Any]) -> Any:
     """Format attribute condition using the correct value column based on attribute definition."""
     value_column = get_value_column_for_attribute(attr_def)
     converted_value = convert_search_value_to_attribute_type(condition["value"], attr_def)
-    
+
     # Create a new condition with the converted value
     converted_condition = {**condition, "value": converted_value}
     return format_condition(value_column, converted_condition)
+
 
 def format_attr_condition(value_column: Any, condition: Dict[str, Any]) -> Any:
     """Legacy function - use format_attr_condition_with_definition instead."""
@@ -290,6 +294,7 @@ def format_attr_condition(value_column: Any, condition: Dict[str, Any]) -> Any:
 # ----------------------------------------
 # Helpers for EXISTS-based query building
 # ----------------------------------------
+
 
 def map_conditions_to_attrs(conditions: List[Dict[str, Any]], fields_map: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Return a new list with 'variable' replaced by the mapped ORM attribute."""
@@ -336,7 +341,7 @@ def and_expr(conds: List[Dict[str, Any]]) -> Any:
 # ----------------------------------------
 # EXISTS builders (semi-joins)
 # ----------------------------------------
-from sqlalchemy import select as sa_select
+from sqlalchemy import select as sa_select  # noqa: E402
 
 
 def exists_forms_for_study(forms_group: Dict[Any, List[Dict[str, Any]]]) -> Any:
@@ -344,9 +349,7 @@ def exists_forms_for_study(forms_group: Dict[Any, List[Dict[str, Any]]]) -> Any:
     if not any(forms_group.values()):
         return None
 
-    subq = sa_select(1).select_from(ActiveFormAnnotation).where(
-        ActiveFormAnnotation.StudyID == Study.StudyID
-    )
+    subq = sa_select(1).select_from(ActiveFormAnnotation).where(ActiveFormAnnotation.StudyID == Study.StudyID)
 
     if FormSchema in forms_group:
         subq = subq.join(
@@ -361,17 +364,14 @@ def exists_forms_for_study(forms_group: Dict[Any, List[Dict[str, Any]]]) -> Any:
             isouter=True,
         )
     if FormTag in forms_group:
-        subq = (
-            subq.join(
-                FormAnnotationTagLink,
-                ActiveFormAnnotation.FormAnnotationID == FormAnnotationTagLink.FormAnnotationID,
-                isouter=True,
-            )
-            .join(
-                FormTag,
-                FormAnnotationTagLink.TagID == FormTag.TagID,
-                isouter=True,
-            )
+        subq = subq.join(
+            FormAnnotationTagLink,
+            ActiveFormAnnotation.FormAnnotationID == FormAnnotationTagLink.FormAnnotationID,
+            isouter=True,
+        ).join(
+            FormTag,
+            FormAnnotationTagLink.TagID == FormTag.TagID,
+            isouter=True,
         )
 
     subconds: List[Dict[str, Any]] = []
@@ -388,9 +388,7 @@ def exists_forms_for_instance(forms_group: Dict[Any, List[Dict[str, Any]]]) -> A
     if not any(forms_group.values()):
         return None
 
-    subq = sa_select(1).select_from(ActiveFormAnnotation).where(
-        ActiveFormAnnotation.ImageInstanceID == ImageInstance.ImageInstanceID
-    )
+    subq = sa_select(1).select_from(ActiveFormAnnotation).where(ActiveFormAnnotation.ImageInstanceID == ImageInstance.ImageInstanceID)
 
     if FormSchema in forms_group:
         subq = subq.join(
@@ -405,17 +403,14 @@ def exists_forms_for_instance(forms_group: Dict[Any, List[Dict[str, Any]]]) -> A
             isouter=True,
         )
     if FormTag in forms_group:
-        subq = (
-            subq.join(
-                FormAnnotationTagLink,
-                ActiveFormAnnotation.FormAnnotationID == FormAnnotationTagLink.FormAnnotationID,
-                isouter=True,
-            )
-            .join(
-                FormTag,
-                FormAnnotationTagLink.TagID == FormTag.TagID,
-                isouter=True,
-            )
+        subq = subq.join(
+            FormAnnotationTagLink,
+            ActiveFormAnnotation.FormAnnotationID == FormAnnotationTagLink.FormAnnotationID,
+            isouter=True,
+        ).join(
+            FormTag,
+            FormAnnotationTagLink.TagID == FormTag.TagID,
+            isouter=True,
         )
 
     subconds: List[Dict[str, Any]] = []
@@ -432,9 +427,7 @@ def exists_segs_for_instance(segs_group: Dict[Any, List[Dict[str, Any]]]) -> Any
     if not any(segs_group.values()):
         return None
 
-    subq = sa_select(1).select_from(ActiveSegmentation).where(
-        ActiveSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID
-    )
+    subq = sa_select(1).select_from(ActiveSegmentation).where(ActiveSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID)
 
     if Feature in segs_group:
         subq = subq.join(
@@ -449,17 +442,14 @@ def exists_segs_for_instance(segs_group: Dict[Any, List[Dict[str, Any]]]) -> Any
             isouter=True,
         )
     if SegTag in segs_group:
-        subq = (
-            subq.join(
-                SegmentationTagLink,
-                ActiveSegmentation.SegmentationID == SegmentationTagLink.SegmentationID,
-                isouter=True,
-            )
-            .join(
-                SegTag,
-                SegmentationTagLink.TagID == SegTag.TagID,
-                isouter=True,
-            )
+        subq = subq.join(
+            SegmentationTagLink,
+            ActiveSegmentation.SegmentationID == SegmentationTagLink.SegmentationID,
+            isouter=True,
+        ).join(
+            SegTag,
+            SegmentationTagLink.TagID == SegTag.TagID,
+            isouter=True,
         )
 
     subconds: List[Dict[str, Any]] = []
@@ -476,12 +466,7 @@ def exists_inst_tags_for_instance(tags_group: Dict[Any, List[Dict[str, Any]]]) -
     if InstTag not in tags_group:
         return None
 
-    subq = (
-        sa_select(1)
-        .select_from(ImageInstanceTagLink)
-        .where(ImageInstanceTagLink.ImageInstanceID == ImageInstance.ImageInstanceID)
-        .join(InstTag, ImageInstanceTagLink.TagID == InstTag.TagID, isouter=True)
-    )
+    subq = sa_select(1).select_from(ImageInstanceTagLink).where(ImageInstanceTagLink.ImageInstanceID == ImageInstance.ImageInstanceID).join(InstTag, ImageInstanceTagLink.TagID == InstTag.TagID, isouter=True)
 
     subq = subq.where(and_expr(tags_group[InstTag]))
     return subq.exists()
@@ -491,40 +476,40 @@ def exists_study_tags_for_study(tags_group: Dict[Any, List[Dict[str, Any]]]) -> 
     """EXISTS subquery for study tags correlated by Study."""
     if StudyTag not in tags_group:
         return None
-    subq = (
-        sa_select(1)
-        .select_from(StudyTagLink)
-        .where(StudyTagLink.StudyID == Study.StudyID)
-        .join(StudyTag, StudyTagLink.TagID == StudyTag.TagID, isouter=True)
-    )
+    subq = sa_select(1).select_from(StudyTagLink).where(StudyTagLink.StudyID == Study.StudyID).join(StudyTag, StudyTagLink.TagID == StudyTag.TagID, isouter=True)
     subq = subq.where(and_expr(tags_group[StudyTag]))
     return subq.exists()
 
 
 class SignatureField(BaseModel):
     """Signature descriptor for a searchable field."""
+
     name: str
     # Either a primitive type marker or an enum of allowed values
     values: str | list[str]  # 'string' | 'int' | 'float' | 'date' | string[]
-    type: Literal['default', 'attribute'] = 'default'
+    type: Literal["default", "attribute"] = "default"
     model: Optional[str] = None
     feature: Optional[str] = None  # NEW: feature name for segmentation-based attributes
 
+
 class DefaultCondition(BaseModel):
-    type: Literal['default'] = 'default'
+    type: Literal["default"] = "default"
     variable: searchable_fields
     operator: operators
     value: Union[date, int, float, str, list[str], None]
 
+
 class AttributeCondition(BaseModel):
-    type: Literal['attribute']
+    type: Literal["attribute"]
     model: str
     variable: str
     operator: operators
     value: Union[int, float, str, list[str], None]
     feature: Optional[str] = None  # NEW: filter by feature name
 
-SearchCondition = Annotated[Union[DefaultCondition, AttributeCondition], Field(discriminator='type')]
+
+SearchCondition = Annotated[Union[DefaultCondition, AttributeCondition], Field(discriminator="type")]
+
 
 class SearchQuery(BaseModel):
     conditions: List[SearchCondition]
@@ -544,11 +529,13 @@ class SearchResponse(BaseModel):
     result_ids: List[int]
     has_more: bool
 
+
 # Study search DTOs
 class StudySearchCondition(BaseModel):
     variable: study_searchable_fields
     operator: operators
     value: Union[date, int, float, str, list[str], None]  # add list[str]
+
 
 class StudySearchQuery(BaseModel):
     conditions: List[StudySearchCondition]
@@ -558,6 +545,7 @@ class StudySearchQuery(BaseModel):
     order: Literal["ASC", "DESC"] = "ASC"
     include_count: bool = False
 
+
 class StudySearchResponse(BaseModel):
     studies: List[StudyGET]
     instances: List[InstanceMeta]
@@ -566,7 +554,6 @@ class StudySearchResponse(BaseModel):
     count: Optional[int] = None
     result_ids: List[int]
     has_more: bool
-
 
 
 def _build_study_select(
@@ -593,11 +580,7 @@ def _build_study_select(
         elif ent in {StudyTag}:
             study_tag_group[ent] = conds
 
-    q = (
-        select(Study)
-        .join_from(Study, Patient, onclause=Study.PatientID == Patient.PatientID)
-        .join_from(Patient, Project)
-    )
+    q = select(Study).join_from(Study, Patient, onclause=Study.PatientID == Patient.PatientID).join_from(Patient, Project)
 
     and_predicates: List[Any] = []
     if base_conds:
@@ -628,7 +611,7 @@ def _build_instance_select(
     """
     Build the base ImageInstance select using correlated EXISTS and apply ordering.
     """
-    
+
     # Split conditions into default and attribute-based based on discriminator
     static_conds_raw: List[Dict[str, Any]] = []
     attr_conds_raw: List[Tuple[str, str, Optional[str], Dict[str, Any]]] = []  # (model_name, attr_name, feature_name, cond)
@@ -656,8 +639,15 @@ def _build_instance_select(
     by_entity = partition_conditions_by_entity(mapped)
 
     base_entities = {
-        ImageInstance, Series, Study, Patient, Project,
-        DeviceInstance, DeviceModel, SourceInfo, Scan,
+        ImageInstance,
+        Series,
+        Study,
+        Patient,
+        Project,
+        DeviceInstance,
+        DeviceModel,
+        SourceInfo,
+        Scan,
     }
     base_conds: List[Dict[str, Any]] = []
     seg_group: Dict[Any, List[Dict[str, Any]]] = {}
@@ -703,10 +693,10 @@ def _build_instance_select(
 
     # Attribute EXISTS filters
     from sqlalchemy import select as sa_select
-    
+
     # First, collect all unique attribute definitions we need to look up
     attr_lookups = {}
-    for (model_name, attr_name, feature_name, c) in attr_conds_raw:
+    for model_name, attr_name, feature_name, c in attr_conds_raw:
         key = (model_name, attr_name, feature_name)
         if key not in attr_lookups:
             attr_lookups[key] = []
@@ -715,28 +705,22 @@ def _build_instance_select(
     # Look up attribute definitions for all unique model/attribute combinations
     # Note: feature doesn't affect which AttributeDefinition to use, only filtering
     attr_defs = {}
-    for (model_name, attr_name, feature_name) in attr_lookups.keys():
-        attr_def_stmt = (
-            select(AttrDef)
-            .join(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID)
-            .join(AttributesModel, AttributesModelOutput.ModelID == AttributesModel.ModelID)
-            .where(AttributesModel.ModelName == model_name)
-            .where(AttrDef.AttributeName == attr_name)
-        )
+    for model_name, attr_name, feature_name in attr_lookups.keys():
+        attr_def_stmt = select(AttrDef).join(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID).join(AttributesModel, AttributesModelOutput.ModelID == AttributesModel.ModelID).where(AttributesModel.ModelName == model_name).where(AttrDef.AttributeName == attr_name)
         attr_def = db.execute(attr_def_stmt).scalar_one_or_none()
-        
+
         if not attr_def:
             continue
-        
+
         # Store with full key including feature for later lookup
         attr_defs[(model_name, attr_name, feature_name)] = attr_def
-    
+
     # Build EXISTS subqueries using the correct attribute definitions
-    for (model_name, attr_name, feature_name, c) in attr_conds_raw:
+    for model_name, attr_name, feature_name, c in attr_conds_raw:
         attr_def = attr_defs.get((model_name, attr_name, feature_name))
         if not attr_def:
             continue
-        
+
         # Single subquery with outer joins to handle all three entity types
         subq = (
             sa_select(1)
@@ -751,17 +735,13 @@ def _build_instance_select(
             .outerjoin(SegmentationModel, ModelSegmentation.ModelID == SegmentationModel.ModelID)
             .where(
                 # Match if ANY of the three paths lead to this ImageInstance
-                or_(
-                    AttrVal.ImageInstanceID == ImageInstance.ImageInstanceID,
-                    Segmentation.ImageInstanceID == ImageInstance.ImageInstanceID,
-                    ModelSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID
-                )
+                or_(AttrVal.ImageInstanceID == ImageInstance.ImageInstanceID, Segmentation.ImageInstanceID == ImageInstance.ImageInstanceID, ModelSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID)
             )
             .where(AttributesModel.ModelName == model_name)
             .where(AttrDef.AttributeName == attr_name)
             .where(format_attr_condition_with_definition(attr_def, c))
         )
-        
+
         # ROBUST: Add feature filter if specified - simpler join logic
         if feature_name:
             subq = subq.outerjoin(
@@ -770,10 +750,10 @@ def _build_instance_select(
                     # Direct Segmentation path
                     Segmentation.FeatureID == Feature.FeatureID,
                     # ModelSegmentation path through SegmentationModel (already joined above)
-                    SegmentationModel.FeatureID == Feature.FeatureID
-                )
+                    SegmentationModel.FeatureID == Feature.FeatureID,
+                ),
             ).where(Feature.FeatureName == feature_name)
-        
+
         and_predicates.append(subq.exists())
 
     where_clause = and_(*and_predicates) if and_predicates else true()
@@ -781,11 +761,7 @@ def _build_instance_select(
     sort_col = instance_order_by_fields_map[order_by]
     sort_dir = sort_col.asc() if order == "ASC" else sort_col.desc()
 
-    final_query = (
-        q.filter(ImageInstance.Modality.is_not(None))
-         .where(where_clause)
-         .order_by(sort_dir, ImageInstance.ImageInstanceID.asc())
-    )
+    final_query = q.filter(ImageInstance.Modality.is_not(None)).where(where_clause).order_by(sort_dir, ImageInstance.ImageInstanceID.asc())
     return final_query
 
 
@@ -814,7 +790,7 @@ async def search_instances(
     )
 
     instances = db.execute(instances_stmt.limit(limit + 1).offset(offset)).scalars().all()
-    
+
     has_more = len(instances) > limit
     if has_more:
         instances = instances[:limit]
@@ -833,9 +809,7 @@ async def search_instances(
 
     studies_dtos: list[StudyGET] = []
     if study_ids_ordered:
-        studies_stmt = select(Study).where(Study.StudyID.in_(study_ids_ordered)).options(
-            selectinload(Study.Series).selectinload(Series.ImageInstances.and_(~ImageInstance.Inactive))
-        )
+        studies_stmt = select(Study).where(Study.StudyID.in_(study_ids_ordered)).options(selectinload(Study.Series).selectinload(Series.ImageInstances.and_(~ImageInstance.Inactive)))
         studies = db.execute(studies_stmt).scalars().all()
         s_order = {sid: i for i, sid in enumerate(study_ids_ordered)}
         studies.sort(key=lambda s: s_order[s.StudyID])
@@ -855,6 +829,7 @@ async def search_instances(
         "has_more": has_more,
     }
 
+
 # New endpoint: /studies/search
 @router.post("/studies/search", response_model=StudySearchResponse, response_model_exclude_none=True)
 async def search_studies(
@@ -869,9 +844,7 @@ async def search_studies(
     page = params.get("page", 0)
     offset = limit * page
 
-    studies_stmt = _build_study_select(conditions, params["order_by"], params["order"]).options(
-        selectinload(Study.Series).selectinload(Series.ImageInstances.and_(~ImageInstance.Inactive))
-    )
+    studies_stmt = _build_study_select(conditions, params["order_by"], params["order"]).options(selectinload(Study.Series).selectinload(Series.ImageInstances.and_(~ImageInstance.Inactive)))
 
     studies = db.execute(studies_stmt.limit(limit + 1).offset(offset)).scalars().all()
     has_more = len(studies) > limit
@@ -900,8 +873,6 @@ async def search_studies(
     )
     instances = db.execute(instances_q).scalars().all()
 
-    
-
     count = None
     if params.get("include_count"):
         count = db.execute(select(func.count()).select_from(studies_stmt.subquery())).scalar_one()
@@ -918,6 +889,7 @@ async def search_studies(
         "result_ids": study_ids,
         "has_more": has_more,
     }
+
 
 @router.get("/instances/search/signature", response_model=list[SignatureField])
 async def instances_signature(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -940,44 +912,22 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
     feat_names = db.execute(select(Feature.FeatureName).distinct()).scalars().all()
     items.append(SignatureField(name="Segmentation Feature Name", values=sorted(feat_names)))
 
-    seg_creators = db.execute(
-        select(Creator.CreatorName)
-        .join(Segmentation, Segmentation.CreatorID == Creator.CreatorID)
-        .where(~Segmentation.Inactive)
-        .distinct()
-    ).scalars().all()
+    seg_creators = db.execute(select(Creator.CreatorName).join(Segmentation, Segmentation.CreatorID == Creator.CreatorID).where(~Segmentation.Inactive).distinct()).scalars().all()
     items.append(SignatureField(name="Segmentation Creator Name", values=sorted(seg_creators)))
 
-    seg_tag_names = db.execute(
-        select(Tag.TagName)
-        .join(SegmentationTagLink, SegmentationTagLink.TagID == Tag.TagID)
-        .distinct()
-    ).scalars().all()
+    seg_tag_names = db.execute(select(Tag.TagName).join(SegmentationTagLink, SegmentationTagLink.TagID == Tag.TagID).distinct()).scalars().all()
     items.append(SignatureField(name="Segmentation Tag Name", values=sorted(seg_tag_names)))
 
     form_schema_names = db.execute(select(FormSchema.SchemaName).distinct()).scalars().all()
     items.append(SignatureField(name="Form Schema Name", values=sorted(form_schema_names)))
 
-    form_creators = db.execute(
-        select(Creator.CreatorName)
-        .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
-        .where(~FormAnnotation.Inactive)
-        .distinct()
-    ).scalars().all()
+    form_creators = db.execute(select(Creator.CreatorName).join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID).where(~FormAnnotation.Inactive).distinct()).scalars().all()
     items.append(SignatureField(name="Form Creator Name", values=sorted(form_creators)))
 
-    form_tag_names = db.execute(
-        select(Tag.TagName)
-        .join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID)
-        .distinct()
-    ).scalars().all()
+    form_tag_names = db.execute(select(Tag.TagName).join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID).distinct()).scalars().all()
     items.append(SignatureField(name="Form Tag Name", values=sorted(form_tag_names)))
 
-    image_tag_names = db.execute(
-        select(Tag.TagName)
-        .join(ImageInstanceTagLink, ImageInstanceTagLink.TagID == Tag.TagID)
-        .distinct()
-    ).scalars().all()
+    image_tag_names = db.execute(select(Tag.TagName).join(ImageInstanceTagLink, ImageInstanceTagLink.TagID == Tag.TagID).distinct()).scalars().all()
     items.append(SignatureField(name="Image Tag Name", values=sorted(image_tag_names)))
 
     # Attributes signature with feature context
@@ -985,12 +935,7 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
 
     # Query 1: AttributeValues linked to Segmentation
     seg_query = (
-        select(
-            AttrDef.AttributeName,
-            AttrDef.AttributeDataType,
-            AttributesModel.ModelName,
-            Feature.FeatureName
-        )
+        select(AttrDef.AttributeName, AttrDef.AttributeDataType, AttributesModel.ModelName, Feature.FeatureName)
         .select_from(AttrVal)
         .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
         .join(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
@@ -1001,12 +946,7 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
 
     # Query 2: AttributeValues linked to ModelSegmentation
     modelseg_query = (
-        select(
-            AttrDef.AttributeName,
-            AttrDef.AttributeDataType,
-            AttributesModel.ModelName,
-            Feature.FeatureName
-        )
+        select(AttrDef.AttributeName, AttrDef.AttributeDataType, AttributesModel.ModelName, Feature.FeatureName)
         .select_from(AttrVal)
         .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
         .join(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
@@ -1023,7 +963,7 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
             AttrDef.AttributeName,
             AttrDef.AttributeDataType,
             AttributesModel.ModelName,
-            literal(None).label('FeatureName')  # NULL as FeatureName
+            literal(None).label("FeatureName"),  # NULL as FeatureName
         )
         .select_from(AttrVal)
         .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
@@ -1044,15 +984,17 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
         if key in seen:
             continue
         seen.add(key)
-        
+
         val = "string" if dtype == AttributeDataType.String else ("int" if dtype == AttributeDataType.Int else "float")
-        items.append(SignatureField(
-            name=name, 
-            values=val, 
-            type='attribute', 
-            model=model_name,
-            feature=feature_name  # Will be None for direct image attributes
-        ))
+        items.append(
+            SignatureField(
+                name=name,
+                values=val,
+                type="attribute",
+                model=model_name,
+                feature=feature_name,  # Will be None for direct image attributes
+            )
+        )
 
     # Free-text/number defaults
     items.append(SignatureField(name="Image DBID", values="int"))
@@ -1062,6 +1004,7 @@ async def instances_signature(db: Session = Depends(get_db), current_user: Curre
     items.append(SignatureField(name="Patient Birthdate", values="date"))
 
     return items
+
 
 @router.get("/studies/search/signature", response_model=list[SignatureField])
 async def studies_signature(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -1078,26 +1021,13 @@ async def studies_signature(db: Session = Depends(get_db), current_user: Current
     form_schema_names = db.execute(select(FormSchema.SchemaName).distinct()).scalars().all()
     items.append(SignatureField(name="Form Schema Name", values=sorted(form_schema_names)))
 
-    form_creators = db.execute(
-        select(Creator.CreatorName)
-        .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
-        .where(~FormAnnotation.Inactive)
-        .distinct()
-    ).scalars().all()
+    form_creators = db.execute(select(Creator.CreatorName).join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID).where(~FormAnnotation.Inactive).distinct()).scalars().all()
     items.append(SignatureField(name="Form Creator Name", values=sorted(form_creators)))
 
-    form_tag_names = db.execute(
-        select(Tag.TagName)
-        .join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID)
-        .distinct()
-    ).scalars().all()
+    form_tag_names = db.execute(select(Tag.TagName).join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID).distinct()).scalars().all()
     items.append(SignatureField(name="Form Tag Name", values=sorted(form_tag_names)))
 
-    study_tag_names = db.execute(
-        select(Tag.TagName)
-        .join(StudyTagLink, StudyTagLink.TagID == Tag.TagID)
-        .distinct()
-    ).scalars().all()
+    study_tag_names = db.execute(select(Tag.TagName).join(StudyTagLink, StudyTagLink.TagID == Tag.TagID).distinct()).scalars().all()
     items.append(SignatureField(name="Study Tag Name", values=sorted(study_tag_names)))
 
     # Typed free-entry fields

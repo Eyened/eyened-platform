@@ -1,182 +1,194 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
 import { fetchInstance } from "$lib/data/api";
 import { instances } from "$lib/data/stores.svelte";
-import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
+import {
+	loadPhotoLocators,
+	type PhotoLocator,
+} from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
 import type { InstanceGET } from "../../types/openapi_types";
-import MainViewer from './MainViewer.svelte';
+import MainViewer from "./MainViewer.svelte";
 
 export type MainPanelType = {
-    component: any;
-    props: any;
-}
+	component: any;
+	props: any;
+};
 
 export class ViewerWindowContext {
-    
-    // show/hide the browser overlay
-    browserOverlay: boolean = $state(false);
+	// show/hide the browser overlay
+	browserOverlay: boolean = $state(false);
 
+	private imagesIndex = new Map<number, Promise<LoadedImages>>();
+	private byDatasetIdentifier = new Map<string, LoadedImages>();
+	private bySOPInstanceUID = new Map<string, LoadedImages>();
 
-    private imagesIndex = new Map<number, Promise<LoadedImages>>();
-    private byDatasetIdentifier = new Map<string, LoadedImages>();
-    private bySOPInstanceUID = new Map<string, LoadedImages>();
+	private viewers = new Set<ViewerContext>();
 
-    private viewers = new Set<ViewerContext>();
+	public instanceIds: number[] = $state([]);
 
-    public instanceIds: number[] = $state([]);
+	public mainPanels: MainPanelType[] = $state([]);
 
-    public mainPanels: MainPanelType[] = $state([]);
+	public readonly imageLoader: ImageLoader;
+	public readonly topViewers = new SvelteMap<AbstractImage, ViewerContext>();
 
-    public readonly imageLoader: ImageLoader;
-    public readonly topViewers = new SvelteMap<AbstractImage, ViewerContext>();
+	photoLocators = new SvelteMap<string, PhotoLocator[]>();
+	photoLocatorSets: PhotoLocator[][] = $state([]);
 
-    photoLocators = new SvelteMap<string, PhotoLocator[]>();
-    photoLocatorSets: PhotoLocator[][] = $state([]);
+	private frame: number = 0;
 
-    private frame: number = 0;
+	constructor(
+		public readonly webgl: WebGL,
+		public readonly registration: Registration,
+		public readonly creator: unknown,
+		instanceIDs: number[] = [],
+	) {
+		console.log("ViewerWindowContext constructor", instanceIDs);
+		this.imageLoader = new ImageLoader(webgl);
 
-    constructor(
-        public readonly webgl: WebGL,
-        public readonly registration: Registration,
-        public readonly creator: unknown,
-        instanceIDs: number[] = [],
-    ) {
-        console.log('ViewerWindowContext constructor', instanceIDs);
-        this.imageLoader = new ImageLoader(webgl);
+		// start rendering loop
+		const loop = () => {
+			this.frame = requestAnimationFrame(loop);
+			this.repaint();
+		};
+		loop();
 
-        // start rendering loop
-        const loop = () => {
-            this.frame = requestAnimationFrame(loop);
-            this.repaint();
-        }
-        loop();
-        
-        this.setInstanceIDs(instanceIDs);
-    }
+		this.setInstanceIDs(instanceIDs);
+	}
 
-    closeBrowserOverlay() {
-        this.browserOverlay = false;
-    }
-    
-    addViewer(viewer: ViewerContext) {
-        this.viewers.add(viewer);
-        return () => this.viewers.delete(viewer);
-    }
+	closeBrowserOverlay() {
+		this.browserOverlay = false;
+	}
 
-    removeViewer(viewer: ViewerContext) {
-        this.viewers.delete(viewer);
-    }
+	addViewer(viewer: ViewerContext) {
+		this.viewers.add(viewer);
+		return () => this.viewers.delete(viewer);
+	}
 
-    repaint() {
-        this.webgl.clear({ left: 0, bottom: 0, width: this.webgl.canvas.width, height: this.webgl.canvas.height });
-        this.viewers.forEach((viewer) => viewer.repaint());
-    }
+	removeViewer(viewer: ViewerContext) {
+		this.viewers.delete(viewer);
+	}
 
-    async setInstanceIDs(ids: number[]) {
-        // ensure metadata of all instances is loaded
-        const missingIds = ids.filter((id) => !instances.get(id));
-        if (missingIds.length) {
-            await Promise.all(missingIds.map((id) => fetchInstance(id, {
-                with_segmentations: true,
-                with_form_annotations: true,
-                with_model_segmentations: true
-            })));
-            // Data is automatically ingested into global stores by fetchInstance
-        }
+	repaint() {
+		this.webgl.clear({
+			left: 0,
+			bottom: 0,
+			width: this.webgl.canvas.width,
+			height: this.webgl.canvas.height,
+		});
+		this.viewers.forEach((viewer) => viewer.repaint());
+	}
 
-        this.instanceIds = ids;
-        
-        // Load images for all instances
-        for (const id of ids) {
-            const instance = instances.get(id);
-            if (instance) {
-                this.loadImage(instance);
-            } else {
-                console.warn(`Instance with id ${id} not found after fetch`);
-            }
-        }
-    }
+	async setInstanceIDs(ids: number[]) {
+		// ensure metadata of all instances is loaded
+		const missingIds = ids.filter((id) => !instances.get(id));
+		if (missingIds.length) {
+			await Promise.all(
+				missingIds.map((id) =>
+					fetchInstance(id, {
+						with_segmentations: true,
+						with_form_annotations: true,
+						with_model_segmentations: true,
+					}),
+				),
+			);
+			// Data is automatically ingested into global stores by fetchInstance
+		}
 
-    destroy() {
-        cancelAnimationFrame(this.frame);
-    }
+		this.instanceIds = ids;
 
-    async loadImage(instance: InstanceGET): Promise<LoadedImages> {
-        // Start loading if not already in progress
-        if (!this.imagesIndex.has(instance.id)) {
-            const loadPromise = this.imageLoader.load(instance).then(loadedImages => {
+		// Load images for all instances
+		for (const id of ids) {
+			const instance = instances.get(id);
+			if (instance) {
+				this.loadImage(instance);
+			} else {
+				console.warn(`Instance with id ${id} not found after fetch`);
+			}
+		}
+	}
 
-                // Process images once loaded
-                for (const image of loadedImages) {
-                    this.importPhotoLocators(image);
-                }
+	destroy() {
+		cancelAnimationFrame(this.frame);
+	}
 
-                // Set up indices
-                this.byDatasetIdentifier.set(instance.dataset_identifier, loadedImages);
-                this.bySOPInstanceUID.set(instance.sop_instance_uid, loadedImages);
+	async loadImage(instance: InstanceGET): Promise<LoadedImages> {
+		// Start loading if not already in progress
+		if (!this.imagesIndex.has(instance.id)) {
+			const loadPromise = this.imageLoader
+				.load(instance)
+				.then((loadedImages) => {
+					// Process images once loaded
+					for (const image of loadedImages) {
+						this.importPhotoLocators(image);
+					}
 
-                // Create viewer contexts
-                for (const image of loadedImages) {
-                    this.topViewers.set(image, new ViewerContext(image, this));
-                }
+					// Set up indices
+					this.byDatasetIdentifier.set(
+						instance.dataset_identifier,
+						loadedImages,
+					);
+					this.bySOPInstanceUID.set(instance.sop_instance_uid, loadedImages);
 
-                return loadedImages;
-            });
+					// Create viewer contexts
+					for (const image of loadedImages) {
+						this.topViewers.set(image, new ViewerContext(image, this));
+					}
 
-            this.imagesIndex.set(instance.id, loadPromise);
-        }
+					return loadedImages;
+				});
 
-        // Return cached promise (either existing or newly created)
-        return this.imagesIndex.get(instance.id)!;
-    }
-    importPhotoLocators(image: AbstractImage) {
-        const photoLocators = loadPhotoLocators(image);
-        this.photoLocatorSets.push(photoLocators);
+			this.imagesIndex.set(instance.id, loadPromise);
+		}
 
-        for (const locator of photoLocators) {
-            for (const key of ['enfaceImageId', 'octImageId']) {
-                const image_id = String(locator[key as keyof PhotoLocator]);
-                if (!this.photoLocators.has(image_id)) {
-                    this.photoLocators.set(image_id, []);
-                }
-                this.photoLocators.get(image_id)!.push(locator);
-            }
-        }
-        const locators = this.photoLocators.get(image.image_id) ?? [];
-        this.registration.addImage(image, locators);
-    }
+		// Return cached promise (either existing or newly created)
+		return this.imagesIndex.get(instance.id)!;
+	}
+	importPhotoLocators(image: AbstractImage) {
+		const photoLocators = loadPhotoLocators(image);
+		this.photoLocatorSets.push(photoLocators);
 
+		for (const locator of photoLocators) {
+			for (const key of ["enfaceImageId", "octImageId"]) {
+				const image_id = String(locator[key as keyof PhotoLocator]);
+				if (!this.photoLocators.has(image_id)) {
+					this.photoLocators.set(image_id, []);
+				}
+				this.photoLocators.get(image_id)!.push(locator);
+			}
+		}
+		const locators = this.photoLocators.get(image.image_id) ?? [];
+		this.registration.addImage(image, locators);
+	}
 
-    addImagePanel(image: AbstractImage) {
-        this.mainPanels.push({ component: MainViewer, props: { image } });
-    }
+	addImagePanel(image: AbstractImage) {
+		this.mainPanels.push({ component: MainViewer, props: { image } });
+	}
 
-    setImagePanel(image: AbstractImage) {
-        this.mainPanels = [{ component: MainViewer, props: { image } }];
-    }
+	setImagePanel(image: AbstractImage) {
+		this.mainPanels = [{ component: MainViewer, props: { image } }];
+	}
 
-    setPanel(panel: MainPanelType) {
-        this.mainPanels = [panel];
-    }
+	setPanel(panel: MainPanelType) {
+		this.mainPanels = [panel];
+	}
 
-    addPanel(panel: MainPanelType) {
-        this.mainPanels.push(panel);
-    }
+	addPanel(panel: MainPanelType) {
+		this.mainPanels.push(panel);
+	}
 
-    removePanel(panel: MainPanelType) {
-        this.mainPanels = this.mainPanels.filter((item) => item !== panel);
-    }
+	removePanel(panel: MainPanelType) {
+		this.mainPanels = this.mainPanels.filter((item) => item !== panel);
+	}
 
-    getImages(instanceID: number): Promise<LoadedImages> {
-        const instance = instances.get(instanceID);
-        if (instance === undefined) {
-            throw new Error(`Instance with id ${instanceID} not found`);
-        }
-        return this.loadImage(instance);
-    }
-
+	getImages(instanceID: number): Promise<LoadedImages> {
+		const instance = instances.get(instanceID);
+		if (instance === undefined) {
+			throw new Error(`Instance with id ${instanceID} not found`);
+		}
+		return this.loadImage(instance);
+	}
 }

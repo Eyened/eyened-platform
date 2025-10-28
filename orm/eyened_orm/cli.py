@@ -1,4 +1,3 @@
-from typing import Optional
 import yaml
 from pathlib import Path
 import click
@@ -7,7 +6,6 @@ from .utils.testdb import DatabaseTransfer
 from tqdm import tqdm
 from .utils.config import (
     DatabaseSettings,
-    EyenedORMConfig,
     load_config,
 )
 
@@ -67,7 +65,7 @@ def database_mirror_test(config_file):
         # Load config from nested dicts (with secret_key override if needed)
         target_config = load_config(config["target"])
         source_config = load_config(config["source"])
-        
+
         target_db = Database(target_config)
         source_db = Database(source_config)
 
@@ -75,19 +73,14 @@ def database_mirror_test(config_file):
         print("source db zarr store", source_db.config.segmentations_zarr_store)
 
         with target_db.get_session() as target_session:
-
             segs = ModelSegmentation.fetch_all(target_session)
 
             with source_db.get_session() as source_session:
                 for seg in segs:
-                    source_seg = ModelSegmentation.by_id(
-                        source_session, seg.ModelSegmentationID
-                    )
+                    source_seg = ModelSegmentation.by_id(source_session, seg.ModelSegmentationID)
                     print("transfer data from", source_seg.ModelSegmentationID)
                     print("seg", seg.config.segmentations_zarr_store)
-                    print(
-                        "seg.storage_manager.store_path", seg.storage_manager.store_path
-                    )
+                    print("seg.storage_manager.store_path", seg.storage_manager.store_path)
                     print("source_seg", source_seg.config.segmentations_zarr_store)
 
                     seg.ZarrArrayIndex = None
@@ -109,9 +102,7 @@ def database_mirror_full(config_file):
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option("--failed", is_flag=True, default=False)
 def update_thumbnails(env, failed):
     """Update thumbnails for all images in the database."""
@@ -131,9 +122,7 @@ def update_thumbnails(env, failed):
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option("-d", "--device", type=str, default=None)
 def run_models(env, device):
     import torch
@@ -165,12 +154,8 @@ def run_models(env, device):
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
-    "--print-errors", is_flag=True, default=False, help="Print validation errors"
-)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
+@click.option("--print-errors", is_flag=True, default=False, help="Print validation errors")
 def validate_forms(env, print_errors):
     """Validate form annotations and schemas in the database.
 
@@ -188,9 +173,7 @@ def validate_forms(env, print_errors):
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 def zarr_tree(env):
     """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
@@ -242,9 +225,7 @@ def zarr_tree(env):
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option(
     "--new-store-path",
     type=click.Path(),
@@ -277,7 +258,7 @@ def defragment_zarr(env, new_store_path):
 
     try:
         # Run defragmentation
-        index_mapping = old_manager.defragment_to_new_store(new_store_path)
+        index_mapping = old_manager.defragment_to_new_store(new_store_path)  # noqa: F841
 
         print("\nDefragmentation completed successfully!")
         print(f"New zarr store created at: {new_store_path}")
@@ -292,9 +273,7 @@ def defragment_zarr(env, new_store_path):
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
 @click.option(
     "--print-errors",
     is_flag=True,
@@ -317,7 +296,7 @@ def update_hashes(env, print_errors):
     with database.get_session() as session:
         # Get all image instances with missing hashes
         query = select(ImageInstance).filter(
-            (ImageInstance.FileChecksum == None) | (ImageInstance.DataHash == None)
+            (ImageInstance.FileChecksum == None) | (ImageInstance.DataHash == None)  # noqa: E711
         )
 
         images = session.execute(query).scalars().all()
@@ -337,9 +316,7 @@ def update_hashes(env, print_errors):
                         updated = True
                     except Exception as e:
                         if print_errors:
-                            print(
-                                f"Error calculating file checksum for ImageInstanceID={im.ImageInstanceID}, path={im.path}: {e}"
-                            )
+                            print(f"Error calculating file checksum for ImageInstanceID={im.ImageInstanceID}, path={im.path}: {e}")
                         errors += 1
 
                 if im.DataHash is None:
@@ -348,9 +325,7 @@ def update_hashes(env, print_errors):
                         updated = True
                     except Exception as e:
                         if print_errors:
-                            print(
-                                f"Error calculating data hash for ImageInstanceID={im.ImageInstanceID}, path={im.path}: {e}"
-                            )
+                            print(f"Error calculating data hash for ImageInstanceID={im.ImageInstanceID}, path={im.path}: {e}")
                         errors += 1
 
                 if updated:
@@ -368,24 +343,12 @@ def update_hashes(env, print_errors):
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
-    "--patient", type=str, required=False, help="Patient identifier to run registration for"
-)
-@click.option(
-    "--project", type=int, required=False, help="Project ID to run registration for"
-)
-@click.option(
-    "--schema", type=str, required=False, default="RegistrationSet", help="SchemaName to run registration for"
-)
-@click.option(
-    "--creator", type=str, required=False, default="registration model", help="CreatorName to run registration for"
-)
-@click.option(
-    "--replace", is_flag=True, required=False, default=False, help="Replace existing registration"
-)
+@click.option("-e", "--env", type=str, help="Path to .env file for environment configuration")
+@click.option("--patient", type=str, required=False, help="Patient identifier to run registration for")
+@click.option("--project", type=int, required=False, help="Project ID to run registration for")
+@click.option("--schema", type=str, required=False, default="RegistrationSet", help="SchemaName to run registration for")
+@click.option("--creator", type=str, required=False, default="registration model", help="CreatorName to run registration for")
+@click.option("--replace", is_flag=True, required=False, default=False, help="Replace existing registration")
 def run_registration(env, patient, project, schema, creator, replace):
     from eyened_orm import Database, Patient, Project
     from eyened_orm.utils.registration import get_or_create_schema, get_or_create_creator, run_patient
@@ -393,7 +356,6 @@ def run_registration(env, patient, project, schema, creator, replace):
     config = load_config(env)
     database = Database(config)
     with database.get_session() as session:
-            
         schema = get_or_create_schema(session, schema)
         creator = get_or_create_creator(session, creator)
         if patient:
@@ -407,4 +369,3 @@ def run_registration(env, patient, project, schema, creator, replace):
                 run_patient(session, patient, schema, creator, replace)
         else:
             print("No patient or project provided")
-        

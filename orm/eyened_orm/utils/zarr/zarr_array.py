@@ -46,30 +46,22 @@ class ZarrArray:
         """
         # Validate input data shape - segmentation_data should be (D, H, W)
         if len(segmentation_data.shape) != 3:
-            raise ValueError(
-                f"Expected 3D array (D, H, W), got shape {segmentation_data.shape}"
-            )
+            raise ValueError(f"Expected 3D array (D, H, W), got shape {segmentation_data.shape}")
 
         # Check if spatial dimensions match
         expected_spatial = self.segmentation_shape
         actual_spatial = segmentation_data.shape  # D, H, W
         if actual_spatial != expected_spatial:
-            raise ValueError(
-                f"Expected spatial dimensions {expected_spatial}, got {actual_spatial}"
-            )
+            raise ValueError(f"Expected spatial dimensions {expected_spatial}, got {actual_spatial}")
 
         # Validate data type
         if segmentation_data.dtype != self.array.dtype:
-            raise ValueError(
-                f"Expected dtype {self.array.dtype}, got {segmentation_data.dtype}"
-            )
+            raise ValueError(f"Expected dtype {self.array.dtype}, got {segmentation_data.dtype}")
 
         if zarr_index is not None:
             if zarr_index >= self.array.shape[0]:
-                raise IndexError(
-                    f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}"
-                )
-            
+                raise IndexError(f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}")
+
             # Write to existing index
             self.array[zarr_index, ...] = segmentation_data
             return zarr_index
@@ -81,7 +73,7 @@ class ZarrArray:
         """Append segmentation data to the zarr array and return the new index."""
         self.array.append(segmentation_data[None, ...])
         return self.array.shape[0] - 1
-        
+
     def _append_zeroed_element(self) -> int:
         """Append a zeroed-out element to the zarr array and return the new index."""
         # Create a zeroed array with the correct shape and dtype
@@ -109,9 +101,7 @@ class ZarrArray:
         if zarr_index is None:
             zarr_index = self._append_zeroed_element()
         elif zarr_index >= self.array.shape[0]:
-            raise IndexError(
-                f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}"
-            )
+            raise IndexError(f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}")
 
         if axis not in [0, 1, 2]:
             raise ValueError(f"Invalid axis: {axis}. Must be 0 (depth), 1 (height), or 2 (width)")
@@ -125,24 +115,18 @@ class ZarrArray:
         # Validate slice_index
         max_slice_index = self.segmentation_shape[axis]
         if slice_index < 0 or slice_index >= max_slice_index:
-            raise IndexError(
-                f"Invalid slice_index: {slice_index}. Must be in range [0, {max_slice_index})"
-            )
+            raise IndexError(f"Invalid slice_index: {slice_index}. Must be in range [0, {max_slice_index})")
 
         # Validate slice_data shape
         expected_shape = list(self.segmentation_shape)
         expected_shape.pop(axis)  # Remove the axis dimension
-        
+
         if slice_data.shape != tuple(expected_shape):
-            raise ValueError(
-                f"Expected slice shape {tuple(expected_shape)}, got {slice_data.shape}"
-            )
+            raise ValueError(f"Expected slice shape {tuple(expected_shape)}, got {slice_data.shape}")
 
         # Validate data type
         if slice_data.dtype != self.array.dtype:
-            raise ValueError(
-                f"Expected dtype {self.array.dtype}, got {slice_data.dtype}"
-            )
+            raise ValueError(f"Expected dtype {self.array.dtype}, got {slice_data.dtype}")
 
         # Create the slice index
         slice_indices = [slice(None)] * 4  # [zarr_index, height, width, depth]
@@ -151,7 +135,7 @@ class ZarrArray:
 
         # Write the slice
         self.array[tuple(slice_indices)] = slice_data
-        
+
         return zarr_index
 
     def read_slice(self, zarr_index: int, axis: int, slice_index: int) -> np.ndarray:
@@ -171,9 +155,7 @@ class ZarrArray:
             ValueError: If axis is invalid
         """
         if zarr_index is None or zarr_index >= self.array.shape[0]:
-            raise IndexError(
-                f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}"
-            )
+            raise IndexError(f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}")
 
         if axis not in [0, 1, 2]:
             raise ValueError(f"Invalid axis: {axis}. Must be 0 (depth), 1 (height), or 2 (width)")
@@ -181,14 +163,12 @@ class ZarrArray:
         # Check if the array is volumetric (all spatial dimensions > 1)
         if not self.is_volume:
             pass
-            #raise ValueError("read_slice is only supported for volumetric segmentations (all spatial dimensions > 1)")
+            # raise ValueError("read_slice is only supported for volumetric segmentations (all spatial dimensions > 1)")
 
         # Validate slice_index
         max_slice_index = self.segmentation_shape[axis]
         if slice_index < 0 or slice_index >= max_slice_index:
-            raise IndexError(
-                f"Invalid slice_index: {slice_index}. Must be in range [0, {max_slice_index})"
-            )
+            raise IndexError(f"Invalid slice_index: {slice_index}. Must be in range [0, {max_slice_index})")
 
         # Create the slice index
         slice_indices = [slice(None)] * 4  # [zarr_index, depth, height, width]
@@ -212,9 +192,7 @@ class ZarrArray:
             IndexError: If zarr_index is invalid
         """
         if zarr_index is None or zarr_index >= self.array.shape[0]:
-            raise IndexError(
-                f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}"
-            )
+            raise IndexError(f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}")
 
         return self.array[zarr_index, ...]
 
@@ -229,9 +207,7 @@ class ZarrArray:
             IndexError: If zarr_index is invalid
         """
         if zarr_index is None or zarr_index >= self.array.shape[0]:
-            raise IndexError(
-                f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}"
-            )
+            raise IndexError(f"Invalid zarr_index: {zarr_index}. Array length: {self.array.shape[0]}")
 
         # Clear the data at the specified index
         # For boolean arrays, set to False; for others, set to 0

@@ -1,7 +1,14 @@
 from eyened_orm import (
-    ImageInstance, Tag, ImageInstanceTagLink,
-    Series, Study, Patient, Project, DeviceInstance, DeviceModel, Scan,
-    Segmentation, ModelSegmentation, Model, Feature, FormAnnotation,
+    ImageInstance,
+    Tag,
+    ImageInstanceTagLink,
+    Series,
+    Study,
+    Patient,
+    DeviceInstance,
+    Segmentation,
+    ModelSegmentation,
+    FormAnnotation,
 )
 from eyened_orm.tag import SegmentationTagLink, FormAnnotationTagLink, TagType
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -16,6 +23,7 @@ from .auth import CurrentUser, get_current_user, is_authenticated
 from ..db import get_db
 
 router = APIRouter()
+
 
 @router.get("/instances/{instance_id}", response_model=InstanceGET)
 async def get_instance(
@@ -104,10 +112,13 @@ async def tag_instance(instance_id: int, body: ObjectTagPOST, db: Session = Depe
     link = db.get(ImageInstanceTagLink, {"TagID": tag.TagID, "ImageInstanceID": instance_id})
     if not link:
         link = ImageInstanceTagLink(TagID=tag.TagID, ImageInstanceID=instance_id, CreatorID=current_user.id)
-        db.add(link); db.commit(); db.refresh(link)
+        db.add(link)
+        db.commit()
+        db.refresh(link)  # noqa: E702
         link.Tag = tag  # optional: avoid Tag lazy-load
 
     return DTOConverter.link_to_tag_metadata(link)
+
 
 @router.delete("/instances/{instance_id}/tags/{tag_id}", status_code=204)
 async def untag_instance(instance_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -117,5 +128,6 @@ async def untag_instance(instance_id: int, tag_id: int, db: Session = Depends(ge
         raise HTTPException(404, "ImageInstance not found")
     link = db.get(ImageInstanceTagLink, {"TagID": tag_id, "ImageInstanceID": instance_id})
     if link:
-        db.delete(link); db.commit()
+        db.delete(link)
+        db.commit()  # noqa: E702
     return Response(status_code=204)

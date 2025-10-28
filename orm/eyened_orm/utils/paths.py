@@ -27,7 +27,7 @@ paths = {
     "ModelSegmentation": {
         "ImageInstance",
         "Model",
-    },    
+    },
     "Model": {
         "Feature",
     },

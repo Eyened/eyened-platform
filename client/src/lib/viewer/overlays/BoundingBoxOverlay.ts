@@ -1,20 +1,20 @@
-import type { int } from '$lib/types';
-import type { RenderTarget } from '$lib/webgl/types';
-import type { Overlay } from '../viewer-utils';
-import type { ViewerContext } from '../viewerContext.svelte';
+import type { int } from "$lib/types";
+import type { RenderTarget } from "$lib/webgl/types";
+import type { Overlay } from "../viewer-utils";
+import type { ViewerContext } from "../viewerContext.svelte";
 
 type Box = [int, int, int, int]; // x1, y1, x2, y2
 
 export class BoundingBoxOverlay implements Overlay {
 	lineWidth = 3;
-	strokeStyle = 'rgba(255,255,255,1)';
+	strokeStyle = "rgba(255,255,255,1)";
 	hide = false;
-	name: string = 'BoundingBox';
+	name: string = "BoundingBox";
 	annotationID: number = 0;
 
 	boundingBoxes: Box[] = [];
 
-	constructor() { }
+	constructor() {}
 
 	addBoundingBox(bb: Box) {
 		this.boundingBoxes.push(bb);

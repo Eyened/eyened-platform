@@ -1,12 +1,8 @@
-from pathlib import Path
-
 import pandas as pd
 import torch
 from rtnls_inference.ensembles import HeatmapRegressionEnsemble
 from rtnls_inference.ensembles.ensemble_classification import ClassificationEnsemble
-from rtnls_inference.ensembles.ensemble_keypoints import KeypointsEnsemble
 from rtnls_inference.utils import decollate_batch, extract_keypoints_from_heatmaps
-from sqlalchemy import select
 from tqdm import tqdm
 
 from eyened_orm import ImageInstance, Modality
@@ -16,12 +12,8 @@ from .utils import auto_device
 def run_basic_models(fpaths, ids, device: torch.device = None):
     if device is None:
         device = auto_device()
-    ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface(
-        "Eyened/vascx:fovea/fovea_july24.pt"
-    ).to(device)
-    ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface(
-        "Eyened/vascx:discedge/discedge_july24.pt"
-    ).to(device)
+    ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface("Eyened/vascx:fovea/fovea_july24.pt").to(device)
+    ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface("Eyened/vascx:discedge/discedge_july24.pt").to(device)
 
     dataloader = ensemble_fovea._make_inference_dataloader(
         fpaths,
@@ -83,9 +75,7 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
 def run_quality_model(fpaths, ids, device: torch.device = None):
     if device is None:
         device = auto_device()
-    ensemble_quality = ClassificationEnsemble.from_huggingface(
-        "Eyened/vascx:quality/quality.pt"
-    ).to(device)
+    ensemble_quality = ClassificationEnsemble.from_huggingface("Eyened/vascx:quality/quality.pt").to(device)
     dataloader = ensemble_quality._make_inference_dataloader(
         fpaths,
         ids=ids,
@@ -120,9 +110,7 @@ def run_quality_model(fpaths, ids, device: torch.device = None):
     )
 
 
-def run_inference_for_images(
-    session, images, device: torch.device = None, cfi_cache_path=None
-):
+def run_inference_for_images(session, images, device: torch.device = None, cfi_cache_path=None):
     from rtnls_fundusprep.preprocessor import parallel_preprocess
 
     if device is None:
@@ -134,21 +122,15 @@ def run_inference_for_images(
     bounds = parallel_preprocess(
         paths,  # List of image files
         ids,
-        rgb_path=(
-            cfi_cache_path / "rgb" if cfi_cache_path is not None else None
-        ),  # Output path for RGB images
-        ce_path=(
-            cfi_cache_path / "ce" if cfi_cache_path is not None else None
-        ),  # Output path for Contrast Enhanced images
+        rgb_path=(cfi_cache_path / "rgb" if cfi_cache_path is not None else None),  # Output path for RGB images
+        ce_path=(cfi_cache_path / "ce" if cfi_cache_path is not None else None),  # Output path for Contrast Enhanced images
         n_jobs=8,  # number of preprocessing workers
     )
 
     df_bounds = pd.DataFrame(bounds).set_index("id")
 
     # Continue only with successfully preprocessed images
-    ids = df_bounds[
-        df_bounds["success"]
-    ].index.tolist()  # only run on successfully preprocessed images
+    ids = df_bounds[df_bounds["success"]].index.tolist()  # only run on successfully preprocessed images
 
     if not ids:
         print("No images to process")
@@ -170,9 +152,7 @@ def run_inference_for_images(
     # Update the DB
     from .utils import clear_unsuccessfull, postprocess, update_database
 
-    df = pd.merge(
-        df_bounds, df_model_outputs, left_index=True, right_index=True, how="left"
-    )
+    df = pd.merge(df_bounds, df_model_outputs, left_index=True, right_index=True, how="left")
     df = pd.merge(df, df_quality, left_index=True, right_index=True, how="left")
     df = df.rename(
         columns={
@@ -198,8 +178,7 @@ def run_inference(session, device: torch.device = None, cfi_cache_path=None):
     # We run preprocessing + inference on all ColorFundus images with DatePreprocessed==None
     images = ImageInstance.where(
         session,
-        (ImageInstance.Modality == Modality.ColorFundus)
-        & (ImageInstance.DatePreprocessed == None)
+        (ImageInstance.Modality == Modality.ColorFundus) & (ImageInstance.DatePreprocessed == None),  # noqa: E711
     )
 
     if len(images) == 0:

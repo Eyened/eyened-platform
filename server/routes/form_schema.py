@@ -9,13 +9,12 @@ from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
 
+
 @router.get("/form-schemas", response_model=list[FormSchemaGET])
-async def list_form_schemas(
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)
-):
+async def list_form_schemas(db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     rows = db.scalars(select(FormSchema).order_by(FormSchema.SchemaName.asc())).all()
     return [DTOConverter.form_schema_to_get(s) for s in rows]
+
 
 @router.get("/form-schemas/{form_schema_id}", response_model=FormSchemaGET)
 async def get_form_schema(form_schema_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):

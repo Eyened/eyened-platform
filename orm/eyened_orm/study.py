@@ -8,7 +8,7 @@ from .base import Base
 
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, Patient, Series as SeriesType, ImageInstance, StudyTagLink
+    from eyened_orm import Annotation, FormAnnotation, Patient, ImageInstance, StudyTagLink
 
 
 class Study(Base):
@@ -38,14 +38,8 @@ class Study(Base):
     StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship("eyened_orm.tag.StudyTagLink", back_populates="Study", lazy="selectin")
 
     @classmethod
-    def by_patient_and_date(
-        cls, session: Session, patient_id: int, study_date: datetime.date
-    ) -> Optional["Study"]:
-        return session.scalar(
-            select(Study).where(
-                Study.PatientID == patient_id, Study.StudyDate == study_date
-            )
-        )
+    def by_patient_and_date(cls, session: Session, patient_id: int, study_date: datetime.date) -> Optional["Study"]:
+        return session.scalar(select(Study).where(Study.PatientID == patient_id, Study.StudyDate == study_date))
 
     @property
     def age_years(self) -> float | None:
@@ -55,7 +49,8 @@ class Study(Base):
 
     def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
         from eyened_orm import ImageInstance
-        q = select(ImageInstance).join(Series).where(Series.StudyID == self.StudyID)
+
+        q = select(ImageInstance).join(Series).where(Series.StudyID == self.StudyID)  # noqa: F821
         if not include_inactive:
             q = q.where(~ImageInstance.Inactive)
         if where is not None:

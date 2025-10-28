@@ -1,6 +1,4 @@
-version: "3.1"
-
-name: eyened-platform-dev-bart
+name: eyened-platform-dev
 
 services:
   
@@ -19,7 +17,7 @@ services:
 
   database:
     env_file: .env
-    image: mysql:8.0.27
+    image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
     ports:
@@ -41,4 +39,3 @@ services:
         condition: service_healthy
     environment:
       - ADMINER_DEFAULT_SERVER=database
-

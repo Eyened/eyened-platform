@@ -13,10 +13,25 @@ import Trigger from "./select-trigger.svelte";
 const Root = SelectPrimitive.Root;
 
 export {
-	Content, Group, GroupHeading, Item, Label, Root, ScrollDownButton,
+	Content,
+	Group,
+	GroupHeading,
+	Item,
+	Label,
+	Root,
+	ScrollDownButton,
 	ScrollUpButton,
 	//
-	Root as Select, Content as SelectContent, Group as SelectGroup, GroupHeading as SelectGroupHeading, Item as SelectItem, Label as SelectLabel, ScrollDownButton as SelectScrollDownButton,
-	ScrollUpButton as SelectScrollUpButton, Separator as SelectSeparator, Trigger as SelectTrigger, Separator, Trigger
+	Root as Select,
+	Content as SelectContent,
+	Group as SelectGroup,
+	GroupHeading as SelectGroupHeading,
+	Item as SelectItem,
+	Label as SelectLabel,
+	ScrollDownButton as SelectScrollDownButton,
+	ScrollUpButton as SelectScrollUpButton,
+	Separator as SelectSeparator,
+	Trigger as SelectTrigger,
+	Separator,
+	Trigger,
 };
-

@@ -34,15 +34,12 @@ if TYPE_CHECKING:
         Project,
         Creator,
         DeviceModel,
-        DeviceInstance,
-        Scan,
         Tag as TagORM,
         Feature,
         Segmentation,
         FormSchema as FormSchemaORM,
         FormAnnotation as FormAnnotationORM,
         TaskDefinition as TaskDefinitionORM,
-        TaskState as TaskStateORM,
         Task as TaskORM,
         SubTask as SubTaskORM,
         StudyTagLink,
@@ -139,21 +136,11 @@ class DTOConverter:
     ) -> InstanceGET:
         """Convert ImageInstance ORM object to InstanceGET."""
         device_meta = DeviceMeta(
-            manufacturer=(
-                image_instance.DeviceInstance.DeviceModel.Manufacturer
-                if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel
-                else "Unknown"
-            ),
-            model=(
-                image_instance.DeviceInstance.DeviceModel.ManufacturerModelName
-                if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel
-                else "Unknown"
-            ),
+            manufacturer=(image_instance.DeviceInstance.DeviceModel.Manufacturer if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel else "Unknown"),
+            model=(image_instance.DeviceInstance.DeviceModel.ManufacturerModelName if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel else "Unknown"),
         )
 
-        scan_meta = ScanMeta(
-            mode=(image_instance.Scan.ScanMode if image_instance.Scan else "Unknown")
-        )
+        scan_meta = ScanMeta(mode=(image_instance.Scan.ScanMode if image_instance.Scan else "Unknown"))
 
         project_meta = ProjectMeta(
             id=image_instance.Series.Study.Patient.Project.ProjectID,
@@ -206,20 +193,11 @@ class DTOConverter:
         if with_tag_metadata:
             dto.tags = DTOConverter._tags_from_image_instance(image_instance)
         if with_segmentations:
-            dto.segmentations = [
-                DTOConverter.segmentation_to_get(s, with_tag_metadata=with_tag_metadata)
-                for s in (getattr(image_instance, "Segmentations", []) or []) if not s.Inactive
-            ]
+            dto.segmentations = [DTOConverter.segmentation_to_get(s, with_tag_metadata=with_tag_metadata) for s in (getattr(image_instance, "Segmentations", []) or []) if not s.Inactive]
         if with_form_annotations:
-            dto.form_annotations = [
-                DTOConverter.form_annotation_to_get(fa, with_tag_metadata=with_tag_metadata)
-                for fa in (getattr(image_instance, "FormAnnotations", []) or []) if not fa.Inactive
-            ]
+            dto.form_annotations = [DTOConverter.form_annotation_to_get(fa, with_tag_metadata=with_tag_metadata) for fa in (getattr(image_instance, "FormAnnotations", []) or []) if not fa.Inactive]
         if with_model_segmentations:
-            dto.model_segmentations = [
-                DTOConverter.model_segmentation_to_get(ms, with_tag_metadata=with_tag_metadata)
-                for ms in (getattr(image_instance, "ModelSegmentations", []) or [])
-            ]
+            dto.model_segmentations = [DTOConverter.model_segmentation_to_get(ms, with_tag_metadata=with_tag_metadata) for ms in (getattr(image_instance, "ModelSegmentations", []) or [])]
         # Populate attributes grouped by model name
         try:
             attrs_by_model: dict[str, dict[str, object]] = {}
@@ -254,16 +232,8 @@ class DTOConverter:
     def image_instance_to_meta(image_instance: "ImageInstance") -> InstanceMeta:
         """Convert ImageInstance ORM object to InstanceMeta."""
         device_meta = DeviceMeta(
-            manufacturer=(
-                image_instance.DeviceInstance.DeviceModel.Manufacturer
-                if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel
-                else "Unknown"
-            ),
-            model=(
-                image_instance.DeviceInstance.DeviceModel.ManufacturerModelName
-                if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel
-                else "Unknown"
-            ),
+            manufacturer=(image_instance.DeviceInstance.DeviceModel.Manufacturer if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel else "Unknown"),
+            model=(image_instance.DeviceInstance.DeviceModel.ManufacturerModelName if image_instance.DeviceInstance and image_instance.DeviceInstance.DeviceModel else "Unknown"),
         )
         return InstanceMeta(
             id=image_instance.ImageInstanceID,
@@ -294,10 +264,7 @@ class DTOConverter:
     @staticmethod
     def creator_to_meta(creator: "Creator") -> CreatorMeta:
         """Convert Creator ORM object to CreatorMetadata."""
-        return CreatorMeta(
-            id=creator.CreatorID,
-            name=creator.CreatorName
-        )
+        return CreatorMeta(id=creator.CreatorID, name=creator.CreatorName)
 
     @staticmethod
     def tag_to_get(tag: "TagORM") -> TagGET:
@@ -328,16 +295,19 @@ class DTOConverter:
             id=ms.ModelSegmentationID,
             image_instance_id=ms.ImageInstanceID,
             annotation_type="model_segmentation",
-            depth=ms.Depth, height=ms.Height, width=ms.Width,
+            depth=ms.Depth,
+            height=ms.Height,
+            width=ms.Width,
             sparse_axis=ms.SparseAxis,
             image_projection_matrix=ms.ImageProjectionMatrix,
             scan_indices=ms.ScanIndices,
             threshold=ms.Threshold,
             reference_segmentation_id=ms.ReferenceSegmentationID,
-            data_type=ms.DataType, data_representation=ms.DataRepresentation,
+            data_type=ms.DataType,
+            data_representation=ms.DataRepresentation,
             creator=DTOConverter.model_to_meta(ms.Model),
             feature=feature_get,  # may be None if not joined
-            tags=[],       # no tags on ModelSegmentation
+            tags=[],  # no tags on ModelSegmentation
             date_inserted=ms.DateInserted,
             date_modified=None,
         )
@@ -375,7 +345,7 @@ class DTOConverter:
         if child_ids is None:
             # fallback if your ORM exposes links (rename 'ChildLinks' if different)
             child_ids = [link.ChildFeatureID for link in getattr(feature, "ChildLinks", [])]
-        
+
         return FeatureGET(
             id=feature.FeatureID,
             name=feature.FeatureName,
@@ -494,11 +464,7 @@ class DTOConverter:
     @staticmethod
     def subtask_with_images_to_get(subtask: "SubTaskORM") -> SubTaskWithImagesGET:
         """Convert SubTask ORM object to SubTaskWithImagesGET, including images."""
-        images = [
-            DTOConverter.image_instance_to_get(link.ImageInstance)
-            for link in (getattr(subtask, "SubTaskImageLinks", None) or [])
-            if getattr(link, "ImageInstance", None)
-        ]
+        images = [DTOConverter.image_instance_to_get(link.ImageInstance) for link in (getattr(subtask, "SubTaskImageLinks", None) or []) if getattr(link, "ImageInstance", None)]
         return SubTaskWithImagesGET(
             id=subtask.SubTaskID,
             task_id=subtask.TaskID,

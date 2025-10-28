@@ -9,36 +9,39 @@ import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
 export class LayerSegmentationOverlay implements Overlay {
-
 	private colors: number[] = new Array(32 * 3).fill(0);
 	alpha = $state(0.8);
 
 	constructor(
 		private readonly registration: Registration,
-		private readonly segmentation: MulticlassSegmentation | MultilabelSegmentation,
+		private readonly segmentation:
+			| MulticlassSegmentation
+			| MultilabelSegmentation,
 		public readonly segmentationContext: SegmentationContext,
-		private shaders: Shaders
-
+		private shaders: Shaders,
 	) {
 		// alternating even and odd colors from tab20
 		// because neighboring pairs of colors are in tab20 are very similar
 		for (let i = 0; i < 10; i++) {
-			this.colors.splice(i * 3, 3, ...tab20[2 * i].map(c => c / 255));
+			this.colors.splice(i * 3, 3, ...tab20[2 * i].map((c) => c / 255));
 		}
 		for (let i = 0; i < 10; i++) {
-			this.colors.splice((i + 10) * 3, 3, ...tab20[2 * i + 1].map(c => c / 255));
+			this.colors.splice(
+				(i + 10) * 3,
+				3,
+				...tab20[2 * i + 1].map((c) => c / 255),
+			);
 		}
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-        // console.log('repaint layers')
+		// console.log('repaint layers')
 		const {
 			hiddenCreators: hideCreators,
 			hideFeatures,
 			visibleSegmentations: hideSegmentations,
-			hideAnnotations
+			hideAnnotations,
 		} = this.segmentationContext;
-
 
 		if (hideSegmentations.has(this.segmentation)) return;
 		const { annotation } = this.segmentation;
@@ -46,11 +49,17 @@ export class LayerSegmentationOverlay implements Overlay {
 		if (hideCreators.has(annotation.creator)) return;
 		if (hideFeatures.has(annotation.feature)) return;
 
-		const position = this.registration.getPosition(viewerContext.image.image_id);
+		const position = this.registration.getPosition(
+			viewerContext.image.image_id,
+		);
 		if (!position) return;
 
 		const scanNr = viewerContext.index;
-		const voxel = this.segmentation.data.getVoxel(Math.round(position.x), Math.round(position.y), scanNr);
+		const voxel = this.segmentation.data.getVoxel(
+			Math.round(position.x),
+			Math.round(position.y),
+			scanNr,
+		);
 
 		const baseUniforms = getBaseUniforms(viewerContext);
 		const uniforms = {
@@ -60,7 +69,11 @@ export class LayerSegmentationOverlay implements Overlay {
 			u_alpha: this.alpha,
 			u_highlight: voxel,
 			u_questionable_bit: this.segmentation.questionable_bit,
-			u_image_size: [viewerContext.image.width, viewerContext.image.height, viewerContext.image.depth]
+			u_image_size: [
+				viewerContext.image.width,
+				viewerContext.image.height,
+				viewerContext.image.depth,
+			],
 		};
 
 		if (this.segmentation instanceof MultilabelSegmentation) {
@@ -71,11 +84,8 @@ export class LayerSegmentationOverlay implements Overlay {
 			}
 			this.shaders.renderMultiClass.pass(renderTarget, uniforms);
 		}
-
 	}
-
 }
-
 
 const tab20 = [
 	[31, 119, 180],
@@ -98,4 +108,4 @@ const tab20 = [
 	[219, 219, 141],
 	[23, 190, 207],
 	[158, 218, 229],
-]
+];

@@ -22,6 +22,7 @@ def transform_kps(colname):
 def logits_to_continuous_score(logits, temperature=3.0):
     import torch
     import torch.nn.functional as F
+
     logits = torch.tensor(logits, dtype=torch.float32) / temperature
     probs = F.softmax(logits, dim=-1)
     num_classes = len(logits)
@@ -34,9 +35,7 @@ def postprocess(df):
     # df["bounds"] = df.apply(add_hw_to_bounds, axis=1)
     df["discedge"] = df.apply(transform_kps("discedge"), axis=1)
     df["fovea"] = df.apply(transform_kps("fovea"), axis=1)
-    df["score"] = df[["q1", "q2", "q3"]].apply(
-        lambda row: logits_to_continuous_score(row.values), axis=1
-    )
+    df["score"] = df[["q1", "q2", "q3"]].apply(lambda row: logits_to_continuous_score(row.values), axis=1)
     return df
 
 
@@ -87,16 +86,13 @@ def clear_unsuccessfull(session, df, commit=True):
         session.commit()
 
 
-
 def auto_device():
     import GPUtil
     import torch
 
     # Attempt to select a free GPU
     try:
-        deviceID = GPUtil.getFirstAvailable(order="memory")[
-            0
-        ]  # Get the GPU with the most free memory
+        deviceID = GPUtil.getFirstAvailable(order="memory")[0]  # Get the GPU with the most free memory
         device = f"cuda:{deviceID}"
     except RuntimeError:
         device = "cpu"

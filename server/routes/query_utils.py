@@ -13,7 +13,7 @@ sqlalchemy_operators = {
     "ilike": lambda column, value: column.ilike(f"%{value}%"),
     "startswith": lambda column, value: column.startswith(value),
     "endswith": lambda column, value: column.endswith(value),
-    "is_null": lambda column, value: column.is_(None) if value else column.isnot(None)
+    "is_null": lambda column, value: column.is_(None) if value else column.isnot(None),
 }
 
 

@@ -46,9 +46,7 @@ def _get_attribute_with_conversion(obj, name: str) -> Any:
             return super(type(obj), obj).__getattribute__(converted_name)
         except AttributeError:
             obj_name = obj.__name__ if isinstance(obj, type) else obj.__class__.__name__
-            raise AttributeError(
-                f"'{obj_name}' has no attribute '{name}' or '{converted_name}'"
-            )
+            raise AttributeError(f"'{obj_name}' has no attribute '{name}' or '{converted_name}'")
 
 
 T = TypeVar("T", bound="Base")
@@ -149,9 +147,7 @@ class Base(DeclarativeBase):
             pk = (pk,)
 
         if len(pk) != len(pks):
-            raise ValueError(
-                f"{cls.__name__}.by_pk() expects {len(pks)} values, got {len(pk)}"
-            )
+            raise ValueError(f"{cls.__name__}.by_pk() expects {len(pks)} values, got {len(pk)}")
 
         conditions = [col == val for col, val in zip(pks, pk)]
         stmt = select(cls).where(*conditions)
@@ -160,10 +156,7 @@ class Base(DeclarativeBase):
     @classmethod
     def name_to_id(cls, session: Session) -> dict[str, int]:
         """Get a mapping of name column values to their IDs."""
-        return {
-            getattr(obj, cls._name_column): getattr(obj, cls.primary_key().name)
-            for obj in cls.fetch_all(session)
-        }
+        return {getattr(obj, cls._name_column): getattr(obj, cls.primary_key().name) for obj in cls.fetch_all(session)}
 
     @classmethod
     def by_column(cls: type[T], session: Session, **kwargs) -> Optional[T]:
@@ -193,7 +186,7 @@ class Base(DeclarativeBase):
     def _base_joins(cls, statement):
         """Override this method to add custom joins to queries."""
         return statement
-    
+
     @classmethod
     def where(cls: Type[T], session: Session, condition, include_inactive=False, **kwargs) -> List[T]:
         """Query objects with a custom condition and optional joins."""
@@ -215,11 +208,7 @@ class Base(DeclarativeBase):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the object to a dictionary, skipping columns marked private."""
-        return {
-            c.name: self.get_value(c)
-            for c in self.columns()
-            if not (getattr(c, "info", None) or {}).get("private", False)
-        }
+        return {c.name: self.get_value(c) for c in self.columns() if not (getattr(c, "info", None) or {}).get("private", False)}
 
     def to_list(self) -> List[Any]:
         """Convert the object to a list of values."""
@@ -231,8 +220,8 @@ class Base(DeclarativeBase):
         return f"{self.__class__.__name__}({args})"
 
     def _repr_html_(self) -> str:
-        """HTML representation for Jupyter notebook display in table format."""            
-        printer = TablePrinter(title=f'{self.__class__.__name__} {self.get_value(self.primary_key())}')
+        """HTML representation for Jupyter notebook display in table format."""
+        printer = TablePrinter(title=f"{self.__class__.__name__} {self.get_value(self.primary_key())}")
         return printer.print_table(self.to_dict())
 
     def __hash__(self):

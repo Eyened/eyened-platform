@@ -1,5 +1,5 @@
 import datetime
-import secrets    
+import secrets
 import warnings
 from pathlib import Path
 from typing import Dict, List, Union
@@ -19,18 +19,7 @@ from eyened_orm.utils.config import EyenedORMConfig
 
 
 class Importer:
-    def __init__(
-        self,
-        session,
-        config: EyenedORMConfig,
-        create_patients: bool = False,
-        create_studies: bool = False,
-        create_series: bool = True,
-        create_projects: bool = False,
-        run_ai_models: bool = False,
-        generate_thumbnails: bool = True
-        
-    ):
+    def __init__(self, session, config: EyenedORMConfig, create_patients: bool = False, create_studies: bool = False, create_series: bool = True, create_projects: bool = False, run_ai_models: bool = False, generate_thumbnails: bool = True):
         """
         Initialize the Importer with database session and data to import.
 
@@ -52,7 +41,7 @@ class Importer:
             If True, run AI models on the images after import
         generate_thumbnails : bool, default=True
             If True, generate thumbnails for the images after import
-       
+
         """
         self.session = session
         self.config = config
@@ -63,12 +52,8 @@ class Importer:
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
 
-
-        
-
         assert self.config.images_basepath is not None, "images_basepath must be set when using the importer"
 
-        
         # Initialize empty collections
         self._clear_collections()
 
@@ -130,7 +115,7 @@ class Importer:
         """
         # Clear collections before starting
         self._clear_collections()
-        
+
         # Check that all patient items have a project_name
         for i, patient_item in enumerate(data):
             if "project_name" not in patient_item or not patient_item["project_name"]:
@@ -141,7 +126,7 @@ class Importer:
             # Find or create the project for this patient
             project = self.find_or_create_projects(patient_item["project_name"])
             self.projects.append(project)
-            
+
             patient = self.find_or_create_patient(patient_item, project)
             self.patients.append(patient)
 
@@ -156,7 +141,7 @@ class Importer:
                     for image_item in series_item.get("images", []):
                         image = self.find_or_create_image(series, image_item)
                         self.images.append(image)
-                        
+
         return self.projects
 
     def find_or_create_projects(self, project_name: str) -> Project:
@@ -164,35 +149,30 @@ class Importer:
         for project in self.projects:
             if project.ProjectName == project_name:
                 return project
-                
+
         # Try to find the project in the database
         project = Project.by_name(self.session, project_name)
-        
+
         # Create the project if it doesn't exist and we're allowed to
         if project is None:
             if not self.create_projects:
-                raise RuntimeError(
-                    f"Project with name '{project_name}' not found and create_projects=False"
-                )
+                raise RuntimeError(f"Project with name '{project_name}' not found and create_projects=False")
             project = Project(ProjectName=project_name, External=True)
-            
+
         # Add to our list of projects
-        
+
         return project
-    
+
     def find_or_create_patient(self, patient_item, project):
         patient_identifier = patient_item.get("patient_identifier")
         patient_props = patient_item.get("props", {})
 
         # Try to find existing patient
-        patient = project.get_patient_by_identifier(
-            self.session, patient_identifier)
+        patient = project.get_patient_by_identifier(self.session, patient_identifier)
 
         if patient is None:
             if not self.create_patients:
-                raise RuntimeError(
-                    f"Patient with identifier '{patient_identifier}' not found and create_patients=False"
-                )
+                raise RuntimeError(f"Patient with identifier '{patient_identifier}' not found and create_patients=False")
 
             # Create new patient
             patient = Patient(**patient_props)
@@ -204,10 +184,7 @@ class Importer:
                 else secrets.token_hex(8)
             )
         elif patient_props:
-            warnings.warn(
-                f"Props provided for existing patient '{patient_identifier}' will be ignored. "
-                f"The importer does not update existing patients."
-            )
+            warnings.warn(f"Props provided for existing patient '{patient_identifier}' will be ignored. The importer does not update existing patients.")
 
         return patient
 
@@ -234,61 +211,46 @@ class Importer:
 
         if series is None:
             if not self.create_series:
-                raise RuntimeError(
-                    f"{string_repr} not found and create_series=False")
+                raise RuntimeError(f"{string_repr} not found and create_series=False")
 
             # Create new series
             series = Series(**props)
             series.Study = study
         elif props:
-            warnings.warn(
-                f"Props provided for existing series ({string_repr}) "
-                f"will be ignored. The importer does not update existing series."
-            )
+            warnings.warn(f"Props provided for existing series ({string_repr}) will be ignored. The importer does not update existing series.")
 
         # Store the series object in the data structure
         return series
 
     def find_or_create_study(self, patient, study_item):
-        default_study_date = self.config.default_study_date or datetime.date(1970,1,1)
+        default_study_date = self.config.default_study_date or datetime.date(1970, 1, 1)
         props = study_item.get("props", {})
 
         # Convert string date to datetime.date if necessary
         if isinstance(default_study_date, str):
             try:
                 # Assuming format is 'yyyy-mm-dd'
-                year, month, day = map(int, default_study_date.split('-'))
+                year, month, day = map(int, default_study_date.split("-"))
                 default_study_date = datetime.date(year, month, day)
             except ValueError:
-                raise ValueError(
-                    f"Invalid study date format: '{default_study_date}'. Expected format: 'yyyy-mm-dd' for patient '{patient.PatientIdentifier}'"
-                )
+                raise ValueError(f"Invalid study date format: '{default_study_date}'. Expected format: 'yyyy-mm-dd' for patient '{patient.PatientIdentifier}'")
 
         if not isinstance(default_study_date, datetime.date):
-            raise ValueError(
-                f"Study date must be a datetime.date object for patient '{patient.PatientIdentifier}'"
-            )
+            raise ValueError(f"Study date must be a datetime.date object for patient '{patient.PatientIdentifier}'")
 
         study = patient.get_study_by_date(default_study_date)
 
         if study is None:
             if not self.create_studies:
-                raise RuntimeError(
-                    f"Study with date '{default_study_date}' for patient '{patient.PatientIdentifier}' not found and create_studies=False"
-                )
+                raise RuntimeError(f"Study with date '{default_study_date}' for patient '{patient.PatientIdentifier}' not found and create_studies=False")
 
             # Create new study
             study = Study(StudyDate=default_study_date, **props)
             study.Patient = patient
         elif props:
-            warnings.warn(
-                f"Props provided for existing study (date: '{default_study_date}', patient: '{patient.PatientIdentifier}') "
-                f"will be ignored. The importer does not update existing studies."
-            )
+            warnings.warn(f"Props provided for existing study (date: '{default_study_date}', patient: '{patient.PatientIdentifier}') will be ignored. The importer does not update existing studies.")
 
         return study
-
-    
 
     def get_image_path(self, image_data):
         """
@@ -319,7 +281,7 @@ class Importer:
         The state for this is kept in the database so there is no need to pass any images here
         This way it is easier to maintain at the expense of being slightly less efficient
         """
-        
+
         if self.generate_thumbnails:
             self.update_thumbnails()
 
@@ -378,29 +340,19 @@ class Importer:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
-            raise RuntimeError(
-                "Failed to commit the transaction. Nothing will be written to the database and no files have been created or changed"
-            ) from e
+            raise RuntimeError("Failed to commit the transaction. Nothing will be written to the database and no files have been created or changed") from e
 
         self.post_insert()
         # Save created images to return before clearing collections
         return list(self.images)
-    
+
     def _summary(self, data: List[Dict]) -> Dict:
         with self.session.begin_nested():
             self.init_objects(data)
-            
-            class_map = {
-                'patients': Patient,
-                'studies': Study,
-                'series': Series,
-                'images': ImageInstance
-            }
+
+            class_map = {"patients": Patient, "studies": Study, "series": Series, "images": ImageInstance}
             entities = {k: getattr(self, k) for k in class_map.keys()}
-            new_entities = {
-                name: [item for item in items if not inspect(item).persistent]
-                for name, items in entities.items()
-            }
+            new_entities = {name: [item for item in items if not inspect(item).persistent] for name, items in entities.items()}
 
             # General statistics in dataframe-ready format
             general_stats = []
@@ -408,69 +360,57 @@ class Importer:
                 total = len(items)
                 new = len(new_entities[name])
                 existing = total - new
-                
+
                 # Calculate percentages
                 new_percentage = (new / total * 100) if total > 0 else 0
                 existing_percentage = (existing / total * 100) if total > 0 else 0
-                
-                general_stats.append({
-                    'Entity': name.capitalize(),
-                    'Total': total,
-                    'New': new,
-                    'Existing': existing,
-                    'New_Percentage': new_percentage,
-                    'Existing_Percentage': existing_percentage
-                })
-            
+
+                general_stats.append({"Entity": name.capitalize(), "Total": total, "New": new, "Existing": existing, "New_Percentage": new_percentage, "Existing_Percentage": existing_percentage})
+
             # Column population statistics for new entities
             column_stats = {}
             for name, items in new_entities.items():
                 if items:
-                    column_stats[name] = self._get_populated_fields_stats(
-                        class_map[name], items)
+                    column_stats[name] = self._get_populated_fields_stats(class_map[name], items)
 
             # Save project names before rolling back
             project_names = [project.ProjectName for project in self.projects]
-            
+
             # Complete summary
-            summary = {
-                "projects": project_names,
-                "general_stats": general_stats,
-                "column_stats": column_stats
-            }
+            summary = {"projects": project_names, "general_stats": general_stats, "column_stats": column_stats}
 
             # Print summary as before
             print(f"\nImport Summary for Projects: {', '.join(summary['projects'])}")
-            print('----------------  Object Statistics  ----------------')
+            print("----------------  Object Statistics  ----------------")
 
             # Create and display dataframe directly from general_stats
             df_stats = pd.DataFrame(general_stats)
             # Format percentages for display
-            df_stats['New_Percentage'] = df_stats['New_Percentage'].apply(lambda x: f"{x:.1f}%")
-            df_stats['Existing_Percentage'] = df_stats['Existing_Percentage'].apply(lambda x: f"{x:.1f}%")
+            df_stats["New_Percentage"] = df_stats["New_Percentage"].apply(lambda x: f"{x:.1f}%")
+            df_stats["Existing_Percentage"] = df_stats["Existing_Percentage"].apply(lambda x: f"{x:.1f}%")
             print(df_stats.to_string(index=False))
 
-            print('\n-----------  Column Population Statistics  -----------')
-            print('- only for new entities')
-            print('- values set to NULL are not considered populated')
+            print("\n-----------  Column Population Statistics  -----------")
+            print("- only for new entities")
+            print("- values set to NULL are not considered populated")
 
             for name, stats in column_stats.items():
                 if stats:
                     print(f"\nPopulated {name.capitalize()} Columns:")
                     df_columns = pd.DataFrame(stats)
                     # Format percentage for display
-                    df_columns['Percentage'] = df_columns['Percentage'].apply(lambda x: f"{x:.1f}%")
+                    df_columns["Percentage"] = df_columns["Percentage"].apply(lambda x: f"{x:.1f}%")
                     print(df_columns.to_string(index=False))
 
             # Rollback the nested transaction to avoid creating any objects
             # This happens automatically when exiting the with block
-        
+
         return summary
 
     def import_many(self, data: List[Dict], summary: bool = False) -> Union[List[ImageInstance], Dict]:
         """
         Import data or generate a summary of what would be imported.
-        
+
         Parameters:
         -----------
         data : List[Dict]
@@ -478,7 +418,7 @@ class Importer:
         summary : bool, default=False
             If True, only generate a summary of what would be imported without actually
             importing the data. If False, perform the actual import.
-            
+
         Returns:
         --------
         Union[List[ImageInstance], Dict]
@@ -497,7 +437,7 @@ class Importer:
     def import_one(self, image_data: Dict, summary: bool = False) -> Union[List[ImageInstance], Dict]:
         """
         Import a single image using a simplified flat dictionary structure.
-        
+
         Parameters:
         -----------
         image_data : Dict
@@ -516,7 +456,7 @@ class Importer:
         summary : bool, default=False
             If True, only generate a summary of what would be imported without actually
             importing the data. If False, perform the actual import.
-            
+
         Returns:
         --------
         Union[List[ImageInstance], Dict]
@@ -525,40 +465,31 @@ class Importer:
         """
         if "project_name" not in image_data:
             raise ValueError("project_name is required in the image_data dictionary")
-            
+
         # Transform the flat dictionary into the nested structure expected by import
-        structured_data = [{
-            "project_name": image_data.get("project_name"),
-            "patient_identifier": image_data.get("patient_identifier"),
-            "props": image_data.get("patient_props", {}),
-            "studies": [{
-                "study_date": image_data.get("study_date"),
-                "props": image_data.get("study_props", {}),
-                "series": [{
-                    "series_id": image_data.get("series_id"),
-                    "props": image_data.get("series_props", {}),
-                    "images": [{
-                        "image": image_data.get("image"),
-                        "props": image_data.get("image_props", {})
-                    }]
-                }]
-            }]
-        }]
-        
+        structured_data = [
+            {
+                "project_name": image_data.get("project_name"),
+                "patient_identifier": image_data.get("patient_identifier"),
+                "props": image_data.get("patient_props", {}),
+                "studies": [{"study_date": image_data.get("study_date"), "props": image_data.get("study_props", {}), "series": [{"series_id": image_data.get("series_id"), "props": image_data.get("series_props", {}), "images": [{"image": image_data.get("image"), "props": image_data.get("image_props", {})}]}]}],
+            }
+        ]
+
         # Call the appropriate method based on the summary flag
         return self.import_many(structured_data, summary=summary)
 
     def _get_populated_fields_stats(self, model_class, instances):
         """
         Return a dictionary of populated fields statistics for a list of model instances.
-        
+
         Parameters:
         -----------
         model_class : SQLAlchemy model class
             The model class (Patient, Study, Series, ImageInstance) to analyze
         instances : List[model_class]
             List of model instances to analyze
-            
+
         Returns:
         --------
         List[Dict]
@@ -569,6 +500,7 @@ class Importer:
 
         # Get all relevant columns from the model class
         from sqlalchemy import inspect as sa_inspect
+
         columns = [c.key for c in sa_inspect(model_class).mapper.column_attrs]
 
         # Count populated columns
@@ -581,23 +513,19 @@ class Importer:
                 continue
 
             # Count non-None values
-            populated_count = sum(
-                1
-                for instance in instances
-                if getattr(instance, column, None) is not None
-            )
+            populated_count = sum(1 for instance in instances if getattr(instance, column, None) is not None)
             if populated_count == 0:
                 continue
 
-            percentage = (
-                (populated_count / total_count * 100) if total_count > 0 else 0
-            )
+            percentage = (populated_count / total_count * 100) if total_count > 0 else 0
 
-            column_stats.append({
-                'Column': column,
-                'Populated': populated_count,
-                'Percentage': percentage  # Return raw number for easy dataframe creation
-            })
+            column_stats.append(
+                {
+                    "Column": column,
+                    "Populated": populated_count,
+                    "Percentage": percentage,  # Return raw number for easy dataframe creation
+                }
+            )
 
         return column_stats
 

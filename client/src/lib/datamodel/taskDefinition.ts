@@ -2,31 +2,31 @@ import { BaseItem } from "./baseItem";
 import { registerConstructor } from "./model";
 
 export interface ServerTaskDefinition {
-    TaskDefinitionID: number;
-    TaskDefinitionName: string;
-    TaskConfig: Record<string, any> | null;
+	TaskDefinitionID: number;
+	TaskDefinitionName: string;
+	TaskConfig: Record<string, any> | null;
 }
 
 export class TaskDefinition extends BaseItem {
-    static endpoint = 'task-definitions';
-    static mapping = {
-        'TaskDefinitionName': 'name',
-        'TaskConfig': 'config',
-    };
+	static endpoint = "task-definitions";
+	static mapping = {
+		TaskDefinitionName: "name",
+		TaskConfig: "config",
+	};
 
-    id!: number;
-    name!: string;
-    config!: Record<string, any> | null;
+	id!: number;
+	name!: string;
+	config!: Record<string, any> | null;
 
-    constructor(item: ServerTaskDefinition) {
-        super();
-        this.init(item);
-    }
+	constructor(item: ServerTaskDefinition) {
+		super();
+		this.init(item);
+	}
 
-    init(item: ServerTaskDefinition) {
-        this.id = item.TaskDefinitionID;
-        this.name = item.TaskDefinitionName;
-        this.config = item.TaskConfig;
-    }
+	init(item: ServerTaskDefinition) {
+		this.id = item.TaskDefinitionID;
+		this.name = item.TaskDefinitionName;
+		this.config = item.TaskConfig;
+	}
 }
-registerConstructor('task-definitions', TaskDefinition);
+registerConstructor("task-definitions", TaskDefinition);

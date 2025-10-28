@@ -9,310 +9,319 @@ import { FilterList } from "./itemList";
 import { data, importData, registerConstructor } from "./model";
 import type { Study } from "./study";
 import type { SubTask } from "./subTask.svelte";
-import { api } from '../utils/api';
+import { api } from "../utils/api";
 
-
-export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
-export type DataRepresentation = SimpleDataRepresentation | 'MultiLabel' | 'MultiClass';
-export type Datatype = 'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F';
+export type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
+export type DataRepresentation =
+	| SimpleDataRepresentation
+	| "MultiLabel"
+	| "MultiClass";
+export type Datatype = "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F";
 
 export interface ServerSegmentation {
-    SegmentationID: number,
-    ImageInstanceID: number,
-    FeatureID: number,
-    CreatorID: number,
-    DataType: Datatype,
-    DataRepresentation: DataRepresentation,
-    Threshold: number,
-    ReferenceSegmentationID: number | null,
-    ZarrArrayIndex: number,
-    SubTaskID: number | null,
-    Depth: number,
-    Height: number,
-    Width: number,
-    SparseAxis: number | null,
-    ImageProjectionMatrix: number[][],
-    ScanIndices: number[],
-    DateInserted: string,
-    DateModified: string | null,
-    Inactive: boolean,
+	SegmentationID: number;
+	ImageInstanceID: number;
+	FeatureID: number;
+	CreatorID: number;
+	DataType: Datatype;
+	DataRepresentation: DataRepresentation;
+	Threshold: number;
+	ReferenceSegmentationID: number | null;
+	ZarrArrayIndex: number;
+	SubTaskID: number | null;
+	Depth: number;
+	Height: number;
+	Width: number;
+	SparseAxis: number | null;
+	ImageProjectionMatrix: number[][];
+	ScanIndices: number[];
+	DateInserted: string;
+	DateModified: string | null;
+	Inactive: boolean;
 }
 
 export class Segmentation extends BaseItem {
+	static endpoint = "segmentations";
+	static mapping = {
+		ImageInstanceID: "instanceId",
+		FeatureID: "featureId",
+		CreatorID: "creatorId",
+		DataType: "dataType",
+		DataRepresentation: "dataRepresentation",
+		Depth: "depth",
+		Height: "height",
+		Width: "width",
+		SparseAxis: "sparseAxis",
+		ImageProjectionMatrix: "imageProjectionMatrix",
+		ScanIndices: "scanIndices",
+		ReferenceSegmentationID: "referenceId",
+		Threshold: "threshold",
+		SubTaskID: "subTaskId",
+		ZarrArrayIndex: "zarrArrayIndex",
+		DateInserted: "dateInserted",
+		DateModified: "dateModified",
+		Inactive: "inactive",
+	};
 
-    static endpoint = 'segmentations';
-    static mapping = {
-        'ImageInstanceID': 'instanceId',
-        'FeatureID': 'featureId',
-        'CreatorID': 'creatorId',
-        'DataType': 'dataType',
-        'DataRepresentation': 'dataRepresentation',
-        'Depth': 'depth',
-        'Height': 'height',
-        'Width': 'width',
-        'SparseAxis': 'sparseAxis',
-        'ImageProjectionMatrix': 'imageProjectionMatrix',
-        'ScanIndices': 'scanIndices',
-        'ReferenceSegmentationID': 'referenceId',
-        'Threshold': 'threshold',
-        'SubTaskID': 'subTaskId',
-        'ZarrArrayIndex': 'zarrArrayIndex',
-        'DateInserted': 'dateInserted',
-        'DateModified': 'dateModified',
-        'Inactive': 'inactive',
-    };
+	id!: number;
+	instanceId: number = 0;
+	featureId: number = 0;
+	creatorId: number = 0;
+	dataType: Datatype = "R8UI";
+	dataRepresentation: DataRepresentation = "Binary";
+	threshold: number = $state(0.5);
+	referenceId: number | null = $state(null);
+	depth: number = 0;
+	height: number = 0;
+	width: number = 0;
+	subTaskId: number | null = null;
+	sparseAxis: number | null = null;
+	imageProjectionMatrix: number[][] = [
+		[1, 0, 0],
+		[0, 1, 0],
+		[0, 0, 1],
+	];
+	scanIndices: number[] | null = $state(null);
+	zarrArrayIndex: number = 0;
+	dateInserted: string = "";
+	dateModified: string | null = null;
+	inactive: boolean = false;
 
-    id!: number;
-    instanceId: number = 0;
-    featureId: number = 0;
-    creatorId: number = 0;
-    dataType: Datatype = 'R8UI';
-    dataRepresentation: DataRepresentation = 'Binary';
-    threshold: number = $state(0.5);
-    referenceId: number | null = $state(null);
-    depth: number = 0;
-    height: number = 0;
-    width: number = 0;
-    subTaskId: number | null = null;
-    sparseAxis: number | null = null;
-    imageProjectionMatrix: number[][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-    scanIndices: number[] | null = $state(null);
-    zarrArrayIndex: number = 0;
-    dateInserted: string = '';
-    dateModified: string | null = null;
-    inactive: boolean = false;
+	constructor(item: ServerSegmentation) {
+		super();
+		this.init(item);
+	}
 
-    constructor(item: ServerSegmentation) {
-        super();
-        this.init(item);
-    }
+	init(serverItem: ServerSegmentation) {
+		this.instanceId = serverItem.ImageInstanceID;
+		this.featureId = serverItem.FeatureID;
+		this.creatorId = serverItem.CreatorID;
+		this.dataType = serverItem.DataType;
+		this.dataRepresentation = serverItem.DataRepresentation;
+		this.threshold = serverItem.Threshold;
+		this.referenceId = serverItem.ReferenceSegmentationID;
+		this.id = serverItem.SegmentationID;
+		this.depth = serverItem.Depth;
+		this.height = serverItem.Height;
+		this.width = serverItem.Width;
+		this.subTaskId = serverItem.SubTaskID;
+		this.sparseAxis = serverItem.SparseAxis;
+		this.imageProjectionMatrix = serverItem.ImageProjectionMatrix;
+		this.scanIndices = serverItem.ScanIndices?.sort();
+		this.zarrArrayIndex = serverItem.ZarrArrayIndex;
+		this.dateInserted = serverItem.DateInserted;
+		this.dateModified = serverItem.DateModified;
+		this.inactive = serverItem.Inactive;
+	}
 
-    init(serverItem: ServerSegmentation) {
-        this.instanceId = serverItem.ImageInstanceID;
-        this.featureId = serverItem.FeatureID;
-        this.creatorId = serverItem.CreatorID;
-        this.dataType = serverItem.DataType;
-        this.dataRepresentation = serverItem.DataRepresentation;
-        this.threshold = serverItem.Threshold;
-        this.referenceId = serverItem.ReferenceSegmentationID;
-        this.id = serverItem.SegmentationID;
-        this.depth = serverItem.Depth;
-        this.height = serverItem.Height;
-        this.width = serverItem.Width;
-        this.subTaskId = serverItem.SubTaskID;
-        this.sparseAxis = serverItem.SparseAxis;
-        this.imageProjectionMatrix = serverItem.ImageProjectionMatrix;
-        this.scanIndices = serverItem.ScanIndices?.sort();
-        this.zarrArrayIndex = serverItem.ZarrArrayIndex;
-        this.dateInserted = serverItem.DateInserted;
-        this.dateModified = serverItem.DateModified;
-        this.inactive = serverItem.Inactive;
-    }
+	static async createFrom(
+		image: AbstractImage,
+		feature: Feature,
+		creator: Creator,
+		dataRepresentation: DataRepresentation,
+		dataType: Datatype,
+		threshold?: number,
+		sparseAxis?: number,
+		subTask?: SubTask,
+	) {
+		const instance = image.instance;
+		const scanIndices = image.is3D ? [] : null;
+		let shape = {
+			depth: image.depth,
+			height: image.height,
+			width: image.width,
+		};
+		if (sparseAxis == 1) {
+			// projection
+			shape.depth = image.height;
+			shape.height = 1;
+			shape.width = image.width;
+		}
 
-    static async createFrom(
-        image: AbstractImage,
-        feature: Feature,
-        creator: Creator,
-        dataRepresentation: DataRepresentation,
-        dataType: Datatype,
-        threshold?: number,
-        sparseAxis?: number,
-        subTask?: SubTask,
-    ) {
+		const item = {
+			instanceId: instance.id,
+			...shape,
+			sparseAxis,
+			imageProjectionMatrix: null,
+			scanIndices,
+			dataRepresentation,
+			dataType,
+			threshold,
+			referenceId: null,
+			creatorId: creator.id,
+			featureId: feature.id,
+			subTaskId: subTask?.id ?? null,
+		};
 
-        const instance = image.instance;
-        const scanIndices = image.is3D ? [] : null;
-        let shape = {
-            depth: image.depth,
-            height: image.height,
-            width: image.width,
-        }
-        if (sparseAxis == 1) {
-            // projection
-            shape.depth = image.height;
-            shape.height = 1;
-            shape.width = image.width;
-        }
+		return await Segmentation.create(item);
+	}
 
-        const item = {
-            instanceId: instance.id,
-            ...shape,
-            sparseAxis,
-            imageProjectionMatrix: null,
-            scanIndices,
-            dataRepresentation,
-            dataType,
-            threshold,
-            referenceId: null,
-            creatorId: creator.id,
-            featureId: feature.id,
-            subTaskId: subTask?.id ?? null,
-        };
+	static async create(item: any, np_array?: NPYArray): Promise<Segmentation> {
+		const formData = new FormData();
+		const serverParams = toServer(item, Segmentation.mapping);
 
-        return await Segmentation.create(item);
-    }
+		formData.append("metadata", JSON.stringify(serverParams));
 
-    static async create(item: any, np_array?: NPYArray): Promise<Segmentation> {
-        const formData = new FormData();
-        const serverParams = toServer(item, Segmentation.mapping);
+		if (np_array) {
+			formData.append(
+				"np_array",
+				await np_array.toBlob(true),
+				"np_array.npy.gz",
+			);
+		}
 
-        formData.append('metadata', JSON.stringify(serverParams));
+		const response = await api.post(Segmentation.endpoint, formData, "form");
+		const segmentation = await response.json();
+		const imported = importData({
+			[Segmentation.endpoint]: [segmentation],
+		}) as Record<string, any[]>;
 
-        if (np_array) {
-            formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
-        }
+		return imported[Segmentation.endpoint][0] as Segmentation;
+	}
 
-        const response = await api.post(Segmentation.endpoint, formData, 'form');
-        const segmentation = await response.json();
-        const imported = importData({ [Segmentation.endpoint]: [segmentation] }) as Record<string, any[]>;
+	get creator(): Creator {
+		return data.creators.get(this.creatorId)!;
+	}
 
-        return imported[Segmentation.endpoint][0] as Segmentation;
-    }
+	get createdBy(): Creator | Model {
+		return this.creator;
+	}
 
-    get creator(): Creator {
-        return data.creators.get(this.creatorId)!;
-    }
+	get feature(): Feature {
+		return data.features.get(this.featureId)!;
+	}
 
-    get createdBy(): Creator | Model {
-        return this.creator;
-    }
+	get instance(): Instance {
+		return data.instances.get(this.instanceId)!;
+	}
 
-    get feature(): Feature {
-        return data.features.get(this.featureId)!;
-    }
+	get study(): Study {
+		return this.instance.study;
+	}
 
-    get instance(): Instance {
-        return data.instances.get(this.instanceId)!;
-    }
+	get reference(): Segmentation | undefined {
+		return this.referenceId
+			? data.segmentations.get(this.referenceId)
+			: undefined;
+	}
 
-    get study(): Study {
-        return this.instance.study;
-    }
+	get compositeFeatures(): FilterList<CompositeFeature> {
+		return data.compositeFeatures
+			.filter((f) => f.parentFeatureId == this.featureId)
+			.sort((a, b) => a.featureIndex - b.featureIndex);
+	}
 
-    get reference(): Segmentation | undefined {
-        return this.referenceId ? data.segmentations.get(this.referenceId) : undefined;
-    }
+	async updateData(scanNr: number | null, data: ArrayBuffer) {
+		// Build the query string
+		const params = new URLSearchParams();
+		params.append("axis", (this.sparseAxis ?? 0).toString());
+		if (scanNr != null) {
+			params.append("scan_nr", scanNr.toString());
+		}
+		const endpoint = (this.constructor as typeof Segmentation).endpoint;
+		const url = `${endpoint}/${this.id}/data?${params.toString()}`;
 
-    get compositeFeatures(): FilterList<CompositeFeature> {
-        return data.compositeFeatures.filter(f => f.parentFeatureId == this.featureId).sort((a, b) => a.featureIndex - b.featureIndex);
-    }
+		const response = await api.put(url, data, "binary");
+		const updatedSegmentation = await response.json();
+		this.updateFields(updatedSegmentation);
+	}
 
-    async updateData(scanNr: number | null, data: ArrayBuffer) {
-        // Build the query string
-        const params = new URLSearchParams();
-        params.append('axis', (this.sparseAxis ?? 0).toString());
-        if (scanNr != null) {
-            params.append('scan_nr', scanNr.toString());
-        }
-        const endpoint = (this.constructor as typeof Segmentation).endpoint;
-        const url = `${endpoint}/${this.id}/data?${params.toString()}`;
-
-        const response = await api.put(url, data, 'binary');
-        const updatedSegmentation = await response.json();
-        this.updateFields(updatedSegmentation);
-    }
-
-    async loadData(scanNr?: number): Promise<NPYArray> {
-        const params = new URLSearchParams();
-        if (this.sparseAxis != null && scanNr != undefined) {
-            params.append('axis', this.sparseAxis.toString());
-        }
-        if (scanNr != null) {
-            params.append('scan_nr', scanNr.toString());
-        }
-        const endpoint = (this.constructor as typeof Segmentation).endpoint;
-        const url = `${endpoint}/${this.id}/data?${params.toString()}`;
-        const response = await api.get(url);
-        return decodeNpy(await response.arrayBuffer());
-    }
+	async loadData(scanNr?: number): Promise<NPYArray> {
+		const params = new URLSearchParams();
+		if (this.sparseAxis != null && scanNr != undefined) {
+			params.append("axis", this.sparseAxis.toString());
+		}
+		if (scanNr != null) {
+			params.append("scan_nr", scanNr.toString());
+		}
+		const endpoint = (this.constructor as typeof Segmentation).endpoint;
+		const url = `${endpoint}/${this.id}/data?${params.toString()}`;
+		const response = await api.get(url);
+		return decodeNpy(await response.arrayBuffer());
+	}
 }
-registerConstructor('segmentations', Segmentation);
-
-
+registerConstructor("segmentations", Segmentation);
 
 export interface ServerModel {
-    ModelName: string;
-    Version: string;
-    ModelType: string;
-    Description: string;
-    FeatureID: number;
-    ModelID: number;
+	ModelName: string;
+	Version: string;
+	ModelType: string;
+	Description: string;
+	FeatureID: number;
+	ModelID: number;
 }
 
 export class Model extends BaseItem {
-    static endpoint = 'models';
-    static mapping = {
-        'ModelName': 'name',
-        'Version': 'version',
-        'ModelType': 'type',
-        'Description': 'description',
-        'FeatureID': 'featureId',
-        'ModelID': 'modelId',
-    };
+	static endpoint = "models";
+	static mapping = {
+		ModelName: "name",
+		Version: "version",
+		ModelType: "type",
+		Description: "description",
+		FeatureID: "featureId",
+		ModelID: "modelId",
+	};
 
-    id!: number;
-    name: string = '';
-    version: string = '';
-    type: string = '';
-    description: string = '';
-    featureId: number = 0;
-    modelId: number = 0;
+	id!: number;
+	name: string = "";
+	version: string = "";
+	type: string = "";
+	description: string = "";
+	featureId: number = 0;
+	modelId: number = 0;
 
-    constructor(item: ServerModel) {
-        super();
-        this.init(item);
-    }
+	constructor(item: ServerModel) {
+		super();
+		this.init(item);
+	}
 
-    init(serverItem: ServerModel) {
-        this.id = serverItem.ModelID;
-        this.name = serverItem.ModelName;
-        this.version = serverItem.Version;
-        this.type = serverItem.ModelType;
-        this.description = serverItem.Description;
-        this.featureId = serverItem.FeatureID;
-        this.modelId = serverItem.ModelID;
-    }
+	init(serverItem: ServerModel) {
+		this.id = serverItem.ModelID;
+		this.name = serverItem.ModelName;
+		this.version = serverItem.Version;
+		this.type = serverItem.ModelType;
+		this.description = serverItem.Description;
+		this.featureId = serverItem.FeatureID;
+		this.modelId = serverItem.ModelID;
+	}
 
-    get feature(): Feature {
-        return data.features.get(this.featureId)!;
-    }
+	get feature(): Feature {
+		return data.features.get(this.featureId)!;
+	}
 }
-registerConstructor('models', Model);
-
+registerConstructor("models", Model);
 
 interface ServerModelSegmentation extends ServerSegmentation {
-    ModelSegmentationID: number;
-    ModelID: number;
+	ModelSegmentationID: number;
+	ModelID: number;
 }
 
 export class ModelSegmentation extends Segmentation {
-    static endpoint = 'model-segmentations';
+	static endpoint = "model-segmentations";
 
-    modelId: number = 0;
-    constructor(item: ServerModelSegmentation) {
-        super(item);
-        this.init(item);
-    }
+	modelId: number = 0;
+	constructor(item: ServerModelSegmentation) {
+		super(item);
+		this.init(item);
+	}
 
-    init(serverItem: ServerModelSegmentation) {
-        super.init(serverItem);
-        this.id = serverItem.ModelSegmentationID;
-        this.modelId = serverItem.ModelID;
-        this.featureId = this.model.featureId;
-    }
+	init(serverItem: ServerModelSegmentation) {
+		super.init(serverItem);
+		this.id = serverItem.ModelSegmentationID;
+		this.modelId = serverItem.ModelID;
+		this.featureId = this.model.featureId;
+	}
 
+	get model(): Model {
+		return data.models.get(this.modelId)!;
+	}
 
+	get createdBy(): Model {
+		return this.model;
+	}
 
-    get model(): Model {
-        return data.models.get(this.modelId)!;
-    }
-
-    get createdBy(): Model {
-        return this.model;
-    }
-
-    get feature(): Feature {
-        return this.model.feature;
-    }
+	get feature(): Feature {
+		return this.model.feature;
+	}
 }
-registerConstructor('model-segmentations', ModelSegmentation);
+registerConstructor("model-segmentations", ModelSegmentation);

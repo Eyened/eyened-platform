@@ -7,21 +7,21 @@ This file contains DTOs that represent:
 2. Frontend object representations (with property names as used in TypeScript)
 """
 
-from datetime import date, datetime
-from typing import Any, Dict, List, Literal, Optional, get_origin
+from datetime import datetime
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel
 from eyened_orm.tag import TagType
 
 # Type aliases matching TypeScript types
-AnnotationTypeInterpretation = Literal[
-    "", "R/G mask", "Binary mask", "Label numbers", "Probability", "Layer bits"
-]
+AnnotationTypeInterpretation = Literal["", "R/G mask", "Binary mask", "Label numbers", "Probability", "Layer bits"]
 AnatomicRegion = str  # Based on database field
 VesselType = Literal["Artery", "Vein", "Vessel"]
 
+
 class ObjectTagPOST(BaseModel):
     tag_id: int
+
 
 # Utility DTOs
 class Position2D(BaseModel):
@@ -74,9 +74,6 @@ class CreatorMeta(BaseModel):
     name: str
 
 
-
-
-
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= TAGS =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -88,11 +85,11 @@ class TagBase(BaseModel):
 
 class TagPUT(TagBase):
     pass
-    
 
 
 class TagPATCH(BaseModel):
     """Partial update for Tag with optional fields."""
+
     name: Optional[str] = None
     tag_type: Optional[TagType] = None
     description: Optional[str] = None

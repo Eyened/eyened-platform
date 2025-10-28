@@ -1,5 +1,4 @@
-from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -51,17 +50,17 @@ async def get_form_annotations(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    query = select(FormAnnotation).filter(~FormAnnotation.Inactive).options(
-        selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
-        selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
-        selectinload(FormAnnotation.Study)
-            .selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Tag),
-        selectinload(FormAnnotation.Study)
-            .selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Creator),
-        selectinload(FormAnnotation.ImageInstance)
-            .selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
-        selectinload(FormAnnotation.ImageInstance)
-            .selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Creator),
+    query = (
+        select(FormAnnotation)
+        .filter(~FormAnnotation.Inactive)
+        .options(
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
+            selectinload(FormAnnotation.Study).selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Tag),
+            selectinload(FormAnnotation.Study).selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Creator),
+            selectinload(FormAnnotation.ImageInstance).selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
+            selectinload(FormAnnotation.ImageInstance).selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Creator),
+        )
     )
 
     if patient_id is not None:
@@ -189,10 +188,13 @@ async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Sessi
     link = db.get(FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id})
     if not link:
         link = FormAnnotationTagLink(TagID=tag.TagID, FormAnnotationID=annotation_id, CreatorID=current_user.id)
-        db.add(link); db.commit(); db.refresh(link)
+        db.add(link)
+        db.commit()
+        db.refresh(link)  # noqa: E702
         link.Tag = tag
 
     return DTOConverter.link_to_tag_metadata(link)
+
 
 @router.delete("/form-annotations/{annotation_id}/tags/{tag_id}", status_code=204)
 async def untag_form_annotation(annotation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -202,7 +204,6 @@ async def untag_form_annotation(annotation_id: int, tag_id: int, db: Session = D
         raise HTTPException(404, "FormAnnotation not found")
     link = db.get(FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id})
     if link:
-        db.delete(link); db.commit()
+        db.delete(link)
+        db.commit()  # noqa: E702
     return Response(status_code=204)
-
-

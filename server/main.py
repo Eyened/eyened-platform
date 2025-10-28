@@ -55,9 +55,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors()},
     )
 
+
 @app_api.exception_handler(SQLAlchemyError)
 async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
-    if settings.environment == 'development':
+    if settings.environment == "development":
         # print stack trace
         traceback.print_exc()
     return JSONResponse(
@@ -65,9 +66,10 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
         content={"detail": "A database error occurred."},
     )
 
+
 @app_api.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    if settings.environment == 'development':
+    if settings.environment == "development":
         # print stack trace
         traceback.print_exc()
     return JSONResponse(
@@ -76,12 +78,11 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up with settings:")
     print(settings)
-    
+
     if settings.public_auth_disabled:
         print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
 
@@ -94,26 +95,17 @@ async def lifespan(app: FastAPI):
     else:
         print("DATABASE_ROOT_PASSWORD is not set, skipping database creation")
 
-
-
     # # before startup
     logging.basicConfig()
-    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
-    
-    
-    db = Database(settings)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
-    
+    db = Database(settings)
 
     with db.get_session() as session:
         init_admin(session)
-        
-
 
     yield
     # after shutdown
-
-
 
 
 app = FastAPI(lifespan=lifespan)
@@ -135,6 +127,3 @@ async def catch_all(path: str):
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)  # Serve existing file
     return FileResponse(os.path.join("/client/build", "index.html"))
-
-
-

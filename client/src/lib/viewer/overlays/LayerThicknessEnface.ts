@@ -6,20 +6,20 @@ import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
 export class LayerThicknessEnfaceOverlay implements Overlay {
+	constructor(
+		readonly image: AbstractImage,
+		readonly segmentation: MulticlassSegmentation,
+		public layer: number,
+		public scaling: number,
+	) {}
 
-    constructor(readonly image: AbstractImage,
-        readonly segmentation: MulticlassSegmentation,
-        public layer: number,
-        public scaling: number
-    ) { }
-
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-        const boundaries = this.segmentation.layerBoundaries;
-        if (!boundaries) return;
-        const uniforms = getBaseUniforms(viewerContext);
-        uniforms.u_boundaries = boundaries.texture;
-        uniforms.u_layer = this.layer - 1; // NOTE: thickness for background (0) is not calculated in boundaries
-        uniforms.u_scaling = this.scaling;
-        this.image.webgl.shaders.renderLayersEnface.pass(renderTarget, uniforms);
-    }
+	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+		const boundaries = this.segmentation.layerBoundaries;
+		if (!boundaries) return;
+		const uniforms = getBaseUniforms(viewerContext);
+		uniforms.u_boundaries = boundaries.texture;
+		uniforms.u_layer = this.layer - 1; // NOTE: thickness for background (0) is not calculated in boundaries
+		uniforms.u_scaling = this.scaling;
+		this.image.webgl.shaders.renderLayersEnface.pass(renderTarget, uniforms);
+	}
 }

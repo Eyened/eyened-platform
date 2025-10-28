@@ -1,9 +1,8 @@
-import type { SubTaskWithImagesGET, TaskGET } from '../../types/openapi_types';
-
+import type { SubTaskWithImagesGET, TaskGET } from "../../types/openapi_types";
 
 export interface TaskContext {
-    task: TaskGET;
-    subTask: SubTaskWithImagesGET;
-    subTaskIndex: number;
-    taskConfig: any;
+	task: TaskGET;
+	subTask: SubTaskWithImagesGET;
+	subTaskIndex: number;
+	taskConfig: any;
 }

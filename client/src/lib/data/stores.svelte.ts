@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap } from "svelte/reactivity";
 import type {
 	InstanceGET,
 	InstanceMeta,
@@ -11,8 +11,8 @@ import type {
 	FormAnnotationGET,
 	TaskGET,
 	SubTaskGET,
-	SubTaskWithImagesGET
-} from '../../types/openapi_types';
+	SubTaskWithImagesGET,
+} from "../../types/openapi_types";
 
 // ReactiveMap extends SvelteMap with array-like iteration methods
 class ReactiveMap<K, V> extends SvelteMap<K, V> {
@@ -67,7 +67,10 @@ class ReactiveMap<K, V> extends SvelteMap<K, V> {
 	}
 
 	// Reduce over values
-	reduce<U>(callback: (acc: U, value: V, key: K, map: this) => U, initial: U): U {
+	reduce<U>(
+		callback: (acc: U, value: V, key: K, map: this) => U,
+		initial: U,
+	): U {
 		let acc = initial;
 		for (const [key, value] of this.entries()) {
 			acc = callback(acc, value, key, this);
@@ -85,16 +88,22 @@ class ReactiveMap<K, V> extends SvelteMap<K, V> {
 
 // Simple stores - just maps of plain data by ID
 export const instances = new ReactiveMap<number, InstanceGET>();
-export const instanceMetas = new ReactiveMap<number, InstanceMeta>();  // Lightweight references
+export const instanceMetas = new ReactiveMap<number, InstanceMeta>(); // Lightweight references
 export const studies = new ReactiveMap<number, StudyGET>();
 export const tags = new ReactiveMap<number, TagGET>();
 export const features = new ReactiveMap<number, FeatureGET>();
 export const formSchemas = new ReactiveMap<number, FormSchemaGET>();
 export const segmentations = new ReactiveMap<number, SegmentationGET>();
-export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>();
+export const modelSegmentations = new ReactiveMap<
+	number,
+	ModelSegmentationGET
+>();
 export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>();
 export const tasks = new ReactiveMap<number, TaskGET>();
-export const subtasks = new ReactiveMap<number, SubTaskGET | SubTaskWithImagesGET>();
+export const subtasks = new ReactiveMap<
+	number,
+	SubTaskGET | SubTaskWithImagesGET
+>();
 
 // Secondary indexes for common lookups
 export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>();
@@ -112,8 +121,11 @@ export function ingestInstances(instancesData: InstanceGET[]) {
 	for (const inst of instancesData) {
 		// Only ingest full InstanceGET objects (from /instances/search or /instances/{id})
 		// If you have InstanceMeta, use ingestInstanceMetas() instead
-		if (!('sop_instance_uid' in inst) || !('rows' in inst)) {
-			console.error('ingestInstances() expects InstanceGET, got InstanceMeta. Use ingestInstanceMetas() instead:', inst);
+		if (!("sop_instance_uid" in inst) || !("rows" in inst)) {
+			console.error(
+				"ingestInstances() expects InstanceGET, got InstanceMeta. Use ingestInstanceMetas() instead:",
+				inst,
+			);
 			continue;
 		}
 		instances.set(inst.id, inst);
@@ -173,7 +185,9 @@ export function ingestTasks(tasksData: TaskGET[]) {
 	}
 }
 
-export function ingestSubTasks(subtasksData: (SubTaskGET | SubTaskWithImagesGET)[]) {
+export function ingestSubTasks(
+	subtasksData: (SubTaskGET | SubTaskWithImagesGET)[],
+) {
 	for (const subtask of subtasksData) {
 		subtasks.set(subtask.id, subtask);
 	}

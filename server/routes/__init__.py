@@ -1,10 +1,10 @@
-from . import segmentations
-from . import auth
-from . import form_annotations
-from . import instances
-from . import import_api
-from . import feature
-from . import tag
-from . import form_schema
-from . import task
-from . import devices
+from . import segmentations  # noqa: F401
+from . import auth  # noqa: F401
+from . import form_annotations  # noqa: F401
+from . import instances  # noqa: F401
+from . import import_api  # noqa: F401
+from . import feature  # noqa: F401
+from . import tag  # noqa: F401
+from . import form_schema  # noqa: F401
+from . import task  # noqa: F401
+from . import devices  # noqa: F401

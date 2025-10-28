@@ -1,0 +1,65 @@
+name: Code checks
+on:
+  push:
+    branches:
+      - development
+      - main
+  pull_request:
+    branches:
+      - development
+      - main
+
+jobs:
+  lint-python:
+    name: Check coding standards (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: 3.12
+
+      - name: Perform Ruff lint checks
+#        continue-on-error: true
+        uses: astral-sh/ruff-action@v3.5.1
+        with:
+          version: '0.14.1'
+          args: check
+
+      - name: Perform Ruff formatting checks
+#        continue-on-error: true
+        uses: astral-sh/ruff-action@v3.5.1
+        with:
+          version: '0.14.1'
+          args: format --check
+
+  lint-typescript:
+    name: Check coding standards (Typescript)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5.0.0
+
+      - name: Set up NodeJS 22
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install node dependencies
+        working-directory: client
+        run: npm install
+
+      - name: Perform Prettier checks
+#        continue-on-error: true
+        working-directory: client
+        run: npm run check:prettier
+
+      - name: Perform Svelte checks
+#        continue-on-error: true
+        working-directory: client
+        run: npm run check

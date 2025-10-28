@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import date
 from typing import Optional, Union, Mapping, Any
 from pathlib import Path
@@ -48,13 +48,13 @@ def _parse_date(value):
 
 def load_config_dict_from_env(env: Mapping[str, str]) -> dict:
     """Convert environment variables to a config dict structure."""
-    
+
     def get_env(key: str, required: bool = True, default=None):
         value = env.get(key)
         if required and value is None:
             raise ValueError(f"Missing required environment variable: {key}")
         return value if value is not None else default
-    
+
     return {
         "database": {
             "user": get_env("DATABASE_USER"),
@@ -78,14 +78,14 @@ def load_config_dict_from_env(env: Mapping[str, str]) -> dict:
 def load_config(source: Optional[Union[str, Path, Mapping[str, Any], dict]] = None) -> EyenedORMConfig:
     """
     Load EyenedORMConfig from various sources.
-    
+
     Args:
         source: Can be:
             - None: Load from os.environ
             - str/Path: Load from .env file
             - Mapping (e.g. os.environ): Flat environment variables dict
             - dict: Nested config dict (e.g. from YAML)
-    
+
     Returns:
         EyenedORMConfig instance
     """
@@ -93,6 +93,7 @@ def load_config(source: Optional[Union[str, Path, Mapping[str, Any], dict]] = No
         config_dict = load_config_dict_from_env(os.environ)
     elif isinstance(source, (str, Path)):
         from dotenv import dotenv_values
+
         env_path = Path(source)
         if not env_path.exists():
             raise FileNotFoundError(f"Environment file not found: {env_path}")
@@ -100,14 +101,11 @@ def load_config(source: Optional[Union[str, Path, Mapping[str, Any], dict]] = No
         config_dict = load_config_dict_from_env(env)
     elif isinstance(source, (Mapping, dict)):
         # Check if it's already a nested config dict (has 'database' key with nested dict)
-        if 'database' in source and isinstance(source.get('database'), dict):
+        if "database" in source and isinstance(source.get("database"), dict):
             config_dict = source  # Already structured as nested dict
         else:
             config_dict = load_config_dict_from_env(source)  # Flat env vars
     else:
         raise ValueError(f"Invalid source type: {type(source)}")
-    
-    return EyenedORMConfig(
-        database=DatabaseSettings(**config_dict["database"]),
-        **{k: v for k, v in config_dict.items() if k != "database"}
-    )
+
+    return EyenedORMConfig(database=DatabaseSettings(**config_dict["database"]), **{k: v for k, v in config_dict.items() if k != "database"})
