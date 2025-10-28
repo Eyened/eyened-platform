@@ -91,7 +91,6 @@ def clear_unsuccessfull(session, df, commit=True):
 def auto_device():
     import GPUtil
     import torch
-
     # Attempt to select a free GPU
     try:
         deviceID = GPUtil.getFirstAvailable(order="memory")[

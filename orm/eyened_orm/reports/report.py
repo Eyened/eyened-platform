@@ -180,7 +180,8 @@ class Report:
 
         for feature_name, img in self.feature_images.items():
             a = np.copy(image)
-            a[img] = 255
+            if img is not None:
+                a[img] = 255
             overlays[feature_name] = a
         imgs = ''.join(
             f'<div><h2>{feature_name}</h2>{make_img(img)}</div>' for feature_name, img in overlays.items())

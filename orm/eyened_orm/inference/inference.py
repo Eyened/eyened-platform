@@ -135,10 +135,10 @@ def run_inference_for_images(
         paths,  # List of image files
         ids,
         rgb_path=(
-            cfi_cache_path / "rgb" if cfi_cache_path is not None else None
+            f'{cfi_cache_path}/rgb' if cfi_cache_path is not None else None
         ),  # Output path for RGB images
         ce_path=(
-            cfi_cache_path / "ce" if cfi_cache_path is not None else None
+            f'{cfi_cache_path}/ce' if cfi_cache_path is not None else None
         ),  # Output path for Contrast Enhanced images
         n_jobs=8,  # number of preprocessing workers
     )
@@ -156,8 +156,8 @@ def run_inference_for_images(
 
     fpaths = [
         (
-            cfi_cache_path / "rgb" / f"{id}.png",
-            cfi_cache_path / "ce" / f"{id}.png",
+            f'{cfi_cache_path}/rgb/{id}.png',
+            f'{cfi_cache_path}/ce/{id}.png',
         )
         for id in ids
     ]
