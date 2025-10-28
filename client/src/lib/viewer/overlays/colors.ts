@@ -35,4 +35,4 @@ export const colors: Color[] = [
 	[0, 0, 128],
 ];
 
-export const colorsFlat = colors.flat().map(c => c / 255);
+export const colorsFlat = colors.flat().map((c) => c / 255);

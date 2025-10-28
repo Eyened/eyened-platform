@@ -6,13 +6,12 @@ import type { ViewerContext } from "../viewerContext.svelte";
 
 const lineWidth = 2;
 
-
 export class PolygonTool extends SegmentationTool {
-
 	constructor(
 		drawingExecutor: DrawingExecutor,
 		viewerContext: ViewerContext,
-		segmentationContext: SegmentationContext) {
+		segmentationContext: SegmentationContext,
+	) {
 		super(drawingExecutor, viewerContext, segmentationContext);
 	}
 
@@ -22,8 +21,8 @@ export class PolygonTool extends SegmentationTool {
 
 		if (event.altKey || event.shiftKey) return;
 
-		if (event.button === 0) this.drawingState = 'paint';
-		else if (event.button === 2) this.drawingState = 'erase';
+		if (event.button === 0) this.drawingState = "paint";
+		else if (event.button === 2) this.drawingState = "erase";
 
 		this.startDraw();
 	}
@@ -32,7 +31,6 @@ export class PolygonTool extends SegmentationTool {
 		const { viewerContext } = e;
 		this.endDraw(viewerContext);
 	}
-
 
 	pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
 		const { event, position } = pointerEvent;
@@ -46,8 +44,11 @@ export class PolygonTool extends SegmentationTool {
 		}
 	}
 
-	executeDraw(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
-		ctx.fillStyle = 'white';
+	executeDraw(
+		ctx: CanvasRenderingContext2D,
+		viewerContext: ViewerContext,
+	): void {
+		ctx.fillStyle = "white";
 
 		ctx.beginPath();
 		let p = this.currentPoints![0];
@@ -60,15 +61,20 @@ export class PolygonTool extends SegmentationTool {
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-        super.repaint(viewerContext, renderTarget);
+		super.repaint(viewerContext, renderTarget);
 		const flipDrawErase = this.flipDrawErase;
-		if (!this.drawingState || !this.currentPoints || this.currentPoints.length == 0) return;
+		if (
+			!this.drawingState ||
+			!this.currentPoints ||
+			this.currentPoints.length == 0
+		)
+			return;
 
 		const ctx = viewerContext.context2D;
 
 		ctx.lineWidth = lineWidth;
 
-		if ((this.drawingState === 'paint') !== flipDrawErase) {
+		if ((this.drawingState === "paint") !== flipDrawErase) {
 			ctx.strokeStyle = this.paintColor;
 		} else {
 			ctx.strokeStyle = this.eraseColor;
@@ -93,10 +99,11 @@ export class PolygonTool extends SegmentationTool {
 		ctx.beginPath();
 		p = viewerContext.imageToViewerCoordinates(this.currentPoints[0]);
 		ctx.moveTo(p.x, p.y);
-		p = viewerContext.imageToViewerCoordinates(this.currentPoints[this.currentPoints.length - 1]);
+		p = viewerContext.imageToViewerCoordinates(
+			this.currentPoints[this.currentPoints.length - 1],
+		);
 		ctx.lineTo(p.x, p.y);
 		ctx.stroke();
 		ctx.setLineDash([]);
 	}
-
 }

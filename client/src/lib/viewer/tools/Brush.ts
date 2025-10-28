@@ -1,41 +1,38 @@
-import type { SegmentationContext } from '$lib/viewer-window/panelSegmentation/segmentationContext.svelte';
-import type { RenderTarget } from '$lib/webgl/types';
-import type { ViewerEvent } from '../viewer-utils';
-import type { ViewerContext } from '../viewerContext.svelte';
-import { SegmentationTool, type DrawingExecutor } from './segmentation';
-
+import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+import type { RenderTarget } from "$lib/webgl/types";
+import type { ViewerEvent } from "../viewer-utils";
+import type { ViewerContext } from "../viewerContext.svelte";
+import { SegmentationTool, type DrawingExecutor } from "./segmentation";
 
 export class BrushTool extends SegmentationTool {
-
 	offscreenCtx: CanvasRenderingContext2D;
 	offscreenCanvas: HTMLCanvasElement;
 
 	alpha: number = 0.5;
-	
+
 	constructor(
 		drawingExecutor: DrawingExecutor,
 		viewerContext: ViewerContext,
-		segmentationContext: SegmentationContext
+		segmentationContext: SegmentationContext,
 	) {
 		super(drawingExecutor, viewerContext, segmentationContext);
 		// Create an offscreen canvas for drawing the ellipses
-		this.offscreenCanvas = document.createElement('canvas');
-		this.offscreenCtx = this.offscreenCanvas.getContext('2d')!;
+		this.offscreenCanvas = document.createElement("canvas");
+		this.offscreenCtx = this.offscreenCanvas.getContext("2d")!;
 	}
 
 	get brushRadius(): number {
 		return this.segmentationContext.brushRadius;
 	}
-	
+
 	startDraw(viewerContext: ViewerContext) {
 		super.startDraw(viewerContext);
-        const { width, height } = viewerContext.canvas2D;
-        this.offscreenCanvas.width = width;
-        this.offscreenCanvas.height = height;
+		const { width, height } = viewerContext.canvas2D;
+		this.offscreenCanvas.width = width;
+		this.offscreenCanvas.height = height;
 		this.offscreenCtx.clearRect(0, 0, width, height);
 		this.offscreenCtx.fillStyle = this.drawingColor;
 	}
-
 
 	pointerdown(e: ViewerEvent<PointerEvent>) {
 		const { event, position, viewerContext } = e;
@@ -44,8 +41,8 @@ export class BrushTool extends SegmentationTool {
 
 		if (event.altKey || event.shiftKey) return;
 
-		if (event.button === 0) this.drawingState = 'paint';
-		else if (event.button === 2) this.drawingState = 'erase';
+		if (event.button === 0) this.drawingState = "paint";
+		else if (event.button === 2) this.drawingState = "erase";
 
 		this.startDraw(viewerContext);
 	}
@@ -55,7 +52,6 @@ export class BrushTool extends SegmentationTool {
 
 		this.endDraw(viewerContext);
 	}
-
 
 	pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
 		const { event, position, viewerContext } = pointerEvent;
@@ -67,10 +63,12 @@ export class BrushTool extends SegmentationTool {
 		}
 
 		if (this.drawingState && this.currentPoints) {
-
 			// deduce brush radius in viewer coordinates
 			const p0 = this.viewerContext.imageToViewerCoordinates({ x: 0, y: 0 });
-			const p1 = this.viewerContext.imageToViewerCoordinates({ x: this.brushRadius, y: this.brushRadius * viewerContext.aspectRatio });
+			const p1 = this.viewerContext.imageToViewerCoordinates({
+				x: this.brushRadius,
+				y: this.brushRadius * viewerContext.aspectRatio,
+			});
 			const rx = p1.x - p0.x;
 			const ry = p1.y - p0.y;
 
@@ -79,12 +77,12 @@ export class BrushTool extends SegmentationTool {
 			const dx = position.x - prev.x;
 			const dy = position.y - prev.y;
 			const length = Math.sqrt(dx * dx + dy * dy);
-			const steps = Math.ceil(8 * length / this.brushRadius);
+			const steps = Math.ceil((8 * length) / this.brushRadius);
 			for (let i = 1; i <= steps; i++) {
 				const r = i / steps;
 				const pt = {
 					x: prev.x + r * dx,
-					y: prev.y + r * dy
+					y: prev.y + r * dy,
 				};
 				this.currentPoints.push(pt);
 
@@ -96,10 +94,11 @@ export class BrushTool extends SegmentationTool {
 		}
 	}
 
-
-	executeDraw(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
-
-		ctx.fillStyle = 'white';
+	executeDraw(
+		ctx: CanvasRenderingContext2D,
+		viewerContext: ViewerContext,
+	): void {
+		ctx.fillStyle = "white";
 		const radiusX = this.brushRadius;
 		const radiusY = this.brushRadius * viewerContext.aspectRatio;
 		for (const pt of this.currentPoints!) {
@@ -107,21 +106,19 @@ export class BrushTool extends SegmentationTool {
 			path.ellipse(pt.x, pt.y, radiusX, radiusY, 0, 0, 2 * Math.PI);
 			ctx.fill(path);
 		}
-
 	}
 
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-        super.repaint(viewerContext, renderTarget);
+		super.repaint(viewerContext, renderTarget);
 		const ctx = viewerContext.context2D;
 
 		if (!this.drawingState || !this.currentPoints) return;
 
 		if (this.currentPoints) {
-            ctx.save();
-            ctx.globalAlpha = this.alpha;
-			ctx.drawImage(this.offscreenCanvas, 0, 0);			
-            ctx.restore();
+			ctx.save();
+			ctx.globalAlpha = this.alpha;
+			ctx.drawImage(this.offscreenCanvas, 0, 0);
+			ctx.restore();
 		}
 	}
-
 }

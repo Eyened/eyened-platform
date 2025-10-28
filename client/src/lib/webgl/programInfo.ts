@@ -12,10 +12,21 @@ export class ProgramInfo {
 	private typeToUniformSetter: { [type: number]: any };
 	private typeToUniformArraySetter: { [type: number]: any };
 	private samplerTypes: Set<number>;
-	typeToUniformVecSetter: { [x: number]: (location: WebGLUniformLocation | null, x: number, y: number, z: number, w: number) => void; };
+	typeToUniformVecSetter: {
+		[x: number]: (
+			location: WebGLUniformLocation | null,
+			x: number,
+			y: number,
+			z: number,
+			w: number,
+		) => void;
+	};
 
-	constructor(private readonly gl: WebGL2RenderingContext, vertexShader: WebGLShader, fragmentShader: WebGLShader) {
-
+	constructor(
+		private readonly gl: WebGL2RenderingContext,
+		vertexShader: WebGLShader,
+		fragmentShader: WebGLShader,
+	) {
 		const program = gl.createProgram()!;
 
 		gl.attachShader(program, vertexShader);
@@ -32,7 +43,7 @@ export class ProgramInfo {
 			gl.COLOR_ATTACHMENT4,
 			gl.COLOR_ATTACHMENT5,
 			gl.COLOR_ATTACHMENT6,
-			gl.COLOR_ATTACHMENT7
+			gl.COLOR_ATTACHMENT7,
 		];
 
 		this.samplerToTexture = {
@@ -41,18 +52,23 @@ export class ProgramInfo {
 			[gl.UNSIGNED_INT_SAMPLER_2D]: gl.TEXTURE_2D,
 			[gl.SAMPLER_3D]: gl.TEXTURE_3D,
 			[gl.INT_SAMPLER_3D]: gl.TEXTURE_3D,
-			[gl.UNSIGNED_INT_SAMPLER_3D]: gl.TEXTURE_3D
+			[gl.UNSIGNED_INT_SAMPLER_3D]: gl.TEXTURE_3D,
 		};
 
 		this.samplerTypes = new Set([
-			gl.SAMPLER_2D, gl.INT_SAMPLER_2D, gl.UNSIGNED_INT_SAMPLER_2D,
-			gl.SAMPLER_3D, gl.INT_SAMPLER_3D, gl.UNSIGNED_INT_SAMPLER_3D, gl.SAMPLER_CUBE]);
-
+			gl.SAMPLER_2D,
+			gl.INT_SAMPLER_2D,
+			gl.UNSIGNED_INT_SAMPLER_2D,
+			gl.SAMPLER_3D,
+			gl.INT_SAMPLER_3D,
+			gl.UNSIGNED_INT_SAMPLER_3D,
+			gl.SAMPLER_CUBE,
+		]);
 
 		this.typeToUniformMatrixSetter = {
 			[gl.FLOAT_MAT2]: gl.uniformMatrix2fv.bind(gl),
 			[gl.FLOAT_MAT3]: gl.uniformMatrix3fv.bind(gl),
-			[gl.FLOAT_MAT4]: gl.uniformMatrix4fv.bind(gl)
+			[gl.FLOAT_MAT4]: gl.uniformMatrix4fv.bind(gl),
 		};
 
 		this.typeToUniformSetter = {
@@ -77,7 +93,7 @@ export class ProgramInfo {
 
 			[gl.BOOL_VEC2]: gl.uniform2i.bind(gl),
 			[gl.BOOL_VEC3]: gl.uniform3i.bind(gl),
-			[gl.BOOL_VEC4]: gl.uniform4i.bind(gl)
+			[gl.BOOL_VEC4]: gl.uniform4i.bind(gl),
 		};
 
 		this.typeToUniformArraySetter = {
@@ -96,7 +112,7 @@ export class ProgramInfo {
 			[gl.BOOL]: gl.uniform1iv.bind(gl),
 			[gl.BOOL_VEC2]: gl.uniform2iv.bind(gl),
 			[gl.BOOL_VEC3]: gl.uniform3iv.bind(gl),
-			[gl.BOOL_VEC4]: gl.uniform4iv.bind(gl)
+			[gl.BOOL_VEC4]: gl.uniform4iv.bind(gl),
 		};
 
 		this.init();
@@ -104,14 +120,17 @@ export class ProgramInfo {
 
 	private init() {
 		const gl = this.gl;
-		const numUniforms = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
+		const numUniforms = gl.getProgramParameter(
+			this.program,
+			gl.ACTIVE_UNIFORMS,
+		);
 
 		for (let i = 0; i < numUniforms; ++i) {
 			const info = gl.getActiveUniform(this.program, i)!;
 
 			let name = info.name;
 			// Remove the array indices if found
-			const bracketIndex = name.indexOf('[');
+			const bracketIndex = name.indexOf("[");
 			if (bracketIndex !== -1) {
 				name = name.substring(0, bracketIndex);
 			}
@@ -128,7 +147,10 @@ export class ProgramInfo {
 		this.uniformSetters[name](value);
 	}
 
-	getSetter(info: WebGLActiveInfo, location: WebGLUniformLocation): UniformSetter {
+	getSetter(
+		info: WebGLActiveInfo,
+		location: WebGLUniformLocation,
+	): UniformSetter {
 		if (this.samplerTypes.has(info.type)) {
 			return this.getSamplerSetter(info, location);
 		} else if (info.type in this.typeToUniformMatrixSetter) {
@@ -136,7 +158,7 @@ export class ProgramInfo {
 			const uniformFunction = this.typeToUniformMatrixSetter[info.type];
 			return (v: any) => uniformFunction(location, false, v);
 		} else if (info.size > 1) {
-			// array 
+			// array
 			const uniformFunction = this.typeToUniformArraySetter[info.type];
 			return (v: any) => uniformFunction(location, v);
 		} else if (info.type in this.typeToUniformVecSetter) {
@@ -148,13 +170,15 @@ export class ProgramInfo {
 			const uniformFunction = this.typeToUniformSetter[info.type];
 			return (v: any) => uniformFunction(location, v);
 		}
-
 	}
 
 	private currentTextureUnit: number = 0;
-	getSamplerSetter(info: WebGLActiveInfo, location: WebGLUniformLocation): UniformSetter {
+	getSamplerSetter(
+		info: WebGLActiveInfo,
+		location: WebGLUniformLocation,
+	): UniformSetter {
 		const gl = this.gl;
-		const textureUnit = this.currentTextureUnit;  // Store the current unit for this sampler
+		const textureUnit = this.currentTextureUnit; // Store the current unit for this sampler
 
 		// Increment the unit for the next texture
 		this.currentTextureUnit++;

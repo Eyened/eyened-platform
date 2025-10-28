@@ -6,54 +6,54 @@ import type { Instance } from "./instance.svelte";
 import type { Project } from "./project.svelte";
 
 export interface ServerPatient {
-    PatientID: number,
-    PatientIdentifier: string,
-    ProjectID: number,
-    BirthDate?: Date,
-    Sex?: 'M' | 'F',
-    IsHuman: boolean,
+	PatientID: number;
+	PatientIdentifier: string;
+	ProjectID: number;
+	BirthDate?: Date;
+	Sex?: "M" | "F";
+	IsHuman: boolean;
 }
 export class Patient extends BaseItem {
-    static endpoint = 'patients';
-    static mapping = {
-        'PatientIdentifier': 'identifier',
-        'ProjectID': 'projectId',
-        'BirthDate': 'birthDate',
-        'Sex': 'sex',
-        'IsHuman': 'isHuman',
-    };
+	static endpoint = "patients";
+	static mapping = {
+		PatientIdentifier: "identifier",
+		ProjectID: "projectId",
+		BirthDate: "birthDate",
+		Sex: "sex",
+		IsHuman: "isHuman",
+	};
 
-    id!: number;
-    identifier!: string;
-    projectId!: number;
-    birthDate?: Date;
-    sex?: 'M' | 'F';
-    isHuman!: boolean;
+	id!: number;
+	identifier!: string;
+	projectId!: number;
+	birthDate?: Date;
+	sex?: "M" | "F";
+	isHuman!: boolean;
 
-    constructor(item: ServerPatient) {
-        super();
-        this.init(item);
-    }
+	constructor(item: ServerPatient) {
+		super();
+		this.init(item);
+	}
 
-    init(item: ServerPatient) {
-        this.id = item.PatientID;
-        this.identifier = item.PatientIdentifier;
-        this.projectId = item.ProjectID;
-        this.birthDate = item.BirthDate ? new Date(item.BirthDate) : undefined;
-        this.sex = item.Sex;
-        this.isHuman = item.IsHuman;
-    }
+	init(item: ServerPatient) {
+		this.id = item.PatientID;
+		this.identifier = item.PatientIdentifier;
+		this.projectId = item.ProjectID;
+		this.birthDate = item.BirthDate ? new Date(item.BirthDate) : undefined;
+		this.sex = item.Sex;
+		this.isHuman = item.IsHuman;
+	}
 
-    get studies(): FilterList<Study> {
-        return data.studies.filter(study => study.patientId == this.id);
-    }
+	get studies(): FilterList<Study> {
+		return data.studies.filter((study) => study.patientId == this.id);
+	}
 
-    get project(): Project {
-        return data.projects.get(this.projectId)!;
-    }
+	get project(): Project {
+		return data.projects.get(this.projectId)!;
+	}
 
-    get instances(): FilterList<Instance> {
-        return data.instances.filter(instance => instance.patient.id == this.id);
-    }
-}       
-registerConstructor('patients', Patient);
+	get instances(): FilterList<Instance> {
+		return data.instances.filter((instance) => instance.patient.id == this.id);
+	}
+}
+registerConstructor("patients", Patient);

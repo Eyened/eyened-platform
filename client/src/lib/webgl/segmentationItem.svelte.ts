@@ -1,5 +1,8 @@
 import { SvelteMap } from "svelte/reactivity";
-import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import type {
+	ModelSegmentationGET,
+	SegmentationGET,
+} from "../../types/openapi_types";
 import { getSegmentationData, getModelSegmentationData } from "../data/helpers";
 import type { NPYArray } from "../utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
@@ -8,108 +11,132 @@ import { SegmentationState } from "./segmentationState";
 
 // manages the segmentation states (one per scan) for a single segmentation
 export class SegmentationItem {
+	// mapping of scanNr to SegmentationState
+	segmentationStates: SvelteMap<number, SegmentationState> = new SvelteMap();
+	loading: boolean = $state(false);
+	ready: Promise<void> | null = null;
 
-    // mapping of scanNr to SegmentationState
-    segmentationStates: SvelteMap<number, SegmentationState> = new SvelteMap();
-    loading: boolean = $state(false);
-    ready: Promise<void> | null = null;
-    
-    // Reactive threshold state for immediate UI updates
-    threshold: number = $state(0.5);
+	// Reactive threshold state for immediate UI updates
+	threshold: number = $state(0.5);
 
-    constructor(
-        readonly image: AbstractImage,
-        readonly segmentation: SegmentationGET | ModelSegmentationGET) {
-        
-        // Initialize threshold from segmentation or default to 0.5
-        this.threshold = this.segmentation.threshold ?? 0.5;
+	constructor(
+		readonly image: AbstractImage,
+		readonly segmentation: SegmentationGET | ModelSegmentationGET,
+	) {
+		// Initialize threshold from segmentation or default to 0.5
+		this.threshold = this.segmentation.threshold ?? 0.5;
 
-        if (Array.isArray(this.segmentation.scan_indices) && this.segmentation.scan_indices.length < 5) {
-            for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
-                this.getSegmentationState(scanNr, true);
-            }
-        } else {
-            this.ready = this.loadFull();
-        }
-    }
+		if (
+			Array.isArray(this.segmentation.scan_indices) &&
+			this.segmentation.scan_indices.length < 5
+		) {
+			for (const scanNr of this.segmentation.scan_indices ??
+				Array.from({ length: this.image.depth }, (_, i) => i)) {
+				this.getSegmentationState(scanNr, true);
+			}
+		} else {
+			this.ready = this.loadFull();
+		}
+	}
 
-    private async loadFull(): Promise<void> {
-        try {
-            this.loading = true;
+	private async loadFull(): Promise<void> {
+		try {
+			this.loading = true;
 
-            // Don't pass axis/scan_nr when loading full volume
-            // API requires both axis AND scan_nr together, or neither
-            const array: NPYArray = this.segmentation.annotation_type === 'model_segmentation'
-                ? await getModelSegmentationData(this.segmentation.id)
-                : await getSegmentationData(this.segmentation.id);
-            
-            const shape = array.shape as number[];
-            // Expecting [depth, height, width]
-            const depth = shape[0] ?? this.image.depth;
-            const height = shape[1] ?? this.image.height;
-            const width = shape[2] ?? this.image.width;
-            const planeSize = height * width;
+			// Don't pass axis/scan_nr when loading full volume
+			// API requires both axis AND scan_nr together, or neither
+			const array: NPYArray =
+				this.segmentation.annotation_type === "model_segmentation"
+					? await getModelSegmentationData(this.segmentation.id)
+					: await getSegmentationData(this.segmentation.id);
 
-            const scanIndices = this.segmentation.scan_indices ?? Array.from({ length: depth }, (_, i) => i);
-            for (const scanNr of scanIndices) {
-                const start = scanNr * planeSize;
-                const end = start + planeSize;
-                const slice = (array.data as any).subarray(start, end);
-                this.getSegmentationState(scanNr, true, slice);
-            }
-        } catch (error) {
-            console.error('SegmentationItem loadFull failed', error);
-        } finally {
-            this.loading = false;
-        }
-    }
+			const shape = array.shape as number[];
+			// Expecting [depth, height, width]
+			const depth = shape[0] ?? this.image.depth;
+			const height = shape[1] ?? this.image.height;
+			const width = shape[2] ?? this.image.width;
+			const planeSize = height * width;
 
-    getMask(scanNr: number): Mask | undefined {
-        return this.segmentationStates.get(scanNr)?.mask;
-    }
+			const scanIndices =
+				this.segmentation.scan_indices ??
+				Array.from({ length: depth }, (_, i) => i);
+			for (const scanNr of scanIndices) {
+				const start = scanNr * planeSize;
+				const end = start + planeSize;
+				const slice = (array.data as any).subarray(start, end);
+				this.getSegmentationState(scanNr, true, slice);
+			}
+		} catch (error) {
+			console.error("SegmentationItem loadFull failed", error);
+		} finally {
+			this.loading = false;
+		}
+	}
 
-    getSegmentationState(scanNr: number, create: boolean = false, initialData?: Uint8Array | Uint16Array | Uint32Array | Float32Array): SegmentationState | undefined {
+	getMask(scanNr: number): Mask | undefined {
+		return this.segmentationStates.get(scanNr)?.mask;
+	}
 
-        if (create && !this.segmentationStates.has(scanNr)) {
-            const segmentationState = new SegmentationState(this.image, this.segmentation, scanNr, initialData);
-            this.segmentationStates.set(scanNr, segmentationState);
-        }
-        return this.segmentationStates.get(scanNr)!;
-    }
+	getSegmentationState(
+		scanNr: number,
+		create: boolean = false,
+		initialData?: Uint8Array | Uint16Array | Uint32Array | Float32Array,
+	): SegmentationState | undefined {
+		if (create && !this.segmentationStates.has(scanNr)) {
+			const segmentationState = new SegmentationState(
+				this.image,
+				this.segmentation,
+				scanNr,
+				initialData,
+			);
+			this.segmentationStates.set(scanNr, segmentationState);
+		}
+		return this.segmentationStates.get(scanNr)!;
+	}
 
-    async importOther(scanNr: number, mask: Mask) {
-        const segmentationState = this.getSegmentationState(scanNr, true)!;
-        segmentationState.importOther(mask);
-    }
+	async importOther(scanNr: number, mask: Mask) {
+		const segmentationState = this.getSegmentationState(scanNr, true)!;
+		segmentationState.importOther(mask);
+	}
 
-    async draw(scanNr: number, drawing: HTMLCanvasElement, settings: PaintSettings) {
-        const segmentationState = this.getSegmentationState(scanNr, true)!;
-        await segmentationState.draw(drawing, settings);
-    }
+	async draw(
+		scanNr: number,
+		drawing: HTMLCanvasElement,
+		settings: PaintSettings,
+	) {
+		const segmentationState = this.getSegmentationState(scanNr, true)!;
+		await segmentationState.draw(drawing, settings);
+	}
 
-    async undo(scanNr: number) {
-        const segmentationState = this.segmentationStates.get(scanNr);
-        if (segmentationState) {
-            segmentationState.undo();
-        } else {
-            console.warn("SegmentationItem.undo: segmentationState not found", scanNr);
-        }
-    }
+	async undo(scanNr: number) {
+		const segmentationState = this.segmentationStates.get(scanNr);
+		if (segmentationState) {
+			segmentationState.undo();
+		} else {
+			console.warn(
+				"SegmentationItem.undo: segmentationState not found",
+				scanNr,
+			);
+		}
+	}
 
-    async redo(scanNr: number) {
-        const segmentationState = this.segmentationStates.get(scanNr);
-        if (segmentationState) {
-            segmentationState.redo();
-        } else {
-            console.warn("SegmentationItem.redo: segmentationState not found", scanNr);
-        }
-    }
+	async redo(scanNr: number) {
+		const segmentationState = this.segmentationStates.get(scanNr);
+		if (segmentationState) {
+			segmentationState.redo();
+		} else {
+			console.warn(
+				"SegmentationItem.redo: segmentationState not found",
+				scanNr,
+			);
+		}
+	}
 
-    dispose() {
-        // Note: not called currently
-        for (const segmentationState of this.segmentationStates.values()) {
-            segmentationState.dispose();
-        }
-        this.segmentationStates.clear();
-    }
+	dispose() {
+		// Note: not called currently
+		for (const segmentationState of this.segmentationStates.values()) {
+			segmentationState.dispose();
+		}
+		this.segmentationStates.clear();
+	}
 }

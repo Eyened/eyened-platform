@@ -1,7 +1,5 @@
 {
-    "useTabs": true,
-    "plugins": [
-        "prettier-plugin-tailwindcss"
-    ],
-    "tailwindStylesheet": "./src/app.css"
+	"useTabs": true,
+	"plugins": ["prettier-plugin-tailwindcss"],
+	"tailwindStylesheet": "./src/app.css"
 }

@@ -1,23 +1,25 @@
-import type { ProgramInfo } from './programInfo';
-import type { RenderTarget } from './types';
-import type { WebGL } from './webgl';
+import type { ProgramInfo } from "./programInfo";
+import type { RenderTarget } from "./types";
+import type { WebGL } from "./webgl";
 
 export abstract class FragmentShaderProgram {
 	constructor(
 		protected readonly gl: WebGL2RenderingContext,
 		protected readonly vertexArrayObject: WebGLVertexArrayObject,
-		protected readonly programInfo: ProgramInfo
-	) { }
+		protected readonly programInfo: ProgramInfo,
+	) {}
 
 	setUniforms(uniforms: { [name: string]: any }) {
 		this.programInfo.setUniforms(uniforms);
 	}
 
-	abstract pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }): void;
+	abstract pass(
+		renderTarget: RenderTarget,
+		uniforms: { [name: string]: any },
+	): void;
 }
 
 export class BaseTextureShaderProgram extends FragmentShaderProgram {
-
 	constructor(webgl: WebGL, vertexShader: string, fragmentShader: string) {
 		/*
 		draw inside a rectangle with fragment coordinates v_uv 0-1
@@ -29,17 +31,17 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
 		const gl = webgl.gl;
 		const programInfo = webgl.createProgramInfo(vertexShader, fragmentShader);
 
-		const positionAttributeLocation = gl.getAttribLocation(programInfo.program, 'a_position');
+		const positionAttributeLocation = gl.getAttribLocation(
+			programInfo.program,
+			"a_position",
+		);
 		const positionBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-			0, 1,
-			1, 0,
-			0, 0,
-			0, 1,
-			1, 1,
-			1, 0
-		]), gl.STATIC_DRAW);
+		gl.bufferData(
+			gl.ARRAY_BUFFER,
+			new Float32Array([0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0]),
+			gl.STATIC_DRAW,
+		);
 
 		const vertexArrayObject = gl.createVertexArray()!;
 
@@ -52,7 +54,6 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
 	}
 
 	pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }) {
-
 		const gl = this.gl;
 		const { left, bottom, width, height, framebuffer } = renderTarget;
 
@@ -68,7 +69,7 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
 		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
 		gl.useProgram(this.programInfo.program);
-		gl.bindVertexArray(this.vertexArrayObject);		
+		gl.bindVertexArray(this.vertexArrayObject);
 		this.setUniforms(uniforms);
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
 	}
@@ -85,21 +86,32 @@ export class TextureShaderProgram3D extends BaseTextureShaderProgram {
 	}
 }
 export class PixelShaderProgram extends FragmentShaderProgram {
-
-
-	constructor(webgl: WebGL, readonly fragmentShader: string) {
+	constructor(
+		webgl: WebGL,
+		readonly fragmentShader: string,
+	) {
 		/*
 			runs for every pixel in the fragment
 		*/
 
 		const gl = webgl.gl;
-		const programInfo = webgl.createProgramInfo(pixelVertexShader, fragmentShader);
+		const programInfo = webgl.createProgramInfo(
+			pixelVertexShader,
+			fragmentShader,
+		);
 
-		const positionAttributeLocation = gl.getAttribLocation(programInfo.program, 'a_position');
+		const positionAttributeLocation = gl.getAttribLocation(
+			programInfo.program,
+			"a_position",
+		);
 		const positionBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 		//triangle covering the whole screen
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, 3, 3, -1, -1, -1]), gl.STATIC_DRAW);
+		gl.bufferData(
+			gl.ARRAY_BUFFER,
+			new Float32Array([-1, 3, 3, -1, -1, -1]),
+			gl.STATIC_DRAW,
+		);
 
 		const vertexArrayObject = gl.createVertexArray()!;
 
@@ -110,7 +122,6 @@ export class PixelShaderProgram extends FragmentShaderProgram {
 
 		super(gl, vertexArrayObject, programInfo);
 	}
-
 
 	pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }) {
 		const gl = this.gl;
@@ -133,23 +144,24 @@ export class PixelShaderProgram extends FragmentShaderProgram {
 }
 
 export class AffineShaderProgram extends FragmentShaderProgram {
-
 	constructor(webgl: WebGL, fragmentShader: string) {
-
 		const gl = webgl.gl;
-		const programInfo = webgl.createProgramInfo(affineVertexShader, fragmentShader);
+		const programInfo = webgl.createProgramInfo(
+			affineVertexShader,
+			fragmentShader,
+		);
 
-		const positionAttributeLocation = gl.getAttribLocation(programInfo.program, 'a_position');
+		const positionAttributeLocation = gl.getAttribLocation(
+			programInfo.program,
+			"a_position",
+		);
 		const positionBuffer = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-			0, 1,
-			1, 0,
-			0, 0,
-			0, 1,
-			1, 1,
-			1, 0
-		]), gl.STATIC_DRAW);
+		gl.bufferData(
+			gl.ARRAY_BUFFER,
+			new Float32Array([0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0]),
+			gl.STATIC_DRAW,
+		);
 
 		const vertexArrayObject = gl.createVertexArray()!;
 
@@ -162,7 +174,6 @@ export class AffineShaderProgram extends FragmentShaderProgram {
 	}
 
 	pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }) {
-
 		const gl = this.gl;
 		const { left, bottom, width, height } = renderTarget;
 
@@ -183,7 +194,6 @@ export class AffineShaderProgram extends FragmentShaderProgram {
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
 	}
 }
-
 
 const textureVertexShader = `#version 300 es
 
@@ -224,13 +234,11 @@ void main() {
 	v_uv = vec3(a_position.xy, (float(u_index) + 0.5) / u_image_size.z);
 }`;
 
-
 const pixelVertexShader = `#version 300 es
 in vec4 a_position;
 void main() {
     gl_Position = a_position;
 }`;
-
 
 const affineVertexShader = `#version 300 es
 in vec4 a_position;
