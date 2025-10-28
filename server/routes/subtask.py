@@ -71,7 +71,7 @@ async def delete_subtask(
     db.commit()
     return Response(status_code=204)
 
-@router.post("/subtasks/{subtaskid}/images", response_model=InstanceGET)
+@router.post("/subtasks/{subtaskid}/images", response_model=SubTaskWithImagesGET)
 async def add_subtask_image(
     subtaskid: int,
     body: AddImageRequest,
@@ -86,9 +86,16 @@ async def add_subtask_image(
         raise HTTPException(404, "ImageInstance not found")
     link = SubTaskImageLink(SubTaskID=subtaskid, ImageInstanceID=body.instance_id)
     db.add(link); db.commit()
-    return DTOConverter.image_instance_to_get(inst)
+    
+    # Fetch the updated subtask with images
+    st = db.execute(
+        select(SubTask)
+        .where(SubTask.SubTaskID == subtaskid)
+        .options(selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance))
+    ).scalars().first()
+    return DTOConverter.subtask_with_images_to_get(st)
 
-@router.delete("/subtasks/{subtaskid}/images/{instance_id}", status_code=204)
+@router.delete("/subtasks/{subtaskid}/images/{instance_id}", response_model=SubTaskWithImagesGET)
 async def remove_subtask_image(
     subtaskid: int,
     instance_id: int,
@@ -104,4 +111,11 @@ async def remove_subtask_image(
     if res.rowcount == 0:
         raise HTTPException(404, "Link not found")
     db.commit()
-    return Response(status_code=204)
+    
+    # Fetch the updated subtask with images
+    st = db.execute(
+        select(SubTask)
+        .where(SubTask.SubTaskID == subtaskid)
+        .options(selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance))
+    ).scalars().first()
+    return DTOConverter.subtask_with_images_to_get(st)

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Creator, Feature, ImageInstance, SegmentationTagLink, SubTask
+    from eyened_orm import Creator, Feature, ImageInstance, SegmentationTagLink, SubTask, AttributeValue
 
 
 class DataRepresentation(Enum):
@@ -203,6 +203,7 @@ class Segmentation(SegmentationBase):
     Feature: Mapped["Feature"] = relationship("eyened_orm.segmentation.Feature", back_populates="Segmentations")
     SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="Segmentations")
     SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship("eyened_orm.tag.SegmentationTagLink", back_populates="Segmentation", lazy="selectin")
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="Segmentation", lazy="selectin")
 
 class FeatureFeatureLink(Base):
     __tablename__ = "CompositeFeature"
@@ -324,6 +325,9 @@ class Model(Base):
     Description: Mapped[Optional[str]] = mapped_column(String(255))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
+    # relationships
+    ProducedAttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="ProducingModel")
+
 
 class SegmentationModel(Model):
     __tablename__ = "SegmentationModel"
@@ -350,6 +354,7 @@ class ModelSegmentation(SegmentationBase):
         "eyened_orm.image_instance.ImageInstance",
         back_populates="ModelSegmentations"
     )
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="ModelSegmentation", lazy="selectin")
 
     @property
     def groupname(self) -> str:

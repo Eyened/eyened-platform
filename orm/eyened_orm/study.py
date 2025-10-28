@@ -26,7 +26,6 @@ class Study(Base):
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID", ondelete="CASCADE"))
     StudyRound: Mapped[Optional[int]]
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))
-    StudyInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
     StudyDate: Mapped[datetime.date]
 
     DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
@@ -37,10 +36,6 @@ class Study(Base):
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Study")
 
     StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship("eyened_orm.tag.StudyTagLink", back_populates="Study", lazy="selectin")
-
-    @classmethod
-    def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
-        return cls.by_column(session, StudyInstanceUid=StudyInstanceUid)
 
     @classmethod
     def by_patient_and_date(

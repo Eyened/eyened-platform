@@ -917,6 +917,8 @@ export interface components {
             operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
             /** Value */
             value: number | string | string[] | null;
+            /** Feature */
+            feature?: string | null;
         };
         /** Body_create_segmentation_segmentations_post */
         Body_create_segmentation_segmentations_post: {
@@ -1038,9 +1040,7 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: {
-                [key: string]: unknown;
-            } | null;
+            form_data?: Record<string, never> | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
             /** Id */
@@ -1082,9 +1082,7 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: {
-                [key: string]: unknown;
-            } | null;
+            form_data?: Record<string, never> | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1101,9 +1099,7 @@ export interface components {
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: {
-                [key: string]: unknown;
-            } | null;
+            form_data?: Record<string, never> | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1112,9 +1108,7 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Schema */
-            schema?: {
-                [key: string]: unknown;
-            } | null;
+            schema?: Record<string, never> | null;
             /** Id */
             id: number;
         };
@@ -1143,9 +1137,7 @@ export interface components {
              * @description Optional key-value properties for new patient
              * @default {}
              */
-            patient_props: {
-                [key: string]: unknown;
-            } | null;
+            patient_props: Record<string, never> | null;
             /**
              * Study Date
              * @description Study date (can be a date object or ISO format string)
@@ -1156,9 +1148,7 @@ export interface components {
              * @description Optional key-value properties for new study
              * @default {}
              */
-            study_props: {
-                [key: string]: unknown;
-            } | null;
+            study_props: Record<string, never> | null;
             /**
              * Series Id
              * @description Optional series identifier
@@ -1169,9 +1159,7 @@ export interface components {
              * @description Optional key-value properties for new series
              * @default {}
              */
-            series_props: {
-                [key: string]: unknown;
-            } | null;
+            series_props: Record<string, never> | null;
             /**
              * Image
              * @description Path to the image file (required)
@@ -1182,9 +1170,7 @@ export interface components {
              * @description Optional key-value properties for new image
              * @default {}
              */
-            image_props: {
-                [key: string]: unknown;
-            } | null;
+            image_props: Record<string, never> | null;
         };
         /**
          * ImportOptions
@@ -1234,9 +1220,7 @@ export interface components {
             /** Message */
             message: string;
             /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
+            data?: Record<string, never> | null;
             /** Error */
             error?: string | null;
             /** Stack Trace */
@@ -1273,13 +1257,9 @@ export interface components {
             /** Resolution Axial */
             resolution_axial: number;
             /** Cf Roi */
-            cf_roi?: {
-                [key: string]: unknown;
-            } | null;
+            cf_roi?: Record<string, never> | null;
             /** Cf Keypoints */
-            cf_keypoints?: {
-                [key: string]: unknown;
-            } | null;
+            cf_keypoints?: Record<string, never> | null;
             /** Cf Quality */
             cf_quality?: number | null;
             /**
@@ -1309,9 +1289,7 @@ export interface components {
             form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
             /** Attributes */
             attributes: {
-                [key: string]: {
-                    [key: string]: unknown;
-                };
+                [key: string]: Record<string, never>;
             };
         };
         /** InstanceMeta */
@@ -1551,6 +1529,8 @@ export interface components {
             type: "default" | "attribute";
             /** Model */
             model?: string | null;
+            /** Feature */
+            feature?: string | null;
         };
         /** StudyGET */
         StudyGET: {
@@ -1565,8 +1545,6 @@ export interface components {
             date: string;
             /** Age */
             age?: number | null;
-            /** Study Instance Uid */
-            study_instance_uid?: string | null;
             project: components["schemas"]["ProjectMeta"];
             patient: components["schemas"]["PatientMeta"];
             /** Series */
@@ -1590,7 +1568,7 @@ export interface components {
              * Variable
              * @enum {string}
              */
-            variable: "Study Date" | "Study Description" | "Study Round" | "Study Instance UID" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Study Tag Name";
+            variable: "Study Date" | "Study Description" | "Study Round" | "Patient Identifier" | "Patient Sex" | "Patient Birthdate" | "Project Name" | "Form Schema Name" | "Form Creator Name" | "Form Tag Name" | "Study Tag Name";
             /**
              * Operator
              * @enum {string}
@@ -1782,9 +1760,7 @@ export interface components {
             /** Id */
             id: number;
             /** Config */
-            config: {
-                [key: string]: unknown;
-            };
+            config: Record<string, never>;
             /**
              * Date Inserted
              * Format: date-time
@@ -4231,7 +4207,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InstanceGET"];
+                    "application/json": components["schemas"]["SubTaskWithImagesGET"];
                 };
             };
             /** @description Validation Error */
@@ -4263,11 +4239,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SubTaskWithImagesGET"];
+                };
             };
             /** @description Validation Error */
             422: {

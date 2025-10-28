@@ -11,6 +11,7 @@ from typing import (
 )
 
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
+from eyened_orm.utils.table_printer import TablePrinter
 from sqlalchemy import Column, Index, UniqueConstraint, select
 from sqlalchemy.orm import DeclarativeBase, Session
 
@@ -228,6 +229,11 @@ class Base(DeclarativeBase):
         """String representation of the object."""
         args = ", ".join([f"{c.name}={getattr(self, c.name)}" for c in self.columns()])
         return f"{self.__class__.__name__}({args})"
+
+    def _repr_html_(self) -> str:
+        """HTML representation for Jupyter notebook display in table format."""            
+        printer = TablePrinter(title=f'{self.__class__.__name__} {self.get_value(self.primary_key())}')
+        return printer.print_table(self.to_dict())
 
     def __hash__(self):
         return id(self)
