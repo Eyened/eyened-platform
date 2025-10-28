@@ -164,7 +164,7 @@
 									placeholder="Query Type"
 								/>
 							</div>
-							{#if browserContext.queryMode === "instances"}
+							<!-- {#if browserContext.queryMode === "instances"}
 								<div class="flex items-center gap-2">
 									<label for="displayMode">Display: </label>
 									<MySelect
@@ -176,7 +176,7 @@
 										placeholder="Render Mode"
 									/>
 								</div>
-							{/if}
+							{/if} -->
 						</div>
 					</div>
 
