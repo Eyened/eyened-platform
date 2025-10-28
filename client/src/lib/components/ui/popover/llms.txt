@@ -1,0 +1,519 @@
+# Popover Documentation
+
+Display supplementary content or information when users interact with specific elements.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { Popover, Separator, Toggle } from "bits-ui";
+  import ImageSquare from "phosphor-svelte/lib/ImageSquare";
+  import LinkSimpleHorizontalBreak from "phosphor-svelte/lib/LinkSimpleHorizontalBreak";
+  let width = $state(1024);
+  let height = $state(768);
+</script>
+<Popover.Root>
+  <Popover.Trigger
+    class="rounded-input bg-dark
+ text-background shadow-mini hover:bg-dark/95 inline-flex h-10 select-none items-center justify-center whitespace-nowrap px-[21px] text-[15px] font-medium transition-all hover:cursor-pointer active:scale-[0.98]"
+  >
+    Resize
+  </Popover.Trigger>
+  <Popover.Portal>
+    <Popover.Content
+      class="border-dark-10 bg-background shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--bits-popover-content-transform-origin) z-30 w-full max-w-[328px] rounded-[12px] border p-4"
+      sideOffset={8}
+    >
+      <div class="flex items-center">
+        <div
+          class="bg-muted mr-3 flex size-12 items-center justify-center rounded-full"
+        >
+          <ImageSquare class="size-6" />
+        </div>
+        <div class="flex flex-col">
+          <h4 class="text-[17px] font-semibold leading-5 tracking-[-0.01em]">
+            Resize image
+          </h4>
+          <p class="text-muted-foreground text-sm font-medium">
+            Resize your photos easily
+          </p>
+        </div>
+      </div>
+      <Separator.Root class="bg-dark-10 -mx-4 mb-6 mt-[17px] block h-px" />
+      <div class="flex items-center pb-2">
+        <div class="mr-2 flex items-center">
+          <div class="relative mr-2">
+            <span class="sr-only">Width</span>
+            <span
+              aria-hidden="true"
+              class="text-xxs text-muted-foreground absolute left-5 top-4"
+              >W</span
+            >
+            <input
+              type="number"
+              class="h-input rounded-10px border-border-input bg-background text-foreground w-[119px] border pl-10 pr-2 text-base sm:text-sm"
+              bind:value={width}
+            />
+          </div>
+          <div class="relative">
+            <span class="sr-only">Height</span>
+            <span
+              aria-hidden="true"
+              class="text-xxs text-muted-foreground absolute left-5 top-4"
+              >H</span
+            >
+            <input
+              type="number"
+              class="h-input rounded-10px border-border-input bg-background text-foreground w-[119px] border pl-10 pr-2 text-base sm:text-sm"
+              bind:value={height}
+            />
+          </div>
+        </div>
+        <Toggle.Root
+          aria-label="toggle constrain portions"
+          class="bg-background hover:bg-muted data-[state=on]:bg-muted inline-flex size-10 items-center justify-center rounded-[9px] transition-all active:scale-[0.98]"
+        >
+          <LinkSimpleHorizontalBreak class="size-6" />
+        </Toggle.Root>
+      </div>
+    </Popover.Content>
+  </Popover.Portal>
+</Popover.Root>
+```
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Popover } from "bits-ui";
+</script>
+<Popover.Root>
+  <Popover.Trigger />
+  <Popover.Content>
+    <Popover.Close />
+    <Popover.Arrow />
+  </Popover.Content>
+</Popover.Root>
+```
+
+## Managing Open State
+
+This section covers how to manage the `open` state of the component.
+
+### Two-Way Binding
+
+Use `bind:open` for simple, automatic state synchronization:
+
+```svelte
+<script lang="ts">
+  import { Popover } from "bits-ui";
+  let isOpen = $state(false);
+</script>
+<button onclick={() => (isOpen = true)}>Open Popover</button>
+<Popover.Root bind:open={isOpen}>
+</Popover.Root>
+```
+
+### Fully Controlled
+
+Use a [Function Binding](https://svelte.dev/docs/svelte/bind#Function-bindings) for complete control over the state's reads and writes.
+
+```svelte
+<script lang="ts">
+  import { Popover } from "bits-ui";
+  let myOpen = $state(false);
+  function getOpen() {
+    return myOpen;
+  }
+  function setOpen(newOpen: boolean) {
+    myOpen = newOpen;
+  }
+</script>
+<Popover.Root bind:open={getOpen, setOpen}>
+</Popover.Root>
+```
+
+## Managing Focus
+
+### Focus Trap
+
+By default, when a Popover is opened, focus will be trapped within that Popover. You can disable this behavior by setting the `trapFocus` prop to `false` on the `Popover.Content` component.
+
+```svelte
+<Popover.Content trapFocus={false}>
+</Popover.Content>
+```
+
+### Open Focus
+
+By default, when a Popover is opened, focus will be set to the first focusable element with the `Popover.Content`. This ensures that users navigating my keyboard end up somewhere within the Popover that they can interact with.
+
+You can override this behavior using the `onOpenAutoFocus` prop on the `Popover.Content` component. It's *highly* recommended that you use this prop to focus *something* within the Popover's content.
+
+You'll first need to cancel the default behavior of focusing the first focusable element by cancelling the event passed to the `onOpenAutoFocus` callback. You can then focus whatever you wish.
+
+```svelte
+<script lang="ts">
+  import { Popover } from "bits-ui";
+  let nameInput = $state<HTMLInputElement>();
+</script>
+<Popover.Root>
+  <Popover.Trigger>Open Popover</Popover.Trigger>
+  <Popover.Content
+    onOpenAutoFocus={(e) => {
+      e.preventDefault();
+      nameInput?.focus();
+    }}
+  >
+    <input type="text" bind:this={nameInput} />
+  </Popover.Content>
+</Popover.Root>
+```
+
+### Close Focus
+
+By default, when a Popover is closed, focus will be set to the trigger element of the Popover. You can override this behavior using the `onCloseAutoFocus` prop on the `Popover.Content` component.
+
+You'll need to cancel the default behavior of focusing the trigger element by cancelling the event passed to the `onCloseAutoFocus` callback, and then focus whatever you wish.
+
+```svelte
+<script lang="ts">
+  import { Popover } from "bits-ui";
+  let nameInput = $state<HTMLInputElement>();
+</script>
+<input type="text" bind:this={nameInput} />
+<Popover.Root>
+  <Popover.Trigger>Open Popover</Popover.Trigger>
+  <Popover.Content
+    onCloseAutoFocus={(e) => {
+      e.preventDefault();
+      nameInput?.focus();
+    }}
+  >
+  </Popover.Content>
+</Popover.Root>
+```
+
+## Scroll Lock
+
+By default, when a Popover is opened, users can still scroll the body and interact with content outside of the Popover. If you wish to lock the body scroll and prevent users from interacting with content outside of the Popover, you can set the `preventScroll` prop to `true` on the `Popover.Content` component.
+
+```svelte
+<Popover.Content preventScroll={true}>
+</Popover.Content>
+```
+
+## Escape Keydown
+
+By default, when a Popover is open, pressing the `Escape` key will close the dialog. Bits UI provides a couple ways to override this behavior.
+
+### escapeKeydownBehavior
+
+You can set the `escapeKeydownBehavior` prop to `'ignore'` on the `Popover.Content` component to prevent the dialog from closing when the `Escape` key is pressed.
+
+```svelte
+<Popover.Content escapeKeydownBehavior="ignore">
+</Popover.Content>
+```
+
+### onEscapeKeydown
+
+You can also override the default behavior by cancelling the event passed to the `onEscapeKeydown` callback on the `Popover.Content` component.
+
+```svelte
+<Popover.Content onEscapeKeydown={(e) => e.preventDefault()}>
+</Popover.Content>
+```
+
+## Interact Outside
+
+By default, when a Popover is open, pointer down events outside the content will close the popover. Bits UI provides a couple ways to override this behavior.
+
+### interactOutsideBehavior
+
+You can set the `interactOutsideBehavior` prop to `'ignore'` on the `Popover.Content` component to prevent the dialog from closing when the user interacts outside the content.
+
+```svelte
+<Popover.Content interactOutsideBehavior="ignore">
+</Popover.Content>
+```
+
+### onInteractOutside
+
+You can also override the default behavior by cancelling the event passed to the `onInteractOutside` callback on the `Popover.Content` component.
+
+```svelte
+<Popover.Content onInteractOutside={(e) => e.preventDefault()}>
+</Popover.Content>
+```
+
+## Custom Anchor
+
+By default, the `Popover.Content` is anchored to the `Popover.Trigger` component, which determines where the content is positioned.
+
+If you wish to instead anchor the content to a different element, you can pass either a selector `string` or an `HTMLElement` to the `customAnchor` prop of the `Popover.Content` component.
+
+```svelte
+<script lang="ts">
+  import { Popover } from "bits-ui";
+  let customAnchor = $state<HTMLElement>(null!);
+</script>
+<div bind:this={customAnchor}></div>
+<Popover.Root>
+  <Popover.Trigger />
+  <Popover.Content {customAnchor}>
+  </Popover.Content>
+</Popover.Root>
+```
+
+## Svelte Transitions
+
+You can use the `forceMount` prop along with the `child` snippet to forcefully mount the `Popover.Content` component to use Svelte Transitions or another animation library that requires more control.
+
+```svelte
+<script lang="ts">
+  import { Popover } from "bits-ui";
+  import { fly } from "svelte/transition";
+</script>
+<Popover.Content forceMount>
+  {#snippet child({ wrapperProps, props, open })}
+    {#if open}
+      <div {...wrapperProps}>
+        <div {...props} transition:fly>
+        </div>
+      </div>
+    {/if}
+  {/snippet}
+</Popover.Content>
+```
+
+Of course, this isn't the prettiest syntax, so it's recommended to create your own reusable content component that handles this logic if you intend to use this approach. For more information on using transitions with Bits UI components, see the [Transitions](/docs/transitions) documentation.
+
+```svelte
+<script lang="ts">
+  import { Popover, Separator, Toggle } from "bits-ui";
+  import ImageSquare from "phosphor-svelte/lib/ImageSquare";
+  import LinkSimpleHorizontalBreak from "phosphor-svelte/lib/LinkSimpleHorizontalBreak";
+  import { fly } from "svelte/transition";
+  let width = $state(1024);
+  let height = $state(768);
+</script>
+<Popover.Root>
+  <Popover.Trigger
+    class="rounded-input bg-dark
+ text-background shadow-mini hover:bg-dark/95 inline-flex h-10 select-none items-center justify-center whitespace-nowrap px-[21px] text-[15px] font-medium transition-all hover:cursor-pointer active:scale-[0.98]"
+  >
+    Resize
+  </Popover.Trigger>
+  <Popover.Portal>
+    <Popover.Content
+      class="border-dark-10 bg-background shadow-popover z-30 w-full max-w-[328px] rounded-[12px] border p-4"
+      sideOffset={8}
+      forceMount
+    >
+      {#snippet child({ wrapperProps, props, open })}
+        {#if open}
+          <div {...wrapperProps}>
+            <div {...props} transition:fly={{ duration: 300 }}>
+              <div class="flex items-center">
+                <div
+                  class="bg-muted mr-3 flex size-12 items-center justify-center rounded-full"
+                >
+                  <ImageSquare class="size-6" />
+                </div>
+                <div class="flex flex-col">
+                  <h4
+                    class="text-[17px] font-semibold leading-5 tracking-[-0.01em]"
+                  >
+                    Resize image
+                  </h4>
+                  <p class="text-muted-foreground text-sm font-medium">
+                    Resize your photos easily
+                  </p>
+                </div>
+              </div>
+              <Separator.Root
+                class="bg-dark-10 -mx-4 mb-6 mt-[17px] block h-px"
+              />
+              <div class="flex items-center pb-2">
+                <div class="mr-2 flex items-center">
+                  <div class="relative mr-2">
+                    <span class="sr-only">Width</span>
+                    <span
+                      aria-hidden="true"
+                      class="text-xxs text-muted-foreground absolute left-5 top-4"
+                      >W</span
+                    >
+                    <input
+                      type="number"
+                      class="h-input rounded-10px border-border-input bg-background text-foreground w-[119px] border pl-10 pr-2 text-base sm:text-sm"
+                      bind:value={width}
+                    />
+                  </div>
+                  <div class="relative">
+                    <span class="sr-only">Height</span>
+                    <span
+                      aria-hidden="true"
+                      class="text-xxs text-muted-foreground absolute left-5 top-4"
+                      >H</span
+                    >
+                    <input
+                      type="number"
+                      class="h-input rounded-10px border-border-input bg-background text-foreground w-[119px] border pl-10 pr-2 text-base sm:text-sm"
+                      bind:value={height}
+                    />
+                  </div>
+                </div>
+                <Toggle.Root
+                  aria-label="toggle constrain portions"
+                  class="bg-background hover:bg-muted data-[state=on]:bg-muted inline-flex size-10 items-center justify-center rounded-[9px] transition-all active:scale-[0.98]"
+                >
+                  <LinkSimpleHorizontalBreak class="size-6" />
+                </Toggle.Root>
+              </div>
+            </div>
+          </div>
+        {/if}
+      {/snippet}
+    </Popover.Content>
+  </Popover.Portal>
+</Popover.Root>
+```
+
+## API Reference
+
+### Popover.Root
+
+The root component used to manage the state of the state of the popover.
+
+| Property                                                                                     | Type                                                                                                                                                                                                            | Description                                                                                                                      | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open` $bindable | `boolean`                                                                                                                                                                                      | The open state of the component.`Default: false`                                                                   |                                      |
+| `onOpenChange`                                             | `function`- (open: boolean) =\&gt; void | A callback function called when the open state changes.`Default:  undefined`                                    |                                      |
+| `onOpenChangeComplete`                                     | `function`- (open: boolean) =\&gt; void | A callback function called after the open state changes and all animations have completed.`Default:  undefined` |                                      |
+| `children`                                                 | `Snippet`                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                            |  |
+
+| Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ### Popover.Trigger
+
+A component which toggles the opening and closing of the popover on press.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                            | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                     | Value                                                                                                                                                                                              | Description                                   | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'open' \| 'closed' | Whether the popover is open or closed. |                                      |
+| `data-popover-trigger`                    | `''`                                                                                                                                                                              | Present on the trigger element.        |  |
+
+### Popover.Content
+
+The contents of the popover which are displayed when the popover is open.
+
+| Property                                                              | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                                                        | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `side` | `enum`- 'top' \| 'bottom' \| 'left' \| 'right'                                                                                                                                                                                                                                                                                                                                                                                                                                     | The preferred side of the anchor to render the floating element against when open. Will be reversed when collisions occur.`Default: 'bottom'`                                                                                                                                                                                                                                                                                        |                                        |
+| `sideOffset`                        | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The distance in pixels from the anchor to the floating element.`Default: 0`                                                                                                                                                                                                                                                                                                                                                          |                                        |
+| `align`                             | `enum`- 'start' \| 'center' \| 'end'                                                                                                                                                                                                                                                                                                                                                                                                                                               | The preferred alignment of the anchor to render the floating element against when open. This may change when collisions occur.`Default: 'start'`                                                                                                                                                                                                                                                                                     |                                        |
+| `alignOffset`                       | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The distance in pixels from the anchor to the floating element.`Default: 0`                                                                                                                                                                                                                                                                                                                                                          |                                        |
+| `arrowPadding`                      | `number`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The amount in pixels of virtual padding around the viewport edges to check for overflow which will cause a collision.`Default: 0`                                                                                                                                                                                                                                                                                                    |                                        |
+| `avoidCollisions`                   | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | When `true`, overrides the `side` and `align` options to prevent collisions with the boundary edges.`Default: true`                                                                                                                                                                                                                                                                                                                  |                                       |
+| `collisionBoundary`                 | `union`- Element \| null                                                                                                                                                                                                                                                                                                                                                                                                                                                         | A boundary element or array of elements to check for collisions against.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                     |                                      |
+| `collisionPadding`                  | `union`- number \| Partial\&lt;Record\&lt;Side, number\&gt;\&gt;                                                                                                                                                                                                                                                                                                                                                                                                                 | The amount in pixels of virtual padding around the viewport edges to check for overflow which will cause a collision.`Default: 0`                                                                                                                                                                                                                                                                                                    |                                      |
+| `sticky`                            | `enum`- 'partial' \| 'always'                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The sticky behavior on the align axis. `'partial'` will keep the content in the boundary as long as the trigger is at least partially in the boundary whilst `'always'` will keep the content in the boundary regardless.`Default: 'partial'`                                                                                                                                                                                        |                                      |
+| `hideWhenDetached`                  | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | When `true`, hides the content when it is detached from the DOM. This is useful for when you want to hide the content when the user scrolls away.`Default: true`                                                                                                                                                                                                                                                                     |                                      |
+| `updatePositionStrategy`            | `enum`- 'optimized' \| 'always'                                                                                                                                                                                                                                                                                                                                                                                                                                                  | The strategy to use when updating the position of the content. When `'optimized'` the content will only be repositioned when the trigger is in the viewport. When `'always'` the content will be repositioned whenever the position changes.`Default: 'optimized'`                                                                                                                                                                   |                                      |
+| `strategy`                          | `enum`- 'fixed' \| 'absolute'                                                                                                                                                                                                                                                                                                                                                                                                                                                    | The positioning strategy to use for the floating element. When `'fixed'` the element will be positioned relative to the viewport. When `'absolute'` the element will be positioned relative to the nearest positioned ancestor.`Default: 'fixed'`                                                                                                                                                                                    |                                      |
+| `preventScroll`                     | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | When `true`, prevents the body from scrolling when the content is open. This is useful when you want to use the content as a modal.`Default: false`                                                                                                                                                                                                                                                                                  |                                      |
+| `customAnchor`                      | `union`- string \| HTMLElement \| Measurable \| null                                                                                                                                                                                                                                                                                                                                                                                                                             | Use an element other than the trigger to anchor the content to. If provided, the content will be anchored to the provided element instead of the trigger.`Default: null`                                                                                                                                                                                                                                                             |                                      |
+| `onInteractOutside`                 | `function`- (event: PointerEvent) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                    | Callback fired when an outside interaction event occurs, which is a `pointerdown` event. You can call `event.preventDefault()` to prevent the default behavior of handling the outside interaction.`Default:  undefined`                                                                                                                                                                                                          |                                      |
+| `onFocusOutside`                    | `function`- (event: FocusEvent) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                      | Callback fired when focus leaves the dismissible layer. You can call `event.preventDefault()` to prevent the default behavior on focus leaving the layer.`Default:  undefined`                                                                                                                                                                                                                                                    |                                      |
+| `interactOutsideBehavior`           | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                                                                                                                                                                                                                                                                                                                                                                                               | The behavior to use when an interaction occurs outside of the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'`  |                                      |
+| `onEscapeKeydown`                   | `function`- (event: KeyboardEvent) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                   | Callback fired when an escape keydown event occurs in the floating content. You can call `event.preventDefault()` to prevent the default behavior of handling the escape keydown event.`Default:  undefined`                                                                                                                                                                                                                      |                                      |
+| `escapeKeydownBehavior`             | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'                                                                                                                                                                                                                                                                                                                                                                                               | The behavior to use when an escape keydown event occurs in the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'` |                                      |
+| `onOpenAutoFocus`                   | `function`- (event: Event) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                           | Event handler called when auto-focusing the content as it is opened. Can be prevented.`Default:  undefined`                                                                                                                                                                                                                                                                                                                       |                                      |
+| `onCloseAutoFocus`                  | `function`- (event: Event) =\&gt; void                                                                                                                                                                                                                                                                                                                                                                                                                                           | Event handler called when auto-focusing the content as it is closed. Can be prevented.`Default:  undefined`                                                                                                                                                                                                                                                                                                                       |                                      |
+| `trapFocus`                         | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Whether or not to trap the focus within the content when open.`Default: true`                                                                                                                                                                                                                                                                                                                                                        |                                      |
+| `preventOverflowTextSelection`      | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | When `true`, prevents the text selection from overflowing the bounds of the element.`Default: true`                                                                                                                                                                                                                                                                                                                                  |                                      |
+| `forceMount`                        | `boolean`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false`                                                                                                                                                                                                                                                                   |                                      |
+| `dir`                               | `enum`- 'ltr' \| 'rtl'                                                                                                                                                                                                                                                                                                                                                                                                                                                           | The reading direction of the app.`Default: 'ltr'`                                                                                                                                                                                                                                                                                                                                                                                    |                                      |
+| `ref` $bindable        | `HTMLDivElement`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                                                                                                                                                                                                    |                                      |
+| `children`                          | `Snippet`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | The children content to render.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                                                              |                                      |
+| `child`                             | `Snippet`- type ChildSnippetProps = \&#123; /\*\* \* Props for the positioning wrapper \* Do not style this element - \* styling should be applied to the content element \*/ wrapperProps: Record\&lt;string, unknown\&gt;; /\*\* \* Props for your content element \* Apply your custom styles here \*/ props: Record\&lt;string, unknown\&gt;; /\*\* \* Content visibility state \* Use this for conditional rendering with \* Svelte transitions \*/ open: boolean; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                                                                                                                                                                                                        |  | | Data Attribute                     | Value                                                                                                                                                                                                | Description                                   | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'open' \| 'closed' | Whether the popover is open or closed. |                                      |
+| `data-popover-content`                    | `''`                                                                                                                                                                                | Present on the content element.        |  |
+
+| CSS Variable                                                    | Description                                                         | Details                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--bits-popover-content-transform-origin` | The transform origin of the content element. |                                      |
+| `--bits-popover-content-available-width`                               | The available width of the content element.  |                                      |
+| `--bits-popover-content-available-height`                              | The available height of the content element. |                                      |
+| `--bits-popover-anchor-width`                                          | The width of the anchor element.             |                                      |
+| `--bits-popover-anchor-height`                                         | The height of the anchor element.            |  |
+
+### Popover.ContentStatic
+
+The contents of the popover which are displayed when the popover is open. (Static/No Floating UI)
+
+| Property                                                                           | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                        | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onInteractOutside` | `function`- (event: PointerEvent) =\&gt; void                                           | Callback fired when an outside interaction event occurs, which is a `pointerdown` event. You can call `event.preventDefault()` to prevent the default behavior of handling the outside interaction.`Default:  undefined`                                                                                                                                                                                                          |                                      |
+| `onFocusOutside`                                 | `function`- (event: FocusEvent) =\&gt; void                                             | Callback fired when focus leaves the dismissible layer. You can call `event.preventDefault()` to prevent the default behavior on focus leaving the layer.`Default:  undefined`                                                                                                                                                                                                                                                    |                                      |
+| `interactOutsideBehavior`                        | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'      | The behavior to use when an interaction occurs outside of the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'`  |                                      |
+| `onEscapeKeydown`                                | `function`- (event: KeyboardEvent) =\&gt; void                                          | Callback fired when an escape keydown event occurs in the floating content. You can call `event.preventDefault()` to prevent the default behavior of handling the escape keydown event.`Default:  undefined`                                                                                                                                                                                                                      |                                      |
+| `escapeKeydownBehavior`                          | `enum`- 'close' \| 'ignore' \| 'defer-otherwise-close' \| 'defer-otherwise-ignore'      | The behavior to use when an escape keydown event occurs in the floating content. `'close'` will close the content immediately. `'ignore'` will prevent the content from closing. `'defer-otherwise-close'` will defer to the parent element if it exists, otherwise it will close the content. `'defer-otherwise-ignore'` will defer to the parent element if it exists, otherwise it will ignore the interaction.`Default: 'close'` |                                      |
+| `onOpenAutoFocus`                                | `function`- (event: Event) =\&gt; void                                                  | Event handler called when auto-focusing the content as it is opened. Can be prevented.`Default:  undefined`                                                                                                                                                                                                                                                                                                                       |                                      |
+| `onCloseAutoFocus`                               | `function`- (event: Event) =\&gt; void                                                  | Event handler called when auto-focusing the content as it is closed. Can be prevented.`Default:  undefined`                                                                                                                                                                                                                                                                                                                       |                                      |
+| `trapFocus`                                      | `boolean`                                                                                                                                                                                                                                        | Whether or not to trap the focus within the content when open.`Default: true`                                                                                                                                                                                                                                                                                                                                                        |                                      |
+| `preventOverflowTextSelection`                   | `boolean`                                                                                                                                                                                                                                        | When `true`, prevents the text selection from overflowing the bounds of the element.`Default: true`                                                                                                                                                                                                                                                                                                                                  |                                      |
+| `preventScroll`                                  | `boolean`                                                                                                                                                                                                                                        | When `true`, prevents the body from scrolling when the content is open. This is useful when you want to use the content as a modal.`Default: false`                                                                                                                                                                                                                                                                                  |                                      |
+| `forceMount`                                     | `boolean`                                                                                                                                                                                                                                        | Whether or not to forcefully mount the content. This is useful if you want to use Svelte transitions or another animation library for the content.`Default: false`                                                                                                                                                                                                                                                                   |                                      |
+| `dir`                                            | `enum`- 'ltr' \| 'rtl'                                                                  | The reading direction of the app.`Default: 'ltr'`                                                                                                                                                                                                                                                                                                                                                                                    |                                      |
+| `ref` $bindable                     | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                                                                                                                                                                                                                                                                                                                    |                                      |
+| `children`                                       | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                                                                                                                                                                                                                                                                                                              |                                      |
+| `child`                                          | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined`                                                                                                                                                                                                                                                                                        |  | | Data Attribute                     | Value                                                                                                                                                                                                | Description                                   | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-state` | `enum`- 'open' \| 'closed' | Whether the popover is open or closed. |                                      |
+| `data-popover-content`                    | `''`                                                                                                                                                                                | Present on the content element.        |  |
+
+### Popover.Close
+
+A button which closes the popover when pressed and is typically placed in the content.
+
+| Property                                                                                    | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref` $bindable | `HTMLButtonElement`                                                                                                                                                                                                                              | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                                | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                                   | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                             | Value                 | Description                         | Details                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-popover-close` | `''` | Present on the close button. |  |
+
+### Popover.Arrow
+
+An optional arrow element which points to the trigger when the popover is open.
+
+| Property                                                               | Type                                                                                                                                                                                                                                                              | Description                                                                                                                                                 | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `width` | `number`                                                                                                                                                                                                                                         | The width of the arrow in pixels.`Default: 8`                                                                                                 |                                      |
+| `height`                             | `number`                                                                                                                                                                                                                                         | The height of the arrow in pixels.`Default: 8`                                                                                                |                                      |
+| `ref` $bindable         | `HTMLDivElement`                                                                                                                                                                                                                                 | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                           | `Snippet`                                                                                                                                                                                                                                        | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                              | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                     | Value                 | Description                          | Details                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-arrow` | `''` | Present on the arrow element. |                                      |
+| `data-popover-arrow`                      | `''` | Present on the arrow element. |  |
+
+### Popover.Portal
+
+When used, will render the popover content into the body or custom `to` element when open
+
+| Property                                                            | Type                                                                                                                                                                                                 | Description                                                                                                                                    | Details                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `to` | `union`- Element \| string | Where to render the content when it is open. Defaults to the body.`Default: document.body`                                       |                                      |
+| `disabled`                        | `boolean`                                                                                                                                                                           | Whether the portal is disabled or not. When disabled, the content will be rendered in its original DOM location.`Default: false` |                                      |
+| `children`                        | `Snippet`                                                                                                                                                                           | The children content to render.`Default:  undefined`                                                                          |  |
+
+| Data Attribute | Value | Description | Details |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |

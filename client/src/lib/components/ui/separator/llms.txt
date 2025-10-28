@@ -1,0 +1,61 @@
+# Separator Documentation
+
+Visually separates content or UI elements for clarity and organization.
+
+This is a documentation section that potentially contains examples, demos, and other useful information related to a specific part of Bits UI. When helping users with this documentation, you can ignore the classnames applied to the demos unless they are relevant to the user's issue.
+
+```svelte
+<script lang="ts">
+  import { Separator } from "bits-ui";
+</script>
+<div>
+  <div class="space-y-1">
+    <h4 class="font-semibold">Bits UI</h4>
+    <p class="text-muted-foreground text-sm">
+      Headless UI components for Svelte.
+    </p>
+  </div>
+  <Separator.Root
+    class="bg-border my-4 shrink-0 data-[orientation=horizontal]:h-px data-[orientation=vertical]:h-full data-[orientation=horizontal]:w-full data-[orientation=vertical]:w-[1px]"
+  />
+  <div class="flex h-5 items-center space-x-4 text-sm">
+    <div>Blog</div>
+    <Separator.Root
+      orientation="vertical"
+      class="bg-border my-4 shrink-0 data-[orientation=horizontal]:h-px data-[orientation=vertical]:h-full data-[orientation=horizontal]:w-full data-[orientation=vertical]:w-[1px]"
+    />
+    <div>Docs</div>
+    <Separator.Root
+      orientation="vertical"
+      class="bg-border my-4 shrink-0 data-[orientation=horizontal]:h-px data-[orientation=vertical]:h-full data-[orientation=horizontal]:w-full data-[orientation=vertical]:w-[1px]"
+    />
+    <div>Source</div>
+  </div>
+</div>
+```
+
+## Structure
+
+```svelte
+<script lang="ts">
+  import { Separator } from "bits-ui";
+</script>
+<Separator.Root />
+```
+
+## API Reference
+
+### Separator.Root
+
+An element used to separate content.
+
+| Property                                                                     | Type                                                                                                                                                                                                                                                            | Description                                                                                                                                                 | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `orientation` | `enum`- 'horizontal' \| 'vertical'                                                      | The orientation of the separator.`Default: 'horizontal'`                                                                                      |                                      |
+| `decorative`                               | `boolean`                                                                                                                                                                                                                                      | Whether the separator is decorative or not, which will determine if it is announced by screen readers.`Default: false`                        |                                      |
+| `ref` $bindable               | `HTMLDivElement`                                                                                                                                                                                                                               | The underlying DOM element being rendered. You can bind to this to get a reference to the element.`Default: null`                             |                                      |
+| `children`                                 | `Snippet`                                                                                                                                                                                                                                      | The children content to render.`Default:  undefined`                                                                                       |                                      |
+| `child`                                    | `Snippet`- type SnippetProps = \&#123; props: Record\&lt;string, unknown\&gt;; \&#125;; | Use render delegation to render your own element. See [Child Snippet](/docs/child-snippet) docs for more information.`Default:  undefined` |  | | Data Attribute                           | Value                                                                                                                                                                                                      | Description                              | Details                                                                                                                                                                                      |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-orientation` | `enum`- 'horizontal' \| 'vertical' | The orientation of the separator. |                                      |
+| `data-separator-root`                           | `''`                                                                                                                                                                                      | Present on the root element.      |  |

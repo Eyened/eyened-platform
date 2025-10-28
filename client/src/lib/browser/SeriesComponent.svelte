@@ -1,49 +1,30 @@
 <script lang="ts">
-	import type { Series } from '$lib/datamodel/series';
-	import InstanceComponent from './InstanceComponent.svelte';
+	import { instanceMetas } from "$lib/data";
+	import type { SeriesGET } from "../../types/openapi_types";
+	import InstanceComponent from "./InstanceComponent.svelte";
 
 	interface Props {
-		series: Series;
-		laterality: 'L' | 'R' | null;
+		series: SeriesGET;
+		laterality: "L" | "R" | null;
 		showSegmentationInfo?: boolean;
 	}
-
 	let { series, laterality, showSegmentationInfo = true }: Props = $props();
 
-	const { instances } = series;
-    
-	const filtered = instances
-		.filter((instance) => instance.laterality == laterality)
-		.sort((a, b) => a.id - b.id);
+	const instances =
+		series.instance_ids
+			?.map((id) => instanceMetas.get(id))
+			.filter((inst) => inst && inst.laterality == laterality)
+			.filter((inst): inst is NonNullable<typeof inst> => inst !== undefined) ?? [];
 </script>
 
-{#if $filtered.length}
-	<div class="series">
-		<div class="items">
-			{#each $filtered as instance}
+{#if instances.length}
+	<div
+		class="series flex flex-col bg-[var(--browser-background)] border border-[var(--browser-border)] rounded-[2px] flex-[0_1_auto] m-[0.1em]"
+	>
+		<div class="items flex flex-1 flex-row flex-wrap gap-[0.3em]">
+			{#each instances as instance (instance.id)}
 				<InstanceComponent {instance} {showSegmentationInfo} />
 			{/each}
 		</div>
 	</div>
 {/if}
-
-<style>
-	div {
-		display: flex;
-	}
-	.series {
-		flex-direction: column;
-		background-color: var(--browser-background);
-		border: 1px solid var(--browser-border);
-		border-radius: 2px;
-		flex: 0 1 auto;
-		margin: 0.1em;
-	}
-	.items {
-		display: flex;
-		flex: 1;
-		flex-direction: row;
-		flex-wrap: wrap;
-		gap: 0.3em;
-	}
-</style>

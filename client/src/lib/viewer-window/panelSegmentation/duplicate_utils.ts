@@ -1,16 +1,17 @@
 import type { Datatype } from "$lib/datamodel/segmentation.svelte";
 
+import type { GlobalContext } from "$lib/data/globalContext.svelte";
+import type { DataRepresentation, SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
 import { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import type { DataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import { convert } from "$lib/webgl/segmentationConverter";
-import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 import { NPYArray } from "$lib/utils/npy_loader";
-import type { DrawingArray } from "$lib/webgl/mask.svelte";
-import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import type { Creator } from "$lib/datamodel/creator.svelte";
+import type { DrawingArray } from "$lib/webgl/mask.svelte";
+import { convert } from "$lib/webgl/segmentationConverter";
+import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+import { createSegmentation } from "$lib/data/api";
 
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
     Q: "DualBitMask",
@@ -40,19 +41,20 @@ function createArray(
 function copyMaskData(
     indices: number[],
     segmentationItem: SegmentationItem,
-    segmentation: Segmentation,
+    segmentation: SegmentationGET | ModelSegmentationGET,
     dataRepresentation: DataRepresentation,
     array: NPYArray,
-    image: AbstractImage
+    image: AbstractImage,
+    originalThreshold: number
 ) {
     for (let i = 0; i < indices.length; i++) {
         const mask = segmentationItem.getMask(indices[i]);
         if (mask) {
             const data = mask.exportData();
-            const threshold = 255 * (segmentation.threshold ?? 0.5);
+            const threshold = 255 * originalThreshold;
             const dataConverted = convert(
                 data,
-                segmentation.dataRepresentation as SimpleDataRepresentation,
+                segmentation.data_representation as SimpleDataRepresentation,
                 dataRepresentation as SimpleDataRepresentation,
                 threshold,
             );
@@ -65,76 +67,76 @@ function copyMaskData(
 }
 
 export async function duplicate(globalContext: GlobalContext,
-    segmentation: Segmentation, segmentationItem: SegmentationItem,
+    segmentation: SegmentationGET | ModelSegmentationGET,
+    segmentationItem: SegmentationItem,
     image: AbstractImage,
     viewerContext: ViewerContext,
     duplicateVolume: boolean,
     type: "Q" | "B" | "P",
-    creator: Creator) {
+    originalThreshold: number,
+    newThreshold: number, 
+    taskContext?: TaskContext) {
     globalContext.dialogue = `Duplicating segmentation ${segmentation.id}...`;
 
-    let dataRepresentation: DataRepresentation;
+    let data_representation: DataRepresentation;
     if (
-        segmentation.dataRepresentation == "MultiClass" ||
-        segmentation.dataRepresentation == "MultiLabel"
+        segmentation.data_representation == "MultiClass" ||
+        segmentation.data_representation == "MultiLabel"
     ) {
         // same as original annotation type
-        dataRepresentation = segmentation.dataRepresentation;
+        data_representation = segmentation.data_representation;
     } else {
         // new annotation can be of different type
-        dataRepresentation = types[type];
+        data_representation = types[type];
     }
 
-    let dataType = segmentation.dataType;
-    if (dataRepresentation == "Probability") {
-        dataType = "R8";
+    let data_type = segmentation.data_type;
+    if (data_representation == "Probability") {
+        data_type = "R8";
     }
     const item = {
         ...segmentation,
-        dataRepresentation,
-        dataType,
-        // properties that need to be mentioned explicitly, because they're marked with $state and hence not enumerable
-        referenceId: segmentation.referenceId,
-        scanIndices: segmentation.scanIndices,
-        threshold: segmentation.threshold,
-
-        // overwrite creatorId to current user
-        creatorId: creator.id,
+        threshold: newThreshold,
+        feature_id: segmentation.feature.id,        
+        data_representation,
+        data_type,
+        subtask_id: taskContext?.subTask.id ?? null,
     };
 
     const scanNr = viewerContext.index;
 
     let depth = 1;
     if (duplicateVolume) {
-        if (segmentation.scanIndices) {
+        if (segmentation.scan_indices) {
             // only upload the data for active scan indices
-            depth = segmentation.scanIndices.length;
+            depth = segmentation.scan_indices.length;
         } else {
             // upload the full volume
             depth = image.depth;
         }
     } else if (image.is3D) {
         // only duplicate the current scan
-        item.scanIndices = [scanNr];
+        item.scan_indices = [scanNr];
     }
 
     const array = createArray(
         [depth, image.height, image.width],
-        segmentation.dataType,
+        segmentation.data_type,
     );
     if (image.image_id.endsWith("proj")) {
         array.shape = [image.height, 1, image.width];
     }
 
-    if (item.scanIndices) {
+    if (item.scan_indices) {
         // sparse volume
         copyMaskData(
-            item.scanIndices,
+            item.scan_indices,
             segmentationItem,
             segmentation,
-            dataRepresentation,
+            data_representation,
             array,
-            image
+            image,
+            originalThreshold
         );
     } else {
         // full volume
@@ -143,13 +145,14 @@ export async function duplicate(globalContext: GlobalContext,
             indices,
             segmentationItem,
             segmentation,
-            dataRepresentation,
+            data_representation,
             array,
-            image
+            image,
+            originalThreshold
         );
     }
-    const newSegmentation = await Segmentation.create(item, array);
-    console.log("newSegmentation", newSegmentation);
+    const newSegmentation = await createSegmentation(item, array);
 
     globalContext.dialogue = null;
+    return newSegmentation;
 }

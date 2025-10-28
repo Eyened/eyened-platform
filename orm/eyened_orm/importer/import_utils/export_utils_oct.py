@@ -47,7 +47,7 @@ def get_all_etrds_grids(session, instance: ImageInstance, creatorname=None):
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
                     Segmentation.Inactive == None))
     if creatorname is not None:
-        query = query.join(Creator).where(Creator.CreatorName == creatorname)
+        query = query.join(creator).where(creator.CreatorName == creatorname)
     return session.execute(query).scalars().all()
 
 def get_all_fovea_segmentations(session, instance: ImageInstance, creatorname=None):
@@ -58,7 +58,7 @@ def get_all_fovea_segmentations(session, instance: ImageInstance, creatorname=No
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
                     Segmentation.Inactive == None))
     if creatorname is not None:
-        query = query.join(Creator).where(Creator.CreatorName == creatorname)
+        query = query.join(creator).where(creator.CreatorName == creatorname)
     return session.execute(query).scalars().all()
 
 def fovea_x_from_segmentation(annotation):

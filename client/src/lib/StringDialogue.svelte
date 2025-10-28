@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { Button } from "./components/ui/button/index.js";
+
     export interface Props {
         query: string;
         approve: string;
@@ -30,6 +32,6 @@
 </div>
 
 <div class="popup-footer">
-    <button onclick={_resolve}>{approve}</button>
-    <button onclick={_reject}>{decline}</button>
+    <Button variant="outline" onclick={_resolve}>{approve}</Button>
+    <Button variant="outline" onclick={_reject}>{decline}</Button>
 </div>

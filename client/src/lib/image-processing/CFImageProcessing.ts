@@ -10,12 +10,30 @@ import { claheWorker } from './clahe-worker-api';
 import { TextureData } from '$lib/webgl/texture';
 import fs_standardize from './shaders/standardize.frag';
 import fs_lut from './shaders/lut.frag';
+
 export type ceOptions = {
     resolution?: number;
     sigma?: number;
     contrast?: number;
 }
 type Histogram = { r: Int32Array, g: Int32Array, b: Int32Array };
+
+type ROI = {
+    center: [number, number];
+    radius: number;
+    min_x: number;
+    max_x: number;
+    min_y: number;
+    max_y: number;
+    lines: {
+        top?: [[number, number], [number, number]]
+        bottom?: [[number, number], [number, number]]
+        left?: [[number, number], [number, number]]
+        right?: [[number, number], [number, number]]
+    }
+    w: number;
+    h: number;
+}
 
 export class CFImageProcessing {
     mirrorShader: PixelShaderProgram;
@@ -76,7 +94,8 @@ export class CFImageProcessing {
     }
 
     private mirroring(image: Image2D): WebGLTexture {
-        const { webgl, width, height, instance: { cfROI } } = image;
+        const { webgl, width, height, instance } = image;
+        const cfROI = instance.cf_roi;
 
         const buffer_mirrored = new TextureData(webgl.gl, width, height, 'RGBA');
 
@@ -94,7 +113,7 @@ export class CFImageProcessing {
         let lines: Lines = {};
         try {
             if (cfROI) {
-                ({ center: [cx, cy], radius, lines } = cfROI);
+                ({ center: [cx, cy], radius, lines } = cfROI as ROI);
             }
         } catch (e) {
             console.warn('Error in cfROI', e);

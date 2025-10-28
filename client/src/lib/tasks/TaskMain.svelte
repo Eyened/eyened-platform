@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import type { TaskContext } from "$lib/types";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
     import { getContext, setContext } from "svelte";
 
@@ -10,7 +10,7 @@
 
     globalContext.updateConfig(taskContext.taskConfig);
 
-    const instanceIDs = taskContext.subTask.instances.map(instance => instance.id);
+    const instanceIDs = taskContext.subTask.images.map(image => image.id);
 </script>
 
-<ViewerWindowLoader instanceIDs={$instanceIDs} />
+<ViewerWindowLoader instanceIDs={instanceIDs} />

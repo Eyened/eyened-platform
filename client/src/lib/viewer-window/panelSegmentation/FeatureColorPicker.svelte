@@ -1,48 +1,46 @@
 <script lang="ts">
-    import { fromHex, toHex } from "$lib/utils";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+	import { fromHex, toHex } from "$lib/utils";
+	import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 
-    import { getContext } from "svelte";
-    import PanelIcon from "../icons/PanelIcon.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+	import { getContext } from "svelte";
+	import PanelIcon from "../icons/PanelIcon.svelte";
+	import { type Segmentation } from "./segmentationContext.svelte";
 
-    interface Props {
-        segmentation: Segmentation;
-    }   
-    let { segmentation }: Props = $props();
+	interface Props {
+		segmentation: Segmentation;
+	}
+	let { segmentation }: Props = $props();
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
-    );
+	const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
 
-    let currentColor = $state("");
+	let currentColor = $state(
+		toHex(mainViewerContext.getFeatureColor(segmentation)),
+	);
 
-    currentColor = toHex(segmentationOverlay.getFeatureColor(segmentation));
-    function handleColorChange(e) {
-        const newColor = e.target.value;
-        segmentationOverlay.setFeatureColor(segmentation, fromHex(newColor));
-        currentColor = newColor;
-    }
+	function handleColorChange(e: Event) {
+		const newColor = (e.target as HTMLInputElement).value;
+		mainViewerContext.setFeatureColor(segmentation, fromHex(newColor));
+		currentColor = newColor;
+	}
 </script>
 
 <PanelIcon tooltip="Change color">
-    <label class="tool">
-        <i class="color-picker" style="background-color: {currentColor};"></i>
-        <input type="color" value={currentColor} oninput={handleColorChange} />
-    </label>
+	<label class="tool">
+		<i class="color-picker" style="background-color: {currentColor};"></i>
+		<input type="color" value={currentColor} oninput={handleColorChange} />
+	</label>
 </PanelIcon>
 
 <style>
-    input {
-        visibility: hidden;
-        position: absolute;
-    }
-    i.color-picker {
-        cursor: pointer;
-        width: 1.2em;
-        height: 1.2em;
-        margin: 0.1em;
-        border-radius: 50%;
-        display: flex;
-    }
+	input {
+		visibility: hidden;
+		position: absolute;
+	}
+	i.color-picker {
+		cursor: pointer;
+		width: 1.2em;
+		height: 1.2em;
+		border-radius: 50%;
+		display: flex;
+	}
 </style>

@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import date
-from typing import Optional, Mapping
+from typing import Optional, Union, Mapping, Any
 from pathlib import Path
+import os
 
 
 @dataclass
@@ -17,79 +18,96 @@ class DatabaseSettings:
 @dataclass
 class EyenedORMConfig:
     database: DatabaseSettings
-    secret_key: str = ""
-    images_basepath: str = "/images"
-    segmentations_zarr_store: str = "/storage/segmentations.zarr"
-    thumbnails_path: str = "/storage/thumbnails"
-    annotations_path: str = "/storage/annotations"
-    default_study_date: Optional[date] = date(1970, 1, 1)
-    cfi_cache_path: Optional[str] = None
-    image_server_url: Optional[str] = None
+    secret_key: str
+    images_basepath: Path
+    segmentations_zarr_store: Path
+    thumbnails_path: Path
+    annotations_path: Path
+    default_study_date: Optional[date]
+    cfi_cache_path: Optional[Path]
+    image_server_url: Optional[str]
 
 
-def _require(env: Mapping[str, str], key: str) -> str:
-    if key not in env or env[key] in (None, ""):
-        raise ValueError(f"Missing required environment key: {key}")
-    return env[key]
+def _parse_int(value):
+    return int(value) if value is not None else None
 
 
-def load_config_from_environ(env: Mapping[str, str]) -> EyenedORMConfig:
-    db_user = _require(env, "DATABASE_USER")
-    db_password = _require(env, "DATABASE_PASSWORD")
-    db_host = _require(env, "DATABASE_HOST")
-    db_name = _require(env, "DATABASE_NAME")
-    db_port_raw = _require(env, "DATABASE_PORT")
-    secret_key = _require(env, "SECRET_KEY")
+def _parse_bool(value):
+    if value is None:
+        return None
+    return str(value).lower() in ("true", "1", "yes", "on")
 
-    try:
-        db_port = int(db_port_raw)
-    except ValueError:
-        raise ValueError(f"DATABASE_PORT must be an integer, got: {db_port_raw}")
 
-    database = DatabaseSettings(
-        user=db_user,
-        password=db_password,
-        host=db_host,
-        database=db_name,
-        port=db_port,
-    )
+def _parse_path(value):
+    return Path(value) if value is not None else None
 
-    images_basepath = env.get("IMAGES_BASEPATH", "/images")
-    segmentations_zarr_store = env.get("SEGMENTATIONS_ZARR_STORE", "/storage/segmentations.zarr")
-    thumbnails_path = env.get("THUMBNAILS_PATH", "/storage/thumbnails")
-    annotations_path = env.get("ANNOTATIONS_PATH", "/storage/annotations")
 
-    default_study_date_raw = env.get("DEFAULT_STUDY_DATE")
-    if default_study_date_raw:
-        try:
-            default_study_date = date.fromisoformat(default_study_date_raw)
-        except ValueError:
-            raise ValueError(
-                f"DEFAULT_STUDY_DATE must be YYYY-MM-DD, got: {default_study_date_raw}"
-            )
+def _parse_date(value):
+    return date.fromisoformat(value) if value is not None else None
+
+
+def load_config_dict_from_env(env: Mapping[str, str]) -> dict:
+    """Convert environment variables to a config dict structure."""
+    
+    def get_env(key: str, required: bool = True, default=None):
+        value = env.get(key)
+        if required and value is None:
+            raise ValueError(f"Missing required environment variable: {key}")
+        return value if value is not None else default
+    
+    return {
+        "database": {
+            "user": get_env("DATABASE_USER"),
+            "password": get_env("DATABASE_PASSWORD"),
+            "host": get_env("DATABASE_HOST"),
+            "database": get_env("DATABASE_NAME"),
+            "port": _parse_int(get_env("DATABASE_PORT")),
+            "raise_on_warnings": _parse_bool(get_env("DATABASE_RAISE_ON_WARNINGS", required=False, default="true")),
+        },
+        "secret_key": get_env("SECRET_KEY"),
+        "images_basepath": _parse_path(get_env("IMAGES_BASEPATH", required=False, default="/images")),
+        "segmentations_zarr_store": _parse_path(get_env("SEGMENTATIONS_ZARR_STORE", required=False, default="/storage/segmentations.zarr")),
+        "thumbnails_path": _parse_path(get_env("THUMBNAILS_PATH", required=False, default="/storage/thumbnails")),
+        "annotations_path": _parse_path(get_env("ANNOTATIONS_PATH", required=False, default="/storage/annotations")),
+        "default_study_date": _parse_date(get_env("DEFAULT_STUDY_DATE", required=False, default="1970-01-01")),
+        "cfi_cache_path": _parse_path(get_env("CFI_CACHE_PATH", required=False)),
+        "image_server_url": get_env("IMAGE_SERVER_URL", required=False),
+    }
+
+
+def load_config(source: Optional[Union[str, Path, Mapping[str, Any], dict]] = None) -> EyenedORMConfig:
+    """
+    Load EyenedORMConfig from various sources.
+    
+    Args:
+        source: Can be:
+            - None: Load from os.environ
+            - str/Path: Load from .env file
+            - Mapping (e.g. os.environ): Flat environment variables dict
+            - dict: Nested config dict (e.g. from YAML)
+    
+    Returns:
+        EyenedORMConfig instance
+    """
+    if source is None:
+        config_dict = load_config_dict_from_env(os.environ)
+    elif isinstance(source, (str, Path)):
+        from dotenv import dotenv_values
+        env_path = Path(source)
+        if not env_path.exists():
+            raise FileNotFoundError(f"Environment file not found: {env_path}")
+        env = {k: v for k, v in dotenv_values(dotenv_path=env_path).items() if v is not None}
+        config_dict = load_config_dict_from_env(env)
+    elif isinstance(source, (Mapping, dict)):
+        # Check if it's already a nested config dict (has 'database' key with nested dict)
+        if 'database' in source and isinstance(source.get('database'), dict):
+            config_dict = source  # Already structured as nested dict
+        else:
+            config_dict = load_config_dict_from_env(source)  # Flat env vars
     else:
-        default_study_date = date(1970, 1, 1)
-
-    cfi_cache_path = env.get("CFI_CACHE_PATH")
-    image_server_url = env.get("IMAGE_SERVER_URL")
-
+        raise ValueError(f"Invalid source type: {type(source)}")
+    
     return EyenedORMConfig(
-        database=database,
-        secret_key=secret_key,
-        images_basepath=images_basepath,
-        segmentations_zarr_store=segmentations_zarr_store,
-        thumbnails_path=thumbnails_path,
-        annotations_path=annotations_path,
-        default_study_date=default_study_date,
-        cfi_cache_path=cfi_cache_path,
-        image_server_url=image_server_url,
+        database=DatabaseSettings(**config_dict["database"]),
+        **{k: v for k, v in config_dict.items() if k != "database"}
     )
-
-
-def load_config_from_env_file(path: str | Path) -> EyenedORMConfig:
-    from dotenv import dotenv_values
-
-    values = dotenv_values(dotenv_path=Path(path))
-    # dotenv_values returns dict[str, str|None]; filter out None
-    filtered = {k: v for k, v in values.items() if v is not None}
-    return load_config_from_environ(filtered)

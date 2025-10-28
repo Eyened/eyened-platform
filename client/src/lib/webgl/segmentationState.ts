@@ -1,12 +1,14 @@
-import type { Segmentation, SimpleDataRepresentation, DataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import { encodeNpy } from "$lib/utils/npy_loader";
+import { getSegmentationData, getModelSegmentationData, updateSegmentationData } from "$lib/data/helpers";
+import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
+import type { ModelSegmentationGET, SegmentationGET, SegmentationDataRepresentation } from "../../types/openapi_types";
+import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
 import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
 
-type MaskConstructor = new (image: AbstractImage, segmentation: Segmentation) => Mask;
+type MaskConstructor = new (image: AbstractImage, segmentation: SegmentationGET) => Mask;
 export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'MultiClass' | 'MultiLabel', MaskConstructor> = {
     'Binary': BinaryMask,
     'DualBitMask': QuestionableMask,
@@ -25,12 +27,12 @@ export class SegmentationState {
 
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: Segmentation,
+        readonly segmentation: SegmentationGET | ModelSegmentationGET,
         readonly scanNr: number,
         initialData?: DrawingArray,
     ) {
-        this.mask = new constructors[segmentation.dataRepresentation](image, segmentation);
-        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.dataType, image.width, image.height));
+        this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
         if (initialData) {
             this.mask.importData(initialData);
             this.history.checkpoint(this.mask.exportData());
@@ -40,8 +42,17 @@ export class SegmentationState {
     }
 
     private async initialize() {
-        const array = await this.segmentation.loadData(this.scanNr);
-        this.mask.importData(array.data as DrawingArray);
+        // Load a single slice from the server
+        const sparse_axis = this.segmentation.sparse_axis ?? undefined;
+        const scan_nr = this.scanNr;
+        
+        let npyArray: NPYArray;
+        if (this.segmentation.annotation_type == 'model_segmentation') {
+            npyArray = await getModelSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
+        } else {
+            npyArray = await getSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
+        }
+        this.mask.importData(npyArray.data as DrawingArray);
         this.history.checkpoint(this.mask.exportData());
     }
 
@@ -56,11 +67,11 @@ export class SegmentationState {
 
         const data = other.exportData();
 
-        const thisType: DataRepresentation = this.segmentation.dataRepresentation;
-        const otherType: DataRepresentation = other.segmentation.dataRepresentation;
+        const thisType = this.segmentation.data_representation as SegmentationDataRepresentation;
+        const otherType = other.segmentation.data_representation as SegmentationDataRepresentation;
         const threshold = (255 * (other.segmentation.threshold ?? 0.5));
 
-        function isSimpleRepresentation(t: DataRepresentation): t is SimpleDataRepresentation {
+        function isSimpleRepresentation(t: SegmentationDataRepresentation): t is SimpleDataRepresentation {
             return t === 'Binary' || t === 'DualBitMask' || t === 'Probability';
         }
 
@@ -109,12 +120,9 @@ export class SegmentationState {
     updateServer() {
         const data = this.mask.exportData();
         const buffer = encodeNpy(data, [this.image.height, this.image.width]);
-        if (this.image.image_id.endsWith('proj')) {
-            return this.segmentation.updateData(null, buffer);
-        } else {
-            return this.segmentation.updateData(this.scanNr, buffer);
-        }
-
+        const sparse_axis = this.segmentation.sparse_axis ?? undefined;
+        const scan_nr = this.image.image_id.endsWith('proj') ? undefined : this.scanNr;
+        return updateSegmentationData(this.segmentation.id, buffer, { sparse_axis, scan_nr });
     }
 
     dispose() {

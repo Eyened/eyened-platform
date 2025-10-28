@@ -1,5 +1,6 @@
 <script lang="ts">
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
+    import { formSchemas } from "$lib/data/stores.svelte";
+    import type { FormAnnotationGET } from "../../types/openapi_types";
     import {
         getAffineTransforms,
         getPointsetRegistrations,
@@ -9,25 +10,25 @@
 
     interface Props {
         registration: Registration;
-        formAnnotation: FormAnnotation;
+        formAnnotation: FormAnnotationGET;
     }
     let { registration, formAnnotation }: Props = $props();
 
+    const formSchema = $derived(formSchemas.get(formAnnotation.form_schema_id));
+
     const update = (value: any) => {
-        if (value) {
-            if (formAnnotation.formSchema.name === "Pointset registration") {
+        if (value && formSchema) {
+            if (formSchema.name === "Pointset registration") {
                 const items = getPointsetRegistrations(value);
                 registration.importRegistrationItems(items);
-            } else if (
-                formAnnotation.formSchema.name === "Affine registration"
-            ) {
+            } else if (formSchema.name === "Affine registration") {
                 const items = getAffineTransforms(value);
                 registration.importRegistrationItems(items);
-            } else if (formAnnotation.formSchema.name === "RegistrationSet") {
+            } else if (formSchema.name === "RegistrationSet") {
                 const items = getRegistrationSets(value);
                 registration.importRegistrationItems(items);
             }
         }
     };
-    $effect(() => update(formAnnotation.value));
+    $effect(() => update(formAnnotation.form_data));
 </script>

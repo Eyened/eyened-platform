@@ -1,47 +1,50 @@
 <script lang="ts">
-    import SchemaForm from "$lib/forms/SchemaForm.svelte";
-    import { getDefault, resolveRefs } from "$lib/forms/schemaType";
-    import { onMount, setContext } from "svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
     import { browser } from "$app/environment";
+    import { formAnnotations, formSchemas, instances, setFormAnnotationValue, tagFormAnnotation, untagFormAnnotation } from "$lib/data";
+    import SchemaForm from "$lib/forms/SchemaForm.svelte";
+    import { getDefault, resolveRefs, type JSONSchema } from "$lib/forms/schemaType";
+    import { onMount } from "svelte";
+    import * as Tooltip from "../../components/ui/tooltip";
+    import Tagger from "../../tags/Tagger.svelte";
 
     interface Props {
-        form: FormAnnotation;
-        viewerContext: ViewerContext;
+        formId: number;
         canEdit: boolean;
     }
-    let { form, viewerContext, canEdit }: Props = $props();
-    setContext("viewerContext", viewerContext);
+    let { formId,  canEdit }: Props = $props();
+    
+    const form = $derived(formAnnotations.get(formId)!);
+    const instance = $derived(instances.get(form.image_instance_id!));
+    const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
+    const schema = $derived(resolveRefs(formSchema.schema as JSONSchema));
 
-    const schema = resolveRefs(form.formSchema.schema);
-
-    let value: any = $state();
-    let status = $state("loading");
-    onMount(async () => {
-        await form.load();
-        value = form.value;
-        status = "ready";
-        if (!value) {
-            value = getDefault(schema);
+    // Keep value as independent $state (not derived from form.form_data) to:
+    // 1. Prevent reactivity loops when updating the store
+    // 2. Allow future throttling/debouncing of save operations
+    // Value initializes from form ONCE on mount, then becomes independent for editing
+    let value: any = $state(undefined);
+    let status = $state("loaded");
+    
+    onMount(() => {
+        // Initialize value from form data once
+        value = form.form_data || getDefault(schema);
+        
+        // Debug logging
+        console.log('Form:', form);
+        if (!instance) {
+            console.error(`Instance ${form.image_instance_id} not found`);
         }
     });
+
 
     async function onchange() {
         if (!canEdit) return;
         if (value) {
             status = "saving";
-            await form.update({ value });
+            await setFormAnnotationValue(form.id, value);
             status = "synced";
         }
     }
-
-    const laterality =
-        form.instance?.laterality === "L"
-            ? "OS"
-            : form.instance?.laterality === "R"
-              ? "OD"
-              : "?";
 
     function readLocalStorageBoolean(key: string, defaultValue: boolean) {
         let value: string | null = null;
@@ -68,9 +71,14 @@
     });
 </script>
 
+<Tooltip.Provider>
 <div class="header">
     <span>[{form.id}]</span>
-    <span>{form.creator.name}</span>
+    <Tagger tagType="FormAnnotation" tags={form.tags ?? []}
+        tag={(id) => tagFormAnnotation(form, id)}
+		untag={(id) => untagFormAnnotation(form, id)}
+		onUpdate={() => {}}/>
+    <span>{form.creator?.name}</span>
     <span class={status}>{status}</span>
 </div>
 <div class="header">
@@ -78,19 +86,19 @@
         <tbody>
             <tr>
                 <td>Patient identifier</td>
-                <td> {form.patient.identifier}</td>
+                <td>{instance?.patient.identifier}</td>
             </tr>
             <tr>
                 <td>Study date</td>
-                <td> {form.study?.date.toLocaleDateString()}</td>
+                <td>{new Date(instance?.study?.date ?? "").toLocaleDateString()}</td>
             </tr>
             <tr>
                 <td>Instance identifier</td>
-                <td> {form.instance?.id}</td>
+                <td>{form.image_instance_id}</td>
             </tr>
             <tr>
                 <td>Laterality</td>
-                <td> {laterality}</td>
+                <td>{instance?.laterality === "L" ? "OS" : instance?.laterality === "R" ? "OD" : "?"}</td>
             </tr>
         </tbody>
     </table>
@@ -117,7 +125,7 @@
         />
     {/if}
 </div>
-
+</Tooltip.Provider>
 <style>
     div.header,
     div.main {
