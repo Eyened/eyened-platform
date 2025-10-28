@@ -55,7 +55,7 @@ def load_settings(env_file: Optional[str | Path] = None) -> Settings:
         admin_password=os.getenv("ADMIN_PASSWORD", ""),
         database_root_password=os.getenv("DATABASE_ROOT_PASSWORD"),
         environment=os.getenv("EYENED_ENV", "production"),
-        public_auth_disabled=os.getenv("VITE_PUBLIC_AUTH_DISABLED", "1") == "1",
+        public_auth_disabled=os.getenv("VITE_PUBLIC_AUTH_DISABLED", "0") == "1",
     )
     
     # Handle database fallback logic
