@@ -1,9 +1,11 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import { formAnnotations, formSchemas, instances, setFormAnnotationValue } from "$lib/data";
+    import { formAnnotations, formSchemas, instances, setFormAnnotationValue, tagFormAnnotation, untagFormAnnotation } from "$lib/data";
     import SchemaForm from "$lib/forms/SchemaForm.svelte";
     import { getDefault, resolveRefs, type JSONSchema } from "$lib/forms/schemaType";
     import { onMount } from "svelte";
+    import * as Tooltip from "../../components/ui/tooltip";
+    import Tagger from "../../tags/Tagger.svelte";
 
     interface Props {
         formId: number;
@@ -21,7 +23,7 @@
     // 2. Allow future throttling/debouncing of save operations
     // Value initializes from form ONCE on mount, then becomes independent for editing
     let value: any = $state(undefined);
-    let status = $state("loading");
+    let status = $state("loaded");
     
     onMount(() => {
         // Initialize value from form data once
@@ -69,8 +71,13 @@
     });
 </script>
 
+<Tooltip.Provider>
 <div class="header">
     <span>[{form.id}]</span>
+    <Tagger tagType="FormAnnotation" tags={form.tags ?? []}
+        tag={(id) => tagFormAnnotation(form, id)}
+		untag={(id) => untagFormAnnotation(form, id)}
+		onUpdate={() => {}}/>
     <span>{form.creator?.name}</span>
     <span class={status}>{status}</span>
 </div>
@@ -118,7 +125,7 @@
         />
     {/if}
 </div>
-
+</Tooltip.Provider>
 <style>
     div.header,
     div.main {

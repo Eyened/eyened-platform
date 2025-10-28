@@ -13,20 +13,20 @@
 		TooltipContent,
 		TooltipTrigger,
 	} from "$lib/components/ui/tooltip";
+	import { starTag, unstarTag } from "$lib/data/api";
 	import { GlobalContext } from "$lib/data/globalContext.svelte";
+	import { createTag, deleteTag } from "$lib/data/helpers";
+	import { tags } from "$lib/data/stores.svelte";
 	import { faStar, faTrash } from "@fortawesome/free-solid-svg-icons";
 	import { getContext } from "svelte";
 	import Fa from "svelte-fa";
+	import type { TagGET, TagType } from "../../types/openapi_types";
 	import { Button } from "../components/ui/button";
 	import TagEditForm from "./TagEditForm.svelte";
-	import { tags } from "$lib/data/stores.svelte";
-	import { createTag, deleteTag } from "$lib/data/helpers";
-	import { starTag, unstarTag } from "$lib/data/api";
-	import type { TagGET } from "../../types/openapi_types";
 
 	let {
 		tagType = "Annotation",
-	}: { tagType?: "Annotation" | "ImageInstance" | "Study" } = $props();
+	}: { tagType?: TagType } = $props();
 
 	const ctx = getContext<GlobalContext>("globalContext");
 

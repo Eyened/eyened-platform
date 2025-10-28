@@ -1,10 +1,12 @@
 <script lang="ts">
+	import type { TagType } from "../../types/openapi_types";
+
     // icons from: https://fontawesome.com/v6/icons?o=r&m=free&s=solid
     let { tagType, initTagName = '', initTagDescription = '', add }: { 
-        tagType: 'Annotation' | 'ImageInstance' | 'Study';
+        tagType: TagType;
         initTagName?: string;
         initTagDescription?: string;
-        add: (payload: { name: string; description: string; type: 'Annotation' | 'ImageInstance' | 'Study' }) => void;
+        add: (payload: { name: string; description: string; tagType: TagType }) => void;
     } = $props();
     
     let newTagName = $state(initTagName);
@@ -13,7 +15,7 @@
     
     function addTag() {
         if (newTagName.trim() !== '') {
-            add({ name: newTagName, description: newTagDescription, type: tagType });
+            add({ name: newTagName, description: newTagDescription, tagType: tagType });
             newTagName = '';
             newTagDescription = '';
         }
