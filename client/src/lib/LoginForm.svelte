@@ -1,6 +1,10 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte"
-    import { getContext } from "svelte"
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+    import * as Field from "$lib/components/ui/field/index.js";
+    import { Input } from "$lib/components/ui/input/index.js";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { getContext } from "svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -28,80 +32,38 @@
     }
 </script>
 
-<div id="main">
-    <div class="container">
-        <form onsubmit={handleLogin}>
-            <label for="username">Username:</label>
-            <input
-                type="text"
-                id="username"
-                placeholder="Enter your username"
-                bind:value={username}
-            />
-            <label for="password">Password:</label>
-            <input
-                type="password"
-                id="password"
-                placeholder="Enter your password"
-                bind:value={password}
-            />
-            <label for="rememberMe">Remember me:</label>
-            <input type="checkbox" id="rememberMe" bind:checked={rememberMe} />
+<div class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-[440px] border border-gray-200 rounded-xl shadow-sm p-8 bg-white">
+        <form onsubmit={handleLogin} class="space-y-6">
+            <Field.Set>
+                <Field.Group>
+                    <Field.Field>
+                        <Field.Label for="username">Username</Field.Label>
+                        <Input id="username" type="text" placeholder="Enter your username" bind:value={username} />
+                    </Field.Field>
+
+                    <Field.Field>
+                        <Field.Label for="password">Password</Field.Label>
+                        <Input id="password" type="password" placeholder="Enter your password" bind:value={password} />
+                    </Field.Field>
+
+                    <Field.Field>
+                        <div class="flex items-center gap-2">
+                            <Checkbox id="rememberMe" bind:checked={rememberMe} />
+                            <Field.Label for="rememberMe" class="cursor-pointer select-none">Remember me</Field.Label>
+                        </div>
+                    </Field.Field>
+                </Field.Group>
+            </Field.Set>
+
             {#if error}
-                <div class="error" style="grid-column: 1 / 3;">{error}</div>
+                <p class="text-sm text-red-600">{error}</p>
             {/if}
-            <div style="grid-column: 1 / 3;">
-                <button type="submit">Login</button>
-            </div>
+
+            <Button type="submit" class="w-full">Login</Button>
         </form>
     </div>
 </div>
 
 <style>
-    div {
-        display: flex;
-    }
-    #main {
-        flex-direction: column;
-        align-items: center;
-        margin-top: 100px;
-    }
-    div.container {
-        flex: 0;
-        align-items: center;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 3em;
-        box-shadow: 0 0 2em 0 rgba(0, 0, 0, 0.05);
-    }
-    .error {
-        color: red;
-        margin: 10px 0;
-    }
-    form {
-        flex: 0;
-        display: grid;
-        grid-template-columns: 0fr 1fr;
-        gap: 0.5em;
-    }
-    label {
-        display: flex;
-        align-items: center;
-    }
-    input {
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-    }
-    button {
-        padding: 10px;
-        background-color: #007bff;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    button:hover {
-        background-color: #0056b3;
-    }
 </style>
