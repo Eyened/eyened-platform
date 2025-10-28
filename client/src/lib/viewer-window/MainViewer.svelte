@@ -49,7 +49,7 @@
     onDestroy(viewerContext.addOverlay(mainViewerContext));
 
     const { activePanels } = viewerContext;
-    activePanels.add("Segmentation");
+    // activePanels.add("Segmentation");
 
     const topViewer = viewerWindowContext.topViewers.get(image)!;
 
