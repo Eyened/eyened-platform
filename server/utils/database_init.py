@@ -1,8 +1,6 @@
-import os
 
 from eyened_orm import (
     Creator,
-    TaskState,
     Base,
     Database,
 )
@@ -12,7 +10,6 @@ from sqlalchemy import create_engine
 
 from ..config import settings
 from ..routes.auth import create_user
-from eyened_orm.utils.config import EyenedORMConfig
 
 def create_database():
     # create generic engine for database creation

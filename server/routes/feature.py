@@ -37,9 +37,9 @@ async def list_features(
 @router.post("/features", response_model=FeatureGET)
 async def create_feature(dto: FeaturePUT, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     feature = Feature(FeatureName=dto.name)
-    db.add(feature); db.flush()
+    db.add(feature); db.flush()  # noqa: E702
     set_subfeatures(db, feature.FeatureID, dto.subfeature_ids)
-    db.commit(); db.refresh(feature)
+    db.commit(); db.refresh(feature)  # noqa: E702
     return DTOConverter.feature_to_get(feature)
 
 @router.get("/features/{feature_id}", response_model=FeatureGET)
@@ -58,7 +58,7 @@ async def patch_feature(feature_id: int, dto: FeaturePATCH, db: Session = Depend
         feature.FeatureName = dto.name
     if dto.subfeature_ids is not None:
         set_subfeatures(db, feature_id, dto.subfeature_ids)
-    db.commit(); db.refresh(feature)
+    db.commit(); db.refresh(feature)  # noqa: E702
     return DTOConverter.feature_to_get(feature)
 
 @router.delete("/features/{feature_id}", status_code=204)

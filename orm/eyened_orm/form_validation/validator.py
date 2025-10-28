@@ -87,7 +87,7 @@ def validate_all_forms(session: Optional[Session] = None, print_errors: bool = F
         valid = results_df["IsValid"].sum()
         invalid = total - valid
         
-        stats_df = pd.DataFrame({
+        stats_df = pd.DataFrame({  # noqa: F841
             "Metric": ["Total Forms", "Valid Forms", "Invalid Forms", "Validity Percentage"],
             "Value": [total, valid, invalid, f"{(valid/total)*100:.2f}%"]
         })

@@ -4,13 +4,13 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, List
 
-from sqlalchemy import Column, ForeignKey, String, Table, func, select, Enum as SAEnum
-from sqlalchemy.orm import Mapped, mapped_column, Session, relationship
+from sqlalchemy import ForeignKey, String, func, Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from eyened_orm.base import Base, ForeignKeyIndex, CompositeUniqueConstraint
 
 if TYPE_CHECKING:
-    from eyened_orm import Study, ImageInstance, Annotation, Segmentation, FormAnnotation, Creator
+    from eyened_orm import Study, ImageInstance, Segmentation, FormAnnotation, Creator
 
 class TagType(enum.Enum):
     Study = "Study"

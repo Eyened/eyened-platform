@@ -4,7 +4,6 @@ import hmac
 import cv2
 import numpy as np
 from PIL import Image
-from sqlalchemy import func, select
 from tqdm import tqdm
 
 from eyened_orm import ImageInstance, Modality
@@ -95,7 +94,7 @@ def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
 
 
 def get_missing_thumbnail_images(session, include_failed=False):
-    where = ImageInstance.ThumbnailPath == None
+    where = ImageInstance.ThumbnailPath == None  # noqa: E711
     if include_failed:
         where = where | (ImageInstance.ThumbnailPath == "")
     images = ImageInstance.where(session, where)

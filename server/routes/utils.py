@@ -1,4 +1,3 @@
-import os
 from typing import Optional, get_origin
 
 from pydantic import create_model

@@ -8,10 +8,9 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 
 import numpy as np
-import pandas as pd
 import pydicom
 from PIL import Image
-from sqlalchemy import Column, ForeignKey, Index, String, Text, select, func, Enum as SAEnum
+from sqlalchemy import ForeignKey, Index, String, select, func, Enum as SAEnum
 from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -190,22 +189,22 @@ class ImageInstance(Base):
         back_populates="ImageInstance", passive_deletes=True
     )
 
-    Segmentations: Mapped[List["Segmentation"]] = relationship(
+    Segmentations: Mapped[List["Segmentation"]] = relationship(  # noqa: F821
         "eyened_orm.segmentation.Segmentation",
         back_populates="ImageInstance", passive_deletes=True
     )
     
-    ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(
+    ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(  # noqa: F821
         "eyened_orm.segmentation.ModelSegmentation",
         back_populates="ImageInstance", passive_deletes=True
     )
 
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(  # noqa: F821
         "eyened_orm.form_annotation.FormAnnotation",
         back_populates="ImageInstance", passive_deletes=True
     )
 
-    SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(
+    SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(  # noqa: F821
         "eyened_orm.task.SubTaskImageLink",
         back_populates="ImageInstance",
         passive_deletes=True,
@@ -214,7 +213,7 @@ class ImageInstance(Base):
     ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship("eyened_orm.tag.ImageInstanceTagLink", back_populates="ImageInstance", lazy="selectin")
 
     # attributes relationship
-    AttributeValues: Mapped[List["AttributeValue"]] = relationship(
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship(  # noqa: F821
         "eyened_orm.attributes.AttributeValue",
         back_populates="ImageInstance",
         lazy="selectin",

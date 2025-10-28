@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
 import pandas as pd
-from sqlalchemy import Column, ForeignKey, Index, Text, String, select, Enum as SAEnum, func
+from sqlalchemy import ForeignKey, Index, Text, String, select, Enum as SAEnum, func
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base

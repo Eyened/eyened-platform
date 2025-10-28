@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any, Dict, List, Literal, Optional, get_origin
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 from eyened_orm import TaskState, SubTaskState

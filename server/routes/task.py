@@ -3,7 +3,7 @@ import bisect
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
-from eyened_orm import Task, SubTask, SubTaskImageLink, ImageInstance, SubTaskState
+from eyened_orm import Task, SubTask, SubTaskImageLink, SubTaskState
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_tasks import (
@@ -24,7 +24,7 @@ async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user:
         TaskDefinitionID=dto.task_definition_id,
         CreatorID=current_user.id,
     )
-    db.add(task); db.commit()
+    db.add(task); db.commit()  # noqa: E702
     # Reload with relationships
     task = db.execute(
         select(Task)
@@ -81,7 +81,7 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
     if dto.task_state is not None:
         task.TaskState = dto.task_state
 
-    db.commit(); db.refresh(task)
+    db.commit(); db.refresh(task)  # noqa: E702
     
     # Reload with SubTasks for consistency
     task = db.execute(

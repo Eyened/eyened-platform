@@ -130,7 +130,7 @@ class Report:
             table.append(row)
 
         def cell(value, i):
-            if type(value) == float:
+            if type(value) == float:  # noqa: E721
                 value = f'{value:.2f}'
             t = 'th' if i == 0 else 'td'
             return f'<{t}>{value}</{t}>'

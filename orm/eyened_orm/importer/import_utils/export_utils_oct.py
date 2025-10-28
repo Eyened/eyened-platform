@@ -3,13 +3,11 @@ import warnings
 import numpy as np
 
 from sqlalchemy import select
-from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.orm.exc import MultipleResultsFound
 
 from eyened_orm import (
     ImageInstance,
     Segmentation,
-    Feature, Creator)
+    Feature)
 
 from .annotation_export import get_center_of_gravity_3d, load_segmentation_3d
 
@@ -45,9 +43,9 @@ def get_all_etrds_grids(session, instance: ImageInstance, creatorname=None):
                 .join(Feature)
                 .where(Feature.FeatureName == 'ETDRS grid',
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
-                    Segmentation.Inactive == None))
+                    Segmentation.Inactive == None))  # noqa: E711
     if creatorname is not None:
-        query = query.join(creator).where(creator.CreatorName == creatorname)
+        query = query.join(creator).where(creator.CreatorName == creatorname)  # noqa: F821
     return session.execute(query).scalars().all()
 
 def get_all_fovea_segmentations(session, instance: ImageInstance, creatorname=None):
@@ -56,9 +54,9 @@ def get_all_fovea_segmentations(session, instance: ImageInstance, creatorname=No
                 .join(Feature)
                 .where(Feature.FeatureName == 'Fovea',
                     ImageInstance.ImageInstanceID == instance.ImageInstanceID,
-                    Segmentation.Inactive == None))
+                    Segmentation.Inactive == None))  # noqa: E711
     if creatorname is not None:
-        query = query.join(creator).where(creator.CreatorName == creatorname)
+        query = query.join(creator).where(creator.CreatorName == creatorname)  # noqa: F821
     return session.execute(query).scalars().all()
 
 def fovea_x_from_segmentation(annotation):
@@ -73,5 +71,5 @@ def fovea_x_from_ETDRS(annotation):
         fovea = data['fovea']['location']['x']
         return fovea
     else:
-        raise KeyError(f'No fovea found in ETDRS grid')
+        raise KeyError('No fovea found in ETDRS grid')
     

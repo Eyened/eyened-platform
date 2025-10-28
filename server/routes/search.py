@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date
-from typing import Any, Dict, List, Literal, Optional, Union, Tuple, cast, Annotated
+from typing import Any, Dict, List, Literal, Optional, Union, Tuple, Annotated
 
 from eyened_orm import (
     DeviceModel,
@@ -18,7 +18,6 @@ from eyened_orm import (
     Study,
     FormSchema,
     Tag,
-    Annotation,
     StudyTagLink,
     Creator,
     Segmentation,
@@ -35,7 +34,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, or_, true, union_all, literal
 from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy.dialects import mysql
 
 from .auth import CurrentUser, get_current_user
 from ..db import get_db
@@ -336,7 +334,7 @@ def and_expr(conds: List[Dict[str, Any]]) -> Any:
 # ----------------------------------------
 # EXISTS builders (semi-joins)
 # ----------------------------------------
-from sqlalchemy import select as sa_select
+from sqlalchemy import select as sa_select  # noqa: E402
 
 
 def exists_forms_for_study(forms_group: Dict[Any, List[Dict[str, Any]]]) -> Any:

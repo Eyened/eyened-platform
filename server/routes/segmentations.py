@@ -5,11 +5,9 @@ from typing import Annotated, Optional
 
 import numpy as np
 from eyened_orm import (
-    Segmentation,
     ImageInstance,
     Segmentation,
     Datatype,
-    DataRepresentation,
     ModelSegmentation,
     Tag,
     SegmentationTagLink,
@@ -25,7 +23,6 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
@@ -134,7 +131,7 @@ async def create_segmentation(
             # sparse volume
             if segmentation.SparseAxis is None:
                 raise HTTPException(
-                    status_code=400, detail=f"SparseAxis is not set for sparse volume"
+                    status_code=400, detail="SparseAxis is not set for sparse volume"
                 )
 
             if len(segmentation.ScanIndices) != array.shape[segmentation.SparseAxis]:
@@ -371,7 +368,7 @@ async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Sessio
     link = db.get(SegmentationTagLink, {"TagID": tag.TagID, "SegmentationID": segmentation_id})
     if not link:
         link = SegmentationTagLink(TagID=tag.TagID, SegmentationID=segmentation_id, CreatorID=current_user.id)
-        db.add(link); db.commit(); db.refresh(link)
+        db.add(link); db.commit(); db.refresh(link)  # noqa: E702
         link.Tag = tag
 
     return DTOConverter.link_to_tag_metadata(link)
@@ -384,7 +381,7 @@ async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = De
         raise HTTPException(404, "Segmentation not found")
     link = db.get(SegmentationTagLink, {"TagID": tag_id, "SegmentationID": segmentation_id})
     if link:
-        db.delete(link); db.commit()
+        db.delete(link); db.commit()  # noqa: E702
     return Response(status_code=204)
 
 

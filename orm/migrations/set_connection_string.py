@@ -1,6 +1,5 @@
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
 if __name__ == "__main__":
     # Check if path argument is provided

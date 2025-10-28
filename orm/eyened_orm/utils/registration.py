@@ -207,13 +207,13 @@ def run_registration_patient(patient, formAnnotation):
         register_f1 = None
         register_f2 = None
         if sorted_images["F1"]:
-            print(f"Running registration for F1 images")
+            print("Running registration for F1 images")
             register_f1, reference_f1 = run_registration(
                 sorted_images["F1"], graph, all_transforms
             )
 
         if sorted_images["F2"]:
-            print(f"Running registration for F2 images")
+            print("Running registration for F2 images")
             register_f2, reference_f2 = run_registration(
                 sorted_images["F2"], graph, all_transforms
             )

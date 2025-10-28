@@ -1,4 +1,3 @@
-from typing import Optional
 import yaml
 from pathlib import Path
 import click
@@ -7,7 +6,6 @@ from .utils.testdb import DatabaseTransfer
 from tqdm import tqdm
 from .utils.config import (
     DatabaseSettings,
-    EyenedORMConfig,
     load_config,
 )
 
@@ -277,7 +275,7 @@ def defragment_zarr(env, new_store_path):
 
     try:
         # Run defragmentation
-        index_mapping = old_manager.defragment_to_new_store(new_store_path)
+        index_mapping = old_manager.defragment_to_new_store(new_store_path)  # noqa: F841
 
         print("\nDefragmentation completed successfully!")
         print(f"New zarr store created at: {new_store_path}")
@@ -317,7 +315,7 @@ def update_hashes(env, print_errors):
     with database.get_session() as session:
         # Get all image instances with missing hashes
         query = select(ImageInstance).filter(
-            (ImageInstance.FileChecksum == None) | (ImageInstance.DataHash == None)
+            (ImageInstance.FileChecksum == None) | (ImageInstance.DataHash == None)  # noqa: E711
         )
 
         images = session.execute(query).scalars().all()

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
 
 import numpy as np
 from PIL import Image
-from sqlalchemy import Column, ForeignKey, Index, UniqueConstraint, String, func
+from sqlalchemy import ForeignKey, Index, UniqueConstraint, String, func
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -13,8 +13,6 @@ from .base import Base
 
 if TYPE_CHECKING:
     from eyened_orm import (
-        AnnotationData as AnnotationDataType,
-        AnnotationType as AnnotationTypeType,
         Creator,
         Feature,
         ImageInstance,

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import BINARY, ForeignKey, String, Boolean, func
+from sqlalchemy import BINARY, String, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base

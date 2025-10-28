@@ -1,16 +1,14 @@
 from typing import Union, Optional
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, delete
 from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel
 from eyened_orm import SubTask, SubTaskImageLink, ImageInstance
 from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_tasks import (
-    SubTasksResponse, SubTasksWithImagesResponse,
     SubTaskGET, SubTaskWithImagesGET,
 )
-from ..dtos.dtos_instances import InstanceGET
 from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
@@ -56,7 +54,7 @@ async def patch_subtask(
         st.Comments = dto.comments
     if dto.task_state is not None:
         st.TaskState = dto.task_state
-    db.commit(); db.refresh(st)
+    db.commit(); db.refresh(st)  # noqa: E702
     return DTOConverter.subtask_to_get(st)
 
 @router.delete("/subtasks/{subtaskid}", status_code=204)
@@ -85,7 +83,7 @@ async def add_subtask_image(
     if not inst:
         raise HTTPException(404, "ImageInstance not found")
     link = SubTaskImageLink(SubTaskID=subtaskid, ImageInstanceID=body.instance_id)
-    db.add(link); db.commit()
+    db.add(link); db.commit()  # noqa: E702
     
     # Fetch the updated subtask with images
     st = db.execute(

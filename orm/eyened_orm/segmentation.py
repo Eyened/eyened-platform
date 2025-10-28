@@ -301,7 +301,7 @@ class Feature(Base):
     @property
     def json(self) -> Dict[str, Any]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
-        subfeatures = [assoc.Child for assoc in assocs]
+        subfeatures = [assoc.Child for assoc in assocs]  # noqa: F841
         return {
             "FeatureName": self.FeatureName,
             "SubFeatures": self.subfeatures_list

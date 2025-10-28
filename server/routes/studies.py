@@ -24,7 +24,7 @@ async def tag_study(study_id: int, body: ObjectTagPOST, db: Session = Depends(ge
     link = db.get(StudyTagLink, {"TagID": tag.TagID, "StudyID": study_id})
     if not link:
         link = StudyTagLink(TagID=tag.TagID, StudyID=study_id, CreatorID=current_user.id)
-        db.add(link); db.commit(); db.refresh(link)
+        db.add(link); db.commit(); db.refresh(link)  # noqa: E702
         link.Tag = tag
 
     return DTOConverter.link_to_tag_metadata(link)
@@ -37,5 +37,5 @@ async def untag_study(study_id: int, tag_id: int, db: Session = Depends(get_db),
         raise HTTPException(404, "Study not found")
     link = db.get(StudyTagLink, {"TagID": tag_id, "StudyID": study_id})
     if link:
-        db.delete(link); db.commit()
+        db.delete(link); db.commit()  # noqa: E702
     return Response(status_code=204)

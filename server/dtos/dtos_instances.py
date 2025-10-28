@@ -8,9 +8,9 @@ This file contains DTOs that represent:
 """
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Literal, Optional, get_origin
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, create_model, Field
+from pydantic import BaseModel, Field
 
 from eyened_orm.image_instance import Laterality, ModalityType, Modality, ETDRSField
 from eyened_orm.patient import SexEnum as Sex

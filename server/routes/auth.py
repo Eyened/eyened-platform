@@ -121,7 +121,7 @@ def verify_token(token: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
@@ -206,7 +206,7 @@ async def get_current_user(
                     username=payload["username"],
                     role=payload.get("role")
                 )
-        except:
+        except:  # noqa: E722
             pass  # Access token failed, try refresh
     
     # Try refresh token
@@ -217,7 +217,7 @@ async def get_current_user(
                 # This will be handled by the refresh endpoint
                 # For now, we'll let the client handle the 401 and call refresh
                 pass
-        except:
+        except:  # noqa: E722
             pass
     
     raise HTTPException(

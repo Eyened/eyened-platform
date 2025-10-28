@@ -1,9 +1,8 @@
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 from pandas import DataFrame, json_normalize
-from sqlalchemy import Column, DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -13,7 +12,6 @@ if TYPE_CHECKING:
     from eyened_orm import (
         Creator,
         FormAnnotationTagLink,
-        FormSchema as FormSchemaType,
         ImageInstance,
         Patient,
         Study,

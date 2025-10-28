@@ -123,7 +123,7 @@ class DatabaseTransfer:
             for sql, values in sql_statements:
                 try:
                     cursor.execute(sql, values)
-                except mysql.connector.DatabaseError as e:
+                except mysql.connector.DatabaseError:
                     # doesn't handle INSERT IGNORE well apparently
                     pass
             conn.commit()

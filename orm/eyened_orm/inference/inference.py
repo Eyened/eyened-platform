@@ -1,12 +1,9 @@
-from pathlib import Path
 
 import pandas as pd
 import torch
 from rtnls_inference.ensembles import HeatmapRegressionEnsemble
 from rtnls_inference.ensembles.ensemble_classification import ClassificationEnsemble
-from rtnls_inference.ensembles.ensemble_keypoints import KeypointsEnsemble
 from rtnls_inference.utils import decollate_batch, extract_keypoints_from_heatmaps
-from sqlalchemy import select
 from tqdm import tqdm
 
 from eyened_orm import ImageInstance, Modality
@@ -199,7 +196,7 @@ def run_inference(session, device: torch.device = None, cfi_cache_path=None):
     images = ImageInstance.where(
         session,
         (ImageInstance.Modality == Modality.ColorFundus)
-        & (ImageInstance.DatePreprocessed == None)
+        & (ImageInstance.DatePreprocessed == None)  # noqa: E711
     )
 
     if len(images) == 0:

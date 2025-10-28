@@ -9,7 +9,6 @@ from pandas.api import types as pdt
 from sqlalchemy.orm import Session
 from sqlalchemy import select, inspect as sa_inspect
 
-from eyened_orm import ImageInstance
 from eyened_orm.segmentation import Model
 from eyened_orm.attributes import AttributeDefinition, AttributeValue, AttributeDataType, AttributesModelOutput
 

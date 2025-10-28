@@ -31,7 +31,7 @@ def task_run_inference():
     from eyened_orm.utils.config import load_config
     from eyened_orm import Database
     
-    logger.info(f"Starting inference task")
+    logger.info("Starting inference task")
 
     config = load_config()
     database = Database(config)
@@ -53,7 +53,7 @@ def task_update_thumbnails(print_errors=False):
     from eyened_orm.utils.config import load_config
     from eyened_orm import Database
     
-    logger.info(f"Starting thumbnail update task")
+    logger.info("Starting thumbnail update task")
 
     config = load_config()
     database = Database(config)
