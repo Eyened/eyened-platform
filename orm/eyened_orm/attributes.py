@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, Enum as SAEnum, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from eyened_orm.segmentation import Model
+from eyened_orm.segmentation import Model, ModelKind
 
 from .base import Base
 
@@ -28,7 +28,7 @@ class AttributesModel(Model):
     OutputAttributes: Mapped[List["AttributeDefinition"]] = relationship("eyened_orm.attributes.AttributeDefinition", secondary="AttributesModelOutput", back_populates="ProducingModels")
     ProducedAttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="ProducingModel")
 
-    __mapper_args__ = {"polymorphic_identity": "attributes"}
+    __mapper_args__ = {"polymorphic_identity": ModelKind.Attributes}
 
 
 class AttributeDefinition(Base):

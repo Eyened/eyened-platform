@@ -98,7 +98,10 @@ async def lifespan(app: FastAPI):
 
     # # before startup
     logging.basicConfig()
-    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    if settings.environment == 'development':
+        logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    else:
+        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
     
     
     db = Database(settings)
