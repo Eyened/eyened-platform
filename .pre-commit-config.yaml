@@ -24,5 +24,19 @@ repos:
 -   repo: https://github.com/pycqa/isort
     rev: 7.0.0
     hooks:
-      - id: isort
+    -   id: isort
         name: isort (python)
+-   repo: local
+    hooks:
+    -   id: prettier
+        name: prettier
+        language: system
+        pass_filenames: false
+        entry: |
+          bash -c 'cd client && npm run fix:prettier .'
+    -   id: svelte-check
+        name: svelte-check
+        language: system
+        pass_filenames: false
+        entry: |
+          bash -c 'cd client && npm run check'

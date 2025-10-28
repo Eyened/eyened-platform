@@ -57,7 +57,7 @@ jobs:
       - name: Perform Prettier checks
 #        continue-on-error: true
         working-directory: client
-        run: npm run prettier
+        run: npm run check:prettier
 
       - name: Perform Svelte checks
 #        continue-on-error: true

@@ -11,7 +11,8 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "verify:runes": "rg -n \"export let \" src --glob \"**/*.svelte\" && echo \"Found legacy export let (should be 0)\" && exit 1 || exit 0",
     "check:unused": "unimported",
-    "prettier": "prettier --check ."
+    "fix:prettier": "npm run check:prettier -- --write",
+    "check:prettier": "prettier --config .prettierrc --check"
   },
   "devDependencies": {
     "@iconify/json": "^2.2.142",
