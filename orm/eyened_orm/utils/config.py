@@ -12,7 +12,7 @@ class DatabaseSettings:
     host: str
     database: str
     port: int
-    raise_on_warnings: bool
+    raise_on_warnings: bool = True
 
 
 @dataclass
