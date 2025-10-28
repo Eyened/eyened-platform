@@ -1,4 +1,4 @@
-"""test
+"""move-studyInstanceUid
 
 Revision ID: eac6e6f7dcea
 Revises: ccb5ba8245c7
