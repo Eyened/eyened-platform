@@ -1,4 +1,4 @@
-import { getInstanceByDataSetIdentifier } from "$lib/datamodel/instance.svelte";
+import { getInstanceByDataSetIdentifier } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 
@@ -7,7 +7,7 @@ export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
     if (!instance || !meta?.registration?.top_left || !meta?.registration?.bottom_right || !meta?.oct_shape) {
         return [];
     }
-    const enfaceInstance = getInstanceByDataSetIdentifier(instance.datasetIdentifier.replace('.binary', '.png'));
+    const enfaceInstance = getInstanceByDataSetIdentifier(instance.dataset_identifier.replace('.binary', '.png'));
     if (!enfaceInstance) {
         return [];
     }

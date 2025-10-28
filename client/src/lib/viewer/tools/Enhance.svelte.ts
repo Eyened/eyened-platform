@@ -1,9 +1,9 @@
+import type { GlobalContext } from "$lib/data/globalContext.svelte";
+import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { ProbabilityMask } from "$lib/webgl/mask.svelte";
 import type { ViewerContext } from "../viewerContext.svelte";
-import type { DrawingExecutor } from "./segmentation";
 import { BrushTool } from "./Brush";
-import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+import type { DrawingExecutor } from "./segmentation";
 
 export class EnhanceTool extends BrushTool {
 

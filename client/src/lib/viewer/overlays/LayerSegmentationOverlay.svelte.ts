@@ -1,8 +1,8 @@
 import type { Registration } from "$lib/registration/registration";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
-import { MultilabelSegmentation } from "$lib/webgl/layerSegmentation";
 import type { MulticlassSegmentation } from "$lib/webgl/layerSegmentation";
+import { MultilabelSegmentation } from "$lib/webgl/layerSegmentation";
 import type { Shaders } from "$lib/webgl/shaders";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay } from "../viewer-utils";
@@ -33,7 +33,7 @@ export class LayerSegmentationOverlay implements Overlay {
 	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
         // console.log('repaint layers')
 		const {
-			hideCreators,
+			hiddenCreators: hideCreators,
 			hideFeatures,
 			visibleSegmentations: hideSegmentations,
 			hideAnnotations

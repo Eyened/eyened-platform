@@ -1,105 +1,95 @@
 <script lang="ts">
-    import { browser } from "$app/environment";
-    import { page } from "$app/state";
-    import { data } from "$lib/datamodel/model";
-    import { onMount } from "svelte";
-    import { getContext } from "svelte";
-    import { BrowserContext } from "./browserContext.svelte";
-    import { goto } from "$app/navigation";
+	import SelectWithSearch from '$lib/components/SelectWithSearch.svelte';
+	import * as Input from '$lib/components/ui/input';
+	import { getContext, onMount, tick } from 'svelte';
+	import DatePicker from '../components/DatePicker.svelte';
+	import { BrowserContext, type Condition } from './browserContext.svelte';
 
-    const { projects } = data;
-    const projectNames = projects.map((project) => project.name);
+	const browserContext = getContext<BrowserContext>('browserContext');
 
-    const params = browser ? page.url.searchParams : new URLSearchParams();
+	// bindable single basic condition
+	let { condition = $bindable<Condition | null>(null) } = $props();
 
-    const browserContext = getContext<BrowserContext>("browserContext");
+	let patientIdentifier = $state('');
+	let studyDate = $state('');
+	let projectName = $state('');
+	
+	// Track previous values to detect which field changed
+	let prev = $state({ patient: '', date: '', project: '' });
 
-    let patientIdentifier: string | null = $state(
-        params.get("PatientIdentifier"),
-    );
-    let date: string | null = $state(params.get("StudyDate"));
-    let projectName: string | null = $state(params.get("ProjectName"));
+	// Single effect: clear other fields when one changes, and set condition
+	$effect(() => {
+		// Check which field changed
+		if (patientIdentifier !== prev.patient) {
+			if (patientIdentifier) {
+				studyDate = '';
+				projectName = '';
+			}
+			prev.patient = patientIdentifier;
+		} else if (studyDate !== prev.date) {
+			if (studyDate) {
+				patientIdentifier = '';
+				projectName = '';
+			}
+			prev.date = studyDate;
+		} else if (projectName !== prev.project) {
+			if (projectName) {
+				patientIdentifier = '';
+				studyDate = '';
+			}
+			prev.project = projectName;
+		}
+		
+		// Set condition based on which field has a value
+		if (patientIdentifier) {
+			condition = { variable: 'Patient Identifier', operator: '==', value: patientIdentifier };
+		} else if (studyDate) {
+			condition = { variable: 'Study Date', operator: '==', value: studyDate };
+		} else if (projectName) {
+			condition = { variable: 'Project Name', operator: '==', value: projectName };
+		} else {
+			condition = null;
+		}
+	});
 
-    async function submitFilter(key: string, value: string | null) {
-        // Reset all state variables
-        patientIdentifier = key === "PatientIdentifier" ? value : null;
-        date = key === "StudyDate" ? value : null;
-        projectName = key === "ProjectName" ? value : null;
+	// Form submit handler
+	function handleSubmit(e: Event) {
+		e.preventDefault();
+		browserContext.search();
+	}
 
-        // Update URL params
-        params.forEach((_, k) => params.delete(k));
-        if (value) {
-            params.set(key, value);
-        }
-        await goto(`?${params.toString()}`);
-        browserContext.loadDataFromServer();
-    }
+	// Input ref for auto-focus
+	let patientInputRef = $state<HTMLInputElement | null>(null);
 
-    async function submitPatientIdentifier(e: Event) {
-        e.preventDefault();
-        await submitFilter("PatientIdentifier", patientIdentifier);
-    }
+	// Focus on page load
+	onMount(async () => {
+		await tick();
+		patientInputRef?.focus();
+	});
 
-    async function submitDate(e: Event) {
-        e.preventDefault();
-        await submitFilter("StudyDate", date);
-    }
-
-    async function submitProjectName(e: Event) {
-        e.preventDefault();
-        await submitFilter("ProjectName", projectName);
-    }
-
-    let patientIdentifierInput: HTMLInputElement | undefined = $state(undefined );
-    onMount(() => patientIdentifierInput?.focus());
+	const projectOptions = $derived(
+		browserContext.getValueOptions('Project Name').map(v => ({ label: v, value: v }))
+	);
 </script>
 
-<!-- svelte-ignore a11y_label_has_associated_control -->
-<div>
-    <form onsubmit={submitPatientIdentifier}>
-        <label> PatientIdentifier: </label>
-        <input
-            type="text"
-            bind:this={patientIdentifierInput}
-            bind:value={patientIdentifier}
-            placeholder="PatientIdentifier"
-        />
-        <button type="submit" disabled={!patientIdentifier}>Search</button>
-    </form>
+<form onsubmit={handleSubmit}>
+	<div class="w-full grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 items-center">
+		<!-- Inputs bind to state, single effect derives condition -->
+		<label>Patient Identifier:</label>
+		<Input.Input 
+			bind:value={patientIdentifier} 
+			placeholder="Patient Identifier" 
+			bind:ref={patientInputRef}
+		/>
 
-    <form onsubmit={submitDate}>
-        <label> Study date: </label>
-        <input type="date" bind:value={date} />
-        <button type="submit" disabled={!date}>Search</button>
-    </form>
+		<label>Study Date:</label>
+		<DatePicker bind:value={studyDate} />
 
-    <form onsubmit={submitProjectName}>
-        <label> Project Name: </label>
-        <select bind:value={projectName}>
-            <option></option>
-            {#each $projectNames as value}
-                <option {value}>{value}</option>
-            {/each}
-        </select>
-        <button type="submit" disabled={!projectName}>Search</button>
-    </form>
-</div>
-
-<style>
-    div {
-        display: grid;
-        grid-template-columns: 0fr 16em 0fr;
-    }
-    label {
-        display: flex;
-        padding-right: 1em;
-        align-items: center;
-    }
-    input, select {
-        margin-right: 1em;
-    }
-    form {
-        display: contents;
-    }
-    
-</style>
+		<label>Project Name:</label>
+		<SelectWithSearch 
+			options={projectOptions} 
+			bind:value={projectName} 
+			placeholder="Project Name"
+		/>
+	</div>
+</form>

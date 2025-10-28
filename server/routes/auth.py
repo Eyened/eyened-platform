@@ -43,6 +43,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: int | None
+    starred_tags: list[int] = []
 
 
 class TokenResponse(BaseModel):
@@ -115,26 +116,66 @@ def verify_token(token: str) -> dict:
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired"
         )
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token verification failed"
         )
+
+def _try_decode_token(token: str) -> dict | None:
+    """Decode JWT safely; return payload or None."""
+    try:
+        return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+
+async def is_authenticated(
+    authorization: str = Header(None),
+    jwt_token: str = Cookie(None),
+) -> bool:
+    """Return True if a valid access token is present (header or cookie)."""
+    if settings.public_auth_disabled:
+        return True
+
+    if authorization and authorization.startswith("Bearer "):
+        payload = _try_decode_token(authorization[7:])
+        if payload and payload.get("type") == "access":
+            return True
+
+    if jwt_token:
+        payload = _try_decode_token(jwt_token)
+        if payload and payload.get("type") == "access":
+            return True
+
+    return False
 
 # Replace the existing get_current_user function with this merged version
 async def get_current_user(
     authorization: str = Header(None),
     jwt_token: str = Cookie(None),
-    refresh_token: str = Cookie(None)
+    refresh_token: str = Cookie(None),
+    session: Session = Depends(get_db),
 ) -> CurrentUser:
     """Get the current authenticated user from either Authorization header or cookies."""
+    
+    # Bypass authentication if disabled (development mode)
+    if settings.public_auth_disabled:
+        creator = session.query(Creator).where(Creator.CreatorName == settings.admin_username).first()
+        if not creator:
+            # Should not happen if init_admin ran; ensure dev usability
+            creator = create_user(session, settings.admin_username, settings.admin_password)
+        return CurrentUser(
+            creator_id=creator.CreatorID,
+            username=creator.CreatorName,
+            role=creator.Role
+        )
     
     # Try Authorization header first (for API clients)
     if authorization and authorization.startswith("Bearer "):
@@ -186,12 +227,18 @@ async def get_current_user(
 
 
 # User utilities
-def creator_to_response(creator: Creator) -> UserResponse:
+def creator_to_response(creator: Creator, session: Session | None = None) -> UserResponse:
     """Convert a Creator object to a UserResponse."""
+    starred: list[int] = []
+    if session is not None:
+        from eyened_orm import CreatorTagLink
+        rows = session.query(CreatorTagLink).where(CreatorTagLink.CreatorID == creator.CreatorID).all()
+        starred = [r.TagID for r in rows]
     return UserResponse(
         id=creator.CreatorID,
         username=creator.CreatorName,
-        role=creator.Role
+        role=creator.Role,
+        starred_tags=starred
     )
 
 
@@ -279,7 +326,7 @@ async def login(
     # If API client, return token in response body
     if user_data.api_client:
         return {
-            "user": creator_to_response(creator),
+            "user": creator_to_response(creator, session),
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
@@ -307,7 +354,7 @@ async def login(
         path="/",
     )
     
-    return creator_to_response(creator)
+    return creator_to_response(creator, session)
 
 
 @router.post("/auth/token", response_model=TokenResponse)
@@ -326,7 +373,7 @@ async def get_token(
         access_token=access_token,
         token_type="bearer",
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=creator_to_response(creator)
+        user=creator_to_response(creator, session)
     )
 
 
@@ -336,7 +383,7 @@ async def get_current_user_info(
     session: Session = Depends(get_db),
 ):
     """Get current user information."""
-    return creator_to_response(current_user.get_creator(session))
+    return creator_to_response(current_user.get_creator(session), session)
 
 
 @router.post("/auth/change-password", response_model=UserResponse)
@@ -353,7 +400,7 @@ async def change_password(
     creator.Password = None  # Clear old hash if it exists
     session.commit()
 
-    return creator_to_response(creator)
+    return creator_to_response(creator, session)
 
 
 @router.post("/auth/register", response_model=UserResponse)
@@ -363,7 +410,7 @@ async def register_user(
 ):
     """Register a new user."""
     new_user = create_user(session, user_data.username, user_data.password)
-    return creator_to_response(new_user)
+    return creator_to_response(new_user, session)
 
 
 @router.post("/auth/refresh", response_model=UserResponse)
@@ -416,7 +463,7 @@ async def refresh_token(
             path="/",
         )
         
-        return creator_to_response(creator)
+        return creator_to_response(creator, session)
         
     except HTTPException:
         raise

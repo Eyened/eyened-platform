@@ -5,7 +5,5 @@
 {@render children()}
 
 <style>
-	:global(body) {
-		background-color: Azure;
-	}
+
 </style>

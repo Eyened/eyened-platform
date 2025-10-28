@@ -31,13 +31,15 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<ul>
+<ul class="flex flex-wrap p-0 m-0 list-none">
     {#each values as value}
+        {@const isActive = selectedValues.includes(value[name])}
+        {@const isHighlight = filter == "" || filteredValues.includes(value)}
         <li
-            class="item"
+            class="item text-[0.9em] text-black/60 cursor-pointer px-[0.2em] py-[0.1em] m-[0.1em] border border-black/10 rounded-[0.2em] opacity-20 hover:bg-gray-100"
+            class:bg-[#b6ddf9]={isActive}
+            class:opacity-100={isHighlight}
             onclick={() => toggle(value[name])}
-            class:highlight={filter == "" || filteredValues.includes(value)}
-            class:active={selectedValues.includes(value[name])}
         >
             {value[name]}
         </li>
@@ -45,30 +47,5 @@
 </ul>
 
 <style>
-    ul {
-        display: flex;
-        flex-wrap: wrap;
-        padding: 0;
-        margin: 0;
-        list-style-type: none;
-    }
-    li.item {
-        font-size: 0.9em;
-        color: rgba(0, 0, 0, 0.6);
-        cursor: pointer;
-        padding: 0.1em 0.2em;
-        margin: 0.1em;
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: 0.2em;
-        opacity: 0.2;
-    }
-    li.item:hover {
-        background-color: #f1f1f1;
-    }
-    li.item.active {
-        background-color: #b6ddf9;
-    }
-    li.item.highlight {
-        opacity: 1;
-    }
+
 </style>

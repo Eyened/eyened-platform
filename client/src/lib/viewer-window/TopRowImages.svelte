@@ -1,17 +1,17 @@
 <script lang="ts">
+	import Spinner from '$lib/components/Spinner.svelte';
 	import { getContext } from 'svelte';
 	import TopViewer from './TopViewer.svelte';
 	import type { ViewerWindowContext } from './viewerWindowContext.svelte';
-	import Spinner from '$lib/utils/Spinner.svelte';
 
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
-	const { instanceIds } = viewerWindowContext;
+	
 </script>
 
-{#if $instanceIds.length == 0}
+{#if viewerWindowContext.instanceIds.length == 0}
 	<div class="empty">Enter instance IDs in url</div>
 {:else}
-	{#each $instanceIds as instanceId}
+	{#each viewerWindowContext.instanceIds as instanceId}
 		{#await viewerWindowContext.getImages(instanceId)}
 			<div class="itemLoading">
 				<div>Loading {instanceId}</div>

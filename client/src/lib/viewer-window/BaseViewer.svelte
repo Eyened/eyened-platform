@@ -10,8 +10,8 @@
 	}
 
 	let { image }: Props = $props();
-	const { registration } = getContext<ViewerWindowContext>('viewerWindowContext');
-	const viewerContext = new ViewerContext(image, registration);
+	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
+	const viewerContext = new ViewerContext(image, viewerWindowContext);
 	setContext('viewerContext', viewerContext);
 </script>
 

@@ -1,34 +1,35 @@
 <script lang="ts">
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import { updateSegmentation } from "$lib/data/api";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext } from "svelte";
+    import type { Segmentation } from "./segmentationContext.svelte";
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+    
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
         segmentation: Segmentation;
+        segmentationItem: SegmentationItem;
     }
-    let { segmentation }: Props = $props();
+    let { segmentation, segmentationItem }: Props = $props();
 
-    let threshold = $state(0.5);
-    threshold = segmentation.threshold;
     const canEdit = globalContext.canEdit(segmentation);
 
-
-    function onUpdateThreshold() {
+    async function onUpdateThreshold() {
         if (canEdit) {
-            segmentation.update({ threshold: segmentation.threshold });
+            await updateSegmentation(segmentation.id, { threshold: segmentationItem.threshold });
         }
     }
 </script>
 
 <label>
-    <span>Threshold: {segmentation.threshold}</span>
+    <span>Threshold: {segmentationItem.threshold.toFixed(2)}</span>
     <input
         type="range"
         min="0"
         max="1"
         step="0.01"
-        bind:value={segmentation.threshold}        
+        bind:value={segmentationItem.threshold}        
         onchange={onUpdateThreshold}
     />
 </label>

@@ -1,9 +1,9 @@
+import type { RenderMode } from "$lib/viewer/viewer-utils";
+import type { InstanceGET } from "../../types/openapi_types";
+import { AbstractImage } from "./abstractImage";
+import { TextureData } from "./texture";
 import type { Dimensions } from "./types";
 import type { WebGL } from "./webgl";
-import { AbstractImage } from "./abstractImage";
-import type { Instance } from "$lib/datamodel/instance.svelte";
-import type { RenderMode } from "$lib/viewer/viewer-utils";
-import { TextureData } from "./texture";
 
 // Define metadata interface
 interface ImageMetadata {
@@ -20,7 +20,7 @@ export class Image2D extends AbstractImage {
     standardizedHistogram!: TextureData;
 
     constructor(
-        instance: Instance,
+        instance: InstanceGET,
         webgl: WebGL,
         image_id: string,
         readonly textureData: TextureData,
@@ -44,7 +44,7 @@ export class Image2D extends AbstractImage {
         this.standardizedHistogram = hist;
     }
 
-    static fromBitmap(instance: Instance, webgl: WebGL, image_id: string, bitmap: ImageBitmap, dimensions: Dimensions, meta: any) {
+    static fromBitmap(instance: InstanceGET, webgl: WebGL, image_id: string, bitmap: ImageBitmap, dimensions: Dimensions, meta: any) {
         const texture = initTexture(webgl.gl, bitmap);
         const result = new Image2D(instance, webgl, image_id, texture, dimensions, meta);
         result.initialize();
@@ -61,7 +61,7 @@ export class Image2D extends AbstractImage {
      * @param meta 
      * @returns 
      */
-    static fromPixelData(instance: Instance, webgl: WebGL, image_id: string, pixelData: Uint8Array, dimensions: Dimensions, meta: any) {
+    static fromPixelData(instance: InstanceGET, webgl: WebGL, image_id: string, pixelData: Uint8Array, dimensions: Dimensions, meta: any) {
         const texture = new TextureData(webgl.gl, dimensions.width, dimensions.height, 'RGBA');
 
         let data;

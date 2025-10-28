@@ -1,12 +1,11 @@
 from contextlib import contextmanager
-import os
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator, Mapping, Optional
 
-from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig, load_config_from_env_file, load_config_from_environ
+from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig, load_config
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from sqlalchemy.orm import Session, sessionmaker
-from sqlmodel import create_engine
+from sqlalchemy import create_engine
 
 
 def create_connection_string(config: DatabaseSettings):
@@ -34,25 +33,19 @@ class EyenedSession(Session):
 class Database:
     """Database connection manager with built-in session and storage management"""
 
-    def __init__(self, config: Optional[EyenedORMConfig | str | Path] = None):
+    def __init__(self, config: Optional[EyenedORMConfig | str | Path | Mapping[str, str]] = None):
         """
         config: EyenedORMConfig | Path | str
         if Path, load from .env file
         if None, initialize with default values (taken from environment variables)
         """
-        if isinstance(config, (Path, str)):
-            # load from .env file without polluting process env
-            if not Path(config).exists():
-                raise FileNotFoundError(f"File not found: {str(config)}")
-            print("loading from .env file", config)
-            config = load_config_from_env_file(config)
-        elif config is None:
-            # initializes config from current process environment
-            config = load_config_from_environ(os.environ)
-        elif isinstance(config, EyenedORMConfig):
+        if isinstance(config, EyenedORMConfig):
+            # Already a config object, use as-is
             pass
         else:
-            raise ValueError(f"Invalid config type: {type(config)}")
+            config = load_config(config)
+            
+            
 
         self.config = config
 

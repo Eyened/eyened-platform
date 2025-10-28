@@ -1,85 +1,84 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { getCompositeFeatures } from "$lib/datamodel/compositeFeature.svelte";
-    import { data } from "$lib/datamodel/model";
-    import { Segmentation, type Datatype } from "$lib/datamodel/segmentation.svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
+	import { Button } from "$lib/components/ui/button";
+	import { createSegmentationFrom, features } from "$lib/data";
+	import type { GlobalContext } from "$lib/data/globalContext.svelte";
+	import type { Datatype } from "$lib/datamodel/segmentation.svelte";
+	import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
+	import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+	import { getContext } from "svelte";
+	import * as Select from "../../components/ui/select";
 
-    export interface Props {
-        dataRepresentation: "MultiLabel" | "MultiClass";
-    }
+	const viewerContext = getContext<ViewerContext>("viewerContext");
+	const { image, axis } = viewerContext;
+	const globalContext = getContext<GlobalContext>("globalContext");
+	const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+	const segmentationContext = mainViewerContext.segmentationContext;
+	const { user: creator } = globalContext;
 
-    const { dataRepresentation }: Props = $props();
-    const viewerContext = getContext<ViewerContext>("viewerContext");
-        const { image, axis } = viewerContext;
-    const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
-    );
-    const segmentationContext = segmentationOverlay.segmentationContext;
-    const { creator } = globalContext;
-    const compositeFeatures = getCompositeFeatures();
-    const features = data.features;
+	// Use repo to drive the UI list of parents-with-subfeatures
+	const featuresWithSubfeatures = $derived(
+		features.filter((f) => (f.subfeatures ?? []).length > 0),
+	);
 
+	let selectedFeatureId: number | false = $state(false);
+	async function create(dataRepresentation: "MultiLabel" | "MultiClass") {
+		if (selectedFeatureId == false) {
+			return;
+		}
+		globalContext.dialogue = `Creating annotation...`;
 
-    let selectedFeatureId: number | undefined = $state(undefined);
-    async function create() {
-        if (selectedFeatureId == undefined) {
-            return;
-        }
-        globalContext.dialogue = `Creating annotation...`;
+		let dataType: Datatype = "R8UI";
 
-        let dataType: Datatype = "R8UI";
-        const feature = features.get(selectedFeatureId)!;
+		await createSegmentationFrom(
+			image,
+			selectedFeatureId,
+			dataRepresentation,
+			dataType,
+			0.5,
+			axis,
+		);
+		segmentationContext.creatorHidden.set(creator.id, false);
 
-        await Segmentation.createFrom(
-            image,
-            feature,
-            creator,
-            dataRepresentation,
-            dataType,
-            0.5,
-            axis,
-        );
-        segmentationContext.hideCreators.delete(creator);
-        globalContext.dialogue = null;
-    }
-    
+		globalContext.dialogue = null;
+	}
 </script>
 
 <div class="multi">
-    <div class="header">{dataRepresentation}</div>
-    <form onsubmit={create}>
-        <select bind:value={selectedFeatureId}>
-            {#each $compositeFeatures.keys() as parentFeatureId}
-                <option value={parentFeatureId}>
-                    {features.get(parentFeatureId)!.name}
-                </option>
-            {/each}
-        </select>
-        <button type="submit" disabled={selectedFeatureId == undefined}>
-            Create
-        </button>
-    </form>
+	<Select.Root type="single" bind:value={selectedFeatureId} size="xs">
+		<Select.Trigger class="w-[180px]">
+			{selectedFeatureId
+				? featuresWithSubfeatures.find((f) => f.id === selectedFeatureId)?.name
+				: "Select feature"}
+		</Select.Trigger>
+		<Select.Content>
+			{#each featuresWithSubfeatures as f}
+				<Select.Item value={f.id}>
+					{f.name}
+				</Select.Item>
+			{/each}
+		</Select.Content>
+	</Select.Root>
+	<Button
+		variant="outline"
+		disabled={selectedFeatureId == false}
+		onclick={() => create("MultiClass")}
+	>
+		Create MultiClass
+	</Button>
+	<Button
+		variant="outline"
+		disabled={selectedFeatureId == false}
+		onclick={() => create("MultiLabel")}
+	>
+		Create MultiLabel
+	</Button>
 </div>
 
 <style>
-    div {
-        display: flex;
-    }
-    div.header {
-        font-weight: bold;
-    }
-    div.multi {
-        flex-direction: column;
-    }
-    select {
-        width: 10em;
-    }
-    
-    div.multi {
-        flex-direction: column;
-    }
+	div {
+		display: flex;
+	}
+	div.multi {
+		flex-direction: column;
+	}
 </style>

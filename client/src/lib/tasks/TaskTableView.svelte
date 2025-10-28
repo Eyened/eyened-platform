@@ -1,13 +1,13 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { data } from "$lib/datamodel/model";
     import { SubTask } from "$lib/datamodel/subTask.svelte";
     import type { Task } from "$lib/datamodel/task.svelte";
     import { get_url_params } from "$lib/utils";
     import SubTaskRow from "./SubTaskRow.svelte";
 
-    import { getContext } from "svelte";
+    import { getContext } from "svelte"
 
     interface Props {
         task: Task;
@@ -15,7 +15,7 @@
 
     let { task }: Props = $props();
 
-    const { creator } = getContext<GlobalContext>("globalContext");
+    const { user: creator } = getContext<GlobalContext>("globalContext");
 
     const content = task.subTasks;
 

@@ -17,22 +17,7 @@ export type Keypoints = {
 }
 export type Laterality = 'L' | 'R';
 export type ETDRSField = 'F1' | 'F2' | 'F3' | 'F4' | 'F5' | 'F6' | 'F7'
-export type ROI = {
-    center: [number, number];
-    radius: number;
-    min_x: number;
-    max_x: number;
-    min_y: number;
-    max_y: number;
-    lines: {
-        top?: [[number, number], [number, number]]
-        bottom?: [[number, number], [number, number]]
-        left?: [[number, number], [number, number]]
-        right?: [[number, number], [number, number]]
-    }
-    w: number;
-    h: number;
-}
+
 export interface ServerInstance {
     ImageInstanceID: number;
     SeriesID: number;
@@ -175,10 +160,10 @@ export class Instance extends BaseItem {
 }
 registerConstructor('instances', Instance);
 
-export function getInstanceByDataSetIdentifier(datasetIdentifier: string): Instance | undefined {
-    return data.instances.find(instance => instance.datasetIdentifier == datasetIdentifier);
-}
+// export function getInstanceByDataSetIdentifier(datasetIdentifier: string): Instance | undefined {
+//     return data.instances.find(instance => instance.datasetIdentifier == datasetIdentifier);
+// }
 
-export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): Instance | undefined {
-    return data.instances.find(instance => instance.SOPInstanceUid == SOPInstanceUid);
-}
+// export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): Instance | undefined {
+//     return data.instances.find(instance => instance.SOPInstanceUid == SOPInstanceUid);
+// }

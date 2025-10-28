@@ -1,0 +1,12 @@
+{
+  "entry": [
+    "src/routes/**/*.{svelte,ts}"
+  ],
+  "ignorePatterns": [
+    "src/lib/components/**/*"
+  ],
+  "aliases": {
+    "$lib": "src/lib",
+    "$routes": "src/routes"
+  }
+}

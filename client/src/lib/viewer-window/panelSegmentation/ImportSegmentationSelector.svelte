@@ -1,34 +1,42 @@
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
     import { converters } from "$lib/webgl/segmentationConverter";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import { getContext } from "svelte";
+    import { type Segmentation, type SegmentationContext } from "./segmentationContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
         image: AbstractImage;
         segmentation: Segmentation;
+        segmentationContext: SegmentationContext;
         close: () => void;
         resolve: (segmentation: Segmentation) => void;
     }
 
-    let { image, segmentation, resolve, close }: Props = $props();
-    const segmentationAnnotations = image.instance.segmentations
-        .concat(image.instance.modelSegmentations)
-        .filter(globalContext.segmentationsFilter);
+    let { image, segmentation, segmentationContext, resolve, close }: Props = $props();
+    
+    const allSegmentations = $derived([
+        ...segmentationContext.graderSegmentations, 
+        ...segmentationContext.modelSegmentations
+    ]);
+    
+    const segmentationAnnotations = $derived(
+        allSegmentations.filter(globalContext.segmentationsFilter)
+    );
 
-    const referenceSegmentations = segmentationAnnotations
-        .filter((s) => s != segmentation)
-        .filter((other) => {
-            const from = segmentation.dataRepresentation;
-            const to = other.dataRepresentation;
-
-            const key = `${from}->${to}`;
-            // filter out conversions that are not supported
-            return from == to || key in converters;
-        });
+    const referenceSegmentations = $derived(
+        segmentationAnnotations
+            .filter((s) => !(s.id === segmentation.id && s.annotation_type === segmentation.annotation_type))
+            .filter((other) => {
+                const from = segmentation.data_representation;
+                const to = other.data_representation;
+                const key = `${from}->${to}`;
+                return from == to || key in converters;
+            })
+    );
 
     function _resolve(segmentation: Segmentation) {
         resolve(segmentation);
@@ -36,7 +44,7 @@
     }
 </script>
 
-{#if $referenceSegmentations.length > 0}
+{#if referenceSegmentations.length > 0}
     <div>Select segmentation to import from:</div>
     <table>
         <thead>
@@ -47,12 +55,12 @@
             </tr>
         </thead>
         <tbody>
-            {#each $referenceSegmentations as segmentation}
+            {#each referenceSegmentations as segmentation}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <tr onclick={() => _resolve(segmentation)}>
                     <td class="annotation-id">[{segmentation.id}]</td>
-                    <td>{segmentation.createdBy.name}</td>
+                    <td>{segmentation.creator.name}</td>
                     <td>{segmentation.feature.name}</td>
                 </tr>
             {/each}
@@ -61,7 +69,7 @@
 {:else}
     <div>No segmentations found to import from</div>
 {/if}
-<button onclick={close}>Cancel</button>
+<Button onclick={close}>Cancel</Button>
 
 <style>
     table {
@@ -76,7 +84,7 @@
         padding: 8px;
         border-bottom: 2px solid rgba(0, 0, 0, 0.3);
         font-weight: bold;
-        background-color: #f5f5f5;
+        /* background-color: #f5f5f5; */
     }
 
     td {

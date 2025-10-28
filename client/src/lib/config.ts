@@ -1,10 +1,4 @@
-// Get the base URL from the current window location
-const getBaseUrl = () => {
-    if (typeof window === 'undefined') return ''; // SSR case
-    const { protocol, hostname, port } = window.location;
-    return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
-};
-
-export const apiUrl = `${getBaseUrl()}/api`;
-export const fsHost = `${getBaseUrl()}/api/instances/images`;
-export const thumbnailHost = `${getBaseUrl()}/api/instances/thumbnails`;
+export const apiUrl = import.meta.env.VITE_API_URL;
+export const fsHost = import.meta.env.VITE_FILESERVER_URL;
+export const thumbnailHost = import.meta.env.VITE_THUMBNAIL_SERVER_URL;
+export const authEnabled = !(import.meta.env.VITE_PUBLIC_AUTH_DISABLED=='1');

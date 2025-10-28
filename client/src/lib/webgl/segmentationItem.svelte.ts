@@ -1,8 +1,10 @@
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-import type { AbstractImage } from "./abstractImage";
-import { SegmentationState } from "./segmentationState";
-import type { Mask, PaintSettings } from "./mask.svelte";
 import { SvelteMap } from "svelte/reactivity";
+import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import { getSegmentationData, getModelSegmentationData } from "../data/helpers";
+import type { NPYArray } from "../utils/npy_loader";
+import type { AbstractImage } from "./abstractImage";
+import type { Mask, PaintSettings } from "./mask.svelte";
+import { SegmentationState } from "./segmentationState";
 
 // manages the segmentation states (one per scan) for a single segmentation
 export class SegmentationItem {
@@ -11,13 +13,19 @@ export class SegmentationItem {
     segmentationStates: SvelteMap<number, SegmentationState> = new SvelteMap();
     loading: boolean = $state(false);
     ready: Promise<void> | null = null;
+    
+    // Reactive threshold state for immediate UI updates
+    threshold: number = $state(0.5);
 
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: Segmentation) {
+        readonly segmentation: SegmentationGET | ModelSegmentationGET) {
+        
+        // Initialize threshold from segmentation or default to 0.5
+        this.threshold = this.segmentation.threshold ?? 0.5;
 
-        if (Array.isArray(this.segmentation.scanIndices) && this.segmentation.scanIndices.length < 5) {
-            for (const scanNr of this.segmentation.scanIndices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
+        if (Array.isArray(this.segmentation.scan_indices) && this.segmentation.scan_indices.length < 5) {
+            for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
                 this.getSegmentationState(scanNr, true);
             }
         } else {
@@ -28,7 +36,13 @@ export class SegmentationItem {
     private async loadFull(): Promise<void> {
         try {
             this.loading = true;
-            const array = await this.segmentation.loadData();
+
+            // Don't pass axis/scan_nr when loading full volume
+            // API requires both axis AND scan_nr together, or neither
+            const array: NPYArray = this.segmentation.annotation_type === 'model_segmentation'
+                ? await getModelSegmentationData(this.segmentation.id)
+                : await getSegmentationData(this.segmentation.id);
+            
             const shape = array.shape as number[];
             // Expecting [depth, height, width]
             const depth = shape[0] ?? this.image.depth;
@@ -36,7 +50,7 @@ export class SegmentationItem {
             const width = shape[2] ?? this.image.width;
             const planeSize = height * width;
 
-            const scanIndices = this.segmentation.scanIndices ?? Array.from({ length: depth }, (_, i) => i);
+            const scanIndices = this.segmentation.scan_indices ?? Array.from({ length: depth }, (_, i) => i);
             for (const scanNr of scanIndices) {
                 const start = scanNr * planeSize;
                 const end = start + planeSize;
@@ -92,6 +106,7 @@ export class SegmentationItem {
     }
 
     dispose() {
+        // Note: not called currently
         for (const segmentationState of this.segmentationStates.values()) {
             segmentationState.dispose();
         }

@@ -30,6 +30,11 @@ def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=[
     if no_create:
         args.append("--no-create-info")
 
+    args += [
+        '--ignore-table=eyened_database.ProjectToImageInstance',
+        '--ignore-table=eyened_database.Statistics'
+    ]
+
     command = build_command("mysqldump", db_config, args) + tables
 
     result = subprocess.run(command, stdout=dump_file, stderr=subprocess.PIPE)
