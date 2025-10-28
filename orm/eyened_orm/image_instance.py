@@ -102,7 +102,7 @@ class ImageInstance(Base):
 
     # Image modality
     Modality: Mapped[Optional[Modality]] = mapped_column(SAEnum(Modality))
-    
+
     # DICOM metadata
     SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64))
     SOPClassUid: Mapped[Optional[str]] = mapped_column(String(64))
@@ -122,7 +122,7 @@ class ImageInstance(Base):
     #     - Rows: height of the B-scan (vitreous <-> choroid)
     #     - Columns: width of the B-scan (lateral <-> temporal)
     #     - NrOfFrames: number of B-scans (superior <-> inferior for horizontal B-scan)
-    
+
     Rows_y: Mapped[Optional[int]]  # Height of the image (in pixels)
     Columns_x: Mapped[Optional[int]]  # Width of the image (in pixels)
     NrOfFrames: Mapped[Optional[int]]  # Used to for number of B-scans in OCT
@@ -141,9 +141,7 @@ class ImageInstance(Base):
     ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(SAEnum(ETDRSField))  # F1-F7
     Angiography: Mapped[Optional[int]]  # 0 = non-angiography, 1 = angiography
 
-    AcquisitionDateTime: (
-        Mapped[Optional[datetime]]
-    )  # Date and time the acquisition of data started
+    AcquisitionDateTime: Mapped[Optional[datetime]]  # Date and time the acquisition of data started
     PupilDilated: Mapped[Optional[bool]]
 
     # Relative filepath to the image file
@@ -184,24 +182,18 @@ class ImageInstance(Base):
     DatePreprocessed: Mapped[Optional[datetime]]
 
     # relationships:
-    Annotations: Mapped[List["Annotation"]] = relationship(
-        "eyened_orm.annotation.Annotation",
-        back_populates="ImageInstance", passive_deletes=True
-    )
+    Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="ImageInstance", passive_deletes=True)
 
     Segmentations: Mapped[List["Segmentation"]] = relationship(  # noqa: F821
-        "eyened_orm.segmentation.Segmentation",
-        back_populates="ImageInstance", passive_deletes=True
+        "eyened_orm.segmentation.Segmentation", back_populates="ImageInstance", passive_deletes=True
     )
-    
+
     ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(  # noqa: F821
-        "eyened_orm.segmentation.ModelSegmentation",
-        back_populates="ImageInstance", passive_deletes=True
+        "eyened_orm.segmentation.ModelSegmentation", back_populates="ImageInstance", passive_deletes=True
     )
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(  # noqa: F821
-        "eyened_orm.form_annotation.FormAnnotation",
-        back_populates="ImageInstance", passive_deletes=True
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="ImageInstance", passive_deletes=True
     )
 
     SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(  # noqa: F821
@@ -214,20 +206,17 @@ class ImageInstance(Base):
 
     # attributes relationship
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(  # noqa: F821
-        "eyened_orm.attributes.AttributeValue",
-        back_populates="ImageInstance",
-        lazy="selectin",
-        cascade="all, delete-orphan"
+        "eyened_orm.attributes.AttributeValue", back_populates="ImageInstance", lazy="selectin", cascade="all, delete-orphan"
     )
 
     @property
     def shape(self) -> tuple[int, int, int]:
         return (self.NrOfFrames or 1, self.Rows_y, self.Columns_x)
-    
+
     @property
     def is_3d(self) -> bool:
         return self.NrOfFrames is not None and self.NrOfFrames > 1
-    
+
     @property
     def is_2d(self) -> bool:
         return not self.is_3d
@@ -276,12 +265,7 @@ class ImageInstance(Base):
             prefix, filename = self.DatasetIdentifier.split("]", 1)
             n_files = int(prefix[len("[png_series_") :])
             base_path = self.config.images_basepath / filename
-            return np.array(
-                [
-                    np.array(Image.open(base_path.parent / f"{base_path.stem}_{i}.png"))
-                    for i in range(n_files)
-                ]
-            ).squeeze()
+            return np.array([np.array(Image.open(base_path.parent / f"{base_path.stem}_{i}.png")) for i in range(n_files)]).squeeze()
         else:
             return np.array(Image.open(self.path))
 
@@ -338,16 +322,8 @@ class ImageInstance(Base):
     def _base_joins(cls, statement):
         """Add useful joins for ImageInstance queries."""
         from eyened_orm import Patient, Project, Series, Study
-        
-        return (
-            statement.join(Series)
-            .join(Study)
-            .join(Patient)
-            .join(Project)
-            .outerjoin(Scan)
-            .outerjoin(DeviceInstance)
-            .outerjoin(DeviceModel)
-        )
+
+        return statement.join(Series).join(Study).join(Patient).join(Project).outerjoin(Scan).outerjoin(DeviceInstance).outerjoin(DeviceModel)
 
     def get_annotations_for_creator(self, creator: "Creator") -> List["Annotation"]:
         """
@@ -377,9 +353,7 @@ class DeviceModel(Base):
     DeviceInstances: Mapped[List["DeviceInstance"]] = relationship("eyened_orm.image_instance.DeviceInstance", back_populates="DeviceModel")
 
     @classmethod
-    def by_manufacturer(
-        cls, Manufacturer: str, ManufacturerModelName: str, session: Session
-    ) -> Optional["DeviceModel"]:
+    def by_manufacturer(cls, Manufacturer: str, ManufacturerModelName: str, session: Session) -> Optional["DeviceModel"]:
         return session.scalar(
             select(cls).where(
                 DeviceModel.Manufacturer == Manufacturer,
@@ -406,9 +380,7 @@ class DeviceInstance(Base):
 
     DeviceModel: Mapped["DeviceModel"] = relationship("eyened_orm.image_instance.DeviceModel", back_populates="DeviceInstances")
 
-    ImageInstances: Mapped[List[ImageInstance]] = relationship(
-        "eyened_orm.image_instance.ImageInstance", back_populates="DeviceInstance"
-    )
+    ImageInstances: Mapped[List[ImageInstance]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="DeviceInstance")
 
 
 class SourceInfo(Base):
@@ -444,11 +416,9 @@ class Scan(Base):
 
     ScanID: Mapped[int] = mapped_column(primary_key=True)
     ScanMode: Mapped[str] = mapped_column(String(40), unique=True)
-    
+
     ImageInstances: Mapped[List["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="Scan")
 
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
         return cls.by_column(session, ScanMode=ScanMode)
-
-

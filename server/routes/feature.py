@@ -10,10 +10,12 @@ from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
 
+
 def set_subfeatures(db: Session, parent_id: int, sub_ids: list[int] | None) -> None:
     db.execute(delete(FeatureFeatureLink).where(FeatureFeatureLink.ParentFeatureID == parent_id))
     for idx, child_id in enumerate(sub_ids or []):
         db.add(FeatureFeatureLink(ParentFeatureID=parent_id, ChildFeatureID=child_id, FeatureIndex=idx))
+
 
 @router.get("/features", response_model=list[FeatureGET])
 async def list_features(
@@ -27,20 +29,22 @@ async def list_features(
         return [DTOConverter.feature_to_get(f) for f in rows]
 
     # Compute counts per FeatureID in one query
-    counts_rows = db.execute(
-        select(Segmentation.FeatureID, func.count()).group_by(Segmentation.FeatureID)
-    ).all()
+    counts_rows = db.execute(select(Segmentation.FeatureID, func.count()).group_by(Segmentation.FeatureID)).all()
     counts = {fid: cnt for (fid, cnt) in counts_rows}
 
     return [DTOConverter.feature_to_get(f, counts.get(f.FeatureID, 0)) for f in rows]
 
+
 @router.post("/features", response_model=FeatureGET)
 async def create_feature(dto: FeaturePUT, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     feature = Feature(FeatureName=dto.name)
-    db.add(feature); db.flush()  # noqa: E702
+    db.add(feature)
+    db.flush()  # noqa: E702
     set_subfeatures(db, feature.FeatureID, dto.subfeature_ids)
-    db.commit(); db.refresh(feature)  # noqa: E702
+    db.commit()
+    db.refresh(feature)  # noqa: E702
     return DTOConverter.feature_to_get(feature)
+
 
 @router.get("/features/{feature_id}", response_model=FeatureGET)
 async def get_feature(feature_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -48,6 +52,7 @@ async def get_feature(feature_id: int, db: Session = Depends(get_db), current_us
     if not feature:
         raise HTTPException(404, "Feature not found")
     return DTOConverter.feature_to_get(feature)
+
 
 @router.patch("/features/{feature_id}", response_model=FeatureGET)
 async def patch_feature(feature_id: int, dto: FeaturePATCH, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -58,8 +63,10 @@ async def patch_feature(feature_id: int, dto: FeaturePATCH, db: Session = Depend
         feature.FeatureName = dto.name
     if dto.subfeature_ids is not None:
         set_subfeatures(db, feature_id, dto.subfeature_ids)
-    db.commit(); db.refresh(feature)  # noqa: E702
+    db.commit()
+    db.refresh(feature)  # noqa: E702
     return DTOConverter.feature_to_get(feature)
+
 
 @router.delete("/features/{feature_id}", status_code=204)
 async def delete_feature(feature_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -68,9 +75,7 @@ async def delete_feature(feature_id: int, db: Session = Depends(get_db), current
         raise HTTPException(404, "Feature not found")
 
     # Block if any segmentations reference this feature
-    seg_count = db.execute(
-        select(func.count()).select_from(Segmentation).where(Segmentation.FeatureID == feature_id)
-    ).scalar_one()
+    seg_count = db.execute(select(func.count()).select_from(Segmentation).where(Segmentation.FeatureID == feature_id)).scalar_one()
     if seg_count > 0:
         raise HTTPException(
             status_code=409,
@@ -82,11 +87,7 @@ async def delete_feature(feature_id: int, db: Session = Depends(get_db), current
         )
 
     # Block if this feature is a child in any composite link
-    parent_rows = db.execute(
-        select(Feature.FeatureName)
-        .join(FeatureFeatureLink, Feature.FeatureID == FeatureFeatureLink.ParentFeatureID)
-        .where(FeatureFeatureLink.ChildFeatureID == feature_id)
-    ).scalars().all()
+    parent_rows = db.execute(select(Feature.FeatureName).join(FeatureFeatureLink, Feature.FeatureID == FeatureFeatureLink.ParentFeatureID).where(FeatureFeatureLink.ChildFeatureID == feature_id)).scalars().all()
     if parent_rows:
         raise HTTPException(
             status_code=409,

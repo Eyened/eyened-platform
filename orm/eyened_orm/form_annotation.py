@@ -57,26 +57,17 @@ class FormAnnotation(Base):
     FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship("eyened_orm.tag.FormAnnotationTagLink", back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
 
     @classmethod
-    def by_schema_and_creator(
-        cls,
-        session: Session,
-        schema_name: str,
-        creator_name: str = None,
-        filterInactive: bool = True,
-        **kwargs
-    ) -> List["FormAnnotation"]:
+    def by_schema_and_creator(cls, session: Session, schema_name: str, creator_name: str = None, filterInactive: bool = True, **kwargs) -> List["FormAnnotation"]:
         """Get all FormAnnotations for a given schema; optionally filter by creator."""
         from eyened_orm import Creator, FormSchema
+
         schema = FormSchema.by_name(session, schema_name)
 
         if schema is None:
             return []
 
         # Build filter conditions
-        filter_kwargs = {
-            "FormSchemaID": schema.FormSchemaID,
-            **kwargs
-        }
+        filter_kwargs = {"FormSchemaID": schema.FormSchemaID, **kwargs}
         if filterInactive:
             filter_kwargs["Inactive"] = False
 
@@ -88,9 +79,7 @@ class FormAnnotation(Base):
         return FormAnnotation.by_columns(session, **filter_kwargs)
 
     @classmethod
-    def export_formannotations_by_schema(
-        cls, session: Session, schema_name: str, creator_name: str = None
-    ) -> DataFrame:
+    def export_formannotations_by_schema(cls, session: Session, schema_name: str, creator_name: str = None) -> DataFrame:
         form_annotations = cls.by_schema_and_creator(session, schema_name, creator_name)
         data = [form_annotation.flat_data for form_annotation in form_annotations]
         return json_normalize(data)
@@ -102,31 +91,15 @@ class FormAnnotation(Base):
             "Created": self.DateInserted,
             "PatientIdentifier": self.Patient.PatientIdentifier,
             "ImageInstance": self.ImageInstanceID,
-            "Laterality": (
-                str(self.ImageInstance.Laterality.name)
-                if self.ImageInstance and self.ImageInstance.Laterality
-                else None
-            ),
+            "Laterality": (str(self.ImageInstance.Laterality.name) if self.ImageInstance and self.ImageInstance.Laterality else None),
         }
         return metadata | flatten_json(self.FormData)
 
 
-def flatten_json(
-    data: dict | list | str | int | float | bool, parent_key: str = ""
-) -> dict:
+def flatten_json(data: dict | list | str | int | float | bool, parent_key: str = "") -> dict:
     if isinstance(data, dict):
-        return {
-            k: v
-            for key, value in data.items()
-            for k, v in flatten_json(
-                value, f"{parent_key}.{key}" if parent_key else key
-            ).items()
-        }
+        return {k: v for key, value in data.items() for k, v in flatten_json(value, f"{parent_key}.{key}" if parent_key else key).items()}
     elif isinstance(data, list):
-        return {
-            k: v
-            for i, value in enumerate(data)
-            for k, v in flatten_json(value, f"{parent_key}[{i}]").items()
-        }
+        return {k: v for i, value in enumerate(data) for k, v in flatten_json(value, f"{parent_key}[{i}]").items()}
     else:
         return {parent_key: data}

@@ -48,18 +48,13 @@ def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version:
     col_types = {col: _infer_column_type(df[col]) for col in cols}
 
     # upsert AttributeDefinitions (globally, not per-model)
-    existing_attrs = {
-        a.AttributeName: a
-        for a in db.scalars(select(AttributeDefinition)).all()
-    }
+    existing_attrs = {a.AttributeName: a for a in db.scalars(select(AttributeDefinition)).all()}
     attrs_by_name: Dict[str, AttributeDefinition] = {}
     for col in cols:
         if col in existing_attrs:
             # validate type consistency
             if existing_attrs[col].AttributeDataType != col_types[col]:
-                raise ValueError(
-                    f"Attribute type mismatch for {col}: existing={existing_attrs[col].AttributeDataType} new={col_types[col]}"
-                )
+                raise ValueError(f"Attribute type mismatch for {col}: existing={existing_attrs[col].AttributeDataType} new={col_types[col]}")
             attrs_by_name[col] = existing_attrs[col]
         else:
             a = AttributeDefinition(AttributeName=col, AttributeDataType=col_types[col])
@@ -69,12 +64,7 @@ def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version:
     # Ensure AttributesModelOutput entries exist for this model
     db.flush()  # Get AttributeIDs for pending attributes
     for attr in attrs_by_name.values():
-        existing_link = db.scalar(
-            select(AttributesModelOutput).where(
-                AttributesModelOutput.ModelID == model.ModelID,
-                AttributesModelOutput.AttributeID == attr.AttributeID
-            )
-        )
+        existing_link = db.scalar(select(AttributesModelOutput).where(AttributesModelOutput.ModelID == model.ModelID, AttributesModelOutput.AttributeID == attr.AttributeID))
         if not existing_link:
             db.add(AttributesModelOutput(ModelID=model.ModelID, AttributeID=attr.AttributeID))
 
@@ -93,11 +83,7 @@ def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version:
     persistent_attr_ids = [a.AttributeID for a in attrs_by_name.values() if not sa_inspect(a).pending]
     existing_av: Dict[Tuple[int, int, int], AttributeValue] = {}  # (ImageInstanceID, AttributeID, ModelID)
     if persistent_attr_ids and image_ids:
-        q = select(AttributeValue).where(
-            AttributeValue.ImageInstanceID.in_(set(image_ids)),
-            AttributeValue.AttributeID.in_(set(persistent_attr_ids)),
-            AttributeValue.ModelID == model.ModelID
-        )
+        q = select(AttributeValue).where(AttributeValue.ImageInstanceID.in_(set(image_ids)), AttributeValue.AttributeID.in_(set(persistent_attr_ids)), AttributeValue.ModelID == model.ModelID)
         for av in db.scalars(q).all():
             existing_av[(av.ImageInstanceID, av.AttributeID, av.ModelID)] = av
 
@@ -112,20 +98,12 @@ def df_to_attributes(db: Session, df: pd.DataFrame, *, model_name: str, version:
 
             dtype = attr.AttributeDataType
             if sa_inspect(attr).pending:
-                av = AttributeValue(
-                    ImageInstanceID=image_id,
-                    AttributeID=attr.AttributeID,
-                    ModelID=model.ModelID
-                )
+                av = AttributeValue(ImageInstanceID=image_id, AttributeID=attr.AttributeID, ModelID=model.ModelID)
             else:
                 key = (image_id, attr.AttributeID, model.ModelID)
                 av = existing_av.get(key)
                 if av is None:
-                    av = AttributeValue(
-                        ImageInstanceID=image_id,
-                        AttributeID=attr.AttributeID,
-                        ModelID=model.ModelID
-                    )
+                    av = AttributeValue(ImageInstanceID=image_id, AttributeID=attr.AttributeID, ModelID=model.ModelID)
 
             # assign per dtype
             if dtype == AttributeDataType.Int:
@@ -182,15 +160,13 @@ def print_import_summary(attributes: List[AttributeDefinition], attribute_values
         print("Existing Attributes:")
         for attr, items in sorted(existing_attrs, key=lambda x: x[0].AttributeName):
             new_avs = sum(1 for av in items if sa_inspect(av).pending or sa_inspect(av).transient)
-            
+
             def is_updated(av: AttributeValue) -> bool:
                 st = sa_inspect(av)
                 if st.transient or st.pending:
                     return False
                 keys = ("ValueInt", "ValueFloat", "ValueText", "ValueJSON")
                 return any(st.attrs[k].history.has_changes() for k in keys if hasattr(av, k))
-            
+
             upd_avs = sum(1 for av in items if is_updated(av))
             print(f"  - {attr.AttributeName}: {new_avs} new, {upd_avs} updated")
-
-

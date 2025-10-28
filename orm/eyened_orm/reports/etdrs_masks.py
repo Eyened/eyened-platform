@@ -5,27 +5,26 @@ import uuid
 
 
 class ETDRS_masks:
-
     # naming convention: CSF = central subfield
     # [SNTI] = superior/nasal/temporal/inferior
     # [IO] = inner/outer
 
-    subfields_9 = 'CSF', 'SIM', 'NIM', 'TIM', 'IIM', 'SOM', 'NOM', 'TOM', 'IOM'
-    rings_3 = 'center', 'inner', 'outer'
-    quadrants = 'superior_grid', 'nasal_grid', 'inferior_grid', 'temporal_grid'
-    all_fields = tuple([*subfields_9, *rings_3, *quadrants, 'grid', 'total'])
+    subfields_9 = "CSF", "SIM", "NIM", "TIM", "IIM", "SOM", "NOM", "TOM", "IOM"
+    rings_3 = "center", "inner", "outer"
+    quadrants = "superior_grid", "nasal_grid", "inferior_grid", "temporal_grid"
+    all_fields = tuple([*subfields_9, *rings_3, *quadrants, "grid", "total"])
 
     def __init__(self, h, w, fovea_x, fovea_y, resolution, laterality):
-        '''
+        """
         h: height of the image
         w: width of the image
         fovea_x: x coordinate of the fovea
         fovea_y: y coordinate of the fovea
-        resolution: resolution of the image in mm/pix 
+        resolution: resolution of the image in mm/pix
             or: (resolution_x, resolution_y)
 
         laterality: laterality of the eye, 'R' or 'L'
-        '''
+        """
         self.h = h
         self.w = w
         self.fovea_x = fovea_x
@@ -59,22 +58,17 @@ class ETDRS_masks:
         return max((r.area for r in regions), default=0) * self.pixel_area
 
     def get_summary(self, binary_image, fields, include_area=True, include_count=True, include_largest=True):
-        masked_images = {
-            field: getattr(self, field) & binary_image
-            for field in fields
-        }
+        masked_images = {field: getattr(self, field) & binary_image for field in fields}
         result = {}
         for field, masked_image in masked_images.items():
             if include_area:
-                result[f'{field}_area'] = self.calculate_area(masked_image)
+                result[f"{field}_area"] = self.calculate_area(masked_image)
             if include_largest or include_count:
                 labeled_image = measure.label(masked_image)
                 if include_count:
-                    result[f'{field}_count'] = self._calculate_count(
-                        labeled_image)
+                    result[f"{field}_count"] = self._calculate_count(labeled_image)
                 if include_largest:
-                    result[f'{field}_largest'] = self.calculate_largest_area(
-                        labeled_image)
+                    result[f"{field}_largest"] = self.calculate_largest_area(labeled_image)
 
         return result
 
@@ -100,7 +94,8 @@ class ETDRS_masks:
     def total(self):
         return np.ones((self.h, self.w), dtype=bool)
 
-    '''rings'''
+    """rings"""
+
     @cached_property
     def center(self):
         return self.distance_to_fovea < 0.5
@@ -117,32 +112,34 @@ class ETDRS_masks:
     def grid(self):
         return self.center | self.inner | self.outer
 
-    '''quadrants'''
+    """quadrants"""
+
     @cached_property
     def inferior(self):
-        return (1/8 < self.theta) & (self.theta <= 3/8)
+        return (1 / 8 < self.theta) & (self.theta <= 3 / 8)
 
     @cached_property
     def left(self):
-        return (3/8 < self.theta) | (self.theta <= -3/8)
+        return (3 / 8 < self.theta) | (self.theta <= -3 / 8)
 
     @cached_property
     def superior(self):
-        return (- 3/8 < self.theta) & (self.theta <= -1/8)
+        return (-3 / 8 < self.theta) & (self.theta <= -1 / 8)
 
     @cached_property
     def right(self):
-        return (-1/8 < self.theta) & (self.theta <= 1/8)
+        return (-1 / 8 < self.theta) & (self.theta <= 1 / 8)
 
     @cached_property
     def nasal(self):
-        return self.right if self.laterality == 'R' else self.left
+        return self.right if self.laterality == "R" else self.left
 
     @cached_property
     def temporal(self):
-        return self.left if self.laterality == 'R' else self.right
+        return self.left if self.laterality == "R" else self.right
 
-    '''quadrants grid'''
+    """quadrants grid"""
+
     @cached_property
     def superior_grid(self):
         return self.superior & self.grid
@@ -159,7 +156,8 @@ class ETDRS_masks:
     def temporal_grid(self):
         return self.temporal & self.grid
 
-    '''subfields'''
+    """subfields"""
+
     @cached_property
     def CSF(self):
         return self.center
@@ -196,26 +194,26 @@ class ETDRS_masks:
     def IOM(self):
         return self.inferior & self.outer
 
-    def create_svg(self, text_dict=None, crop=True, color='black'):
+    def create_svg(self, text_dict=None, crop=True, color="black"):
         id_ = f"id_{uuid.uuid4().hex}"
 
         if text_dict is None:
-            text_dict = {k: '' for k in ETDRS_masks.subfields_9}
+            text_dict = {k: "" for k in ETDRS_masks.subfields_9}
 
-        if self.laterality == 'R':
+        if self.laterality == "R":
             # nasal right, temporal left
-            translate = str.maketrans({'N': 'R', 'T': 'L'})
+            translate = str.maketrans({"N": "R", "T": "L"})
         else:
             # nasal left, temporal right
-            translate = str.maketrans({'T': 'R', 'N': 'L'})
+            translate = str.maketrans({"T": "R", "N": "L"})
         text_query = {k.translate(translate): v for k, v in text_dict.items()}
 
         def svg_element(element, **kwargs):
-            attr = ' '.join(f'{k}="{v}"' for k, v in kwargs.items())
-            return f'<{element} {attr}/>'
+            attr = " ".join(f'{k}="{v}"' for k, v in kwargs.items())
+            return f"<{element} {attr}/>"
 
         if crop:
-            viewbox = '-3 -3 6 6'
+            viewbox = "-3 -3 6 6"
             width = 240
             height = 240
         else:
@@ -223,7 +221,7 @@ class ETDRS_masks:
             fy = self.fovea_y * self.resolution_y
             w = self.w * self.resolution_x
             h = self.h * self.resolution_y
-            viewbox = f'{-fx} {-fy} {w} {h}'
+            viewbox = f"{-fx} {-fy} {w} {h}"
             width = self.w
             height = self.h
 
@@ -231,19 +229,18 @@ class ETDRS_masks:
             return f'<text x="{x}" y="{y}">{text}</text>'
 
         text_coordinates = [
-            (0, 0, text_query.get('CSF', 'CSF')),
-            (0, 1, text_query.get('IIM', 'IIM')),
-            (0, -1, text_query.get('SIM', 'SIM')),
-            (-1, 0, text_query.get('LIM', 'LIM')),
-            (1, 0, text_query.get('RIM', 'RIM')),
-            (0, 2.25, text_query.get('IOM', 'IOM')),
-            (0, -2.25, text_query.get('SOM', 'SOM')),
-            (-2.25, 0, text_query.get('LOM', 'LOM')),
-            (2.25, 0, text_query.get('ROM', 'ROM'))
+            (0, 0, text_query.get("CSF", "CSF")),
+            (0, 1, text_query.get("IIM", "IIM")),
+            (0, -1, text_query.get("SIM", "SIM")),
+            (-1, 0, text_query.get("LIM", "LIM")),
+            (1, 0, text_query.get("RIM", "RIM")),
+            (0, 2.25, text_query.get("IOM", "IOM")),
+            (0, -2.25, text_query.get("SOM", "SOM")),
+            (-2.25, 0, text_query.get("LOM", "LOM")),
+            (2.25, 0, text_query.get("ROM", "ROM")),
         ]
 
-        svg_texts = "\n".join(svg_text(x, y, text)
-                              for (x, y, text) in text_coordinates)
+        svg_texts = "\n".join(svg_text(x, y, text) for (x, y, text) in text_coordinates)
 
         d_inner = np.sqrt((0.5**2) / 2)
         d_outer = np.sqrt((3**2) / 2)
@@ -264,13 +261,13 @@ class ETDRS_masks:
                     font-size: 0.3px;
                 }}
             </style>
-            {svg_element('circle', cx=0, cy=0, r=3)}
-            {svg_element('circle', cx=0, cy=0, r=1.5)}
-            {svg_element('circle', cx=0, cy=0, r=0.5)}
-            {svg_element('line', x1=-d_inner, y1=-d_inner, x2=-d_outer, y2=-d_outer)}
-            {svg_element('line', x1=+d_inner, y1=-d_inner, x2=+d_outer, y2=-d_outer)}
-            {svg_element('line', x1=-d_inner, y1=+d_inner, x2=-d_outer, y2=+d_outer)}
-            {svg_element('line', x1=+d_inner, y1=+d_inner, x2=+d_outer, y2=+d_outer)}
+            {svg_element("circle", cx=0, cy=0, r=3)}
+            {svg_element("circle", cx=0, cy=0, r=1.5)}
+            {svg_element("circle", cx=0, cy=0, r=0.5)}
+            {svg_element("line", x1=-d_inner, y1=-d_inner, x2=-d_outer, y2=-d_outer)}
+            {svg_element("line", x1=+d_inner, y1=-d_inner, x2=+d_outer, y2=-d_outer)}
+            {svg_element("line", x1=-d_inner, y1=+d_inner, x2=-d_outer, y2=+d_outer)}
+            {svg_element("line", x1=+d_inner, y1=+d_inner, x2=+d_outer, y2=+d_outer)}
             {svg_texts}
         
         </svg>

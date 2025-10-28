@@ -43,17 +43,11 @@ class Annotation(Base):
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
     SeriesID: Mapped[Optional[int]] = mapped_column(ForeignKey("Series.SeriesID"))
-    ImageInstanceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE")
-    )
+    ImageInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"))
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
-    AnnotationTypeID: Mapped[int] = mapped_column(
-        ForeignKey("AnnotationType.AnnotationTypeID")
-    )
-    AnnotationReferenceID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Annotation.AnnotationID", ondelete="CASCADE")
-    )
+    AnnotationTypeID: Mapped[int] = mapped_column(ForeignKey("AnnotationType.AnnotationTypeID"))
+    AnnotationReferenceID: Mapped[Optional[int]] = mapped_column(ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"))
     Inactive: Mapped[bool] = mapped_column(default=False)
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -61,17 +55,11 @@ class Annotation(Base):
     Patient: Mapped[Optional["Patient"]] = relationship("eyened_orm.patient.Patient", back_populates="Annotations")
     Study: Mapped[Optional["Study"]] = relationship("eyened_orm.study.Study", back_populates="Annotations")
     Series: Mapped[Optional["Series"]] = relationship("eyened_orm.series.Series", back_populates="Annotations")
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
-        "eyened_orm.image_instance.ImageInstance",
-        back_populates="Annotations"
-    )
+    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="Annotations")
     Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Annotations")
 
     AnnotationType: Mapped["AnnotationType"] = relationship("eyened_orm.annotation.AnnotationType", back_populates="Annotations")
-    AnnotationReference: Mapped[Optional["Annotation"]] = relationship(
-        "eyened_orm.annotation.Annotation",
-        back_populates="ChildAnnotations", remote_side="Annotation.AnnotationID"
-    )
+    AnnotationReference: Mapped[Optional["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="ChildAnnotations", remote_side="Annotation.AnnotationID")
 
     ChildAnnotations: Mapped[List["Annotation"]] = relationship(
         "eyened_orm.annotation.Annotation",
@@ -79,10 +67,7 @@ class Annotation(Base):
         passive_deletes=True,
     )
     # Actual data is stored in AnnotationData
-    AnnotationData: Mapped[List["AnnotationData"]] = relationship(
-        "eyened_orm.annotation.AnnotationData",
-        back_populates="Annotation", passive_deletes=True
-    )
+    AnnotationData: Mapped[List["AnnotationData"]] = relationship("eyened_orm.annotation.AnnotationData", back_populates="Annotation", passive_deletes=True)
 
     def __repr__(self):
         return f"Annotation({self.AnnotationID}, {self.FeatureName}, {self.Creator.CreatorName})"
@@ -129,9 +114,7 @@ class AnnotationData(Base):
 
     __table_args__ = (Index("fk_AnnotationData_Annotation1_idx", "AnnotationID"),)
 
-    AnnotationID: Mapped[int] = mapped_column(
-        ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True
-    )
+    AnnotationID: Mapped[int] = mapped_column(ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True)
     # use -1 for all scans (e.g. enface OCT)
     ScanNr: Mapped[int] = mapped_column(primary_key=True)
 
@@ -160,9 +143,7 @@ class AnnotationData(Base):
         return annotation_data
 
     @classmethod
-    def by_composite_id(
-        cls, session: Session, annotation_data_id: str
-    ) -> "AnnotationData":
+    def by_composite_id(cls, session: Session, annotation_data_id: str) -> "AnnotationData":
         """
         Get an AnnotationData object from a composite ID string separated by an underscore.
         (AnnotationID_ScanNr)

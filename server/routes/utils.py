@@ -2,11 +2,10 @@ from typing import Optional, get_origin
 
 from pydantic import create_model
 
+
 def collect_rows(rows):
     def to_dict(row):
-        return {
-            k: v for k, v in row.to_dict().items() if k not in ("ValueBlob", "FormData")
-        }
+        return {k: v for k, v in row.to_dict().items() if k not in ("ValueBlob", "FormData")}
 
     return [
         to_dict(row)
@@ -22,11 +21,7 @@ def model_omit(model, omit_fields):
     :param model: The original Pydantic model class.
     :param omit_fields: A set or list of field names to omit.
     """
-    fields = {
-        name: (field.outer_type_, field.default)
-        for name, field in model.__fields__.items()
-        if name not in omit_fields
-    }
+    fields = {name: (field.outer_type_, field.default) for name, field in model.__fields__.items() if name not in omit_fields}
     return create_model(f"{model.__name__}Omit", **fields)
 
 
@@ -36,11 +31,7 @@ def model_pick(model, pick_fields):
     :param model: The original Pydantic model class.
     :param pick_fields: A set or list of field names to include.
     """
-    fields = {
-        name: (field.outer_type_, field.default)
-        for name, field in model.__fields__.items()
-        if name in pick_fields
-    }
+    fields = {name: (field.outer_type_, field.default) for name, field in model.__fields__.items() if name in pick_fields}
     return create_model(f"{model.__name__}Pick", **fields)
 
 

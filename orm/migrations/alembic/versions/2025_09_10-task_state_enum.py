@@ -5,21 +5,21 @@ Revises: b5d7958b7e13
 Create Date: 2025-09-10 17:32:00.582790
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = 'd155d64d71b3'
-down_revision: Union[str, None] = 'b5d7958b7e13'
+revision: str = "d155d64d71b3"
+down_revision: Union[str, None] = "b5d7958b7e13"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    
-    op.add_column('SubTask', sa.Column('TaskState', sa.Enum('NotStarted', 'Busy', 'Ready', name='taskstate'), nullable=False))
+    op.add_column("SubTask", sa.Column("TaskState", sa.Enum("NotStarted", "Busy", "Ready", name="taskstate"), nullable=False))
 
     # task state update values
     op.execute("UPDATE SubTask SET TaskState = 'NotStarted' WHERE TaskStateID = 1")
@@ -31,15 +31,15 @@ def upgrade() -> None:
     # op.drop_index('fk_CreatorTag_Tag1_idx', table_name='CreatorTag')
     # op.drop_table('CreatorTag')
     # op.drop_index('TaskStateName', table_name='TaskState')
-    
-    op.drop_constraint('CompositeFeature_ibfk_2', 'CompositeFeature', type_='foreignkey')
-    op.create_foreign_key(None, 'CompositeFeature', 'Feature', ['ParentFeatureID'], ['FeatureID'], ondelete='CASCADE')
-    
-    op.drop_constraint('fk_SubTask_TaskState1', 'SubTask', type_='foreignkey')
-    op.drop_index('fk_SubTask_TaskState1_idx', table_name='SubTask')
-    
-    op.drop_constraint('fk_Task_TaskState1', 'Task', type_='foreignkey')
-    op.drop_index('fk_Task_TaskState1_idx', table_name='Task')
-    
-    op.drop_column('SubTask', 'TaskStateID')
-    op.drop_table('TaskState')
+
+    op.drop_constraint("CompositeFeature_ibfk_2", "CompositeFeature", type_="foreignkey")
+    op.create_foreign_key(None, "CompositeFeature", "Feature", ["ParentFeatureID"], ["FeatureID"], ondelete="CASCADE")
+
+    op.drop_constraint("fk_SubTask_TaskState1", "SubTask", type_="foreignkey")
+    op.drop_index("fk_SubTask_TaskState1_idx", table_name="SubTask")
+
+    op.drop_constraint("fk_Task_TaskState1", "Task", type_="foreignkey")
+    op.drop_index("fk_Task_TaskState1_idx", table_name="Task")
+
+    op.drop_column("SubTask", "TaskStateID")
+    op.drop_table("TaskState")

@@ -30,10 +30,7 @@ def dump_database(db_config, dump_file, no_data=False, no_create=False, tables=[
     if no_create:
         args.append("--no-create-info")
 
-    args += [
-        '--ignore-table=eyened_database.ProjectToImageInstance',
-        '--ignore-table=eyened_database.Statistics'
-    ]
+    args += ["--ignore-table=eyened_database.ProjectToImageInstance", "--ignore-table=eyened_database.Statistics"]
 
     command = build_command("mysqldump", db_config, args) + tables
 
@@ -55,9 +52,7 @@ def drop_create_db(test_db):
 
     print("Creating empty database")
     print(" ".join(command))
-    result = subprocess.run(
-        command, input=sql_commands, stderr=subprocess.PIPE, text=True, check=True
-    )
+    result = subprocess.run(command, input=sql_commands, stderr=subprocess.PIPE, text=True, check=True)
 
     if result.returncode == 0:
         print("Database created successfully.")
@@ -105,7 +100,6 @@ class DatabaseTransfer:
             load_db(self.test_db, dump_file)
 
     def populate(self, copy_objects: list):
-
         dumper = DatabaseDumper(self.source_db, paths, copy_objects)
         sql_statements = dumper.dump()
 
@@ -116,9 +110,7 @@ class DatabaseTransfer:
 
         conn = mysql.connector.connect(**asdict(self.test_db))
         with conn.cursor() as cursor:
-            cursor.execute(
-                f"INSERT INTO alembic_version (version_num) VALUES ('{version}');"
-            )
+            cursor.execute(f"INSERT INTO alembic_version (version_num) VALUES ('{version}');")
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
             for sql, values in sql_statements:
                 try:

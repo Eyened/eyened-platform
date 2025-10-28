@@ -9,6 +9,7 @@ from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 
 router = APIRouter()
 
+
 @router.post("/studies/{study_id}/tags", response_model=TagMeta)
 async def tag_study(study_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
     """Attach a Tag to a Study by tag ID (idempotent)."""
@@ -24,10 +25,13 @@ async def tag_study(study_id: int, body: ObjectTagPOST, db: Session = Depends(ge
     link = db.get(StudyTagLink, {"TagID": tag.TagID, "StudyID": study_id})
     if not link:
         link = StudyTagLink(TagID=tag.TagID, StudyID=study_id, CreatorID=current_user.id)
-        db.add(link); db.commit(); db.refresh(link)  # noqa: E702
+        db.add(link)
+        db.commit()
+        db.refresh(link)  # noqa: E702
         link.Tag = tag
 
     return DTOConverter.link_to_tag_metadata(link)
+
 
 @router.delete("/studies/{study_id}/tags/{tag_id}", status_code=204)
 async def untag_study(study_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -37,5 +41,6 @@ async def untag_study(study_id: int, tag_id: int, db: Session = Depends(get_db),
         raise HTTPException(404, "Study not found")
     link = db.get(StudyTagLink, {"TagID": tag_id, "StudyID": study_id})
     if link:
-        db.delete(link); db.commit()  # noqa: E702
+        db.delete(link)
+        db.commit()  # noqa: E702
     return Response(status_code=204)

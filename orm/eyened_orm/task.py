@@ -48,9 +48,7 @@ class TaskState(Enum):
 
 class Task(Base):
     __tablename__ = "Task"
-    __table_args__ = (
-        Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),
-    )
+    __table_args__ = (Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),)
     _name_column: ClassVar[str] = "TaskName"
 
     TaskID: Mapped[int] = mapped_column(primary_key=True)
@@ -67,8 +65,8 @@ class Task(Base):
 
     Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Tasks")
     TaskDefinition: Mapped["TaskDefinition"] = relationship("eyened_orm.task.TaskDefinition", back_populates="Tasks")
-    TaskState: Mapped["TaskState"] 
-    
+    TaskState: Mapped["TaskState"]
+
     SubTasks: Mapped[List["SubTask"]] = relationship(
         "eyened_orm.task.SubTask",
         back_populates="Task",
@@ -86,9 +84,7 @@ class Task(Base):
     ) -> "Task":
         from .Annotation import Creator
 
-        subtasks = [
-            SubTask.create_from_image_ids(session, imset) for imset in imagesets
-        ]
+        subtasks = [SubTask.create_from_image_ids(session, imset) for imset in imagesets]
         state = SubTaskState.by_name(session, "Not Started")
 
         if creator_name is not None:
@@ -104,11 +100,10 @@ class Task(Base):
             SubTasks=subtasks,
         )
 
-    def get_form_annotations(
-        self, session: Session, schema_id: Optional[int] = None
-    ) -> List["FormAnnotation"]:
+    def get_form_annotations(self, session: Session, schema_id: Optional[int] = None) -> List["FormAnnotation"]:
         """Return all FormAnnotations for this task; filter by schema if provided."""
         from eyened_orm import FormAnnotation, SubTask
+
         q = select(FormAnnotation).join(SubTask).where(SubTask.TaskID == self.TaskID)
         if schema_id is not None:
             q = q.where(FormAnnotation.FormSchemaID == schema_id)
@@ -123,9 +118,7 @@ class SubTaskImageLink(Base):
         Index("fk_SubTaskImageLink_ImageInstance1_idx", "ImageInstanceID"),
     )
     SubTaskID: Mapped[int] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="CASCADE"), primary_key=True)
-    ImageInstanceID: Mapped[int] = mapped_column(
-        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"), primary_key=True
-    )
+    ImageInstanceID: Mapped[int] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"), primary_key=True)
 
     SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="SubTaskImageLinks")
     ImageInstance: Mapped["ImageInstance"] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="SubTaskImageLinks")
@@ -155,15 +148,11 @@ class SubTask(Base):
     Segmentations: Mapped[List["Segmentation"]] = relationship("eyened_orm.segmentation.Segmentation", back_populates="SubTask")
 
     @classmethod
-    def create_from_image_ids(
-        cls, session: Session, image_ids: List[int], task_state: str | None = None
-    ) -> "SubTask":
+    def create_from_image_ids(cls, session: Session, image_ids: List[int], task_state: str | None = None) -> "SubTask":
         if task_state is None:
             task_state = "Not Started"
 
         subtask = cls(TaskState=SubTaskState.by_name(session, task_state))
-        subtask.SubTaskImageLinks = [
-            SubTaskImageLink(ImageInstanceID=id, SubTask=subtask) for id in image_ids
-        ]
+        subtask.SubTaskImageLinks = [SubTaskImageLink(ImageInstanceID=id, SubTask=subtask) for id in image_ids]
 
         return subtask

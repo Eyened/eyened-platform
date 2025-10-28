@@ -21,21 +21,15 @@ from eyened_orm.forms import (
 
 def main():
     parser = argparse.ArgumentParser(description="Form validation example")
-    parser.add_argument(
-        "--config", help="Path to config file", default="eyened_orm/config.py"
-    )
-    parser.add_argument(
-        "--schema-file", help="Path to JSON schema file to import", default=None
-    )
+    parser.add_argument("--config", help="Path to config file", default="eyened_orm/config.py")
+    parser.add_argument("--schema-file", help="Path to JSON schema file to import", default=None)
     parser.add_argument(
         "--validate-annotation",
         help="ID of form annotation to validate",
         type=int,
         default=None,
     )
-    parser.add_argument(
-        "--list-schemas", help="List available schemas", action="store_true"
-    )
+    parser.add_argument("--list-schemas", help="List available schemas", action="store_true")
     parser.add_argument(
         "--list-annotations",
         help="List form annotations for a schema",
@@ -59,15 +53,11 @@ def main():
             try:
                 schema_data = load_schema_from_file(str(schema_path))
                 schema_name = schema_data.get("title", schema_path.stem)
-                
-                form_schema = import_schema_to_db(
-                    session=session,
-                    schema_data=schema_data,
-                    schema_name=schema_name
-                )
-                
+
+                form_schema = import_schema_to_db(session=session, schema_data=schema_data, schema_name=schema_name)
+
                 print(f"Successfully imported schema: {schema_name} (ID: {form_schema.FormSchemaID})")
-                
+
             except Exception as e:
                 print(f"Error importing schema: {str(e)}")
                 return 1
@@ -75,16 +65,16 @@ def main():
         if args.list_schemas:
             # List available schemas
             schemas = get_form_schemas(session)
-            
+
             if not schemas:
                 print("No schemas found in the database")
                 return 0
-                
+
             print("\nAvailable Form Schemas:")
             print("-----------------------")
             for schema in schemas:
                 print(f"ID: {schema.FormSchemaID}, Name: {schema.SchemaName}")
-                
+
                 # Show some basic information about the schema
                 if schema.Schema and isinstance(schema.Schema, dict):
                     property_count = len(schema.Schema.get("properties", {}))
@@ -94,28 +84,26 @@ def main():
         if args.validate_annotation:
             # Validate a form annotation
             from eyened_orm.forms import check_form_submission
-            
+
             annotation_id = args.validate_annotation
             is_valid, error_message = check_form_submission(session, annotation_id)
-            
-            annotation = session.execute(
-                select(FormAnnotation).where(FormAnnotation.FormAnnotationID == annotation_id)
-            ).scalar_one_or_none()
-            
+
+            annotation = session.execute(select(FormAnnotation).where(FormAnnotation.FormAnnotationID == annotation_id)).scalar_one_or_none()
+
             if annotation is None:
                 print(f"Form annotation not found: {annotation_id}")
                 return 1
-                
+
             schema = annotation.FormSchema
-            
+
             print(f"\nValidating Form Annotation {annotation_id} (Schema: {schema.SchemaName})")
             print("-" * 60)
-            
+
             if is_valid:
                 print("✓ Form data is valid according to its schema")
             else:
                 print(f"✗ Validation failed: {error_message}")
-                
+
             # Print some information about the form data
             if annotation.FormData:
                 print("\nForm Data:")
@@ -127,17 +115,17 @@ def main():
             # List form annotations for a specific schema
             schema_name = args.list_annotations
             annotations = get_form_annotations(session, schema_name=schema_name)
-            
+
             if not annotations:
                 print(f"No annotations found for schema: {schema_name}")
                 return 0
-                
+
             print(f"\nForm Annotations for Schema: {schema_name}")
             print("-" * 60)
-            
+
             for ann in annotations[:10]:  # Limit to 10 annotations for brevity
                 print(f"ID: {ann.FormAnnotationID}, Creator: {ann.Creator.CreatorName}, Date: {ann.DateInserted}")
-                
+
             if len(annotations) > 10:
                 print(f"... and {len(annotations) - 10} more annotations")
 
@@ -151,4 +139,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    sys.exit(main())

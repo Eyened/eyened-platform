@@ -12,8 +12,6 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 
 
-
-
 def project_root() -> Path:
     """Return repository root (parent of `eyened_platform`)."""
     return Path(__file__).resolve().parents[1]
@@ -33,18 +31,13 @@ def load_fastapi_app() -> FastAPI:
     module = importlib.import_module("server.main")
     app: Optional[FastAPI] = getattr(module, "app_api", None) or getattr(module, "app", None)
     if app is None:
-        raise RuntimeError(
-            "No FastAPI app found in eyened_platform.server.main (expected `app_api` or `app`)."
-        )
+        raise RuntimeError("No FastAPI app found in eyened_platform.server.main (expected `app_api` or `app`).")
     return app
-
 
 
 def main() -> None:
     """Generate OpenAPI JSON and write it to the given directory."""
-    parser = argparse.ArgumentParser(
-        description="Generate OpenAPI schema from the FastAPI app."
-    )
+    parser = argparse.ArgumentParser(description="Generate OpenAPI schema from the FastAPI app.")
     parser.add_argument(
         "directory",
         nargs="?",
@@ -61,6 +54,7 @@ def main() -> None:
     schema = app.openapi()
 
     from server.dtos.dtos_main import SegmentationPOST, SegmentationBase
+
     # these models are not automatically added by the fastapi openapi generator
     # so we need to add them manually
     models_to_add = [

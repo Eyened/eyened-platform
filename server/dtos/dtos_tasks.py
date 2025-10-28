@@ -1,5 +1,3 @@
-
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -14,6 +12,7 @@ from .dtos_aux import CreatorMeta
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= TASK SYSTEM=========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 class TaskDefinitionBase(BaseModel):
     name: str
@@ -35,6 +34,7 @@ class TaskBase(BaseModel):
     description: Optional[str] = None
     contact_id: Optional[int] = None
     task_definition_id: int
+
 
 class TaskPUT(TaskBase):
     pass
@@ -64,8 +64,10 @@ class SubTaskBase(BaseModel):
     task_state: SubTaskState
     comments: Optional[str] = None
 
+
 class SubTaskPOST(BaseModel):
     comments: Optional[str] = None
+
 
 class SubTaskPUT(SubTaskBase):
     pass
@@ -81,11 +83,13 @@ class SubTaskGET(SubTaskBase):
 
 class SubTaskWithImagesGET(SubTaskGET):
     """SubTask with associated images included."""
+
     images: List[InstanceGET]
 
 
 class SubTasksResponse(BaseModel):
     """Response envelope for paginated SubTasks without images."""
+
     subtasks: List[SubTaskGET]
     limit: int
     page: int
@@ -94,6 +98,7 @@ class SubTasksResponse(BaseModel):
 
 class SubTasksWithImagesResponse(BaseModel):
     """Response envelope for paginated SubTasks with images."""
+
     subtasks: List[SubTaskWithImagesGET]
     limit: int
     page: int

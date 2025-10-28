@@ -45,9 +45,7 @@ def build_where_clause(condition):
     if isinstance(condition, str):
         return condition
     if isinstance(condition, dict):
-        return " AND ".join(
-            f"{column} = {format_value(value)}" for column, value in condition.items()
-        )
+        return " AND ".join(f"{column} = {format_value(value)}" for column, value in condition.items())
     raise ValueError(f"Unsupported condition type: {type(condition)}")
 
 
@@ -65,18 +63,10 @@ def is_binary(column_type):
 def dump_row(row, columns, table, column_types):
     # skipping NULL values
     # assuming NULL is the default value for all columns
-    non_null_columns = [
-        (col, column_types[(table, col)]) for col in columns if row[col] is not None
-    ]
+    non_null_columns = [(col, column_types[(table, col)]) for col in columns if row[col] is not None]
 
-    placeholders = [
-        "_binary %s" if is_binary(column_type) else "%s"
-        for _, column_type in non_null_columns
-    ]
-    value_columns = [
-        bytes(row[col]) if is_binary(column_type) else row[col]
-        for col, column_type in non_null_columns
-    ]
+    placeholders = ["_binary %s" if is_binary(column_type) else "%s" for _, column_type in non_null_columns]
+    value_columns = [bytes(row[col]) if is_binary(column_type) else row[col] for col, column_type in non_null_columns]
     column_names = [f"`{col}`" for col, _ in non_null_columns]
     return (
         f"INSERT IGNORE INTO `{table}` ({','.join(column_names)}) VALUES ({','.join(placeholders)});",
@@ -98,12 +88,8 @@ class DatabaseDumper:
         self.extracted_ids: Dict[str, Set[Any]] = defaultdict(set)
         with self.cursor as cursor:
             self.primary_keys: Dict[str, str] = self._get_primary_keys(cursor)
-            self.foreign_keys: Dict[str, List[ForeignKey]] = self._get_foreign_keys(
-                cursor
-            )
-            self.column_types: Dict[Tuple[str, str], str] = self._get_column_types(
-                cursor
-            )
+            self.foreign_keys: Dict[str, List[ForeignKey]] = self._get_foreign_keys(cursor)
+            self.column_types: Dict[Tuple[str, str], str] = self._get_column_types(cursor)
 
     @property
     @contextmanager
@@ -142,14 +128,9 @@ class DatabaseDumper:
 
     def _get_column_types(self, cursor) -> Dict[Tuple[str, str], str]:
         cursor.execute(SQLStatements.COLUMN_TYPES, (self.config.database,))
-        return {
-            (row["TABLE_NAME"], row["COLUMN_NAME"]): row["DATA_TYPE"]
-            for row in cursor.fetchall()
-        }
+        return {(row["TABLE_NAME"], row["COLUMN_NAME"]): row["DATA_TYPE"] for row in cursor.fetchall()}
 
-    def _dump_rows(
-        self, cursor, table: str, where_clause: str
-    ) -> Tuple[Set[Tuple[str, Tuple]], List[Dict]]:
+    def _dump_rows(self, cursor, table: str, where_clause: str) -> Tuple[Set[Tuple[str, Tuple]], List[Dict]]:
         cursor.execute(f"SELECT * FROM {table} WHERE {where_clause}")
         rows = cursor.fetchall()
         if not rows:
@@ -188,10 +169,7 @@ class DatabaseDumper:
         return queue
 
     def dump(self) -> Set[Tuple[str, Tuple]]:
-        queue = [
-            ((entry['table'],), build_where_clause(entry['clause']))
-            for entry in self.root_conditions
-        ]
+        queue = [((entry["table"],), build_where_clause(entry["clause"])) for entry in self.root_conditions]
 
         visited = set()
         output = set()

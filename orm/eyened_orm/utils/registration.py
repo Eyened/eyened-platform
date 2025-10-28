@@ -39,15 +39,11 @@ def get_or_create_FormAnnotation(session, patient, schema, creator):
     """
     formAnnotation = FormAnnotation.where(
         session,
-        (FormAnnotation.FormSchemaID == schema.FormSchemaID)
-        & (FormAnnotation.CreatorID == creator.CreatorID)
-        & (FormAnnotation.PatientID == patient.PatientID),
+        (FormAnnotation.FormSchemaID == schema.FormSchemaID) & (FormAnnotation.CreatorID == creator.CreatorID) & (FormAnnotation.PatientID == patient.PatientID),
     )
     if formAnnotation:
         if len(formAnnotation) > 1:
-            print(
-                f"Found multiple form annotations for patient {patient.PatientID}, using the first one ({formAnnotation[0].FormAnnotationID})"
-            )
+            print(f"Found multiple form annotations for patient {patient.PatientID}, using the first one ({formAnnotation[0].FormAnnotationID})")
         return formAnnotation[0]
 
     formAnnotation = FormAnnotation()
@@ -162,9 +158,7 @@ def run_registration(image_set, graph, form_data):
 
         registrator.set_target(get_pixel_array(i))
         try:
-            print(
-                f"Running registration for {reference.ImageInstanceID} -> {i.ImageInstanceID}"
-            )
+            print(f"Running registration for {reference.ImageInstanceID} -> {i.ImageInstanceID}")
             transform = registrator.run()
             graph[reference.ImageInstanceID].add(i.ImageInstanceID)
             graph[i.ImageInstanceID].add(reference.ImageInstanceID)
@@ -176,29 +170,20 @@ def run_registration(image_set, graph, form_data):
                 }
             )
         except Exception as e:
-            print(
-                f"Error running registration for {reference.ImageInstanceID}, {i.ImageInstanceID}: {e}"
-            )
+            print(f"Error running registration for {reference.ImageInstanceID}, {i.ImageInstanceID}: {e}")
 
     return registrator, reference
 
 
 def run_registration_patient(patient, formAnnotation):
-    print(
-        f"Running registration for patient {patient.PatientID} {patient.PatientIdentifier}"
-    )
-    enface_images = patient.get_images(
-        where=ImageInstance.Modality.in_(
-            ["ColorFundus", "InfraredReflectance", "Autofluorescence"]
-        )
-    )
+    print(f"Running registration for patient {patient.PatientID} {patient.PatientIdentifier}")
+    enface_images = patient.get_images(where=ImageInstance.Modality.in_(["ColorFundus", "InfraredReflectance", "Autofluorescence"]))
     print(f"Found {len(enface_images)} enface images")
     graph = get_processed_edges(formAnnotation)
     print(f"Found {len(graph)} processed pairs")
 
     all_transforms = [*formAnnotation.FormData] if formAnnotation.FormData else []
     for eye in "RL":
-
         eye_images = [i for i in enface_images if i.Laterality.name == eye]
 
         # split images into F1 and F2
@@ -208,24 +193,13 @@ def run_registration_patient(patient, formAnnotation):
         register_f2 = None
         if sorted_images["F1"]:
             print("Running registration for F1 images")
-            register_f1, reference_f1 = run_registration(
-                sorted_images["F1"], graph, all_transforms
-            )
+            register_f1, reference_f1 = run_registration(sorted_images["F1"], graph, all_transforms)
 
         if sorted_images["F2"]:
             print("Running registration for F2 images")
-            register_f2, reference_f2 = run_registration(
-                sorted_images["F2"], graph, all_transforms
-            )
+            register_f2, reference_f2 = run_registration(sorted_images["F2"], graph, all_transforms)
 
-
-        if (
-            register_f1
-            and register_f2
-            and not are_connected(
-                reference_f1.ImageInstanceID, reference_f2.ImageInstanceID, graph
-            )
-        ):
+        if register_f1 and register_f2 and not are_connected(reference_f1.ImageInstanceID, reference_f2.ImageInstanceID, graph):
             # register the two reference images
             registration = Registration()
             registration.M0 = register_f1.M0
@@ -251,9 +225,7 @@ def run_registration_patient(patient, formAnnotation):
                     }
                 )
             except Exception as e:
-                print(
-                    f"Error running reference-to-reference registration for {reference_f1.ImageInstanceID}, {reference_f2.ImageInstanceID}: {e}"
-                )
+                print(f"Error running reference-to-reference registration for {reference_f1.ImageInstanceID}, {reference_f2.ImageInstanceID}: {e}")
 
     return all_transforms
 

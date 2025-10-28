@@ -1,4 +1,3 @@
-
 from eyened_orm import (
     Creator,
     Base,
@@ -11,31 +10,25 @@ from sqlalchemy import create_engine
 from ..config import settings
 from ..routes.auth import create_user
 
+
 def create_database():
     # create generic engine for database creation
-    dbstring = (
-        f"mysql+pymysql://root:{settings.database_root_password}@{settings.database.host}:{settings.database.port}"
-    )    
+    dbstring = f"mysql+pymysql://root:{settings.database_root_password}@{settings.database.host}:{settings.database.port}"
     temp_engine = create_engine(dbstring)
 
     # First check if database exists
     try:
         with temp_engine.connect() as conn:
-            conn.execute(
-                text(
-                    f"CREATE DATABASE IF NOT EXISTS {settings.database.database}"
-                )
-            )
+            conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {settings.database.database}"))
     except Exception as e:
-        raise RuntimeError(
-            f"Could not check if database {settings.database.database} exists. Error: {str(e)}"
-        )
-    
+        raise RuntimeError(f"Could not check if database {settings.database.database} exists. Error: {str(e)}")
+
     # Now create tables using the correct database
     print(settings)
     database = Database(settings)
-    
+
     Base.metadata.create_all(database.engine)
+
 
 def init_admin(session: Session) -> None:
     """
@@ -67,4 +60,3 @@ def init_admin(session: Session) -> None:
         print(f"Created admin user: {admin_username}")
     except Exception as e:
         raise RuntimeError(f"Failed to create admin user: {str(e)}")
-   

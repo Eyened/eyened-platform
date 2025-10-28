@@ -9,9 +9,7 @@ from sqlalchemy import create_engine
 
 
 def create_connection_string(config: DatabaseSettings):
-    dbstring = (
-        f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}"
-    )
+    dbstring = f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}"
     if config.database is not None:
         dbstring += f"/{config.database}"
     return dbstring
@@ -23,12 +21,13 @@ class EyenedSession(Session):
     def __init__(self, config: EyenedORMConfig, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config = config
-        
+
     @property
     def storage_manager(self):
-        if not hasattr(self, '_storage_manager'):
+        if not hasattr(self, "_storage_manager"):
             self._storage_manager = ZarrStorageManager(self.config.segmentations_zarr_store)
         return self._storage_manager
+
 
 class Database:
     """Database connection manager with built-in session and storage management"""
@@ -44,8 +43,6 @@ class Database:
             pass
         else:
             config = load_config(config)
-            
-            
 
         self.config = config
 
@@ -55,9 +52,7 @@ class Database:
         self.engine = create_engine(conn_string, pool_pre_ping=True)
 
         # Create session factory with custom session class
-        self._session_factory = sessionmaker(
-            autocommit=False, autoflush=False, bind=self.engine, class_=EyenedSession
-        )
+        self._session_factory = sessionmaker(autocommit=False, autoflush=False, bind=self.engine, class_=EyenedSession)
 
     @contextmanager
     def get_session(self) -> Generator[EyenedSession, None, None]:

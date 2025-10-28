@@ -70,8 +70,6 @@ def create_empty_array(segmentation: Segmentation, image: ImageInstance) -> np.n
     return np.zeros(shape, dtype=dtypes[segmentation.DataType])
 
 
-
-
 # this endpoint uses multipart/form-data
 # to create an annotation and upload its data at the same time
 # it was implemented this way to ensure that the annotation data and metadata are consistent
@@ -103,7 +101,7 @@ async def create_segmentation(
         ScanIndices=dto.scan_indices,
         Threshold=dto.threshold,
         ReferenceSegmentationID=dto.reference_segmentation_id,
-        DateInserted=datetime.now()
+        DateInserted=datetime.now(),
     )
 
     # creator can be different from the current_user and is passed in the params
@@ -111,9 +109,7 @@ async def create_segmentation(
 
     image = ImageInstance.by_id(db, segmentation.ImageInstanceID)
     if image is None:
-        raise HTTPException(
-            status_code=400, detail="Segmentation has no associated image"
-        )
+        raise HTTPException(status_code=400, detail="Segmentation has no associated image")
 
     array = await load_array(np_array)
     if array is None:
@@ -130,9 +126,7 @@ async def create_segmentation(
         else:
             # sparse volume
             if segmentation.SparseAxis is None:
-                raise HTTPException(
-                    status_code=400, detail="SparseAxis is not set for sparse volume"
-                )
+                raise HTTPException(status_code=400, detail="SparseAxis is not set for sparse volume")
 
             if len(segmentation.ScanIndices) != array.shape[segmentation.SparseAxis]:
                 raise HTTPException(
@@ -179,10 +173,8 @@ async def get_segmentation(
         Segmentation,
         segmentation_id,
         options=(
-            selectinload(Segmentation.SegmentationTagLinks)
-                .selectinload(SegmentationTagLink.Tag),
-            selectinload(Segmentation.SegmentationTagLinks)
-                .selectinload(SegmentationTagLink.Creator),
+            selectinload(Segmentation.SegmentationTagLinks).selectinload(SegmentationTagLink.Tag),
+            selectinload(Segmentation.SegmentationTagLinks).selectinload(SegmentationTagLink.Creator),
         ),
     )
     if item is None:
@@ -221,9 +213,7 @@ async def update_segmentation_data(
 
     content_type = request.headers.get("Content-Type", "").lower()
     if content_type != "application/octet-stream":
-        raise HTTPException(
-            status_code=400, detail=f"Unsupported media type: {content_type}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported media type: {content_type}")
 
     data = await request.body()
     np_image = np.load(io.BytesIO(data))
@@ -276,8 +266,6 @@ async def get_segmentation_data(
         "Content-Length": str(len(gz)),
     }
     return Response(content=gz, media_type="application/octet-stream", headers=headers)
-
-
 
 
 @router.patch("/segmentations/{segmentation_id}", response_model=SegmentationGET)
@@ -368,10 +356,13 @@ async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Sessio
     link = db.get(SegmentationTagLink, {"TagID": tag.TagID, "SegmentationID": segmentation_id})
     if not link:
         link = SegmentationTagLink(TagID=tag.TagID, SegmentationID=segmentation_id, CreatorID=current_user.id)
-        db.add(link); db.commit(); db.refresh(link)  # noqa: E702
+        db.add(link)
+        db.commit()
+        db.refresh(link)  # noqa: E702
         link.Tag = tag
 
     return DTOConverter.link_to_tag_metadata(link)
+
 
 @router.delete("/segmentations/{segmentation_id}/tags/{tag_id}", status_code=204)
 async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
@@ -381,7 +372,8 @@ async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = De
         raise HTTPException(404, "Segmentation not found")
     link = db.get(SegmentationTagLink, {"TagID": tag_id, "SegmentationID": segmentation_id})
     if link:
-        db.delete(link); db.commit()  # noqa: E702
+        db.delete(link)
+        db.commit()  # noqa: E702
     return Response(status_code=204)
 
 

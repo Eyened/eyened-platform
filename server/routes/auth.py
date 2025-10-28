@@ -92,7 +92,7 @@ def create_access_token(user_id: int, username: str, role: str | None = None) ->
         "role": role,
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-        "iat": datetime.now(timezone.utc)
+        "iat": datetime.now(timezone.utc),
     }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
@@ -103,7 +103,7 @@ def create_refresh_token(user_id: int) -> str:
         "sub": str(user_id),  # Convert to string
         "type": "refresh",
         "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-        "iat": datetime.now(timezone.utc)
+        "iat": datetime.now(timezone.utc),
     }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
@@ -126,15 +126,14 @@ def verify_token(token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
+
 def _try_decode_token(token: str) -> dict | None:
     """Decode JWT safely; return payload or None."""
     try:
         return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
 
 async def is_authenticated(
     authorization: str = Header(None),
@@ -156,6 +155,7 @@ async def is_authenticated(
 
     return False
 
+
 # Replace the existing get_current_user function with this merged version
 async def get_current_user(
     authorization: str = Header(None),
@@ -164,51 +164,36 @@ async def get_current_user(
     session: Session = Depends(get_db),
 ) -> CurrentUser:
     """Get the current authenticated user from either Authorization header or cookies."""
-    
+
     # Bypass authentication if disabled (development mode)
     if settings.public_auth_disabled:
         creator = session.query(Creator).where(Creator.CreatorName == settings.admin_username).first()
         if not creator:
             # Should not happen if init_admin ran; ensure dev usability
             creator = create_user(session, settings.admin_username, settings.admin_password)
-        return CurrentUser(
-            creator_id=creator.CreatorID,
-            username=creator.CreatorName,
-            role=creator.Role
-        )
-    
+        return CurrentUser(creator_id=creator.CreatorID, username=creator.CreatorName, role=creator.Role)
+
     # Try Authorization header first (for API clients)
     if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "")
         try:
             payload = verify_token(token)
             if payload.get("type") == "access":
-                return CurrentUser(
-                    creator_id=int(payload["sub"]),
-                    username=payload["username"],
-                    role=payload.get("role")
-                )
+                return CurrentUser(creator_id=int(payload["sub"]), username=payload["username"], role=payload.get("role"))
         except HTTPException:
             raise
         except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token"
-            )
-    
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
     # Try access token cookie (for web clients)
     if jwt_token:
         try:
             payload = verify_token(jwt_token)
             if payload.get("type") == "access":
-                return CurrentUser(
-                    creator_id=int(payload["sub"]),
-                    username=payload["username"],
-                    role=payload.get("role")
-                )
+                return CurrentUser(creator_id=int(payload["sub"]), username=payload["username"], role=payload.get("role"))
         except:  # noqa: E722
             pass  # Access token failed, try refresh
-    
+
     # Try refresh token
     if refresh_token:
         try:
@@ -219,11 +204,8 @@ async def get_current_user(
                 pass
         except:  # noqa: E722
             pass
-    
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required"
-    )
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
 
 # User utilities
@@ -232,26 +214,17 @@ def creator_to_response(creator: Creator, session: Session | None = None) -> Use
     starred: list[int] = []
     if session is not None:
         from eyened_orm import CreatorTagLink
+
         rows = session.query(CreatorTagLink).where(CreatorTagLink.CreatorID == creator.CreatorID).all()
         starred = [r.TagID for r in rows]
-    return UserResponse(
-        id=creator.CreatorID,
-        username=creator.CreatorName,
-        role=creator.Role,
-        starred_tags=starred
-    )
+    return UserResponse(id=creator.CreatorID, username=creator.CreatorName, role=creator.Role, starred_tags=starred)
 
 
 def check_login(username: str, password: str, db: Session) -> Creator:
     """Verify user credentials and return the user."""
-    creator = (
-        db.query(Creator).where(Creator.CreatorName == username).first()
-    )
+    creator = db.query(Creator).where(Creator.CreatorName == username).first()
     if creator is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     # Verify password using Argon2 hash
     if creator.PasswordHash and verify_password(password, creator.PasswordHash):
@@ -260,6 +233,7 @@ def check_login(username: str, password: str, db: Session) -> Creator:
     # Legacy password hash support (for migration)
     if creator.Password:
         from hashlib import pbkdf2_hmac
+
         old_hash = pbkdf2_hmac("sha256", password.encode(), "6f4b661212".encode(), 10000)
         if old_hash == creator.Password:
             # Migrate to new hash
@@ -269,10 +243,7 @@ def check_login(username: str, password: str, db: Session) -> Creator:
             db.refresh(creator)
             return creator
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid credentials"
-    )
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
 
 def create_user(
@@ -284,14 +255,9 @@ def create_user(
 ) -> Creator:
     """Create a new user with the given credentials."""
     # Check if username already exists
-    existing_user = (
-        session.query(Creator).where(Creator.CreatorName == username).first()
-    )
+    existing_user = session.query(Creator).where(Creator.CreatorName == username).first()
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already exists"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
     # Create new user
     new_user = Creator(
@@ -303,7 +269,7 @@ def create_user(
     session.add(new_user)
     session.commit()
     session.refresh(new_user)
-    
+
     return new_user
 
 
@@ -312,27 +278,19 @@ def create_user(
 async def login(
     user_data: TokenLoginRequest,  # Changed from UserLogin to TokenLoginRequest
     response: Response,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_db),
 ):
     """Login with username and password, return user info and set JWT cookies or return token."""
     creator = check_login(user_data.username, user_data.password, session)
-    
+
     # Create both tokens
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName, creator.Role)
     refresh_token = create_refresh_token(creator.CreatorID)
-    
+
     # If API client, return token in response body
     if user_data.api_client:
-        return {
-            "user": creator_to_response(creator, session),
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
-        }
-    
+        return {"user": creator_to_response(creator, session), "access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60}
+
     # Otherwise, set cookies (existing behavior)
     response.set_cookie(
         key=JWT_COOKIE_NAME,
@@ -343,7 +301,7 @@ async def login(
         samesite="strict",
         path="/",
     )
-    
+
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=refresh_token,
@@ -353,28 +311,18 @@ async def login(
         samesite="strict",
         path="/",
     )
-    
+
     return creator_to_response(creator, session)
 
 
 @router.post("/auth/token", response_model=TokenResponse)
-async def get_token(
-    user_data: UserLogin,
-    session: Session = Depends(get_db)
-):
+async def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
     """Get access token for API clients."""
     creator = check_login(user_data.username, user_data.password, session)
-    
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
-    
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=creator_to_response(creator, session)
-    )
+
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName, creator.Role)
+
+    return TokenResponse(access_token=access_token, token_type="bearer", expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60, user=creator_to_response(creator, session))
 
 
 @router.get("/auth/me", response_model=UserResponse)
@@ -404,43 +352,34 @@ async def change_password(
 
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register_user(
-    user_data: UserLogin,
-    session: Session = Depends(get_db)
-):
+async def register_user(user_data: UserLogin, session: Session = Depends(get_db)):
     """Register a new user."""
     new_user = create_user(session, user_data.username, user_data.password)
     return creator_to_response(new_user, session)
 
 
 @router.post("/auth/refresh", response_model=UserResponse)
-async def refresh_token(
-    response: Response,
-    refresh_token: str = Cookie(None),
-    session: Session = Depends(get_db)
-):
+async def refresh_token(response: Response, refresh_token: str = Cookie(None), session: Session = Depends(get_db)):
     """Refresh access token and extend refresh token for active users."""
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Refresh token required")
-    
+
     try:
         payload = verify_token(refresh_token)
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        
+
         # Get user from database
         creator = session.query(Creator).where(Creator.CreatorID == payload["sub"]).first()
         if not creator:
             raise HTTPException(status_code=401, detail="User not found")
-        
+
         # Create new access token
-        new_access_token = create_access_token(
-            creator.CreatorID, creator.CreatorName, creator.Role
-        )
-        
+        new_access_token = create_access_token(creator.CreatorID, creator.CreatorName, creator.Role)
+
         # Create NEW refresh token (extends session for active users)
         new_refresh_token = create_refresh_token(creator.CreatorID)
-        
+
         # Update access token cookie
         response.set_cookie(
             key=JWT_COOKIE_NAME,
@@ -451,7 +390,7 @@ async def refresh_token(
             samesite="strict",
             path="/",
         )
-        
+
         # Update refresh token cookie (extends session)
         response.set_cookie(
             key=REFRESH_COOKIE_NAME,
@@ -462,13 +401,14 @@ async def refresh_token(
             samesite="strict",
             path="/",
         )
-        
+
         return creator_to_response(creator, session)
-        
+
     except HTTPException:
         raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
 
 # Update logout to clear both cookies
 @router.post("/auth/logout")

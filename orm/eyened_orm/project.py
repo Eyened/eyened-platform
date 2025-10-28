@@ -19,7 +19,6 @@ class ExternalEnum(enum.Enum):
     M = "M"
 
 
-
 class Project(Base):
     """Projects group patients and images; hold metadata and contact."""
 
@@ -27,9 +26,7 @@ class Project(Base):
 
     _name_column: ClassVar[str] = "ProjectName"
 
-    __table_args__ = (
-        Index("fk_Project_Contact1_idx", "ContactID"),
-    )
+    __table_args__ = (Index("fk_Project_Contact1_idx", "ContactID"),)
 
     ProjectID: Mapped[int] = mapped_column(primary_key=True)
     ProjectName: Mapped[str] = mapped_column(String(255), unique=True)
@@ -42,31 +39,19 @@ class Project(Base):
 
     Contact: Mapped[Optional["Contact"]] = relationship("eyened_orm.project.Contact", back_populates="Projects")
 
-    Patients: Mapped[List["Patient"]] = relationship(
-        "eyened_orm.patient.Patient",
-        back_populates="Project", passive_deletes=True
-    )
+    Patients: Mapped[List["Patient"]] = relationship("eyened_orm.patient.Patient", back_populates="Project", passive_deletes=True)
 
     def make_dataframe(self, session: Session) -> pd.DataFrame:
         """Return a dataframe of all images in the project."""
         from eyened_orm import ImageInstance, Patient, Series, Study
 
-        images = session.execute(
-            select(ImageInstance)
-            .select_from(ImageInstance)
-            .join(Series)
-            .join(Study)
-            .join(Patient)
-            .where(Patient.ProjectID == self.ProjectID)
-        ).all()
+        images = session.execute(select(ImageInstance).select_from(ImageInstance).join(Series).join(Study).join(Patient).where(Patient.ProjectID == self.ProjectID)).all()
 
         image_ids = [im.ImageInstanceID for im in images]
 
         return ImageInstance.make_dataframe(session, image_ids)
 
-    def get_patient_by_identifier(
-        self, session: Session, patient_identifier: string
-    ) -> Optional["Patient"]:
+    def get_patient_by_identifier(self, session: Session, patient_identifier: string) -> Optional["Patient"]:
         """Return a patient with the specified ID that belongs to this project."""
         from eyened_orm import Patient
 
@@ -80,9 +65,7 @@ class Project(Base):
 
 class Contact(Base):
     __tablename__ = "Contact"
-    __table_args__ = (
-        Index("NameEmailInstitute_UNIQUE", "Name", "Email", "Institute", unique=True),
-    )
+    __table_args__ = (Index("NameEmailInstitute_UNIQUE", "Name", "Email", "Institute", unique=True),)
     _name_column: ClassVar[str] = "Name"
 
     ContactID: Mapped[int] = mapped_column(primary_key=True)

@@ -8,8 +8,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import (Annotation, FormAnnotation, ImageInstance, Project,
-                            Study)
+    from eyened_orm import Annotation, FormAnnotation, ImageInstance, Project, Study
 
 
 class SexEnum(enum.Enum):
@@ -45,9 +44,7 @@ class Patient(Base):
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Patient")
 
     @classmethod
-    def by_project_and_identifier(
-        cls, session: Session, project_id: int, patient_identifier: str | int | None
-    ) -> Optional["Patient"]:
+    def by_project_and_identifier(cls, session: Session, project_id: int, patient_identifier: str | int | None) -> Optional["Patient"]:
         """Return the patient with the given project ID and identifier."""
         from eyened_orm import Patient
 
@@ -59,28 +56,19 @@ class Patient(Base):
         )
 
     @classmethod
-    def by_identifier(
-        cls, session: Session, patient_identifier: str | int | None
-    ) -> List["Patient"]:
+    def by_identifier(cls, session: Session, patient_identifier: str | int | None) -> List["Patient"]:
         """Return a list of patients with the given identifier."""
         return cls.by_columns(session, PatientIdentifier=patient_identifier)
 
     def get_study_by_date(self, study_date: date) -> Optional["Study"]:
         """Return the study for this patient with the given study date."""
-        return next(
-            (study for study in self.Studies if study.StudyDate == study_date), None
-        )
+        return next((study for study in self.Studies if study.StudyDate == study_date), None)
 
     def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
         from eyened_orm import ImageInstance, Series, Study
 
         session = Session.object_session(self)
-        q = (
-            select(ImageInstance)
-            .join(Series)
-            .join(Study)
-            .where(Study.PatientID == self.PatientID)
-        )
+        q = select(ImageInstance).join(Series).join(Study).where(Study.PatientID == self.PatientID)
         if not include_inactive:
             q = q.where(~ImageInstance.Inactive)
         if where is not None:

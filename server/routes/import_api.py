@@ -24,26 +24,14 @@ class ImageImportData(BaseModel):
     """
 
     project_name: str = Field(..., description="Required project name")
-    patient_identifier: Optional[str] = Field(
-        None, description="Patient identifier in the system"
-    )
-    patient_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new patient"
-    )
-    study_date: Optional[Union[datetime.date, str]] = Field(
-        None, description="Study date (can be a date object or ISO format string)"
-    )
-    study_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new study"
-    )
+    patient_identifier: Optional[str] = Field(None, description="Patient identifier in the system")
+    patient_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new patient")
+    study_date: Optional[Union[datetime.date, str]] = Field(None, description="Study date (can be a date object or ISO format string)")
+    study_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new study")
     series_id: Optional[str] = Field(None, description="Optional series identifier")
-    series_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new series"
-    )
+    series_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new series")
     image: str = Field(..., description="Path to the image file (required)")
-    image_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new image"
-    )
+    image_props: Optional[Dict[str, Any]] = Field({}, description="Optional key-value properties for new image")
 
 
 class ImportOptions(BaseModel):
@@ -51,21 +39,11 @@ class ImportOptions(BaseModel):
     Options for the import process
     """
 
-    create_patients: bool = Field(
-        False, description="If True, create patients when they don't exist"
-    )
-    create_studies: bool = Field(
-        False, description="If True, create studies when they don't exist"
-    )
-    create_series: bool = Field(
-        True, description="If True, create series when they don't exist"
-    )
-    create_project: bool = Field(
-        False, description="If True, create project when it doesn't exist"
-    )
-    include_stack_trace: bool = Field(
-        False, description="If True, include stack trace in the error response"
-    )
+    create_patients: bool = Field(False, description="If True, create patients when they don't exist")
+    create_studies: bool = Field(False, description="If True, create studies when they don't exist")
+    create_series: bool = Field(True, description="If True, create series when they don't exist")
+    create_project: bool = Field(False, description="If True, create project when it doesn't exist")
+    include_stack_trace: bool = Field(False, description="If True, include stack trace in the error response")
 
 
 class ImportRequest(BaseModel):
@@ -108,7 +86,6 @@ async def import_single_image(
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-
     # Create importer with options
     importer = make_importer(session, request.options)
 
@@ -144,13 +121,9 @@ async def run_inference(current_user: CurrentUser = Depends(get_current_user)):
     try:
         task = task_run_inference()
 
-        return TaskResponse(
-            success=True, message="Inference task queued successfully", task_id=task.id
-        )
+        return TaskResponse(success=True, message="Inference task queued successfully", task_id=task.id)
     except Exception as e:
-        return TaskResponse(
-            success=False, message="Failed to queue inference task", error=str(e)
-        )
+        return TaskResponse(success=False, message="Failed to queue inference task", error=str(e))
 
 
 @router.post("/import/update_thumbnails", response_model=TaskResponse)
@@ -164,6 +137,4 @@ async def update_thumbnails(current_user: CurrentUser = Depends(get_current_user
             task_id=task.id,
         )
     except Exception as e:
-        return TaskResponse(
-            success=False, message="Failed to queue thumbnail update task", error=str(e)
-        )
+        return TaskResponse(success=False, message="Failed to queue thumbnail update task", error=str(e))
