@@ -12,7 +12,7 @@
 
 	const {userManager} = getContext<GlobalContext>('globalContext');;
 
-
+	console.log('userManager.loggedIn', authEnabled,  userManager.loggedIn);
 	if(authEnabled && !userManager.loggedIn) {
 		// redirect to login page if user not logged
 		console.log('User not logged in. Redirecting..')
