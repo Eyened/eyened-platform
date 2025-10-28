@@ -24,12 +24,12 @@
 		TooltipContent,
 		TooltipTrigger,
 	} from "$lib/components/ui/tooltip";
-	import { tags } from "$lib/data/stores.svelte";
 	import { createTag } from "$lib/data/helpers";
+	import { tags } from "$lib/data/stores.svelte";
 	import { timeAgo } from "$lib/utils";
 	import { faSquareXmark } from "@fortawesome/free-solid-svg-icons";
 	import Fa from "svelte-fa";
-	import type { TagGET, TagMeta } from "../../types/openapi_types";
+	import type { TagMeta, TagType } from "../../types/openapi_types";
 	import TagEditForm from "./TagEditForm.svelte";
 
 	let {
@@ -40,7 +40,7 @@
 		untag: onUntag = (id: number) => {},
 		onUpdate,
 	}: {
-		tagType: "Annotation" | "ImageInstance" | "Study";
+		tagType: TagType
 		tags?: TagMeta[];
 		maxTags?: number;
 		tag?: (id: number) => void;
@@ -91,12 +91,11 @@
 	async function handleCreateTag(p: {
 		name: string;
 		description?: string;
-		type: "Annotation" | "ImageInstance" | "Study";
+		tagType: TagType;
 	}) {
-		const apiTagType = p.type === "Annotation" ? "FormAnnotation" : p.type;
 		
 		// Use the helper function
-		const newTag = await createTag(p.name, apiTagType, p.description);
+		const newTag = await createTag(p.name, p.tagType, p.description);
 		
 		if (newTag) {
 			// Auto-link the newly created tag
@@ -117,12 +116,12 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="tagging-component border border-gray-300 rounded-md bg-gray-100 p-2"
+	class="tagging-component border border-gray-300 rounded-md bg-gray-100 p-2 text-lg"
 	onclick={(e) => e.stopPropagation()}
 >
 	<!-- Dialog with the new tag form -->
 	<Dialog bind:open={dialogOpen}>
-		<DialogContent>
+		<DialogContent portalProps={{ disabled: true }}>
 			<DialogHeader>
 				<DialogTitle>New Tag</DialogTitle>
 				<TagEditForm {tagType} initTagName={textValue} add={handleCreateTag} />
@@ -141,7 +140,7 @@
 				Add tag...
 			</Button>
 		</PopoverTrigger>
-		<PopoverContent class="w-40">
+		<PopoverContent class="w-40" portalProps={{ disabled: true }}>
 			<Command bind:value onkeydown={handleCommandKeydown}>
 				<CommandInput bind:value={textValue} placeholder="Search tags..." />
 				<CommandList>

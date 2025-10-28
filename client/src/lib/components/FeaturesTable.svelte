@@ -14,10 +14,10 @@
 		type SortingState,
 	} from "@tanstack/table-core";
 	import { createRawSnippet, getContext } from "svelte";
+	import type { FeatureGET } from "../../types/openapi_types";
 	import FeatureRow from "./FeatureRow.svelte";
 	import SortHeader from "./SortHeader.svelte";
 	import Button from "./ui/button/button.svelte";
-	import type { FeatureGET } from "../../types/openapi_types";
 
 	const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -55,7 +55,8 @@
 					size: "sm",
 					variant: "link",
 					href: globalContext.makeInstancesBrowserURL({
-						variable: "SegmentationFeature Name",
+						variable: "Segmentation Feature Name",
+						type: "default",
 						operator: "IN",
 						value: [row.original.name],
 					}),

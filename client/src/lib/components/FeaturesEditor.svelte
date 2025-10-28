@@ -1,7 +1,8 @@
 <script lang="ts">
 	import * as Dialog from "$lib/components/ui/dialog";
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
-	import { getContext, onMount } from "svelte";
+	import { createFeature } from "$lib/data/helpers";
+	import { getContext } from "svelte";
 	import type { FeaturePATCH, FeaturePUT } from "../../types/openapi_types";
 	import FeatureForm from "./FeatureForm.svelte";
 	import FeaturesTable from "./FeaturesTable.svelte";
@@ -9,12 +10,8 @@
 	const globalContext = getContext<GlobalContext>("globalContext");
 	let createOpen = $state(false);
 
-	onMount(async () => {
-		await globalContext.ensureFeaturesLoaded();
-	});
-
 	async function handleCreate(payload: FeaturePATCH) {
-		await globalContext.features.create({
+		await createFeature({
 			name: payload.name!,
 			subfeature_ids: payload.subfeature_ids ?? null
 		} as FeaturePUT);

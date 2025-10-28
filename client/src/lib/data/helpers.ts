@@ -1,5 +1,5 @@
-import type { FeaturePATCH, InstanceGET, SegmentationGET, StudyGET, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
-import { ingestTasks, instances, segmentations, studies, tasks } from './stores.svelte';
+import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, InstanceGET, SegmentationGET, StudyGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
+import { formAnnotations, ingestTasks, instances, segmentations, studies, tasks } from './stores.svelte';
 
 
 // ===== Tag Helpers =====
@@ -41,16 +41,39 @@ export async function tagStudy(study: StudyGET, tagId: number) {
 		body: { tag_id: tagId } as any
 	});
 	// Update store
-    console.log('tagStudy', study.id, tagId, data);
-    console.log({
-		...study,
-		tags: [...study.tags, data as any]
-	})
+   
 	studies.set(study.id, {
 		...study,
 		tags: [...study.tags, data as any]
 	});
 }
+
+export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number) {
+	const { api } = await import('../api/client');
+	const { data } = await api.POST('/form-annotations/{form_annotation_id}/tags' as any, {
+		params: { path: { form_annotation_id: Number(formAnnotation.id) } } as any,
+		body: { tag_id: tagId } as any
+	});
+	// Update store
+	formAnnotations.set(formAnnotation.id, {
+		...formAnnotation,
+		tags: [...(formAnnotation.tags ?? []), data as any]
+	});
+}
+
+export async function untagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number) {
+	const { api } = await import('../api/client');
+	await api.DELETE('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
+		params: { path: { form_annotation_id: Number(formAnnotation.id), tag_id: tagId } } as any
+	});
+	// Update store
+	formAnnotations.set(formAnnotation.id, {
+		...formAnnotation,
+		tags: (formAnnotation.tags ?? []).filter(t => t.id !== tagId)
+	});
+}
+
+
 
 export async function untagStudy(study: StudyGET, tagId: number) {
 	const { api } = await import('../api/client');
@@ -203,6 +226,21 @@ export async function setFormAnnotationValue(annotationId: number, form_data: un
 
 // ===== Feature Helpers =====
 
+/** Create a new feature on the server and update local feature stores. */
+export async function createFeature(data: FeaturePUT): Promise<FeatureGET | null> {
+	const { api } = await import('../api/client');
+	const { features, featuresByName } = await import('./stores.svelte');
+
+	const res = await api.POST('/features' as any, { body: data });
+	if (res.data) {
+		const feature = res.data as FeatureGET;
+		features.set(feature.id, feature);
+		featuresByName.set(feature.name, feature);
+		return feature;
+	}
+	return null;
+}
+
 export async function updateFeature(featureId: number, patch: FeaturePATCH) {
 	const { api } = await import('../api/client');
 	const { features, featuresByName } = await import('./stores.svelte');
@@ -243,7 +281,7 @@ export async function deleteFeature(featureId: number) {
 
 export async function createTag(
 	name: string, 
-	tagType: 'Study' | 'ImageInstance' | 'FormAnnotation', 
+	tagType: TagType, 
 	description?: string
 ) {
 	const { api } = await import('../api/client');
