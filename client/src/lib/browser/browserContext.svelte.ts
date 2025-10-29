@@ -62,16 +62,21 @@ export class BrowserContext {
         this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
     );
 
+	// Helper: Get instance from either store (full InstanceGET or lightweight InstanceMeta)
+	private getInstance(id: number): InstanceGET | InstanceMeta | undefined {
+		return instances.get(id) ?? instanceMetas.get(id);
+	}
+
 	selectedInstances = $derived(
 		this.selectedIds
-			.map(id => instanceMetas.get(id))
-			.filter((x): x is InstanceMeta => x !== undefined)
+			.map(id => this.getInstance(id))
+			.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
 	);
 
 	// Derived: ordered instances for rendering
 	orderedInstances = $derived(
 	    this.orderedInstanceIds
-		.map(id => instances.get(id) ?? instanceMetas.get(id))
+		.map(id => this.getInstance(id))
 		.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
 );
 
@@ -312,7 +317,8 @@ export function encodeConditions(conditions: Condition[]): string {
         const encodedValue = encodeURIComponent(serializeValue((condition as any).value ?? null));
         const encodedType = encodeURIComponent((condition as any).type ?? 'default');
         const encodedModel = encodeURIComponent(((condition as any).type === 'attribute' ? (condition as any).model ?? '' : ''));
-        return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}`;
+        const encodedFeature = encodeURIComponent(((condition as any).type === 'attribute' ? (condition as any).feature ?? '' : ''));
+        return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}:${encodedFeature}`;
     }).join(';');
 }
 
@@ -320,14 +326,22 @@ export function decodeConditions(urlString: string): Condition[] {
     if (urlString === '') return [];
     return urlString.split(';').map((conditionString) => {
         const parts = conditionString.split(':');
-        const [v, o, val, t, m] = parts;
+        const [v, o, val, t, m, f] = parts;  // Add 'f' for feature
         const variable = decodeURIComponent(v);
         const operator = decodeURIComponent(o) as Condition['operator'];
         const value = deserializeValue(val);
         const type = t ? (decodeURIComponent(t) as any) : 'default';
         const model = m ? decodeURIComponent(m) : undefined;
+        const feature = f ? decodeURIComponent(f) : undefined;  // Decode feature
         if (type === 'attribute') {
-            return { type: 'attribute', variable, operator: operator as any, value, model } as any;
+            return { 
+                type: 'attribute', 
+                variable, 
+                operator: operator as any, 
+                value, 
+                model,
+                feature: feature || undefined  // Include feature, convert empty string to undefined
+            } as any;
         }
         return { type: 'default', variable: variable as any, operator: operator as any, value } as any;
     });

@@ -17,6 +17,7 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
+    restart: always
 
   api-server:
     user: "${USERID:-1000}:${GROUPID:-1000}"
@@ -60,6 +61,7 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
+    restart: always
 
   worker:
     user: "${USERID:-1000}:${GROUPID:-1000}"
@@ -103,12 +105,13 @@ services:
       - ${THUMBNAILS_PATH}:/thumbnails
     ports:
       - ${PORT}:80
+    restart: always
 
   adminer:
     image: adminer:latest
     restart: always
     ports:
-      - "18080:8080"
+      - "8080:8080"
     depends_on:
       database:
         condition: service_healthy

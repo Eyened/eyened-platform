@@ -9,10 +9,7 @@
 	const globalContext = getContext<GlobalContext>('globalContext');
 	const { userManager } = globalContext;
 
-	function logout() {
-		userManager.logout();
-		globalContext.showUserMenu = false;
-	}
+
 </script>
 
 

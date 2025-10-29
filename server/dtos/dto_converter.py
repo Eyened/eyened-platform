@@ -106,7 +106,6 @@ class DTOConverter:
             description=study.StudyDescription,
             date=study.StudyDate,
             age=study.age_years,
-            study_instance_uid=study.StudyInstanceUid,
             project=project_meta,
             patient=patient_meta,
             tags=[],
@@ -224,25 +223,26 @@ class DTOConverter:
         # Populate attributes grouped by model name
         try:
             attrs_by_model: dict[str, dict[str, object]] = {}
-            for ia in getattr(image_instance, "ImageAttributes", []) or []:
-                attr = getattr(ia, "Attribute", None)
-                if not attr or not getattr(attr, "Model", None):
+            for av in getattr(image_instance, "AttributeValues", []) or []:
+                attr_def = getattr(av, "AttributeDefinition", None)
+                producing_model = getattr(av, "ProducingModel", None)
+                if not attr_def or not producing_model:
                     continue
-                model_name = attr.Model.ModelName
+                model_name = producing_model.ModelName
                 value = None
-                if ia.ValueInt is not None:
-                    value = ia.ValueInt
-                elif ia.ValueFloat is not None:
-                    value = ia.ValueFloat
-                elif ia.ValueText is not None:
-                    value = ia.ValueText
-                elif ia.ValueJSON is not None:
-                    value = ia.ValueJSON
+                if av.ValueInt is not None:
+                    value = av.ValueInt
+                elif av.ValueFloat is not None:
+                    value = av.ValueFloat
+                elif av.ValueText is not None:
+                    value = av.ValueText
+                elif av.ValueJSON is not None:
+                    value = av.ValueJSON
                 if value is None:
                     continue
                 if model_name not in attrs_by_model:
                     attrs_by_model[model_name] = {}
-                attrs_by_model[model_name][attr.AttributeName] = value
+                attrs_by_model[model_name][attr_def.AttributeName] = value
             dto.attributes = attrs_by_model
         except Exception:
             # Fail-safe: leave attributes empty if relationships not loaded

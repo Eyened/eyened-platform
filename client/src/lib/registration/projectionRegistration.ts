@@ -1,11 +1,11 @@
-import type { Instance } from "$lib/datamodel/instance.svelte";
 import type { Position } from "$lib/types";
+import type { InstanceGET } from "../../types/openapi_types";
 import type { RegistrationItem } from "./registrationItem";
 
 export class OCTToProj implements RegistrationItem {
     public readonly source: string;
     public readonly target: string;
-    constructor(public readonly instance: Instance) {
+    constructor(public readonly instance: InstanceGET) {
         this.source = `${instance.id}`;
         this.target = `${instance.id}_proj`;
     }
@@ -28,7 +28,7 @@ export class OCTToProj implements RegistrationItem {
 export class ProjToOCT implements RegistrationItem {
     public readonly source: string;
     public readonly target: string;
-    constructor(public readonly instance: Instance) {
+    constructor(public readonly instance: InstanceGET) {
         this.source = `${instance.id}_proj`;
         this.target = `${instance.id}`;
     }
@@ -37,7 +37,7 @@ export class ProjToOCT implements RegistrationItem {
         return {
             x: p.x,
             y: 0,
-            index: Math.round(Math.max(0, Math.min(p.y, this.instance.nrOfFrames - 1)))
+            index: Math.round(Math.max(0, Math.min(p.y, this.instance.nr_of_frames - 1)))
         }
     }
 

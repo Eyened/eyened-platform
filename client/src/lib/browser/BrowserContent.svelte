@@ -15,7 +15,6 @@
 		// Re-run search with whichever mode is active
 		browserContext.search();
 	}
-    console.log("BrowserContent", browserContext.orderedInstances);
 </script>
 
 {#if browserContext.queryMode === "instances" && browserContext.displayMode === "instance"}
@@ -43,7 +42,7 @@
 		{onPageChange}
 	>
 		{#each browserContext.orderedStudies as study (study.id)}
-			<StudyBlock studyId={study.id} {mode} />
+			<StudyBlock study={study} {mode} />
 		{/each}
 	</PaginatedResults>
 {:else}

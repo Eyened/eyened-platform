@@ -9,7 +9,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Creator, Feature, ImageInstance, SegmentationTagLink, SubTask
+    from eyened_orm import Creator, Feature, ImageInstance, SegmentationTagLink, SubTask, AttributeValue
+
+
+class ModelKind(Enum):
+    Segmentation = "segmentation"
+    Attributes = "attributes"
 
 
 class DataRepresentation(Enum):
@@ -203,6 +208,7 @@ class Segmentation(SegmentationBase):
     Feature: Mapped["Feature"] = relationship("eyened_orm.segmentation.Feature", back_populates="Segmentations")
     SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="Segmentations")
     SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship("eyened_orm.tag.SegmentationTagLink", back_populates="Segmentation", lazy="selectin")
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="Segmentation", lazy="selectin")
 
 class FeatureFeatureLink(Base):
     __tablename__ = "CompositeFeature"
@@ -318,11 +324,17 @@ class Model(Base):
     ModelID: Mapped[int] = mapped_column(primary_key=True)
     ModelName: Mapped[str] = mapped_column(String(255), unique=True)
     Version: Mapped[str] = mapped_column(String(255))
-    ModelType: Mapped[str] = mapped_column(String(255)) # to distinguish between segmentation and attribute models
+    ModelType: Mapped[ModelKind] = mapped_column(
+        SAEnum(ModelKind, name="modelkind", values_callable=lambda e: [m.value for m in e]),
+        nullable=False
+    ) # to distinguish between segmentation and attribute models
     # segmentation models have a feature and segmentations
     # attribute models have only attributes
     Description: Mapped[Optional[str]] = mapped_column(String(255))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # relationships
+    ProducedAttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="ProducingModel")
 
 
 class SegmentationModel(Model):
@@ -334,7 +346,7 @@ class SegmentationModel(Model):
     Feature: Mapped[Optional["Feature"]] = relationship("eyened_orm.segmentation.Feature", back_populates="SegmentationModels")
     Segmentations: Mapped[List["ModelSegmentation"]] = relationship("eyened_orm.segmentation.ModelSegmentation", back_populates="Model")
 
-    __mapper_args__ = {"polymorphic_identity": "segmentation"}
+    __mapper_args__ = {"polymorphic_identity": ModelKind.Segmentation}
     
 class ModelSegmentation(SegmentationBase):
     __tablename__ = "ModelSegmentation"   
@@ -350,6 +362,7 @@ class ModelSegmentation(SegmentationBase):
         "eyened_orm.image_instance.ImageInstance",
         back_populates="ModelSegmentations"
     )
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="ModelSegmentation", lazy="selectin")
 
     @property
     def groupname(self) -> str:
