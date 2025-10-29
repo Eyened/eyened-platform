@@ -1,29 +1,29 @@
 <script lang="ts">
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
-	import type { BrowserContext } from "./browserContext.svelte";
 	import extensions from "$lib/extensions";
 	import Tagger from "$lib/tags/Tagger.svelte";
 	import { getContext } from "svelte";
+	import type { BrowserContext } from "./browserContext.svelte";
 	import Eye from "./Eye.svelte";
 
-	import { studies } from "$lib/data";
 	import { tagStudy, untagStudy } from "$lib/data/helpers";
+	import type { StudyGET } from "../../types/openapi_types";
+	import AdditionalDataSources from "./AdditionalDataSources.svelte";
 	import StudyBlockForms from "./StudyBlockForms.svelte";
 	interface Props {
-		studyId: number;
+		study: StudyGET;
 		mode?: "full" | "overlay";
 	}
 
-	let { studyId, mode = "full" }: Props = $props();
+	let { study, mode = "full" }: Props = $props();
 	
 	// Reactive: updates when study in store changes!
-	const study = $derived(studies.get(studyId)!);
+	// const study = $derived(studies.get(studyId)!);
 	
 	let collapse = $state(false);
 
 	const globalContext = getContext<GlobalContext>("globalContext");
 	const browserContext = getContext<BrowserContext>("browserContext");
-	const { additional_data_sources } = extensions.browser.study;
 	
 	// Derived URLs for links
 	const urlByPatient = $derived(
@@ -42,6 +42,13 @@
 		operator: "==",
 		value: dateStr,
 	}));
+
+	const { additional_data_sources } = extensions.browser.study;
+	const dataSourceContext = {
+        study,
+        patient: study.patient,
+        project: study.project,
+    };
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -97,7 +104,7 @@
 
 		{#if mode == "full"}
 			<StudyBlockForms {study} />
-			<!-- <AdditionalDataSources {context} {additional_data_sources} /> -->
+			<AdditionalDataSources context={dataSourceContext} {additional_data_sources} />
 		{/if}
 	</div>
 </div>
