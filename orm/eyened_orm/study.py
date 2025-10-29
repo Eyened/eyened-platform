@@ -59,7 +59,7 @@ class Study(Base):
         return (self.StudyDate - self.Patient.BirthDate).days / 365.25
 
     def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
-        from eyened_orm import ImageInstance
+        from eyened_orm import ImageInstance, Series
         q = select(ImageInstance).join(Series).where(Series.StudyID == self.StudyID)
         if not include_inactive:
             q = q.where(~ImageInstance.Inactive)
