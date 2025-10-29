@@ -136,7 +136,7 @@ class ImageInstance(Base):
 
     HorizontalFieldOfView: Mapped[Optional[float]]  # in degrees
 
-    Laterality: Mapped[Optional[Laterality]] = mapped_column(SAEnum(Laterality))  # L or R
+    Laterality: Mapped[Laterality] = mapped_column(SAEnum(Laterality))  # L or R
     DICOMModality: Mapped[Optional[ModalityType]] = mapped_column(SAEnum(ModalityType))  # OP, OPT, SC
     AnatomicRegion: Mapped[Optional[int]]  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
     ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(SAEnum(ETDRSField))  # F1-F7
@@ -149,6 +149,8 @@ class ImageInstance(Base):
 
     # Relative filepath to the image file
     DatasetIdentifier: Mapped[str] = mapped_column(String(256))
+    # Alternative relative filepath to the image file. Typically a lower resolution version of the image.
+    AltDatasetIdentifier: Mapped[Optional[str]] = mapped_column(String(256))
 
     # identifier for the thumbnail (project_id/thumbnail_name), needs suffix for different sizes
     ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(256))
@@ -212,8 +214,8 @@ class ImageInstance(Base):
     ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship("eyened_orm.tag.ImageInstanceTagLink", back_populates="ImageInstance", lazy="selectin")
 
     # attributes relationship
-    ImageAttributes: Mapped[List["ImageAttribute"]] = relationship(
-        "eyened_orm.attributes.ImageAttribute",
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship(
+        "eyened_orm.attributes.AttributeValue",
         back_populates="ImageInstance",
         lazy="selectin",
         cascade="all, delete-orphan"

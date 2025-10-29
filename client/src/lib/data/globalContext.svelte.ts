@@ -124,7 +124,7 @@ export class GlobalContext {
     }
 
     private _encodeSingleConditionExtended(
-        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default'|'attribute'; model?: string }
+        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default'|'attribute'; model?: string; feature?: string }
     ): string {
         const serializeValue = (v: string | number | string[] | null) => JSON.stringify(v);
         const encodedVariable = encodeURIComponent(condition.variable);
@@ -132,6 +132,7 @@ export class GlobalContext {
         const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
         const encodedType = encodeURIComponent(condition.type ?? 'default');
         const encodedModel = encodeURIComponent((condition.type === 'attribute' ? condition.model ?? '' : ''));
-        return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}`;
+        const encodedFeature = encodeURIComponent((condition.type === 'attribute' ? condition.feature ?? '' : ''));
+        return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}:${encodedFeature}`;
     }
 }

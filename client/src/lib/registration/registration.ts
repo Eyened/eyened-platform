@@ -48,9 +48,11 @@ export class Registration {
     }
 
     getPosition(image_id: string): Position | undefined {
+        
         if (this.cache.has(image_id)) {
             return this.cache.get(image_id);
         }
+        
         const source = this.pointer.image_id;
         const target = image_id;
         let path = this.shortestPaths[source]?.[target];

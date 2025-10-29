@@ -13,7 +13,7 @@ class ETDRS_masks:
     subfields_9 = 'CSF', 'SIM', 'NIM', 'TIM', 'IIM', 'SOM', 'NOM', 'TOM', 'IOM'
     rings_3 = 'center', 'inner', 'outer'
     quadrants = 'superior_grid', 'nasal_grid', 'inferior_grid', 'temporal_grid'
-    all_fields = tuple([*subfields_9, *rings_3, *quadrants, 'grid', 'total'])
+    all_fields = (*subfields_9, *rings_3, *quadrants, 'grid', 'total')
 
     def __init__(self, h, w, fovea_x, fovea_y, resolution, laterality):
         '''
@@ -59,6 +59,14 @@ class ETDRS_masks:
         return max((r.area for r in regions), default=0) * self.pixel_area
 
     def get_summary(self, binary_image, fields, include_area=True, include_count=True, include_largest=True):
+        if binary_image is None:
+            result = {}
+            for field in fields:
+                result[f'{field}_area'] = 0.0
+                result[f'{field}_count'] = 0
+                result[f'{field}_largest'] = 0.0
+            return result
+            
         masked_images = {
             field: getattr(self, field) & binary_image
             for field in fields
@@ -100,7 +108,7 @@ class ETDRS_masks:
     def total(self):
         return np.ones((self.h, self.w), dtype=bool)
 
-    '''rings'''
+    # rings
     @cached_property
     def center(self):
         return self.distance_to_fovea < 0.5
@@ -117,7 +125,7 @@ class ETDRS_masks:
     def grid(self):
         return self.center | self.inner | self.outer
 
-    '''quadrants'''
+    # quadrants
     @cached_property
     def inferior(self):
         return (1/8 < self.theta) & (self.theta <= 3/8)
@@ -142,7 +150,7 @@ class ETDRS_masks:
     def temporal(self):
         return self.left if self.laterality == 'R' else self.right
 
-    '''quadrants grid'''
+    # quadrants grid
     @cached_property
     def superior_grid(self):
         return self.superior & self.grid
@@ -159,7 +167,7 @@ class ETDRS_masks:
     def temporal_grid(self):
         return self.temporal & self.grid
 
-    '''subfields'''
+    # subfields
     @cached_property
     def CSF(self):
         return self.center
@@ -272,7 +280,7 @@ class ETDRS_masks:
             {svg_element('line', x1=-d_inner, y1=+d_inner, x2=-d_outer, y2=+d_outer)}
             {svg_element('line', x1=+d_inner, y1=+d_inner, x2=+d_outer, y2=+d_outer)}
             {svg_texts}
-        
+
         </svg>
         """
 

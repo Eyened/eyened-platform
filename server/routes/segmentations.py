@@ -265,6 +265,9 @@ async def get_segmentation_data(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
+    if arr is None:
+        return Response(status_code=204)
+
     np_buf = io.BytesIO()
     np.save(np_buf, arr)
     raw = np_buf.getvalue()
@@ -401,6 +404,9 @@ async def get_model_segmentation_data(
         arr = model_segmentation.read_data(axis=axis, slice_index=scan_nr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+    if arr is None:
+        return Response(status_code=204)
 
     np_buf = io.BytesIO()
     np.save(np_buf, arr)

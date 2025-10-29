@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
     if settings.public_auth_disabled:
         print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
 
-    if settings.database_root_password is not None:
+    if settings.database_root_password:
         try:
             # create database tables and user if they don't exist
             create_database()
@@ -98,7 +98,10 @@ async def lifespan(app: FastAPI):
 
     # # before startup
     logging.basicConfig()
-    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    if settings.environment == 'development':
+        logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    else:
+        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
     
     
     db = Database(settings)

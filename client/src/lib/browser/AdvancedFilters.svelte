@@ -28,9 +28,19 @@
     // Field options for SelectWithSearch (grouped)
     const fieldOptions = $derived(
         signature.map(s => ({
-            label: s.name,
-            value: s.name,
-            group: (s.type ?? 'default') === 'attribute' ? (s.model ?? 'Attributes') : 'Fields'
+            // For attributes with features, show: "attribute_name (feature)"
+            // For attributes without features, show: "attribute_name"
+            // For default fields, show: "field_name"
+            label: (s.type ?? 'default') === 'attribute' && s.feature
+                ? `${s.name} (${s.feature})`
+                : s.name,
+            // Make value unique by combining type, model, feature, and name
+            value: (s.type ?? 'default') === 'attribute' 
+                ? `${s.model}__${s.feature ?? 'none'}__${s.name}`
+                : s.name,
+            group: (s.type ?? 'default') === 'attribute' 
+                ? (s.feature ? `${s.model} (${s.feature})` : s.model ?? 'Attributes')
+                : 'Fields'
         }))
     );
 
@@ -39,8 +49,33 @@
 	});
 
 	// Get signature info for a field
-    function getFieldSignature(fieldName: string): SignatureField | undefined {
-		return signature.find(s => s.name === fieldName);
+    function getFieldSignature(fieldValue: string): SignatureField | undefined {
+		// Check if it's an attribute field with encoded value (model__feature__name)
+		if (fieldValue.includes('__')) {
+			const parts = fieldValue.split('__');
+			if (parts.length === 3) {
+				const [model, feature, name] = parts;
+				return signature.find(s => 
+					s.name === name && 
+					s.model === model && 
+					(feature === 'none' ? !s.feature : s.feature === feature)
+				);
+			}
+		}
+		// Fallback to simple name match for non-attribute fields
+		return signature.find(s => s.name === fieldValue);
+	}
+
+	// Convert condition to encoded field value for dropdown
+	function conditionToFieldValue(condition: Condition): string {
+		if ((condition as any).type === 'attribute') {
+			const attrCond = condition as any;
+			const model = attrCond.model || '';
+			const feature = attrCond.feature ?? 'none';
+			const name = attrCond.variable;
+			return `${model}__${feature}__${name}`;
+		}
+		return (condition as any).variable;
 	}
 
 	// Get operator options for a field
@@ -147,7 +182,14 @@
 		const sig = getFieldSignature(draftRow.field);
 		const value = coerceValue(draftRow.value, sig?.values ?? 'string');
         const newCond: Condition = (sig && (sig.type ?? 'default') === 'attribute')
-            ? ({ type: 'attribute', model: sig?.model || '', variable: draftRow.field as any, operator: draftRow.operator as any, value } as AttributeCondition)
+            ? ({ 
+                type: 'attribute', 
+                model: sig?.model || '', 
+                variable: sig.name as any,  // Use actual attribute name, not encoded value
+                operator: draftRow.operator as any, 
+                value,
+                feature: sig?.feature ?? undefined  // Use ?? instead of || to preserve empty string if needed
+              } as AttributeCondition)
             : ({ type: 'default', variable: draftRow.field as any, operator: draftRow.operator as any, value } as DefaultCondition);
         setConditions([...(conditions ?? []), newCond]);
 		draftRow = null;
@@ -186,7 +228,14 @@
             const operator = allowedOps.includes(c.operator as ConditionOperator) ? c.operator : getDefaultOperator(c.variable);
             const value = coerceValue(c.value, sig.values);
             if ((c as any).type === 'attribute') {
-                next.push({ type: 'attribute', model: (c as any).model || '', variable: c.variable as any, operator: operator as any, value } as AttributeCondition);
+                next.push({ 
+                    type: 'attribute', 
+                    model: (c as any).model || '', 
+                    variable: c.variable as any, 
+                    operator: operator as any, 
+                    value,
+                    feature: (c as any).feature ?? undefined  // PRESERVE feature
+                } as AttributeCondition);
             } else {
                 next.push({ type: 'default', variable: c.variable as any, operator: operator as any, value } as DefaultCondition);
             }
@@ -205,21 +254,23 @@
 			<div class="flex-1">
                 <SelectWithSearch
                     options={fieldOptions}
-                    value={condition.variable}
+                    value={conditionToFieldValue(condition)}
 					placeholder="Select field..."
 					onSelect={(v: string) => {
 						const sig = getFieldSignature(v);
                         const patch: Partial<Condition> = {
-                            variable: v,
+                            variable: sig?.name || v,  // Use actual name from signature
                             operator: getDefaultOperator(v) as any,
                             value: Array.isArray(sig?.values) ? [] : ''
                         } as any;
                         if (sig && (sig.type ?? 'default') === 'attribute') {
                             (patch as any).type = 'attribute';
                             (patch as any).model = sig.model || '';
+                            (patch as any).feature = sig.feature ?? undefined;  // Explicitly set feature
                         } else {
                             (patch as any).type = 'default';
                             delete (patch as any).model;
+                            delete (patch as any).feature;
                         }
                         updateConditionAt(i, patch);
 					}}

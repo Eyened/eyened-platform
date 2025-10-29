@@ -4130,7 +4130,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InstanceGET"
+                  "$ref": "#/components/schemas/SubTaskWithImagesGET"
                 }
               }
             }
@@ -4200,8 +4200,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubTaskWithImagesGET"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4490,6 +4497,17 @@
               }
             ],
             "title": "Value"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature"
           }
         },
         "type": "object",
@@ -4876,7 +4894,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5015,7 +5032,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5086,7 +5102,6 @@
           "form_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5130,7 +5145,6 @@
           "schema": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5185,7 +5199,6 @@
           "patient_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5215,7 +5228,6 @@
           "study_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5241,7 +5253,6 @@
           "series_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5260,7 +5271,6 @@
           "image_props": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5346,7 +5356,6 @@
           "data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5478,7 +5487,6 @@
           "cf_roi": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5490,7 +5498,6 @@
           "cf_keypoints": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5612,7 +5619,6 @@
           },
           "attributes": {
             "additionalProperties": {
-              "additionalProperties": true,
               "type": "object"
             },
             "type": "object",
@@ -6397,6 +6403,17 @@
               }
             ],
             "title": "Model"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature"
           }
         },
         "type": "object",
@@ -6439,17 +6456,6 @@
               }
             ],
             "title": "Age"
-          },
-          "study_instance_uid": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Study Instance Uid"
           },
           "project": {
             "$ref": "#/components/schemas/ProjectMeta"
@@ -6516,7 +6522,6 @@
               "Study Date",
               "Study Description",
               "Study Round",
-              "Study Instance UID",
               "Patient Identifier",
               "Patient Sex",
               "Patient Birthdate",
@@ -7073,7 +7078,6 @@
             "title": "Id"
           },
           "config": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           },
