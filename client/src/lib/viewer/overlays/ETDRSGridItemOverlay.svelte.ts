@@ -4,6 +4,15 @@ import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
 const [C, I, O] = [1, 3, 6];
+const additionalCircles: Record<string, number> = {
+    C0: C / 16,
+    C1: C / 8,
+    C2: C / 4,
+    I1: I / 8,
+    I2: I / 4,
+    O1: O / 8,
+    O2: O / 4,
+};
 export type etdrsGridType = {
     image_instance_id: string;
     form_data: {
@@ -15,6 +24,7 @@ export class ETDRSGridItemOverlay implements Overlay {
     lineWidth = 1;
     strokeStyle = 'rgba(255,255,255, 1)';
     name: string = 'ETRDR grid item';
+    cursorCircle: string | undefined = undefined;
 
     constructor(
         private readonly annotation: etdrsGridType,
@@ -23,8 +33,21 @@ export class ETDRSGridItemOverlay implements Overlay {
 
     ) { }
 
-
-    keydown(_keyEvent: ViewerEvent<KeyboardEvent>) { }
+    keydown(keyEvent: ViewerEvent<KeyboardEvent>) {
+        const { event } = keyEvent;
+        const circles: Record<string, string[]> = {
+            C: ['C0', 'C1', 'C2'],
+            I: ['I1', 'I2'],
+            O: ['O1', 'O2'],
+        };
+        const cycle = circles[event.key.toUpperCase()];
+        if (cycle !== undefined) {
+            const i = this.cursorCircle ? cycle.indexOf(this.cursorCircle) : 0;
+            this.cursorCircle = cycle[(i + 1) % cycle.length];
+        } else {
+            this.cursorCircle = undefined;
+        }
+    }
 
     repaint(viewerContext: ViewerContext) {
         const { image, context2D } = viewerContext;
@@ -53,6 +76,8 @@ export class ETDRSGridItemOverlay implements Overlay {
     private paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext, fovea: Position2D, diskBorder: Position2D) {
         ctx.lineWidth = this.lineWidth;
         ctx.strokeStyle = this.strokeStyle;
+        ctx.fillStyle = this.strokeStyle;
+        ctx.font = '14px Arial';
         ctx.imageSmoothingEnabled = true;
 
         const p_fovea = viewerContext.imageToViewerCoordinates(fovea);
@@ -76,6 +101,47 @@ export class ETDRSGridItemOverlay implements Overlay {
                 ctx.lineTo(p_fovea.x + 3 * sdx * r, p_fovea.y + 3 * sdy * r);
                 ctx.stroke();
             }
+        }
+
+        // Draw additionalCircles legend with labels (bottom-left), if size allows
+        const r_max = 0.5 * additionalCircles['O2'] * pix_per_mm;
+        let y = viewerContext.viewerSize.height - 10 - r_max;
+        let x = 10;
+        if (r_max < 0.1 * viewerContext.viewerSize.height) {
+            for (const [name, diameter] of Object.entries(additionalCircles)) {
+                const selected = name === this.cursorCircle;
+                if (selected) {
+                    ctx.lineWidth = 4 * this.lineWidth;
+                    ctx.strokeStyle = 'rgba(100, 255, 100, 1)';
+                } else {
+                    ctx.lineWidth = this.lineWidth;
+                    ctx.strokeStyle = this.strokeStyle;
+                }
+                const r = diameter / 2;
+                x += r * pix_per_mm;
+                ctx.beginPath();
+                ctx.ellipse(x, y, r * pix_per_mm, r * pix_per_mm, 0, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.fillText(name, x, y - r_max - 5);
+                x += Math.max(r * pix_per_mm, 20);
+                x += 10;
+            }
+        }
+
+        // Draw cursor-following circle if active
+        const cursor = this.registration.getPosition(viewerContext.image.image_id);
+        if (cursor && this.cursorCircle) {
+            ctx.lineWidth = this.lineWidth;
+            ctx.strokeStyle = this.strokeStyle;
+            const diameter = additionalCircles[this.cursorCircle];
+            const r_c = diameter / 2;
+            const { x: cx, y: cy } = viewerContext.imageToViewerCoordinates(cursor);
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, r_c * pix_per_mm, r_c * pix_per_mm, 0, 0, 2 * Math.PI);
+            ctx.stroke();
+            viewerContext.cursorStyle = 'none';
+        } else {
+            viewerContext.cursorStyle = 'default';
         }
     }
 }
