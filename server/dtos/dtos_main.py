@@ -129,7 +129,7 @@ class FormAnnotationBase(BaseModel):
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
     sub_task_id: Optional[int] = None
-    form_data: Optional[Dict[str, Any]] = None
+    form_data: Optional[Any] = None
     form_annotation_reference_id: Optional[int] = None
 
 
@@ -156,7 +156,7 @@ class FormAnnotationPATCH(BaseModel):
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
     sub_task_id: Optional[int] = None
-    form_data: Optional[Dict[str, Any]] = None
+    form_data: Optional[Any] = None
     form_annotation_reference_id: Optional[int] = None
 
 

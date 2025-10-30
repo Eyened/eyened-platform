@@ -1,5 +1,5 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { fetchInstance } from "$lib/data/api";
+import { fetchInstance, fetchFormAnnotations } from "$lib/data/api";
 import { instances } from "$lib/data/stores.svelte";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
@@ -38,6 +38,7 @@ export class ViewerWindowContext {
     photoLocatorSets: PhotoLocator[][] = $state([]);
 
     private frame: number = 0;
+    private loadedPatientIds = new Set<number>();
 
     constructor(
         public readonly webgl: WebGL,
@@ -89,6 +90,23 @@ export class ViewerWindowContext {
         }
 
         this.instanceIds = ids;
+        
+        // Fetch all form annotations for the involved patient(s)
+        const patientIds = Array.from(new Set(
+            ids
+                .map((id) => instances.get(id)?.patient?.id)
+                .filter((pid): pid is number => typeof pid === 'number')
+        ));
+        if (patientIds.length) {
+            await Promise.all(
+                patientIds
+                    .filter((pid) => !this.loadedPatientIds.has(pid))
+                    .map(async (pid) => {
+                        await fetchFormAnnotations({ patient_id: pid });
+                        this.loadedPatientIds.add(pid);
+                    })
+            );
+        }
         
         // Load images for all instances
         for (const id of ids) {
