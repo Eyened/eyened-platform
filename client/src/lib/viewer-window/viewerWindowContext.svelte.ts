@@ -16,7 +16,7 @@ export type MainPanelType = {
 }
 
 export class ViewerWindowContext {
-    
+
     // show/hide the browser overlay
     browserOverlay: boolean = $state(false);
 
@@ -55,14 +55,14 @@ export class ViewerWindowContext {
             this.repaint();
         }
         loop();
-        
+
         this.setInstanceIDs(instanceIDs);
     }
 
     closeBrowserOverlay() {
         this.browserOverlay = false;
     }
-    
+
     addViewer(viewer: ViewerContext) {
         this.viewers.add(viewer);
         return () => this.viewers.delete(viewer);
@@ -90,7 +90,7 @@ export class ViewerWindowContext {
         }
 
         this.instanceIds = ids;
-        
+
         // Fetch all form annotations for the involved patient(s)
         const patientIds = Array.from(new Set(
             ids
@@ -107,7 +107,7 @@ export class ViewerWindowContext {
                     })
             );
         }
-        
+
         // Load images for all instances
         for (const id of ids) {
             const instance = instances.get(id);
