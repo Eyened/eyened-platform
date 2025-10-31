@@ -104,7 +104,12 @@ const FLOAT_FORMAT = {
     type: WebGL2RenderingContext.UNSIGNED_BYTE,
     filtering: WebGL2RenderingContext.LINEAR
 }
-const TEXTURE_FORMATS: Record<'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F' | 'RGBA', TextureFormat> = {
+const FLOAT_FORMAT_2CH = {
+    format: WebGL2RenderingContext.RG,
+    type: WebGL2RenderingContext.FLOAT,
+    filtering: WebGL2RenderingContext.NEAREST
+}
+const TEXTURE_FORMATS: Record<'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F' | 'RG32F' | 'RGBA', TextureFormat> = {
     // Used for probability maps
     R8: {
         ...FLOAT_FORMAT,
@@ -133,6 +138,11 @@ const TEXTURE_FORMATS: Record<'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F' | 'RGBA
         ...FLOAT_FORMAT,
         internalFormat: WebGL2RenderingContext.R32F
     },
+    // Used for min/max pairs (R=min, G=max)
+    RG32F: {
+        ...FLOAT_FORMAT_2CH,
+        internalFormat: WebGL2RenderingContext.RG32F
+    },
     RGBA: {
         format: WebGL2RenderingContext.RGBA,
         type: WebGL2RenderingContext.UNSIGNED_BYTE,
@@ -160,7 +170,8 @@ export class TextureData {
         private readonly format: keyof typeof TEXTURE_FORMATS
     ) {
         this.textureFormat = TEXTURE_FORMATS[this.format];
-        this.numChannels = this.textureFormat.format === WebGL2RenderingContext.RGBA ? 4 : 1;
+        this.numChannels = this.textureFormat.format === WebGL2RenderingContext.RGBA ? 4 : 
+                          this.textureFormat.format === WebGL2RenderingContext.RG ? 2 : 1;
 
         if (this.format === 'R8' || this.format === 'R8UI' || this.format === 'RGBA') {
             this.arrayType = Uint8Array;
@@ -168,7 +179,7 @@ export class TextureData {
             this.arrayType = Uint16Array;
         } else if (this.format === 'R32UI') {
             this.arrayType = Uint32Array;
-        } else if (this.format === 'R32F') {
+        } else if (this.format === 'R32F' || this.format === 'RG32F') {
             this.arrayType = Float32Array;
         } else {
             throw new Error(`Unsupported format: ${this.format}`);
@@ -468,6 +479,11 @@ function readDataFromFrameBuffer(gl: WebGL2RenderingContext, internalFormat: num
         case gl.RGBA8:
             pixels = new Uint8Array(width * height * 4);
             gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            break;
+        case gl.R32F:
+        case gl.RG32F:
+            pixels = new Float32Array(width * height * 4);
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, pixels);
             break;
         default:
             // Add other cases above as needed

@@ -27,7 +27,8 @@ export class Image3D extends AbstractImage {
     async createEnfaceProjection(): Promise<Image2D> {
         const { webgl, width, depth, height } = this;
 
-        const textureData = new TextureData(webgl.gl, width, depth, 'R32UI');
+        // Accumulate along z into float texture (R32F)
+        const textureData = new TextureData(webgl.gl, width, depth, 'R32F');
 
         // top and bottom are the top and bottom of the slab (entire volume)
         const top = new TextureData(webgl.gl, width, depth, 'R16UI');
@@ -43,7 +44,12 @@ export class Image3D extends AbstractImage {
         };
         textureData.passShader(this.webgl.shaders.enfaceProjection, uniforms);
 
-        const normalized = this.normalize(textureData);
+        // Compute min and max entirely on GPU via progressive 2x2 reductions
+        // Returns a 1x1 RG32F texture with min (R) and max (G)
+        const minmaxTexture = this.computeMinMaxGPU(textureData);
+
+        // Normalize on GPU to RGBA8
+        const normalizedTexture = this.normalizeGPU(textureData, minmaxTexture);
         const proj_img_id = `${this.image_id}_proj`;
         const proj_dimensions = {
             width: this.dimensions.width,
@@ -56,10 +62,11 @@ export class Image3D extends AbstractImage {
         };
         const meta = this.meta;
 
-        const result = Image2D.fromPixelData(this.instance, this.webgl, proj_img_id, normalized, proj_dimensions, meta);
+        const result = new Image2D(this.instance, this.webgl, proj_img_id, normalizedTexture, proj_dimensions, meta);
         this.setOrientation(result);
 
         textureData.dispose();
+        minmaxTexture.dispose();
         top.dispose();
         bottom.dispose();
 
@@ -97,25 +104,77 @@ export class Image3D extends AbstractImage {
         }
     }
 
-    private normalize(textureData: TextureData): Uint8Array {
-        const sumValues = textureData.data as Uint32Array;
+    private computeMinMaxGPU(input: TextureData): TextureData {
+        const gl = this.webgl.gl;
+        const reduce = this.webgl.shaders.minMaxReduction;
 
-        const { min, max } = sumValues.reduce(
-            (acc: { min: number; max: number; }, val: number) => ({
-                min: Math.min(acc.min, val),
-                max: Math.max(acc.max, val),
-            }),
-            { min: Infinity, max: -Infinity }
-        );
-        const f = 255 / (max - min);
-        const data = new Uint8Array(4 * sumValues.length);
-        for (let i = 0; i < sumValues.length; i++) {
-            data[4 * i] = f * (sumValues[i] - min);
-            data[4 * i + 1] = f * (sumValues[i] - min);
-            data[4 * i + 2] = f * (sumValues[i] - min);
-            data[4 * i + 3] = 255;
+        // Create ping-pong textures for reduction
+        let w = input.width;
+        let h = input.height;
+        
+        // Calculate size for first reduction level
+        let nextW = Math.max(1, Math.floor((w + 1) / 2));
+        let nextH = Math.max(1, Math.floor((h + 1) / 2));
+        
+        // Create ping and pong textures
+        let ping = new TextureData(gl, nextW, nextH, 'RG32F');
+        let pong: TextureData | null = null;
+
+        // First pass: convert R32F to RG32F (both min and max are the same value)
+        const firstUniforms = {
+            u_input: input.texture,
+            u_srcSize: [w, h],
+            u_firstPass: true
+        };
+        ping.passShader(reduce, firstUniforms);
+
+        // Subsequent passes: ping-pong between textures
+        w = nextW;
+        h = nextH;
+        while (w > 1 || h > 1) {
+            nextW = Math.max(1, Math.floor((w + 1) / 2));
+            nextH = Math.max(1, Math.floor((h + 1) / 2));
+            
+            // Create pong if it doesn't exist or if size changed
+            if (!pong || pong.width !== nextW || pong.height !== nextH) {
+                if (pong) pong.dispose();
+                pong = new TextureData(gl, nextW, nextH, 'RG32F');
+            }
+            
+            const uniforms = {
+                u_input: ping.texture,
+                u_srcSize: [w, h],
+                u_firstPass: false
+            };
+            pong.passShader(reduce, uniforms);
+            
+            // Swap ping and pong
+            const temp = ping;
+            ping = pong;
+            pong = temp;
+            
+            w = nextW;
+            h = nextH;
         }
-        return data;
+
+        // Clean up pong if it exists and is different from ping
+        if (pong && (pong.width !== ping.width || pong.height !== ping.height)) {
+            pong.dispose();
+        }
+
+        // ping now contains the final 1x1 RG32F texture with min (R) and max (G)
+        return ping;
+    }
+
+    private normalizeGPU(input: TextureData, minmaxTexture: TextureData): TextureData {
+        const gl = this.webgl.gl;
+        const outTex = new TextureData(gl, input.width, input.height, 'RGBA');
+        const uniforms = {
+            u_input: input.texture,
+            u_minmax: minmaxTexture.texture
+        };
+        outTex.passShader(this.webgl.shaders.normalize, uniforms);
+        return outTex;
     }
 }
 
