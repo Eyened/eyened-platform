@@ -21,6 +21,11 @@ class FeatureBase(BaseModel):
     name: str
 
 
+class SubFeatureItem(BaseModel):
+    index: int
+    name: str
+
+
 class FeaturePUT(FeatureBase):
     subfeature_ids: List[int] | None = None
 
@@ -33,7 +38,7 @@ class FeaturePATCH(BaseModel):
 
 class FeatureGET(FeatureBase):
     id: int
-    subfeatures: List[str]
+    subfeatures: List[SubFeatureItem]
     subfeature_ids: List[int]
     date_inserted: datetime
     segmentation_count: Optional[int] = None

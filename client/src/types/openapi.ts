@@ -999,7 +999,7 @@ export interface components {
             /** Id */
             id: number;
             /** Subfeatures */
-            subfeatures: string[];
+            subfeatures: Array<{index: number, name: string}>;
             /** Subfeature Ids */
             subfeature_ids: number[];
             /**
