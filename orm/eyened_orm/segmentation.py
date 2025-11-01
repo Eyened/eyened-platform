@@ -299,17 +299,17 @@ class Feature(Base):
         return feature
     
     @property
-    def subfeatures_list(self) -> List[str]:
+    def subfeatures(self) -> Dict[int, str]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
-        return [assoc.Child.FeatureName for assoc in assocs]
+        return {assoc.FeatureIndex: assoc.Child.FeatureName for assoc in assocs}
     
     @property
     def json(self) -> Dict[str, Any]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
-        subfeatures = [assoc.Child for assoc in assocs]
+        subfeatures = [{"index": assoc.FeatureIndex, "name": assoc.Child.FeatureName} for assoc in assocs]
         return {
             "FeatureName": self.FeatureName,
-            "SubFeatures": self.subfeatures_list
+            "SubFeatures": subfeatures
         }
 
 

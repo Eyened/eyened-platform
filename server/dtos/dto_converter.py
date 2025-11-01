@@ -376,10 +376,13 @@ class DTOConverter:
             # fallback if your ORM exposes links (rename 'ChildLinks' if different)
             child_ids = [link.ChildFeatureID for link in getattr(feature, "ChildLinks", [])]
         
+        subfeatures_dict = feature.subfeatures
+        subfeatures = [{"index": k, "name": v} for k, v in sorted(subfeatures_dict.items())]
+        
         return FeatureGET(
             id=feature.FeatureID,
             name=feature.FeatureName,
-            subfeatures=feature.subfeatures_list,
+            subfeatures=subfeatures, 
             subfeature_ids=child_ids,
             date_inserted=feature.DateInserted,
             segmentation_count=segmentation_count,
