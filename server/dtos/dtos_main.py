@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from eyened_orm.segmentation import DataRepresentation, Datatype
+from eyened_orm.image_instance import Laterality
 from .dtos_aux import CreatorMeta, TagMeta
 from pydantic import BaseModel
 
@@ -133,6 +134,7 @@ class FormAnnotationBase(BaseModel):
     patient_id: int
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
+    laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
     form_data: Optional[Any] = None
     form_annotation_reference_id: Optional[int] = None
@@ -160,6 +162,7 @@ class FormAnnotationPATCH(BaseModel):
     patient_id: Optional[int] = None
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
+    laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
     form_data: Optional[Any] = None
     form_annotation_reference_id: Optional[int] = None
