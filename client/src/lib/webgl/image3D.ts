@@ -36,7 +36,7 @@ export class Image3D extends AbstractImage {
 
         top.uploadData(new Uint16Array(width * depth).fill(0));
         bottom.uploadData(new Uint16Array(width * depth).fill(height));
-
+        
         const uniforms = {
             u_volume: this.texture,
             u_top: top.texture,
@@ -112,13 +112,13 @@ export class Image3D extends AbstractImage {
         let w = input.width;
         let h = input.height;
         
-        // Calculate size for first reduction level
-        let nextW = Math.max(1, Math.floor((w + 1) / 2));
-        let nextH = Math.max(1, Math.floor((h + 1) / 2));
+        // Calculate size for first reduction level (maximum size needed)
+        const maxW = Math.max(1, Math.floor((w + 1) / 2));
+        const maxH = Math.max(1, Math.floor((h + 1) / 2));
         
-        // Create ping and pong textures
-        let ping = new TextureData(gl, nextW, nextH, 'RG32F');
-        let pong: TextureData | null = null;
+        // Create both ping and pong textures upfront at maximum size
+        let ping = new TextureData(gl, maxW, maxH, 'RG32F');
+        let pong = new TextureData(gl, maxW, maxH, 'RG32F');
 
         // First pass: convert R32F to RG32F (both min and max are the same value)
         const firstUniforms = {
@@ -129,17 +129,11 @@ export class Image3D extends AbstractImage {
         ping.passShader(reduce, firstUniforms);
 
         // Subsequent passes: ping-pong between textures
-        w = nextW;
-        h = nextH;
+        w = maxW;
+        h = maxH;
         while (w > 1 || h > 1) {
-            nextW = Math.max(1, Math.floor((w + 1) / 2));
-            nextH = Math.max(1, Math.floor((h + 1) / 2));
-            
-            // Create pong if it doesn't exist or if size changed
-            if (!pong || pong.width !== nextW || pong.height !== nextH) {
-                if (pong) pong.dispose();
-                pong = new TextureData(gl, nextW, nextH, 'RG32F');
-            }
+            const nextW = Math.max(1, Math.floor((w + 1) / 2));
+            const nextH = Math.max(1, Math.floor((h + 1) / 2));
             
             const uniforms = {
                 u_input: ping.texture,
@@ -157,10 +151,8 @@ export class Image3D extends AbstractImage {
             h = nextH;
         }
 
-        // Clean up pong if it exists and is different from ping
-        if (pong && (pong.width !== ping.width || pong.height !== ping.height)) {
-            pong.dispose();
-        }
+        // Clean up pong (not needed as return value)
+        pong.dispose();
 
         // ping now contains the final 1x1 RG32F texture with min (R) and max (G)
         return ping;
