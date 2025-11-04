@@ -438,6 +438,7 @@ class DTOConverter:
             patient_id=annotation.PatientID,
             study_id=annotation.StudyID,
             image_instance_id=annotation.ImageInstanceID,
+            laterality=annotation.Laterality,
             sub_task_id=annotation.SubTaskID,
             form_data=annotation.FormData,
             form_annotation_reference_id=annotation.FormAnnotationReferenceID,
