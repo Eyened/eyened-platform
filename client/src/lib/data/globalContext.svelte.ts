@@ -38,8 +38,9 @@ export class GlobalContext {
     }
 
     async init(pathname: string) {
+        // user must be logged in before fetching any data
+        await this.userManager.init(pathname);
         await Promise.all([
-            this.userManager.init(pathname),            
             fetchTags(),
             fetchFormSchemas(),
             fetchFeatures({ with_counts: true })
@@ -124,7 +125,7 @@ export class GlobalContext {
     }
 
     private _encodeSingleConditionExtended(
-        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default'|'attribute'; model?: string; feature?: string }
+        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default' | 'attribute'; model?: string; feature?: string }
     ): string {
         const serializeValue = (v: string | number | string[] | null) => JSON.stringify(v);
         const encodedVariable = encodeURIComponent(condition.variable);
