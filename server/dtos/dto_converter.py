@@ -419,7 +419,7 @@ class DTOConverter:
     @staticmethod
     def form_schema_to_get(schema: "FormSchemaORM") -> FormSchemaGET:
         """Convert FormSchema ORM object to FormSchemaGET."""
-        return FormSchemaGET(id=schema.FormSchemaID, name=schema.SchemaName, schema=schema.Schema)
+        return FormSchemaGET(id=schema.FormSchemaID, name=schema.SchemaName, schema=schema.Schema, entity_type=schema.EntityType)
 
     @staticmethod
     def form_annotation_to_get(annotation: "FormAnnotationORM", with_tag_metadata: bool = False) -> FormAnnotationGET:
