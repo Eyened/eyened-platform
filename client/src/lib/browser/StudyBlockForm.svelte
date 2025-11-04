@@ -58,11 +58,13 @@
 	);
 
 	async function create(instanceId: number) {
+		const laterality = instanceMetas.get(instanceId)?.laterality ?? undefined;
 		await createFormAnnotation({
 			form_schema_id: formSchema.id,
 			patient_id: study.patient.id,
 			study_id: study.id,
 			image_instance_id: instanceId,
+			laterality: laterality,
 			sub_task_id: taskContext?.subTask?.id,
 			form_data: {},
 		});

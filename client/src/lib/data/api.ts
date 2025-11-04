@@ -231,6 +231,7 @@ export async function createFormAnnotation(data: {
 	patient_id: number;
 	study_id?: number;
 	image_instance_id: number;
+	laterality?: 'L' | 'R';
 	sub_task_id?: number;
 	form_data: any;
 	form_annotation_reference_id?: number;
