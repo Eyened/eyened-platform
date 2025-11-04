@@ -992,6 +992,11 @@ export interface components {
          * @enum {string}
          */
         ETDRSField: "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7";
+        /**
+         * EntityType
+         * @enum {string}
+         */
+        EntityType: "Patient" | "Study" | "Eye" | "StudyEye" | "ImageInstance";
         /** FeatureGET */
         FeatureGET: {
             /** Name */
@@ -999,7 +1004,7 @@ export interface components {
             /** Id */
             id: number;
             /** Subfeatures */
-            subfeatures: Array<{index: number, name: string}>;
+            subfeatures: components["schemas"]["SubFeatureItem"][];
             /** Subfeature Ids */
             subfeature_ids: number[];
             /**
@@ -1037,10 +1042,11 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
+            laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: unknown | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
             /** Id */
@@ -1079,10 +1085,11 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
+            laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: unknown | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1096,10 +1103,11 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
+            laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: unknown | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1109,6 +1117,7 @@ export interface components {
             name?: string | null;
             /** Schema */
             schema?: Record<string, never> | null;
+            entity_type?: components["schemas"]["EntityType"] | null;
             /** Id */
             id: number;
         };
@@ -1624,6 +1633,13 @@ export interface components {
             result_ids: number[];
             /** Has More */
             has_more: boolean;
+        };
+        /** SubFeatureItem */
+        SubFeatureItem: {
+            /** Index */
+            index: number;
+            /** Name */
+            name: string;
         };
         /** SubTaskGET */
         SubTaskGET: {

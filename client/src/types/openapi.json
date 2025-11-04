@@ -4738,6 +4738,17 @@
         ],
         "title": "ETDRSField"
       },
+      "EntityType": {
+        "type": "string",
+        "enum": [
+          "Patient",
+          "Study",
+          "Eye",
+          "StudyEye",
+          "ImageInstance"
+        ],
+        "title": "EntityType"
+      },
       "FeatureGET": {
         "properties": {
           "name": {
@@ -4750,7 +4761,7 @@
           },
           "subfeatures": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/SubFeatureItem"
             },
             "type": "array",
             "title": "Subfeatures"
@@ -4880,6 +4891,16 @@
             ],
             "title": "Image Instance Id"
           },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_task_id": {
             "anyOf": [
               {
@@ -4893,9 +4914,7 @@
           },
           "form_data": {
             "anyOf": [
-              {
-                "type": "object"
-              },
+              {},
               {
                 "type": "null"
               }
@@ -5018,6 +5037,16 @@
             ],
             "title": "Image Instance Id"
           },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_task_id": {
             "anyOf": [
               {
@@ -5031,9 +5060,7 @@
           },
           "form_data": {
             "anyOf": [
-              {
-                "type": "object"
-              },
+              {},
               {
                 "type": "null"
               }
@@ -5088,6 +5115,16 @@
             ],
             "title": "Image Instance Id"
           },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_task_id": {
             "anyOf": [
               {
@@ -5101,9 +5138,7 @@
           },
           "form_data": {
             "anyOf": [
-              {
-                "type": "object"
-              },
+              {},
               {
                 "type": "null"
               }
@@ -5152,6 +5187,16 @@
               }
             ],
             "title": "Schema"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityType"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "type": "integer",
@@ -6689,6 +6734,24 @@
           "has_more"
         ],
         "title": "StudySearchResponse"
+      },
+      "SubFeatureItem": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "name"
+        ],
+        "title": "SubFeatureItem"
       },
       "SubTaskGET": {
         "properties": {

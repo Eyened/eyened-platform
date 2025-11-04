@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from eyened_orm.segmentation import DataRepresentation, Datatype
 from eyened_orm.image_instance import Laterality
+from eyened_orm.form_annotation import EntityType
 from .dtos_aux import CreatorMeta, TagMeta
 from pydantic import BaseModel
 
@@ -118,6 +119,7 @@ class ModelSegmentationGET(SegmentationBase):
 class FormSchemaBase(BaseModel):
     name: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
+    entity_type: Optional[EntityType] = None
 
 
 class FormSchemaPUT(FormSchemaBase):
