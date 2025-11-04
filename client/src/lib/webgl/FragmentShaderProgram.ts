@@ -124,6 +124,9 @@ export class PixelShaderProgram extends FragmentShaderProgram {
 			gl.drawBuffers(renderTarget.attachments);
 		}
 
+		// Disable blending for compute-like shaders (not needed and avoids EXT_float_blend requirement)
+		gl.disable(gl.BLEND);
+
 		gl.useProgram(this.programInfo.program);
 		gl.bindVertexArray(this.vertexArrayObject);
 		this.setUniforms(uniforms);
