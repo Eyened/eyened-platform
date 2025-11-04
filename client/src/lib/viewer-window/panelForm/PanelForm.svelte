@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation } from "$lib/data";
+    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation, getInstanceByDataSetIdentifier, instances } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -28,12 +28,21 @@
     let selectedSchema: FormSchemaGET | undefined = $state();
 
     const filters = [
+        (annotation: FormAnnotationGET) => !form_schema_ids_to_exclude.has(annotation.form_schema_id),    
         (annotation: FormAnnotationGET) => annotation.patient_id === instance.patient.id, //same patient
-        (annotation: FormAnnotationGET) =>
-            annotation.image_instance_id == instance.id, // same eye/laterality via instance
-        (annotation: FormAnnotationGET) => annotation.study_id == instance.study?.id, // same study
-        (annotation: FormAnnotationGET) => !form_schema_ids_to_exclude.has(annotation.form_schema_id)
+        (annotation: FormAnnotationGET) => {
+            const schema = formSchemas.get(annotation.form_schema_id);
+            if (!schema) return false;
+            if (schema.entity_type == 'StudyEye') {
+                return annotation.study_id == instance.study?.id && annotation.laterality == instance.laterality;
+            }
+
+            //TODO: check for other entity types
+            return annotation.image_instance_id == instance.id;     
+        }
+        
     ];
+    
 
     // TODO: refactor this, to be used as extension?
     if (taskContext) {
@@ -52,8 +61,7 @@
 
 
     const forms = $derived(
-        formAnnotations.filter((annotation) => filters.every((filter) => filter(annotation)))
-        .filter(globalContext.segmentationsFilter)
+        formAnnotations.filter((annotation) => filters.every((filter) => filter(annotation)))        
         .sort((a, b) => a.id - b.id)
     )
 
@@ -68,6 +76,7 @@
             patient_id: instance.patient.id,
             study_id: instance.study?.id ?? undefined,
             image_instance_id: instance.id,
+            laterality: instance.laterality ?? undefined,
             sub_task_id: taskContext?.subTask?.id,
             form_data: {},
         });
