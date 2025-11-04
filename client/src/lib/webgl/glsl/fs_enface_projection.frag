@@ -12,9 +12,9 @@ out float sum;
 void main() {
     sum = 0.0;
     ivec2 loc = ivec2(gl_FragCoord.xy);
-    int top = int(texelFetch(u_top, loc, 0).r);
-    int bottom = int(texelFetch(u_bottom, loc, 0).r);
-    for(int z = top; z < bottom; z++) {
+    uint top = texelFetch(u_top, loc, 0).r;
+    uint bottom = texelFetch(u_bottom, loc, 0).r;
+    for(uint z = top; z < bottom; z++) {
         ivec3 loc3 = ivec3(gl_FragCoord.x, z, gl_FragCoord.y);
         float val = texelFetch(u_volume, loc3, 0).r;
         sum += val;
