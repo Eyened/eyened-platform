@@ -3,55 +3,34 @@ DTO Conversion Service
 Converts ORM objects (eyened_orm) into Pydantic GET DTOs defined in server/dtos.
 """
 
-from typing import TYPE_CHECKING, Optional, List
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Optional
 
-from eyened_orm import SubTaskState
+from eyened_orm import Model, SubTaskState
+from sqlalchemy.orm import object_session
 
-from .dtos_instances import (
-    InstanceMeta,
-    ProjectGET,
-    PatientGET,
-    StudyGET,
-    SeriesGET,
-    InstanceGET,
-    ProjectMeta,
-    PatientMeta,
-    StudyMeta,
-    SeriesMeta,
-    DeviceMeta,
-    ScanMeta,
-)
 from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
-from .dtos_main import FeatureGET, SegmentationGET, FormSchemaGET, FormAnnotationGET, DeviceModelGET, ModelMeta, ModelSegmentationGET
-from .dtos_tasks import TaskDefinitionGET, TaskGET, SubTaskGET, SubTaskWithImagesGET
+from .dtos_instances import (DeviceMeta, InstanceGET, InstanceMeta, PatientGET,
+                             PatientMeta, ProjectGET, ProjectMeta, ScanMeta,
+                             SeriesGET, SeriesMeta, StudyGET, StudyMeta)
+from .dtos_main import (DeviceModelGET, FeatureGET, FormAnnotationGET,
+                        FormSchemaGET, ModelMeta, ModelSegmentationGET,
+                        SegmentationGET)
+from .dtos_tasks import (SubTaskGET, SubTaskWithImagesGET, TaskDefinitionGET,
+                         TaskGET)
 
 if TYPE_CHECKING:
-    from eyened_orm import (
-        Study,
-        Patient,
-        Series,
-        ImageInstance,
-        Project,
-        Creator,
-        DeviceModel,
-        DeviceInstance,
-        Scan,
-        Tag as TagORM,
-        Feature,
-        Segmentation,
-        FormSchema as FormSchemaORM,
-        FormAnnotation as FormAnnotationORM,
-        TaskDefinition as TaskDefinitionORM,
-        TaskState as TaskStateORM,
-        Task as TaskORM,
-        SubTask as SubTaskORM,
-        StudyTagLink,
-        ImageInstanceTagLink,
-        SegmentationTagLink,
-        FormAnnotationTagLink,
-        Model,
-        ModelSegmentation,
-    )
+    from eyened_orm import Creator, DeviceModel, Feature
+    from eyened_orm import FormAnnotation as FormAnnotationORM
+    from eyened_orm import FormAnnotationTagLink
+    from eyened_orm import FormSchema as FormSchemaORM
+    from eyened_orm import (ImageInstance, ImageInstanceTagLink,
+                            ModelSegmentation, Patient, Project, Segmentation,
+                            SegmentationTagLink, Series, Study, StudyTagLink)
+    from eyened_orm import SubTask as SubTaskORM
+    from eyened_orm import Tag as TagORM
+    from eyened_orm import Task as TaskORM
+    from eyened_orm import TaskDefinition as TaskDefinitionORM
 
 
 class DTOConverter:
@@ -323,7 +302,22 @@ class DTOConverter:
         """Convert ModelSegmentation ORM object to ModelSegmentationGET."""
         # feature best-effort via model.Feature if relationship exists; else omit
         feat = getattr(getattr(ms, "Model", None), "Feature", None)
-        feature_get = DTOConverter.feature_to_get(feat) if feat is not None else None  # type: ignore[arg-type]
+        if feat is not None:
+            feature_get = DTOConverter.feature_to_get(feat)
+        else:
+            feature_get = FeatureGET(id=0, name="Unknown feature", subfeatures=[], subfeature_ids=[], date_inserted=datetime.now())
+        
+        
+        if ms.Model is not None:
+            creator_meta = DTOConverter.model_to_meta(ms.Model)
+        else:
+            sess = object_session(ms)
+            base_model = sess.get(Model, getattr(ms, "ModelID", None))
+            if base_model is not None:
+                creator_meta = DTOConverter.model_to_meta(base_model)
+            else:
+                creator_meta = ModelMeta(id=ms.ModelID, name="Unknown model", version="")
+            
         return ModelSegmentationGET(
             id=ms.ModelSegmentationID,
             image_instance_id=ms.ImageInstanceID,
@@ -335,8 +329,8 @@ class DTOConverter:
             threshold=ms.Threshold,
             reference_segmentation_id=ms.ReferenceSegmentationID,
             data_type=ms.DataType, data_representation=ms.DataRepresentation,
-            creator=DTOConverter.model_to_meta(ms.Model),
-            feature=feature_get,  # may be None if not joined
+            creator=creator_meta,
+            feature=feature_get,
             tags=[],       # no tags on ModelSegmentation
             date_inserted=ms.DateInserted,
             date_modified=None,
