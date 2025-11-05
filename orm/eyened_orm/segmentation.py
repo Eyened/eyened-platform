@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import JSON, ForeignKey, Index, UniqueConstraint, String, func, Enum as SAEnum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, object_session
 
 from .base import Base
 
@@ -357,7 +357,7 @@ class ModelSegmentation(SegmentationBase):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
-    Model: Mapped["Model"] = relationship("eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations")    
+    Model: Mapped["SegmentationModel"] = relationship("eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations")    
     ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance",
         back_populates="ModelSegmentations"
@@ -366,4 +366,13 @@ class ModelSegmentation(SegmentationBase):
 
     @property
     def groupname(self) -> str:
-        return f"model_{self.Model.ModelName}_{self.Model.Version}"
+        model = self.Model
+        if model is not None:
+            return f"model_{model.ModelName}_{model.Version}"
+        # Fallback: query base Model directly by ID
+        sess = object_session(self)
+        if sess is not None:
+            base_model = sess.get(Model, getattr(self, "ModelID", None))
+            if base_model is not None:
+                return f"model_{base_model.ModelName}_{base_model.Version}"
+        return f"model_name_unknown"
