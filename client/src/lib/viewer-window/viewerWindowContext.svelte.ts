@@ -46,7 +46,6 @@ export class ViewerWindowContext {
         public readonly creator: unknown,
         instanceIDs: number[] = [],
     ) {
-        console.log('ViewerWindowContext constructor', instanceIDs);
         this.imageLoader = new ImageLoader(webgl);
 
         // start rendering loop
