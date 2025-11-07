@@ -212,17 +212,16 @@
 						/>
 					{/if}
 				</div>
-				{#if isEditable}
-					<div class="row">
-						<ReferenceSegmentationPanel
-							{segmentation}
-							{image}
-							{isEditable}
-							{segmentationItem}
-						/>
-					</div>
-				{/if}
-				{#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
+				
+                <div class="row">
+                    <ReferenceSegmentationPanel
+                        {segmentation}
+                        {image}
+                        {isEditable}
+                        {segmentationItem}
+                    />
+                </div>
+                {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
 					<div class="row">
 						<CCPanel {segmentationItem} />
 					</div>
