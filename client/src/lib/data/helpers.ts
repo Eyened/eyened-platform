@@ -1,44 +1,78 @@
-import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, InstanceGET, SegmentationGET, StudyGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
-import { formAnnotations, ingestTasks, instances, segmentations, studies, tasks } from './stores.svelte';
+import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, InstanceGET, InstanceMeta, SegmentationGET, StudyGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
+import { formAnnotations, ingestTasks, instanceMetas, instances, segmentations, studies, tasks } from './stores.svelte';
 
 
 // ===== Tag Helpers =====
 
-export async function tagInstance(instance: InstanceGET, tagId: number) {
+export async function tagInstance(instance: InstanceGET | InstanceMeta, tagId: number, comment?: string) {
     const { api } = await import('../api/client');
     const { data } = await api.POST('/instances/{instance_id}/tags' as any, {
         params: { path: { instance_id: instance.id } } as any,
-        body: { tag_id: tagId } as any
+        body: { tag_id: tagId, comment } as any
     });
     console.log('tagInstance', instance.id, tagId, data);
     console.log({
         ...instance,
         tags: [...instance.tags, data as any]
     })
+
+    // we attempt to update both instanceMeta and instance
+    if(instanceMetas.has(instance.id)) {
+        instanceMetas.set(instance.id, {
+            ...instanceMetas.get(instance.id)!,
+            tags: [...instanceMetas.get(instance.id)!.tags, data as any]
+        });
+    }
     // Update store with new tag
-    instances.set(instance.id, {
-        ...instance,
-        tags: [...instance.tags, data as any]
-    });
+    if(instances.has(instance.id)) {
+        instances.set(instance.id, {
+            ...instances.get(instance.id)!,
+            tags: [...instances.get(instance.id)!.tags, data as any]
+        });
+    }
 }
 
-export async function untagInstance(instance: InstanceGET, tagId: number) {
+export async function updateTagInstance(instanceId: number, tagId: number, comment?: string) {
+    const { api } = await import('../api/client');
+    const { instances } = await import('./stores.svelte');
+    const res = await api.PATCH('/instances/{instance_id}/tags/{tag_id}' as any, {
+        params: { path: { instance_id: Number(instanceId), tag_id: tagId } } as any,
+        body: { comment } as any
+    });
+    const inst = instances.get(instanceId);
+    if (inst && res.data) {
+        const tm = res.data as any;
+        instances.set(instanceId, { ...inst, tags: inst.tags.map(t => t.id === tagId ? tm : t) });
+    }
+}
+
+export async function untagInstance(instance: InstanceGET | InstanceMeta, tagId: number) {
     const { api } = await import('../api/client');
     await api.DELETE('/instances/{instance_id}/tags/{tag_id}' as any, {
         params: { path: { instance_id: Number(instance.id), tag_id: tagId } } as any
     });
-    // Update store - remove tag
-    instances.set(instance.id, {
-        ...instance,
-        tags: instance.tags.filter(t => t.id !== tagId)
-    });
+    // Update both stores when present
+    if (instanceMetas.has(instance.id)) {
+        const meta = instanceMetas.get(instance.id)!;
+        instanceMetas.set(instance.id, {
+            ...meta,
+            tags: meta.tags.filter(t => t.id !== tagId)
+        });
+    }
+    if (instances.has(instance.id)) {
+        const inst = instances.get(instance.id)!;
+        instances.set(instance.id, {
+            ...inst,
+            tags: inst.tags.filter(t => t.id !== tagId)
+        });
+    }
 }
 
-export async function tagStudy(study: StudyGET, tagId: number) {
+export async function tagStudy(study: StudyGET, tagId: number, comment?: string) {
     const { api } = await import('../api/client');
     const { data } = await api.POST('/studies/{study_id}/tags' as any, {
         params: { path: { study_id: Number(study.id) } } as any,
-        body: { tag_id: tagId } as any
+        body: { tag_id: tagId, comment } as any
     });
     // Update store
 
@@ -48,17 +82,45 @@ export async function tagStudy(study: StudyGET, tagId: number) {
     });
 }
 
-export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number) {
+export async function updateTagStudy(studyId: number, tagId: number, comment?: string) {
+    const { api } = await import('../api/client');
+    const { studies } = await import('./stores.svelte');
+    const res = await api.PATCH('/studies/{study_id}/tags/{tag_id}' as any, {
+        params: { path: { study_id: Number(studyId), tag_id: tagId } } as any,
+        body: { comment } as any
+    });
+    const s = studies.get(studyId);
+    if (s && res.data) {
+        const tm = res.data as any;
+        studies.set(studyId, { ...s, tags: s.tags.map(t => t.id === tagId ? tm : t) });
+    }
+}
+
+export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number, comment?: string) {
     const { api } = await import('../api/client');
     const { data } = await api.POST('/form-annotations/{form_annotation_id}/tags' as any, {
         params: { path: { form_annotation_id: Number(formAnnotation.id) } } as any,
-        body: { tag_id: tagId } as any
+        body: { tag_id: tagId, comment } as any
     });
     // Update store
     formAnnotations.set(formAnnotation.id, {
         ...formAnnotation,
         tags: [...(formAnnotation.tags ?? []), data as any]
     });
+}
+
+export async function updateTagFormAnnotation(annotationId: number, tagId: number, comment?: string) {
+    const { api } = await import('../api/client');
+    const { formAnnotations } = await import('./stores.svelte');
+    const res = await api.PATCH('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
+        params: { path: { form_annotation_id: Number(annotationId), tag_id: tagId } } as any,
+        body: { comment } as any
+    });
+    const fa = formAnnotations.get(annotationId);
+    if (fa && res.data) {
+        const tm = res.data as any;
+        formAnnotations.set(annotationId, { ...fa, tags: (fa.tags ?? []).map(t => t.id === tagId ? tm : t) });
+    }
 }
 
 export async function untagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number) {
@@ -87,11 +149,11 @@ export async function untagStudy(study: StudyGET, tagId: number) {
     });
 }
 
-export async function tagSegmentation(seg: SegmentationGET, tagId: number) {
+export async function tagSegmentation(seg: SegmentationGET, tagId: number, comment?: string) {
     const { api } = await import('../api/client');
     const { data } = await api.POST('/segmentations/{segmentation_id}/tags' as any, {
         params: { path: { segmentation_id: Number(seg.id) } } as any,
-        body: { tag_id: tagId } as any
+        body: { tag_id: tagId, comment } as any
     });
     // Update store
     segmentations.set(seg.id, {

@@ -5,14 +5,14 @@
 	import Main from '$lib/components/Main.svelte';
 	import SubtasksTable from '$lib/tasks/SubtasksTable.svelte';
 	import { onMount } from 'svelte';
-	// Status filter UI
+// Status filter UI
 	import { ButtonGroup } from '$lib/components/ui/button-group';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { fetchSubTasks, fetchTask } from '$lib/data/api';
+	import { subtasks, tasks } from '$lib/data/stores.svelte';
 	import Label from '../../../lib/components/ui/label/label.svelte';
 	import { subTaskStates } from '../../../types/openapi_constants';
-	import type { SubTaskState, TaskGET } from '../../../types/openapi_types';
-	import { fetchTask, fetchSubTasks } from '$lib/data/api';
-	import { tasks, subtasks } from '$lib/data/stores.svelte';
+	import type { SubTaskState } from '../../../types/openapi_types';
 
 	let { data } = $props();
 
@@ -38,6 +38,7 @@
 			await fetchTask(data.taskid);
 			const nextPage = Math.max(0, Number.isFinite(p) ? p : 0);
 
+			subtasks.clear()
 			const res = await fetchSubTasks({
 				task_id: data.taskid,
 				with_images: true,

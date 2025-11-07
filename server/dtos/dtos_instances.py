@@ -8,14 +8,14 @@ This file contains DTOs that represent:
 """
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Literal, Optional, get_origin
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, create_model, Field
-
-from eyened_orm.image_instance import Laterality, ModalityType, Modality, ETDRSField
+from eyened_orm.image_instance import ETDRSField, Laterality, Modality, ModalityType
 from eyened_orm.patient import SexEnum as Sex
-from .dtos_main import FormAnnotationGET, ModelSegmentationGET, SegmentationGET
+from pydantic import BaseModel, Field
+
 from .dtos_aux import TagMeta
+from .dtos_main import FormAnnotationGET, ModelSegmentationGET, SegmentationGET
 
 # Type aliases matching TypeScript types
 AnatomicRegion = str  # Based on database field
@@ -36,18 +36,17 @@ class PatientGET(BaseModel):
     identifier: str
     birth_date: Optional[date] = None
     sex: Optional[Sex] = None
-    
+
 
 class StudyGET(BaseModel):
     id: int
     description: Optional[str] = None
     date: datetime
-    age: Optional[float] = None # patient age in years
+    age: Optional[float] = None  # patient age in years
     project: "ProjectMeta"
     patient: "PatientMeta"
     series: Optional[List["SeriesGET"]] = None
     tags: List[TagMeta]
-
 
 
 class SeriesGET(BaseModel):
@@ -58,7 +57,6 @@ class SeriesGET(BaseModel):
     instance_ids: List[int] = Field(default_factory=list)
 
 
-
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= INSTANCE METADATA =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -66,21 +64,26 @@ class ProjectMeta(BaseModel):
     id: int
     name: str
 
+
 class PatientMeta(BaseModel):
     id: int
     identifier: str
     birth_date: Optional[date] = None
 
+
 class StudyMeta(BaseModel):
     id: int
     date: datetime
 
+
 class SeriesMeta(BaseModel):
     id: int
+
 
 class DeviceMeta(BaseModel):
     manufacturer: str
     model: str
+
 
 class ScanMeta(BaseModel):
     mode: str
@@ -125,7 +128,8 @@ class InstanceMeta(BaseModel):
     laterality: Optional[Laterality] = None
     anatomic_region: AnatomicRegion
     device: DeviceMeta
-    
+    tags: List[TagMeta]
+
 
 class InstanceGET(InstanceBase):
     id: int
@@ -147,6 +151,3 @@ class InstanceGET(InstanceBase):
 
     # Nested attributes by model name then attribute name
     attributes: Dict[str, Dict[str, Any]]
-
-
-
