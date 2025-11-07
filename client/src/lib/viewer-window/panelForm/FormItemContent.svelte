@@ -1,6 +1,7 @@
 <script lang="ts">
     import { browser } from "$app/environment";
     import { formAnnotations, formSchemas, instances, setFormAnnotationValue, tagFormAnnotation, untagFormAnnotation } from "$lib/data";
+    import { updateTagFormAnnotation } from "$lib/data/helpers";
     import SchemaForm from "$lib/forms/SchemaForm.svelte";
     import { getDefault, resolveRefs, type JSONSchema } from "$lib/forms/schemaType";
     import { onMount } from "svelte";
@@ -75,9 +76,10 @@
 <div class="header">
     <span>[{form.id}]</span>
     <Tagger tagType="FormAnnotation" tags={form.tags ?? []}
-        tag={(id) => tagFormAnnotation(form, id)}
-		untag={(id) => untagFormAnnotation(form, id)}
-		onUpdate={() => {}}/>
+        tag={(id) => {tagFormAnnotation(form, id);}}
+        untag={(id) => untagFormAnnotation(form, id)}
+        onUpdate={(tagId, comment) => updateTagFormAnnotation(form.id, tagId, comment)}
+    />
     <span>{form.creator?.name}</span>
     <span class={status}>{status}</span>
 </div>

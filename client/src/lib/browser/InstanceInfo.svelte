@@ -2,7 +2,7 @@
 	import { getThumbUrl } from '$lib/data-loading/utils';
 	import { instances } from '$lib/data/stores.svelte';
 	import { getContext } from 'svelte';
-	import { tagInstance, untagInstance } from '../data/helpers';
+	import { tagInstance, untagInstance, updateTagInstance } from '../data/helpers';
 	import Tagger from '../tags/Tagger.svelte';
 	import type { BrowserContext } from './browserContext.svelte';
 
@@ -56,13 +56,13 @@
 		<h2 class="text-2xl font-bold">
 			{instance.id}
 		</h2>
-		<Tagger
-			tagType="ImageInstance"
-			tags={instance.tags ?? []}
-			tag={(id) => tagInstance(instance, id)}
-			untag={(id) => untagInstance(instance, id)}
-			onUpdate={browserContext?.refreshSignatures}
-		/>
+        <Tagger
+            tagType="ImageInstance"
+            tags={instance.tags ?? []}
+            tag={(id) => {tagInstance(instance, id); browserContext?.refreshSignatures()}}
+            untag={(id) => untagInstance(instance, id)}
+            onUpdate={(tagId, comment) => updateTagInstance(instance.id, tagId, comment)}
+        />
 	</div>
 
 	<div class="flex-1 flex min-h-0">

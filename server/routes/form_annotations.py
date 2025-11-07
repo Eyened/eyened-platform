@@ -11,7 +11,7 @@ from ..db import get_db
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import FormAnnotationPUT, FormAnnotationPATCH, FormAnnotationGET
 from ..dtos.dto_converter import DTOConverter
-from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
+from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
 
 router = APIRouter()
 
@@ -191,9 +191,13 @@ async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Sessi
 
     link = db.get(FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id})
     if not link:
-        link = FormAnnotationTagLink(TagID=tag.TagID, FormAnnotationID=annotation_id, CreatorID=current_user.id)
+        link = FormAnnotationTagLink(TagID=tag.TagID, FormAnnotationID=annotation_id, CreatorID=current_user.id, Comment=body.comment)
         db.add(link); db.commit(); db.refresh(link)
         link.Tag = tag
+    else:
+        if body.comment is not None:
+            link.Comment = body.comment
+            db.commit(); db.refresh(link)
 
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -207,5 +211,34 @@ async def untag_form_annotation(annotation_id: int, tag_id: int, db: Session = D
     if link:
         db.delete(link); db.commit()
     return Response(status_code=204)
+
+
+@router.patch("/form-annotations/{annotation_id}/tags/{tag_id}", response_model=TagMeta)
+async def patch_form_annotation_tag(
+    annotation_id: int,
+    tag_id: int,
+    body: ObjectTagPATCH,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> TagMeta:
+    """Update comment on an existing FormAnnotation tag link."""
+    ann = db.get(FormAnnotation, annotation_id)
+    if not ann:
+        raise HTTPException(404, "FormAnnotation not found")
+    tag = db.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    if tag.TagType != TagType.FormAnnotation:
+        raise HTTPException(400, "Tag type must be FormAnnotation")
+
+    link = db.get(FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id})
+    if not link:
+        raise HTTPException(404, "Link not found")
+
+    if body.comment is not None:
+        link.Comment = body.comment
+        db.commit(); db.refresh(link)
+    link.Tag = tag
+    return DTOConverter.link_to_tag_metadata(link)
 
 

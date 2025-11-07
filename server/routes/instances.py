@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_instances import InstanceGET
-from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
+from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
 
 from .auth import CurrentUser, get_current_user, is_authenticated
 from ..db import get_db
@@ -103,10 +103,43 @@ async def tag_instance(instance_id: int, body: ObjectTagPOST, db: Session = Depe
 
     link = db.get(ImageInstanceTagLink, {"TagID": tag.TagID, "ImageInstanceID": instance_id})
     if not link:
-        link = ImageInstanceTagLink(TagID=tag.TagID, ImageInstanceID=instance_id, CreatorID=current_user.id)
+        link = ImageInstanceTagLink(TagID=tag.TagID, ImageInstanceID=instance_id, CreatorID=current_user.id, Comment=body.comment)
         db.add(link); db.commit(); db.refresh(link)
         link.Tag = tag  # optional: avoid Tag lazy-load
+    else:
+        if body.comment is not None:
+            link.Comment = body.comment
+            db.commit(); db.refresh(link)
 
+    return DTOConverter.link_to_tag_metadata(link)
+
+
+@router.patch("/instances/{instance_id}/tags/{tag_id}", response_model=TagMeta)
+async def patch_instance_tag(
+    instance_id: int,
+    tag_id: int,
+    body: ObjectTagPATCH,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> TagMeta:
+    """Update comment on an existing ImageInstance tag link."""
+    instance = db.get(ImageInstance, instance_id)
+    if not instance:
+        raise HTTPException(404, "ImageInstance not found")
+    tag = db.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    if tag.TagType != TagType.ImageInstance:
+        raise HTTPException(400, "Tag type must be ImageInstance")
+
+    link = db.get(ImageInstanceTagLink, {"TagID": tag_id, "ImageInstanceID": instance_id})
+    if not link:
+        raise HTTPException(404, "Link not found")
+
+    if body.comment is not None:
+        link.Comment = body.comment
+        db.commit(); db.refresh(link)
+    link.Tag = tag
     return DTOConverter.link_to_tag_metadata(link)
 
 @router.delete("/instances/{instance_id}/tags/{tag_id}", status_code=204)
