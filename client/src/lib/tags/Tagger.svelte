@@ -76,16 +76,22 @@
 	}
 
 	function handleCommandKeydown(e: KeyboardEvent) {
-		if (e.key === "Enter") {
-			if (allTags.some((t) => t.name === textValue)) {
-				linkTag(textValue);
-				value = "";
-				textValue = "";
-			} else {
-				// Close popover before opening dialog
-				dropdownOpen = false;
-				dialogOpen = true;
-			}
+		if (e.key !== "Enter") return;
+
+		// Ignore Enter while any dialog is open
+		if (dialogOpen || commentDialogOpen) return;
+
+		const q = textValue.trim();
+		if (!q) return;
+
+		if (allTags.some((t) => t.name === q)) {
+			linkTag(q);
+			value = "";
+			textValue = "";
+		} else {
+			// Close popover before opening dialog
+			dropdownOpen = false;
+			dialogOpen = true;
 		}
 	}
 
@@ -146,7 +152,13 @@
 			<DialogHeader>
 				<DialogTitle>Edit Tag Comment</DialogTitle>
 				<div class="flex gap-2">
-					<input class="input" bind:value={commentText} onkeydown={(e) => e.key === 'Enter' && submitComment()} />
+					<input class="input" bind:value={commentText} onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							e.stopPropagation();
+							submitComment();
+						}
+					}} />
 					<Button onclick={submitComment}>Save</Button>
 				</div>
 			</DialogHeader>
