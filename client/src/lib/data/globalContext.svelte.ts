@@ -40,11 +40,24 @@ export class GlobalContext {
     async init(pathname: string) {
         // user must be logged in before fetching any data
         await this.userManager.init(pathname);
-        await Promise.all([
-            fetchTags(),
-            fetchFormSchemas(),
-            fetchFeatures({ with_counts: true })
-        ]);
+        
+        // Only fetch data if user is logged in
+        // If user is not logged in, userManager.init will redirect to login
+        if (this.userManager.loggedIn) {
+            try {
+                await Promise.all([
+                    fetchTags(),
+                    fetchFormSchemas(),
+                    fetchFeatures({ with_counts: true })
+                ]);
+            } catch (error) {
+                // Log error but don't throw - let pages handle errors individually
+                // Authentication errors are already handled by fetchWithAuthRetry
+                console.error('Failed to fetch initial data:', error);
+                // If it's an auth error, the redirect has already happened
+                // Otherwise, we'll let individual pages handle the errors
+            }
+        }
     }
 
     get user() {
