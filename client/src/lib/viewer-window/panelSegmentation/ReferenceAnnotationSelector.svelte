@@ -1,11 +1,9 @@
 <script lang="ts">
     import { segmentations } from "$lib/data/stores.svelte";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext } from "svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
     import { type Segmentation } from "./segmentationContext.svelte";
-    const globalContext = getContext<GlobalContext>("globalContext");
+    
 
     interface Props {
         image: AbstractImage;
@@ -18,7 +16,6 @@
 
     const referenceAnnotations = $derived(
         segmentations.filter(s => s.image_instance_id === image.instance.id)
-            .filter(globalContext.segmentationsFilter)
             .filter(
                 (a) =>
                     a.data_representation == "Binary" ||

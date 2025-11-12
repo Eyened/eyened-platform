@@ -46,7 +46,7 @@ export const segmentations = new ReactiveMap<number, SegmentationGET>()
 export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>()
 export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>()
 export const tasks = new ReactiveMap<number, TaskGET>()
-export const subtasks = new ReactiveMap<number, SubTaskGET | SubTaskWithImagesGET>()
+export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>()
 
 // Secondary indexes for name-based lookups
 export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>()
@@ -447,22 +447,17 @@ if (instance.segmentations) {
 const segs = segmentations.filter(s => s.image_instance_id === instance.id);
 ```
 
-### SubTask Type Union
+### SubTask With Images
 
-**`subtasks` store contains union type `SubTaskGET | SubTaskWithImagesGET`:**
+**`subtasks` store contains `SubTaskWithImagesGET`:**
 
 ```typescript
-export const subtasks = new ReactiveMap<number, SubTaskGET | SubTaskWithImagesGET>();
+export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>();
 
-// Check type at runtime
+// All subtasks have images included
 const subtask = subtasks.get(123);
-if (subtask && 'images' in subtask) {
-  // subtask is SubTaskWithImagesGET
+if (subtask) {
   const instanceIds = subtask.images.map(img => img.id);
-} else {
-  // subtask is SubTaskGET - no images
-  // Need to fetch with with_images: true
-  const fullSubtask = await fetchSubTaskByIndex(taskId, subtask.index, { with_images: true });
 }
 ```
 
@@ -774,11 +769,11 @@ def image_instance_to_get(
 - Use `getSegmentationData(id, params)` to fetch actual data
 - Returns decoded numpy array
 
-### Check SubTask Type at Runtime
+### SubTask Always Includes Images
 
-- `subtasks` store contains union type `SubTaskGET | SubTaskWithImagesGET`
-- Check `'images' in subtask` to verify type
-- Use `fetchSubTaskByIndex(taskId, index, { with_images: true })` to get images
+- `subtasks` store contains `SubTaskWithImagesGET` (always includes images)
+- All subtask fetches default to `with_images: true`
+- No need to check for images - they're always present
 
 ### Secondary Indexes Are Updated Automatically
 

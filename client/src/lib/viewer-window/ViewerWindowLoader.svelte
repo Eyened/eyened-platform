@@ -63,9 +63,6 @@ Used to create the viewerwindow context.
 
 {#await promise then viewerWindowContext}
     <ViewerWindow {viewerWindowContext} />
-    {#if viewerWindowContext.browserOverlay}
-        <BrowserOverlay {viewerWindowContext} />
-    {/if}
 {:catch error}
     <div class="error">Failed to initialize viewer: {error.message}</div>
 {/await}

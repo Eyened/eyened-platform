@@ -6,11 +6,10 @@
 	import { getContext, setContext } from "svelte";
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
 	import type {
-		SubTaskGET,
 		SubTaskWithImagesGET,
 	} from "../../types/openapi_types";
 
-	type SubTaskAny = SubTaskGET | SubTaskWithImagesGET;
+	type SubTaskAny = SubTaskWithImagesGET;
 
 	let {
 		rows,
@@ -20,7 +19,7 @@
 		perPage = 20,
 		onPageChange,
 	}: {
-		rows: SubTaskAny[];
+		rows: SubTaskWithImagesGET[];
 		taskId: number;
 		count: number;
 		page: number;

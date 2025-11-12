@@ -1,5 +1,5 @@
 import { api } from '../api/client';
-import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET, SubTaskWithImagesGET, SubTaskGET } from '../../types/openapi_types';
+import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET, SubTaskWithImagesGET } from '../../types/openapi_types';
 import { 
 	ingestTags, 
 	ingestFeatures, 
@@ -408,8 +408,8 @@ export async function fetchSubTaskByIndex(
         with_images?: boolean;
         with_next?: boolean;
     }
-): Promise<SubTaskWithImagesGET | SubTaskGET> {
-    const data = await apiGet<SubTaskWithImagesGET | SubTaskGET>('/task/{task_id}/subtask/{subtask_index}' as any, {
+): Promise<SubTaskWithImagesGET> {
+    const data = await apiGet<SubTaskWithImagesGET>('/task/{task_id}/subtask/{subtask_index}' as any, {
         params: {
             path: {
                 task_id: Number(task_id),

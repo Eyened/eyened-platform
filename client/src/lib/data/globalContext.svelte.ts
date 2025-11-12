@@ -2,7 +2,6 @@ import { UserManager } from '$lib/usermanager.svelte';
 
 import type { FormAnnotationGET, ModelSegmentationGET, SearchCondition, SegmentationGET, StudySearchCondition } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
-import type { Segmentation } from '../viewer-window/panelSegmentation/segmentationContext.svelte';
 import { fetchFeatures, fetchFormSchemas, fetchTags } from './api';
 
 export type ComponentDef = {
@@ -13,10 +12,6 @@ export type ComponentDef = {
 export class GlobalContext {
 
     public userManager: UserManager;
-    // public tags = new TagsRepo('tags');
-    // public features = new FeaturesRepo('features');
-    // public formSchemas = new FormSchemasRepo('form-schemas');
-
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
     public showUserMenu: boolean = $state(false);
@@ -77,21 +72,6 @@ export class GlobalContext {
 
     updateConfig(config: any) {
         this.config = { ...this.config, ...config };
-    }
-
-    get segmentationsFilter() {
-        return (a: Segmentation | FormAnnotationGET) => {
-
-            return true
-
-
-
-            // if (a.creator.isHuman) {
-            //     return this.config.showOtherAnnotationsHuman;
-            // } else {
-            //     return this.config.showOtherAnnotationsMachine;
-            // }
-        }
     }
 
     /**
