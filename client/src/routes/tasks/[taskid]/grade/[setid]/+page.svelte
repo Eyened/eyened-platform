@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fetchSubTasks, fetchTask } from "../../../../../lib/data/api";
+	import { fetchSubTaskByIndex, fetchTask } from "../../../../../lib/data/api";
 	import TaskMain from "../../../../../lib/tasks/TaskMain.svelte";
 	import type {
 		SubTaskWithImagesGET,
@@ -16,15 +16,13 @@
 		subTask: SubTaskWithImagesGET;
 		instanceIDs: number[];
 	}> = (async () => {
-		const [task, subTasksResponse] = await Promise.all([
+		const [task, subTask] = await Promise.all([
 			fetchTask(Number(taskid)),
-			fetchSubTasks({ task_id: Number(taskid), with_images: true }),
+			fetchSubTaskByIndex(Number(taskid), Number(subTaskIndex), { with_images: true }),
 		]);
-		const st = subTasksResponse?.subtasks?.[Number(subTaskIndex)];
-		if (!st) throw new Error("Subtask not found");
-		if (!("images" in st)) throw new Error("Subtask missing images; ensure with_images=true");
-		const subTask = st as SubTaskWithImagesGET;
-		const instanceIDs = subTask.images.map((img: any) => img.id);
+		if (!subTask) throw new Error("Subtask not found");
+		if (!("images" in subTask)) throw new Error("Subtask missing images; ensure with_images=true");
+		const instanceIDs = subTask.images.map(img => img.id);
 		return { task, subTask, instanceIDs };
 	})();
 </script>

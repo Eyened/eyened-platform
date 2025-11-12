@@ -1,5 +1,5 @@
 import { api } from '../api/client';
-import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET } from '../../types/openapi_types';
+import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET, SubTaskWithImagesGET, SubTaskGET } from '../../types/openapi_types';
 import { 
 	ingestTags, 
 	ingestFeatures, 
@@ -312,7 +312,7 @@ export async function unstarTag(tagId: number) {
 
 // ===== Task Functions =====
 
-export async function fetchTasks() {
+export async function fetchTasks(): Promise<TaskGET[]> {
 	const res = await api.GET('/task', {});
 	const data = (res.data ?? []) as TaskGET[];
 	ingestTasks(data);
@@ -378,5 +378,31 @@ export async function fetchSubTask(subtask_id: number) {
         ingestSubTasks([res.data as any]);
     }
     return res.data as any;
+}
+
+export async function fetchSubTaskByIndex(
+    task_id: number,
+    subtask_index: number,
+    options?: {
+        with_images?: boolean;
+        with_next?: boolean;
+    }
+): Promise<SubTaskWithImagesGET | SubTaskGET> {
+    const res = await api.GET('/task/{task_id}/subtask/{subtask_index}' as any, {
+        params: {
+            path: {
+                task_id: Number(task_id),
+                subtask_index: Number(subtask_index)
+            },
+            query: {
+                with_images: options?.with_images ?? false,
+                with_next: options?.with_next ?? false
+            }
+        } as any
+    });
+    if (res.data) {
+        ingestSubTasks([res.data as SubTaskWithImagesGET | SubTaskGET]);
+    }
+    return res.data as SubTaskWithImagesGET | SubTaskGET;
 }
 
