@@ -1,20 +1,17 @@
-import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, InstanceGET, InstanceMeta, SegmentationGET, StudyGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
-import { formAnnotations, ingestTasks, instanceMetas, instances, segmentations, studies, tasks } from './stores.svelte';
+import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, InstanceGET, InstanceMeta, SegmentationGET, StudyGET, SubTaskWithImagesGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
+import { api } from '../api/client';
+import { apiUrl } from '../config';
+import { decodeNpy } from '../utils/npy_loader';
+import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks, instanceMetas, instances, segmentations, studies, tags, tasks } from './stores.svelte';
 
 
 // ===== Tag Helpers =====
 
 export async function tagInstance(instance: InstanceGET | InstanceMeta, tagId: number, comment?: string) {
-    const { api } = await import('../api/client');
     const { data } = await api.POST('/instances/{instance_id}/tags' as any, {
         params: { path: { instance_id: instance.id } } as any,
         body: { tag_id: tagId, comment } as any
     });
-    console.log('tagInstance', instance.id, tagId, data);
-    console.log({
-        ...instance,
-        tags: [...instance.tags, data as any]
-    })
 
     // we attempt to update both instanceMeta and instance
     if(instanceMetas.has(instance.id)) {
@@ -33,8 +30,6 @@ export async function tagInstance(instance: InstanceGET | InstanceMeta, tagId: n
 }
 
 export async function updateTagInstance(instanceId: number, tagId: number, comment?: string) {
-    const { api } = await import('../api/client');
-    const { instances } = await import('./stores.svelte');
     const res = await api.PATCH('/instances/{instance_id}/tags/{tag_id}' as any, {
         params: { path: { instance_id: Number(instanceId), tag_id: tagId } } as any,
         body: { comment } as any
@@ -47,7 +42,6 @@ export async function updateTagInstance(instanceId: number, tagId: number, comme
 }
 
 export async function untagInstance(instance: InstanceGET | InstanceMeta, tagId: number) {
-    const { api } = await import('../api/client');
     await api.DELETE('/instances/{instance_id}/tags/{tag_id}' as any, {
         params: { path: { instance_id: Number(instance.id), tag_id: tagId } } as any
     });
@@ -69,7 +63,6 @@ export async function untagInstance(instance: InstanceGET | InstanceMeta, tagId:
 }
 
 export async function tagStudy(study: StudyGET, tagId: number, comment?: string) {
-    const { api } = await import('../api/client');
     const { data } = await api.POST('/studies/{study_id}/tags' as any, {
         params: { path: { study_id: Number(study.id) } } as any,
         body: { tag_id: tagId, comment } as any
@@ -83,8 +76,6 @@ export async function tagStudy(study: StudyGET, tagId: number, comment?: string)
 }
 
 export async function updateTagStudy(studyId: number, tagId: number, comment?: string) {
-    const { api } = await import('../api/client');
-    const { studies } = await import('./stores.svelte');
     const res = await api.PATCH('/studies/{study_id}/tags/{tag_id}' as any, {
         params: { path: { study_id: Number(studyId), tag_id: tagId } } as any,
         body: { comment } as any
@@ -97,7 +88,6 @@ export async function updateTagStudy(studyId: number, tagId: number, comment?: s
 }
 
 export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number, comment?: string) {
-    const { api } = await import('../api/client');
     const { data } = await api.POST('/form-annotations/{form_annotation_id}/tags' as any, {
         params: { path: { form_annotation_id: Number(formAnnotation.id) } } as any,
         body: { tag_id: tagId, comment } as any
@@ -110,8 +100,6 @@ export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId
 }
 
 export async function updateTagFormAnnotation(annotationId: number, tagId: number, comment?: string) {
-    const { api } = await import('../api/client');
-    const { formAnnotations } = await import('./stores.svelte');
     const res = await api.PATCH('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
         params: { path: { form_annotation_id: Number(annotationId), tag_id: tagId } } as any,
         body: { comment } as any
@@ -124,7 +112,6 @@ export async function updateTagFormAnnotation(annotationId: number, tagId: numbe
 }
 
 export async function untagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number) {
-    const { api } = await import('../api/client');
     await api.DELETE('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
         params: { path: { form_annotation_id: Number(formAnnotation.id), tag_id: tagId } } as any
     });
@@ -138,7 +125,6 @@ export async function untagFormAnnotation(formAnnotation: FormAnnotationGET, tag
 
 
 export async function untagStudy(study: StudyGET, tagId: number) {
-    const { api } = await import('../api/client');
     await api.DELETE('/studies/{study_id}/tags/{tag_id}' as any, {
         params: { path: { study_id: Number(study.id), tag_id: tagId } } as any
     });
@@ -150,7 +136,6 @@ export async function untagStudy(study: StudyGET, tagId: number) {
 }
 
 export async function tagSegmentation(seg: SegmentationGET, tagId: number, comment?: string) {
-    const { api } = await import('../api/client');
     const { data } = await api.POST('/segmentations/{segmentation_id}/tags' as any, {
         params: { path: { segmentation_id: Number(seg.id) } } as any,
         body: { tag_id: tagId, comment } as any
@@ -163,7 +148,6 @@ export async function tagSegmentation(seg: SegmentationGET, tagId: number, comme
 }
 
 export async function untagSegmentation(seg: SegmentationGET, tagId: number) {
-    const { api } = await import('../api/client');
     await api.DELETE('/segmentations/{segmentation_id}/tags/{tag_id}' as any, {
         params: { path: { segmentation_id: Number(seg.id), tag_id: tagId } } as any
     });
@@ -177,9 +161,6 @@ export async function untagSegmentation(seg: SegmentationGET, tagId: number) {
 // ===== Segmentation Data Helpers =====
 
 export async function getSegmentationData(segmentationId: number, params?: { scan_nr?: number; sparse_axis?: number }) {
-    const { api } = await import('../api/client');
-    const { decodeNpy } = await import('../utils/npy_loader');
-
     const query: any = {};
 
     query.axis = params?.sparse_axis;
@@ -195,8 +176,6 @@ export async function getSegmentationData(segmentationId: number, params?: { sca
 }
 
 export async function updateSegmentationData(segmentationId: number, data: ArrayBuffer, params?: { scan_nr?: number; sparse_axis?: number }) {
-    const { apiUrl } = await import('../config');
-
     const urlParams = new URLSearchParams();
     const sparseAxis = params?.sparse_axis;
     if (sparseAxis != null) {
@@ -219,9 +198,6 @@ export async function updateSegmentationData(segmentationId: number, data: Array
 }
 
 export async function getModelSegmentationData(modelSegmentationId: number, params?: { axis?: number; scan_nr?: number; sparse_axis?: number }) {
-    const { api } = await import('../api/client');
-    const { decodeNpy } = await import('../utils/npy_loader');
-
     // Match original logic:
     // - axis only sent if sparse_axis != null AND scan_nr != undefined
     // - scan_nr can be sent alone
@@ -247,7 +223,6 @@ export async function getModelSegmentationData(modelSegmentationId: number, para
 // ===== Form Annotation Value Helpers =====
 
 export async function getFormAnnotationValue(annotationId: number) {
-    const { api } = await import('../api/client');
     const res = await api.GET('/form-annotations/{form_annotation_id}/value', {
         params: { path: { form_annotation_id: annotationId } }
     });
@@ -255,9 +230,6 @@ export async function getFormAnnotationValue(annotationId: number) {
 }
 
 export async function setFormAnnotationValue(annotationId: number, form_data: unknown) {
-    const { api } = await import('../api/client');
-    const { formAnnotations } = await import('./stores.svelte');
-
     // Save to server first (server is source of truth)
     await api.PUT('/form-annotations/{form_annotation_id}/value', {
         params: { path: { form_annotation_id: annotationId } },
@@ -280,9 +252,6 @@ export async function setFormAnnotationValue(annotationId: number, form_data: un
 
 /** Create a new feature on the server and update local feature stores. */
 export async function createFeature(data: FeaturePUT): Promise<FeatureGET | null> {
-    const { api } = await import('../api/client');
-    const { features, featuresByName } = await import('./stores.svelte');
-
     const res = await api.POST('/features' as any, { body: data });
     if (res.data) {
         const feature = res.data as FeatureGET;
@@ -294,9 +263,6 @@ export async function createFeature(data: FeaturePUT): Promise<FeatureGET | null
 }
 
 export async function updateFeature(featureId: number, patch: FeaturePATCH) {
-    const { api } = await import('../api/client');
-    const { features, featuresByName } = await import('./stores.svelte');
-
     const res = await api.PATCH('/features/{feature_id}' as any, {
         params: { path: { feature_id: featureId } } as any,
         body: patch
@@ -312,9 +278,6 @@ export async function updateFeature(featureId: number, patch: FeaturePATCH) {
 }
 
 export async function deleteFeature(featureId: number) {
-    const { api } = await import('../api/client');
-    const { features, featuresByName } = await import('./stores.svelte');
-
     // Get the feature name before deleting
     const feature = features.get(featureId);
 
@@ -336,9 +299,6 @@ export async function createTag(
     tagType: TagType,
     description?: string
 ) {
-    const { api } = await import('../api/client');
-    const { tags } = await import('./stores.svelte');
-
     const res = await api.POST('/tags' as any, {
         body: {
             name,
@@ -358,9 +318,6 @@ export async function createTag(
 }
 
 export async function deleteTag(tagId: number) {
-    const { api } = await import('../api/client');
-    const { tags } = await import('./stores.svelte');
-
     await api.DELETE('/tags/{tag_id}' as any, {
         params: { path: { tag_id: tagId } } as any
     });
@@ -372,7 +329,6 @@ export async function deleteTag(tagId: number) {
 // ===== Task CRUD Helpers =====
 
 export async function createTask(data: TaskPUT) {
-    const { api } = await import('../api/client');
     const res = await api.POST('/task', { body: data });
     if (res.data) {
         ingestTasks([res.data as TaskGET]);
@@ -381,7 +337,6 @@ export async function createTask(data: TaskPUT) {
 }
 
 export async function updateTask(id: number, patch: TaskPATCH) {
-    const { api } = await import('../api/client');
     const res = await api.PATCH('/task/{task_id}' as any, {
         params: { path: { task_id: id } } as any,
         body: patch
@@ -393,7 +348,6 @@ export async function updateTask(id: number, patch: TaskPATCH) {
 }
 
 export async function deleteTask(id: number) {
-    const { api } = await import('../api/client');
     await api.DELETE('/task/{task_id}' as any, {
         params: { path: { task_id: id } } as any
     });
@@ -403,9 +357,6 @@ export async function deleteTask(id: number) {
 // ===== SubTask Helpers =====
 
 export async function addSubTaskImage(subtaskId: number, instanceId: number) {
-    const { api } = await import('../api/client');
-    const { ingestSubTasks } = await import('./stores.svelte');
-
     const res = await api.POST('/subtasks/{subtaskid}/images' as any, {
         params: {
             path: {
@@ -422,9 +373,6 @@ export async function addSubTaskImage(subtaskId: number, instanceId: number) {
 }
 
 export async function removeSubTaskImage(subtaskId: number, instanceId: number) {
-    const { api } = await import('../api/client');
-    const { ingestSubTasks } = await import('./stores.svelte');
-
     const res = await api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
         params: {
             path: {
@@ -441,9 +389,6 @@ export async function removeSubTaskImage(subtaskId: number, instanceId: number) 
 }
 
 export async function updateSubTaskComments(subtaskId: number, comments: string) {
-    const { api } = await import('../api/client');
-    const { ingestSubTasks } = await import('./stores.svelte');
-
     const res = await api.PATCH('/subtasks/{subtaskid}' as any, {
         params: {
             path: {
@@ -454,7 +399,7 @@ export async function updateSubTaskComments(subtaskId: number, comments: string)
     });
 
     if (res.data) {
-        ingestSubTasks([res.data as any]);
+        ingestSubTasks([res.data as SubTaskWithImagesGET]);
     }
     return res.data;
 }

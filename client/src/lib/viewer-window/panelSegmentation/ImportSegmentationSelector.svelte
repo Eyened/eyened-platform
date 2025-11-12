@@ -1,34 +1,24 @@
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { converters } from "$lib/webgl/segmentationConverter";
-    import { getContext } from "svelte";
     import { type Segmentation, type SegmentationContext } from "./segmentationContext.svelte";
 
-    const globalContext = getContext<GlobalContext>("globalContext");
-
     interface Props {
-        image: AbstractImage;
         segmentation: Segmentation;
         segmentationContext: SegmentationContext;
         close: () => void;
         resolve: (segmentation: Segmentation) => void;
     }
 
-    let { image, segmentation, segmentationContext, resolve, close }: Props = $props();
+    let { segmentation, segmentationContext, resolve, close }: Props = $props();
     
     const allSegmentations = $derived([
         ...segmentationContext.graderSegmentations, 
         ...segmentationContext.modelSegmentations
     ]);
     
-    const segmentationAnnotations = $derived(
-        allSegmentations.filter(globalContext.segmentationsFilter)
-    );
-
     const referenceSegmentations = $derived(
-        segmentationAnnotations
+        allSegmentations
             .filter((s) => !(s.id === segmentation.id && s.annotation_type === segmentation.annotation_type))
             .filter((other) => {
                 const from = segmentation.data_representation;

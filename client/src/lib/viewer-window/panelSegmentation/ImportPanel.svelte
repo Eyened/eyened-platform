@@ -29,7 +29,6 @@
             component: ImportSegmentationSelector,
             props: {
                 segmentation,
-                image,
                 segmentationContext: mainViewerContext.segmentationContext,
                 resolve: (other: Segmentation) => {
                     const otherSegmentation = image

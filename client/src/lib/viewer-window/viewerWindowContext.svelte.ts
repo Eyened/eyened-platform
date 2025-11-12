@@ -17,10 +17,6 @@ export type MainPanelType = {
 
 export class ViewerWindowContext {
 
-    // show/hide the browser overlay
-    browserOverlay: boolean = $state(false);
-
-
     private imagesIndex = new Map<number, Promise<LoadedImages>>();
     private byDatasetIdentifier = new Map<string, LoadedImages>();
     private bySOPInstanceUID = new Map<string, LoadedImages>();
@@ -56,10 +52,6 @@ export class ViewerWindowContext {
         loop();
 
         this.setInstanceIDs(instanceIDs);
-    }
-
-    closeBrowserOverlay() {
-        this.browserOverlay = false;
     }
 
     addViewer(viewer: ViewerContext) {

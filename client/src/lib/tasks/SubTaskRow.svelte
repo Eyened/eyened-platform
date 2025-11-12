@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { page } from "$app/state";
 	import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Input from "$lib/components/ui/input";
 	import * as Table from "$lib/components/ui/table";
 	import type {
-		SubTaskGET,
 		SubTaskWithImagesGET,
 	} from "../../types/openapi_types";
 	import { toast } from "svelte-sonner";
@@ -16,7 +14,7 @@
 	} from "$lib/data/helpers";
 
 	type Props = {
-		subtask: SubTaskGET | SubTaskWithImagesGET;
+		subtask: SubTaskWithImagesGET;
 		taskId: number;
 		index: number;
 		start: number;

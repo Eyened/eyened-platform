@@ -1,13 +1,11 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
-	import { page } from "$app/state";
 	import BrowserContent from "$lib/browser/BrowserContent.svelte";
 	import { BrowserContext } from "$lib/browser/browserContext.svelte";
 	import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
 	import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
 	import { instances } from "$lib/data/stores.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-	import { getContext, onMount, setContext } from "svelte";
+	import { getContext, setContext } from "svelte";
 	import type { InstanceGET } from "../../types/openapi_types";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
@@ -71,23 +69,6 @@
 
 	const searching = performPatientIdentifierSearch();
 
-	function close() {
-		viewerWindowContext.closeBrowserOverlay();
-
-		const currentInstanceIds = [...browserContext.selectedIds];
-		if (subTask) {
-			if (updateImageLinks) {
-				updateSubTaskImageLinks(currentInstanceIds);
-			}
-		} else {
-			// updates url (just visual, does not reload the page)
-			const searchParams = page.url.searchParams;
-			searchParams.set("instances", currentInstanceIds.join(","));
-			goto(`?${page.url.searchParams.toString()}`.replaceAll("%2C", ","));
-		}
-		viewerWindowContext.setInstanceIDs(currentInstanceIds);
-	}
-
 	async function updateSubTaskImageLinks(currentInstanceIds: number[]) {
 		const newInstanceIds = currentInstanceIds.filter(
 			(id) => !initialInstanceIds.includes(id),
@@ -115,7 +96,6 @@
 				bind:checked={updateImageLinks}
 			/>
 		{/if}
-		<button class="close-button" onclick={close}>Close</button>
 	</div>
 	<div id="selection">
 		{#each browserContext.selectedInstances as instance (instance.id)}
@@ -132,23 +112,6 @@
 </div>
 
 <style>
-	div#browser-overlay {
-		position: fixed;
-		z-index: 100;
-		left: 0;
-		top: 0;
-		bottom: 0;
-		right: 0;
-		background-color: rgba(255, 255, 255, 0.8);
-		backdrop-filter: blur(10px); /* Add this line */
-
-		transition: 0.5s;
-		display: flex;
-		flex-direction: column;
-
-		/* Force light theme for all child components */
-		color: #1a1a1a !important;
-	}
 	div#content {
 		flex: 1;
 		display: flex;
@@ -168,19 +131,7 @@
 	label {
 		align-self: center;
 	}
-	.close-button {
-		background-color: #85c1e9;
-		color: #333;
-		font-size: 18px;
-		padding: 10px 24px;
-		border: none;
-		cursor: pointer;
-		border-radius: 5px;
-		transition: 0.3s;
-	}
-	.close-button:hover {
-		background-color: #6cb6e7; /* Darker blue on hover */
-	}
+
 	.loading-message {
 		display: flex;
 		justify-content: center;
