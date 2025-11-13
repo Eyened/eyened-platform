@@ -1,6 +1,5 @@
 import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, InstanceGET, InstanceMeta, SegmentationGET, StudyGET, SubTaskWithImagesGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
-import { api } from '../api/client';
-import { apiUrl } from '../config';
+import { api, fetchApi } from '../api/client';
 import { decodeNpy } from '../utils/npy_loader';
 import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks, instanceMetas, instances, segmentations, studies, tags, tasks } from './stores.svelte';
 
@@ -185,15 +184,11 @@ export async function updateSegmentationData(segmentationId: number, data: Array
         urlParams.append('scan_nr', params.scan_nr.toString());
     }
 
-    const queryString = urlParams.toString();
-
-    const url = `${apiUrl}/segmentations/${segmentationId}/data${queryString ? '?' + queryString : ''}`;
-
-    return fetch(url, {
+    return fetchApi(`/segmentations/${segmentationId}/data`, {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/octet-stream' },
-        body: data
+        body: data,
+        query: urlParams
     });
 }
 
