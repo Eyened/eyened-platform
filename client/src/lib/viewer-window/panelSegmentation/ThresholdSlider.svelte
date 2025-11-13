@@ -15,11 +15,14 @@
 
     const canEdit = globalContext.canEdit(segmentation);
 
+    let pendingUpdate = Promise.resolve();
     async function onUpdateThreshold() {
         if (canEdit) {
-            await updateSegmentation(segmentation.id, { threshold: segmentationItem.threshold });
+            await pendingUpdate;
+            pendingUpdate = updateSegmentation(segmentation.id, { threshold: segmentationItem.threshold });
         }
     }
+
 </script>
 
 <label>
@@ -29,7 +32,7 @@
         min="0"
         max="1"
         step="0.01"
-        bind:value={segmentationItem.threshold}        
+        bind:value={segmentationItem.threshold}
         onchange={onUpdateThreshold}
     />
 </label>
