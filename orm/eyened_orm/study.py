@@ -34,7 +34,7 @@ class Study(Base):
     Series: Mapped[List["Series"]] = relationship("eyened_orm.series.Series", back_populates="Study", passive_deletes=True)
     Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Study")
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Study")
-
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="Study")
     StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship("eyened_orm.tag.StudyTagLink", back_populates="Study", lazy="selectin")
 
     @classmethod
