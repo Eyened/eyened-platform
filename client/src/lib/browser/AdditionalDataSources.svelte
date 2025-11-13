@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { resolveURL, resolveValue } from "$lib/utils/cached_source_loader";
+    import { loadDataSource, resolveURL, resolveValue } from "$lib/browser/dataSources";
     import ExternalData from "./ExternalData.svelte";
 
     interface Props {
@@ -26,9 +26,7 @@
     }
     async function loadAdditionalData(source: AdditionalDataSource) {
         const url = resolveURL(source.url, context);
-        const response = await fetch(url);
-        const data = await response.json();
-        return data;
+        return loadDataSource(url);
     }
 </script>
 

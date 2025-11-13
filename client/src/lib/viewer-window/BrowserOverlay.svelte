@@ -1,24 +1,27 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
 	import BrowserContent from "$lib/browser/BrowserContent.svelte";
 	import { BrowserContext } from "$lib/browser/browserContext.svelte";
 	import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
 	import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
 	import { instances } from "$lib/data/stores.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-	import { getContext, setContext } from "svelte";
+	import { getContext, onDestroy, setContext } from "svelte";
 	import type { InstanceGET } from "../../types/openapi_types";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
 	interface Props {
 		viewerWindowContext: ViewerWindowContext;
 	}
-
 	let { viewerWindowContext }: Props = $props();
+
+    const browserContext = new BrowserContext();
+    setContext("browserContext", browserContext);
+
 	const initialInstanceIds = viewerWindowContext.instanceIds.slice();
-	const browserContext = new BrowserContext();
 
-	setContext("browserContext", browserContext);
-
+	
 	const taskContext = getContext<TaskContext>("taskContext");
 	const subTask = taskContext?.subTask;
 
@@ -69,7 +72,7 @@
 
 	const searching = performPatientIdentifierSearch();
 
-	async function updateSubTaskImageLinks(currentInstanceIds: number[]) {
+	function updateSubTaskImageLinks(currentInstanceIds: number[]) {
 		const newInstanceIds = currentInstanceIds.filter(
 			(id) => !initialInstanceIds.includes(id),
 		);
@@ -77,13 +80,26 @@
 			(id) => !currentInstanceIds.includes(id),
 		);
 
-		for (const instanceId of newInstanceIds) {
-			await addSubTaskImage(subTask!.id, instanceId);
-		}
-		for (const instanceId of removedInstanceIds) {
-			await removeSubTaskImage(subTask!.id, instanceId);
-		}
+		return Promise.all([
+			...newInstanceIds.map((id) => addSubTaskImage(subTask!.id, id)),
+			...removedInstanceIds.map((id) => removeSubTaskImage(subTask!.id, id)),
+		]);
 	}
+	function close() {
+		const currentInstanceIds = [...browserContext.selectedIds];
+		if (subTask) {
+			if (updateImageLinks) {
+				updateSubTaskImageLinks(currentInstanceIds);
+			}
+		} else {
+			// updates url (just visual, does not reload the page)
+			const searchParams = page.url.searchParams;
+			searchParams.set("instances", currentInstanceIds.join(","));
+			goto(`?${page.url.searchParams.toString()}`.replaceAll("%2C", ","));
+		}
+		viewerWindowContext.setInstanceIDs(currentInstanceIds);
+	}
+	onDestroy(close);
 </script>
 
 <div id="browser-overlay">

@@ -1,14 +1,14 @@
 <script lang="ts">
 	import Spinner from "$lib/components/Spinner.svelte";
+	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 	import { getContext } from "svelte";
 	import TopViewer from "./TopViewer.svelte";
 	import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
-	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
-	import Task from "./icons/Task.svelte";
-	import TaskTopBar from "$lib/tasks/TaskTopBar.svelte";
-	import BrowserOverlay from "./BrowserOverlay.svelte";
 	import { Button } from "$lib/components/ui/button";
+	import TaskOverlay from "$lib/tasks/TaskOverlay.svelte";
+	import BrowserOverlay from "./BrowserOverlay.svelte";
+	import Task from "./icons/Task.svelte";
 
 	const viewerWindowContext = getContext<ViewerWindowContext>(
 		"viewerWindowContext",
@@ -57,13 +57,13 @@
 		}}
 	>
 		<div class="header">
-			<Button variant="outline" size="sm" onclick={() => selectPanel(null)}
-				>Close</Button
-			>
+			<Button variant="outline" size="sm" onclick={() => selectPanel(null)}>
+				Close
+			</Button>
 		</div>
 		<div>
 			{#if selectedPanel == "task"}
-				<TaskTopBar
+				<TaskOverlay
 					task={taskContext.task}
 					subTask={taskContext.subTask}
 					subTaskIndex={taskContext.subTaskIndex}
@@ -77,7 +77,9 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div id="panel-selector">
-		<div class="icon" onclick={() => selectPanel("task")}><Task /></div>
+		{#if taskContext}
+			<div class="icon" onclick={() => selectPanel("task")}><Task /></div>
+		{/if}
 		<div class="icon" onclick={() => selectPanel("browser")}>+</div>
 	</div>
 {/if}
@@ -122,7 +124,7 @@
 		backdrop-filter: blur(10px);
 		display: flex;
 		flex-direction: column;
-
+		overflow-y: auto;
 		/* Force light theme for all child components */
 		color: #1a1a1a !important;
 	}

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DataRow } from "$lib/utils/cached_source_loader";
+    import type { DataRow } from "$lib/browser/dataSources";
     interface Props {
         data: DataRow[];
     }

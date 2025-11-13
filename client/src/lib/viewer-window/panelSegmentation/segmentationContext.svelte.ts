@@ -2,41 +2,37 @@
 import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import type { CreatorMeta, ModelMeta, ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import { SvelteSet } from "svelte/reactivity";
+import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
 export type Segmentation = SegmentationGET | ModelSegmentationGET;
 
+
+export function getSegmentationKey(segmentation: Segmentation): string {
+    return `${segmentation.annotation_type}_${segmentation.id}`;
+}
 export class SegmentationContext {
 
     public graderSegmentations: SegmentationGET[] = $derived(
         segmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
     );
-    
+
     public modelSegmentations: ModelSegmentationGET[] = $derived(
         modelSegmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
     );
-    
-    public creators: SvelteMap<number, CreatorMeta> = $derived(
-        new SvelteMap(this.graderSegmentations.map(s => [s.creator.id, s.creator]))
-    );
 
-    public models: SvelteMap<number, ModelMeta> = $derived(
-        new SvelteMap(this.modelSegmentations.map(s => [s.creator.id, s.creator]))
-    );
+    public creatorVisible = new SvelteSet<number>();
+    public modelVisible = $state(true);
+    public shownSegmentations = new SvelteSet<string>();
 
-    public creatorHidden = new SvelteMap<number, boolean>();
-    public modelHidden = new SvelteMap<number, boolean>();
-
-    public hiddenSegmentations = new SvelteSet<Segmentation>();
 
     public visibleGraderSegmentations: SegmentationGET[] = $derived(
-        this.graderSegmentations.filter(s => !this.hiddenSegmentations.has(s))
+        this.graderSegmentations.filter(s => this.shownSegmentations.has(getSegmentationKey(s)))
     );
 
     public visibleModelSegmentations: ModelSegmentationGET[] = $derived(
-        this.modelSegmentations.filter(s => !this.hiddenSegmentations.has(s))
+        this.modelSegmentations.filter(s => this.shownSegmentations.has(getSegmentationKey(s)))
     );
 
     public flipDrawErase = $state(false);
@@ -51,58 +47,60 @@ export class SegmentationContext {
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage,
-    ) {}
+    ) { }
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         return this.image.getOrCreateSegmentationItem(segmentation);
     }
 
     getSegmentationItemById(segmentationId: number): SegmentationItem | undefined {
-        const segmentation = this.graderSegmentations.find(s => s.id === segmentationId) 
+        const segmentation = this.graderSegmentations.find(s => s.id === segmentationId)
             || this.modelSegmentations.find(s => s.id === segmentationId);
-        
+
         return segmentation ? this.image.getOrCreateSegmentationItem(segmentation) : undefined;
     }
 
     toggleShowCreator(creatorId: number) {
-        const currentValue = this.creatorHidden.get(creatorId) ?? false;
-        this.creatorHidden.set(creatorId, !currentValue);
+        if (this.creatorVisible.has(creatorId)) {
+            this.creatorVisible.delete(creatorId);
+        } else {
+            this.creatorVisible.add(creatorId);
+        }
     }
 
-    toggleShowModel(modelId: number) {
-        const currentValue = this.modelHidden.get(modelId) ?? false;
-        this.modelHidden.set(modelId, !currentValue);
-    }
-        
     toggleShowSegmentation(segmentation: Segmentation) {
-        if (this.hiddenSegmentations.has(segmentation)) {
-            this.hiddenSegmentations.delete(segmentation);
+        const key = getSegmentationKey(segmentation);
+
+        if (this.shownSegmentations.has(key)) {
+            this.shownSegmentations.delete(key);
         } else {
-            this.hiddenSegmentations.add(segmentation);
+            this.shownSegmentations.add(key);
         }
+    }
+
+    toggleShowModel() {
+        this.modelVisible = !this.modelVisible;
     }
 
     hideAll() {
-        // Hide all segmentations
-        for (const seg of this.graderSegmentations) {
-            this.hiddenSegmentations.add(seg);
-        }
-        for (const seg of this.modelSegmentations) {
-            this.hiddenSegmentations.add(seg);
-        }
+        // Hide all segmentations by clearing the shown set
+        this.shownSegmentations.clear();
     }
 
     showOnlySegmentation(segmentation: Segmentation) {
-        this.hideAll();
-        this.hiddenSegmentations.delete(segmentation);
+        const key = getSegmentationKey(segmentation);
+        this.shownSegmentations.clear();
+        this.shownSegmentations.add(key);
     }
 
-    toggleActive(segmentationItem: SegmentationItem | undefined) {
+    toggleActive(segmentationItem: SegmentationItem) {
         if (this.segmentationItem == segmentationItem) {
             this.segmentationItem = undefined;
         } else {
             this.segmentationItem = segmentationItem;
+            this.shownSegmentations.add(getSegmentationKey(segmentationItem.segmentation));
         }
+
     }
 }
 

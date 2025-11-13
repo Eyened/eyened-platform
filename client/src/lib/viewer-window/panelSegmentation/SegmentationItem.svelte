@@ -8,7 +8,6 @@
 	import ThresholdSlider from "./ThresholdSlider.svelte";
 
 	import StringDialogue from "$lib/StringDialogue.svelte";
-	import AI from "../icons/AI.svelte";
 	import CCPanel from "./CCPanel.svelte";
 	import { duplicate } from "./duplicate_utils";
 	import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte";
@@ -16,7 +15,7 @@
 	import ImportPanel from "./ImportPanel.svelte";
 	import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
 	import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
-	import type { Segmentation } from "./segmentationContext.svelte";
+	import { getSegmentationKey, type Segmentation } from "./segmentationContext.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
 	const globalContext = getContext<GlobalContext>("globalContext");
@@ -27,17 +26,16 @@
 
 	interface Props {
 		segmentation: Segmentation;
-		style?: "AI" | "normal";
 	}
 
-	let { segmentation, style = "normal" }: Props = $props();
+	let { segmentation }: Props = $props();
 
 	const feature = segmentation.feature;
 	const dataRepresentation = segmentation.data_representation;
 	const image = viewerContext.image;
 
 	const visible = $derived(
-		!segmentationContext.hiddenSegmentations.has(segmentation),
+		segmentationContext.shownSegmentations.has(getSegmentationKey(segmentation)),
 	);
 
 	const segmentationItem =
@@ -49,14 +47,15 @@
 	const isEditable = globalContext.canEdit(segmentation);
 	let collapsed = $state(true);
 
-	async function removeAnnotation() {
+	async function remove() {
 		const resolve = async () => {
 			// remove from database on server
 			if (segmentation.annotation_type === "grader_segmentation") {
 				await deleteSegmentation(segmentation.id);
 			}
-			segmentationContext.toggleActive(undefined);
-			// segmentationItem.dispose();
+			if (segmentationContext.segmentationItem == segmentationItem) {
+				segmentationContext.segmentationItem = undefined;
+			}
 		};
 
 		globalContext.dialogue = {
@@ -78,7 +77,7 @@
 		segmentationContext.showOnlySegmentation(segmentation);
 	}
 
-	function activate() {
+	function toggleActive() {
 		segmentationContext.toggleActive(segmentationItem);
 	}
 
@@ -118,12 +117,8 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="content"
-	class:compact={style == "AI"}
-	class:normal={style == "normal"}
 	class:loading={segmentationItem.loading}
 	class:active
 	onpointerenter={pointerEnter}
@@ -152,17 +147,14 @@
 			<FeatureColorPicker {segmentation} />
 		{/if}
 
-		<div class="expand" onclick={activate}>
-			{#if style == "AI"}
-				<div class="ai"><AI size="1.2em" /></div>
-			{/if}
+		<button type="button" class="expand" onclick={toggleActive}>
 			<div class="feature-name">{feature.name}</div>
 			<div class="segmentationID">[{segmentation.id}]</div>
 			<div class="segmentationType">[{segmentationType}]</div>
-		</div>
+		</button>
 
 		{#if isEditable}
-			<PanelIcon onclick={removeAnnotation} tooltip="Delete" Icon={Trash} />
+			<PanelIcon onclick={remove} tooltip="Delete" Icon={Trash} />
 		{/if}
 	</div>
 
@@ -173,9 +165,11 @@
 			</div>
 		{/if}
 	{/if}
-	{#if active && style == "AI"}
+	{#if active && segmentation.annotation_type == "model_segmentation"}
 		<div class="row">
-			<div class="button" onclick={applyDuplicateAI}>Duplicate</div>
+			<button type="button" class="duplicate-button" onclick={applyDuplicateAI}>
+				Duplicate
+			</button>
 		</div>
 	{/if}
 
@@ -188,13 +182,13 @@
 		</div>
 	{/if}
 	{#if active}
-		<div class="open" onclick={() => (collapsed = !collapsed)}>
+		<button type="button" class="open" onclick={() => (collapsed = !collapsed)}>
 			{#if collapsed}
 				&#9654;
 			{:else}
 				&#9660;
 			{/if}
-		</div>
+		</button>
 
 		{#if !collapsed}
 			<div class="content">
@@ -212,16 +206,16 @@
 						/>
 					{/if}
 				</div>
-				
-                <div class="row">
-                    <ReferenceSegmentationPanel
-                        {segmentation}
-                        {image}
-                        {isEditable}
-                        {segmentationItem}
-                    />
-                </div>
-                {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
+
+				<div class="row">
+					<ReferenceSegmentationPanel
+						{segmentation}
+						{image}
+						{isEditable}
+						{segmentationItem}
+					/>
+				</div>
+				{#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
 					<div class="row">
 						<CCPanel {segmentationItem} />
 					</div>
@@ -235,17 +229,6 @@
 	div {
 		display: flex;
 	}
-	div.content.compact {
-		padding: 0em;
-	}
-	div.ai {
-		align-items: center;
-		padding-right: 0.2em;
-	}
-	div.content.normal {
-		padding: 0.2em;
-		border-radius: 2px;
-	}
 	div.content {
 		flex-direction: column;
 	}
@@ -257,19 +240,19 @@
 		flex-direction: row;
 		flex: 1;
 		width: 100%;
-        align-items: center;
+		align-items: center;
 	}
-	div.open {
+	button.open {
 		border-top: 1px solid rgba(100, 255, 255, 0.3);
 		flex-direction: row;
 		flex: 1;
 		cursor: pointer;
 	}
-	div.open:hover {
+	button.open:hover {
 		background-color: rgba(100, 255, 255, 0.3);
 	}
 
-	div.expand {
+	button.expand {
 		cursor: pointer;
 		flex: 1;
 		min-height: 2em;
@@ -279,7 +262,7 @@
 	div.active {
 		background-color: rgba(100, 255, 255, 0.3);
 	}
-	div.expand:hover {
+	button.expand:hover {
 		background-color: rgba(100, 255, 255, 0.3);
 	}
 	div.feature-name {
@@ -291,7 +274,10 @@
 		font-size: x-small;
 		flex: 0;
 	}
-	div.feature-name,
+	div.feature-name {
+		text-align: left;
+		font-size: small;
+	}
 	div.segmentationID,
 	div.segmentationType {
 		align-items: center;
@@ -301,7 +287,20 @@
 		opacity: 0.8;
 	}
 
-	div.button {
+	button {
+		background: transparent;
+		border: none;
+		color: inherit;
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		padding: 0;
+	}
+	button:focus-visible {
+		outline: 2px solid currentColor;
+		outline-offset: 2px;
+	}
+	button.duplicate-button {
 		cursor: pointer;
 		padding: 0.2em;
 		border-radius: 2px;
@@ -309,7 +308,7 @@
 		margin: 0.2em;
 		text-wrap-mode: nowrap;
 	}
-	div.button:hover {
+	button.duplicate-button:hover {
 		background-color: rgba(255, 255, 255, 0.3);
 	}
 </style>
