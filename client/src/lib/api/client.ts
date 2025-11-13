@@ -1,7 +1,6 @@
 import createClient from 'openapi-fetch';
 import type { paths } from '../../types/openapi';
 import { authClient } from '../../auth';
-
 // Token refresh state - prevents multiple simultaneous refresh attempts
 let refreshPromise: Promise<void> | null = null;
 
@@ -12,6 +11,20 @@ function redirectToLogin() {
 		const currentUrl = encodeURIComponent(window.location.href);
 		window.location.href = `/users/login?redirect=${currentUrl}`;
 	}
+}
+
+function withCredentials(init?: RequestInit): RequestInit {
+	return {
+		...init,
+		credentials: 'include'
+	};
+}
+
+async function fetchWithCredentials(
+	input: RequestInfo | URL,
+	init?: RequestInit
+): Promise<Response> {
+	return fetch(input, withCredentials(init));
 }
 
 // Handle token refresh with deduplication
@@ -66,10 +79,7 @@ async function fetchWithAuthRetry(
 	init?: RequestInit
 ): Promise<Response> {
 	// Ensure credentials are included
-	const requestInit: RequestInit = {
-		...init,
-		credentials: 'include'
-	};
+	const requestInit = withCredentials(init);
 
 	// Extract URL for checking
 	const url = typeof input === 'string' 
@@ -115,3 +125,76 @@ export const api = createClient<paths>({
 	baseUrl: '/api',
 	fetch: fetchWithAuthRetry
 });
+
+type QueryRecordValue = string | number | boolean | null | undefined;
+
+type QueryRecord = Record<
+	string,
+	QueryRecordValue | Array<QueryRecordValue>
+>;
+
+export interface FetchApiOptions extends RequestInit {
+	query?: URLSearchParams | QueryRecord;
+	skipAuthRetry?: boolean;
+}
+
+function buildQueryString(query?: URLSearchParams | QueryRecord): string {
+	if (!query) {
+		return '';
+	}
+
+	const params =
+		query instanceof URLSearchParams ? query : new URLSearchParams();
+
+	if (!(query instanceof URLSearchParams)) {
+		for (const [key, value] of Object.entries(query)) {
+			if (value == null) {
+				continue;
+			}
+
+			if (Array.isArray(value)) {
+				for (const item of value) {
+					if (item == null) continue;
+					params.append(key, String(item));
+				}
+			} else {
+				params.set(key, String(value));
+			}
+		}
+	}
+
+	const qs = params.toString();
+	return qs ? `?${qs}` : '';
+}
+
+function normalizePath(path: string): string {
+	if (/^https?:\/\//i.test(path)) {
+		return path;
+	}
+
+	if (path.startsWith('/api/')) {
+		return path;
+	}
+
+	if (path.startsWith('/')) {
+		return `/api${path}`;
+	}
+
+	return `/api/${path}`;
+}
+
+export async function fetchApi(
+	path: string,
+	options: FetchApiOptions = {}
+): Promise<Response> {
+	const { query, skipAuthRetry, ...init } = options;
+	const basePath = normalizePath(path);
+	const queryString = buildQueryString(query);
+	const url = `${basePath}${queryString}`;
+
+	if (skipAuthRetry) {
+		return fetchWithCredentials(url, init);
+	}
+
+	return fetchWithAuthRetry(url, init);
+}

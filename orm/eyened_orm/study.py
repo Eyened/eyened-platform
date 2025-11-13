@@ -8,7 +8,7 @@ from .base import Base
 
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, FormAnnotation, Patient, Series as SeriesType, ImageInstance, StudyTagLink
+    from eyened_orm import Annotation, FormAnnotation, Patient, Series, ImageInstance, StudyTagLink, AttributeValue
 
 
 class Study(Base):
