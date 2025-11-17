@@ -13,12 +13,6 @@ Used to create the viewerwindow context.
     import ViewerWindow from "./ViewerWindow.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
-    // dark mode
-    onMount(() => {
-        document.documentElement.classList.add('dark');
-    });
-    
-
     interface Props {
         instanceIDs: number[];
     }
@@ -38,6 +32,7 @@ Used to create the viewerwindow context.
     const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();
     let viewerWindowContext: ViewerWindowContext | null = null;
     let webgl: WebGL | null = null;
+    let addedDarkClass = false;
 
     function handleContextLost(event: Event) {
         event.preventDefault();
@@ -65,6 +60,11 @@ Used to create the viewerwindow context.
         window.addEventListener("resize", resizeCanvas);
         resizeCanvas();
 
+        if (!document.documentElement.classList.contains('dark')) {
+            document.documentElement.classList.add('dark');
+            addedDarkClass = true;
+        }
+
         // Add WebGL context event listeners
         mainCanvas.addEventListener("webglcontextlost", handleContextLost);
         mainCanvas.addEventListener("webglcontextrestored", handleContextRestored);
@@ -84,6 +84,11 @@ Used to create the viewerwindow context.
             window.removeEventListener("resize", resizeCanvas);
             mainCanvas.removeEventListener("webglcontextlost", handleContextLost);
             mainCanvas.removeEventListener("webglcontextrestored", handleContextRestored);
+
+            if (addedDarkClass) {
+                document.documentElement.classList.remove('dark');
+                addedDarkClass = false;
+            }
             
             if (viewerWindowContext) {
                 viewerWindowContext.destroy();
