@@ -111,7 +111,28 @@ export class ViewerWindowContext {
     }
 
     destroy() {
+        // Cancel animation frame
         cancelAnimationFrame(this.frame);
+        
+        // Dispose all images and their resources
+        for (const [image, viewer] of this.topViewers.entries()) {
+            try {
+                image.dispose();
+            } catch (error) {
+                console.error(`Error disposing image ${image.image_id}:`, error);
+            }
+        }
+        
+        // Clear all maps and sets
+        this.topViewers.clear();
+        this.viewers.clear();
+        this.imagesIndex.clear();
+        this.byDatasetIdentifier.clear();
+        this.bySOPInstanceUID.clear();
+        this.photoLocators.clear();
+        this.photoLocatorSets = [];
+        this.mainPanels = [];
+        this.instanceIds = [];
     }
 
     async loadImage(instance: InstanceGET): Promise<LoadedImages> {

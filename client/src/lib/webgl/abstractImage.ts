@@ -126,4 +126,21 @@ export abstract class AbstractImage {
         return segmentationItem;
     }
 
+    /**
+     * Dispose of all resources associated with this image.
+     * Should be called when the image is no longer needed, especially before
+     * navigating away or destroying the WebGL context.
+     */
+    dispose(): void {
+        // Dispose all segmentation items
+        for (const segmentationItem of this.segmentationItems.values()) {
+            segmentationItem.dispose();
+        }
+        this.segmentationItems.clear();
+        
+        // Clear canvas contexts
+        this._drawingContext = null;
+        this._ioContext = null;
+    }
+
 }

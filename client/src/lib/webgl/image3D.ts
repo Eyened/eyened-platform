@@ -168,6 +168,16 @@ export class Image3D extends AbstractImage {
         outTex.passShader(this.webgl.shaders.normalize, uniforms);
         return outTex;
     }
+
+    dispose(): void {
+        // Call parent dispose to clean up segmentations
+        super.dispose();
+        
+        // Dispose 3D texture
+        if (this.texture) {
+            this.webgl.gl.deleteTexture(this.texture);
+        }
+    }
 }
 
 function initTexture3D(gl: WebGL2RenderingContext, dimensions: Dimensions, data: Uint8Array): WebGLTexture {

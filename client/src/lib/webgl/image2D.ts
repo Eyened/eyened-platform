@@ -113,6 +113,21 @@ export class Image2D extends AbstractImage {
 
         return textureMap[renderMode] || this.texture;
     }
+
+    dispose(): void {
+        // Call parent dispose to clean up segmentations
+        super.dispose();
+        
+        // Dispose all texture data
+        this.textureData?.dispose();
+        this.contrastEnhanced?.dispose();
+        this.sharpened?.dispose();
+        if (this.CLAHE && this.CLAHE !== this.textureData) {
+            this.CLAHE.dispose();
+        }
+        this.standardizedMuSigma?.dispose();
+        this.standardizedHistogram?.dispose();
+    }
 }
 
 function initTexture(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement | ImageBitmap): TextureData {

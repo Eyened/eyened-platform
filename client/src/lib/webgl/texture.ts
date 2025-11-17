@@ -5,6 +5,36 @@ import type { RenderTarget } from "./types";
 export type TypedArray = Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
 export type ImageType = HTMLImageElement | HTMLCanvasElement | ImageBitmap;
 
+// Framebuffer tagging system to detect cross-context violations
+const framebufferOwners = new WeakMap<WebGLFramebuffer, WebGL2RenderingContext>();
+
+export function tagFramebuffer(gl: WebGL2RenderingContext, framebuffer: WebGLFramebuffer): void {
+    framebufferOwners.set(framebuffer, gl);
+}
+
+export function checkFramebufferContext(gl: WebGL2RenderingContext, framebuffer: WebGLFramebuffer | null, label: string): boolean {
+    if (!framebuffer) return true; // null framebuffer is valid (default framebuffer)
+    
+    const owner = framebufferOwners.get(framebuffer);
+    if (owner && owner !== gl) {
+        const error = new Error(
+            `[WebGL Context Violation] Attempted to bind framebuffer from different context. ` +
+            `Label: ${label}. ` +
+            `This framebuffer was created in a different WebGL context and should be disposed.`
+        );
+        console.error(error);
+        console.trace('Framebuffer context violation stack trace:');
+        return false;
+    }
+    
+    // If framebuffer is not tagged, tag it now (for framebuffers created before tagging system)
+    if (!owner) {
+        framebufferOwners.set(framebuffer, gl);
+    }
+    
+    return true;
+}
+
 interface TextureFormat {
     internalFormat: number;
     format: number;
@@ -19,13 +49,16 @@ interface SwapTexture {
     key: string;
 }
 
+const swapManagers = new WeakMap<WebGL2RenderingContext, SwapTextureManager>();
+const swapIOCache = new WeakMap<WebGL2RenderingContext, WebGLTexture>();
+
 class SwapTextureManager {
-    static instance: SwapTextureManager;
     private swapTextures: Map<string, SwapTexture> = new Map();
     public readonly framebuffer: WebGLFramebuffer;
 
     constructor(private gl: WebGL2RenderingContext) {
         this.framebuffer = gl.createFramebuffer()!;
+        tagFramebuffer(gl, this.framebuffer);
     }
 
     private getTextureKey(format: TextureFormat, width: number, height: number): string {
@@ -44,22 +77,23 @@ class SwapTextureManager {
     }
 }
 
-let swapIOCache: WebGLTexture | undefined = undefined;
-
 export function imageToTexture(gl: WebGL2RenderingContext, image: ImageType): WebGLTexture {
-    let swapIO = swapIOCache;
+    let swapIO = swapIOCache.get(gl);
     if (!swapIO) {
         swapIO = createTextureIO(gl, image.width, image.height);
+        swapIOCache.set(gl, swapIO);
     }
     gl.bindTexture(gl.TEXTURE_2D, swapIO);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, image.width, image.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
     return swapIO;
 }
 function getSwapManager(gl: WebGL2RenderingContext): SwapTextureManager {
-    if (!SwapTextureManager.instance) {
-        SwapTextureManager.instance = new SwapTextureManager(gl);
+    let manager = swapManagers.get(gl);
+    if (!manager) {
+        manager = new SwapTextureManager(gl);
+        swapManagers.set(gl, manager);
     }
-    return SwapTextureManager.instance;
+    return manager;
 }
 
 export function createTexture(gl: WebGL2RenderingContext, format: TextureFormat, width: number, height: number): WebGLTexture {
@@ -226,6 +260,11 @@ export class TextureData {
             const { internalFormat } = this.textureFormat;
             const data = this._getData();
 
+            if (!checkFramebufferContext(gl, this.renderTarget.framebuffer, 'TextureData.updateCPU')) {
+                console.error('Skipping updateCPU due to framebuffer context violation');
+                return;
+            }
+
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.renderTarget.framebuffer);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._getTexture(), 0);
             readDataFromFrameBuffer(gl, internalFormat, this.width, this.height, this.numChannels, data);
@@ -284,6 +323,12 @@ export class TextureData {
         this.updateGPU();
         const gl = this.gl;
         const swap = getSwapManager(gl).getSwapTexture(this.textureFormat, this.width, this.height);
+
+        // Check framebuffer context before binding
+        if (!checkFramebufferContext(gl, swap.framebuffer, 'TextureData.passShader')) {
+            console.error('Skipping passShader due to framebuffer context violation');
+            return;
+        }
 
         // Bind the framebuffer and attach the swap texture
         gl.bindFramebuffer(gl.FRAMEBUFFER, swap.framebuffer);
