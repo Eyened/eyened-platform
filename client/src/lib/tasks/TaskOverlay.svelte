@@ -1,25 +1,27 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import Button from "$lib/components/ui/button/button.svelte";
 	import { ButtonGroup } from "$lib/components/ui/button-group";
-	import { ChevronLeft, ChevronRight } from "@lucide/svelte";
+	import Button from "$lib/components/ui/button/button.svelte";
 	import { updateSubTaskComments } from "$lib/data";
 	import { updateSubTask } from "$lib/data/api";
+	import ChevronLeft from "@lucide/svelte/icons/chevron-left";
+	import ChevronRight from "@lucide/svelte/icons/chevron-right";
 	import { toast } from "svelte-sonner";
 	import { subTaskStates } from "../../types/openapi_constants";
 	import type {
-		SubTaskState,
-		SubTaskWithImagesGET,
-		TaskGET,
+		SubTaskState
 	} from "../../types/openapi_types";
+	import type { TaskContext } from "./TaskContext.svelte";
+	import { TaskNavigation } from "./taskUtils.svelte";
 
 	interface Props {
-		task: TaskGET;
-		subTask: SubTaskWithImagesGET;
-		subTaskIndex: number;
+		taskContext: TaskContext;
 	}
 
-	let { task, subTask, subTaskIndex }: Props = $props();
+	let { taskContext }: Props = $props();
+
+	const navigation = new TaskNavigation(taskContext);
+    const { task, subTask, subTaskIndex } = taskContext;
 
 	async function setState(state: SubTaskState) {
 		await updateSubTask(subTask.id, { task_state: state });
@@ -33,30 +35,6 @@
 		window.location.href = url.href;
 	}
 
-	function navigateSubtaskIndex(index: number, searchParams: URLSearchParams) {
-		const currentUrl = window.location.href;
-		const lastSlashIndex = currentUrl.lastIndexOf("/");
-		const suffix_string = `?${searchParams.toString()}`;
-		const newUrl =
-			currentUrl.substring(0, lastSlashIndex + 1) + index + suffix_string;
-		window.location.href = newUrl;
-	}
-
-	function navigate(delta: number) {
-		const searchParams = page.url.searchParams;
-		searchParams.delete("annotation");
-		searchParams.delete("instances");
-		navigateSubtaskIndex(subTaskIndex + delta, searchParams);
-	}
-
-	function prev() {
-		navigate(-1);
-	}
-
-	function next() {
-		navigate(1);
-	}
-
 	async function updateComments(comments: string) {
 		try {
 			await updateSubTaskComments(subTask.id, comments);
@@ -68,17 +46,18 @@
 
 <div id="main">
 	<div id="content">
-		
-		<div class="title">Task {task.name}. Set {subTaskIndex} of {task.num_tasks}.</div>
+		<div class="title">
+			Task {task.name}. Set {subTaskIndex} of {task.num_tasks}.
+		</div>
 		<hr />
-		
+
 		<div class="controls">
 			<ButtonGroup orientation="horizontal">
 				<Button
 					variant="outline"
 					size="sm"
-					onclick={prev}
-					disabled={subTaskIndex == 0}
+					onclick={() => navigation.prev()}
+					disabled={navigation.prevDisabled}
 					aria-label="Previous subtask"
 				>
 					<ChevronLeft />
@@ -87,8 +66,8 @@
 				<Button
 					variant="outline"
 					size="sm"
-					onclick={next}
-					disabled={subTaskIndex == task.num_tasks - 1}
+					onclick={() => navigation.next()}
+					disabled={navigation.nextDisabled}
 					aria-label="Next subtask"
 				>
 					Next
@@ -128,7 +107,7 @@
 			></textarea>
 		</div>
 
-        <div class="controls">
+		<div class="controls">
 			<Button variant="outline" onclick={handleViewTask}>Task overview</Button>
 		</div>
 	</div>
@@ -153,10 +132,10 @@
 		color: white;
 		border-radius: 1em;
 	}
-    div.title {
-        font-weight: bold;
-        align-self: center;
-    }
+	div.title {
+		font-weight: bold;
+		align-self: center;
+	}
 	div.controls {
 		margin: 1em;
 		align-items: center;

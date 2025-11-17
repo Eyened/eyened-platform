@@ -9,8 +9,6 @@
 		SubTaskWithImagesGET,
 	} from "../../types/openapi_types";
 
-	type SubTaskAny = SubTaskWithImagesGET;
-
 	let {
 		rows,
 		taskId,
@@ -27,7 +25,6 @@
 		onPageChange: (p: number) => void;
 	} = $props();
 
-	const globalContext = getContext<GlobalContext>("globalContext");
 	const browserContext = new BrowserContext();
 	setContext("browserContext", browserContext);
 
