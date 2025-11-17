@@ -11,41 +11,136 @@ The Eyened ORM can be configured through environment variables or by passing con
 
 ### Database Settings
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| DATABASE_USER | Yes | Database username |
-| DATABASE_PASSWORD | Yes | Database password |
-| DATABASE_HOST | Yes | Database host address |
-| DATABASE_NAME | Yes | Database name |
-| DATABASE_PORT | Yes | Database port number |
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| DATABASE_USER | Yes | - | Database username |
+| DATABASE_PASSWORD | Yes | - | Database password |
+| DATABASE_HOST | Yes | - | Database host address |
+| DATABASE_NAME | Yes | - | Database name |
+| DATABASE_PORT | Yes | - | Database port number |
+| DATABASE_RAISE_ON_WARNINGS | No | "true" | Whether to raise exceptions on database warnings |
 
 ### Global Settings
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
-| secret_key | No | "6f4b661212" | Secret key used for password hashing and file name obfuscation |
-| images_basepath | No | "/images" | Base path for image storage (in docker deployment by default mapped to "/images") |
-| segmentations_zarr_store | No | "/storage/segmentations.zarr" | Path to the zarr store containing segmentations. Used by the platform for reading and writing segmentations |
-| thumbnails_path | No | "/storage/thumbnails" | Folder containing the thumbnail structure. Used by the ORM to read thumbnails and by the importer to write thumbnails on insertion |
-| default_study_date | No | "1970-01-01" | Default date for new studies when no date is provided |
-| cfi_cache_path | No | None | Path of a cache for fundus images. Used by the importer to write a preprocessed version of the images |
-| image_server_url | No | None | URL of the image server endpoint for generating image URLs |
+| SECRET_KEY | Yes | - | Secret key used for file name obfuscation |
+| IMAGES_BASEPATH | No | "/images" | Base path for image storage (in docker deployment by default mapped to "/images") |
+| SEGMENTATIONS_ZARR_STORE | No | "/storage/segmentations.zarr" | Path to the zarr store containing segmentations. Used by the platform for reading and writing segmentations |
+| THUMBNAILS_PATH | No | "/storage/thumbnails" | Folder containing the thumbnail structure. Used by the ORM to read thumbnails and by the importer to write thumbnails on insertion |
+| ANNOTATIONS_PATH | No | "/storage/annotations" | Folder containing annotation files |
+| DEFAULT_STUDY_DATE | No | "1970-01-01" | Default date for new studies when no date is provided |
+| CFI_CACHE_PATH | No | None | Path of a cache for fundus images. Used by the importer to write a preprocessed version of the images |
+| IMAGE_SERVER_URL | No | None | URL of the image server endpoint for generating image URLs |
 
-## Initialization
+## Creating Environment Files
 
-The Eyened ORM can be initialized in several ways:
+The most common way to configure the ORM is through `.env` files. Create a `.env` file in your project directory with the following structure:
 
-1. **Passing configuration as keyword arguments**
-2. **Passing a string/path to an environment file**
-3. **Passing None (will read from environment variables)**
+```bash
+# Database Settings (Required)
+DATABASE_USER=myuser
+DATABASE_PASSWORD=mypassword
+DATABASE_HOST=localhost
+DATABASE_NAME=eyened_database
+DATABASE_PORT=3306
+DATABASE_RAISE_ON_WARNINGS=true
+
+# Global Settings (Required)
+SECRET_KEY=your-secret-key-here
+
+# Global Settings (Optional - defaults shown)
+IMAGES_BASEPATH=/images
+SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
+THUMBNAILS_PATH=/storage/thumbnails
+ANNOTATIONS_PATH=/storage/annotations
+DEFAULT_STUDY_DATE=1970-01-01
+CFI_CACHE_PATH=
+IMAGE_SERVER_URL=
+```
+
+You can maintain multiple environment files for different environments (e.g., `development.env`, `production.env`, `test.env`).
+
+## Initialization Methods
+
+The `Database` class can be initialized in several ways:
+
+### 1. From Environment Variables
+
+If no configuration is provided, the `Database` class reads from your system's environment variables:
+
+```python
+from eyened_orm import Database
+
+# Reads from os.environ
+database = Database()
+```
+
+### 2. From a Configuration File
+
+Load configuration from a `.env` file by passing the file path:
+
+```python
+from eyened_orm import Database
+from pathlib import Path
+
+# Load from a specific .env file
+database = Database("production.env")
+
+# Or using a Path object
+database = Database(Path("/path/to/config.env"))
+```
+
+### 3. From a Dictionary
+
+Pass configuration as a dictionary. You can use either:
+
+**Flat dictionary** (environment variable style):
+```python
+config_dict = {
+    "DATABASE_USER": "myuser",
+    "DATABASE_PASSWORD": "mypassword",
+    "DATABASE_HOST": "localhost",
+    "DATABASE_NAME": "mydb",
+    "DATABASE_PORT": "3306",
+    "SECRET_KEY": "my-secret-key",
+    "IMAGES_BASEPATH": "/images",
+}
+
+database = Database(config_dict)
+```
+
+**Nested dictionary**:
+```python
+nested_config = {
+    "database": {
+        "user": "myuser",
+        "password": "mypassword",
+        "host": "localhost",
+        "database": "mydb",
+        "port": 3306,
+    },
+    "secret_key": "my-secret-key",
+    "images_basepath": "/images",
+}
+
+database = Database(nested_config)
+```
 
 ## Usage
+
+Once initialized, you can use the database connection:
 
 ```python
 from eyened_orm import Database
 
 # Initialize database
 database = Database()
+
+# Context managed session (recommended - automatically closed)
+with database.get_session() as session:
+    # Use session for database operations
+    pass
 
 # Manual session management (must be closed manually)
 session = database.create_session()
@@ -54,12 +149,7 @@ try:
     pass
 finally:
     session.close()
-
-# Context managed session (automatically closed)
-with database.get_session() as session:
-    # Use session for database operations
-    pass
 ```
 
-You can easily switch between environments by maintaining multiple environment files (e.g., `development.env`, `production.env`).
+You can easily switch between environments by maintaining multiple environment files and passing the appropriate file path when initializing the `Database` object.
 

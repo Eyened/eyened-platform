@@ -22,9 +22,9 @@ To start the development environment:
 cd dev
 docker-compose up -d
 ```
-To start a database and fileserver 
+This starts the database and fileserver services.
 
-And in separate terminals:
+In separate terminals:
 ```bash
 ./start_client_dev.sh
 ./start_server_dev.sh
@@ -94,4 +94,5 @@ The FastAPI server doesn't always restart automatically after code edits. You ma
 
 :::caution
 Never commit sensitive information like API keys or passwords to the repository. Use environment variables for all sensitive configuration.
-::: 
+:::
+

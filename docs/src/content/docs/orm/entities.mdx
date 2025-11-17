@@ -1,0 +1,571 @@
+---
+title: Database Entities
+description: Overview of all main database entities and their relationships in the Eyened ORM
+sidebar:
+  order: 2
+---
+
+This document provides an overview of all main database entities in the Eyened ORM, their relationships, and how to work with them.
+
+## Image Hierarchy
+
+The core data model follows a hierarchical structure: **Project → Patient → Study → Series → ImageInstance**. 
+
+```python
+from eyened_orm import Project, Patient, Study, Series, ImageInstance
+
+# Navigate the hierarchy
+project = Project.by_name(session, 'My Project')
+
+for patient in project.Patients:
+    print(f"Patient: {patient.PatientIdentifier}")
+    
+    for study in patient.Studies:
+        print(f"  Study: {study.StudyDate}")
+        
+        for series in study.Series:
+            print(f"    Series: {series.SeriesInstanceUid}")
+            
+            for image in series.ImageInstances:
+                print(f"      Image: {image.DatasetIdentifier}")
+```
+
+### Project
+
+A `Project` groups related patients and images together. Each project has:
+- A unique `ProjectName`
+- An optional `Contact` (researcher or institution)
+- A `DOI` for publication references
+- An `External` flag indicating if it's an external project
+
+### Patient
+
+A `Patient` belongs to a `Project` and contains:
+- `PatientIdentifier`: Unique identifier within the project
+- `BirthDate` and `Sex` for demographic information
+- Multiple `Studies` associated with the patient
+
+### Study
+
+A `Study` represents a single examination session for a patient.
+- `StudyDate`: Date when the study was performed
+- `StudyInstanceUid`: DICOM study identifier
+- `StudyDescription`: Description of the study
+- `StudyRound`: Project round number
+- Multiple `Series` within the study
+
+:::note
+We diverge from the DICOM definition: the combination (StudyDate, PatientID) is unique, so it is used to group images acquired on the same day. The Study might be better named "Visit" to reflect this usage.
+::: 
+
+
+### Series
+
+A `Series` groups related images from a study:
+- `SeriesInstanceUid`: DICOM series identifier
+- `SeriesNumber`: Series number within the study
+- Multiple `ImageInstances` in the series
+
+:::note
+Different vendors use different definitions of the Series, and which images are considered to belong to the same Series is sometimes arbitrary.
+:::
+
+### ImageInstance
+
+An `ImageInstance` represents a single image or volume:
+- `DatasetIdentifier`: Path to the image file
+- `SOPInstanceUid`: DICOM SOP instance identifier
+- Image dimensions: `Rows_y`, `Columns_x`, `NrOfFrames`
+- Resolution information: `ResolutionAxial`, `ResolutionHorizontal`, `ResolutionVertical`
+- `Modality`: Type of image (ColorFundus, OCT, OCTA, etc.)
+- `Laterality`: Left (L) or Right (R) eye
+- `ETDRSField`: ETDRS field position (F1-F7)
+- `ThumbnailPath`: Path identifier for image thumbnails (see below)
+- Relationships to `DeviceInstance`, `SourceInfo`, `ModalityTable`, and `Scan`
+
+:::note
+We do not currently support images consisting of multiple files. When there's a need for this, we should update the concept of DatasetIdentifier.
+:::
+
+#### ThumbnailPath
+
+The `ThumbnailPath` column stores the thumbnail path identifier and generation state:
+
+- **NULL**: The image has no thumbnail and thumbnail generation must be run
+- **Empty string (`""`)**: Thumbnail generation was attempted but failed
+- **Path string**: A relative path identifier within the `THUMBNAILS_PATH` directory
+
+The thumbnail generator creates multiple sizes (e.g., 144px, 540px). To get the full path for a specific size, append `_{size}.jpg` to the `ThumbnailPath`. For example, if `ThumbnailPath` is `"1/abc123"`, the 144px thumbnail will be at `<THUMBNAILS_PATH>/1/abc123_144.jpg`.
+
+You can access thumbnails programmatically using the `get_thumbnail_path(size)` method:
+
+```python
+image = ImageInstance.by_id(session, image_id)
+thumbnail_144 = image.get_thumbnail_path(144)  # Returns Path object
+```
+
+### Related Entities
+
+- **Contact**: Researcher or institution associated with a project
+- **DeviceModel**: Model of the imaging device
+- **DeviceInstance**: Specific instance of a device used to acquire images
+- **SourceInfo**: Information about the source database/system
+- **ModalityTable**: Reference table for imaging modalities
+- **Scan**: Scan configuration for volume images
+
+## Segmentation System
+
+The segmentation system stores pixel-level annotations and model-generated segmentations. It replaces the legacy `Annotation` system for new data.
+
+### Segmentation
+
+A `Segmentation` represents a manual or AI-assisted segmentation of an image:
+- Associated with an `ImageInstance`
+- Created by a `Creator` (human grader). Previously this could be either human or AI, but now AI-generated segmentations go to the `ModelSegmentation` table
+- Has a `Feature` (what is being segmented)
+- Stored in Zarr format with metadata:
+  - `DataRepresentation`: Binary, DualBitMask, Probability, MultiLabel, or MultiClass
+  - `DataType`: R8, R8UI, R16UI, R32UI, or R32F
+  - Shape: `Depth`, `Height`, `Width`
+  - `SparseAxis` and `ScanIndices` for sparse data
+  - `ImageProjectionMatrix` for coordinate transformations (optional if not using the same coordinates as the original image)
+- Can be linked to a `SubTask` for workflow management
+- Can reference another `Segmentation` via `ReferenceSegmentationID` (the other segmentation is then interpreted as a conditional mask, i.e., final segmentation = segmentation & reference)
+
+```python
+from eyened_orm import Segmentation, Feature, Creator
+
+# Get all segmentations for an image
+image = ImageInstance.by_id(session, image_id)
+for seg in image.Segmentations:
+    print(f"Feature: {seg.Feature.FeatureName}")
+    print(f"Creator: {seg.Creator.CreatorName}")
+    print(f"Shape: {seg.shape}")
+    
+    # Read segmentation data
+    data = seg.read_data()
+```
+
+### ModelSegmentation
+
+A `ModelSegmentation` is a segmentation generated by an AI model:
+- Similar structure to `Segmentation` but linked to a `Model` instead of a `Creator`
+- Automatically generated by segmentation models
+- Can have `AttributeValues` attached for model outputs
+
+### Feature
+
+A `Feature` represents what is being segmented (e.g., "ILM", "RNFL", "Drusen"):
+- `FeatureName`: Unique name of the feature
+- Can have a hierarchical structure via `FeatureFeatureLink` relationships
+- Used by both `Segmentation` and `SegmentationModel`
+
+### FeatureFeatureLink
+
+A `FeatureFeatureLink` creates a parent-child relationship between features. These are used in MultiClass or MultiLabel segmentations to map data values to feature names.
+- Allows features to be organized hierarchically
+- Uses `FeatureIndex` to maintain order and map to data values
+- The parent `Feature` is linked to the `Segmentation`, while child features define what each index/bit represents
+- The relationship is managed through the `FeatureFeatureLink` table, which links parent and child features
+
+```python
+from eyened_orm import Feature
+
+# Create a feature hierarchy
+retinal_layers = Feature.from_list(
+    session,
+    "Retinal Layers",
+    sub_features=["ILM", "RNFL", "GCL", "IPL"]
+)
+```
+
+### Data Representation: MultiLabel and MultiClass
+
+MultiLabel and MultiClass segmentations use `FeatureFeatureLink` relationships to map data values to feature names. The interpretation depends on the `DataRepresentation` type:
+
+#### MultiLabel
+
+In a **MultiLabel** segmentation, each bit in an integer value represents a different feature. Multiple features can be present at the same pixel/voxel simultaneously.
+
+- **Data interpretation**: Each bit position corresponds to a child feature via `FeatureIndex`
+  - Bit 0 (value 1) = first child feature (`FeatureIndex = 0`)
+  - Bit 1 (value 2) = second child feature (`FeatureIndex = 1`)
+  - Bit 2 (value 4) = third child feature (`FeatureIndex = 2`)
+  - And so on...
+- **Value 0**: Background (no features present)
+- **Multiple bits set**: Multiple features present at the same location (e.g., value 3 = 0b11 means both feature 0 and feature 1 are present)
+- **Data types**: Typically uses integer types (`R8UI`, `R16UI`, or `R32UI`) to store bit masks
+- **Use case**: When features can overlap (e.g., multiple pathologies in the same region)
+
+**Example**:
+```python
+# Create a MultiLabel segmentation for "Retinal Pathologies"
+# with sub-features: Drusen (index 0), Hemorrhage (index 1), Exudate (index 2)
+pathologies = Feature.from_list(
+    session,
+    "Retinal Pathologies",
+    sub_features=["Drusen", "Hemorrhage", "Exudate"]
+)
+
+# In the segmentation data:
+# Value 0x00 (0b000) = background
+# Value 0x01 (0b001) = Drusen only
+# Value 0x02 (0b010) = Hemorrhage only
+# Value 0x04 (0b100) = Exudate only
+# Value 0x03 (0b011) = Drusen + Hemorrhage
+# Value 0x07 (0b111) = All three pathologies
+```
+
+#### MultiClass
+
+In a **MultiClass** segmentation, each pixel/voxel is assigned exactly one class. The integer value in the segmentation data maps to a child feature via its `FeatureIndex`.
+
+- **Data interpretation**: The data value maps to the child feature's `FeatureIndex` with an offset of 1 (since 0 is reserved for background)
+  - Value 0 = background (no feature)
+  - Value 1 = first child feature (the feature with `FeatureIndex = 0`)
+  - Value 2 = second child feature (the feature with `FeatureIndex = 1`)
+  - Value 3 = third child feature (the feature with `FeatureIndex = 2`)
+  - In general: data value = `FeatureIndex + 1`
+- **Mutually exclusive**: Only one feature can be present at each location
+- **Data types**: Typically uses integer types (`R8UI`, `R16UI`, or `R32UI`)
+- **Use case**: When features are mutually exclusive (e.g., retinal layers where each pixel belongs to exactly one layer)
+
+**Example**:
+```python
+# Create a MultiClass segmentation for "Retinal Layers"
+# with sub-features: ILM (index 0), RNFL (index 1), GCL (index 2), IPL (index 3)
+retinal_layers = Feature.from_list(
+    session,
+    "Retinal Layers",
+    sub_features=["ILM", "RNFL", "GCL", "IPL"]
+)
+
+# In the segmentation data:
+# Value 0 = background
+# Value 1 = ILM boundary
+# Value 2 = RNFL boundary
+# Value 3 = GCL boundary
+# Value 4 = IPL boundary
+```
+
+#### Working with MultiLabel and MultiClass Segmentations
+
+```python
+from eyened_orm import Segmentation, Feature
+from eyened_orm.segmentation import DataRepresentation
+
+# Get a segmentation with hierarchical features
+seg = Segmentation.by_id(session, segmentation_id)
+
+# Access the parent feature
+parent = seg.Feature
+print(f"Parent feature: {parent.FeatureName}")
+
+# Access child features via FeatureFeatureLink relationships
+for assoc in sorted(parent.FeatureAssociations, key=lambda x: x.FeatureIndex):
+    print(f"  Index {assoc.FeatureIndex}: {assoc.Child.FeatureName}")
+```
+
+**MultiLabel: DataRepresentation == DataRepresentation.MultiLabel**
+
+```python
+# Assume seg.DataRepresentation == DataRepresentation.MultiLabel
+# Read the segmentation data
+data = seg.read_data()
+# Note: read_data() returns a 3D array (depth, height, width)
+# For 2D images, depth will be 1, so use data[0, y, x] or data[z, y, x] for volumes
+print(f"Data shape: {data.shape}")  # Check dimensions
+
+# Example: Check which features are present at pixel (z, y, x)
+z, y, x = 0, 100, 200  # Adjust indices based on your data shape
+pixel_value = data[z, y, x] if len(data.shape) == 3 else data[y, x]
+
+# Loop through all features and check if each is present
+present_features = []
+for assoc in sorted(parent.FeatureAssociations, key=lambda x: x.FeatureIndex):
+    if pixel_value & (1 << assoc.FeatureIndex):  # Check if bit for this feature is set
+        present_features.append(assoc.Child.FeatureName)
+        print(f"Feature '{assoc.Child.FeatureName}' (index {assoc.FeatureIndex}) is present")
+
+if not present_features:
+    print("No features present (background)")
+```
+
+**MultiClass: DataRepresentation == DataRepresentation.MultiClass**
+
+```python
+# Assume seg.DataRepresentation == DataRepresentation.MultiClass
+# Read the segmentation data
+data = seg.read_data()
+# Note: read_data() returns a 3D array (depth, height, width)
+# For 2D images, depth will be 1, so use data[0, y, x] or data[z, y, x] for volumes
+print(f"Data shape: {data.shape}")  # Check dimensions
+
+# Build a dictionary mapping class value to FeatureName
+# Value 0 = background, Value 1 = FeatureIndex 0, Value 2 = FeatureIndex 1, etc.
+class_to_feature = {0: "Background"}
+for assoc in parent.FeatureAssociations:
+    class_to_feature[assoc.FeatureIndex + 1] = assoc.Child.FeatureName
+
+# Example: Look up which feature is present at pixel (z, y, x)
+z, y, x = 0, 100, 200  # Adjust indices based on your data shape
+class_value = int(data[z, y, x] if len(data.shape) == 3 else data[y, x])
+
+# Look up the feature in the dictionary
+feature_name = class_to_feature.get(class_value, "Unknown")
+print(f"Pixel belongs to: {feature_name} (class value: {class_value})")
+```
+
+### Creator
+
+A `Creator` represents a human user (or previously also an AI model). This table is also used for user authentication. These concerns should perhaps be separated in some future version.
+- `CreatorName`: Unique identifier
+- `IsHuman`: Boolean flag (deprecated: use Model for AI outputs)
+- `EmployeeIdentifier`: For human creators
+- Can create `Segmentations`, `FormAnnotations`, `Annotations`, and `Tags`
+- Has authentication fields (`Password`, `PasswordHash`) for human creators
+
+### Model
+
+A `Model` represents an AI model in the system. It has two subtypes:
+
+#### SegmentationModel
+
+A `SegmentationModel` generates segmentations:
+- Has an associated `Feature` (what it segments)
+- Produces `ModelSegmentation` objects
+- Inherits from `Model` with `ModelType = Segmentation`
+
+#### AttributesModel
+
+An `AttributesModel` generates attribute values (see below):
+- Declares output `AttributeDefinition`s
+- Can have `ModelInput`s (required input attributes)
+- Produces `AttributeValue` objects
+- Inherits from `Model` with `ModelType = Attributes`
+
+```python
+from eyened_orm import Model, SegmentationModel
+
+# Get all models
+models = Model.fetch_all(session)
+
+for model in models:
+    print(f"{model.ModelName} v{model.Version}")
+    if isinstance(model, SegmentationModel):
+        print(f"  Segments: {model.Feature.FeatureName}")
+```
+
+## Form Annotations
+
+Form annotations store structured data collected through forms, such as clinical assessments or grading forms.
+
+### FormAnnotation
+
+A `FormAnnotation` stores form data:
+- Linked to a `FormSchema` that defines the form structure
+- Can be attached to `Patient`, `Study`, or `ImageInstance`, with `Laterality` for eye-specific forms (e.g., grade a combination of (Study, Laterality) to grade a specific eye on a given date, based on multiple images)
+- Has `FormData`: JSON containing the form responses
+- Created by a `Creator`
+- Can be linked to a `SubTask` for workflow management
+- Can reference another `FormAnnotation` via `FormAnnotationReferenceID`. The referenced `FormAnnotation` is interpreted as the 'parent' of this one, useful when making duplicates (as a rudimentary versioning system)
+- Has an `Inactive` flag for soft deletion
+
+```python
+from eyened_orm import FormAnnotation, FormSchema
+
+# Get all form annotations for a schema
+schema = FormSchema.by_name(session, "AMD Grading")
+annotations = FormAnnotation.by_schema_and_creator(
+    session,
+    "AMD Grading",
+    creator_name="Dr. Smith"
+)
+
+for fa in annotations:
+    print(f"Patient: {fa.Patient.PatientIdentifier}")
+    print(f"Data: {fa.FormData}")
+```
+
+### FormSchema
+
+A `FormSchema` defines the structure of a form:
+- `SchemaName`: Unique name
+- `Schema`: JSON schema defining form fields and validation
+- `EntityType`: What the form applies to (Patient, Study, ImageInstance, etc.)
+- Multiple `FormAnnotations` use the same schema
+
+## Attributes
+
+The attributes system allows attaching structured metadata to various entities. Attributes can be generated by models or manually created.
+
+### AttributeValue
+
+An `AttributeValue` stores a single attribute value:
+- Attached to exactly one entity: `ImageInstance`, `Segmentation`, `ModelSegmentation`, `Patient`, or `Study`
+- Can have `Laterality` for eye-specific attributes
+- Has an `AttributeDefinition` that defines the attribute
+- Produced by a `Model`
+- Stores the value in one of: `ValueFloat`, `ValueInt`, `ValueText`, or `ValueJSON`
+- Supports provenance tracking via `InputValues` and `UsedByValues`
+
+```python
+from eyened_orm import AttributeValue, AttributeDefinition
+
+# Get all attribute values for an image
+image = ImageInstance.by_id(session, image_id)
+for attr_val in image.AttributeValues:
+    print(f"{attr_val.AttributeDefinition.AttributeName}: {attr_val.ValueFloat}")
+```
+
+### AttributeDefinition
+
+An `AttributeDefinition` defines what an attribute is:
+- `AttributeName`: Unique name (e.g., "Central Retinal Thickness")
+- `AttributeDataType`: String, Float, Int, or JSON
+- Multiple `AttributeValues` use the same definition
+- Can be produced by multiple `AttributesModel`s
+
+### AttributesModel
+
+An `AttributesModel` (subtype of `Model`) generates attributes:
+- Declares `OutputAttributes` (what it produces)
+- Can have `ModelInput`s (what it requires as input)
+- Produces `AttributeValue` objects
+
+### ModelInput
+
+A `ModelInput` declares what input an `AttributesModel` requires:
+- Links a model to a required input `AttributeDefinition`
+- `InputName`: Name used by the model for this input
+
+### AttributeValueInput
+
+An `AttributeValueInput` tracks provenance:
+- Links output `AttributeValue`s to their input `AttributeValue`s
+- Enables tracking how attribute values were computed
+- Supports dependency graphs for computed attributes
+
+## Tasks
+
+The task system manages annotation workflows, organizing work into tasks and subtasks.
+
+### Task
+
+A `Task` represents a work assignment:
+- Has a `TaskDefinition` that defines the task type
+- Has a `Creator` (assigned user)
+- Has a `Contact` (responsible party)
+- Contains multiple `SubTask`s
+- Has a `TaskState`: NotStarted, Busy, Finished, Aborted, or Archived
+
+```python
+from eyened_orm import Task, TaskDefinition
+
+# Create a task from image sets
+task = Task.create_from_imagesets(
+    session,
+    taskdef_name="AMD Grading",
+    task_name="Q1 2024 AMD Review",
+    imagesets=[[1, 2, 3], [4, 5, 6]],  # Two subtasks
+    creator_name="Dr. Smith"
+)
+```
+
+### SubTask
+
+A `SubTask` represents a unit of work within a task:
+- Belongs to a `Task`
+- Has a `Creator` (assigned annotator)
+- Has a `TaskState`: NotStarted, Busy, or Ready
+- Contains multiple `ImageInstance`s via `SubTaskImageLink`
+- Can have `Comments`
+- Can produce `Segmentations` and `FormAnnotations`
+
+### TaskDefinition
+
+A `TaskDefinition` defines a type of task:
+- `TaskDefinitionName`: Unique name
+- `TaskConfig`: JSON configuration for the task
+- Multiple `Task`s use the same definition
+
+### SubTaskImageLink
+
+A `SubTaskImageLink` links images to subtasks:
+- Junction table connecting `SubTask` and `ImageInstance`
+- Defines which images are part of a subtask
+
+## Tagging
+
+The tagging system allows labeling entities with tags for organization and filtering.
+
+### Tag
+
+A `Tag` represents a label that can be applied to entities:
+- `TagName`: Unique name (within `TagType`)
+- `TagType`: Study, ImageInstance, Annotation, Segmentation, or FormAnnotation
+- `TagDescription`: Description of what the tag means
+- Created by a `Creator`
+- Can be "starred" by creators via `CreatorTagLink`
+
+### TagLink Entities
+
+Tags are linked to entities through various junction tables:
+
+- **StudyTagLink**: Links tags to `Study` objects
+- **ImageInstanceTagLink**: Links tags to `ImageInstance` objects
+- **AnnotationTagLink**: Links tags to `Annotation` objects (legacy)
+- **SegmentationTagLink**: Links tags to `Segmentation` objects
+- **FormAnnotationTagLink**: Links tags to `FormAnnotation` objects
+- **CreatorTagLink**: Links tags to `Creator` objects (for starring/favorites)
+
+Each tag link includes:
+- The `Tag` and target entity
+- A `Creator` who applied the tag
+- An optional `Comment`
+- `DateInserted` timestamp
+
+```python
+from eyened_orm import Tag, ImageInstanceTagLink
+
+# Get all tags for an image
+image = ImageInstance.by_id(session, image_id)
+for tag_link in image.ImageInstanceTagLinks:
+    print(f"Tag: {tag_link.Tag.TagName}")
+    print(f"  Applied by: {tag_link.Creator.CreatorName}")
+    if tag_link.Comment:
+        print(f"  Comment: {tag_link.Comment}")
+```
+
+## Legacy Annotations
+
+:::note
+The `Annotation` system is being replaced by the `Segmentation` system. New annotations should use `Segmentation` instead. The `Annotation` system is maintained for backward compatibility.
+:::
+
+### Annotation
+
+An `Annotation` represents a legacy annotation:
+- Similar to `Segmentation` but uses a different storage mechanism
+- Linked to `Patient`, `Study`, `Series`, and optionally `ImageInstance`
+- Has a `Feature` and `Creator`
+- Has an `AnnotationType` that defines interpretation
+- Can reference other annotations via `AnnotationReferenceID`
+- Has an `Inactive` flag
+
+### AnnotationData
+
+An `AnnotationData` stores the actual annotation data:
+- Belongs to an `Annotation`
+- `ScanNr`: Which scan in a volume (or -1 for all scans)
+- Stores data in `ValueBlob` (binary), `ValueInt`, or `ValueFloat`
+- `MediaType`: Format of the data (e.g., "image/png")
+- `DatasetIdentifier`: Path to the data file
+
+### AnnotationType
+
+An `AnnotationType` defines how an annotation should be interpreted:
+- `AnnotationTypeName`: Name of the type
+- `Interpretation`: How to interpret the data (e.g., "Binary mask", "R/G mask")
+- Used by multiple `Annotation`s
+
