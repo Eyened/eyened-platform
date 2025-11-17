@@ -16,7 +16,7 @@ For a complete example of using the import API with real images, check out our [
 :::
 
 :::note
-For detailed information about entity fields available for each level (Patient, Study, Series, Image), see the [Metadata Fields documentation](/eyened-platform/entities).
+For detailed information about entity fields available for each level (Patient, Study, Series, Image), see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
 :::
 
 ### Single Image Import
@@ -50,13 +50,13 @@ This endpoint accepts a JSON payload with the following structure:
     "create_patients": true,           # Create patient if not exists
     "create_studies": true,            # Create study if not exists
     "create_series": true,             # Create series if not exists
-    "create_projects": true,            # Create projects if not exists
+    "create_project": true,            # Create project if not exists
     "include_stack_trace": true        # Include stack trace in error responses
   }
 }
 ```
 
-The `props` dictionaries at each level can include any of the fields documented in the [Metadata Fields documentation](/eyened-platform/entities). These properties are used to populate the corresponding database objects.
+The `props` dictionaries at each level can include any of the fields documented in the [Metadata Fields documentation](/eyened-platform/import_metadata_fields). These properties are used to populate the corresponding database objects.
 
 :::caution
 When importing make sure that the image path is relative to `IMAGES_BASEPATH` as specified in the [Eyened platform setup](/eyened-platform/getting_started#setup). This could mean that files need to be relocated within this folder.
@@ -73,7 +73,7 @@ For a hands-on introduction to using the ORM importer, make sure to check our [e
 :::
 
 :::note
-For detailed information about entity fields that can be included in the `props` dictionaries, see the [Metadata Fields documentation](/eyened-platform/entities).
+For detailed information about entity fields that can be included in the `props` dictionaries, see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
 :::
 
 ### Data Structure
@@ -139,3 +139,4 @@ When initializing the `Importer` class, you can provide the following options:
 | `env` | str | "test" | Environment to use for configuration (e.g., "test", "production") |
 
 */}
+

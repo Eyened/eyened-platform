@@ -5,15 +5,26 @@ sidebar:
   order: 1
 ---
 
-{/* Claude query: Update the documentation in getting_started.mdx using the sample in import.ipynb. Keep the setup section the same but update the Connecting section and add a section briefly showing how to import and use the database objects.  */}
+The Eyened ORM (Object-Relational Mapping) is a Python library that provides direct access to the Eyened database through a high-level, object-oriented interface. Built on SQLAlchemy 2.0, it allows you to interact with database entities as Python objects, making it easy to query, update, and manage data programmatically.
 
-The ORM allows you to interact with the Eyened database for operations such as:
-- Updating fields not updateable in the viewer
-- Importing and exporting data
-- Bulk updates to metadata or corrections
+## When to Use the ORM
+
+The Eyened ORM provides direct, low-level access to database objects, which gives you maximum flexibility and control. However, for many common operations, the [Eyened API](/eyened-platform/api/features) may provide a more convenient interface with a higher level of abstraction.
+
+**Use the ORM when you need to:**
+- Perform bulk operations on large datasets
+- Access fields or relationships not exposed through the API
+- Write complex queries requiring SQLAlchemy's full capabilities
+- Build custom data processing pipelines or automated workflows
+- Import/export data or work directly with database entities in Python scripts or Jupyter notebooks
+
+**Consider using the API instead when:**
+- You need standard CRUD operations
+- You want built-in validation and business logic
+- You're building web applications or integrations
 
 :::note
-The Eyened API may provide a more convenient way to interact with the database. Use of the ORM is considered advanced as it provides broader functionality and more direct interaction with database objects.
+Use of the ORM is considered advanced as it provides broader functionality and more direct interaction with database objects. Make sure you understand the database schema and relationships before making changes that could affect data integrity.
 :::
 
 ## Setup
@@ -28,36 +39,40 @@ pip install -e .
 
 ## Connecting to the database
 
-The easiest way to connect the ORM to a database from Python code is to use the `Database` class with a configuration:
-
-```python
-from eyened_orm import Database
-
-# Initialize database
-database = Database()
-
-with database.get_session() as session:
-    # Use session for database operations
-    pass
-```
-
-:::tip
-See [ORM Configuration](/eyened-platform/orm/configuration) for more information on how to create environments or manually set up configuration files for the ORM.
-:::
-
+To connect the ORM to a database, use the `Database` class. You can initialize it from environment variables, configuration files, or dictionaries. See [ORM Configuration](/eyened-platform/orm/configuration) for detailed setup instructions and all available configuration options.
 
 ## Working with database objects
 
-Once connected, you can import and use database objects from the ORM:
+Once connected, you can import and use database objects from the ORM. The Eyened database follows a hierarchical structure: **Project → Patient → Study → Series → ImageInstance**.
+
+### Basic usage
+
+Start by importing the entity classes you need:
 
 ```python
-# Import database model classes
 from eyened_orm import Project, Patient, Study, Series, ImageInstance
+```
 
+### Finding objects
+
+Use helper methods to find objects by common identifiers:
+
+```python
 # Find a project by name
 project = Project.by_name(session, 'My Project Name')
 
-# Access related objects
+# Find a patient by identifier
+patient = Patient.by_identifier(session, project_id, 'Patient_001')
+```
+
+### Navigating relationships
+
+Access related objects through relationship properties:
+
+```python
+# Navigate from project down the hierarchy
+project = Project.by_name(session, 'My Project Name')
+
 for patient in project.Patients:
     print(f"Patient ID: {patient.PatientID}, Identifier: {patient.PatientIdentifier}")
     
@@ -69,20 +84,65 @@ for patient in project.Patients:
             
             for image in series.ImageInstances:
                 print(f"      Image path: {image.path}")
+```
 
-# Query objects directly
-patients = session.query(Patient).filter(Patient.PatientIdentifier.like("Patient_%")).all()
+### Querying with SQLAlchemy
 
-# You can also use Python-style attribute names
-for patient in project.Patients:
-    print(f"Patient ID: {patient.patient_id}, Identifier: {patient.patient_identifier}")
-    
-    for study in patient.Studies:
-        print(f"  Study date: {study.study_date}")
+For more complex queries, use SQLAlchemy 2.0's query API:
+
+```python
+from sqlalchemy import select
+
+# Query patients matching a pattern
+patients = session.scalars(
+    select(Patient).where(Patient.PatientIdentifier.like("Patient_%"))
+).all()
+
+# Query with joins and filters
+from sqlalchemy import and_
+
+studies = session.scalars(
+    select(Study)
+    .join(Patient)
+    .where(and_(
+        Patient.PatientIdentifier == "Patient_001",
+        Study.StudyDate >= "2024-01-01"
+    ))
+).all()
+```
+
+### Attribute naming
+
+The properties on each ORM object match the database column names (in capitalized camel case), but they're also exposed in Python style (snake_case):
+
+```python
+# Both styles work
+patient_id = patient.PatientID  # Database style
+patient_id = patient.patient_id  # Python style
+
+identifier = patient.PatientIdentifier  # Database style
+identifier = patient.patient_identifier  # Python style
+
+study_date = study.StudyDate  # Database style
+study_date = study.study_date  # Python style
 ```
 
 :::tip
-The properties on each ORM object are the same as the database column names (in capitalized camel case), but they're also exposed in Python style (snake_case). For example, you can access `patient_id` instead of `PatientID`, `patient_identifier` instead of `PatientIdentifier`, and `study_date` instead of `StudyDate`.
+For detailed information about all available entities, their properties, and relationships, see the [Database Entities](/eyened-platform/orm/entities) documentation.
 :::
 
-For more information on using the ORM, see the [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/).
+For more information on using SQLAlchemy queries, see the [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/).
+
+## Next Steps
+
+Now that you're set up and familiar with the basics, explore these resources to learn more:
+
+- **[ORM Configuration](/eyened-platform/orm/configuration)**: Learn about all available configuration options, including database settings, file paths, and other global settings.
+
+- **[Database Entities](/eyened-platform/orm/entities)**: Get detailed information about all database entities, their relationships, and how to work with them, including segmentations, form annotations, attributes, tasks, and more.
+
+- **[Command Line Utilities](/eyened-platform/orm/cli)**: Discover command-line tools for database mirroring, thumbnail updates, model execution, and other maintenance tasks.
+
+- **[Development and Migrations](/eyened-platform/orm/development_and_migrations)**: Learn about database migrations, schema changes, and development workflows.
+
+- **[Utilities](/eyened-platform/orm/utils)**: Explore utility functions and helpers available in the ORM.

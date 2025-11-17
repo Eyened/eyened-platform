@@ -126,7 +126,8 @@ Make sure to set up regular back ups for both the MySQL database and storage fol
 
 The eyened_orm python package can be installed by running:
 ```bash
-pip install orm
+cd orm
+pip install -e .
 ```
 
 To use the eyened_orm package for database access, copy the `.env` file from the docker folder to the eyened_orm/environments folder:
@@ -146,18 +147,18 @@ cp orm/eyened_orm/environments/.env orm/eyened_orm/environments/read-only.env
 
 2. Update the database credentials in `read-only.env`:
 ```bash
-DB_USER=readonly_user
-DB_PASSWORD=your_password
+DATABASE_USER=readonly_user
+DATABASE_PASSWORD=your_password
 ```
 
 3. Use the environment in your code:
 ```python
-from eyened_orm import DBManager
-DBManager.init("read-only")  # Will automatically read from 'eyened_orm/environments/read-only.env'
+from eyened_orm import Database
+database = Database("read-only")  # Will automatically read from 'eyened_orm/environments/read-only.env'
 ```
 :::
 
 ## Next Steps
-To import data into the platform, follow the [Importer guide](/eyened-platform/importer).
+To import data into the platform, follow the [Importing Data guide](/eyened-platform/importing_data).
 
 For more details about the platform's architecture and services, see the [Platform Design](/eyened-platform/platform_design) documentation.
