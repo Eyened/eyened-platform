@@ -35,15 +35,43 @@ Used to create the viewerwindow context.
     const globalContext = getContext<GlobalContext>("globalContext");
     const { user: creator } = globalContext;
 
-    const { promise, resolve } = new Deferred<ViewerWindowContext>();
+    const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();
+    let viewerWindowContext: ViewerWindowContext | null = null;
+    let webgl: WebGL | null = null;
+
+    function handleContextLost(event: Event) {
+        event.preventDefault();
+        console.error("[WebGL] Context lost - stopping rendering and cleaning up");
+        
+        if (viewerWindowContext) {
+            viewerWindowContext.destroy();
+            viewerWindowContext = null;
+        }
+        
+        // Reject the promise so the error UI is shown
+        reject(new Error("WebGL context was lost. Please reload the page."));
+    }
+
+    function handleContextRestored(event: Event) {
+        console.warn("[WebGL] Context restored - this should not happen during normal navigation");
+        console.warn("[WebGL] If you see this during navigation, it may indicate a context leak");
+        
+        // Context restoration is complex - for now, we'll just log it
+        // In a production app, you might want to attempt to rebuild the viewer
+    }
 
     onMount(() => {
+        
         window.addEventListener("resize", resizeCanvas);
         resizeCanvas();
 
-        const webgl = new WebGL(mainCanvas);
+        // Add WebGL context event listeners
+        mainCanvas.addEventListener("webglcontextlost", handleContextLost);
+        mainCanvas.addEventListener("webglcontextrestored", handleContextRestored);
+
+        webgl = new WebGL(mainCanvas);
         const registration = new Registration();
-        const viewerWindowContext = new ViewerWindowContext(
+        viewerWindowContext = new ViewerWindowContext(
             webgl,
             registration,
             creator,
@@ -54,10 +82,28 @@ Used to create the viewerwindow context.
 
         return () => {
             window.removeEventListener("resize", resizeCanvas);
-            viewerWindowContext.destroy();
+            mainCanvas.removeEventListener("webglcontextlost", handleContextLost);
+            mainCanvas.removeEventListener("webglcontextrestored", handleContextRestored);
+            
+            if (viewerWindowContext) {
+                viewerWindowContext.destroy();
+                viewerWindowContext = null;
+            }
+            
+            // Optionally force context loss to ensure cleanup
+            try {
+                const ext = webgl?.gl.getExtension('WEBGL_lose_context');
+                if (ext) {
+                    ext.loseContext();
+                }
+            } catch (error) {
+                console.warn("Could not force context loss:", error);
+            }
+            
+            webgl = null;
         };
     });
-</script>
+</script>   
 
 <canvas bind:this={mainCanvas} class="editor" id="mainCanvas"></canvas>
 
