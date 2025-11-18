@@ -10,7 +10,6 @@ import type {
 	ModelSegmentationGET,
 	FormAnnotationGET,
 	TaskGET,
-	SubTaskGET,
 	SubTaskWithImagesGET
 } from '../../types/openapi_types';
 
@@ -94,7 +93,7 @@ export const segmentations = new ReactiveMap<number, SegmentationGET>();
 export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>();
 export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>();
 export const tasks = new ReactiveMap<number, TaskGET>();
-export const subtasks = new ReactiveMap<number, SubTaskGET | SubTaskWithImagesGET>();
+export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>();
 
 // Secondary indexes for common lookups
 export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>();
@@ -173,25 +172,8 @@ export function ingestTasks(tasksData: TaskGET[]) {
 	}
 }
 
-export function ingestSubTasks(subtasksData: (SubTaskGET | SubTaskWithImagesGET)[]) {
+export function ingestSubTasks(subtasksData: SubTaskWithImagesGET[]) {
 	for (const subtask of subtasksData) {
 		subtasks.set(subtask.id, subtask);
 	}
-}
-
-// Clear functions for cleanup
-export function clearInstances() {
-	instances.clear();
-}
-
-export function clearStudies() {
-	studies.clear();
-}
-
-export function clearTasks() {
-	tasks.clear();
-}
-
-export function clearSubTasks() {
-	subtasks.clear();
 }

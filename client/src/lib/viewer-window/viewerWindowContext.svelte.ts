@@ -1,5 +1,5 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { fetchInstance } from "$lib/data/api";
+import { fetchInstance, fetchFormAnnotations } from "$lib/data/api";
 import { instances } from "$lib/data/stores.svelte";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
@@ -16,10 +16,6 @@ export type MainPanelType = {
 }
 
 export class ViewerWindowContext {
-    
-    // show/hide the browser overlay
-    browserOverlay: boolean = $state(false);
-
 
     private imagesIndex = new Map<number, Promise<LoadedImages>>();
     private byDatasetIdentifier = new Map<string, LoadedImages>();
@@ -38,6 +34,7 @@ export class ViewerWindowContext {
     photoLocatorSets: PhotoLocator[][] = $state([]);
 
     private frame: number = 0;
+    private loadedPatientIds = new Set<number>();
 
     constructor(
         public readonly webgl: WebGL,
@@ -45,7 +42,6 @@ export class ViewerWindowContext {
         public readonly creator: unknown,
         instanceIDs: number[] = [],
     ) {
-        console.log('ViewerWindowContext constructor', instanceIDs);
         this.imageLoader = new ImageLoader(webgl);
 
         // start rendering loop
@@ -54,14 +50,10 @@ export class ViewerWindowContext {
             this.repaint();
         }
         loop();
-        
+
         this.setInstanceIDs(instanceIDs);
     }
 
-    closeBrowserOverlay() {
-        this.browserOverlay = false;
-    }
-    
     addViewer(viewer: ViewerContext) {
         this.viewers.add(viewer);
         return () => this.viewers.delete(viewer);
@@ -89,7 +81,24 @@ export class ViewerWindowContext {
         }
 
         this.instanceIds = ids;
-        
+
+        // Fetch all form annotations for the involved patient(s)
+        const patientIds = Array.from(new Set(
+            ids
+                .map((id) => instances.get(id)?.patient?.id)
+                .filter((pid): pid is number => typeof pid === 'number')
+        ));
+        if (patientIds.length) {
+            await Promise.all(
+                patientIds
+                    .filter((pid) => !this.loadedPatientIds.has(pid))
+                    .map(async (pid) => {
+                        await fetchFormAnnotations({ patient_id: pid });
+                        this.loadedPatientIds.add(pid);
+                    })
+            );
+        }
+
         // Load images for all instances
         for (const id of ids) {
             const instance = instances.get(id);
@@ -102,7 +111,28 @@ export class ViewerWindowContext {
     }
 
     destroy() {
+        // Cancel animation frame
         cancelAnimationFrame(this.frame);
+        
+        // Dispose all images and their resources
+        for (const [image, viewer] of this.topViewers.entries()) {
+            try {
+                image.dispose();
+            } catch (error) {
+                console.error(`Error disposing image ${image.image_id}:`, error);
+            }
+        }
+        
+        // Clear all maps and sets
+        this.topViewers.clear();
+        this.viewers.clear();
+        this.imagesIndex.clear();
+        this.byDatasetIdentifier.clear();
+        this.bySOPInstanceUID.clear();
+        this.photoLocators.clear();
+        this.photoLocatorSets = [];
+        this.mainPanels = [];
+        this.instanceIds = [];
     }
 
     async loadImage(instance: InstanceGET): Promise<LoadedImages> {

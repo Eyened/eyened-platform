@@ -6,11 +6,8 @@
 	import { getContext, setContext } from "svelte";
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
 	import type {
-		SubTaskGET,
 		SubTaskWithImagesGET,
 	} from "../../types/openapi_types";
-
-	type SubTaskAny = SubTaskGET | SubTaskWithImagesGET;
 
 	let {
 		rows,
@@ -20,7 +17,7 @@
 		perPage = 20,
 		onPageChange,
 	}: {
-		rows: SubTaskAny[];
+		rows: SubTaskWithImagesGET[];
 		taskId: number;
 		count: number;
 		page: number;
@@ -28,7 +25,6 @@
 		onPageChange: (p: number) => void;
 	} = $props();
 
-	const globalContext = getContext<GlobalContext>("globalContext");
 	const browserContext = new BrowserContext();
 	setContext("browserContext", browserContext);
 

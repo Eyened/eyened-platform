@@ -1,5 +1,6 @@
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
+import { tagFramebuffer, checkFramebufferContext } from "./texture";
 
 export type TextureDataFormat = 'RG32UI' | 'RG16UI' | 'R16UI' | 'R8' | 'R8UI' | 'RGBA' | 'RGBA_FLOAT' | 'R32UI' | 'RG8';
 
@@ -64,6 +65,7 @@ export class RenderTexture {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.bindTexture(gl.TEXTURE_2D, null);
 
+        tagFramebuffer(gl, this.framebuffer);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -121,6 +123,10 @@ export class RenderTexture {
             return pixels;
         }
         const gl = this.webgl.gl;
+        if (!checkFramebufferContext(gl, this.framebuffer, 'RenderTexture.readData')) {
+            console.error('Skipping RenderTexture.readData due to framebuffer context violation');
+            throw new Error('Framebuffer context violation in RenderTexture.readData');
+        }
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
         let pixels;
         if (this.format.includes('UI')) {
@@ -160,6 +166,11 @@ export class RenderTexture {
     getData(ctx: CanvasRenderingContext2D) {
         //assert type === 'RGBA'
         const gl = this.webgl.gl;
+
+        if (!checkFramebufferContext(gl, this.framebuffer, 'RenderTexture.getData')) {
+            console.error('Skipping RenderTexture.getData due to framebuffer context violation');
+            return;
+        }
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
         const pixels = new Uint8Array(this.width * this.height * 4);

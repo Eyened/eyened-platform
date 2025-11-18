@@ -36,16 +36,16 @@
 		tagType,
 		tags: itemTags = [],
 		maxTags = 3,
-		tag: onTag = (id: number) => {},
+		tag: onTag = (id: number, comment?: string) => {},
 		untag: onUntag = (id: number) => {},
-		onUpdate,
+		onUpdate = (id: number, comment?: string) => {},
 	}: {
 		tagType: TagType
 		tags?: TagMeta[];
 		maxTags?: number;
-		tag?: (id: number) => void;
+		tag?: (id: number, comment?: string) => void;
 		untag?: (id: number) => void;
-		onUpdate?: () => void | Promise<void>;
+		onUpdate?: (id: number, comment?: string) => void;
 	} = $props();
 	
 	const allTags = $derived(
@@ -60,31 +60,38 @@
 	let value = $state("");
 	let dropdownOpen = $state(false);
 	let dialogOpen = $state(false);
+	let commentDialogOpen = $state(false);
+	let activeTagId = $state<number | null>(null);
+	let commentText = $state("");
 
 	async function linkTag(name: string) {
 		const id = allTags.find((t) => t.name === name)?.id;
 		if (id !== undefined) {
 			onTag(id);
-			if (onUpdate) await onUpdate();
 		}
 	}
 	
 	async function handleUntag(id: number) {
 		onUntag(id);
-		if (onUpdate) await onUpdate();
 	}
 
 	function handleCommandKeydown(e: KeyboardEvent) {
-		if (e.key === "Enter") {
-			if (allTags.some((t) => t.name === textValue)) {
-				linkTag(textValue);
-				value = "";
-				textValue = "";
-			} else {
-				// Close popover before opening dialog
-				dropdownOpen = false;
-				dialogOpen = true;
-			}
+		if (e.key !== "Enter") return;
+
+		// Ignore Enter while any dialog is open
+		if (dialogOpen || commentDialogOpen) return;
+
+		const q = textValue.trim();
+		if (!q) return;
+
+		if (allTags.some((t) => t.name === q)) {
+			linkTag(q);
+			value = "";
+			textValue = "";
+		} else {
+			// Close popover before opening dialog
+			dropdownOpen = false;
+			dialogOpen = true;
 		}
 	}
 
@@ -101,15 +108,25 @@
 			// Auto-link the newly created tag
 			onTag(newTag.id);
 			
-			// Refresh signatures
-			if (onUpdate) await onUpdate();
-			
 			// Clear input and close dialog
 			textValue = '';
 			value = '';
 		}
 		
 		dialogOpen = false;
+	}
+
+	function openCommentDialog(t: TagMeta) {
+		activeTagId = t.id;
+		commentText = (t as any).comment ?? "";
+		commentDialogOpen = true;
+	}
+
+	function submitComment() {
+		if (activeTagId == null) return;
+		const newComment = (commentText || '').trim() || undefined;
+		onUpdate?.(activeTagId, newComment);
+		commentDialogOpen = false;
 	}
 </script>
 
@@ -125,6 +142,25 @@
 			<DialogHeader>
 				<DialogTitle>New Tag</DialogTitle>
 				<TagEditForm {tagType} initTagName={textValue} add={handleCreateTag} />
+			</DialogHeader>
+		</DialogContent>
+	</Dialog>
+
+	<!-- Dialog for editing/adding a tag comment -->
+	<Dialog bind:open={commentDialogOpen}>
+		<DialogContent portalProps={{ disabled: true }}>
+			<DialogHeader>
+				<DialogTitle>Edit Tag Comment</DialogTitle>
+				<div class="flex gap-2">
+					<input class="input" bind:value={commentText} onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							e.stopPropagation();
+							submitComment();
+						}
+					}} />
+					<Button onclick={submitComment}>Save</Button>
+				</div>
 			</DialogHeader>
 		</DialogContent>
 	</Dialog>
@@ -168,17 +204,20 @@
 	<div class="tags-list">
 		{#each itemTags.slice(0, maxTags) as tag}
 			{@const fullTag = tags.get(tag.id)}
-			<div class="tag">
+			<div class="tag" onclick={() => openCommentDialog(tag)}>
 				<Tooltip>
 					<TooltipTrigger><span>{tag.name}</span></TooltipTrigger>
 					<TooltipContent>
 						{#if fullTag}
 							<p>{fullTag.description}</p>
 						{/if}
+						{#if (tag as any).comment}
+							<p>“{(tag as any).comment}”</p>
+						{/if}
 						<p>Tagged by {tag.tagger.name} {timeAgo(new Date(tag.date))}</p>
 					</TooltipContent>
 				</Tooltip>
-				<button class="ml-2 hover:text-red-700" onclick={() => handleUntag(tag.id)}>
+				<button class="ml-2 hover:text-red-700" onclick={(e) => { e.stopPropagation(); handleUntag(tag.id); }}>
 					<Fa icon={faSquareXmark} size="lg" />
 				</button>
 			</div>

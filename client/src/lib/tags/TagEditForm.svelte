@@ -26,13 +26,26 @@
         type="text"
         placeholder="New tag name"
         maxlength="256"
-        bind:value={newTagName}/>
+        bind:value={newTagName}
+        onkeydown={(e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            addTag();
+        }
+        }}/>
     <input
         type="text"
         placeholder="Short tag description"
         maxlength="256"
         bind:value={newTagDescription}
-        onkeydown={(e) => e.key === 'Enter' && addTag()} />
+        onkeydown={(e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            addTag();
+        }
+        }} />
     <button onclick={addTag}>Add</button>
 </div>
 <style>

@@ -1,11 +1,14 @@
 <script lang="ts">
-	import type { Creator } from '$lib/datamodel/creator.svelte';
+	// SKIPPED: Creator and Segmentation types - need to understand usage context
+	// import type { Creator } from '$lib/datamodel/creator.svelte';
+	// import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
 	import SegmentationArea from './SegmentationArea.svelte';
-	import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
+	import type { CreatorMeta } from '../../../types/openapi_types';
 
+	// SKIPPED: Proper type replacement - Segmentation type needs investigation
 	interface Props {
-		creator: Creator;
-		rows: [Segmentation, number, number | undefined][];
+		creator: CreatorMeta;
+		rows: [any, number, number | undefined][]; // TODO: Replace 'any' with proper Segmentation type
 	}
 	let { creator, rows }: Props = $props();
 

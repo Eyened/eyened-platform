@@ -25,7 +25,7 @@
 			max={Math.log(20)}
 			step="0.1"
 		/>
-		<div>
+		<div id="stretch-buttons">
 			<button onclick={() => (stretchLog.value = Math.log(1))}>1</button>
 			<button onclick={() => (stretchLog.value = Math.log(2))}>2</button>
 			<button onclick={() => (stretchLog.value = Math.log(4))}>4</button>
@@ -44,4 +44,27 @@
 	div#controls {
 		flex-direction: column;
 	}
+    div#stretch-buttons {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+    }
+    button {
+        align-items: center;
+        justify-content: center;
+        display: flex;
+        margin: 0.1em;
+        border-radius: 2px;
+        width: 2em;
+        height: 2em;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background-color: rgba(255, 255, 255, 0.3);
+        color:white;
+        cursor: pointer;
+        font-size: small;
+    }
+    button:hover {
+        background-color: rgba(255, 255, 255, 0.5);
+    }
 </style>
+

@@ -1,4 +1,5 @@
-import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
+// SimpleDataRepresentation is a subset of SegmentationDataRepresentation
+export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
 import type { DrawingArray } from "./mask.svelte";
 
 export interface ConversionRule {

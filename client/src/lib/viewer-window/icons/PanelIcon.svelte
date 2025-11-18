@@ -119,7 +119,7 @@
         --icon-active-color: rgba(255, 255, 255, 1);
         --icon-disabled-color: rgba(255, 255, 255, 0.1);
         --icon-hover-bg: rgba(255, 255, 255, 0.1);
-        --icon-active-bg: rgba(155, 255, 255, 0.4);
+        --icon-active-bg: rgba(155, 255, 255, 0.5);
         --tooltip-bg: #555;
         --tooltip-color: #fff;
     }
@@ -130,7 +130,7 @@
         cursor: pointer;
         color: var(--icon-color);
         margin: 0em;
-        padding: 0.1em;
+        padding: 0.2em;
         border-radius: 50%;
         transition: all 0.3s ease;
     }

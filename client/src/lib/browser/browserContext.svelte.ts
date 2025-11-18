@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 
-
+import { api } from '../api/client';
 import { ingestInstanceMetas, ingestInstances, ingestStudies, instanceMetas, instances, studies } from '$lib/data/stores.svelte';
 import type { InstanceGET, InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
 
@@ -101,7 +101,6 @@ export class BrowserContext {
     async loadSignatures() {
         this.loading = true;
         try {
-            const { api } = await import('../api/client');
             const [instRes, studRes] = await Promise.all([
                 api.GET('/instances/search/signature', {}),
                 api.GET('/studies/search/signature', {})
@@ -115,7 +114,6 @@ export class BrowserContext {
     
     // Refresh signatures (e.g., after creating/modifying tags)
     async refreshSignatures() {
-        const { api } = await import('../api/client');
         const [instRes, studRes] = await Promise.all([
             api.GET('/instances/search/signature', {}),
             api.GET('/studies/search/signature', {})
@@ -231,7 +229,6 @@ export class BrowserContext {
     }
 
     private async executeSearch(query: Condition[]) {
-        const { api } = await import('../api/client');
         const baseBody = {
             conditions: query,
             limit: this.limit,

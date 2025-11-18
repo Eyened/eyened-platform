@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { fetchSubTasks, fetchTask } from "../../../../../lib/data/api";
+	import { fetchSubTaskByIndex, fetchTask } from "../../../../../lib/data/api";
+	import { tasks, subtasks } from "../../../../../lib/data/stores.svelte";
 	import TaskMain from "../../../../../lib/tasks/TaskMain.svelte";
 	import type {
 		SubTaskWithImagesGET,
@@ -9,22 +10,34 @@
 	let { data } = $props();
 	const { taskid, subTaskIndex } = data;
 
-	const taskConfig = {};
+	// Store IDs after loading
+	let taskId: number | null = $state(null);
+	let subTaskId: number | null = $state(null);
+
+	// Derive task and subtask from stores (will react to store updates)
+	const task = $derived(taskId ? tasks.get(taskId) : undefined);
+	const subTask = $derived(subTaskId ? subtasks.get(subTaskId) : undefined);
 
 	const loadPromise: Promise<{
 		task: TaskGET;
 		subTask: SubTaskWithImagesGET;
 		instanceIDs: number[];
 	}> = (async () => {
-		const [task, subTasksResponse] = await Promise.all([
+		const [task, subTask] = await Promise.all([
 			fetchTask(Number(taskid)),
-			fetchSubTasks({ task_id: Number(taskid), with_images: true }),
+			fetchSubTaskByIndex(Number(taskid), Number(subTaskIndex), {
+				with_images: true,
+			}),
 		]);
-		const st = subTasksResponse?.subtasks?.[Number(subTaskIndex)];
-		if (!st) throw new Error("Subtask not found");
-		if (!("images" in st)) throw new Error("Subtask missing images; ensure with_images=true");
-		const subTask = st as SubTaskWithImagesGET;
-		const instanceIDs = subTask.images.map((img: any) => img.id);
+		if (!subTask) throw new Error("Subtask not found");
+		if (!("images" in subTask))
+			throw new Error("Subtask missing images; ensure with_images=true");
+
+		// Store IDs so we can derive from stores
+		taskId = task.id;
+		subTaskId = subTask.id;
+
+		const instanceIDs = subTask.images.map((img) => img.id);
 		return { task, subTask, instanceIDs };
 	})();
 </script>
@@ -36,7 +49,11 @@
 {#await loadPromise}
 	<p>Loading subtask...</p>
 {:then loaded}
-	<TaskMain task={loaded.task} subTask={loaded.subTask} {subTaskIndex} {taskConfig} />
+	{#if task && subTask}
+		<TaskMain {task} {subTask} {subTaskIndex} />
+	{:else}
+		<p>Error: Task or subtask not found in store</p>
+	{/if}
 {:catch e}
 	<p>Error: {e?.message ?? String(e)}</p>
 {/await}

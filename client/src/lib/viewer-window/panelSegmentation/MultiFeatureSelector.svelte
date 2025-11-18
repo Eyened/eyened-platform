@@ -39,19 +39,19 @@
 
 <div class:hidden={!active}>
     <ul>
-        {#each feature.subfeatures as subfeatureName, i}
+        {#each feature.subfeatures as subfeature}
             <li
-                onpointerenter={() => pointerEnter(i)}
+                onpointerenter={() => pointerEnter(subfeature.index)}
                 onpointerleave={pointerLeave}
             >
                 <div class="feature-container">
                     <div
                         class="color-box"
                         style="background-color: rgb({colors[
-                            i - 1
+                            subfeature.index - 1
                         ]});"
                     >
-                        {i}
+                        {subfeature.index}
                     </div>
 
                     <label>
@@ -59,16 +59,16 @@
                             <input
                                 type="radio"
                                 bind:group={activeIndices}
-                                value={i}
+                                value={subfeature.index}
                             />
-                            {subfeatureName}
+                            {subfeature.name}
                         {:else}
                             <input
                                 type="checkbox"
                                 bind:group={activeIndices}
-                                value={i}
+                                value={subfeature.index}
                             />
-                            {subfeatureName}
+                            {subfeature.name}
                         {/if}
                     </label>
                 </div>

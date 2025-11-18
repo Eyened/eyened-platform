@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { openNewWindow } from "$lib/newWindow";
-	import type { DataRow, DataSource } from "$lib/utils/cached_source_loader";
+	import type { DataRow, DataSource } from "$lib/browser/dataSources";
 	import DataTable from "$lib/utils/DataTable.svelte";
 	interface Props {
 		data: DataSource;

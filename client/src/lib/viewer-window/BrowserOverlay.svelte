@@ -7,20 +7,21 @@
 	import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
 	import { instances } from "$lib/data/stores.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-	import { getContext, onMount, setContext } from "svelte";
+	import { getContext, onDestroy, setContext } from "svelte";
 	import type { InstanceGET } from "../../types/openapi_types";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
 	interface Props {
 		viewerWindowContext: ViewerWindowContext;
 	}
-
 	let { viewerWindowContext }: Props = $props();
+
+    const browserContext = new BrowserContext();
+    setContext("browserContext", browserContext);
+
 	const initialInstanceIds = viewerWindowContext.instanceIds.slice();
-	const browserContext = new BrowserContext();
 
-	setContext("browserContext", browserContext);
-
+	
 	const taskContext = getContext<TaskContext>("taskContext");
 	const subTask = taskContext?.subTask;
 
@@ -71,9 +72,20 @@
 
 	const searching = performPatientIdentifierSearch();
 
-	function close() {
-		viewerWindowContext.closeBrowserOverlay();
+	function updateSubTaskImageLinks(currentInstanceIds: number[]) {
+		const newInstanceIds = currentInstanceIds.filter(
+			(id) => !initialInstanceIds.includes(id),
+		);
+		const removedInstanceIds = initialInstanceIds.filter(
+			(id) => !currentInstanceIds.includes(id),
+		);
 
+		return Promise.all([
+			...newInstanceIds.map((id) => addSubTaskImage(subTask!.id, id)),
+			...removedInstanceIds.map((id) => removeSubTaskImage(subTask!.id, id)),
+		]);
+	}
+	function close() {
 		const currentInstanceIds = [...browserContext.selectedIds];
 		if (subTask) {
 			if (updateImageLinks) {
@@ -87,22 +99,7 @@
 		}
 		viewerWindowContext.setInstanceIDs(currentInstanceIds);
 	}
-
-	async function updateSubTaskImageLinks(currentInstanceIds: number[]) {
-		const newInstanceIds = currentInstanceIds.filter(
-			(id) => !initialInstanceIds.includes(id),
-		);
-		const removedInstanceIds = initialInstanceIds.filter(
-			(id) => !currentInstanceIds.includes(id),
-		);
-
-		for (const instanceId of newInstanceIds) {
-			await addSubTaskImage(subTask!.id, instanceId);
-		}
-		for (const instanceId of removedInstanceIds) {
-			await removeSubTaskImage(subTask!.id, instanceId);
-		}
-	}
+	onDestroy(close);
 </script>
 
 <div id="browser-overlay">
@@ -115,7 +112,6 @@
 				bind:checked={updateImageLinks}
 			/>
 		{/if}
-		<button class="close-button" onclick={close}>Close</button>
 	</div>
 	<div id="selection">
 		{#each browserContext.selectedInstances as instance (instance.id)}
@@ -132,23 +128,6 @@
 </div>
 
 <style>
-	div#browser-overlay {
-		position: fixed;
-		z-index: 100;
-		left: 0;
-		top: 0;
-		bottom: 0;
-		right: 0;
-		background-color: rgba(255, 255, 255, 0.8);
-		backdrop-filter: blur(10px); /* Add this line */
-
-		transition: 0.5s;
-		display: flex;
-		flex-direction: column;
-
-		/* Force light theme for all child components */
-		color: #1a1a1a !important;
-	}
 	div#content {
 		flex: 1;
 		display: flex;
@@ -168,19 +147,7 @@
 	label {
 		align-self: center;
 	}
-	.close-button {
-		background-color: #85c1e9;
-		color: #333;
-		font-size: 18px;
-		padding: 10px 24px;
-		border: none;
-		cursor: pointer;
-		border-radius: 5px;
-		transition: 0.3s;
-	}
-	.close-button:hover {
-		background-color: #6cb6e7; /* Darker blue on hover */
-	}
+
 	.loading-message {
 		display: flex;
 		justify-content: center;

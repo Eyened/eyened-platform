@@ -599,6 +599,90 @@
       }
     },
     "/instances/{instance_id}/tags/{tag_id}": {
+      "patch": {
+        "summary": "Patch Instance Tag",
+        "description": "Update comment on an existing ImageInstance tag link.",
+        "operationId": "patch_instance_tag_instances__instance_id__tags__tag_id__patch",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectTagPATCH"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagMeta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "summary": "Untag Instance",
         "description": "Remove a Tag from an ImageInstance (idempotent).",
@@ -2200,6 +2284,90 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch Form Annotation Tag",
+        "description": "Update comment on an existing FormAnnotation tag link.",
+        "operationId": "patch_form_annotation_tag_form_annotations__annotation_id__tags__tag_id__patch",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Annotation Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectTagPATCH"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagMeta"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4429,6 +4597,90 @@
             }
           }
         }
+      },
+      "patch": {
+        "summary": "Patch Study Tag",
+        "description": "Update comment on an existing Study tag link.",
+        "operationId": "patch_study_tag_studies__study_id__tags__tag_id__patch",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tag Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectTagPATCH"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagMeta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -4738,6 +4990,17 @@
         ],
         "title": "ETDRSField"
       },
+      "EntityType": {
+        "type": "string",
+        "enum": [
+          "Patient",
+          "Study",
+          "Eye",
+          "StudyEye",
+          "ImageInstance"
+        ],
+        "title": "EntityType"
+      },
       "FeatureGET": {
         "properties": {
           "name": {
@@ -4750,7 +5013,7 @@
           },
           "subfeatures": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/SubFeatureItem"
             },
             "type": "array",
             "title": "Subfeatures"
@@ -4880,6 +5143,16 @@
             ],
             "title": "Image Instance Id"
           },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_task_id": {
             "anyOf": [
               {
@@ -4893,9 +5166,7 @@
           },
           "form_data": {
             "anyOf": [
-              {
-                "type": "object"
-              },
+              {},
               {
                 "type": "null"
               }
@@ -5018,6 +5289,16 @@
             ],
             "title": "Image Instance Id"
           },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_task_id": {
             "anyOf": [
               {
@@ -5031,9 +5312,7 @@
           },
           "form_data": {
             "anyOf": [
-              {
-                "type": "object"
-              },
+              {},
               {
                 "type": "null"
               }
@@ -5088,6 +5367,16 @@
             ],
             "title": "Image Instance Id"
           },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sub_task_id": {
             "anyOf": [
               {
@@ -5101,9 +5390,7 @@
           },
           "form_data": {
             "anyOf": [
-              {
-                "type": "object"
-              },
+              {},
               {
                 "type": "null"
               }
@@ -5145,6 +5432,7 @@
           "schema": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5152,6 +5440,16 @@
               }
             ],
             "title": "Schema"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityType"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "type": "integer",
@@ -5199,6 +5497,7 @@
           "patient_props": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5228,6 +5527,7 @@
           "study_props": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5253,6 +5553,7 @@
           "series_props": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5271,6 +5572,7 @@
           "image_props": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5356,6 +5658,7 @@
           "data": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5487,6 +5790,7 @@
           "cf_roi": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5498,6 +5802,7 @@
           "cf_keypoints": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5619,6 +5924,7 @@
           },
           "attributes": {
             "additionalProperties": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "object",
@@ -5708,6 +6014,13 @@
           },
           "device": {
             "$ref": "#/components/schemas/DeviceMeta"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagMeta"
+            },
+            "type": "array",
+            "title": "Tags"
           }
         },
         "type": "object",
@@ -5715,7 +6028,8 @@
           "id",
           "thumbnail_path",
           "anatomic_region",
-          "device"
+          "device",
+          "tags"
         ],
         "title": "InstanceMeta"
       },
@@ -5925,11 +6239,39 @@
         ],
         "title": "ModelSegmentationGET"
       },
+      "ObjectTagPATCH": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "title": "ObjectTagPATCH"
+      },
       "ObjectTagPOST": {
         "properties": {
           "tag_id": {
             "type": "integer",
             "title": "Tag Id"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
           }
         },
         "type": "object",
@@ -6690,6 +7032,24 @@
         ],
         "title": "StudySearchResponse"
       },
+      "SubFeatureItem": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "name"
+        ],
+        "title": "SubFeatureItem"
+      },
       "SubTaskGET": {
         "properties": {
           "task_id": {
@@ -6984,6 +7344,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Date"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
           }
         },
         "type": "object",
@@ -7078,6 +7449,7 @@
             "title": "Id"
           },
           "config": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           },

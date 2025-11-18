@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 import numpy as np
 from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
 from .base import Base
 
@@ -366,15 +366,18 @@ class Feature(Base):
         return feature
 
     @property
-    def subfeatures_list(self) -> List[str]:
+    def subfeatures(self) -> Dict[int, str]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
-        return [assoc.Child.FeatureName for assoc in assocs]
+        return {assoc.FeatureIndex: assoc.Child.FeatureName for assoc in assocs}
 
     @property
     def json(self) -> Dict[str, Any]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
-        subfeatures = [assoc.Child for assoc in assocs]
-        return {"FeatureName": self.FeatureName, "SubFeatures": self.subfeatures_list}
+        subfeatures = [
+            {"index": assoc.FeatureIndex, "name": assoc.Child.FeatureName}
+            for assoc in assocs
+        ]
+        return {"FeatureName": self.FeatureName, "SubFeatures": subfeatures}
 
 
 class Model(Base):
@@ -443,4 +446,13 @@ class ModelSegmentation(SegmentationBase):
 
     @property
     def groupname(self) -> str:
-        return f"model_{self.Model.ModelName}_{self.Model.Version}"
+        model = self.Model
+        if model is not None:
+            return f"model_{model.ModelName}_{model.Version}"
+        # Fallback: query base Model directly by ID
+        sess = object_session(self)
+        if sess is not None:
+            base_model = sess.get(Model, getattr(self, "ModelID", None))
+            if base_model is not None:
+                return f"model_{base_model.ModelName}_{base_model.Version}"
+        return "model_name_unknown"

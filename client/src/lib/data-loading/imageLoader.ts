@@ -34,7 +34,6 @@ export class ImageLoader {
 
         if (extension && supportedFormats.includes(extension)) {
             return [await this.loadImage2D(instance, img_id)];
-
         } else if (instance.dataset_identifier.endsWith('.binary')) {
             const url = `${fsHost}/${instance.dataset_identifier}`;
             const meta = await this.loadMeta(url);
@@ -86,7 +85,7 @@ export class ImageLoader {
     }
 
     async returnImage3D(img3d: Image3D): Promise<LoadedImages> {
-        if (img3d.depth > this.minBscansForEnface) {
+        if (img3d.depth > this.minBscansForEnface && img3d.orientation === 'axial') {
             return [await img3d.createEnfaceProjection(), img3d];
         } else {
             return [img3d];

@@ -11,6 +11,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from eyened_orm.segmentation import DataRepresentation, Datatype
+from eyened_orm.image_instance import Laterality
+from eyened_orm.form_annotation import EntityType
 from .dtos_aux import CreatorMeta, TagMeta
 from pydantic import BaseModel
 
@@ -18,6 +20,11 @@ from pydantic import BaseModel
 # ========================= FEATURES =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 class FeatureBase(BaseModel):
+    name: str
+
+
+class SubFeatureItem(BaseModel):
+    index: int
     name: str
 
 
@@ -33,7 +40,7 @@ class FeaturePATCH(BaseModel):
 
 class FeatureGET(FeatureBase):
     id: int
-    subfeatures: List[str]
+    subfeatures: List[SubFeatureItem]
     subfeature_ids: List[int]
     date_inserted: datetime
     segmentation_count: Optional[int] = None
@@ -112,6 +119,7 @@ class ModelSegmentationGET(SegmentationBase):
 class FormSchemaBase(BaseModel):
     name: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
+    entity_type: Optional[EntityType] = None
 
 
 class FormSchemaPUT(FormSchemaBase):
@@ -128,8 +136,9 @@ class FormAnnotationBase(BaseModel):
     patient_id: int
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
+    laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
-    form_data: Optional[Dict[str, Any]] = None
+    form_data: Optional[Any] = None
     form_annotation_reference_id: Optional[int] = None
 
 
@@ -155,8 +164,9 @@ class FormAnnotationPATCH(BaseModel):
     patient_id: Optional[int] = None
     study_id: Optional[int] = None
     image_instance_id: Optional[int] = None
+    laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
-    form_data: Optional[Dict[str, Any]] = None
+    form_data: Optional[Any] = None
     form_annotation_reference_id: Optional[int] = None
 
 

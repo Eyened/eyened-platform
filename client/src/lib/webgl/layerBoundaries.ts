@@ -1,4 +1,5 @@
 import type { AbstractImage } from "./abstractImage";
+import { tagFramebuffer, checkFramebufferContext } from "./texture";
 
 export class LayerBoundaries {
 
@@ -38,6 +39,11 @@ export class LayerBoundaries {
         const shader = webgl.shaders.calculateBoundaries;
 
         const framebuffer = webgl.gl.createFramebuffer()!;
+        tagFramebuffer(gl, framebuffer);
+        if (!checkFramebufferContext(gl, framebuffer, 'LayerBoundaries.calculateBoundaries')) {
+            console.error('Skipping LayerBoundaries.calculateBoundaries due to framebuffer context violation');
+            return;
+        }
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         for (let i = 0; i < this.n_layers; i++) {
             const renderTarget = {

@@ -5,5 +5,4 @@ export interface TaskContext {
     task: TaskGET;
     subTask: SubTaskWithImagesGET;
     subTaskIndex: number;
-    taskConfig: any;
 }

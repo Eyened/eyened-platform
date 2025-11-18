@@ -1,6 +1,6 @@
 ---
-title: Metadata Fields
-description: Detailed documentation of entity fields in the eyened platform data model
+title: Import Metadata Fields
+description: Detailed documentation of metadata fields available when importing data into the eyened platform
 ---
 
 The following fields may be provided in the `props` dictionary of the Patient, Study, Series or Image when importing data into the eyened platform.
@@ -23,7 +23,6 @@ The `Study` model contains the following non-relationship fields:
 |-------|------|-------------|
 | `StudyRound` | int | Project round of this study |
 | `StudyDescription` | str | Description of the study |
-| `StudyInstanceUid` | str | Unique identifier for the study (DICOM) |
 | `StudyDate` | date | Date when the study was performed |
 
 ## Series
@@ -34,6 +33,7 @@ The `Series` model contains the following non-relationship fields:
 |-------|------|-------------|
 | `SeriesNumber` | int | Series number |
 | `SeriesInstanceUid` | str | Unique identifier for the series (DICOM) |
+| `StudyInstanceUid` | str | Unique identifier for the study (DICOM) |
 
 ## ImageInstance
 
@@ -60,4 +60,5 @@ The `ImageInstance` model contains the following non-relationship fields:
 | `HorizontalFieldOfView` | float | Horizontal dimension of field of view in millimeters |
 | `ResolutionAxial` | float | Axial resolution in millimeters |
 | `ResolutionHorizontal` | float | Horizontal resolution in millimeters |
-| `ResolutionVertical` | float | Vertical resolution in millimeters | 
+| `ResolutionVertical` | float | Vertical resolution in millimeters |
+

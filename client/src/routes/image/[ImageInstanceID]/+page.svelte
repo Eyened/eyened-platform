@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { data } from "$lib/datamodel/model";
+    import { instances } from "$lib/data";
     import { loadInstances } from "$lib/utils/api";
-    import type { Instance } from "$lib/datamodel/instance.svelte";
+    import type { InstanceGET } from "../../../types/openapi_types";
     import { Deferred } from "$lib/utils";
     import ImageWindow from "$lib/viewer-window/ImageWindow.svelte";
     import { WebGL } from "$lib/webgl/webgl";
@@ -25,7 +25,7 @@
 
     const { promise, resolve, reject } = new Deferred<{
         webgl: WebGL;
-        instance: Instance;
+        instance: InstanceGET;
     }>();
 
     onMount(async () => {
@@ -39,7 +39,7 @@
         const webgl = new WebGL(mainCanvas);
 
         await loadInstances([ImageInstanceID]);
-        const instance = data.images.get(ImageInstanceID)!;
+        const instance = instances.get(ImageInstanceID)!;
         if (!instance) {
             reject(new Error(`Instance with ID ${ImageInstanceID} not found`));
         }

@@ -57,6 +57,7 @@ export type TagPATCH = components['schemas']['TagPATCH'];
 export type TagPUT = components['schemas']['TagPUT'];
 export type TagType = components['schemas']['TagType'];
 export type TagMeta = components['schemas']['TagMeta'];
+export type ObjectTagPATCH = components['schemas']['ObjectTagPATCH'];
 export type TaskGET = components['schemas']['TaskGET'];
 export type TaskPATCH = components['schemas']['TaskPATCH'];
 export type TaskPUT = components['schemas']['TaskPUT'];
