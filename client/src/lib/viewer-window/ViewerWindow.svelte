@@ -10,7 +10,6 @@ Keeps track of the main panels and the top row of images.
 	import MainViewer from "./MainViewer.svelte";
 	import TopRowImages from "./TopRowImages.svelte";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
-	import ViewerWindowInfoPanel from "./ViewerWindowInfoPanel.svelte";
 	import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
 	import { formAnnotations } from "$lib/data";
 

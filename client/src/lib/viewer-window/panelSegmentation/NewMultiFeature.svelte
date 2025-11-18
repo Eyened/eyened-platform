@@ -2,7 +2,7 @@
 	import { Button } from "$lib/components/ui/button";
 	import { createSegmentationFrom, features } from "$lib/data";
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
-	import type { Datatype } from "$lib/datamodel/segmentation.svelte";
+	import type { SegmentationDataType } from "../../../types/openapi_types";
 	import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 	import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 	import { getContext } from "svelte";
@@ -27,7 +27,7 @@
 		}
 		globalContext.dialogue = `Creating annotation...`;
 
-		let dataType: Datatype = "R8UI";
+		let dataType: SegmentationDataType = "R8UI";
 
 		await createSegmentationFrom(
 			image,

@@ -82,7 +82,7 @@
 		const canEdit = globalContext.canEdit(formAnnotation);
 		const tool = new RegistrationTool(
 			formAnnotation,
-			viewerContext.image.instance as any,
+			viewerContext.image.instance,
 			canEdit,
 		);
 		activeID = formAnnotation.id;
