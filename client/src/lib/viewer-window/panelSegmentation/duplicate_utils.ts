@@ -1,8 +1,5 @@
-import type { Datatype } from "$lib/datamodel/segmentation.svelte";
-
 import type { GlobalContext } from "$lib/data/globalContext.svelte";
-import type { DataRepresentation, SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
-import { Segmentation } from "$lib/datamodel/segmentation.svelte";
+import type { SegmentationDataRepresentation, SegmentationDataType } from "../../../types/openapi_types";
 import { NPYArray } from "$lib/utils/npy_loader";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
@@ -13,6 +10,10 @@ import type { ModelSegmentationGET, SegmentationGET } from "../../../types/opena
 import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 import { createSegmentation } from "$lib/data/api";
 
+// SimpleDataRepresentation is a subset of SegmentationDataRepresentation
+type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
+type DataRepresentation = SegmentationDataRepresentation;
+
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
     Q: "DualBitMask",
     B: "Binary",
@@ -20,7 +21,7 @@ export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
 };
 function createArray(
     shape: [number, number, number],
-    dataType: Datatype,
+    dataType: SegmentationDataType,
 ): NPYArray {
     const n = shape[0] * shape[1] * shape[2];
     let a: DrawingArray;
@@ -42,7 +43,7 @@ function copyMaskData(
     indices: number[],
     segmentationItem: SegmentationItem,
     segmentation: SegmentationGET | ModelSegmentationGET,
-    dataRepresentation: DataRepresentation,
+    dataRepresentation: SegmentationDataRepresentation,
     array: NPYArray,
     image: AbstractImage,
     originalThreshold: number
@@ -78,7 +79,7 @@ export async function duplicate(globalContext: GlobalContext,
     taskContext?: TaskContext) {
     globalContext.dialogue = `Duplicating segmentation ${segmentation.id}...`;
 
-    let data_representation: DataRepresentation;
+    let data_representation: SegmentationDataRepresentation;
     if (
         segmentation.data_representation == "MultiClass" ||
         segmentation.data_representation == "MultiLabel"

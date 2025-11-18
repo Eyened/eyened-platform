@@ -1,7 +1,8 @@
 import { getSegmentationData, getModelSegmentationData, updateSegmentationData } from "$lib/data/helpers";
 import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type { ModelSegmentationGET, SegmentationGET, SegmentationDataRepresentation } from "../../types/openapi_types";
-import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
+// SimpleDataRepresentation is a subset of SegmentationDataRepresentation
+export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
