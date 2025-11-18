@@ -6,12 +6,13 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
-
 import numpy as np
-import pandas as pd
 import pydicom
 from PIL import Image
-from sqlalchemy import Column, ForeignKey, Index, String, Text, select, func, Enum as SAEnum
+from rtnls_fundusprep.cfi_bounds import CFIBounds
+from rtnls_fundusprep.mask_extraction import get_cfi_bounds
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -94,16 +95,20 @@ class ImageInstance(Base):
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
 
     # repeating field, but non-nullable
-    SeriesID: Mapped[int] = mapped_column(ForeignKey("Series.SeriesID", ondelete="CASCADE"))
+    SeriesID: Mapped[int] = mapped_column(
+        ForeignKey("Series.SeriesID", ondelete="CASCADE")
+    )
     SourceInfoID: Mapped[int] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"))
-    DeviceInstanceID: Mapped[int] = mapped_column(ForeignKey("DeviceInstance.DeviceInstanceID"))
+    DeviceInstanceID: Mapped[int] = mapped_column(
+        ForeignKey("DeviceInstance.DeviceInstanceID")
+    )
     # TODO: redundant with Modality enum
     ModalityID: Mapped[int] = mapped_column(ForeignKey("Modality.ModalityID"))
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
 
     # Image modality
     Modality: Mapped[Optional[Modality]] = mapped_column(SAEnum(Modality))
-    
+
     # DICOM metadata
     SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64))
     SOPClassUid: Mapped[Optional[str]] = mapped_column(String(64))
@@ -123,28 +128,42 @@ class ImageInstance(Base):
     #     - Rows: height of the B-scan (vitreous <-> choroid)
     #     - Columns: width of the B-scan (lateral <-> temporal)
     #     - NrOfFrames: number of B-scans (superior <-> inferior for horizontal B-scan)
-    
+
     Rows_y: Mapped[Optional[int]]  # Height of the image (in pixels)
     Columns_x: Mapped[Optional[int]]  # Width of the image (in pixels)
     NrOfFrames: Mapped[Optional[int]]  # Used to for number of B-scans in OCT
 
     # resolution (all in millimeters)
-    SliceThickness: Mapped[Optional[float]]  # Nominal slice thickness for raster OCT scans
-    ResolutionAxial: Mapped[Optional[float]]  # OCT-depth resolution (vitreous <-> choroid)
-    ResolutionHorizontal: Mapped[Optional[float]]  # Enface resolution (lateral <-> temporal)
-    ResolutionVertical: Mapped[Optional[float]]  # Enface resolution (superior <-> inferior)
+    SliceThickness: Mapped[
+        Optional[float]
+    ]  # Nominal slice thickness for raster OCT scans
+    ResolutionAxial: Mapped[
+        Optional[float]
+    ]  # OCT-depth resolution (vitreous <-> choroid)
+    ResolutionHorizontal: Mapped[
+        Optional[float]
+    ]  # Enface resolution (lateral <-> temporal)
+    ResolutionVertical: Mapped[
+        Optional[float]
+    ]  # Enface resolution (superior <-> inferior)
 
     HorizontalFieldOfView: Mapped[Optional[float]]  # in degrees
 
     Laterality: Mapped[Laterality] = mapped_column(SAEnum(Laterality))  # L or R
-    DICOMModality: Mapped[Optional[ModalityType]] = mapped_column(SAEnum(ModalityType))  # OP, OPT, SC
-    AnatomicRegion: Mapped[Optional[int]]  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
-    ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(SAEnum(ETDRSField))  # F1-F7
+    DICOMModality: Mapped[Optional[ModalityType]] = mapped_column(
+        SAEnum(ModalityType)
+    )  # OP, OPT, SC
+    AnatomicRegion: Mapped[
+        Optional[int]
+    ]  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
+    ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(
+        SAEnum(ETDRSField)
+    )  # F1-F7
     Angiography: Mapped[Optional[int]]  # 0 = non-angiography, 1 = angiography
 
-    AcquisitionDateTime: (
-        Mapped[Optional[datetime]]
-    )  # Date and time the acquisition of data started
+    AcquisitionDateTime: Mapped[
+        Optional[datetime]
+    ]  # Date and time the acquisition of data started
     PupilDilated: Mapped[Optional[bool]]
 
     # Relative filepath to the image file
@@ -172,11 +191,27 @@ class ImageInstance(Base):
     DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
 
     # relationships:
-    Series: Mapped["Series"] = relationship("eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin")
-    SourceInfo: Mapped["SourceInfo"] = relationship("eyened_orm.image_instance.SourceInfo", back_populates="ImageInstances", lazy="selectin")
-    DeviceInstance: Mapped["DeviceInstance"] = relationship("eyened_orm.image_instance.DeviceInstance", back_populates="ImageInstances", lazy="selectin")
-    _Modality: Mapped["ModalityTable"] = relationship("eyened_orm.image_instance.ModalityTable", back_populates="ImageInstances")
-    Scan: Mapped[Optional["Scan"]] = relationship("eyened_orm.image_instance.Scan", back_populates="ImageInstances", lazy="selectin")
+    Series: Mapped["Series"] = relationship(
+        "eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin"
+    )
+    SourceInfo: Mapped["SourceInfo"] = relationship(
+        "eyened_orm.image_instance.SourceInfo",
+        back_populates="ImageInstances",
+        lazy="selectin",
+    )
+    DeviceInstance: Mapped["DeviceInstance"] = relationship(
+        "eyened_orm.image_instance.DeviceInstance",
+        back_populates="ImageInstances",
+        lazy="selectin",
+    )
+    _Modality: Mapped["ModalityTable"] = relationship(
+        "eyened_orm.image_instance.ModalityTable", back_populates="ImageInstances"
+    )
+    Scan: Mapped[Optional["Scan"]] = relationship(
+        "eyened_orm.image_instance.Scan",
+        back_populates="ImageInstances",
+        lazy="selectin",
+    )
 
     # Datetimes - automatically filled
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -187,22 +222,26 @@ class ImageInstance(Base):
     # relationships:
     Annotations: Mapped[List["Annotation"]] = relationship(
         "eyened_orm.annotation.Annotation",
-        back_populates="ImageInstance", passive_deletes=True
+        back_populates="ImageInstance",
+        passive_deletes=True,
     )
 
     Segmentations: Mapped[List["Segmentation"]] = relationship(
         "eyened_orm.segmentation.Segmentation",
-        back_populates="ImageInstance", passive_deletes=True
+        back_populates="ImageInstance",
+        passive_deletes=True,
     )
-    
+
     ModelSegmentations: Mapped[List["ModelSegmentation"]] = relationship(
         "eyened_orm.segmentation.ModelSegmentation",
-        back_populates="ImageInstance", passive_deletes=True
+        back_populates="ImageInstance",
+        passive_deletes=True,
     )
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
         "eyened_orm.form_annotation.FormAnnotation",
-        back_populates="ImageInstance", passive_deletes=True
+        back_populates="ImageInstance",
+        passive_deletes=True,
     )
 
     SubTaskImageLinks: Mapped[List["SubTaskImageLink"]] = relationship(
@@ -211,24 +250,28 @@ class ImageInstance(Base):
         passive_deletes=True,
     )
 
-    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship("eyened_orm.tag.ImageInstanceTagLink", back_populates="ImageInstance", lazy="selectin")
+    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
+        "eyened_orm.tag.ImageInstanceTagLink",
+        back_populates="ImageInstance",
+        lazy="selectin",
+    )
 
     # attributes relationship
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         back_populates="ImageInstance",
         lazy="selectin",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     @property
     def shape(self) -> tuple[int, int, int]:
         return (self.NrOfFrames or 1, self.Rows_y, self.Columns_x)
-    
+
     @property
     def is_3d(self) -> bool:
         return self.NrOfFrames is not None and self.NrOfFrames > 1
-    
+
     @property
     def is_2d(self) -> bool:
         return not self.is_3d
@@ -263,6 +306,10 @@ class ImageInstance(Base):
         return f"{self.config.image_server_url}/{self.DatasetIdentifier}"
 
     @property
+    def device_str(self):
+        return f"{self.DeviceInstance.DeviceModel.Manufacturer} {self.DeviceInstance.DeviceModel.ManufacturerModelName}"
+
+    @property
     def pixel_array(self):
         """Return the raw data for this image as a numpy array"""
         if self.DatasetIdentifier.endswith(".dcm"):
@@ -287,22 +334,31 @@ class ImageInstance(Base):
             return np.array(Image.open(self.path))
 
     @property
-    def bounds(self):
+    def bounds(self) -> CFIBounds:
         pixel_array = self.pixel_array
         shape = pixel_array.shape
         if len(shape) == 3 and shape[2] > 4:
             raise ValueError("Can only handle 2D images")
         if self.CFROI is not None:
             # use bounds from database
-            from rtnls_fundusprep.cfi_bounds import CFIBounds
-
             return CFIBounds(**self.CFROI, image=pixel_array)
 
-        from rtnls_fundusprep.mask_extraction import get_cfi_bounds
-
         bounds = get_cfi_bounds(pixel_array)
-        self.CFROI = bounds.to_dict_all()
         return bounds
+
+    @property
+    def cropping_matrix(self) -> Optional[np.ndarray]:
+        """3x3 transformation matrix from original image to 1024x1024 square space"""
+        if self.bounds is None:
+            return None
+        return self.bounds.get_cropping_transform(1024).M
+
+    @property
+    def cropping_matrix_inverse(self) -> Optional[np.ndarray]:
+        """3x3 transformation matrix from 1024x1024 square to original image space"""
+        if self.bounds is None:
+            return None
+        return self.bounds.get_cropping_transform(1024).M_inv
 
     def calc_data_hash(self):
         """Return the hash of the image data"""
@@ -339,7 +395,7 @@ class ImageInstance(Base):
     def _base_joins(cls, statement):
         """Add useful joins for ImageInstance queries."""
         from eyened_orm import Patient, Project, Series, Study
-        
+
         return (
             statement.join(Series)
             .join(Study)
@@ -375,7 +431,9 @@ class DeviceModel(Base):
     Manufacturer: Mapped[str] = mapped_column(String(45))
     ManufacturerModelName: Mapped[str] = mapped_column(String(45))
 
-    DeviceInstances: Mapped[List["DeviceInstance"]] = relationship("eyened_orm.image_instance.DeviceInstance", back_populates="DeviceModel")
+    DeviceInstances: Mapped[List["DeviceInstance"]] = relationship(
+        "eyened_orm.image_instance.DeviceInstance", back_populates="DeviceModel"
+    )
 
     @classmethod
     def by_manufacturer(
@@ -405,7 +463,9 @@ class DeviceInstance(Base):
     SerialNumber: Mapped[Optional[str]] = mapped_column(TEXT)
     Description: Mapped[str] = mapped_column(String(256))
 
-    DeviceModel: Mapped["DeviceModel"] = relationship("eyened_orm.image_instance.DeviceModel", back_populates="DeviceInstances")
+    DeviceModel: Mapped["DeviceModel"] = relationship(
+        "eyened_orm.image_instance.DeviceModel", back_populates="DeviceInstances"
+    )
 
     ImageInstances: Mapped[List[ImageInstance]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="DeviceInstance"
@@ -422,7 +482,9 @@ class SourceInfo(Base):
     SourcePath: Mapped[str] = mapped_column(String(250), unique=True)
     ThumbnailPath: Mapped[str] = mapped_column(String(250), unique=True)
 
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo"
+    )
 
 
 class ModalityTable(Base):
@@ -432,7 +494,9 @@ class ModalityTable(Base):
     ModalityID: Mapped[int] = mapped_column(primary_key=True)
     ModalityTag: Mapped[str] = mapped_column(String(40), unique=True)
 
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="_Modality")
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="_Modality"
+    )
 
     @classmethod
     def by_tag(cls, ModalityTag: str, session: Session) -> Optional["ModalityTable"]:
@@ -445,11 +509,11 @@ class Scan(Base):
 
     ScanID: Mapped[int] = mapped_column(primary_key=True)
     ScanMode: Mapped[str] = mapped_column(String(40), unique=True)
-    
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="Scan")
+
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="Scan"
+    )
 
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
         return cls.by_column(session, ScanMode=ScanMode)
-
-

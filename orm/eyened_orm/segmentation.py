@@ -3,13 +3,21 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 import numpy as np
-from sqlalchemy import JSON, ForeignKey, Index, UniqueConstraint, String, func, Enum as SAEnum
+from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import Creator, Feature, ImageInstance, SegmentationTagLink, SubTask, AttributeValue
+    from eyened_orm import (
+        AttributeValue,
+        Creator,
+        Feature,
+        ImageInstance,
+        SegmentationTagLink,
+        SubTask,
+    )
 
 
 class ModelKind(Enum):
@@ -67,7 +75,9 @@ class SegmentationBase(Base):
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE")
     )
 
-    DataRepresentation: Mapped[DataRepresentation] = mapped_column(SAEnum(DataRepresentation))
+    DataRepresentation: Mapped[DataRepresentation] = mapped_column(
+        SAEnum(DataRepresentation)
+    )
 
     # shape of the segmentation
     Depth: Mapped[int]
@@ -89,9 +99,9 @@ class SegmentationBase(Base):
     DataType: Mapped[Datatype] = mapped_column(SAEnum(Datatype))
 
     Threshold: Mapped[Optional[float]]
-    ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(ForeignKey("Segmentation.SegmentationID"))
-
-    
+    ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("Segmentation.SegmentationID")
+    )
 
     @property
     def dtype(self) -> np.dtype:
@@ -111,39 +121,57 @@ class SegmentationBase(Base):
     @property
     def shape(self) -> tuple[int, int, int]:
         return (self.Depth, self.Height, self.Width)
-   
+
     @property
     def is_3d(self) -> bool:
         # all axes must be > 1 in length
         return self.Height > 1 and self.Width > 1 and self.Depth > 1
-    
+
     @property
     def is_2d(self) -> bool:
         return not self.is_3d
-    
+
     @property
     def is_sparse(self) -> bool:
         return self.SparseAxis is not None
-    
+
     @property
     def groupname(self) -> str:
         return str(self.DataRepresentation)
 
+    @property
+    def projection_matrix(self) -> Optional[np.ndarray]:
+        """3x3 transformation matrix from segmentation space to original image space"""
+        if self.ImageProjectionMatrix is None:
+            return None
+        return np.array(self.ImageProjectionMatrix)
 
-    def write_data(self, data: np.ndarray, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
+    @property
+    def projection_matrix_inverse(self) -> Optional[np.ndarray]:
+        """3x3 transformation matrix from original image space to segmentation space"""
+        if self.ImageProjectionMatrix is None:
+            return None
+        return np.linalg.inv(np.array(self.ImageProjectionMatrix))
+
+    def write_data(
+        self,
+        data: np.ndarray,
+        axis: Optional[int] = None,
+        slice_index: Optional[int] = None,
+    ) -> int:
         """Write annotation data to the zarr array and update the ZarrArrayIndex."""
-        
+
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
 
         zarr_index = self.storage_manager.write(
-            group_name=self.groupname,  
+            group_name=self.groupname,
             data_dtype=self.dtype,
             data_shape=self.shape,
-            data=data, 
+            data=data,
             zarr_index=self.ZarrArrayIndex,
             axis=axis,
-            slice_index=slice_index
+            slice_index=slice_index,
         )
 
         # for sparse annotations, we need to update the ScanIndices list
@@ -156,32 +184,38 @@ class SegmentationBase(Base):
 
         self.ZarrArrayIndex = zarr_index
         return zarr_index
-    
-    def write_empty(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> int:
-        """Write an empty segmentation to the zarr array and update the ZarrArrayIndex."""
-        return self.write_data(np.zeros(self.shape, dtype=self.dtype), axis, slice_index)
 
-    def read_data(self, axis: Optional[int] = None, slice_index: Optional[int] = None) -> np.ndarray:
+    def write_empty(
+        self, axis: Optional[int] = None, slice_index: Optional[int] = None
+    ) -> int:
+        """Write an empty segmentation to the zarr array and update the ZarrArrayIndex."""
+        return self.write_data(
+            np.zeros(self.shape, dtype=self.dtype), axis, slice_index
+        )
+
+    def read_data(
+        self, axis: Optional[int] = None, slice_index: Optional[int] = None
+    ) -> np.ndarray:
         if self.ZarrArrayIndex is None:
             return None
 
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
-        
+
         return self.storage_manager.read(
             group_name=self.groupname,
             data_dtype=self.dtype,
             data_shape=self.shape,
             zarr_index=self.ZarrArrayIndex,
             axis=axis,
-            slice_index=slice_index
+            slice_index=slice_index,
         )
 
     @property
     def shape_matches_image_shape(self):
         image_shape = self.ImageInstance.shape
         annotation_shape = self.shape
-        for i, (x,y) in enumerate(zip(image_shape, annotation_shape)):
+        for i, (x, y) in enumerate(zip(image_shape, annotation_shape)):
             if i != self.l1_axis and x != y:
                 return False
         return True
@@ -192,8 +226,12 @@ class Segmentation(SegmentationBase):
     SegmentationID: Mapped[int] = mapped_column(primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID", ondelete="RESTRICT"))
-    SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="SET NULL"))
+    FeatureID: Mapped[int] = mapped_column(
+        ForeignKey("Feature.FeatureID", ondelete="RESTRICT")
+    )
+    SubTaskID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("SubTask.SubTaskID", ondelete="SET NULL")
+    )
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]]
@@ -201,14 +239,28 @@ class Segmentation(SegmentationBase):
     Inactive: Mapped[bool] = mapped_column(default=False)
 
     ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
-        "eyened_orm.image_instance.ImageInstance",
-        back_populates="Segmentations"
+        "eyened_orm.image_instance.ImageInstance", back_populates="Segmentations"
     )
-    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Segmentations")
-    Feature: Mapped["Feature"] = relationship("eyened_orm.segmentation.Feature", back_populates="Segmentations")
-    SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="Segmentations")
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship("eyened_orm.tag.SegmentationTagLink", back_populates="Segmentation", lazy="selectin")
-    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="Segmentation", lazy="selectin")
+    Creator: Mapped["Creator"] = relationship(
+        "eyened_orm.creator.Creator", back_populates="Segmentations"
+    )
+    Feature: Mapped["Feature"] = relationship(
+        "eyened_orm.segmentation.Feature", back_populates="Segmentations"
+    )
+    SubTask: Mapped["SubTask"] = relationship(
+        "eyened_orm.task.SubTask", back_populates="Segmentations"
+    )
+    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+        "eyened_orm.tag.SegmentationTagLink",
+        back_populates="Segmentation",
+        lazy="selectin",
+    )
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship(
+        "eyened_orm.attributes.AttributeValue",
+        back_populates="Segmentation",
+        lazy="selectin",
+    )
+
 
 class FeatureFeatureLink(Base):
     __tablename__ = "CompositeFeature"
@@ -217,20 +269,26 @@ class FeatureFeatureLink(Base):
         Index("fk_CompositeFeature_ChildFeature1_idx", "ChildFeatureID"),
     )
 
-    ParentFeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID", ondelete="CASCADE"), primary_key=True)
-    ChildFeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID", ondelete="RESTRICT"), primary_key=True)
+    ParentFeatureID: Mapped[int] = mapped_column(
+        ForeignKey("Feature.FeatureID", ondelete="CASCADE"), primary_key=True
+    )
+    ChildFeatureID: Mapped[int] = mapped_column(
+        ForeignKey("Feature.FeatureID", ondelete="RESTRICT"), primary_key=True
+    )
     FeatureIndex: Mapped[int] = mapped_column(primary_key=True)
 
     Feature: Mapped["Feature"] = relationship(
         "eyened_orm.segmentation.Feature",
-        back_populates="FeatureAssociations", foreign_keys="FeatureFeatureLink.ParentFeatureID"
+        back_populates="FeatureAssociations",
+        foreign_keys="FeatureFeatureLink.ParentFeatureID",
     )
 
     Child: Mapped["Feature"] = relationship(
         "eyened_orm.segmentation.Feature",
-        back_populates="ChildFeatureAssociations", foreign_keys="FeatureFeatureLink.ChildFeatureID"
+        back_populates="ChildFeatureAssociations",
+        foreign_keys="FeatureFeatureLink.ChildFeatureID",
     )
-    
+
 
 class Feature(Base):
     __tablename__ = "Feature"
@@ -239,8 +297,12 @@ class Feature(Base):
     FeatureID: Mapped[int] = mapped_column(primary_key=True)
     FeatureName: Mapped[str] = mapped_column(String(60), unique=True)
 
-    Segmentations: Mapped[List["Segmentation"]] = relationship("eyened_orm.segmentation.Segmentation", back_populates="Feature")
-    SegmentationModels: Mapped[List["SegmentationModel"]] = relationship("eyened_orm.segmentation.SegmentationModel", back_populates="Feature")
+    Segmentations: Mapped[List["Segmentation"]] = relationship(
+        "eyened_orm.segmentation.Segmentation", back_populates="Feature"
+    )
+    SegmentationModels: Mapped[List["SegmentationModel"]] = relationship(
+        "eyened_orm.segmentation.SegmentationModel", back_populates="Feature"
+    )
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # Relationships for parent-child feature hierarchy
@@ -250,11 +312,12 @@ class Feature(Base):
         foreign_keys="FeatureFeatureLink.ParentFeatureID",
         passive_deletes=True,
     )
-    
+
     # Child side stays non-cascading (used only to detect blocking links)
     ChildFeatureAssociations: Mapped[List["FeatureFeatureLink"]] = relationship(
         "eyened_orm.segmentation.FeatureFeatureLink",
-        back_populates="Child", foreign_keys="FeatureFeatureLink.ChildFeatureID"
+        back_populates="Child",
+        foreign_keys="FeatureFeatureLink.ChildFeatureID",
     )
 
     @property
@@ -266,103 +329,117 @@ class Feature(Base):
         return bool(self.ChildFeatureAssociations)
 
     @classmethod
-    def from_list(cls, session, feature_name: str, sub_features: List[str] | None = None) -> "Feature":
-        '''
+    def from_list(
+        cls, session, feature_name: str, sub_features: List[str] | None = None
+    ) -> "Feature":
+        """
         Create a feature hierarchy from a list of feature names.
         If a feature does not exist, it will be created.
         If a feature already exists, it will be appended to the parent.
-        '''
+        """
         feature = cls(FeatureName=feature_name)
         session.add(feature)
         session.flush()
 
         if sub_features is None:
             return feature
-        
+
         if isinstance(sub_features, list):
             # first create the sub-features that don't exist
             for sub_feature in sub_features:
                 if Feature.by_name(session, sub_feature) is None:
                     session.add(Feature(FeatureName=sub_feature))
             session.flush()
-            
+
             # then create the feature associations
             for i, sub_feature in enumerate(sub_features):
-                feature.FeatureAssociations.append(FeatureFeatureLink(
-                    ParentFeatureID=feature.FeatureID,
-                    ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
-                    FeatureIndex=i
-                ))
+                feature.FeatureAssociations.append(
+                    FeatureFeatureLink(
+                        ParentFeatureID=feature.FeatureID,
+                        ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
+                        FeatureIndex=i,
+                    )
+                )
         else:
             raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
-        
+
         return feature
-    
+
     @property
     def subfeatures_list(self) -> List[str]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
         return [assoc.Child.FeatureName for assoc in assocs]
-    
+
     @property
     def json(self) -> Dict[str, Any]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
         subfeatures = [assoc.Child for assoc in assocs]
-        return {
-            "FeatureName": self.FeatureName,
-            "SubFeatures": self.subfeatures_list
-        }
+        return {"FeatureName": self.FeatureName, "SubFeatures": self.subfeatures_list}
 
 
 class Model(Base):
     __tablename__ = "Model"
 
     __table_args__ = (UniqueConstraint("ModelName", "Version"),)
-    __mapper_args__ = {
-        "polymorphic_on": "ModelType"
-    }
+    __mapper_args__ = {"polymorphic_on": "ModelType"}
 
     ModelID: Mapped[int] = mapped_column(primary_key=True)
     ModelName: Mapped[str] = mapped_column(String(255), unique=True)
     Version: Mapped[str] = mapped_column(String(255))
     ModelType: Mapped[ModelKind] = mapped_column(
-        SAEnum(ModelKind, name="modelkind", values_callable=lambda e: [m.value for m in e]),
-        nullable=False
-    ) # to distinguish between segmentation and attribute models
+        SAEnum(
+            ModelKind, name="modelkind", values_callable=lambda e: [m.value for m in e]
+        ),
+        nullable=False,
+    )  # to distinguish between segmentation and attribute models
     # segmentation models have a feature and segmentations
     # attribute models have only attributes
     Description: Mapped[Optional[str]] = mapped_column(String(255))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # relationships
-    ProducedAttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="ProducingModel")
+    ProducedAttributeValues: Mapped[List["AttributeValue"]] = relationship(
+        "eyened_orm.attributes.AttributeValue", back_populates="ProducingModel"
+    )
 
 
 class SegmentationModel(Model):
     __tablename__ = "SegmentationModel"
 
-    ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID", ondelete="CASCADE"), primary_key=True)
+    ModelID: Mapped[int] = mapped_column(
+        ForeignKey("Model.ModelID", ondelete="CASCADE"), primary_key=True
+    )
     FeatureID: Mapped[Optional[int]] = mapped_column(ForeignKey("Feature.FeatureID"))
 
-    Feature: Mapped[Optional["Feature"]] = relationship("eyened_orm.segmentation.Feature", back_populates="SegmentationModels")
-    Segmentations: Mapped[List["ModelSegmentation"]] = relationship("eyened_orm.segmentation.ModelSegmentation", back_populates="Model")
+    Feature: Mapped[Optional["Feature"]] = relationship(
+        "eyened_orm.segmentation.Feature", back_populates="SegmentationModels"
+    )
+    Segmentations: Mapped[List["ModelSegmentation"]] = relationship(
+        "eyened_orm.segmentation.ModelSegmentation", back_populates="Model"
+    )
 
     __mapper_args__ = {"polymorphic_identity": ModelKind.Segmentation}
-    
+
+
 class ModelSegmentation(SegmentationBase):
-    __tablename__ = "ModelSegmentation"   
+    __tablename__ = "ModelSegmentation"
 
     ModelSegmentationID: Mapped[int] = mapped_column(primary_key=True)
     ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID"))
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-
-    Model: Mapped["Model"] = relationship("eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations")    
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
-        "eyened_orm.image_instance.ImageInstance",
-        back_populates="ModelSegmentations"
+    Model: Mapped["SegmentationModel"] = relationship(
+        "eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations"
     )
-    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="ModelSegmentation", lazy="selectin")
+    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="ModelSegmentations"
+    )
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship(
+        "eyened_orm.attributes.AttributeValue",
+        back_populates="ModelSegmentation",
+        lazy="selectin",
+    )
 
     @property
     def groupname(self) -> str:
