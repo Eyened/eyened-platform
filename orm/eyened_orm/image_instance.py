@@ -414,6 +414,64 @@ class ImageInstance(Base):
         """
         return [a for a in self.Annotations if a.CreatorID == creator.CreatorID]
 
+    def make_tag(
+        self,
+        tag_name: str,
+        creator_name: str,
+        comment: Optional[str] = None,
+        tag_description: Optional[str] = None,
+    ) -> "ImageInstanceTagLink":
+        """Create or reuse a tag and link it to this image instance."""
+        from eyened_orm import Tag, TagType, Creator
+        from eyened_orm.tag import ImageInstanceTagLink
+
+        session = self.session
+        tag_type = TagType.ImageInstance
+
+        # Get or create creator
+        creator = Creator.by_name(session, creator_name)
+        if creator is None:
+            creator = Creator(CreatorName=creator_name, IsHuman=True)
+            session.add(creator)
+            session.flush()
+
+        # Get or create tag
+        tag = Tag.by_column(session, TagName=tag_name, TagType=tag_type)
+        if tag is None:
+            if tag_description is None:
+                raise ValueError(
+                    f"Tag '{tag_name}' does not exist and tag_description is required for new tags"
+                )
+            tag = Tag(
+                TagName=tag_name,
+                TagType=tag_type,
+                TagDescription=tag_description,
+                CreatorID=creator.CreatorID,
+            )
+            session.add(tag)
+            session.flush()
+        elif tag_description is not None and tag.TagDescription != tag_description:
+            raise ValueError(
+                f"Tag '{tag_name}' exists with different description: '{tag.TagDescription}' != '{tag_description}'"
+            )
+
+        # Get or create link
+        link = ImageInstanceTagLink.by_pk(session, (tag.TagID, self.ImageInstanceID))
+        if link is None:
+            link = ImageInstanceTagLink(
+                TagID=tag.TagID,
+                ImageInstanceID=self.ImageInstanceID,
+                CreatorID=creator.CreatorID,
+                Comment=comment,
+            )
+            session.add(link)
+            session.flush()
+        elif comment is not None:
+            link.Comment = comment
+            session.flush()
+
+        return link
+
 
 class DeviceModel(Base):
     __tablename__ = "DeviceModel"

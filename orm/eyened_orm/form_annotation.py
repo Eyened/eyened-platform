@@ -68,6 +68,64 @@ class FormAnnotation(Base):
     SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="FormAnnotations")
     FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship("eyened_orm.tag.FormAnnotationTagLink", back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
 
+    def make_tag(
+        self,
+        tag_name: str,
+        creator_name: str,
+        comment: Optional[str] = None,
+        tag_description: Optional[str] = None,
+    ) -> "FormAnnotationTagLink":
+        """Create or reuse a tag and link it to this form annotation."""
+        from eyened_orm import Tag, TagType, Creator
+        from eyened_orm.tag import FormAnnotationTagLink
+
+        session = self.session
+        tag_type = TagType.FormAnnotation
+
+        # Get or create creator
+        creator = Creator.by_name(session, creator_name)
+        if creator is None:
+            creator = Creator(CreatorName=creator_name, IsHuman=True)
+            session.add(creator)
+            session.flush()
+
+        # Get or create tag
+        tag = Tag.by_column(session, TagName=tag_name, TagType=tag_type)
+        if tag is None:
+            if tag_description is None:
+                raise ValueError(
+                    f"Tag '{tag_name}' does not exist and tag_description is required for new tags"
+                )
+            tag = Tag(
+                TagName=tag_name,
+                TagType=tag_type,
+                TagDescription=tag_description,
+                CreatorID=creator.CreatorID,
+            )
+            session.add(tag)
+            session.flush()
+        elif tag_description is not None and tag.TagDescription != tag_description:
+            raise ValueError(
+                f"Tag '{tag_name}' exists with different description: '{tag.TagDescription}' != '{tag_description}'"
+            )
+
+        # Get or create link
+        link = FormAnnotationTagLink.by_pk(session, (tag.TagID, self.FormAnnotationID))
+        if link is None:
+            link = FormAnnotationTagLink(
+                TagID=tag.TagID,
+                FormAnnotationID=self.FormAnnotationID,
+                CreatorID=creator.CreatorID,
+                Comment=comment,
+            )
+            session.add(link)
+            session.flush()
+        elif comment is not None:
+            link.Comment = comment
+            session.flush()
+
+        return link
+
     @classmethod
     def by_schema_and_creator(
         cls,

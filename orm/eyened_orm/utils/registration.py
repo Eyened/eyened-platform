@@ -26,7 +26,7 @@ def get_or_create_schema(session, schema_name):
 def get_or_create_creator(session, creator_name):
     creator = Creator.by_name(session, creator_name)
     if creator is None:
-        creator = Creator(CreatorName=creator_name)
+        creator = Creator(CreatorName=creator_name, IsHuman=True)
         session.add(creator)
         session.commit()
         print(f"Created creator for registration set using name '{creator_name}'")
