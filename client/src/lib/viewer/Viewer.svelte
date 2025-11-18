@@ -167,6 +167,9 @@
                     />
                     <span>{index.value}</span>
                 </div>
+                
+            {/if}
+            {#if viewerContext.image.orientation === 'axial'}
                 <WindowLevel />
                 <Stretch />
             {/if}

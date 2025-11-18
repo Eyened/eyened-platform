@@ -25,7 +25,7 @@
 	<div class="section">
 		<WindowLevel />
 	</div>
-	{#if viewerContext.image.is2D}
+	{#if viewerContext.image.orientation === 'enface'}
 		<div>
 			{#if radio}
 				<ul>
@@ -49,18 +49,7 @@
 			{/if}
 		</div>
 	{/if}
-	<!-- <div class="section linking">
-		<LinkImages />
-		<div class="link-settings">
-			{#if image.is3D}
-				<label>
-					<span>Lock scroll:</span>
-					<input type="checkbox" bind:checked={viewerContext.lockScroll} />
-				</label>
-			{/if}
-		</div>
-	</div> -->
-	{#if viewerContext.image.is3D}
+	{#if viewerContext.image.orientation === 'axial'}
 		<div class="section">
 			<Stretch />
 		</div>

@@ -18,7 +18,7 @@ export abstract class AbstractImage {
     
     // Cache segmentation items per segmentation ID
     public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
-
+    public readonly orientation: 'axial' | 'enface';
     constructor(
         public readonly instance: InstanceGET,
         public readonly webgl: WebGL,
@@ -31,6 +31,16 @@ export abstract class AbstractImage {
         this.depth = depth;
 
 
+        if (instance.modality === 'OCT') {
+            if (instance.resolution_axial && instance.resolution_axial>0) {
+                this.orientation = 'axial';
+            } else {
+                this.orientation = 'enface';
+            }
+        } else {
+            this.orientation = 'enface';
+        }
+
         this.resolution = {
             x: 1000 * width_mm / width,
             y: 1000 * height_mm / height,
@@ -41,6 +51,7 @@ export abstract class AbstractImage {
 
     abstract is3D: boolean;
     abstract is2D: boolean;
+    
 
     getAspectRatio() {
         const { width, height, width_mm, height_mm } = this.dimensions;

@@ -28,6 +28,7 @@ export class Image2D extends AbstractImage {
         meta: ImageMetadata
     ) {
         super(instance, webgl, image_id, dimensions, meta);
+    
     }
 
     get texture(): WebGLTexture {
