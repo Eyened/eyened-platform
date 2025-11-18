@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { data } from '$lib/datamodel/model';
+	import { instances } from '$lib/data';
 	import Viewer from '$lib/viewer/Viewer.svelte';
 	import { ViewerContext } from '$lib/viewer/viewerContext.svelte';
 	import { AbstractImage } from '$lib/webgl/abstractImage';
@@ -15,7 +15,7 @@
 	}
 
 	let { image }: Props = $props();
-	const { instances } = data;
+	// instances is already imported from $lib/data
 	const renderer = new MultiImageRenderer(image, viewerWindowContext.registration);
 	class MultiViewerContext extends ViewerContext {
 		constructor(image: AbstractImage, viewerWindowContext: ViewerWindowContext) {

@@ -6,10 +6,10 @@
 	import type { BrowserContext } from "./browserContext.svelte";
 	import Eye from "./Eye.svelte";
 
-	import { tagStudy, untagStudy } from "$lib/data/helpers";
-	import type { StudyGET } from "../../types/openapi_types";
-	import AdditionalDataSources from "./AdditionalDataSources.svelte";
-	import StudyBlockForms from "./StudyBlockForms.svelte";
+import { tagStudy, untagStudy, updateTagStudy } from "$lib/data/helpers";
+import type { StudyGET } from "../../types/openapi_types";
+import AdditionalDataSources from "./AdditionalDataSources.svelte";
+import StudyBlockForms from "./StudyBlockForms.svelte";
 	interface Props {
 		study: StudyGET;
 		mode?: "full" | "overlay";
@@ -85,13 +85,13 @@
 			</div>
 
 			<div class="ml-4">
-				<Tagger
-					tagType="Study"
-					tags={study.tags ?? []}
-					tag={(id) => tagStudy(study, id)}
-					untag={(id) => untagStudy(study, id)}
-					onUpdate={browserContext.refreshSignatures}
-				/>
+                <Tagger
+                    tagType="Study"
+                    tags={study.tags ?? []}
+                    tag={(id) => {tagStudy(study, id); browserContext?.refreshSignatures()}}
+                    untag={(id) => untagStudy(study, id)}
+                    onUpdate={(tagId, comment) => updateTagStudy(study.id, tagId, comment)}
+                />
 			</div>
 		</div>
 	</div>

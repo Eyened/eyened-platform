@@ -5,10 +5,7 @@
     import { getContext } from "svelte";
     import FeatureSelect from "./FeatureSelect.svelte";
 
-    import {
-        type DataRepresentation,
-        type Datatype
-    } from "$lib/datamodel/segmentation.svelte";
+    import type { SegmentationDataRepresentation, SegmentationDataType } from "../../../types/openapi_types";
     import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import type { FeatureGET } from "../../../types/openapi_types";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
@@ -36,7 +33,7 @@
     const types = ["Q", "B", "P"];
     let selectedType = $state("Q");
 
-    const dataRepresentations: { [key: string]: DataRepresentation } = {
+    const dataRepresentations: { [key: string]: SegmentationDataRepresentation } = {
         Q: "DualBitMask",
         B: "Binary",
         P: "Probability",
@@ -45,7 +42,7 @@
     async function create(feature: FeatureGET) {
         globalContext.dialogue = `Creating annotation...`;
 
-        let dataType: Datatype = "R8UI";
+        let dataType: SegmentationDataType = "R8UI";
         if (selectedType == "P") {
             // TODO: this could perhaps also be R32F?
             dataType = "R8";

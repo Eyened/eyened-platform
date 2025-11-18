@@ -9,7 +9,7 @@ from .base import Base
 
 if TYPE_CHECKING:
     from eyened_orm import (Annotation, FormAnnotation, ImageInstance, Project,
-                            Study)
+                            Study, AttributeValue)
 
 
 class SexEnum(enum.Enum):
@@ -43,6 +43,7 @@ class Patient(Base):
     Studies: Mapped[List["Study"]] = relationship("eyened_orm.study.Study", back_populates="Patient", passive_deletes=True)
     Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Patient")
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Patient")
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="Patient")
 
     @classmethod
     def by_project_and_identifier(

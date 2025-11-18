@@ -194,38 +194,44 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="main">
 	<div>
-		<PanelIcon
-			onclick={() => activate(brush)}
-			active={activeTool == brush}
-			disabled={!canEdit && activeTool != brush}
-			tooltip={canEdit
-				? "Brush"
-				: "Select an editable segmentation to use the brush"}
-			Icon={Brush}
-		/>
+		<div class="tool-group">
+			<PanelIcon
+				onclick={() => activate(brush)}
+				active={activeTool == brush}
+				disabled={!canEdit && activeTool != brush}
+				tooltip={canEdit
+					? "Brush"
+					: "Select an editable segmentation to use the brush"}
+				Icon={Brush}
+				size={2}
+			/>
 
-		<PanelIcon
-			onclick={() => activate(polygon)}
-			active={activeTool == polygon}
-			disabled={!canEdit && activeTool != polygon}
-			tooltip={canEdit
-				? "Polygon"
-				: "Select an editable segmentation to use the polygon tool"}
-			Icon={Polygon}
-		/>
+			<PanelIcon
+				onclick={() => activate(polygon)}
+				active={activeTool == polygon}
+				disabled={!canEdit && activeTool != polygon}
+				tooltip={canEdit
+					? "Polygon"
+					: "Select an editable segmentation to use the polygon tool"}
+				Icon={Polygon}
+				size={2}
+			/>
 
-		{#if segmentationContext.segmentationItem?.segmentation.data_representation == 'Probability'}
 			<PanelIcon
 				onclick={() => activate(enhance)}
 				active={activeTool == enhance}
-				disabled={!canEdit && activeTool != enhance}
+				disabled={(!canEdit ||
+					segmentationContext.segmentationItem?.segmentation
+						.data_representation != "Probability") &&
+					activeTool != enhance}
 				tooltip={canEdit
 					? "Enhance"
 					: "Select an editable segmentation to use the enhance tool"}
 				Icon={Enhance}
+				size={2}
 			/>
-		{/if}
-		{#if activeTool != enhance}
+		</div>
+		<div class="tool-group">
 			<PanelIcon
 				active={segmentationContext.erodeDilateActive}
 				onclick={() => toggle("erodeDilateActive")}
@@ -234,29 +240,34 @@
 					? "Dilate / Erode"
 					: "Select an editable segmentation to use dilate/erode"}
 				Icon={ErodeDilate}
+				size={2}
 			/>
-		{/if}
-		<PanelIcon
-			active={segmentationContext.questionableActive}
-			onclick={() => toggle("questionableActive")}
-			disabled={!canEdit && !segmentationContext.questionableActive}
-			tooltip={canEdit
-				? "Questionable"
-				: "Select an editable segmentation to mark as questionable"}
-			Icon={Questionable}
-		/>
-		<div class="undo-redo">
+
+			<PanelIcon
+				active={segmentationContext.questionableActive}
+				onclick={() => toggle("questionableActive")}
+				disabled={!canEdit && !segmentationContext.questionableActive}
+				tooltip={canEdit
+					? "Questionable"
+					: "Select an editable segmentation to mark as questionable"}
+				Icon={Questionable}
+				size={2}
+			/>
+		</div>
+		<div class="tool-group">
 			<PanelIcon
 				onclick={undo}
 				tooltip="Undo"
 				disabled={!canUndo}
 				Icon={Undo}
+				size={2}
 			/>
 			<PanelIcon
 				onclick={redo}
 				tooltip="Redo"
 				disabled={!canRedo}
 				Icon={Redo}
+				size={2}
 			/>
 		</div>
 	</div>
@@ -266,7 +277,7 @@
 			<BrushradiusControl {segmentationContext} />
 		</div>
 	{/if}
-	{#if enhance && activeTool === enhance}
+	{#if activeTool === enhance}
 		<div class="controls">
 			<label>
 				<span>Hardness {enhance.hardness}</span>
@@ -308,7 +319,8 @@
 	div.main {
 		font-size: small;
 		padding: 0.2em;
-		background-color: rgba(255, 255, 255, 0.1);
+		background-color: rgba(0, 120, 255, 0.1);
+        border-radius: 0.5em;
 	}
 	div.main {
 		flex-direction: column;
@@ -317,8 +329,11 @@
 		flex-direction: row;
 		justify-content: center;
 	}
-	div.undo-redo {
-		border-left: 1px solid rgba(255, 255, 255, 0.5);
+	div.tool-group {
+		padding: 0.5em;
+
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 0.5em;
 	}
 	div.controls {
 		display: flex;

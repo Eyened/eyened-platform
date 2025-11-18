@@ -232,7 +232,11 @@ export interface paths {
         delete: operations["untag_instance_instances__instance_id__tags__tag_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Instance Tag
+         * @description Update comment on an existing ImageInstance tag link.
+         */
+        patch: operations["patch_instance_tag_instances__instance_id__tags__tag_id__patch"];
         trace?: never;
     };
     "/segmentations": {
@@ -489,7 +493,11 @@ export interface paths {
         delete: operations["untag_form_annotation_form_annotations__annotation_id__tags__tag_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Form Annotation Tag
+         * @description Update comment on an existing FormAnnotation tag link.
+         */
+        patch: operations["patch_form_annotation_tag_form_annotations__annotation_id__tags__tag_id__patch"];
         trace?: never;
     };
     "/instances/search": {
@@ -887,7 +895,11 @@ export interface paths {
         delete: operations["untag_study_studies__study_id__tags__tag_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Study Tag
+         * @description Update comment on an existing Study tag link.
+         */
+        patch: operations["patch_study_tag_studies__study_id__tags__tag_id__patch"];
         trace?: never;
     };
 }
@@ -992,6 +1004,11 @@ export interface components {
          * @enum {string}
          */
         ETDRSField: "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7";
+        /**
+         * EntityType
+         * @enum {string}
+         */
+        EntityType: "Patient" | "Study" | "Eye" | "StudyEye" | "ImageInstance";
         /** FeatureGET */
         FeatureGET: {
             /** Name */
@@ -999,7 +1016,7 @@ export interface components {
             /** Id */
             id: number;
             /** Subfeatures */
-            subfeatures: string[];
+            subfeatures: components["schemas"]["SubFeatureItem"][];
             /** Subfeature Ids */
             subfeature_ids: number[];
             /**
@@ -1037,10 +1054,11 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
+            laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: unknown | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
             /** Id */
@@ -1079,10 +1097,11 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
+            laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: unknown | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1096,10 +1115,11 @@ export interface components {
             study_id?: number | null;
             /** Image Instance Id */
             image_instance_id?: number | null;
+            laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
             /** Form Data */
-            form_data?: Record<string, never> | null;
+            form_data?: unknown | null;
             /** Form Annotation Reference Id */
             form_annotation_reference_id?: number | null;
         };
@@ -1108,7 +1128,10 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Schema */
-            schema?: Record<string, never> | null;
+            schema?: {
+                [key: string]: unknown;
+            } | null;
+            entity_type?: components["schemas"]["EntityType"] | null;
             /** Id */
             id: number;
         };
@@ -1137,7 +1160,9 @@ export interface components {
              * @description Optional key-value properties for new patient
              * @default {}
              */
-            patient_props: Record<string, never> | null;
+            patient_props: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Study Date
              * @description Study date (can be a date object or ISO format string)
@@ -1148,7 +1173,9 @@ export interface components {
              * @description Optional key-value properties for new study
              * @default {}
              */
-            study_props: Record<string, never> | null;
+            study_props: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Series Id
              * @description Optional series identifier
@@ -1159,7 +1186,9 @@ export interface components {
              * @description Optional key-value properties for new series
              * @default {}
              */
-            series_props: Record<string, never> | null;
+            series_props: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Image
              * @description Path to the image file (required)
@@ -1170,7 +1199,9 @@ export interface components {
              * @description Optional key-value properties for new image
              * @default {}
              */
-            image_props: Record<string, never> | null;
+            image_props: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ImportOptions
@@ -1220,7 +1251,9 @@ export interface components {
             /** Message */
             message: string;
             /** Data */
-            data?: Record<string, never> | null;
+            data?: {
+                [key: string]: unknown;
+            } | null;
             /** Error */
             error?: string | null;
             /** Stack Trace */
@@ -1257,9 +1290,13 @@ export interface components {
             /** Resolution Axial */
             resolution_axial: number;
             /** Cf Roi */
-            cf_roi?: Record<string, never> | null;
+            cf_roi?: {
+                [key: string]: unknown;
+            } | null;
             /** Cf Keypoints */
-            cf_keypoints?: Record<string, never> | null;
+            cf_keypoints?: {
+                [key: string]: unknown;
+            } | null;
             /** Cf Quality */
             cf_quality?: number | null;
             /**
@@ -1289,7 +1326,9 @@ export interface components {
             form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
             /** Attributes */
             attributes: {
-                [key: string]: Record<string, never>;
+                [key: string]: {
+                    [key: string]: unknown;
+                };
             };
         };
         /** InstanceMeta */
@@ -1305,6 +1344,8 @@ export interface components {
             /** Anatomic Region */
             anatomic_region: string;
             device: components["schemas"]["DeviceMeta"];
+            /** Tags */
+            tags: components["schemas"]["TagMeta"][];
         };
         /**
          * Laterality
@@ -1371,10 +1412,17 @@ export interface components {
             /** Date Modified */
             date_modified?: string | null;
         };
+        /** ObjectTagPATCH */
+        ObjectTagPATCH: {
+            /** Comment */
+            comment?: string | null;
+        };
         /** ObjectTagPOST */
         ObjectTagPOST: {
             /** Tag Id */
             tag_id: number;
+            /** Comment */
+            comment?: string | null;
         };
         /** PatientMeta */
         PatientMeta: {
@@ -1625,6 +1673,13 @@ export interface components {
             /** Has More */
             has_more: boolean;
         };
+        /** SubFeatureItem */
+        SubFeatureItem: {
+            /** Index */
+            index: number;
+            /** Name */
+            name: string;
+        };
         /** SubTaskGET */
         SubTaskGET: {
             /** Task Id */
@@ -1728,6 +1783,8 @@ export interface components {
              * Format: date-time
              */
             date: string;
+            /** Comment */
+            comment?: string | null;
         };
         /**
          * TagPATCH
@@ -1760,7 +1817,9 @@ export interface components {
             /** Id */
             id: number;
             /** Config */
-            config: Record<string, never>;
+            config: {
+                [key: string]: unknown;
+            };
             /**
              * Date Inserted
              * Format: date-time
@@ -2403,6 +2462,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_instance_tag_instances__instance_id__tags__tag_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                instance_id: number;
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectTagPATCH"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagMeta"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -3182,6 +3282,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_form_annotation_tag_form_annotations__annotation_id__tags__tag_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                annotation_id: number;
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectTagPATCH"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagMeta"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -4355,6 +4496,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_study_tag_studies__study_id__tags__tag_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                study_id: number;
+                tag_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectTagPATCH"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagMeta"];
+                };
             };
             /** @description Validation Error */
             422: {

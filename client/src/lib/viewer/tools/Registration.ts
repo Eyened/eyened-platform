@@ -1,8 +1,7 @@
 import { setFormAnnotationValue } from "$lib/data";
-import type { Instance } from "$lib/datamodel/instance.svelte";
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
-import type { FormAnnotationGET } from "../../../types/openapi_types";
+import type { FormAnnotationGET, InstanceGET } from "../../../types/openapi_types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
@@ -21,7 +20,7 @@ export class RegistrationTool implements Overlay {
 
     constructor(
         private formAnnotation: FormAnnotationGET,
-        private instance: Instance,
+        private instance: InstanceGET,
         private canEdit: boolean,
         private pointStyle: 'rect' | 'cross' = 'cross',
         private radius: number = 16

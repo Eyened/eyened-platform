@@ -54,6 +54,7 @@
 			patient_id: instance.patient.id,
 			study_id: instance.study?.id ?? undefined,
 			image_instance_id: instance.id,
+			laterality: instance.laterality ?? undefined,
 			sub_task_id: taskContext?.subTask?.id,
 			form_data: {},
 		});

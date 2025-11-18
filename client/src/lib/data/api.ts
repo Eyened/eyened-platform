@@ -1,5 +1,5 @@
 import { api } from '../api/client';
-import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET } from '../../types/openapi_types';
+import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET, SubTaskWithImagesGET } from '../../types/openapi_types';
 import { 
 	ingestTags, 
 	ingestFeatures, 
@@ -16,38 +16,98 @@ import {
 	segmentations
 } from './stores.svelte';
 
+// ===== Helper Functions =====
+
+/**
+ * Helper function to handle API responses and throw errors if present
+ * @param res - The API response from openapi-fetch
+ * @param operation - The operation name for error messages (e.g., "fetch tags")
+ * @returns The data from the response
+ */
+function handleResponse<T>(res: { data?: T; error?: any; response: Response }, operation: string): T {
+	if (res.error) {
+		// If authentication error, redirect is already handled by fetchWithAuthRetry
+		// But we should still throw to prevent processing invalid data
+		throw new Error(`Failed to ${operation}: ${res.response.status}`);
+	}
+	return res.data as T;
+}
+
+/**
+ * Extract operation name from API path for error messages
+ */
+function getOperationName(path: string, method: string): string {
+	// Remove leading slash and convert to readable format
+	const cleanPath = path.replace(/^\//, '').replace(/\//g, ' ');
+	// Convert method to verb
+	const verb = method === 'GET' ? 'fetch' : method === 'POST' ? 'create' : method === 'PATCH' ? 'update' : method === 'DELETE' ? 'delete' : method.toLowerCase();
+	return `${verb} ${cleanPath}`;
+}
+
+/**
+ * Wrapped API GET method that automatically handles errors
+ */
+async function apiGet<T = any>(path: string, options?: any): Promise<T> {
+	const res = await api.GET(path as any, options);
+	return handleResponse<T>(res, getOperationName(path, 'GET'));
+}
+
+/**
+ * Wrapped API POST method that automatically handles errors
+ */
+async function apiPost<T = any>(path: string, options?: any): Promise<T> {
+	const res = await api.POST(path as any, options);
+	return handleResponse<T>(res, getOperationName(path, 'POST'));
+}
+
+/**
+ * Wrapped API PATCH method that automatically handles errors
+ */
+async function apiPatch<T = any>(path: string, options?: any): Promise<T> {
+	const res = await api.PATCH(path as any, options);
+	return handleResponse<T>(res, getOperationName(path, 'PATCH'));
+}
+
+/**
+ * Wrapped API DELETE method that automatically handles errors
+ */
+async function apiDelete(path: string, options?: any): Promise<void> {
+	const res = await api.DELETE(path as any, options);
+	handleResponse(res, getOperationName(path, 'DELETE'));
+}
+
 // ===== Fetch Functions =====
 
-export async function fetchTags() {
-	const res = await api.GET('/tags', {});
-	const data = (res.data ?? []) as TagGET[];
+export async function fetchTags(): Promise<TagGET[]> {
+	const data = (await apiGet<TagGET[]>('/tags', {}) ?? []) as TagGET[];
 	ingestTags(data);
 	return data;
 }
 
-export async function fetchFeatures(params?: { with_counts?: boolean }) {
-	const res = await api.GET('/features', { 
+export async function fetchFeatures(params?: { with_counts?: boolean }): Promise<FeatureGET[]> {
+	const data = (await apiGet<FeatureGET[]>('/features', { 
 		params: { query: params ?? {} } as any 
-	});
-	const data = (res.data ?? []) as FeatureGET[];
+	}) ?? []) as FeatureGET[];
 	ingestFeatures(data);
 	return data;
 }
 
-export async function fetchFormSchemas() {
-	const res = await api.GET('/form-schemas', {});
-	const data = (res.data ?? []) as FormSchemaGET[];
+export async function fetchFormSchemas(): Promise<FormSchemaGET[]> {
+	const data = (await apiGet<FormSchemaGET[]>('/form-schemas', {}) ?? []) as FormSchemaGET[];
 	ingestFormSchemas(data);
 	return data;
 }
 
-export async function fetchInstance(id: number, options?: {
-	with_segmentations?: boolean;
-	with_form_annotations?: boolean;
-	with_model_segmentations?: boolean;
-	with_tag_metadata?: boolean;
-}) {
-	const res = await api.GET('/instances/{instance_id}' as any, {
+export async function fetchInstance(
+	id: number, 
+	options?: {
+		with_segmentations?: boolean;
+		with_form_annotations?: boolean;
+		with_model_segmentations?: boolean;
+		with_tag_metadata?: boolean;
+	}
+): Promise<InstanceGET> {
+	const instance = await apiGet<InstanceGET>('/instances/{instance_id}' as any, {
 		params: { 
 			path: { instance_id: id },
 			query: { 
@@ -55,44 +115,38 @@ export async function fetchInstance(id: number, options?: {
 				...options
 			}
 		} as any
-	});
-	if (res.data) {
-		const instance = res.data as any;
-		
-		// Ingest the instance
-		ingestInstances([instance]);
-		
-		// Ingest embedded data if present
-		if (instance.form_annotations) {
-			ingestFormAnnotations(instance.form_annotations);
-		}
-		if (instance.segmentations) {
-			ingestSegmentations(instance.segmentations);
-		}
-		if (instance.model_segmentations) {
-			ingestModelSegmentations(instance.model_segmentations);
-		}
+	}) as any;
+	
+	// Ingest the instance
+	ingestInstances([instance]);
+	
+	// Ingest embedded data if present
+	if (instance.form_annotations) {
+		ingestFormAnnotations(instance.form_annotations);
 	}
-	return res.data as any;
+	if (instance.segmentations) {
+		ingestSegmentations(instance.segmentations);
+	}
+	if (instance.model_segmentations) {
+		ingestModelSegmentations(instance.model_segmentations);
+	}
+	
+	return instance;
 }
 
-export async function fetchStudy(id: number) {
-	const res = await api.GET('/studies/{study_id}' as any, {
+export async function fetchStudy(id: number): Promise<StudyGET> {
+	const study = await apiGet<StudyGET>('/studies/{study_id}' as any, {
 		params: { path: { study_id: id } } as any
 	});
-	if (res.data) {
-		const study = res.data as StudyGET;
-		// This will auto-ingest embedded series
-		ingestStudies([study]);
-	}
-	return res.data as StudyGET;
+	// This will auto-ingest embedded series
+	ingestStudies([study]);
+	return study;
 }
 
 // ===== Search Functions =====
 
-export async function searchInstances(query: any) {
-	const res = await api.POST('/instances/search', { body: query });
-	const data = res.data as any;
+export async function searchInstances(query: any): Promise<any> {
+	const data = await apiPost<any>('/instances/search', { body: query });
 	
 	// Ingest studies first (which ingests embedded series)
 	if (data.studies) {
@@ -107,9 +161,8 @@ export async function searchInstances(query: any) {
 	return data;
 }
 
-export async function searchStudies(query: any) {
-	const res = await api.POST('/studies/search', { body: query });
-	const data = res.data as any;
+export async function searchStudies(query: any): Promise<any> {
+	const data = await apiPost<any>('/studies/search', { body: query });
 	
 	// Ingest studies (which ingests embedded series)
 	if (data.studies) {
@@ -127,19 +180,17 @@ export async function searchStudies(query: any) {
 
 // ===== Signature Functions =====
 
-export async function getInstancesSignature() {
-	const res = await api.GET('/instances/search/signature', {});
-	return res.data ?? [];
+export async function getInstancesSignature(): Promise<any[]> {
+	return await apiGet<any[]>('/instances/search/signature', {}) ?? [];
 }
 
-export async function getStudiesSignature() {
-	const res = await api.GET('/studies/search/signature', {});
-	return res.data ?? [];
+export async function getStudiesSignature(): Promise<any[]> {
+	return await apiGet<any[]>('/studies/search/signature', {}) ?? [];
 }
 
 // ===== Segmentation Creation (specialized) =====
 
-export async function createSegmentation(item: any, np_array?: any) {
+export async function createSegmentation(item: any, np_array?: any): Promise<any> {
 	const formData = new FormData();
 	formData.append('metadata', JSON.stringify(item));
 	
@@ -147,15 +198,13 @@ export async function createSegmentation(item: any, np_array?: any) {
 		formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
 	}
 	
-	const res = await api.POST('/segmentations' as any, {
+	const data = await apiPost<any>('/segmentations' as any, {
 		body: formData
 	} as any);
 	
-	if (res.data) {
-		ingestSegmentations([res.data as any]);
-	}
+	ingestSegmentations([data]);
 	
-	return res.data;
+	return data;
 }
 
 export async function createSegmentationFrom(
@@ -166,7 +215,7 @@ export async function createSegmentationFrom(
 	threshold?: number,
 	sparse_axis?: number,
 	subtask_id?: number
-) {
+): Promise<any> {
 	const instance = image.instance;
 	const scan_indices = image.is3D ? [] : null;
 	let shape = {
@@ -201,14 +250,12 @@ export async function createSegmentationFrom(
 
 // ===== Form Annotations Functions =====
 
-export async function fetchFormAnnotation(id: number) {
-	const res = await api.GET('/form-annotations/{annotation_id}' as any, {
+export async function fetchFormAnnotation(id: number): Promise<any> {
+	const data = await apiGet<any>('/form-annotations/{annotation_id}' as any, {
 		params: { path: { annotation_id: id } } as any
 	});
-	if (res.data) {
-		ingestFormAnnotations([res.data as any]);
-	}
-	return res.data as any;
+	ingestFormAnnotations([data]);
+	return data;
 }
 
 export async function fetchFormAnnotations(filters?: {
@@ -217,11 +264,10 @@ export async function fetchFormAnnotations(filters?: {
 	image_instance_id?: number;
 	form_schema_id?: number;
 	sub_task_id?: number;
-}) {
-	const res = await api.GET('/form-annotations', {
+}): Promise<any[]> {
+	const data = (await apiGet<any[]>('/form-annotations', {
 		params: { query: filters ?? {} }
-	});
-	const data = (res.data ?? []) as any[];
+	}) ?? []) as any[];
 	ingestFormAnnotations(data);
 	return data;
 }
@@ -231,21 +277,20 @@ export async function createFormAnnotation(data: {
 	patient_id: number;
 	study_id?: number;
 	image_instance_id: number;
+	laterality?: 'L' | 'R';
 	sub_task_id?: number;
 	form_data: any;
 	form_annotation_reference_id?: number;
-}) {
-	const res = await api.POST('/form-annotations', {
+}): Promise<any> {
+	const result = await apiPost<any>('/form-annotations', {
 		body: data as any
 	});
-	if (res.data) {
-		ingestFormAnnotations([res.data as any]);
-	}
-	return res.data as any;
+	ingestFormAnnotations([result]);
+	return result;
 }
 
-export async function deleteFormAnnotation(id: number) {
-	await api.DELETE('/form-annotations/{annotation_id}' as any, {
+export async function deleteFormAnnotation(id: number): Promise<void> {
+	await apiDelete('/form-annotations/{annotation_id}' as any, {
 		params: { path: { annotation_id: id } } as any
 	});
 	formAnnotations.delete(id);
@@ -253,29 +298,28 @@ export async function deleteFormAnnotation(id: number) {
 
 // ===== Segmentation Functions =====
 
-export async function fetchSegmentation(id: number) {
-	const res = await api.GET('/segmentations/{segmentation_id}' as any, {
+export async function fetchSegmentation(id: number): Promise<any> {
+	const data = await apiGet<any>('/segmentations/{segmentation_id}' as any, {
 		params: { path: { segmentation_id: id } } as any
 	});
-	if (res.data) {
-		ingestSegmentations([res.data as any]);
-	}
-	return res.data as any;
+	ingestSegmentations([data]);
+	return data;
 }
 
-export async function updateSegmentation(id: number, data: { threshold?: number; reference_segmentation_id?: number | null }) {
-	const res = await api.PATCH('/segmentations/{segmentation_id}' as any, {
+export async function updateSegmentation(
+	id: number, 
+	data: { threshold?: number; reference_segmentation_id?: number | null }
+): Promise<any> {
+	const result = await apiPatch<any>('/segmentations/{segmentation_id}' as any, {
 		params: { path: { segmentation_id: id } } as any,
 		body: data as any
 	});
-	if (res.data) {
-		ingestSegmentations([res.data as any]);
-	}
-	return res.data as any;
+	ingestSegmentations([result]);
+	return result;
 }
 
-export async function deleteSegmentation(id: number) {
-	await api.DELETE('/segmentations/{segmentation_id}' as any, {
+export async function deleteSegmentation(id: number): Promise<void> {
+	await apiDelete('/segmentations/{segmentation_id}' as any, {
 		params: { path: { segmentation_id: id } } as any
 	});
 	segmentations.delete(id);
@@ -283,49 +327,32 @@ export async function deleteSegmentation(id: number) {
 
 // ===== Tag Star/Unstar =====
 
-export async function starTag(tagId: number) {
-	try {
-		await api.POST('/tags/{tag_id}/star' as any, {
-			params: { path: { tag_id: tagId } } as any
-		});
-	} catch {
-		await fetch(`/api/tags/${tagId}/star`, { 
-			method: 'POST', 
-			credentials: 'include' 
-		});
-	}
+export async function starTag(tagId: number): Promise<void> {
+	await apiPost('/tags/{tag_id}/star' as any, {
+		params: { path: { tag_id: tagId } } as any
+	});
 }
 
-export async function unstarTag(tagId: number) {
-	try {
-		await api.DELETE('/tags/{tag_id}/star' as any, {
-			params: { path: { tag_id: tagId } } as any
-		});
-	} catch {
-		await fetch(`/api/tags/${tagId}/star`, { 
-			method: 'DELETE', 
-			credentials: 'include' 
-		});
-	}
+export async function unstarTag(tagId: number): Promise<void> {
+	await apiDelete('/tags/{tag_id}/star' as any, {
+		params: { path: { tag_id: tagId } } as any
+	});
 }
 
 // ===== Task Functions =====
 
-export async function fetchTasks() {
-	const res = await api.GET('/task', {});
-	const data = (res.data ?? []) as TaskGET[];
+export async function fetchTasks(): Promise<TaskGET[]> {
+	const data = (await apiGet<TaskGET[]>('/task', {}) ?? []) as TaskGET[];
 	ingestTasks(data);
 	return data;
 }
 
-export async function fetchTask(id: number) {
-	const res = await api.GET('/task/{task_id}' as any, {
+export async function fetchTask(id: number): Promise<TaskGET> {
+	const task = await apiGet<TaskGET>('/task/{task_id}' as any, {
 		params: { path: { task_id: id } } as any
 	});
-	if (res.data) {
-		ingestTasks([res.data as TaskGET]);
-	}
-	return res.data as TaskGET;
+	ingestTasks([task]);
+	return task;
 }
 
 export async function fetchSubTasks(params: {
@@ -334,8 +361,8 @@ export async function fetchSubTasks(params: {
 	limit?: number;
 	page?: number;
 	subtask_status?: string;
-}) {
-	const res = await api.GET('/task/{task_id}/subtasks' as any, {
+}): Promise<any> {
+	const data = await apiGet<any>('/task/{task_id}/subtasks' as any, {
 		params: {
 			path: { task_id: params.task_id },
 			query: {
@@ -346,7 +373,6 @@ export async function fetchSubTasks(params: {
 			}
 		} as any
 	});
-	const data = res.data as any;
 	if (data.subtasks) {
 		ingestSubTasks(data.subtasks);
 	}
@@ -358,24 +384,44 @@ export async function fetchSubTasks(params: {
 export async function updateSubTask(
     subtask_id: number,
     patch: { task_state?: any; comments?: string | null }
-) {
-    const res = await api.PATCH('/subtasks/{subtaskid}' as any, {
+): Promise<any> {
+    const data = await apiPatch<any>('/subtasks/{subtaskid}' as any, {
         params: { path: { subtaskid: Number(subtask_id) } } as any,
         body: patch as any
     });
-    if (res.data) {
-        ingestSubTasks([res.data as any]);
-    }
-    return res.data as any;
+    ingestSubTasks([data]);
+    return data;
 }
 
-export async function fetchSubTask(subtask_id: number) {
-    const res = await api.GET('/subtasks/{subtaskid}' as any, {
+export async function fetchSubTask(subtask_id: number): Promise<any> {
+    const data = await apiGet<any>('/subtasks/{subtaskid}' as any, {
         params: { path: { subtaskid: Number(subtask_id) } } as any
     });
-    if (res.data) {
-        ingestSubTasks([res.data as any]);
+    ingestSubTasks([data]);
+    return data;
+}
+
+export async function fetchSubTaskByIndex(
+    task_id: number,
+    subtask_index: number,
+    options?: {
+        with_images?: boolean;
+        with_next?: boolean;
     }
-    return res.data as any;
+): Promise<SubTaskWithImagesGET> {
+    const data = await apiGet<SubTaskWithImagesGET>('/task/{task_id}/subtask/{subtask_index}' as any, {
+        params: {
+            path: {
+                task_id: Number(task_id),
+                subtask_index: Number(subtask_index)
+            },
+            query: {
+                with_images: options?.with_images ?? false,
+                with_next: options?.with_next ?? false
+            }
+        } as any
+    });
+    ingestSubTasks([data]);
+    return data;
 }
 

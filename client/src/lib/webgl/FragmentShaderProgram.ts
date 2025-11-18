@@ -1,6 +1,7 @@
 import type { ProgramInfo } from './programInfo';
 import type { RenderTarget } from './types';
 import type { WebGL } from './webgl';
+import { checkFramebufferContext } from './texture';
 
 export abstract class FragmentShaderProgram {
 	constructor(
@@ -55,6 +56,11 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
 
 		const gl = this.gl;
 		const { left, bottom, width, height, framebuffer } = renderTarget;
+
+		if (!checkFramebufferContext(gl, framebuffer, 'BaseTextureShaderProgram.pass')) {
+			console.error('Skipping BaseTextureShaderProgram.pass due to framebuffer context violation');
+			return;
+		}
 
 		gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 		gl.viewport(left, bottom, width, height);
@@ -116,6 +122,11 @@ export class PixelShaderProgram extends FragmentShaderProgram {
 		const gl = this.gl;
 		const { left, bottom, width, height } = renderTarget;
 
+		if (!checkFramebufferContext(gl, renderTarget.framebuffer, 'PixelShaderProgram.pass')) {
+			console.error('Skipping PixelShaderProgram.pass due to framebuffer context violation');
+			return;
+		}
+
 		gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget.framebuffer);
 		gl.viewport(left, bottom, width, height);
 		gl.scissor(left, bottom, width, height);
@@ -123,6 +134,9 @@ export class PixelShaderProgram extends FragmentShaderProgram {
 		if (renderTarget.attachments) {
 			gl.drawBuffers(renderTarget.attachments);
 		}
+
+		// Disable blending for compute-like shaders (not needed and avoids EXT_float_blend requirement)
+		gl.disable(gl.BLEND);
 
 		gl.useProgram(this.programInfo.program);
 		gl.bindVertexArray(this.vertexArrayObject);
@@ -165,6 +179,11 @@ export class AffineShaderProgram extends FragmentShaderProgram {
 
 		const gl = this.gl;
 		const { left, bottom, width, height } = renderTarget;
+
+		if (!checkFramebufferContext(gl, renderTarget.framebuffer, 'AffineShaderProgram.pass')) {
+			console.error('Skipping AffineShaderProgram.pass due to framebuffer context violation');
+			return;
+		}
 
 		gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget.framebuffer);
 		gl.viewport(left, bottom, width, height);

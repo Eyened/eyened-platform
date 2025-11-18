@@ -1,7 +1,8 @@
 import { getSegmentationData, getModelSegmentationData, updateSegmentationData } from "$lib/data/helpers";
 import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type { ModelSegmentationGET, SegmentationGET, SegmentationDataRepresentation } from "../../types/openapi_types";
-import type { SimpleDataRepresentation } from "$lib/datamodel/segmentation.svelte";
+// SimpleDataRepresentation is a subset of SegmentationDataRepresentation
+export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
@@ -24,6 +25,7 @@ export class SegmentationState {
     public readonly mask: Mask;
 
     private isDrawing = Promise.resolve();
+    private hasInitialCheckpoint = false;
 
     constructor(
         readonly image: AbstractImage,
@@ -35,9 +37,15 @@ export class SegmentationState {
         this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
         if (initialData) {
             this.mask.importData(initialData);
-            this.history.checkpoint(this.mask.exportData());
         } else {
             this.isDrawing = this.initialize();
+        }
+    }
+
+    private ensureInitialCheckpoint() {
+        if (!this.hasInitialCheckpoint) {
+            this.history.checkpoint(this.mask.exportData());
+            this.hasInitialCheckpoint = true;
         }
     }
 
@@ -53,17 +61,18 @@ export class SegmentationState {
             npyArray = await getSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
         }
         this.mask.importData(npyArray.data as DrawingArray);
-        this.history.checkpoint(this.mask.exportData());
     }
 
     async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
         await this.isDrawing; // wait for previous drawing to finish
+        this.ensureInitialCheckpoint();
         this.mask.draw(drawing, settings);
         this.isDrawing = this.checkpoint();
     }
 
     async importOther(other: Mask) {
         await this.isDrawing; // wait for previous drawing to finish
+        this.ensureInitialCheckpoint();
 
         const data = other.exportData();
 

@@ -8,9 +8,9 @@
     setContext("taskContext", taskContext);
     const globalContext = getContext<GlobalContext>("globalContext");
 
-    globalContext.updateConfig(taskContext.taskConfig);
+    globalContext.updateConfig(taskContext.task.task_definition.config);
 
     const instanceIDs = taskContext.subTask.images.map(image => image.id);
 </script>
 
-<ViewerWindowLoader instanceIDs={instanceIDs} />
+<ViewerWindowLoader {instanceIDs} />

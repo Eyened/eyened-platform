@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { page } from "$app/state";
 	import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Input from "$lib/components/ui/input";
 	import * as Table from "$lib/components/ui/table";
 	import type {
-		SubTaskGET,
 		SubTaskWithImagesGET,
 	} from "../../types/openapi_types";
 	import { toast } from "svelte-sonner";
@@ -16,7 +14,7 @@
 	} from "$lib/data/helpers";
 
 	type Props = {
-		subtask: SubTaskGET | SubTaskWithImagesGET;
+		subtask: SubTaskWithImagesGET;
 		taskId: number;
 		index: number;
 		start: number;
@@ -62,7 +60,8 @@
 	<Table.Cell>{row.task_state ?? "-"}</Table.Cell>
 	<Table.Cell>
 		<Button
-			href={`${window.location.origin}/tasks/${taskId}/grade/${index + start}`}
+			href={`/tasks/${taskId}/grade/${index + start}`}
+			target="_blank"
 			class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
 		>
 			View

@@ -2,7 +2,6 @@ import { UserManager } from '$lib/usermanager.svelte';
 
 import type { FormAnnotationGET, ModelSegmentationGET, SearchCondition, SegmentationGET, StudySearchCondition } from '../../types/openapi_types';
 import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
-import type { Segmentation } from '../viewer-window/panelSegmentation/segmentationContext.svelte';
 import { fetchFeatures, fetchFormSchemas, fetchTags } from './api';
 
 export type ComponentDef = {
@@ -13,10 +12,6 @@ export type ComponentDef = {
 export class GlobalContext {
 
     public userManager: UserManager;
-    // public tags = new TagsRepo('tags');
-    // public features = new FeaturesRepo('features');
-    // public formSchemas = new FormSchemasRepo('form-schemas');
-
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
     public showUserMenu: boolean = $state(false);
@@ -38,12 +33,26 @@ export class GlobalContext {
     }
 
     async init(pathname: string) {
-        await Promise.all([
-            this.userManager.init(pathname),            
-            fetchTags(),
-            fetchFormSchemas(),
-            fetchFeatures({ with_counts: true })
-        ]);
+        // user must be logged in before fetching any data
+        await this.userManager.init(pathname);
+        
+        // Only fetch data if user is logged in
+        // If user is not logged in, userManager.init will redirect to login
+        if (this.userManager.loggedIn) {
+            try {
+                await Promise.all([
+                    fetchTags(),
+                    fetchFormSchemas(),
+                    fetchFeatures({ with_counts: true })
+                ]);
+            } catch (error) {
+                // Log error but don't throw - let pages handle errors individually
+                // Authentication errors are already handled by fetchWithAuthRetry
+                console.error('Failed to fetch initial data:', error);
+                // If it's an auth error, the redirect has already happened
+                // Otherwise, we'll let individual pages handle the errors
+            }
+        }
     }
 
     get user() {
@@ -63,21 +72,6 @@ export class GlobalContext {
 
     updateConfig(config: any) {
         this.config = { ...this.config, ...config };
-    }
-
-    get segmentationsFilter() {
-        return (a: Segmentation | FormAnnotationGET) => {
-
-            return true
-
-
-
-            // if (a.creator.isHuman) {
-            //     return this.config.showOtherAnnotationsHuman;
-            // } else {
-            //     return this.config.showOtherAnnotationsMachine;
-            // }
-        }
     }
 
     /**
@@ -124,7 +118,7 @@ export class GlobalContext {
     }
 
     private _encodeSingleConditionExtended(
-        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default'|'attribute'; model?: string; feature?: string }
+        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default' | 'attribute'; model?: string; feature?: string }
     ): string {
         const serializeValue = (v: string | number | string[] | null) => JSON.stringify(v);
         const encodedVariable = encodeURIComponent(condition.variable);

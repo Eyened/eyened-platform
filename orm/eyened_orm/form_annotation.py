@@ -1,13 +1,14 @@
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
-
+from enum import Enum
 from pandas import DataFrame, json_normalize
-from sqlalchemy import Column, DateTime, ForeignKey, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, String, func, Enum as SAEnum
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
+from .image_instance import Laterality
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -20,7 +21,13 @@ if TYPE_CHECKING:
         SubTask,
     )
 
-
+class EntityType(Enum):
+    Patient = "Patient"
+    Study = "Study"
+    Eye = "Eye"
+    StudyEye = "StudyEye"
+    ImageInstance = "ImageInstance"
+    
 class FormSchema(Base):
     __tablename__ = "FormSchema"
     _name_column: ClassVar[str] = "SchemaName"
@@ -28,6 +35,7 @@ class FormSchema(Base):
     FormSchemaID: Mapped[int] = mapped_column(primary_key=True)
     SchemaName: Mapped[str] = mapped_column(String(255), unique=True)
     Schema: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    EntityType: Mapped[Optional[EntityType]] = mapped_column(SAEnum(EntityType), default=None)
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="FormSchema")
 
@@ -41,6 +49,8 @@ class FormAnnotation(Base):
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
     ImageInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"))
+    Laterality: Mapped[Optional[Laterality]] = mapped_column(SAEnum(Laterality))
+    
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="SET NULL"))
     FormData: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
@@ -105,9 +115,13 @@ class FormAnnotation(Base):
             "PatientIdentifier": self.Patient.PatientIdentifier,
             "ImageInstance": self.ImageInstanceID,
             "Laterality": (
-                str(self.ImageInstance.Laterality.name)
-                if self.ImageInstance and self.ImageInstance.Laterality
-                else None
+                str(self.Laterality.name)
+                if self.Laterality
+                else (
+                    str(self.ImageInstance.Laterality.name)
+                    if self.ImageInstance and self.ImageInstance.Laterality
+                    else None
+                )
             ),
         }
         return metadata | flatten_json(self.FormData)

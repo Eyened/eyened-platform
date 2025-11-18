@@ -54,6 +54,7 @@
 			patient_id: form.patient_id,
 			study_id: form.study_id ?? undefined,
 			image_instance_id: form.image_instance_id!,
+			laterality: form.laterality ?? undefined,
 			sub_task_id: taskContext?.subTask?.id ?? form.sub_task_id ?? undefined,
 			form_data: form.form_data,
 			form_annotation_reference_id: form.id,
