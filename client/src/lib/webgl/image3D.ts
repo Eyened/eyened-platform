@@ -7,11 +7,15 @@ import { Image2D } from "./image2D";
 import { TextureData } from "./texture";
 import type { Dimensions } from "./types";
 import type { WebGL } from "./webgl";
+import type { ClaheInput } from "$lib/image-processing/CFImageProcessing";
 
 export class Image3D extends AbstractImage {
     is3D = true;
     is2D = false;
     texture: WebGLTexture;
+    
+    // Cache for CLAHE-processed slices
+    private claheSliceCache = new Map<number, TextureData>();
 
     constructor(instance: InstanceGET,
         webgl: WebGL,
@@ -169,9 +173,89 @@ export class Image3D extends AbstractImage {
         return outTex;
     }
 
+    /**
+     * Extract a single slice from the 3D volume as a 2D texture
+     * @param index The slice index (0 to depth-1)
+     * @returns A TextureData containing the extracted slice in RGBA format
+     */
+    extractSlice(index: number): TextureData {
+        const { webgl, width, height, depth } = this;
+        
+        // Clamp index to valid range
+        const clampedIndex = Math.max(0, Math.min(index, depth - 1));
+        
+        // Create output texture for the slice
+        const sliceTexture = new TextureData(webgl.gl, width, height, 'RGBA');
+        
+        // Extract the slice using the shader
+        const uniforms = {
+            u_volume: this.texture,
+            u_image_size: [width, height, depth],
+            u_index: clampedIndex
+        };
+        
+        sliceTexture.passShader(webgl.shaders.extractSlice, uniforms);
+        
+        return sliceTexture;
+    }
+
+    /**
+     * Get CLAHE-processed texture for a specific slice (cached)
+     * @param index The slice index (0 to depth-1)
+     * @returns A TextureData containing the CLAHE-processed slice, or undefined if processing fails
+     */
+    async getClaheSliceTexture(index: number): Promise<TextureData | undefined> {
+        const { depth } = this;
+        const clampedIndex = Math.max(0, Math.min(index, depth - 1));
+        
+        // Check cache first
+        const cached = this.getClaheSliceTextureSync(clampedIndex);
+        if (cached) {
+            return cached;
+        }
+        
+        // Extract the slice
+        const sliceTexture = this.extractSlice(clampedIndex);
+        
+        // Create a ClaheInput wrapper for the slice
+        const claheInput: ClaheInput = {
+            width: this.width,
+            height: this.height,
+            webgl: this.webgl,
+            texture: sliceTexture.texture,
+            instance: this.instance
+        };
+        
+        // Apply CLAHE processing
+        const claheResult = await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
+        
+        // Dispose the intermediate slice texture
+        sliceTexture.dispose();
+        
+        // If CLAHE processing succeeded, cache and return the result
+        if (claheResult) {
+            this.claheSliceCache.set(clampedIndex, claheResult);
+            return claheResult;
+        }
+        
+        return undefined;
+    }
+
+    getClaheSliceTextureSync(index: number): TextureData | undefined {
+        const { depth } = this;
+        const clampedIndex = Math.max(0, Math.min(index, depth - 1));
+        return this.claheSliceCache.get(clampedIndex);
+    }
+
     dispose(): void {
         // Call parent dispose to clean up segmentations
         super.dispose();
+        
+        // Dispose all cached CLAHE slice textures
+        for (const texture of this.claheSliceCache.values()) {
+            texture.dispose();
+        }
+        this.claheSliceCache.clear();
         
         // Dispose 3D texture
         if (this.texture) {

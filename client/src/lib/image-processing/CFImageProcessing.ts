@@ -1,5 +1,6 @@
 import { PixelShaderProgram } from '$lib/webgl/FragmentShaderProgram.js';
 import type { Image2D } from '$lib/webgl/image2D';
+import type { InstanceGET } from '../../types/openapi_types';
 import fs_mirror from './shaders/mirror.frag';
 import fs_blur from './shaders/blur.frag';
 import fs_contrast_enhance from './shaders/contrast_enhance.frag';
@@ -17,6 +18,18 @@ export type ceOptions = {
     contrast?: number;
 }
 type Histogram = { r: Int32Array, g: Int32Array, b: Int32Array };
+
+/**
+ * Interface for inputs to CLAHE processing
+ * Allows both Image2D and slice textures to be processed
+ */
+export interface ClaheInput {
+    width: number;
+    height: number;
+    webgl: WebGL;
+    texture: WebGLTexture;
+    instance: InstanceGET;
+}
 
 type ROI = {
     center: [number, number];
@@ -197,8 +210,8 @@ export class CFImageProcessing {
     }
 
 
-    private async apply_CLAHE(image: Image2D): Promise<TextureData | undefined> {
-        const { width, height, webgl, texture, instance: { cfROI } } = image;
+    async apply_CLAHE(input: ClaheInput): Promise<TextureData | undefined> {
+        const { width, height, webgl, texture, instance: { cfROI } } = input;
 
         // CLAHE tile size
         // adapted to the image size

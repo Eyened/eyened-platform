@@ -6,6 +6,7 @@ import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import fs_renderImage2D from './glsl/fs_render_image2D.frag';
 import fs_renderLuminance from './glsl/fs_render_luminance.frag';
 import fs_renderImage3D from './glsl/fs_render_image3D.frag';
+import type { Image3D } from "./image3D";
 
 export interface ImageRenderer {
     renderImage(viewerContext: ViewerContext, renderTarget: RenderTarget): void;
@@ -28,12 +29,29 @@ export class BaseImageRenderer implements ImageRenderer {
         const { image } = viewerContext;
 
         const uniforms = getBaseUniforms(viewerContext);
-        // console.log(uniforms);
+        const { renderMode } = viewerContext;
+
         if (image.is3D) {
-            this.shader3D.pass(renderTarget, uniforms);
+            if (renderMode == 'CLAHE') {
+                const img3d = image as Image3D;
+                // initiate the CLAHE processing (async)
+                img3d.getClaheSliceTexture(viewerContext.index);
+                // check if the CLAHE processing is complete (sync)
+                const claheTexture = img3d.getClaheSliceTextureSync(viewerContext.index);
+                // use the CLAHE texture
+                if (claheTexture) {
+                    uniforms.u_image = claheTexture?.texture;
+                    this.shaderBase.pass(renderTarget, uniforms);
+                } else {
+                    this.shader3D.pass(renderTarget, uniforms);
+                }
+            } else {
+                this.shader3D.pass(renderTarget, uniforms);
+            }
+
             return;
         }
-        const { renderMode } = viewerContext;
+
 
         // image stores different textures for different render modes
         uniforms.u_image = (image as Image2D).selectTexture(renderMode);
