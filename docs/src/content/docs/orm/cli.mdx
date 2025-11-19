@@ -48,6 +48,37 @@ Updates thumbnails for all images in the database. This is useful when the thumb
 eorm update-thumbnails [OPTIONS]
 ```
 
+**Options:**
+- `-e, --env PATH`: Path to `.env` file for environment configuration (see [Configuration](/eyened-platform/orm/configuration))
+- `--failed`: Include images with failed thumbnails (empty `ThumbnailPath`) in addition to images with no thumbnails (NULL `ThumbnailPath`)
+
+**Usage:**
+
+By default, the command processes images where `ThumbnailPath` is NULL:
+
+```bash
+eorm update-thumbnails --env production.env
+```
+
+To also regenerate thumbnails for images where generation previously failed:
+
+```bash
+eorm update-thumbnails --failed --env production.env
+```
+
+**Updating thumbnail generation code:**
+
+If you need to modify the thumbnail generation logic (e.g., to support new image types or change generation behavior):
+
+1. Update the thumbnail generation code in [`orm/eyened_orm/importer/thumbnails.py`](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/thumbnails.py)
+2. Test your changes using the [test notebook](https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/test_thumbnail_generator.ipynb)
+3. For images that need regeneration, set their `ThumbnailPath` to NULL in the database
+4. Run the update command with the `--failed` flag to regenerate all thumbnails:
+
+```bash
+eorm update-thumbnails --failed --env production.env
+```
+
 ### run-models
 
 Runs inference models on the database. This command processes images with the configured AI models.
@@ -86,6 +117,39 @@ Updates FileChecksum and DataHash for all ImageInstances in the database where t
 
 ```bash
 eorm update-hashes [OPTIONS]
+```
+
+### run-registration
+
+Runs registration processing for images in the database. This command processes images to perform registration operations, which can be filtered by patient identifier, project ID, form schema, or creator.
+
+```bash
+eorm run-registration [OPTIONS]
+```
+
+**Options:**
+- `-e, --env PATH`: Path to `.env` file for environment configuration (see [Configuration](/eyened-platform/orm/configuration))
+- `--patient PATIENT`: Patient identifier to run registration for (optional)
+- `--project PROJECT_ID`: Project ID to run registration for (optional)
+- `--schema SCHEMA_NAME`: SchemaName to run registration for (default: "RegistrationSet")
+- `--creator CREATOR_NAME`: CreatorName to run registration for (default: "registration model")
+- `--replace`: Replace existing registration if it already exists
+
+**Usage:**
+
+To run registration for a specific patient:
+```bash
+eorm run-registration --env production.env --patient Patient_001
+```
+
+To run registration for all patients in a project:
+```bash
+eorm run-registration --env production.env --project 1
+```
+
+To run registration with custom schema and creator:
+```bash
+eorm run-registration --env production.env --schema "CustomRegistration" --creator "My Registration Model"
 ```
 
 

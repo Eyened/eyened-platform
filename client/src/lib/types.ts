@@ -1,5 +1,3 @@
-import type { SubTask } from './datamodel/subTask.svelte';
-import type { Task } from './datamodel/task.svelte';
 import type { Color } from './utils';
 
 export type int = number;
@@ -19,13 +17,6 @@ export type Keypoints = {
     disc_edge_xy: [number, number],
     prep_fovea_xy: [number, number],
     prep_disc_edge_xy: [number, number]
-}
-
-export interface TaskContext {
-    task: Task;
-    subTask: SubTask;
-    subTaskIndex: number;
-    taskConfig: any;
 }
 
 export interface Position2D {

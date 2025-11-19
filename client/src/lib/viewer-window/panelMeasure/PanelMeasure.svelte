@@ -4,10 +4,10 @@
 	import { getContext, onDestroy } from 'svelte';
 	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import MeasureAreas from './MeasureAreas.svelte';
-	import { data } from '$lib/datamodel/model';
+	import { formAnnotations, formSchemasByName } from '$lib/data';
 	import Line from './Line.svelte';
-	import type { FormAnnotation } from '$lib/datamodel/formAnnotation.svelte';
 	import SetResolutionEtdrs from './SetResolutionETDRS.svelte';
+	
 	interface props {
 		active: boolean;
 	}
@@ -30,29 +30,28 @@
 
 	// filter any annotation that can be linked to this image using the registration
 	const { registration } = getContext<ViewerWindowContext>('viewerWindowContext');
-	const { formAnnotations, formSchemas } = data;
 
-	// TODO: code duplicated from PanelETDRS.svelte (refactor?)
-	const etdrsSchema = formSchemas.find((schema) => schema.name === 'ETDRS-grid coordinates')!;
+	const etdrsSchema = formSchemasByName.get('ETDRS-grid coordinates')!;
 
-	const filter = (formAnnotation: FormAnnotation) => {
-		if (formAnnotation.formSchema !== etdrsSchema) return false;
-		if (formAnnotation.instance == image.instance) return true;
-		// TODO: this should be reactive?
-		const linkedIDs = registration.getLinkedImgIds(image.image_id);
-		if (linkedIDs.has(`${formAnnotation.instance?.id}`)) return true;
-		if (linkedIDs.has(`${formAnnotation.instance?.id}_proj`)) return true;
-		return false;
-	};
-	const filtered = formAnnotations.filter(filter);
+	const filtered = $derived(
+		formAnnotations.filter(formAnnotation => {
+			if (formAnnotation.form_schema_id !== etdrsSchema?.id) return false;
+			if (formAnnotation.image_instance_id == image.instance.id) return true;
+			// TODO: this should be reactive?
+			const linkedIDs = registration.getLinkedImgIds(image.image_id);
+			if (linkedIDs.has(`${formAnnotation.image_instance_id}`)) return true;
+			if (linkedIDs.has(`${formAnnotation.image_instance_id}_proj`)) return true;
+			return false;
+		})
+	);
 
 	let fraction = $state(0.85);
 
-	const cfKeypoints = image.instance.cfKeypoints;
+	const cfKeypoints = image.instance.cf_keypoints;
 	const autoValue = cfKeypoints
 		? {
-				fovea: { x: cfKeypoints.fovea_xy[0], y: cfKeypoints.fovea_xy[1] },
-				disc_edge: { x: cfKeypoints.disc_edge_xy[0], y: cfKeypoints.disc_edge_xy[1] }
+				fovea: { x: (cfKeypoints.fovea_xy as any)?.[0], y: (cfKeypoints.fovea_xy as any)?.[1] },
+				disc_edge: { x: (cfKeypoints.disc_edge_xy as any)?.[0], y: (cfKeypoints.disc_edge_xy as any)?.[1] }
 			}
 		: null;
 
@@ -112,9 +111,10 @@
 					<SetResolutionEtdrs value={autoValue} {measureTool} name="automatic" {fraction} />
 				{/if}
 
-				{#each $filtered as formAnnotation (formAnnotation.id)}
+				{#each filtered as formAnnotation (formAnnotation.id)}
+					<!-- @ts-expect-error - form_data type is generic -->
 					<SetResolutionEtdrs
-						value={formAnnotation.value}
+						value={formAnnotation.form_data}
 						{measureTool}
 						name={`[${formAnnotation.id}]`}
 						{fraction}

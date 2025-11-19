@@ -1,0 +1,70 @@
+---
+title: Features API
+description: API endpoints for managing anatomical features and their hierarchical relationships
+---
+
+The Features API provides endpoints for creating, reading, updating, and deleting anatomical features used in segmentation tasks. Features support hierarchical parent-child relationships through composite feature links.
+
+## API Endpoints
+
+### POST /features
+- Creates a new feature with optional subfeature relationships
+- Accepts feature name and list of subfeature IDs
+- Automatically creates parent-child links with indexed ordering
+- Returns the created feature with populated subfeature names
+
+### GET /features/\{feature_id\}
+- Retrieves a single feature by ID
+- Returns feature details including subfeature list
+- Returns 404 if feature not found
+
+### PATCH /features/\{feature_id\}
+- Partially updates an existing feature
+- Supports updating feature name and/or subfeature relationships
+- Replaces entire subfeature list when provided (not additive)
+- Returns updated feature with current state
+
+### DELETE /features/\{feature_id\}
+- Deletes a feature with comprehensive safety checks
+- Returns 409 with `FEATURE_HAS_SEGMENTATIONS` if feature has linked segmentations
+- Returns 409 with `FEATURE_IS_CHILD` if feature is referenced as a child by other features
+- Allows deletion of parent features - automatically removes parent-child links while preserving child features
+- Returns 204 on successful deletion
+
+## Design Choices
+
+### Hierarchical Relationships
+- Features support parent-child relationships through `FeatureFeatureLink` table
+- Parent features can have multiple children with indexed ordering
+- Child features can belong to multiple parents
+- Relationships are managed through `subfeature_ids` array in requests
+
+### Safe Deletion Strategy
+- Database-level foreign key constraints prevent unsafe deletions
+- API-level checks provide user-friendly error messages with context
+- Segmentation references block feature deletion (RESTRICT behavior)
+- Child feature references block deletion with parent feature names
+- Parent feature deletion cascades to remove links but preserves child features
+- No database migrations required - uses ORM cascades and API validation
+
+### Data Transfer Objects
+- `FeaturePUT`: Contains name and optional subfeature_ids for creation
+- `FeaturePATCH`: Same structure as PUT for partial updates
+- `FeatureGET`: Returns id, name, subfeatures list, subfeature_ids array, and date_inserted
+- Subfeatures returned as both string names (subfeatures) and IDs (subfeature_ids) for frontend convenience
+
+### Subfeature Management
+- `set_subfeatures()` helper function manages parent-child link replacement
+- Removes all existing links for a parent before creating new ones
+- Maintains feature index ordering for consistent subfeature sequences
+- Used by both POST and PATCH endpoints for consistent behavior
+
+### Error Handling
+- 404 for non-existent features
+- 409 for business rule violations with structured error details
+- Error responses include machine-readable codes and human-friendly messages
+- Deletion errors provide specific counts and related entity names
+
+### Authentication
+- All endpoints require authenticated user via `get_current_user` dependency
+- User context available for potential audit logging or access control

@@ -1,30 +1,30 @@
 <script lang="ts">
-    import type { TaskContext } from "$lib/types";
-    import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
-    import Viewer from "$lib/viewer/Viewer.svelte";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext, onDestroy, setContext, type Component } from "svelte";
-    import MainIcon from "./icons/MainIcon.svelte";
-    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
-    import PanelForm from "./panelForm/PanelForm.svelte";
-    import PanelHeader from "./PanelHeader.svelte";
-    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
-    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
-    import PanelRendering from "./panelRendering/PanelRendering.svelte";
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
+        import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
+        import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
+        import Viewer from "$lib/viewer/Viewer.svelte";
+        import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+        import type { AbstractImage } from "$lib/webgl/abstractImage";
+        import { getContext, onDestroy, setContext, type Component } from "svelte";
+        import MainIcon from "./icons/MainIcon.svelte";
+        import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
+        import PanelForm from "./panelForm/PanelForm.svelte";
+        import PanelHeader from "./PanelHeader.svelte";
+        import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
+        import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
+        import PanelRendering from "./panelRendering/PanelRendering.svelte";
+        import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { data } from "$lib/datamodel/model";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { formSchemas } from '$lib/data/stores.svelte';
+    import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import {
-        Close,
-        Draw,
-        ETDRS,
-        Form,
-        Info,
-        Registration,
-        Rendering,
+    	Close,
+    	Draw,
+    	ETDRS,
+    	Form,
+    	Info,
+    	Registration,
+    	Rendering,
     } from "./icons/icons";
     import Measure from "./icons/Measure.svelte";
     import PanelInfo from "./panelInfo/panelInfo.svelte";
@@ -39,19 +39,17 @@
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
-    const { registration } = viewerWindowContext;
     const closePanel = getContext<() => {}>("closePanel");
 
-    const viewerContext = new ViewerContext(image, registration);
+    const viewerContext = new ViewerContext(image, viewerWindowContext);
     setContext("viewerContext", viewerContext);
 
-    const globalContext = getContext<GlobalContext>("globalContext");
-    const segmentationOverlay = new SegmentationOverlay(viewerContext, globalContext);
-    setContext("segmentationOverlay", segmentationOverlay);    
-    onDestroy(viewerContext.addOverlay(segmentationOverlay));
+    const mainViewerContext = new MainViewerContext(viewerContext.instance.id, viewerContext.axis, viewerWindowContext, viewerContext.image);
+    setContext("mainViewerContext", mainViewerContext);    
+    onDestroy(viewerContext.addOverlay(mainViewerContext));
 
     const { activePanels } = viewerContext;
-    activePanels.add("Segmentation");
+    // activePanels.add("Segmentation");
 
     const topViewer = viewerWindowContext.topViewers.get(image)!;
 
@@ -83,7 +81,6 @@
 
     let minimize = $state(viewerWindowContext.mainPanels.length > 1);
 
-    const { formSchemas } = data;
     const etdrsSchema = formSchemas.find(
         (schema) => schema.name === "ETDRS-grid coordinates",
     )!;
@@ -135,6 +132,7 @@
             Icon: Draw,
         },
     );
+    
 </script>
 
 

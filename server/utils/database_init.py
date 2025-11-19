@@ -8,7 +8,7 @@ from eyened_orm import (
 )
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from sqlmodel import create_engine
+from sqlalchemy import create_engine
 
 from ..config import settings
 from ..routes.auth import create_user
@@ -36,7 +36,7 @@ def create_database():
     
     # Now create tables using the correct database
     print(settings)
-    database = Database(EyenedORMConfig(database=settings.database))
+    database = Database(settings)
     
     Base.metadata.create_all(database.engine)
 
@@ -71,19 +71,3 @@ def init_admin(session: Session) -> None:
     except Exception as e:
         raise RuntimeError(f"Failed to create admin user: {str(e)}")
    
-
-def init_task_states(session: Session):
-    expected_states = [
-        "Not started",
-        "Busy",
-        "Ready",
-    ]
-
-    task_states = TaskState.fetch_all(session)
-    for name in expected_states:
-        if name not in [t.TaskStateName for t in task_states]:
-            task_state = TaskState(TaskStateName=name)
-            print(f"Adding task state: {task_state}")
-            session.add(task_state)
-
-    session.commit()

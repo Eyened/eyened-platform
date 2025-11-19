@@ -296,7 +296,7 @@ class Importer:
          - is absolute and within the images_basepath directory
          - is relative and exists within the images_basepath directory
         """
-        basepath = Path(self.config.images_basepath)
+        basepath = self.config.images_basepath
 
         path_or_url = image_data.get("image")
         if path_or_url.startswith("http"):

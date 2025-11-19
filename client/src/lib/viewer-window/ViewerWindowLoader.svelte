@@ -4,18 +4,14 @@ Used to create the viewerwindow context.
 
 -->
 <script lang="ts">
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { Registration } from "$lib/registration/registration";
     import { Deferred } from "$lib/utils";
     import { WebGL } from "$lib/webgl/webgl";
-    import { onMount } from "svelte";
+    import { getContext, onMount } from "svelte";
     import BrowserOverlay from "./BrowserOverlay.svelte";
     import ViewerWindow from "./ViewerWindow.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
-    import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import { data } from "$lib/datamodel/model";
-    import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
-    import { getContext } from "svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
     interface Props {
         instanceIDs: number[];
@@ -31,17 +27,51 @@ Used to create the viewerwindow context.
         }
     }
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
 
-    const { promise, resolve } = new Deferred<ViewerWindowContext>();
+    const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();
+    let viewerWindowContext: ViewerWindowContext | null = null;
+    let webgl: WebGL | null = null;
+    let addedDarkClass = false;
+
+    function handleContextLost(event: Event) {
+        event.preventDefault();
+        console.error("[WebGL] Context lost - stopping rendering and cleaning up");
+        
+        if (viewerWindowContext) {
+            viewerWindowContext.destroy();
+            viewerWindowContext = null;
+        }
+        
+        // Reject the promise so the error UI is shown
+        reject(new Error("WebGL context was lost. Please reload the page."));
+    }
+
+    function handleContextRestored(event: Event) {
+        console.warn("[WebGL] Context restored - this should not happen during normal navigation");
+        console.warn("[WebGL] If you see this during navigation, it may indicate a context leak");
+        
+        // Context restoration is complex - for now, we'll just log it
+        // In a production app, you might want to attempt to rebuild the viewer
+    }
 
     onMount(() => {
+        
         window.addEventListener("resize", resizeCanvas);
         resizeCanvas();
 
-        const webgl = new WebGL(mainCanvas);
+        if (!document.documentElement.classList.contains('dark')) {
+            document.documentElement.classList.add('dark');
+            addedDarkClass = true;
+        }
+
+        // Add WebGL context event listeners
+        mainCanvas.addEventListener("webglcontextlost", handleContextLost);
+        mainCanvas.addEventListener("webglcontextrestored", handleContextRestored);
+
+        webgl = new WebGL(mainCanvas);
         const registration = new Registration();
-        const viewerWindowContext = new ViewerWindowContext(
+        viewerWindowContext = new ViewerWindowContext(
             webgl,
             registration,
             creator,
@@ -52,35 +82,38 @@ Used to create the viewerwindow context.
 
         return () => {
             window.removeEventListener("resize", resizeCanvas);
-            viewerWindowContext.destroy();
+            mainCanvas.removeEventListener("webglcontextlost", handleContextLost);
+            mainCanvas.removeEventListener("webglcontextrestored", handleContextRestored);
+
+            if (addedDarkClass) {
+                document.documentElement.classList.remove('dark');
+                addedDarkClass = false;
+            }
+            
+            if (viewerWindowContext) {
+                viewerWindowContext.destroy();
+                viewerWindowContext = null;
+            }
+            
+            // Optionally force context loss to ensure cleanup
+            try {
+                const ext = webgl?.gl.getExtension('WEBGL_lose_context');
+                if (ext) {
+                    ext.loseContext();
+                }
+            } catch (error) {
+                console.warn("Could not force context loss:", error);
+            }
+            
+            webgl = null;
         };
     });
+</script>   
 
-    const filter = (formAnnotation: FormAnnotation) => {
-        if (formAnnotation.formSchema.name === "Pointset registration")
-            return true;
-        if (formAnnotation.formSchema.name === "Affine registration")
-            return true;
-        if (formAnnotation.formSchema.name === "RegistrationSet") return true;
-        return false;
-    };
-
-    const filteredFormAnnotations = data.formAnnotations.filter(filter);
-</script>
-
-<canvas bind:this={mainCanvas} class="editor"></canvas>
+<canvas bind:this={mainCanvas} class="editor" id="mainCanvas"></canvas>
 
 {#await promise then viewerWindowContext}
-    {#each $filteredFormAnnotations as formAnnotation (formAnnotation.id)}
-        {#await formAnnotation.load() then _}
-            <RegistrationItemLoader {formAnnotation} registration={viewerWindowContext.registration} />
-        {/await}
-    {/each}
-
     <ViewerWindow {viewerWindowContext} />
-    {#if viewerWindowContext.browserOverlay}
-        <BrowserOverlay {viewerWindowContext} />
-    {/if}
 {:catch error}
     <div class="error">Failed to initialize viewer: {error.message}</div>
 {/await}

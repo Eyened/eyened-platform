@@ -10,17 +10,17 @@
 
     const instanceProperties = {
         "Patient ID": instance.patient.identifier,
-        Date: instance.study.date.toISOString().slice(0, 10),
+        Date: instance.study.date.split('T')[0],
         Laterality: instance.laterality,
         Camera: instance.device?.model,
         "Scan mode": instance.scan?.mode,
-        "ETDRS Field": instance.etdrsField,
+        "ETDRS Field": instance.etdrs_field,
     };
     const context = {
         instance,
         study: instance.study,
         patient: instance.patient,
-        project: instance.patient.project,
+        project: instance.project,
     };
     const { additional_data_sources } = extensions.viewer.panel_info;
 </script>

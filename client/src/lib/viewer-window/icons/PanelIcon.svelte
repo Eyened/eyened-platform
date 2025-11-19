@@ -8,7 +8,7 @@
         isText?: boolean;
         children?: Snippet;
         Icon?: Component;
-        onclick?: () => void;
+        onclick?: (e: MouseEvent) => void;
         onrightclick?: () => void;
         color?: string;
         backgroundColor?: string;
@@ -25,7 +25,7 @@
         isText = false,
         children,
         Icon = undefined,
-        onclick = () => {},
+        onclick = (e: MouseEvent) => {},
         onrightclick = () => {},
         color,
         backgroundColor,
@@ -62,9 +62,10 @@
             () => (tooltiptextElem.style.right = "auto"),
         );
     });
-    function click() {
+    function click(e: MouseEvent) {
         if (disabled) return;
-        onclick();
+        e.stopPropagation();
+        onclick(e);
     }
     function rightclick(e: MouseEvent) {
         e.preventDefault();
@@ -118,7 +119,7 @@
         --icon-active-color: rgba(255, 255, 255, 1);
         --icon-disabled-color: rgba(255, 255, 255, 0.1);
         --icon-hover-bg: rgba(255, 255, 255, 0.1);
-        --icon-active-bg: rgba(155, 255, 255, 0.4);
+        --icon-active-bg: rgba(155, 255, 255, 0.5);
         --tooltip-bg: #555;
         --tooltip-color: #fff;
     }
@@ -128,7 +129,7 @@
         align-items: center;
         cursor: pointer;
         color: var(--icon-color);
-        margin: 0.2em;
+        margin: 0em;
         padding: 0.2em;
         border-radius: 50%;
         transition: all 0.3s ease;

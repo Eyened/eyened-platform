@@ -1,11 +1,11 @@
 <script lang="ts">
-	import Viewer from '$lib/viewer/Viewer.svelte';
-	import { getContext, setContext } from 'svelte';
-	import type { ViewerWindowContext } from './viewerWindowContext.svelte';
-	import type { AbstractImage } from '$lib/webgl/abstractImage';
-	import MainIcon from './icons/MainIcon.svelte';
-	import { OCTLinesOverlay } from '$lib/viewer/overlays/OCTLinesOverlays';
-	import Lines from './icons/Lines.svelte';
+	import Viewer from "$lib/viewer/Viewer.svelte";
+	import { getContext, setContext } from "svelte";
+	import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
+	import type { AbstractImage } from "$lib/webgl/abstractImage";
+	import MainIcon from "./icons/MainIcon.svelte";
+	import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
+	import Lines from "./icons/Lines.svelte";
 
 	interface Props {
 		image: AbstractImage;
@@ -13,23 +13,31 @@
 
 	let { image }: Props = $props();
 
-	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
+	const viewerWindowContext = getContext<ViewerWindowContext>(
+		"viewerWindowContext",
+	);
 
 	const viewerContext = viewerWindowContext.topViewers.get(image)!;
-	setContext('viewerContext', viewerContext);
+	setContext("viewerContext", viewerContext);
 
 	// const registration = viewerContext.registration;
 	// let linkedImages = $derived(registration.getLinkedImgIds(image.image_id));
 
-	let photoLocators = $derived(viewerWindowContext.photoLocators.get(image.image_id)!);
-	let hasLocators = $derived(image.is2D && photoLocators && photoLocators.length);
+	let photoLocators = $derived(
+		viewerWindowContext.photoLocators.get(image.image_id)!,
+	);
+	let hasLocators = $derived(
+		image.is2D && photoLocators && photoLocators.length,
+	);
 	let removeOverlay = () => {};
 	let hideOverlay = $state(false);
 
 	$effect(() => {
 		removeOverlay();
 		if (hasLocators && !hideOverlay) {
-			removeOverlay = viewerContext.addOverlay(new OCTLinesOverlay(photoLocators));
+			removeOverlay = viewerContext.addOverlay(
+				new OCTLinesOverlay(photoLocators),
+			);
 		} else {
 			removeOverlay();
 		}
@@ -57,11 +65,11 @@
 		<div class="header overlay">
 			<div class="content outer">
 				<div class="content">
-					<MainIcon onclick={toggleOverlay} active={!hideOverlay}>
-						{#snippet icon()}
-							<Lines />
-						{/snippet}
-					</MainIcon>
+					<MainIcon
+						onclick={toggleOverlay}
+						active={!hideOverlay}
+						Icon={Lines}
+					/>
 				</div>
 			</div>
 		</div>

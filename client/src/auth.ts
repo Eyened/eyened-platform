@@ -1,7 +1,10 @@
+import { fetchApi } from '$lib/api/client';
+
 export interface UserResponse {
     id: number;
     username: string;
     role: string | null;
+    starred_tags: number[];
 }
 
 interface UserLogin {
@@ -22,18 +25,10 @@ class AuthClient {
         this.baseUrl = baseUrl;
     }
 
-    async getProfile(): Promise<UserResponse | null> {
-        const response = await fetch(`${this.baseUrl}/me`, {
-            method: 'GET',
-            credentials: 'include'
-        });
+    async me(): Promise<UserResponse | null> {
+        const response = await fetchApi(`${this.baseUrl}/me`);
         if (response.status === 401) {
-            // Try to refresh the token
-            try {
-                return await this.refresh();
-            } catch {
-                return null;
-            }
+            return null;
         }
         if (!response.ok) {
             throw new Error('Failed to get profile');
@@ -43,12 +38,12 @@ class AuthClient {
     }
 
     async login(username: string, password: string, rememberMe: boolean = false): Promise<UserResponse> {
-        const response = await fetch(`${this.baseUrl}/login`, {
+        const response = await fetchApi(`${this.baseUrl}/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            credentials: 'include',
+            skipAuthRetry: true,
             body: JSON.stringify({
                 username,
                 password,
@@ -64,9 +59,9 @@ class AuthClient {
     }
 
     async logout(): Promise<void> {
-        const response = await fetch(`${this.baseUrl}/logout`, {
+        const response = await fetchApi(`${this.baseUrl}/logout`, {
             method: 'POST',
-            credentials: 'include'
+            skipAuthRetry: true
         });
 
         if (!response.ok) {
@@ -75,12 +70,12 @@ class AuthClient {
     }
 
     async changePassword(oldPassword: string, newPassword: string): Promise<UserResponse> {
-        const response = await fetch(`${this.baseUrl}/change-password`, {
+        const response = await fetchApi(`${this.baseUrl}/change-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            credentials: 'include',
+            skipAuthRetry: true,
             body: JSON.stringify({
                 old_password: oldPassword,
                 new_password: newPassword
@@ -95,12 +90,12 @@ class AuthClient {
     }
 
     async register(username: string, password: string): Promise<UserResponse> {
-        const response = await fetch(`${this.baseUrl}/register`, {
+        const response = await fetchApi(`${this.baseUrl}/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            credentials: 'include',
+            skipAuthRetry: true,
             body: JSON.stringify({
                 username,
                 password,
@@ -116,9 +111,9 @@ class AuthClient {
     }
 
     async refresh(): Promise<UserResponse> {
-        const response = await fetch(`${this.baseUrl}/refresh`, {
+        const response = await fetchApi(`${this.baseUrl}/refresh`, {
             method: 'POST',
-            credentials: 'include'
+            skipAuthRetry: true
         });
 
         if (!response.ok) {

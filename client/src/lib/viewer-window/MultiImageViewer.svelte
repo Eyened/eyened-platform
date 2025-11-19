@@ -1,34 +1,32 @@
 <script lang="ts">
+	import { instances } from '$lib/data';
 	import Viewer from '$lib/viewer/Viewer.svelte';
-	import { getContext, setContext } from 'svelte';
-	import { ViewerWindowContext } from './viewerWindowContext.svelte';
 	import { ViewerContext } from '$lib/viewer/viewerContext.svelte';
 	import { AbstractImage } from '$lib/webgl/abstractImage';
-	import { Registration } from '$lib/registration/registration';
-	import { MultiImageRenderer } from '$lib/webgl/multiImageRenderer';
-	import type { ImageRenderer } from '$lib/webgl/imageRenderer';
-	import { data } from '$lib/datamodel/model';
 	import { Image2D } from '$lib/webgl/image2D';
+	import type { ImageRenderer } from '$lib/webgl/imageRenderer';
+	import { MultiImageRenderer } from '$lib/webgl/multiImageRenderer';
+	import { getContext, setContext } from 'svelte';
+	import { ViewerWindowContext } from './viewerWindowContext.svelte';
 
 	const viewerWindowContext = getContext<ViewerWindowContext>('viewerWindowContext');
-	const { registration } = viewerWindowContext;
 	interface Props {
 		image: Image2D;
 	}
 
 	let { image }: Props = $props();
-	const { instances } = data;
-	const renderer = new MultiImageRenderer(image, registration);
+	// instances is already imported from $lib/data
+	const renderer = new MultiImageRenderer(image, viewerWindowContext.registration);
 	class MultiViewerContext extends ViewerContext {
-		constructor(image: AbstractImage, registration: Registration) {
-			super(image, registration);
+		constructor(image: AbstractImage, viewerWindowContext: ViewerWindowContext) {
+			super(image, viewerWindowContext);
 		}
 		getImageRenderer(): ImageRenderer {
 			return renderer;
 		}
 	}
 
-	const viewerContext = new MultiViewerContext(image, registration);
+	const viewerContext = new MultiViewerContext(image, viewerWindowContext);
 	setContext('viewerContext', viewerContext);
 
 	const CFInstances = instances.filter((i) => i.modality === 'ColorFundus');

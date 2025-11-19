@@ -1,84 +1,146 @@
 <script lang="ts">
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
-    import { data } from "$lib/datamodel/model";
-    import { ViewerWindowContext } from "../viewerWindowContext.svelte";
-    import { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-    import type { TaskContext } from "$lib/types";
-    import RegistrationItem from "./RegistrationItem.svelte";
-    import type { FormSchema } from "$lib/datamodel/formSchema.svelte";
+	import {
+		createFormAnnotation,
+		deleteFormAnnotation,
+		formAnnotations,
+		instances,
+	} from "$lib/data";
+	import type { GlobalContext } from "$lib/data/globalContext.svelte";
+	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+	import { RegistrationTool } from "$lib/viewer/tools/Registration";
+	import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+	import { getContext } from "svelte";
+	import type { FormSchemaGET } from "../../../types/openapi_types";
+	import RegistrationItem from "./RegistrationItem.svelte";
+	import { Button } from "$lib/components/ui/button";
 
-    interface props {
-        active: boolean;
-        registrationSchema: FormSchema;
-    }
-    const { active, registrationSchema }: props = $props();
+	const viewerContext = getContext<ViewerContext>("viewerContext");
+	const taskContext = getContext<TaskContext>("taskContext");
+	const globalContext = getContext<GlobalContext>("globalContext");
 
-    const viewerContext = getContext<ViewerContext>("viewerContext");
-    const taskContext = getContext<TaskContext>("taskContext");
+	interface props {
+		active: boolean;
+		registrationSchema: FormSchemaGET;
+	}
+	const { active: panelActive, registrationSchema }: props = $props();
 
-    const { creator } = getContext<ViewerWindowContext>("viewerWindowContext");
-    const {
-        image: { instance },
-    } = viewerContext;
+	const {
+		image: { instance },
+	} = viewerContext;
 
-    const { formAnnotations } = data;
+	//filter all registrations for the same eye
+	const filtered = $derived(
+		formAnnotations
+			.filter((formAnnotation) => {
+				if (formAnnotation.form_schema_id !== registrationSchema.id)
+					return false;
+				if (formAnnotation.patient_id !== instance.patient.id) return false;
+				// Check laterality - look up full instance if needed
+				const formInstance = formAnnotation.image_instance_id
+					? instances.get(formAnnotation.image_instance_id)
+					: null;
+				if (formInstance && formInstance.laterality !== instance.laterality) {
+					return false;
+				}
+				return true;
+			})
+			.sort((a, b) => a.id - b.id),
+	);
 
-    //filter all registrations for the same eye
-    const filter = (formAnnotation: FormAnnotation) => {
-        if (formAnnotation.formSchema !== registrationSchema) return false;
-        if (formAnnotation.patient !== instance.patient) return false;
-        if (formAnnotation.instance?.laterality !== instance.laterality)
-            return false;
-        return true;
-    };
-    const filtered = formAnnotations.filter(filter);
+	async function create() {
+		const formAnnotation = await createFormAnnotation({
+			form_schema_id: registrationSchema.id,
+			patient_id: instance.patient.id,
+			study_id: instance.study?.id ?? undefined,
+			image_instance_id: instance.id,
+			laterality: instance.laterality ?? undefined,
+			sub_task_id: taskContext?.subTask?.id,
+			form_data: {},
+		});
+        onactivate(formAnnotation);
+	}
 
-    async function create() {
-        await FormAnnotation.createFrom(
-            creator,
-            instance,
-            registrationSchema,
-            taskContext?.subTask,
-        );
-    }
+	let activeID: number | undefined = $state(undefined);
+	let removeTool: (() => void) | undefined = $state(undefined);
 
-    let activeID: number | undefined = $state(undefined);
-    
+	function onactivate(formAnnotation: any) {
+		// Check if this annotation still exists in the filtered list
+		const stillExists = filtered.some(f => f.id === formAnnotation.id);
+		if (!stillExists) {
+			console.log("Annotation no longer exists, ignoring onactivate");
+			return;
+		}
+
+		if (activeID === formAnnotation.id) {
+			// deactivate current
+			removeTool?.();
+			removeTool = undefined;
+			activeID = undefined;
+			return;
+		}
+		
+		const canEdit = globalContext.canEdit(formAnnotation);
+		const tool = new RegistrationTool(
+			formAnnotation,
+			viewerContext.image.instance,
+			canEdit,
+		);
+		activeID = formAnnotation.id;
+        // switch to new one
+		removeTool?.();     
+		removeTool = viewerContext.addOverlay(tool);
+	}
+
+	function onremove(formAnnotation: any) {
+		if (activeID === formAnnotation.id) {
+			removeTool?.();
+			removeTool = undefined;
+			activeID = undefined;
+		}
+		deleteFormAnnotation(formAnnotation.id);
+	}
+	$effect(() => {
+		if (!panelActive) {
+			activeID = undefined;
+			removeTool?.();
+			removeTool = undefined;
+		}
+	});
 </script>
 
 <div class="main">
-    <div class="available">
-        <ul>
-            {#each $filtered.sort((a, b) => a.id - b.id) as formAnnotation (formAnnotation.id)}
-                {#await formAnnotation.load()}
-                    <div>Loading [{formAnnotation.id}]</div>
-                {:then}
-                    <RegistrationItem {formAnnotation} {active} bind:activeID={activeID} />
-                {/await}
-            {/each}
-        </ul>
-    </div>
-    <div class="new">
-        <button onclick={create}> Create new registration set </button>
-    </div>
+	<div class="available">
+		<ul>
+			{#each filtered as formAnnotation (formAnnotation.id)}
+				<RegistrationItem
+					{formAnnotation}
+					active={activeID === formAnnotation.id}
+					{onactivate}
+					{onremove}
+				/>
+			{/each}
+		</ul>
+	</div>
+	<div class="new">
+		<Button variant="outline" onclick={create}>Create new</Button>
+	</div>
 </div>
 
 <style>
-    div.main {
-        padding: 0.5em;
-        min-height: 0;
-        flex: 1 1 auto;
-        overflow-y: auto;
-        min-height: 0px;
-    }
-    div.new,
-    div.available {
-        padding: 0.2em;
-        margin-bottom: 0.5em;
-    }
-    ul {
-        list-style-type: none;
-        padding-inline-start: 0em;
-    }
+	div.main {
+		padding: 0.5em;
+		min-height: 0;
+		flex: 1 1 auto;
+		overflow-y: auto;
+		min-height: 0px;
+	}
+	div.new,
+	div.available {
+		padding: 0.2em;
+		margin-bottom: 0.5em;
+	}
+	ul {
+		list-style-type: none;
+		padding-inline-start: 0em;
+	}
 </style>

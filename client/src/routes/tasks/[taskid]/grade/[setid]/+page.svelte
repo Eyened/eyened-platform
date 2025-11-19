@@ -1,42 +1,59 @@
 <script lang="ts">
-    import TaskMain from "$lib/tasks/TaskMain.svelte";
-    import { data as modelData } from "$lib/datamodel/model.js";
-    import { loadInstances, loadSubtasks } from "$lib/utils/api";
-    import { Deferred } from "$lib/utils.js";
-    import { onMount } from "svelte";
-    import type { SubTask } from "$lib/datamodel/subTask.svelte.js";
-    let { data } = $props();
+	import { fetchSubTaskByIndex, fetchTask } from "../../../../../lib/data/api";
+	import { tasks, subtasks } from "../../../../../lib/data/stores.svelte";
+	import TaskMain from "../../../../../lib/tasks/TaskMain.svelte";
+	import type {
+		SubTaskWithImagesGET,
+		TaskGET,
+	} from "../../../../../types/openapi_types";
 
-    const { subTaskIndex, taskid } = data;
+	let { data } = $props();
+	const { taskid, subTaskIndex } = data;
 
-    const subTaskPromise = new Deferred<SubTask>();
+	// Store IDs after loading
+	let taskId: number | null = $state(null);
+	let subTaskId: number | null = $state(null);
 
-    const task = modelData.tasks.get(taskid);
-    onMount(async () => {
-        if (!task) {
-            subTaskPromise.reject(new Error("Task not found"));
-            return;
-        }
-        await loadSubtasks(task);
-        const subTask = task.subTasks.get$(subTaskIndex);
-        if (!subTask) {
-            subTaskPromise.reject(new Error("Subtask not found"));
-            return;
-        }
-        await loadInstances(subTask.instances.map$((instance) => instance.id));
+	// Derive task and subtask from stores (will react to store updates)
+	const task = $derived(taskId ? tasks.get(taskId) : undefined);
+	const subTask = $derived(subTaskId ? subtasks.get(subTaskId) : undefined);
 
-        subTaskPromise.resolve(subTask);
-    });
-    const taskConfig = {};
+	const loadPromise: Promise<{
+		task: TaskGET;
+		subTask: SubTaskWithImagesGET;
+		instanceIDs: number[];
+	}> = (async () => {
+		const [task, subTask] = await Promise.all([
+			fetchTask(Number(taskid)),
+			fetchSubTaskByIndex(Number(taskid), Number(subTaskIndex), {
+				with_images: true,
+			}),
+		]);
+		if (!subTask) throw new Error("Subtask not found");
+		if (!("images" in subTask))
+			throw new Error("Subtask missing images; ensure with_images=true");
+
+		// Store IDs so we can derive from stores
+		taskId = task.id;
+		subTaskId = subTask.id;
+
+		const instanceIDs = subTask.images.map((img) => img.id);
+		return { task, subTask, instanceIDs };
+	})();
 </script>
 
 <svelte:head>
-    <title>Task {taskid} - {subTaskIndex}</title>
+	<title>Task {taskid} - {subTaskIndex}</title>
 </svelte:head>
-{#await subTaskPromise.promise}
-    <p>Loading subtask...</p>
-{:then subTask}
-    <TaskMain task={task!} {subTask} {subTaskIndex} {taskConfig} />
-{:catch error}
-    <p>Error: {error.message}</p>
+
+{#await loadPromise}
+	<p>Loading subtask...</p>
+{:then loaded}
+	{#if task && subTask}
+		<TaskMain {task} {subTask} {subTaskIndex} />
+	{:else}
+		<p>Error: Task or subtask not found in store</p>
+	{/if}
+{:catch e}
+	<p>Error: {e?.message ?? String(e)}</p>
 {/await}

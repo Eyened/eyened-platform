@@ -38,6 +38,10 @@ export class Registration {
     private readonly registrationItems = new Mapper<RegistrationItem>();
     private shortestPaths: { [node: string]: { [node: string]: string[] } } = allPairsShortestPaths(this.mappings);
 
+    // Debounce state for coalescing path recomputation across multiple imports
+    private pathsDirty = false;
+    private recomputeScheduled = false;
+
     constructor() { }
 
     // set the pointer position for the given image
@@ -48,9 +52,11 @@ export class Registration {
     }
 
     getPosition(image_id: string): Position | undefined {
+        
         if (this.cache.has(image_id)) {
             return this.cache.get(image_id);
         }
+        
         const source = this.pointer.image_id;
         const target = image_id;
         let path = this.shortestPaths[source]?.[target];
@@ -76,6 +82,24 @@ export class Registration {
         return currentPosition;
     }
 
+    private scheduleRecompute() {
+        if (this.recomputeScheduled) return;
+        this.recomputeScheduled = true;
+        queueMicrotask(() => {
+            this.recomputeScheduled = false;
+            if (!this.pathsDirty) return;
+            this.pathsDirty = false;
+            this.shortestPaths = allPairsShortestPaths(this.mappings);
+        });
+    }
+
+    // Expose an explicit synchronous recomputation when needed by callers
+    public recomputePathsNow() {
+        this.pathsDirty = false;
+        this.recomputeScheduled = false;
+        this.shortestPaths = allPairsShortestPaths(this.mappings);
+    }
+
     async addImage(image: AbstractImage, photoLocators: PhotoLocator[]) {
         const items = photoLocatorsToRegistrationItems(photoLocators);
         if (image.is3D) {
@@ -96,7 +120,8 @@ export class Registration {
                 this.mappings.set(item.target, item.source, p => inverse.mapping(p));
             }
         }
-        this.shortestPaths = allPairsShortestPaths(this.mappings);
+        this.pathsDirty = true;
+        this.scheduleRecompute();
     }
 
     getLinkedImgIds(source: string): Set<string> {

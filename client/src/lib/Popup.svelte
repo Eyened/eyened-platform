@@ -1,7 +1,7 @@
 <script lang="ts">
-    import Close from "$lib/viewer-window/icons/Close.svelte";
-    import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte";
-    import type { ComponentDef } from "$lib/data-loading/globalContext.svelte";
+    import type { ComponentDef } from "$lib/data/globalContext.svelte"
+    import Close from "$lib/viewer-window/icons/Close.svelte"
+    import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte"
 
     interface Props {
         componentDef: ComponentDef;

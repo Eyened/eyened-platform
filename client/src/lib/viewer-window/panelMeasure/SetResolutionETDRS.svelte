@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button';
 	import type { ETDRSCoordinates } from '$lib/types';
 	import type { MeasureTool } from '$lib/viewer/tools/Measure.svelte';
 
@@ -23,19 +24,8 @@
 	});
 </script>
 
-<button onclick={() => measureTool.setResolution(val)}>
+<Button variant="outline" size="sm" onclick={() => measureTool.setResolution(val)} class="flex-1 justify-center">
 	From {name}
 	<br />
 	{val.toFixed(2)} μm/pix
-</button>
-
-<style>
-	button {
-		display: flex;
-		flex: 1;
-		border-radius: 2px;
-		background-color: rgba(0, 0, 0, 0.1);
-		color: rgba(255, 255, 255, 0.5);
-		justify-content: center;
-	}
-</style>
+</Button>

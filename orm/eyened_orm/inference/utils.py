@@ -1,13 +1,8 @@
 from datetime import datetime
 
-
-
+from eyened_orm import ImageInstance
 from sqlalchemy import update
 from tqdm import tqdm
-
-from eyened_orm import (
-    ImageInstance,
-)
 
 
 def transform_kps(colname):
@@ -95,6 +90,7 @@ def clear_unsuccessfull(session, df, commit=True):
 
 def auto_device():
     import GPUtil
+    import torch
     # Attempt to select a free GPU
     try:
         deviceID = GPUtil.getFirstAvailable(order="memory")[

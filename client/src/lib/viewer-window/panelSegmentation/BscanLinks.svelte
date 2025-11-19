@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { getContext } from "svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
+    import { getContext } from "svelte";
 
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const segmentationContext = segmentationOverlay.segmentationContext;
+    const segmentationContext = mainViewerContext.segmentationContext;
     let segmentation = $derived(
         segmentationContext.segmentationItem?.segmentation,
     );
@@ -29,7 +29,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="row links">
     {#if segmentation}
-        {#each segmentation.scanIndices as scanNr, i (scanNr)}
+        {#each segmentation.scan_indices as scanNr, i (scanNr)}
             {#if i > 0}|{/if}
             <span
                 class="link-scan"

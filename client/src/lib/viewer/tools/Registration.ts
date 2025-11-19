@@ -1,7 +1,7 @@
-import type { FormAnnotation } from "$lib/datamodel/formAnnotation.svelte";
-import type { Instance } from "$lib/datamodel/instance.svelte";
+import { setFormAnnotationValue } from "$lib/data";
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
+import type { FormAnnotationGET, InstanceGET } from "../../../types/openapi_types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
@@ -19,25 +19,26 @@ export class RegistrationTool implements Overlay {
     name: string = 'Registration';
 
     constructor(
-        private formAnnotation: FormAnnotation,
-        private instance: Instance,
+        private formAnnotation: FormAnnotationGET,
+        private instance: InstanceGET,
+        private canEdit: boolean,
         private pointStyle: 'rect' | 'cross' = 'cross',
         private radius: number = 16
     ) {
     }
 
     private update() {
-        this.formAnnotation.update({ value: this.formAnnotation.value });
+        setFormAnnotationValue(this.formAnnotation.id, this.formAnnotation.form_data);
     }
 
     get points(): PointList {
-        if (!this.formAnnotation.value) {
-            this.formAnnotation.value = {};
+        if (!this.formAnnotation.form_data) {
+            this.formAnnotation.form_data = {};
         }
-        if (!this.formAnnotation.value[this.instance.id]) {
-            this.formAnnotation.value[this.instance.id] = [];
+        if (!this.formAnnotation.form_data[this.instance.id]) {
+            this.formAnnotation.form_data[this.instance.id] = [];
         }
-        return this.formAnnotation.value[this.instance.id];
+        return this.formAnnotation.form_data[this.instance.id] as PointList;
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {
@@ -74,6 +75,13 @@ export class RegistrationTool implements Overlay {
     pointerup(pointerEvent: ViewerEvent<PointerEvent>) {
         const { event, viewerContext, cursor } = pointerEvent;
         if (event.shiftKey) return;
+        
+        if (!this.canEdit) {
+            this.activePointIndex = undefined;
+            this.hoverPointIndex = this.findHit(cursor, viewerContext);
+            return;
+        }
+        
         if (event.button === 0) {
             if (this.activePointIndex !== undefined) {
                 this.update();
@@ -91,7 +99,8 @@ export class RegistrationTool implements Overlay {
     }
 
     private addPoint(position: Position2D) {
-
+        if (!this.canEdit) return;
+        
         if (!this.points)
             return
         for (let i = 0; i <= this.points.length; i++) {
@@ -107,6 +116,8 @@ export class RegistrationTool implements Overlay {
     }
 
     private removePoint() {
+        if (!this.canEdit) return;
+        
         if (!this.points)
             return;
         const index = this.hoverPointIndex!;
@@ -122,7 +133,7 @@ export class RegistrationTool implements Overlay {
             return;
         const { cursor, viewerContext } = e;
 
-        if (this.activePointIndex !== undefined) {
+        if (this.activePointIndex !== undefined && this.canEdit) {
             const point = this.points[this.activePointIndex]!;
             const position = viewerContext.viewerToImageCoordinates(cursor);
             Object.assign(point, position);

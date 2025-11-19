@@ -1,25 +1,26 @@
+import { Matrix } from "$lib/matrix";
+import type { InstanceGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
-import type { Instance } from "$lib/datamodel/instance.svelte";
-import { Matrix } from "$lib/matrix";
-import { SegmentationItem } from "./segmentationItem.svelte";
-import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
 import { SvelteMap } from "svelte/reactivity";
+import { SegmentationItem } from "./segmentationItem.svelte";
 
 export abstract class AbstractImage {
 
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
-    public readonly segmentationItems = new SvelteMap<Segmentation, SegmentationItem>();
     abstract texture: WebGLTexture;
 
     // in micrometers / pixel
     public readonly resolution: { x: number, y: number, z: number };
     transform: Matrix = Matrix.identity;
-
+    
+    // Cache segmentation items per segmentation ID
+    public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
+    public readonly orientation: 'axial' | 'enface';
     constructor(
-        public readonly instance: Instance,
+        public readonly instance: InstanceGET,
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
@@ -29,6 +30,16 @@ export abstract class AbstractImage {
         this.height = height;
         this.depth = depth;
 
+
+        if (instance.modality === 'OCT') {
+            if (instance.resolution_axial && instance.resolution_axial>0) {
+                this.orientation = 'axial';
+            } else {
+                this.orientation = 'enface';
+            }
+        } else {
+            this.orientation = 'enface';
+        }
 
         this.resolution = {
             x: 1000 * width_mm / width,
@@ -40,18 +51,7 @@ export abstract class AbstractImage {
 
     abstract is3D: boolean;
     abstract is2D: boolean;
-
-    getSegmentationItem(segmentation: Segmentation): SegmentationItem {
-        // If the segmentationItem is already created, return it
-        if (this.segmentationItems.has(segmentation)) {
-            return this.segmentationItems.get(segmentation)!;
-        }
-
-        // Create new segmentation item
-        const segmentationItem = new SegmentationItem(this, segmentation);
-        this.segmentationItems.set(segmentation, segmentationItem);
-        return segmentationItem;
-    }
+    
 
     getAspectRatio() {
         const { width, height, width_mm, height_mm } = this.dimensions;
@@ -124,11 +124,34 @@ export abstract class AbstractImage {
         return this._ioContext;
     }
 
-    dispose() {
+    getOrCreateSegmentationItem(segmentation: SegmentationGET | ModelSegmentationGET): SegmentationItem {
+        // Use id as key (unique per segmentation)
+        const cached = this.segmentationItems.get(segmentation.id);
+        if (cached) {
+            return cached;
+        }
+
+        // Create new segmentation item
+        const segmentationItem = new SegmentationItem(this, segmentation);
+        this.segmentationItems.set(segmentation.id, segmentationItem);
+        return segmentationItem;
+    }
+
+    /**
+     * Dispose of all resources associated with this image.
+     * Should be called when the image is no longer needed, especially before
+     * navigating away or destroying the WebGL context.
+     */
+    dispose(): void {
+        // Dispose all segmentation items
         for (const segmentationItem of this.segmentationItems.values()) {
             segmentationItem.dispose();
         }
         this.segmentationItems.clear();
+        
+        // Clear canvas contexts
+        this._drawingContext = null;
+        this._ioContext = null;
     }
 
 }

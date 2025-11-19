@@ -1,0 +1,416 @@
+---
+title: API Reference
+description: Complete reference for all Eyened Platform API endpoints
+---
+
+This document provides a comprehensive reference for all API endpoints in the Eyened Platform. All endpoints require authentication unless otherwise noted.
+
+## Authentication
+
+All API endpoints (except login/register) require authentication via JWT tokens. Include the token in the `Authorization` header:
+
+```
+Authorization: Bearer <token>
+```
+
+### POST /api/auth/login
+
+Authenticate a user and receive JWT tokens.
+
+**Request Body:**
+```json
+{
+  "username": "string",
+  "password": "string",
+  "api_client": false
+}
+```
+
+**Response:** User information and JWT tokens (either in cookies for web clients or response body for API clients).
+
+### POST /api/auth/token
+
+Get an access token for API clients.
+
+**Request Body:**
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+**Response:** Access token and user information.
+
+### GET /api/auth/me
+
+Get current authenticated user information.
+
+### POST /api/auth/change-password
+
+Change the current user's password.
+
+**Request Body:**
+```json
+{
+  "old_password": "string",
+  "new_password": "string"
+}
+```
+
+### POST /api/auth/register
+
+Register a new user (may require admin privileges).
+
+### POST /api/auth/refresh
+
+Refresh an access token using a refresh token.
+
+### POST /api/auth/logout
+
+Log out the current user.
+
+## Image Instances
+
+### GET /api/instances/\{instance_id\}
+
+Get a single image instance by ID.
+
+**Query Parameters:**
+- `with_segmentations` (bool): Include segmentation data
+- `with_form_annotations` (bool): Include form annotations
+- `with_model_segmentations` (bool): Include model-generated segmentations
+- `with_tag_metadata` (bool): Include tag metadata
+
+### GET /api/instances/images/\{dataset_identifier:path\}
+
+Get the image file for a given dataset identifier.
+
+### GET /api/instances/thumbnails/\{thumbnail_identifier:path\}
+
+Get a thumbnail image for a given thumbnail identifier.
+
+### POST /api/instances/\{instance_id\}/tags
+
+Add a tag to an image instance.
+
+### PATCH /api/instances/\{instance_id\}/tags/\{tag_id\}
+
+Update a tag on an image instance.
+
+### DELETE /api/instances/\{instance_id\}/tags/\{tag_id\}
+
+Remove a tag from an image instance.
+
+## Import
+
+### POST /api/import/image
+
+Import a single image into the platform. See [Importing Data](/eyened-platform/importing_data) for detailed documentation.
+
+### POST /api/import/run_inference
+
+Queue a background task to run AI model inference on images.
+
+### POST /api/import/update_thumbnails
+
+Queue a background task to update thumbnails for all images.
+
+## Segmentations
+
+### POST /api/segmentations
+
+Create a new segmentation.
+
+**Request Body:** Segmentation data including image_id, feature_id, creator_id, and segmentation metadata.
+
+### GET /api/segmentations/\{segmentation_id\}
+
+Get a segmentation by ID.
+
+### DELETE /api/segmentations/\{segmentation_id\}
+
+Delete a segmentation.
+
+### PUT /api/segmentations/\{segmentation_id\}/data
+
+Upload segmentation data (zarr format).
+
+### GET /api/segmentations/\{segmentation_id\}/data
+
+Download segmentation data.
+
+### PATCH /api/segmentations/\{segmentation_id\}
+
+Update segmentation metadata.
+
+### POST /api/segmentations/\{segmentation_id\}/tags
+
+Add a tag to a segmentation.
+
+### DELETE /api/segmentations/\{segmentation_id\}/tags/\{tag_id\}
+
+Remove a tag from a segmentation.
+
+### GET /api/model-segmentations/\{model_segmentation_id\}/data
+
+Get model-generated segmentation data.
+
+## Features
+
+### GET /api/features
+
+List all features.
+
+**Query Parameters:**
+- `with_counts` (bool): Include usage counts for each feature
+
+### POST /api/features
+
+Create a new feature with optional subfeatures.
+
+**Request Body:**
+```json
+{
+  "name": "string",
+  "subfeature_ids": [1, 2, 3]
+}
+```
+
+### GET /api/features/\{feature_id\}
+
+Get a feature by ID.
+
+### PATCH /api/features/\{feature_id\}
+
+Update a feature (name and/or subfeatures).
+
+### DELETE /api/features/\{feature_id\}
+
+Delete a feature (with safety checks).
+
+See [Features API](/eyened-platform/api/features) for detailed documentation.
+
+## Tags
+
+### GET /api/tags
+
+List all tags.
+
+**Query Parameters:**
+- `tag_type` (optional): Filter by tag type (Study, ImageInstance, Segmentation, FormAnnotation)
+
+### POST /api/tags
+
+Create a new tag.
+
+**Request Body:**
+```json
+{
+  "name": "string",
+  "tag_type": "ImageInstance",
+  "description": "string"
+}
+```
+
+### PATCH /api/tags/\{tag_id\}
+
+Update a tag.
+
+### DELETE /api/tags/\{tag_id\}
+
+Delete a tag.
+
+### POST /api/tags/\{tag_id\}/star
+
+Star/favorite a tag for the current user.
+
+### DELETE /api/tags/\{tag_id\}/star
+
+Unstar a tag for the current user.
+
+## Tasks
+
+### GET /api/task
+
+List all tasks.
+
+### POST /api/task
+
+Create a new task.
+
+**Request Body:**
+```json
+{
+  "name": "string",
+  "description": "string",
+  "contact_id": 1,
+  "task_definition_id": 1
+}
+```
+
+### GET /api/task/\{task_id\}
+
+Get a task by ID with subtasks.
+
+### PATCH /api/task/\{task_id\}
+
+Update a task.
+
+### DELETE /api/task/\{task_id\}
+
+Delete a task.
+
+### GET /api/task/\{task_id\}/subtasks
+
+Get all subtasks for a task.
+
+### GET /api/task/\{task_id\}/subtasks-with-images
+
+Get all subtasks with their associated images.
+
+## Subtasks
+
+### GET /api/subtasks/\{subtask_id\}
+
+Get a subtask by ID.
+
+**Query Parameters:**
+- `with_images` (bool): Include associated images
+
+### PATCH /api/subtasks/\{subtask_id\}
+
+Update a subtask (state, creator, etc.).
+
+### DELETE /api/subtasks/\{subtask_id\}
+
+Delete a subtask.
+
+### POST /api/subtasks/\{subtask_id\}/images
+
+Add images to a subtask.
+
+**Request Body:**
+```json
+{
+  "image_ids": [1, 2, 3]
+}
+```
+
+### DELETE /api/subtasks/\{subtask_id\}/images/\{instance_id\}
+
+Remove an image from a subtask.
+
+## Form Annotations
+
+### GET /api/form-annotations
+
+List form annotations.
+
+**Query Parameters:**
+- `patient_id` (int, optional): Filter by patient
+- `study_id` (int, optional): Filter by study
+- `image_instance_id` (int, optional): Filter by image
+- `form_schema_id` (int, optional): Filter by schema
+- `creator_id` (int, optional): Filter by creator
+
+### POST /api/form-annotations
+
+Create a new form annotation.
+
+**Request Body:**
+```json
+{
+  "form_schema_id": 1,
+  "patient_id": 1,
+  "study_id": 1,
+  "image_instance_id": 1,
+  "laterality": "R",
+  "form_data": {}
+}
+```
+
+### GET /api/form-annotations/\{annotation_id\}
+
+Get a form annotation by ID.
+
+### PATCH /api/form-annotations/\{annotation_id\}
+
+Update a form annotation.
+
+### DELETE /api/form-annotations/\{annotation_id\}
+
+Delete a form annotation.
+
+### GET /api/form-annotations/\{form_annotation_id\}/value
+
+Get the form data value for a form annotation.
+
+### PUT /api/form-annotations/\{form_annotation_id\}/value
+
+Update the form data value for a form annotation.
+
+### POST /api/form-annotations/\{annotation_id\}/tags
+
+Add a tag to a form annotation.
+
+### DELETE /api/form-annotations/\{annotation_id\}/tags/\{tag_id\}
+
+Remove a tag from a form annotation.
+
+### PATCH /api/form-annotations/\{annotation_id\}/tags/\{tag_id\}
+
+Update a tag on a form annotation.
+
+## Form Schemas
+
+### GET /api/form-schemas
+
+List all form schemas.
+
+### GET /api/form-schemas/\{form_schema_id\}
+
+Get a form schema by ID.
+
+## Studies
+
+### POST /api/studies/\{study_id\}/tags
+
+Add a tag to a study.
+
+### DELETE /api/studies/\{study_id\}/tags/\{tag_id\}
+
+Remove a tag from a study.
+
+### PATCH /api/studies/\{study_id\}/tags/\{tag_id\}
+
+Update a tag on a study.
+
+## Devices
+
+### GET /api/devices
+
+List all device models.
+
+## Search
+
+### POST /api/instances/search
+
+Search for image instances with complex filters.
+
+**Request Body:** Search criteria including filters, sorting, pagination.
+
+### POST /api/studies/search
+
+Search for studies with complex filters.
+
+**Request Body:** Search criteria including filters, sorting, pagination.
+
+### GET /api/instances/search/signature
+
+Get the search signature (available fields) for instance searches.
+
+### GET /api/studies/search/signature
+
+Get the search signature (available fields) for study searches.
+

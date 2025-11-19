@@ -1,16 +1,15 @@
 <script lang="ts">
-    import { getContext } from "svelte";
     import { ImageLoader } from "$lib/data-loading/imageLoader";
-    import type { Instance } from "$lib/datamodel/instance.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { Registration } from "$lib/registration/registration";
     import type { WebGL } from "$lib/webgl/webgl";
-    import { setContext } from "svelte";
+    import { getContext, setContext } from "svelte";
+    import type { InstanceGET } from "../../types/openapi_types";
     import BaseViewer from "./BaseViewer.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
-    import { Registration } from "$lib/registration/registration";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
 
     interface Props {
-        instance: Instance;
+        instance: InstanceGET;
         webgl: WebGL;
     }
 
@@ -18,7 +17,7 @@
 
     const imageLoader = new ImageLoader(webgl);
     const globalContext = getContext<GlobalContext>("globalContext");
-    const { creator } = globalContext;
+    const { user: creator } = globalContext;
     const registration = new Registration();
     const viewerWindowContext = new ViewerWindowContext(
         webgl,

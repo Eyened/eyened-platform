@@ -1,307 +1,314 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
-    import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
-    import ThresholdSlider from "./ThresholdSlider.svelte";
+	import { deleteSegmentation } from "$lib/data/api";
+	import type { GlobalContext } from "$lib/data/globalContext.svelte";
+	import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
+	import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+	import { getContext } from "svelte";
+	import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
+	import ThresholdSlider from "./ThresholdSlider.svelte";
 
-    import CCPanel from "./CCPanel.svelte";
-    import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte";
-    import FeatureColorPicker from "./FeatureColorPicker.svelte";
-    import ImportPanel from "./ImportPanel.svelte";
-    import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
-    import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
-    import type { Segmentation } from "$lib/datamodel/segmentation.svelte";
-    import StringDialogue from "$lib/StringDialogue.svelte";
-    import AI from "../icons/AI.svelte";
-    import { duplicate } from "./duplicate_utils";
+	import StringDialogue from "$lib/StringDialogue.svelte";
+	import CCPanel from "./CCPanel.svelte";
+	import { duplicate } from "./duplicate_utils";
+	import DuplicateAnnotationPanel from "./DuplicateAnnotationPanel.svelte";
+	import FeatureColorPicker from "./FeatureColorPicker.svelte";
+	import ImportPanel from "./ImportPanel.svelte";
+	import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
+	import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
+	import { getSegmentationKey, type Segmentation } from "./segmentationContext.svelte";
+	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
-    const globalContext = getContext<GlobalContext>("globalContext");
+	const globalContext = getContext<GlobalContext>("globalContext");
+	const viewerContext = getContext<ViewerContext>("viewerContext");
+	const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+	const taskContext = getContext<TaskContext>("taskContext");
+	const segmentationContext = mainViewerContext.segmentationContext;
 
-    interface Props {
-        segmentation: Segmentation;
-        style?: "AI" | "normal";
-    }
-    
-    let { segmentation, style = "normal" }: Props = $props();
+	interface Props {
+		segmentation: Segmentation;
+	}
 
-    const { feature, dataRepresentation } = segmentation;
+	let { segmentation }: Props = $props();
 
-    const viewerContext = getContext<ViewerContext>("viewerContext");
+	const feature = segmentation.feature;
+	const dataRepresentation = segmentation.data_representation;
+	const image = viewerContext.image;
 
-    const image = viewerContext.image;
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
-    );
+	const visible = $derived(
+		segmentationContext.shownSegmentations.has(getSegmentationKey(segmentation)),
+	);
 
-    const { segmentationContext } = segmentationOverlay;
-    if (style == "normal") {
-        segmentationContext.visibleSegmentations.add(segmentation);
-    }
+	const segmentationItem =
+		segmentationContext.getSegmentationItem(segmentation);
 
-    const segmentationItem = image.getSegmentationItem(segmentation);
-    let segmentationState = $derived(
-        segmentationItem.getSegmentationState(viewerContext.index),
-    );
+	const segmentationState = $derived(
+		segmentationItem.getSegmentationState(viewerContext.index),
+	);
+	const isEditable = globalContext.canEdit(segmentation);
+	let collapsed = $state(true);
 
-    async function removeAnnotation() {
-        const resolve = () => {
-            // remove from database on server
-            segmentation.delete();
-            segmentationContext.toggleActive(undefined);
-            segmentationItem.dispose();
-        };
+	async function remove() {
+		const resolve = async () => {
+			// remove from database on server
+			if (segmentation.annotation_type === "grader_segmentation") {
+				await deleteSegmentation(segmentation.id);
+			}
+			if (segmentationContext.segmentationItem == segmentationItem) {
+				segmentationContext.segmentationItem = undefined;
+			}
+		};
 
-        globalContext.dialogue = {
-            component: StringDialogue,
-            props: {
-                query: `Delete segmentation [${segmentation.id}]?`,
-                approve: "Delete",
-                decline: "Cancel",
-                resolve,
-            },
-        };
-    }
+		globalContext.dialogue = {
+			component: StringDialogue,
+			props: {
+				query: `Delete segmentation [${segmentation.id}]?`,
+				approve: "Delete",
+				decline: "Cancel",
+				resolve,
+			},
+		};
+	}
 
-    function toggleShow() {
-        segmentationContext.toggleShow(segmentation);
-    }
+	function toggleShow() {
+		segmentationContext.toggleShowSegmentation(segmentation);
+	}
 
-    function showOnly() {
-        segmentationContext.showOnly(segmentation);
-    }
+	function showOnly() {
+		segmentationContext.showOnlySegmentation(segmentation);
+	}
 
-    const isEditable = globalContext.canEdit(segmentation);
-    function activate() {
-        segmentationContext.toggleActive(segmentationItem);
-    }
+	function toggleActive() {
+		segmentationContext.toggleActive(segmentationItem);
+	}
 
-    let active = $derived(
-        segmentationContext.segmentationItem == segmentationItem,
-    );
+	const active = $derived(
+		segmentationContext.segmentationItem == segmentationItem,
+	);
 
-    let collapsed = $state(true);
+	function pointerEnter() {
+		mainViewerContext.highlightedSegmentationItem = segmentationItem;
+	}
 
-    function pointerEnter() {
-        segmentationOverlay.highlightedSegmentationItem = segmentationItem;
-    }
+	function pointerLeave() {
+		mainViewerContext.highlightedSegmentationItem = undefined;
+	}
 
-    function pointerLeave() {
-        segmentationOverlay.highlightedSegmentationItem = undefined;
-    }
+	const segmentationType = {
+		Binary: "B",
+		DualBitMask: "Q",
+		Probability: "P",
+		MultiClass: "MC",
+		MultiLabel: "ML",
+	}[dataRepresentation];
 
-    const segmentationType = {
-        Binary: "B",
-        DualBitMask: "Q",
-        Probability: "P",
-        MultiClass: "MC",
-        MultiLabel: "ML",
-    }[segmentation.dataRepresentation];
-
-    function applyDuplicate() {
-        duplicate(
-            globalContext,
-            segmentation,
-            segmentationItem,
-            image,
-            viewerContext,
-            false,
-            "Q",
-            globalContext.creator,
-        );
-    }
-    console.log(feature);
+	function applyDuplicateAI() {
+		duplicate(
+			globalContext,
+			segmentation,
+			segmentationItem,
+			image,
+			viewerContext,
+			false,
+			"Q",
+			segmentationItem.threshold ?? segmentation.threshold ?? 0.5, //original threshold
+			0.5, //new threshold
+			taskContext,
+		);
+	}
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="content"
-    class:compact={style == "AI"}
-    class:normal={style == "normal"}
-    class:loading={segmentationItem.loading}
-    class:active
-    onpointerenter={pointerEnter}
-    onpointerleave={pointerLeave}
+	class="content"
+	class:loading={segmentationItem.loading}
+	class:active
+	onpointerenter={pointerEnter}
+	onpointerleave={pointerLeave}
 >
-    <div class="row">
-        <div>
-            {#if segmentationContext.visibleSegmentations.has(segmentation)}
-                <PanelIcon
-                    onclick={toggleShow}
-                    onrightclick={showOnly}
-                    tooltip="Hide"
-                    Icon={Show}
-                />
-            {:else}
-                <PanelIcon
-                    onclick={toggleShow}
-                    onrightclick={showOnly}
-                    tooltip="Show"
-                    Icon={Hide}
-                />
-            {/if}
-        </div>
+	<div class="row">
+		<div>
+			{#if visible}
+				<PanelIcon
+					onclick={toggleShow}
+					onrightclick={showOnly}
+					tooltip="Hide"
+					Icon={Show}
+				/>
+			{:else}
+				<PanelIcon
+					onclick={toggleShow}
+					onrightclick={showOnly}
+					tooltip="Show"
+					Icon={Hide}
+				/>
+			{/if}
+		</div>
 
-        {#if !(dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass")}
-            <FeatureColorPicker {segmentation} />
-        {/if}
+		{#if !(dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass")}
+			<FeatureColorPicker {segmentation} />
+		{/if}
 
-        <div class="expand" onclick={activate}>
-            {#if style == "AI"}
-                <div class="ai"><AI size="1.2em" /></div>
-            {/if}
-            <div class="feature-name">{feature.name}</div>
-            <div class="segmentationID">[{segmentation.id}]</div>
-            <div class="segmentationType">[{segmentationType}]</div>
-        </div>
+		<button type="button" class="expand" onclick={toggleActive}>
+			<div class="feature-name">{feature.name}</div>
+			<div class="segmentationID">[{segmentation.id}]</div>
+			<div class="segmentationType">[{segmentationType}]</div>
+		</button>
 
-        {#if isEditable}
-            <PanelIcon
-                onclick={removeAnnotation}
-                tooltip="Delete"
-                Icon={Trash}
-            />
-        {/if}
-    </div>
+		{#if isEditable}
+			<PanelIcon onclick={remove} tooltip="Delete" Icon={Trash} />
+		{/if}
+	</div>
 
-    {#if dataRepresentation == "Probability"}
-        {#if active}
-            <div class="row">
-                <ThresholdSlider {segmentation} />
-            </div>
-        {/if}
-    {/if}
-    {#if active && style == "AI"}
-        <div class="row">
-            <button onclick={applyDuplicate}>Duplicate</button>
-        </div>
-    {/if}
+	{#if dataRepresentation == "Probability"}
+		{#if active}
+			<div class="row">
+				<ThresholdSlider {segmentation} {segmentationItem} />
+			</div>
+		{/if}
+	{/if}
+	{#if active && segmentation.annotation_type == "model_segmentation"}
+		<div class="row">
+			<button type="button" class="duplicate-button" onclick={applyDuplicateAI}>
+				Duplicate
+			</button>
+		</div>
+	{/if}
 
-    {#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
-        <MultiFeatureSelector {segmentation} {active} />
-    {/if}
-    {#if segmentationItem.loading}
-        <div class="row">
-            <div class="loading">Loading segmentation…</div>
-        </div>
-    {/if}
-    {#if active}
-        <div class="open" onclick={() => (collapsed = !collapsed)}>
-            {#if collapsed}
-                &#9654;
-            {:else}
-                &#9660;
-            {/if}
-        </div>
+	{#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
+		<MultiFeatureSelector {segmentation} {active} />
+	{/if}
+	{#if segmentationItem.loading}
+		<div class="row">
+			<div class="loading">Loading segmentation…</div>
+		</div>
+	{/if}
+	{#if active}
+		<button type="button" class="open" onclick={() => (collapsed = !collapsed)}>
+			{#if collapsed}
+				&#9654;
+			{:else}
+				&#9660;
+			{/if}
+		</button>
 
-        {#if !collapsed}
-            <div class="content">
-                {#if isEditable}
-                    <div class="row">
-                        <ImportPanel
-                            {segmentation}
-                            {image}
-                            {segmentationItem}
-                        />
-                    </div>
-                {/if}
-                <div class="row">
-                    {#if segmentationState}
-                        <DuplicateAnnotationPanel
-                            {segmentation}
-                            {image}
-                            {segmentationItem}
-                        />
-                    {/if}
-                </div>
+		{#if !collapsed}
+			<div class="content">
+				{#if isEditable}
+					<div class="row">
+						<ImportPanel {segmentation} {image} {segmentationItem} />
+					</div>
+				{/if}
+				<div class="row">
+					{#if segmentationState}
+						<DuplicateAnnotationPanel
+							{segmentation}
+							{image}
+							{segmentationItem}
+						/>
+					{/if}
+				</div>
 
-                <div class="row">
-                    <ReferenceSegmentationPanel
-                        {segmentation}
-                        {image}
-                        {isEditable}
-                        {segmentationItem}
-                    />
-                </div>
-
-                {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
-                    <div class="row">
-                        <CCPanel {segmentationItem} />
-                    </div>
-                {/if}
-            </div>
-        {/if}
-    {/if}
+				<div class="row">
+					<ReferenceSegmentationPanel
+						{segmentation}
+						{image}
+						{isEditable}
+						{segmentationItem}
+					/>
+				</div>
+				{#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
+					<div class="row">
+						<CCPanel {segmentationItem} />
+					</div>
+				{/if}
+			</div>
+		{/if}
+	{/if}
 </div>
 
 <style>
-    div {
-        display: flex;
-    }
-    div.content.compact {
-        padding: 0em;
-    }
-    div.ai {
-        align-items: center;
-        padding-right: 0.2em;
-    }
-    div.content.normal {
-        padding: 0.2em;
-        border-radius: 2px;
-    }
-    div.content {
-        flex-direction: column;
-    }
-    div.content.loading {
-        opacity: 0.5;
-    }
-    
-    div.row {
-        flex-direction: row;
-        flex: 1;
-        width: 100%;
-    }
-    div.open {
-        border-top: 1px solid rgba(100, 255, 255, 0.3);
-        flex-direction: row;
-        flex: 1;
-        cursor: pointer;
-    }
-    div.open:hover {
-        background-color: rgba(100, 255, 255, 0.3);
-    }
+	div {
+		display: flex;
+	}
+	div.content {
+		flex-direction: column;
+	}
+	div.content.loading {
+		opacity: 0.5;
+	}
 
-    div.expand {
-        cursor: pointer;
-        flex: 1;
-        min-height: 2em;
-        border-radius: 2px;
-        transition: all 0.3s ease;
-    }
-    div.active {
-        background-color: rgba(100, 255, 255, 0.3);
-    }
-    div.expand:hover {
-        background-color: rgba(100, 255, 255, 0.3);
-    }
-    div.feature-name {
-        flex: 1;
-        /* max-width: 12em; */
-        padding-right: 0.5em;
-    }
-    div.segmentationID {
-        font-size: x-small;
-        flex: 0;
-    }
-    div.feature-name,
-    div.segmentationID,
-    div.segmentationType {
-        align-items: center;
-    }
-    div.loading {
-        font-size: 0.9em;
-        opacity: 0.8;
-    }
+	div.row {
+		flex-direction: row;
+		flex: 1;
+		width: 100%;
+		align-items: center;
+	}
+	button.open {
+		border-top: 1px solid rgba(100, 255, 255, 0.3);
+		flex-direction: row;
+		flex: 1;
+		cursor: pointer;
+	}
+	button.open:hover {
+		background-color: rgba(100, 255, 255, 0.3);
+	}
+
+	button.expand {
+		cursor: pointer;
+		flex: 1;
+		min-height: 2em;
+		border-radius: 2px;
+		transition: all 0.3s ease;
+	}
+	div.active {
+		background-color: rgba(100, 255, 255, 0.3);
+	}
+	button.expand:hover {
+		background-color: rgba(100, 255, 255, 0.3);
+	}
+	div.feature-name {
+		flex: 1;
+		/* max-width: 12em; */
+		padding-right: 0.5em;
+	}
+	div.segmentationID {
+		font-size: x-small;
+		flex: 0;
+	}
+	div.feature-name {
+		text-align: left;
+		font-size: small;
+	}
+	div.segmentationID,
+	div.segmentationType {
+		align-items: center;
+	}
+	div.loading {
+		font-size: 0.9em;
+		opacity: 0.8;
+	}
+
+	button {
+		background: transparent;
+		border: none;
+		color: inherit;
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		padding: 0;
+	}
+	button:focus-visible {
+		outline: 2px solid currentColor;
+		outline-offset: 2px;
+	}
+	button.duplicate-button {
+		cursor: pointer;
+		padding: 0.2em;
+		border-radius: 2px;
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		margin: 0.2em;
+		text-wrap-mode: nowrap;
+	}
+	button.duplicate-button:hover {
+		background-color: rgba(255, 255, 255, 0.3);
+	}
 </style>

@@ -16,10 +16,10 @@ export default defineConfig({
             social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/eyened/eyened-platform' }],
             sidebar: [
                 { slug: 'getting_started' },
-                { slug: 'importer' },
-                { slug: 'entities' },
+                { slug: 'importing_data' },
+                { slug: 'import_metadata_fields' },
                 { slug: 'platform_design' },
-                { slug: 'development_setup' },
+                { slug: 'guides/development_setup' },
                 {
                     label: 'Eyened ORM',
                     // Autogenerate a group of links for the 'orm' directory.

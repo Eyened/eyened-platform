@@ -3,6 +3,7 @@ version: "3.1"
 name: eyened-platform-dev
 
 services:
+  
   fileserver:
     env_file: .env
     build:
@@ -17,6 +18,7 @@ services:
       - ${THUMBNAILS_PATH}:/thumbnails
 
   database:
+    env_file: .env
     image: mysql:8.0.27
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
@@ -29,6 +31,7 @@ services:
       retries: 10
  
   adminer:
+    env_file: .env
     image: adminer:latest
     restart: always
     ports:

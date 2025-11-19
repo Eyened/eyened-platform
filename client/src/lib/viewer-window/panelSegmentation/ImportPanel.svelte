@@ -1,13 +1,17 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { AbstractImage } from "$lib/webgl/abstractImage";
     import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
+    import type { MainViewerContext } from "../../viewer/overlays/MainViewerContext.svelte";
 
     import ImportSegmentation from "../icons/ImportSegmentation.svelte";
     import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
-    import { Segmentation } from "$lib/datamodel/segmentation.svelte";
+    import { type Segmentation } from "./segmentationContext.svelte";
+
+    const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+
     interface Props {
         segmentation: Segmentation;
         image: AbstractImage;
@@ -20,14 +24,15 @@
     const globalContext = getContext<GlobalContext>("globalContext");
 
     async function importFromOther() {
+        
         globalContext.dialogue = {
             component: ImportSegmentationSelector,
             props: {
                 segmentation,
-                image,
+                segmentationContext: mainViewerContext.segmentationContext,
                 resolve: (other: Segmentation) => {
                     const otherSegmentation = image
-                        .getSegmentationItem(other)
+                        .getOrCreateSegmentationItem(other)
                         ?.getMask(viewerContext.index);
                     if (otherSegmentation) {
                         segmentationItem?.importOther(

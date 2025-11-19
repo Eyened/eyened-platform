@@ -1,66 +1,64 @@
 <script lang="ts">
-    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext } from "svelte";
     import FeatureSelect from "./FeatureSelect.svelte";
-    import { data } from "$lib/datamodel/model";
-    import type { Feature } from "$lib/datamodel/feature.svelte";
-    import type { GlobalContext } from "$lib/data-loading/globalContext.svelte";
-    import { SegmentationOverlay } from "$lib/viewer/overlays/SegmentationOverlay.svelte";
 
-    import {
-        Segmentation,
-        type DataRepresentation,
-        type Datatype,
-    } from "$lib/datamodel/segmentation.svelte";
+    import type { SegmentationDataRepresentation, SegmentationDataType } from "../../../types/openapi_types";
+    import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
+    import type { FeatureGET } from "../../../types/openapi_types";
+    import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import NewMultiFeature from "./NewMultiFeature.svelte";
-    import type { TaskContext } from "$lib/types";
+    import type { Segmentation } from "./segmentationContext.svelte";
+    import { createSegmentationFrom, features } from "$lib/data";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
     const taskContext = getContext<TaskContext>("taskContext");
 
-    const featureSubsets: { [name: string]: [number] } =
-        taskContext?.task?.definition?.config?.featureSubsets || {};
+
+
+    // const featureSubsets: { [name: string]: [number] } =
+    //     taskContext?.task?.definition?.config?.featureSubsets || {};
 
     const { image, axis } = viewerContext;
-    const { creator } = globalContext;
-    const segmentationOverlay = getContext<SegmentationOverlay>(
-        "segmentationOverlay",
+    const { user: creator } = globalContext;
+    const mainViewerContext = getContext<MainViewerContext>(
+        "mainViewerContext",
     );
-    const segmentationContext = segmentationOverlay.segmentationContext;
-    const { features } = data;
+    const segmentationContext = mainViewerContext.segmentationContext;
 
     const types = ["Q", "B", "P"];
     let selectedType = $state("Q");
 
-    const dataRepresentations: { [key: string]: DataRepresentation } = {
+    const dataRepresentations: { [key: string]: SegmentationDataRepresentation } = {
         Q: "DualBitMask",
         B: "Binary",
         P: "Probability",
     };
 
-    async function create(feature: Feature) {
+    async function create(feature: FeatureGET) {
         globalContext.dialogue = `Creating annotation...`;
 
-        let dataType: Datatype = "R8UI";
+        let dataType: SegmentationDataType = "R8UI";
         if (selectedType == "P") {
             // TODO: this could perhaps also be R32F?
             dataType = "R8";
         }
 
-        const segmentation = await Segmentation.createFrom(
+        const segmentation = await createSegmentationFrom(
             image,
-            feature,
-            creator,
+            feature.id,
             dataRepresentations[selectedType],
             dataType,
             0.5,
             axis,
-            taskContext?.subTask
+            taskContext?.subTask?.id
         );
-        // show segmentations for this creator
-        segmentationContext.hideCreators.delete(creator);
-        const segmentationItem = image.getSegmentationItem(segmentation);
+
+        const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
 
         segmentationContext.segmentationItem = segmentationItem
 
@@ -69,10 +67,11 @@
 
     const availableFeatures = features.filter((f) => true);
     let selectedFeatureId: number | undefined = $state(undefined);
+    
 </script>
 
 <div class="new">
-    {#if Object.keys(featureSubsets).length > 0}
+    <!-- {#if Object.keys(featureSubsets).length > 0}
         <div>
             <select bind:value={selectedFeatureId}>
                 <option value="" selected disabled hidden>
@@ -102,7 +101,7 @@
                 Create
             </button>
         </div>
-    {/if}
+    {/if} -->
 
     <div>
         <span>Type:</span>
@@ -119,11 +118,11 @@
         {/each}
     </div>
     <FeatureSelect
-        values={availableFeatures}
+        values={features.map(f => f)}
         onselect={(feature) => create(feature)}
     />
-    <NewMultiFeature dataRepresentation="MultiLabel" />
-    <NewMultiFeature dataRepresentation="MultiClass" />
+    <hr />
+    <NewMultiFeature/>
 </div>
 
 <style>
@@ -132,5 +131,10 @@
     }
     div.new {
         flex-direction: column;
+    }
+    hr {
+        margin: 0.5em 0;
+        color: rgba(255, 255, 255, 0.5);
+        height: 0.2em;
     }
 </style>
