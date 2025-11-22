@@ -34,10 +34,10 @@ class Series(Base):
     StudyInstanceUid: Mapped[Optional[str]] = mapped_column(String(64))
 
 
-    Study: Mapped[Study] = relationship("eyened_orm.study.Study", back_populates="Series")
+    Study: Mapped[Study] = relationship("eyened_orm.study.Study", back_populates="Series", lazy="selectin")
     ImageInstances: Mapped[List[ImageInstance]] = relationship(
         "eyened_orm.image_instance.ImageInstance",
-        back_populates="Series", cascade="all,delete-orphan"
+        back_populates="Series", cascade="all,delete-orphan", lazy="selectin"
     )
     Annotations: Mapped[List[Annotation]] = relationship("eyened_orm.annotation.Annotation", back_populates="Series")
 

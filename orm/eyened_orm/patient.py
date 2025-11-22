@@ -2,14 +2,21 @@ import enum
 from datetime import date, datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import Index, String, ForeignKey, select, Enum as SAEnum, func
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
-    from eyened_orm import (Annotation, FormAnnotation, ImageInstance, Project,
-                            Study, AttributeValue)
+    from eyened_orm import (
+        Annotation,
+        AttributeValue,
+        FormAnnotation,
+        ImageInstance,
+        Project,
+        Study,
+    )
 
 
 class SexEnum(enum.Enum):
@@ -35,15 +42,30 @@ class Patient(Base):
     PatientIdentifier: Mapped[str] = mapped_column(String(255))
     BirthDate: Mapped[Optional[date]]
     Sex: Mapped[Optional[SexEnum]] = mapped_column(SAEnum(SexEnum))
-    ProjectID: Mapped[int] = mapped_column(ForeignKey("Project.ProjectID", ondelete="CASCADE"))
+    ProjectID: Mapped[int] = mapped_column(
+        ForeignKey("Project.ProjectID", ondelete="CASCADE")
+    )
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Project: Mapped["Project"] = relationship("eyened_orm.project.Project", back_populates="Patients", lazy="selectin")
-    Studies: Mapped[List["Study"]] = relationship("eyened_orm.study.Study", back_populates="Patient", passive_deletes=True)
-    Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Patient")
-    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="Patient")
-    AttributeValues: Mapped[List["AttributeValue"]] = relationship("eyened_orm.attributes.AttributeValue", back_populates="Patient")
+    Project: Mapped["Project"] = relationship(
+        "eyened_orm.project.Project", back_populates="Patients", lazy="selectin"
+    )
+    Studies: Mapped[List["Study"]] = relationship(
+        "eyened_orm.study.Study",
+        back_populates="Patient",
+        passive_deletes=True,
+        lazy="selectin",
+    )
+    Annotations: Mapped[List["Annotation"]] = relationship(
+        "eyened_orm.annotation.Annotation", back_populates="Patient"
+    )
+    FormAnnotations: Mapped[List["FormAnnotation"]] = relationship(
+        "eyened_orm.form_annotation.FormAnnotation", back_populates="Patient"
+    )
+    AttributeValues: Mapped[List["AttributeValue"]] = relationship(
+        "eyened_orm.attributes.AttributeValue", back_populates="Patient"
+    )
 
     @classmethod
     def by_project_and_identifier(
