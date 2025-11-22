@@ -242,10 +242,10 @@ class Segmentation(SegmentationBase):
         "eyened_orm.image_instance.ImageInstance", back_populates="Segmentations"
     )
     Creator: Mapped["Creator"] = relationship(
-        "eyened_orm.creator.Creator", back_populates="Segmentations"
+        "eyened_orm.creator.Creator", back_populates="Segmentations", lazy="selectin"
     )
     Feature: Mapped["Feature"] = relationship(
-        "eyened_orm.segmentation.Feature", back_populates="Segmentations"
+        "eyened_orm.segmentation.Feature", back_populates="Segmentations", lazy="selectin"
     )
     SubTask: Mapped["SubTask"] = relationship(
         "eyened_orm.task.SubTask", back_populates="Segmentations"
@@ -491,7 +491,7 @@ class ModelSegmentation(SegmentationBase):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     Model: Mapped["SegmentationModel"] = relationship(
-        "eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations"
+        "eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations", lazy="selectin"
     )
     ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="ModelSegmentations"

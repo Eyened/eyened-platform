@@ -43,7 +43,7 @@ class Study(Base):
         "eyened_orm.patient.Patient", back_populates="Studies", lazy="selectin"
     )
     Series: Mapped[List["Series"]] = relationship(
-        "eyened_orm.series.Series", back_populates="Study", passive_deletes=True
+        "eyened_orm.series.Series", back_populates="Study", passive_deletes=True, lazy="selectin"
     )
     Annotations: Mapped[List["Annotation"]] = relationship(
         "eyened_orm.annotation.Annotation", back_populates="Study"
