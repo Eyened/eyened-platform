@@ -149,7 +149,9 @@ class ImageInstance(Base):
 
     HorizontalFieldOfView: Mapped[Optional[float]]  # in degrees
 
-    Laterality: Mapped[Laterality] = mapped_column(SAEnum(Laterality))  # L or R
+    Laterality: Mapped[Optional[Laterality]] = mapped_column(
+        SAEnum(Laterality)
+    )  # L or R
     DICOMModality: Mapped[Optional[ModalityType]] = mapped_column(
         SAEnum(ModalityType)
     )  # OP, OPT, SC

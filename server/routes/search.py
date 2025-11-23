@@ -1095,7 +1095,9 @@ async def instances_signature(
 
     # Enum-backed
     items.append(
-        SignatureField(name="Laterality", values=[e.value for e in ImgLaterality])
+        SignatureField(
+            name="Laterality", values=[e.value for e in ImgLaterality], nullable=True
+        )
     )
     items.append(
         SignatureField(
