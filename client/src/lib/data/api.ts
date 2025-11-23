@@ -1,18 +1,18 @@
+import type { FeatureGET, FormSchemaGET, InstanceGET, StudyGET, SubTaskWithImagesGET, TagGET, TaskGET } from '../../types/openapi_types';
 import { api } from '../api/client';
-import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET, SubTaskWithImagesGET } from '../../types/openapi_types';
-import { 
-	ingestTags, 
-	ingestFeatures, 
-	ingestFormSchemas,
-	ingestInstances,
-	ingestInstanceMetas,
-	ingestStudies,
-	ingestSegmentations,
-	ingestModelSegmentations,
-	ingestFormAnnotations,
-	ingestTasks,
-	ingestSubTasks,
+import {
 	formAnnotations,
+	ingestFeatures,
+	ingestFormAnnotations,
+	ingestFormSchemas,
+	ingestInstanceMetas,
+	ingestInstances,
+	ingestModelSegmentations,
+	ingestSegmentations,
+	ingestStudies,
+	ingestSubTasks,
+	ingestTags,
+	ingestTasks,
 	segmentations
 } from './stores.svelte';
 
@@ -277,7 +277,7 @@ export async function createFormAnnotation(data: {
 	patient_id: number;
 	study_id?: number;
 	image_instance_id: number;
-	laterality?: 'L' | 'R';
+	laterality?: 'L' | 'R' | null;
 	sub_task_id?: number;
 	form_data: any;
 	form_annotation_reference_id?: number;

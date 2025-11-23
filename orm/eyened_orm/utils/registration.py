@@ -199,7 +199,7 @@ def run_registration_patient(patient, formAnnotation):
     all_transforms = [*formAnnotation.FormData] if formAnnotation.FormData else []
     for eye in "RL":
 
-        eye_images = [i for i in enface_images if i.Laterality.name == eye]
+        eye_images = [i for i in enface_images if i.Laterality and i.Laterality.name == eye]
 
         # split images into F1 and F2
         sorted_images = sort_images(eye_images)

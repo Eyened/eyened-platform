@@ -1,17 +1,24 @@
-from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
+
+from eyened_orm import (
+    FormAnnotation,
+    FormAnnotationTagLink,
+    ImageInstance,
+    ImageInstanceTagLink,
+    Study,
+    StudyTagLink,
+    Tag,
+)
+from eyened_orm.tag import TagType
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import FormAnnotation, Tag, FormAnnotationTagLink, Study, StudyTagLink, ImageInstance, ImageInstanceTagLink
-from eyened_orm.tag import TagType
-
 from ..db import get_db
-from .auth import CurrentUser, get_current_user
-from ..dtos.dtos_main import FormAnnotationPUT, FormAnnotationPATCH, FormAnnotationGET
 from ..dtos.dto_converter import DTOConverter
-from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
+from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
+from ..dtos.dtos_main import FormAnnotationGET, FormAnnotationPATCH, FormAnnotationPUT
+from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
 
@@ -52,17 +59,29 @@ async def get_form_annotations(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    query = select(FormAnnotation).filter(~FormAnnotation.Inactive).options(
-        selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
-        selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
-        selectinload(FormAnnotation.Study)
-            .selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Tag),
-        selectinload(FormAnnotation.Study)
-            .selectinload(Study.StudyTagLinks).selectinload(StudyTagLink.Creator),
-        selectinload(FormAnnotation.ImageInstance)
-            .selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Tag),
-        selectinload(FormAnnotation.ImageInstance)
-            .selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(ImageInstanceTagLink.Creator),
+    query = (
+        select(FormAnnotation)
+        .filter(~FormAnnotation.Inactive)
+        .options(
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
+                FormAnnotationTagLink.Tag
+            ),
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
+                FormAnnotationTagLink.Creator
+            ),
+            selectinload(FormAnnotation.Study)
+            .selectinload(Study.StudyTagLinks)
+            .selectinload(StudyTagLink.Tag),
+            selectinload(FormAnnotation.Study)
+            .selectinload(Study.StudyTagLinks)
+            .selectinload(StudyTagLink.Creator),
+            selectinload(FormAnnotation.ImageInstance)
+            .selectinload(ImageInstance.ImageInstanceTagLinks)
+            .selectinload(ImageInstanceTagLink.Tag),
+            selectinload(FormAnnotation.ImageInstance)
+            .selectinload(ImageInstance.ImageInstanceTagLinks)
+            .selectinload(ImageInstanceTagLink.Creator),
+        )
     )
 
     if patient_id is not None:
@@ -90,8 +109,12 @@ async def get_form_annotation(
         FormAnnotation,
         annotation_id,
         options=(
-            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Tag),
-            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(FormAnnotationTagLink.Creator),
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
+                FormAnnotationTagLink.Tag
+            ),
+            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
+                FormAnnotationTagLink.Creator
+            ),
         ),
     )
     if annotation is None:
@@ -110,22 +133,26 @@ async def update_form_annotation(
     if existing_annotation is None:
         raise HTTPException(status_code=404, detail="FormAnnotation not found")
 
-    if annotation.form_schema_id is not None:
-        existing_annotation.FormSchemaID = annotation.form_schema_id
-    if annotation.patient_id is not None:
-        existing_annotation.PatientID = annotation.patient_id
-    if annotation.study_id is not None:
-        existing_annotation.StudyID = annotation.study_id
-    if annotation.image_instance_id is not None:
-        existing_annotation.ImageInstanceID = annotation.image_instance_id
-    if annotation.laterality is not None:
-        existing_annotation.Laterality = annotation.laterality
-    if annotation.sub_task_id is not None:
-        existing_annotation.SubTaskID = annotation.sub_task_id
-    if annotation.form_data is not None:
-        existing_annotation.FormData = annotation.form_data
-    if annotation.form_annotation_reference_id is not None:
-        existing_annotation.FormAnnotationReferenceID = annotation.form_annotation_reference_id
+    payload = annotation.dict(exclude_unset=True)
+
+    if "form_schema_id" in payload:
+        existing_annotation.FormSchemaID = payload["form_schema_id"]
+    if "patient_id" in payload:
+        existing_annotation.PatientID = payload["patient_id"]
+    if "study_id" in payload:
+        existing_annotation.StudyID = payload["study_id"]
+    if "image_instance_id" in payload:
+        existing_annotation.ImageInstanceID = payload["image_instance_id"]
+    if "laterality" in payload:
+        existing_annotation.Laterality = payload["laterality"]
+    if "sub_task_id" in payload:
+        existing_annotation.SubTaskID = payload["sub_task_id"]
+    if "form_data" in payload:
+        existing_annotation.FormData = payload["form_data"]
+    if "form_annotation_reference_id" in payload:
+        existing_annotation.FormAnnotationReferenceID = payload[
+            "form_annotation_reference_id"
+        ]
 
     db.commit()
     db.refresh(existing_annotation)
@@ -178,7 +205,12 @@ async def update_form_annotation_value(
 
 
 @router.post("/form-annotations/{annotation_id}/tags", response_model=TagMeta)
-async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
+async def tag_form_annotation(
+    annotation_id: int,
+    body: ObjectTagPOST,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> TagMeta:
     """Attach a Tag to a FormAnnotation by tag ID (idempotent)."""
     ann = db.get(FormAnnotation, annotation_id)
     if not ann:
@@ -189,27 +221,46 @@ async def tag_form_annotation(annotation_id: int, body: ObjectTagPOST, db: Sessi
     if tag.TagType != TagType.FormAnnotation:
         raise HTTPException(400, "Tag type must be FormAnnotation")
 
-    link = db.get(FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id})
+    link = db.get(
+        FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id}
+    )
     if not link:
-        link = FormAnnotationTagLink(TagID=tag.TagID, FormAnnotationID=annotation_id, CreatorID=current_user.id, Comment=body.comment)
-        db.add(link); db.commit(); db.refresh(link)
+        link = FormAnnotationTagLink(
+            TagID=tag.TagID,
+            FormAnnotationID=annotation_id,
+            CreatorID=current_user.id,
+            Comment=body.comment,
+        )
+        db.add(link)
+        db.commit()
+        db.refresh(link)
         link.Tag = tag
     else:
         if body.comment is not None:
             link.Comment = body.comment
-            db.commit(); db.refresh(link)
+            db.commit()
+            db.refresh(link)
 
     return DTOConverter.link_to_tag_metadata(link)
 
+
 @router.delete("/form-annotations/{annotation_id}/tags/{tag_id}", status_code=204)
-async def untag_form_annotation(annotation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+async def untag_form_annotation(
+    annotation_id: int,
+    tag_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
     """Remove a Tag from a FormAnnotation (idempotent)."""
     ann = db.get(FormAnnotation, annotation_id)
     if not ann:
         raise HTTPException(404, "FormAnnotation not found")
-    link = db.get(FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id})
+    link = db.get(
+        FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id}
+    )
     if link:
-        db.delete(link); db.commit()
+        db.delete(link)
+        db.commit()
     return Response(status_code=204)
 
 
@@ -231,14 +282,15 @@ async def patch_form_annotation_tag(
     if tag.TagType != TagType.FormAnnotation:
         raise HTTPException(400, "Tag type must be FormAnnotation")
 
-    link = db.get(FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id})
+    link = db.get(
+        FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id}
+    )
     if not link:
         raise HTTPException(404, "Link not found")
 
     if body.comment is not None:
         link.Comment = body.comment
-        db.commit(); db.refresh(link)
+        db.commit()
+        db.refresh(link)
     link.Tag = tag
     return DTOConverter.link_to_tag_metadata(link)
-
-
