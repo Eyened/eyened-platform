@@ -92,6 +92,8 @@ class ScanMeta(BaseModel):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= INSTANCES =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 class InstanceBase(BaseModel):
     """Instance frontend object"""
 
@@ -150,4 +152,6 @@ class InstanceGET(InstanceBase):
     date_preprocessed: Optional[datetime] = None
 
     # Nested attributes by model name then attribute name
-    attributes: Dict[str, Dict[str, Any]]
+    model_attrs: Dict[str, Dict[str, Any]]
+    # Attributes without a model
+    attrs: Dict[str, Any]

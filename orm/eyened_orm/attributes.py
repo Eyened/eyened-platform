@@ -3,11 +3,18 @@ from __future__ import annotations
 from enum import Enum
 from typing import List, Optional
 
-from eyened_orm.segmentation import Model, ModelKind
-from sqlalchemy import JSON, CheckConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from eyened_orm.segmentation import Model, ModelKind
 
 from .base import Base
 from .image_instance import Laterality
@@ -125,8 +132,8 @@ class AttributeValue(Base):
     AttributeID: Mapped[int] = mapped_column(
         ForeignKey("AttributeDefinition.AttributeID", ondelete="CASCADE")
     )
-    ModelID: Mapped[int] = mapped_column(
-        ForeignKey("Model.ModelID", ondelete="CASCADE")
+    ModelID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("Model.ModelID", ondelete="CASCADE"), nullable=True
     )
 
     # Entity FKs (exactly one must be non-null)
@@ -152,16 +159,26 @@ class AttributeValue(Base):
     AttributeDefinition: Mapped["AttributeDefinition"] = relationship(
         "eyened_orm.attributes.AttributeDefinition", back_populates="AttributeValues"
     )
-    ProducingModel: Mapped["Model"] = relationship(
+    ProducingModel: Mapped[Optional["Model"]] = relationship(
         "eyened_orm.segmentation.Model", back_populates="ProducedAttributeValues"
     )
 
     # Entity relationships
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="AttributeValues")  # type: ignore[name-defined]
-    Segmentation: Mapped[Optional["Segmentation"]] = relationship("eyened_orm.segmentation.Segmentation", back_populates="AttributeValues")  # type: ignore[name-defined]
-    ModelSegmentation: Mapped[Optional["ModelSegmentation"]] = relationship("eyened_orm.segmentation.ModelSegmentation", back_populates="AttributeValues")  # type: ignore[name-defined]
-    Patient: Mapped[Optional["Patient"]] = relationship("eyened_orm.patient.Patient", back_populates="AttributeValues")  # type: ignore[name-defined]
-    Study: Mapped[Optional["Study"]] = relationship("eyened_orm.study.Study", back_populates="AttributeValues")  # type: ignore[name-defined]
+    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    Segmentation: Mapped[Optional["Segmentation"]] = relationship(
+        "eyened_orm.segmentation.Segmentation", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    ModelSegmentation: Mapped[Optional["ModelSegmentation"]] = relationship(
+        "eyened_orm.segmentation.ModelSegmentation", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    Patient: Mapped[Optional["Patient"]] = relationship(
+        "eyened_orm.patient.Patient", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    Study: Mapped[Optional["Study"]] = relationship(
+        "eyened_orm.study.Study", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
 
     # Provenance tracking
     InputValues: Mapped[List["AttributeValue"]] = relationship(

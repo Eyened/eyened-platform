@@ -226,7 +226,8 @@ class DTOConverter:
             device=device_meta,
             scan=scan_meta,
             tags=[],
-            attributes={},
+            model_attrs={},
+            attrs={},
         )
         if with_tag_metadata:
             dto.tags = DTOConverter._tags_from_image_instance(image_instance)
@@ -251,15 +252,18 @@ class DTOConverter:
                 )
                 for ms in (getattr(image_instance, "ModelSegmentations", []) or [])
             ]
-        # Populate attributes grouped by model name
+        # Populate attributes
         try:
             attrs_by_model: dict[str, dict[str, object]] = {}
+            attrs_flat: dict[str, object] = {}
+
             for av in getattr(image_instance, "AttributeValues", []) or []:
                 attr_def = getattr(av, "AttributeDefinition", None)
-                producing_model = getattr(av, "ProducingModel", None)
-                if not attr_def or not producing_model:
+                if not attr_def:
                     continue
-                model_name = producing_model.ModelName
+
+                producing_model = getattr(av, "ProducingModel", None)
+
                 value = None
                 if av.ValueInt is not None:
                     value = av.ValueInt
@@ -269,15 +273,24 @@ class DTOConverter:
                     value = av.ValueText
                 elif av.ValueJSON is not None:
                     value = av.ValueJSON
+
                 if value is None:
                     continue
-                if model_name not in attrs_by_model:
-                    attrs_by_model[model_name] = {}
-                attrs_by_model[model_name][attr_def.AttributeName] = value
-            dto.attributes = attrs_by_model
+
+                if producing_model:
+                    model_name = producing_model.ModelName
+                    if model_name not in attrs_by_model:
+                        attrs_by_model[model_name] = {}
+                    attrs_by_model[model_name][attr_def.AttributeName] = value
+                else:
+                    attrs_flat[attr_def.AttributeName] = value
+
+            dto.model_attrs = attrs_by_model
+            dto.attrs = attrs_flat
         except Exception:
             # Fail-safe: leave attributes empty if relationships not loaded
-            dto.attributes = {}
+            dto.model_attrs = {}
+            dto.attrs = {}
 
         return dto
 

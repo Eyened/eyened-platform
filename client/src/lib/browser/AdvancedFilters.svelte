@@ -85,22 +85,32 @@
 		const sig = getFieldSignature(fieldName);
 		if (!sig) return [];
 
+		let ops: ConditionOperator[] = [];
+
 		// If values is an array (enum), only IN operator
 		if (Array.isArray(sig.values)) {
-			return ['IN'];
+			ops = ['IN'];
+		} else {
+			// For type markers
+			switch (sig.values) {
+				case 'string':
+					ops = ['=='];
+					break;
+				case 'int':
+				case 'float':
+				case 'date':
+					ops = ['>', '<', '=='];
+					break;
+				default:
+					ops = ['=='];
+			}
 		}
 
-		// For type markers
-		switch (sig.values) {
-			case 'string':
-				return ['=='];
-			case 'int':
-			case 'float':
-			case 'date':
-				return ['>', '<', '=='];
-			default:
-				return ['=='];
+		if ((sig as any).nullable) {
+			ops.push('IS NULL' as any);
 		}
+
+		return ops;
 	}
 
 	// Get value options for enum fields
@@ -156,7 +166,9 @@
 		if (!allowedOps.includes(updated.operator as ConditionOperator)) {
 			updated.operator = getDefaultOperator(updated.variable) as any;
 		}
-		updated.value = coerceValue(updated.value, sig?.values ?? 'string');
+		if (updated.operator !== 'IS NULL') {
+			updated.value = coerceValue(updated.value, sig?.values ?? 'string');
+		}
 		next[i] = updated;
 		setConditions(next);
 	}
@@ -177,10 +189,18 @@
 	}
 
     function commitDraftIfValid() {
-		if (!draftRow?.field || !draftRow?.operator || (draftRow.value === undefined || draftRow.value === '' || (Array.isArray(draftRow.value) && draftRow.value.length === 0))) return;
+		if (!draftRow?.field || !draftRow?.operator) return;
+
+		if (draftRow.operator !== 'IS NULL') {
+			if (draftRow.value === undefined || draftRow.value === '' || (Array.isArray(draftRow.value) && draftRow.value.length === 0)) return;
+		}
 		
 		const sig = getFieldSignature(draftRow.field);
-		const value = coerceValue(draftRow.value, sig?.values ?? 'string');
+		let value = draftRow.value;
+		if (draftRow.operator !== 'IS NULL') {
+			value = coerceValue(draftRow.value, sig?.values ?? 'string');
+		}
+
         const newCond: Condition = (sig && (sig.type ?? 'default') === 'attribute')
             ? ({ 
                 type: 'attribute', 
@@ -226,7 +246,10 @@
 			if (!sig) continue; // drop unknown fields for current signature
 			const allowedOps = getOperatorOptions(c.variable);
             const operator = allowedOps.includes(c.operator as ConditionOperator) ? c.operator : getDefaultOperator(c.variable);
-            const value = coerceValue(c.value, sig.values);
+            let value = c.value;
+			if (operator !== 'IS NULL') {
+            	value = coerceValue(c.value, sig.values);
+			}
             if ((c as any).type === 'attribute') {
                 next.push({ 
                     type: 'attribute', 
@@ -302,7 +325,7 @@
 
 			<!-- Value Input -->
 			<div class="flex-1">
-				{#if true}
+				{#if condition.operator !== 'IS NULL'}
 					{@const sig = getFieldSignature(condition.variable)}
                     {#if sig && Array.isArray(sig.values)}
 						<MultiSelectWithSearch
@@ -323,6 +346,8 @@
 								placeholder="Enter value..."
 								oninput={(e: Event) => updateConditionAt(i, { value: (e.target as HTMLInputElement).value })}/>
 					{/if}
+				{:else}
+					<Input disabled value="" />
 				{/if}
 			</div>
 
@@ -374,24 +399,28 @@
 			<!-- Value Input -->
 			<div class="flex-1">
 				{#if draftRow.field}
-					{@const sig = getFieldSignature(draftRow.field)}
-					{#if sig && Array.isArray(sig.values)}
-						<MultiSelectWithSearch
-							options={getValueOptions(draftRow.field)}
-							values={(draftRow.value as string[]) ?? []}
-							onselect={(values) => updateDraftValue(values)}
-						/>
-					{:else if sig?.values === 'date'}
-						<DatePicker value={String(draftRow.value ?? '')}
-								onchange={(v) => updateDraftValue(v)}/>
-					{:else if sig?.values === 'int' || sig?.values === 'float'}
-						<Input type="number" step={sig.values === 'float' ? 'any' : '1'}
-								value={String(draftRow.value ?? '')}
-                                onchange={(e: Event) => updateDraftValue((e.target as HTMLInputElement).value)}/>
+					{#if draftRow.operator !== 'IS NULL'}
+						{@const sig = getFieldSignature(draftRow.field)}
+						{#if sig && Array.isArray(sig.values)}
+							<MultiSelectWithSearch
+								options={getValueOptions(draftRow.field)}
+								values={(draftRow.value as string[]) ?? []}
+								onselect={(values) => updateDraftValue(values)}
+							/>
+						{:else if sig?.values === 'date'}
+							<DatePicker value={String(draftRow.value ?? '')}
+									onchange={(v) => updateDraftValue(v)}/>
+						{:else if sig?.values === 'int' || sig?.values === 'float'}
+							<Input type="number" step={sig.values === 'float' ? 'any' : '1'}
+									value={String(draftRow.value ?? '')}
+									onchange={(e: Event) => updateDraftValue((e.target as HTMLInputElement).value)}/>
+						{:else}
+							<Input value={String(draftRow.value ?? '')}
+									placeholder="Enter value..."
+									onchange={(e: Event) => updateDraftValue((e.target as HTMLInputElement).value)}/>
+						{/if}
 					{:else}
-						<Input value={String(draftRow.value ?? '')}
-								placeholder="Enter value..."
-                                onchange={(e: Event) => updateDraftValue((e.target as HTMLInputElement).value)}/>
+						<Input disabled value="" />
 					{/if}
 				{:else}
 					<Input type="text" disabled placeholder="Select field first..."/>
