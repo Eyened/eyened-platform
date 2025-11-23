@@ -103,7 +103,7 @@ class ImageInstance(Base):
         ForeignKey("DeviceInstance.DeviceInstanceID")
     )
     # TODO: redundant with Modality enum
-    ModalityID: Mapped[int] = mapped_column(ForeignKey("Modality.ModalityID"))
+    ModalityID: Mapped[Optional[int]] = mapped_column(ForeignKey("Modality.ModalityID"))
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
 
     # Image modality
@@ -204,7 +204,7 @@ class ImageInstance(Base):
         back_populates="ImageInstances",
         lazy="selectin",
     )
-    _Modality: Mapped["ModalityTable"] = relationship(
+    _Modality: Mapped[Optional["ModalityTable"]] = relationship(
         "eyened_orm.image_instance.ModalityTable", back_populates="ImageInstances"
     )
     Scan: Mapped[Optional["Scan"]] = relationship(
@@ -422,7 +422,7 @@ class ImageInstance(Base):
         tag_description: Optional[str] = None,
     ) -> "ImageInstanceTagLink":
         """Create or reuse a tag and link it to this image instance."""
-        from eyened_orm import Tag, TagType, Creator
+        from eyened_orm import Creator, Tag, TagType
         from eyened_orm.tag import ImageInstanceTagLink
 
         session = self.session

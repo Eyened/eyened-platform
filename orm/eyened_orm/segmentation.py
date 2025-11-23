@@ -3,7 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 import numpy as np
-from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
@@ -220,6 +220,117 @@ class SegmentationBase(Base):
                 return False
         return True
 
+    def check_consistency(self):
+        """
+        Checks if the segmentation is consistent with the associated ImageInstance
+        and ReferenceSegmentation according to the rules.
+        """
+        # 1. Get ImageInstance
+        image = self.ImageInstance
+        if not image and self.ImageInstanceID:
+            session = object_session(self)
+            if session:
+                from eyened_orm.image_instance import ImageInstance
+
+                image = session.get(ImageInstance, self.ImageInstanceID)
+
+        if not image:
+            # If we can't find the image, we can't check (e.g. detached object without ID)
+            # For strict safety, raise error if ID is present but image not found.
+            if self.ImageInstanceID:
+                # This might happen if we are inserting a new Segmentation and a new ImageInstance together and flush hasn't happened for ImageInstance?
+                # But ImageInstanceID is required.
+                pass
+            return
+
+        # Image dimensions
+        # Note: ImageInstance.NrOfFrames can be None (implies 1)
+        img_d = image.NrOfFrames if image.NrOfFrames is not None else 1
+        img_h = image.Rows_y
+        img_w = image.Columns_x
+
+        # 2. Check Dimensions
+        if self.ImageProjectionMatrix is None:
+            # Strict match
+            if self.Depth != img_d:
+                raise ValueError(
+                    f"Depth mismatch: Segmentation {self.Depth} != Image {img_d}"
+                )
+            if self.Height != img_h:
+                raise ValueError(
+                    f"Height mismatch: Segmentation {self.Height} != Image {img_h}"
+                )
+            if self.Width != img_w:
+                raise ValueError(
+                    f"Width mismatch: Segmentation {self.Width} != Image {img_w}"
+                )
+        else:
+            # Sparse / Projected
+            if self.SparseAxis not in (0, 1, 2):
+                raise ValueError(
+                    "SparseAxis must be 0, 1, or 2 when ImageProjectionMatrix is provided"
+                )
+
+            # Check the sparse axis dimension
+            # The dimension along SparseAxis must be equal to image dimension OR 1
+            if self.SparseAxis == 0:
+                if self.Depth != img_d and self.Depth != 1:
+                    raise ValueError(
+                        f"Sparse Depth mismatch: {self.Depth} != {img_d} and != 1"
+                    )
+            elif self.SparseAxis == 1:
+                if self.Height != img_h and self.Height != 1:
+                    raise ValueError(
+                        f"Sparse Height mismatch: {self.Height} != {img_h} and != 1"
+                    )
+            elif self.SparseAxis == 2:
+                if self.Width != img_w and self.Width != 1:
+                    raise ValueError(
+                        f"Sparse Width mismatch: {self.Width} != {img_w} and != 1"
+                    )
+
+        # 3. Check ScanIndices
+        if self.ScanIndices is not None:
+            if self.SparseAxis is None:
+                raise ValueError("ScanIndices provided but SparseAxis is None")
+
+            limit = 0
+            if self.SparseAxis == 0:
+                limit = img_d
+            elif self.SparseAxis == 1:
+                limit = img_h
+            elif self.SparseAxis == 2:
+                limit = img_w
+
+            # indices must be < limit
+            for idx in self.ScanIndices:
+                if idx >= limit:
+                    raise ValueError(
+                        f"ScanIndex {idx} out of bounds for axis {self.SparseAxis} (limit {limit})"
+                    )
+
+        # 4. Check Reference Segmentation
+        if self.ReferenceSegmentationID is not None:
+            # We need to fetch the reference.
+            # Since SegmentationBase defines the ID but not the relationship in all subclasses,
+            # we might need to query safely.
+            # Assuming we are in a session
+            session = object_session(self)
+            if session:
+                # Use the class of the reference, which is Segmentation (manual)
+                from eyened_orm.segmentation import Segmentation as ManualSegmentation
+
+                ref = session.get(ManualSegmentation, self.ReferenceSegmentationID)
+                if ref:
+                    if (self.Depth, self.Height, self.Width) != (
+                        ref.Depth,
+                        ref.Height,
+                        ref.Width,
+                    ):
+                        raise ValueError(
+                            f"Dimensions mismatch with ReferenceSegmentation: {self.shape} != {ref.shape}"
+                        )
+
 
 class Segmentation(SegmentationBase):
     __tablename__ = "Segmentation"
@@ -245,7 +356,9 @@ class Segmentation(SegmentationBase):
         "eyened_orm.creator.Creator", back_populates="Segmentations", lazy="selectin"
     )
     Feature: Mapped["Feature"] = relationship(
-        "eyened_orm.segmentation.Feature", back_populates="Segmentations", lazy="selectin"
+        "eyened_orm.segmentation.Feature",
+        back_populates="Segmentations",
+        lazy="selectin",
     )
     SubTask: Mapped["SubTask"] = relationship(
         "eyened_orm.task.SubTask", back_populates="Segmentations"
@@ -491,7 +604,9 @@ class ModelSegmentation(SegmentationBase):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     Model: Mapped["SegmentationModel"] = relationship(
-        "eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations", lazy="selectin"
+        "eyened_orm.segmentation.SegmentationModel",
+        back_populates="Segmentations",
+        lazy="selectin",
     )
     ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="ModelSegmentations"
@@ -514,3 +629,26 @@ class ModelSegmentation(SegmentationBase):
             if base_model is not None:
                 return f"model_{base_model.ModelName}_{base_model.Version}"
         return "model_name_unknown"
+
+
+# Event Listeners
+def validate_segmentation(mapper, connection, target):
+    target.check_consistency()
+
+
+def validate_immutable_dims(mapper, connection, target):
+    # Check if history shows changes to dims
+    from sqlalchemy.orm.attributes import get_history
+
+    for attr in ["Depth", "Height", "Width"]:
+        hist = get_history(target, attr)
+        if hist.has_changes():
+            raise ValueError(f"Cannot modify {attr} of a Segmentation once created.")
+    target.check_consistency()
+
+
+event.listen(Segmentation, "before_insert", validate_segmentation)
+event.listen(Segmentation, "before_update", validate_immutable_dims)
+
+event.listen(ModelSegmentation, "before_insert", validate_segmentation)
+event.listen(ModelSegmentation, "before_update", validate_immutable_dims)

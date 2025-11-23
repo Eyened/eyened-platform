@@ -20,3 +20,4 @@ orm/migrations/transfer-config.*.yml
 database/
 segmentations.zarr/
 **/.ipynb_checkpoints/**
+.cursor/

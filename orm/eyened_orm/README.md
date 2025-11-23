@@ -664,12 +664,12 @@ session.commit()
   - `AttributeDataType` enum: String, Float, Int, JSON
   - Relationships: `AttributeValues` (1→N), `ProducingModels` (N→M, via AttributesModelOutput)
 
-- **`AttributeValue`**: Stores a computed attribute value for an entity
+- **`AttributeValue`**: Stores a computed or manual attribute value for an entity
   - Primary key: `AttributeValueID`
   - Unique constraints: separate constraints for each entity type (ImageInstance, Segmentation, ModelSegmentation) with AttributeID and ModelID
   - Check constraint: exactly one of ImageInstanceID, SegmentationID, or ModelSegmentationID must be non-null
   - Can attach to: `ImageInstance` (optional), `Segmentation` (optional), `ModelSegmentation` (optional)
-  - Relationships: `AttributeDefinition` (N→1, required), `ProducingModel` (N→1, required), `ImageInstance` (N→1, optional, CASCADE), `Segmentation` (N→1, optional, CASCADE), `ModelSegmentation` (N→1, optional, CASCADE), `InputValues` (provenance tracking, N→M), `UsedByValues` (provenance tracking, N→M)
+  - Relationships: `AttributeDefinition` (N→1, required), `ProducingModel` (N→1, optional), `ImageInstance` (N→1, optional, CASCADE), `Segmentation` (N→1, optional, CASCADE), `ModelSegmentation` (N→1, optional, CASCADE), `InputValues` (provenance tracking, N→M), `UsedByValues` (provenance tracking, N→M)
   - Stores value as: `ValueFloat`, `ValueInt`, `ValueText`, or `ValueJSON` depending on attribute type
 
 - **`AttributesModel`**: Model that produces attribute values (polymorphic)

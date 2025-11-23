@@ -919,14 +919,14 @@ export interface components {
              */
             type: "attribute";
             /** Model */
-            model: string;
+            model?: string | null;
             /** Variable */
             variable: string;
             /**
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN" | "IS NULL";
             /** Value */
             value: number | string | string[] | null;
             /** Feature */
@@ -979,7 +979,7 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN" | "IS NULL";
             /** Value */
             value: string | number | string[] | null;
         };
@@ -1141,69 +1141,6 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
-         * ImageImportData
-         * @description Model for a single image import data
-         */
-        ImageImportData: {
-            /**
-             * Project Name
-             * @description Required project name
-             */
-            project_name: string;
-            /**
-             * Patient Identifier
-             * @description Patient identifier in the system
-             */
-            patient_identifier?: string | null;
-            /**
-             * Patient Props
-             * @description Optional key-value properties for new patient
-             * @default {}
-             */
-            patient_props: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Study Date
-             * @description Study date (can be a date object or ISO format string)
-             */
-            study_date?: string | null;
-            /**
-             * Study Props
-             * @description Optional key-value properties for new study
-             * @default {}
-             */
-            study_props: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Series Id
-             * @description Optional series identifier
-             */
-            series_id?: string | null;
-            /**
-             * Series Props
-             * @description Optional key-value properties for new series
-             * @default {}
-             */
-            series_props: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Image
-             * @description Path to the image file (required)
-             */
-            image: string;
-            /**
-             * Image Props
-             * @description Optional key-value properties for new image
-             * @default {}
-             */
-            image_props: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
          * ImportOptions
          * @description Options for the import process
          */
@@ -1241,7 +1178,7 @@ export interface components {
         };
         /** ImportRequest */
         ImportRequest: {
-            data: components["schemas"]["ImageImportData"];
+            data: components["schemas"]["InstancePOSTFlat"];
             options: components["schemas"]["ImportOptions"];
         };
         /** ImportResponse */
@@ -1324,11 +1261,15 @@ export interface components {
             model_segmentations?: components["schemas"]["ModelSegmentationGET"][] | null;
             /** Form Annotations */
             form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
-            /** Attributes */
-            attributes: {
+            /** Model Attrs */
+            model_attrs: {
                 [key: string]: {
                     [key: string]: unknown;
                 };
+            };
+            /** Attrs */
+            attrs: {
+                [key: string]: unknown;
             };
         };
         /** InstanceMeta */
@@ -1346,6 +1287,76 @@ export interface components {
             device: components["schemas"]["DeviceMeta"];
             /** Tags */
             tags: components["schemas"]["TagMeta"][];
+        };
+        /** InstancePOSTFlat */
+        InstancePOSTFlat: {
+            /** Sop Instance Uid */
+            sop_instance_uid?: string | null;
+            modality?: components["schemas"]["Modality"] | null;
+            dicom_modality?: components["schemas"]["ModalityType"] | null;
+            etdrs_field?: components["schemas"]["ETDRSField"] | null;
+            /** Angio Graphy */
+            angio_graphy?: string | null;
+            laterality?: components["schemas"]["Laterality"] | null;
+            /** Rows */
+            rows?: number | null;
+            /** Columns */
+            columns?: number | null;
+            /** Nr Of Frames */
+            nr_of_frames?: number | null;
+            /** Resolution Horizontal */
+            resolution_horizontal?: number | null;
+            /** Resolution Vertical */
+            resolution_vertical?: number | null;
+            /** Resolution Axial */
+            resolution_axial?: number | null;
+            /** Old Path */
+            old_path?: string | null;
+            /** Device Id */
+            device_id?: number | null;
+            /** Device Serial Number */
+            device_serial_number?: string | null;
+            /** Device Description */
+            device_description?: string | null;
+            /** Device Manufacturer */
+            device_manufacturer?: string | null;
+            /** Device Model */
+            device_model?: string | null;
+            /**
+             * Project Name
+             * @description Required project name
+             */
+            project_name: string;
+            /**
+             * Patient Identifier
+             * @description Patient identifier
+             */
+            patient_identifier?: string | null;
+            sex?: components["schemas"]["SexEnum"] | null;
+            /** Birth Date */
+            birth_date?: string | null;
+            /** Study Date */
+            study_date?: string | null;
+            /** Study Description */
+            study_description?: string | null;
+            /** Series Id */
+            series_id?: string | null;
+            /** Series Number */
+            series_number?: number | null;
+            /** Series Instance Uid */
+            series_instance_uid?: string | null;
+            /**
+             * Image
+             * @description Path to the image file
+             */
+            image: string;
+            /**
+             * Attributes
+             * @description Optional key-value properties
+             */
+            attributes?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * Laterality
@@ -1561,6 +1572,11 @@ export interface components {
             id: number;
         };
         /**
+         * SexEnum
+         * @enum {string}
+         */
+        SexEnum: "M" | "F";
+        /**
          * SignatureField
          * @description Signature descriptor for a searchable field.
          */
@@ -1579,6 +1595,11 @@ export interface components {
             model?: string | null;
             /** Feature */
             feature?: string | null;
+            /**
+             * Nullable
+             * @default false
+             */
+            nullable: boolean;
         };
         /** StudyGET */
         StudyGET: {
@@ -1621,7 +1642,7 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN" | "IS NULL";
             /** Value */
             value: string | number | string[] | null;
         };

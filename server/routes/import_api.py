@@ -1,16 +1,17 @@
-from typing import Dict, Optional, Any, Union
 import traceback
-import datetime
+from typing import Any, Dict, Optional
 
+from eyened_orm.importer.importer import Importer
+from eyened_orm.importer.importer_dtos import InstancePOSTFlat
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBasic
 from pydantic import BaseModel, Field
-from server.routes.auth import CurrentUser, get_current_user
 from sqlalchemy.orm import Session
 
-from eyened_orm.importer.importer import Importer
-from ..db import get_db
+from server.routes.auth import CurrentUser, get_current_user
+
 from ..config import settings
+from ..db import get_db
 from ..utils.huey import task_run_inference, task_update_thumbnails
 
 router = APIRouter()
@@ -18,32 +19,7 @@ security = HTTPBasic()
 
 
 # Pydantic models for request and response schemas
-class ImageImportData(BaseModel):
-    """
-    Model for a single image import data
-    """
-
-    project_name: str = Field(..., description="Required project name")
-    patient_identifier: Optional[str] = Field(
-        None, description="Patient identifier in the system"
-    )
-    patient_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new patient"
-    )
-    study_date: Optional[Union[datetime.date, str]] = Field(
-        None, description="Study date (can be a date object or ISO format string)"
-    )
-    study_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new study"
-    )
-    series_id: Optional[str] = Field(None, description="Optional series identifier")
-    series_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new series"
-    )
-    image: str = Field(..., description="Path to the image file (required)")
-    image_props: Optional[Dict[str, Any]] = Field(
-        {}, description="Optional key-value properties for new image"
-    )
+# InstancePOSTFlat is used as ImageImportData replacement
 
 
 class ImportOptions(BaseModel):
@@ -69,7 +45,7 @@ class ImportOptions(BaseModel):
 
 
 class ImportRequest(BaseModel):
-    data: ImageImportData
+    data: InstancePOSTFlat
     options: ImportOptions
 
 
@@ -108,17 +84,12 @@ async def import_single_image(
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-
     # Create importer with options
     importer = make_importer(session, request.options)
 
-    # Process the date field if it's a string
-    image_data = request.data.model_dump()
-    image_data["study_date"] = datetime.date.fromisoformat(image_data["study_date"])
-
     # Execute the import
     try:
-        images = importer.import_one(image_data)
+        images = importer.import_one(request.data)
 
     except Exception as e:
         include_stack_trace = request.options.include_stack_trace
@@ -135,7 +106,7 @@ async def import_single_image(
     return ImportResponse(
         success=True,
         message="Import completed successfully",
-        data={"project_name": image_data["project_name"], "image_count": len(images)},
+        data={"project_name": request.data.project_name, "image_count": len(images)},
     )
 
 

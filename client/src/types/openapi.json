@@ -4707,7 +4707,14 @@
             "title": "Type"
           },
           "model": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Model"
           },
           "variable": {
@@ -4723,7 +4730,8 @@
               "<=",
               "==",
               "!=",
-              "IN"
+              "IN",
+              "IS NULL"
             ],
             "title": "Operator"
           },
@@ -4765,7 +4773,6 @@
         "type": "object",
         "required": [
           "type",
-          "model",
           "variable",
           "operator",
           "value"
@@ -4896,7 +4903,8 @@
               "<=",
               "==",
               "!=",
-              "IN"
+              "IN",
+              "IS NULL"
             ],
             "title": "Operator"
           },
@@ -5475,123 +5483,6 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ImageImportData": {
-        "properties": {
-          "project_name": {
-            "type": "string",
-            "title": "Project Name",
-            "description": "Required project name"
-          },
-          "patient_identifier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Identifier",
-            "description": "Patient identifier in the system"
-          },
-          "patient_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Props",
-            "description": "Optional key-value properties for new patient",
-            "default": {}
-          },
-          "study_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Study Date",
-            "description": "Study date (can be a date object or ISO format string)"
-          },
-          "study_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Study Props",
-            "description": "Optional key-value properties for new study",
-            "default": {}
-          },
-          "series_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Series Id",
-            "description": "Optional series identifier"
-          },
-          "series_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Series Props",
-            "description": "Optional key-value properties for new series",
-            "default": {}
-          },
-          "image": {
-            "type": "string",
-            "title": "Image",
-            "description": "Path to the image file (required)"
-          },
-          "image_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image Props",
-            "description": "Optional key-value properties for new image",
-            "default": {}
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_name",
-          "image"
-        ],
-        "title": "ImageImportData",
-        "description": "Model for a single image import data"
-      },
       "ImportOptions": {
         "properties": {
           "create_patients": {
@@ -5632,7 +5523,7 @@
       "ImportRequest": {
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ImageImportData"
+            "$ref": "#/components/schemas/InstancePOSTFlat"
           },
           "options": {
             "$ref": "#/components/schemas/ImportOptions"
@@ -5922,13 +5813,18 @@
             ],
             "title": "Form Annotations"
           },
-          "attributes": {
+          "model_attrs": {
             "additionalProperties": {
               "additionalProperties": true,
               "type": "object"
             },
             "type": "object",
-            "title": "Attributes"
+            "title": "Model Attrs"
+          },
+          "attrs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attrs"
           }
         },
         "type": "object",
@@ -5954,7 +5850,8 @@
           "device",
           "scan",
           "tags",
-          "attributes"
+          "model_attrs",
+          "attrs"
         ],
         "title": "InstanceGET"
       },
@@ -6032,6 +5929,316 @@
           "tags"
         ],
         "title": "InstanceMeta"
+      },
+      "InstancePOSTFlat": {
+        "properties": {
+          "sop_instance_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sop Instance Uid"
+          },
+          "modality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Modality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dicom_modality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModalityType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "etdrs_field": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ETDRSField"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "angio_graphy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Angio Graphy"
+          },
+          "laterality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Laterality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "nr_of_frames": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nr Of Frames"
+          },
+          "resolution_horizontal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Horizontal"
+          },
+          "resolution_vertical": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Vertical"
+          },
+          "resolution_axial": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Axial"
+          },
+          "old_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Path"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "device_serial_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial Number"
+          },
+          "device_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Description"
+          },
+          "device_manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Manufacturer"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name",
+            "description": "Required project name"
+          },
+          "patient_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Identifier",
+            "description": "Patient identifier"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SexEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
+          "study_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Date"
+          },
+          "study_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Description"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "series_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Number"
+          },
+          "series_instance_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Instance Uid"
+          },
+          "image": {
+            "type": "string",
+            "title": "Image",
+            "description": "Path to the image file"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes",
+            "description": "Optional key-value properties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_name",
+          "image"
+        ],
+        "title": "InstancePOSTFlat"
       },
       "Laterality": {
         "type": "string",
@@ -6706,6 +6913,14 @@
         ],
         "title": "SeriesMeta"
       },
+      "SexEnum": {
+        "type": "string",
+        "enum": [
+          "M",
+          "F"
+        ],
+        "title": "SexEnum"
+      },
       "SignatureField": {
         "properties": {
           "name": {
@@ -6756,6 +6971,11 @@
               }
             ],
             "title": "Feature"
+          },
+          "nullable": {
+            "type": "boolean",
+            "title": "Nullable",
+            "default": false
           }
         },
         "type": "object",
@@ -6884,7 +7104,8 @@
               "<=",
               "==",
               "!=",
-              "IN"
+              "IN",
+              "IS NULL"
             ],
             "title": "Operator"
           },
