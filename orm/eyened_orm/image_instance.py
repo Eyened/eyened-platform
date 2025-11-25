@@ -74,11 +74,24 @@ class ETDRSField(Enum):
 class ImageInstance(Base):
     __tablename__ = "ImageInstance"
     __table_args__ = (
-        Index("fk_ImageInstance_Series1_idx", "SeriesID"),
+        Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
         Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
         Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
         Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
         Index("fk_ImageInstance_Scan1_idx", "ScanID"),
+        Index("fk_ImageInstance_Series1_idx", "SeriesID"),
+        Index(
+            "ix_ImageInstance_Modality_Inactive_Laterality",
+            "Modality",
+            "Inactive",
+            "Laterality",
+        ),
+        Index(
+            "ix_ImageInstance_Modality_Inactive_ETDRSField",
+            "Modality",
+            "Inactive",
+            "ETDRSField",
+        ),
         Index(
             "SOPInstanceUid_UNIQUE",
             "SOPInstanceUid",

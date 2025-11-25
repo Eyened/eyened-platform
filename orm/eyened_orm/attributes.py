@@ -118,6 +118,27 @@ class AttributeValue(Base):
         Index("fk_AttributeValue_Study1_idx", "StudyID"),
         Index("fk_AttributeValue_Attribute1_idx", "AttributeID"),
         Index("fk_AttributeValue_Model1_idx", "ModelID"),
+        Index(
+            "ix_AttributeValue_ImageInstance_Attribute",
+            "ImageInstanceID",
+            "AttributeID",
+        ),
+        Index(
+            "ix_AttributeValue_Segmentation_Attribute",
+            "SegmentationID",
+            "AttributeID",
+        ),
+        Index(
+            "ix_AttributeValue_ModelSegmentation_Attribute",
+            "ModelSegmentationID",
+            "AttributeID",
+        ),
+        Index(
+            "ix_AttributeValue_Patient_Attribute",
+            "PatientID",
+            "AttributeID",
+        ),
+        Index("ix_AttributeValue_Study_Attribute", "StudyID", "AttributeID"),
         CheckConstraint(
             "(ImageInstanceID IS NOT NULL AND SegmentationID IS NULL AND ModelSegmentationID IS NULL AND PatientID IS NULL AND StudyID IS NULL) OR "
             "(ImageInstanceID IS NULL AND SegmentationID IS NOT NULL AND ModelSegmentationID IS NULL AND PatientID IS NULL AND StudyID IS NULL) OR "

@@ -50,6 +50,7 @@ class Task(Base):
     __tablename__ = "Task"
     __table_args__ = (
         Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),
+        Index("ix_Task_Creator_TaskDefinition", "CreatorID", "TaskDefinitionID"),
     )
     _name_column: ClassVar[str] = "TaskName"
 
@@ -121,6 +122,11 @@ class SubTaskImageLink(Base):
     __table_args__ = (
         Index("fk_SubTaskImageLink_SubTask1_idx", "SubTaskID"),
         Index("fk_SubTaskImageLink_ImageInstance1_idx", "ImageInstanceID"),
+        Index(
+            "ix_SubTaskImageLink_Image_SubTask",
+            "ImageInstanceID",
+            "SubTaskID",
+        ),
     )
     SubTaskID: Mapped[int] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="CASCADE"), primary_key=True)
     ImageInstanceID: Mapped[int] = mapped_column(
@@ -136,6 +142,7 @@ class SubTask(Base):
     __table_args__ = (
         Index("fk_SubTask_Creator1_idx", "CreatorID"),
         Index("fk_SubTask_Task1_idx", "TaskID"),
+        Index("ix_SubTask_TaskState_Creator", "TaskState", "CreatorID"),
     )
 
     SubTaskID: Mapped[int] = mapped_column(primary_key=True)

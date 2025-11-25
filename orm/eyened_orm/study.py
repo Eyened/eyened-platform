@@ -23,10 +23,11 @@ class Study(Base):
 
     __tablename__ = "Study"
     __table_args__ = (
-        Index("PatientIDStudyDate_UNIQUE", "StudyDate", "PatientID", unique=True),
-        Index("fk_Study_Patient1_idx", "PatientID"),
+        Index("PatientIDStudyDate_UNIQUE", "PatientID", "StudyDate", unique=True),
         Index("StudyDate_idx", "StudyDate"),
-        Index("StudyRound", "StudyRound"),
+        Index("fk_Study_Patient1_idx", "PatientID"),
+        Index("ix_Study_PatientID_StudyRound", "PatientID", "StudyRound"),
+        Index("ix_Study_StudyRound_StudyDate", "StudyRound", "StudyDate"),
     )
 
     StudyID: Mapped[int] = mapped_column(primary_key=True)
@@ -43,7 +44,10 @@ class Study(Base):
         "eyened_orm.patient.Patient", back_populates="Studies", lazy="selectin"
     )
     Series: Mapped[List["Series"]] = relationship(
-        "eyened_orm.series.Series", back_populates="Study", passive_deletes=True, lazy="selectin"
+        "eyened_orm.series.Series",
+        back_populates="Study",
+        passive_deletes=True,
+        lazy="selectin",
     )
     Annotations: Mapped[List["Annotation"]] = relationship(
         "eyened_orm.annotation.Annotation", back_populates="Study"

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, String, func
+from sqlalchemy import ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from eyened_orm.base import Base, CompositeUniqueConstraint, ForeignKeyIndex
@@ -108,6 +108,7 @@ class StudyTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "Study", "StudyID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_StudyTag_Study_Tag", "StudyID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -137,6 +138,7 @@ class ImageInstanceTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "ImageInstance", "ImageInstanceID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_ImageInstanceTag_Image_Tag", "ImageInstanceID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -168,6 +170,7 @@ class AnnotationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "Annotation", "AnnotationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_AnnotationTag_Annotation_Tag", "AnnotationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -193,6 +196,7 @@ class SegmentationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "Segmentation", "SegmentationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_SegmentationTag_Segmentation_Tag", "SegmentationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -222,6 +226,11 @@ class FormAnnotationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "FormAnnotation", "FormAnnotationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index(
+            "ix_FormAnnotationTag_Form_Tag",
+            "FormAnnotationID",
+            "TagID",
+        ),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
