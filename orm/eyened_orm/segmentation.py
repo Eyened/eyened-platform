@@ -334,6 +334,16 @@ class SegmentationBase(Base):
 
 class Segmentation(SegmentationBase):
     __tablename__ = "Segmentation"
+    __table_args__ = (
+        Index(
+            "ix_Segmentation_Image_Feature_Inactive",
+            "ImageInstanceID",
+            "FeatureID",
+            "Inactive",
+        ),
+        Index("ix_Segmentation_SubTask_Feature", "SubTaskID", "FeatureID"),
+        Index("ix_Segmentation_Feature_Inactive", "FeatureID", "Inactive"),
+    )
     SegmentationID: Mapped[int] = mapped_column(primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
@@ -597,6 +607,10 @@ class SegmentationModel(Model):
 
 class ModelSegmentation(SegmentationBase):
     __tablename__ = "ModelSegmentation"
+    __table_args__ = (
+        Index("ix_ModelSegmentation_Model_Image", "ModelID", "ImageInstanceID"),
+        Index("ix_ModelSegmentation_Image_Model", "ImageInstanceID", "ModelID"),
+    )
 
     ModelSegmentationID: Mapped[int] = mapped_column(primary_key=True)
     ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID"))

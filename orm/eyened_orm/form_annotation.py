@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 from enum import Enum
 from pandas import DataFrame, json_normalize
-from sqlalchemy import Column, DateTime, ForeignKey, String, func, Enum as SAEnum
+from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func, Enum as SAEnum
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -42,6 +42,27 @@ class FormSchema(Base):
 
 class FormAnnotation(Base):
     __tablename__ = "FormAnnotation"
+    __table_args__ = (
+        Index(
+            "ix_FormAnnotation_FormSchema_Inactive_Creator",
+            "FormSchemaID",
+            "Inactive",
+            "CreatorID",
+        ),
+        Index(
+            "ix_FormAnnotation_Patient_Study_Inactive",
+            "PatientID",
+            "StudyID",
+            "Inactive",
+        ),
+        Index(
+            "ix_FormAnnotation_Image_Laterality_Inactive",
+            "ImageInstanceID",
+            "Laterality",
+            "Inactive",
+        ),
+        Index("ix_FormAnnotation_SubTask_Inactive", "SubTaskID", "Inactive"),
+    )
 
     FormAnnotationID: Mapped[int] = mapped_column(primary_key=True)
 

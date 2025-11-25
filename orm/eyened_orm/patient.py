@@ -29,11 +29,17 @@ class Patient(Base):
     __table_args__ = (
         Index(
             "ProjectIDPatientIdentifier_UNIQUE",
-            "PatientIdentifier",
             "ProjectID",
+            "PatientIdentifier",
             unique=True,
         ),
         Index("fk_Patient_Project1_idx", "ProjectID"),
+        Index(
+            "ix_Patient_Project_Sex_BirthDate",
+            "ProjectID",
+            "Sex",
+            "BirthDate",
+        ),
     )
 
     _name_column: ClassVar[str] = "PatientIdentifier"
