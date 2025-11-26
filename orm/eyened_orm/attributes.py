@@ -3,11 +3,14 @@ from __future__ import annotations
 from enum import Enum
 from typing import List, Optional
 
+import pandas as pd
+
 from sqlalchemy import (
     JSON,
     CheckConstraint,
     ForeignKey,
     Index,
+    cast,
     String,
     UniqueConstraint,
 )
@@ -15,6 +18,11 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from eyened_orm.segmentation import Model, ModelKind
+from eyened_orm.image_instance import ImageInstance
+from eyened_orm.study import Study
+from eyened_orm.patient import Patient
+from eyened_orm.project import Project
+from eyened_orm.series import Series
 
 from .base import Base
 from .image_instance import Laterality
@@ -50,6 +58,42 @@ class AttributesModel(Model):
     )
 
     __mapper_args__ = {"polymorphic_identity": ModelKind.Attributes}
+
+    def export_to_csv(self, session: Session, output_path: str, attributes: List[AttributeDefinition], project_names: List[str]):
+
+        attribute_values = (session.query(
+                AttributeValue.ValueFloat,
+                AttributeValue.ValueInt,
+                AttributeValue.ValueText,
+                AttributeDefinition.AttributeName,
+                ImageInstance.ImageInstanceID,
+                cast(ImageInstance.Laterality, String),
+                Patient.PatientIdentifier,
+                Study.StudyDate,
+                Project.ProjectName,
+            ).join(AttributeDefinition).filter(AttributeDefinition.AttributeName.in_(attributes))
+            .filter(AttributeDefinition.AttributeDataType != AttributeDataType.JSON)
+            .join(AttributesModel).filter(AttributesModel.ModelID == self.ModelID)
+            .join(ImageInstance, AttributeValue.ImageInstanceID == ImageInstance.ImageInstanceID)
+            .join(Series, ImageInstance.SeriesID == Series.SeriesID)
+            .join(Study, Series.StudyID == Study.StudyID)
+            .join(Patient, Study.PatientID == Patient.PatientID)
+            .join(Project, Patient.ProjectID == Project.ProjectID)
+            .filter(Project.ProjectName.in_(project_names)))
+
+        results = attribute_values.all()
+        df = pd.DataFrame(results, columns=['ValueFloat', 'ValueInt', 'ValueJSON', 'AttributeName', 'ImageInstanceID', 'Laterality', 'PatientIdentifier', 'StudyDate', 'ProjectName'])
+
+        df_pivot = df.pivot(
+                index=['ImageInstanceID', 'PatientIdentifier', 'Laterality', 'ProjectName', 'StudyDate'],
+                columns='AttributeName',
+                values=['ValueFloat', 'ValueInt', 'ValueJSON']
+            )
+        df_pivot.reset_index(inplace=True)
+        df_pivot.dropna(axis=1, how='all', inplace=True)
+        # Remove the top-level ('ValueFloat', ...), keep only 'AttributeName' in columns
+        df_pivot.columns = [col[1] if isinstance(col, tuple) and col[1] else col[0] for col in df_pivot.columns.values]
+        df_pivot.to_csv(output_path, index=False)
 
 
 class AttributeDefinition(Base):
