@@ -138,7 +138,7 @@ def sort_images(images):
 
 
 def get_pixel_array(image):
-    if image.NrOfFrames > 1:
+    if image.NrOfFrames and image.NrOfFrames > 1:
         # Note: using only the first frame for registration
         return image.pixel_array[0]
     else:
