@@ -159,7 +159,7 @@ class SegmentationBase(Base):
         axis: Optional[int] = None,
         slice_index: Optional[int] = None,
     ) -> int:
-        """Write annotation data to the zarr array and update the ZarrArrayIndex."""
+        """Write annotation data (D, H, W) to the zarr array and update the ZarrArrayIndex."""
 
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")

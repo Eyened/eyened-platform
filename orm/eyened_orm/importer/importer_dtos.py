@@ -14,11 +14,10 @@ class InstancePOST(BaseModel):
     modality: Optional[Modality] = None
     dicom_modality: Optional[ModalityType] = None
     etdrs_field: Optional[ETDRSField] = None
-    angio_graphy: Optional[str] = None
     laterality: Optional[Laterality] = None
-    rows: Optional[int] = None
-    columns: Optional[int] = None
-    nr_of_frames: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    depth: Optional[int] = None
     resolution_horizontal: Optional[float] = None
     resolution_vertical: Optional[float] = None
     resolution_axial: Optional[float] = None
@@ -47,6 +46,10 @@ class SegmentationImport(BaseModel):
     threshold: Optional[float] = None
     reference_segmentation_id: Optional[int] = None
 
+    # Metadata fields
+    creator_name: Optional[str] = None
+    feature_name: Optional[str] = None
+
 
 class ImageImport(InstancePOST):
     image: str
@@ -72,7 +75,6 @@ class StudyImport(BaseModel):
 
 
 class PatientImport(BaseModel):
-    project_name: str
     patient_identifier: Optional[str] = None
     studies: List[StudyImport] = Field(default_factory=list)
 
@@ -83,7 +85,6 @@ class PatientImport(BaseModel):
 
 class InstancePOSTFlat(InstancePOST):
     # Flattened version of PatientImport -> StudyImport -> SeriesImport -> ImageImport
-    project_name: str = Field(..., description="Required project name")
     patient_identifier: Optional[str] = Field(None, description="Patient identifier")
     sex: Optional[SexEnum] = None
     birth_date: Optional[date] = None
