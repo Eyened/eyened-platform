@@ -37,10 +37,11 @@ class Importer:
         self,
         session,
         config: EyenedORMConfig,
+        project_name: str,
         create_patients: bool = False,
         create_studies: bool = False,
         create_series: bool = True,
-        create_projects: bool = False,
+        create_project: bool = False,
         run_ai_models: bool = False,
         generate_thumbnails: bool = True,
     ):
@@ -53,13 +54,15 @@ class Importer:
             Database session to use for the import
         config : EyenedORMConfig
             Configuration to use for the import
+        project_name : str
+            The name of the project to import into
         create_patients : bool, default=False
             If True, create patients when they don't exist
         create_studies : bool, default=False
             If True, create studies when they don't exist
         create_series : bool, default=False
             If True, create series when they don't exist
-        create_projects : bool, default=False
+        create_project : bool, default=False
             If True, create project when it doesn't exist
         run_ai_models : bool, default=False
             If True, run AI models on the images after import
@@ -69,10 +72,11 @@ class Importer:
         """
         self.session = session
         self.config = config
+        self.project_name = project_name
         self.create_patients = create_patients
         self.create_studies = create_studies
         self.create_series = create_series
-        self.create_projects = create_projects
+        self.create_project = create_project
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
 
@@ -119,17 +123,11 @@ class Importer:
         # Clear collections before starting
         self._clear_collections()
 
-        # Check that all patient items have a project_name
-        for i, patient_item in enumerate(data):
-            if not patient_item.project_name:
-                raise ValueError(f"project_name is required for patient at index {i}")
+        # Get or create the project for this importer instance
+        project = self.get_or_create_project()
 
         # Process each patient
         for patient_item in data:
-            # Find or create the project for this patient
-            project = self.find_or_create_projects(patient_item.project_name)
-            self.projects.append(project)
-
             patient = self.find_or_create_patient(patient_item, project)
             self.patients.append(patient)
 
@@ -197,6 +195,8 @@ class Importer:
     def _process_segmentations(
         self, image: ImageInstance, segmentations_data: List[SegmentationImport]
     ):
+        from eyened_orm import Creator, Feature
+
         for item in segmentations_data:
             data = item.data
 
@@ -213,6 +213,23 @@ class Importer:
                 ReferenceSegmentationID=item.reference_segmentation_id,
                 ImageInstance=image,
             )
+
+            # Set metadata if provided
+            if item.creator_name:
+                creator = Creator.by_name(self.session, item.creator_name)
+                if creator is None:
+                    raise ValueError(
+                        f"Creator '{item.creator_name}' not found in database"
+                    )
+                seg.CreatorID = creator.CreatorID
+
+            if item.feature_name:
+                feature = Feature.by_name(self.session, item.feature_name)
+                if feature is None:
+                    raise ValueError(
+                        f"Feature '{item.feature_name}' not found in database"
+                    )
+                seg.FeatureID = feature.FeatureID
 
             # Infer DataType if missing
             if seg.DataType is None:
@@ -238,23 +255,23 @@ class Importer:
             self.segmentations.append(seg)
             self.pending_segmentation_writes.append((seg, data))
 
-    def find_or_create_projects(self, project_name: str) -> Project:
+    def get_or_create_project(self) -> Project:
         # Check if we've already processed this project
-        for project in self.projects:
-            if project.ProjectName == project_name:
-                return project
+        if self.projects:
+            return self.projects[0]
 
         # Try to find the project in the database
-        project = Project.by_name(self.session, project_name)
+        project = Project.by_name(self.session, self.project_name)
 
         # Create the project if it doesn't exist and we're allowed to
         if project is None:
-            if not self.create_projects:
+            if not self.create_project:
                 raise RuntimeError(
-                    f"Project with name '{project_name}' not found and create_projects=False"
+                    f"Project with name '{self.project_name}' not found and create_project=False"
                 )
-            project = Project(ProjectName=project_name, External=ExternalEnum.Y)
+            project = Project(ProjectName=self.project_name, External=ExternalEnum.Y)
 
+        self.projects.append(project)
         return project
 
     def find_or_create_patient(
@@ -397,12 +414,6 @@ class Importer:
     def find_or_create_image(
         self, series: Series, image_data: ImageImport
     ) -> ImageInstance:
-        angio = None
-        if image_data.angio_graphy is not None:
-            angio = (
-                int(image_data.angio_graphy) if image_data.angio_graphy.isdigit() else 0
-            )
-
         device_instance = self.find_or_create_device_instance(
             device_id=image_data.device_id,
             manufacturer=image_data.device_manufacturer,
@@ -416,11 +427,10 @@ class Importer:
             Modality=image_data.modality,
             DICOMModality=image_data.dicom_modality,
             ETDRSField=image_data.etdrs_field,
-            Angiography=angio,
             Laterality=image_data.laterality,
-            Rows_y=image_data.rows,
-            Columns_x=image_data.columns,
-            NrOfFrames=image_data.nr_of_frames,
+            Rows_y=image_data.height,
+            Columns_x=image_data.width,
+            NrOfFrames=image_data.depth,
             ResolutionHorizontal=image_data.resolution_horizontal,
             ResolutionVertical=image_data.resolution_vertical,
             ResolutionAxial=image_data.resolution_axial,
@@ -713,18 +723,6 @@ class Importer:
                 print("\n-----------  Segmentation Consistency Checks  -----------")
                 for i, (seg, data) in enumerate(self.pending_segmentation_writes):
                     try:
-                        # Check dimensions
-                        if seg.shape != data.shape:
-                            print(
-                                f"ERROR: Segmentation {i} shape mismatch. Object: {seg.shape}, Data: {data.shape}"
-                            )
-
-                        # Check dtype
-                        if seg.dtype != data.dtype:
-                            print(
-                                f"ERROR: Segmentation {i} dtype mismatch. Object: {seg.dtype}, Data: {data.dtype}"
-                            )
-
                         # Run ORM consistency check
                         seg.check_consistency()
                     except Exception as e:
@@ -736,7 +734,7 @@ class Importer:
         return summary
 
     def import_many(
-        self, data: List[Dict], summary: bool = False
+        self, data: List[PatientImport], summary: bool = False
     ) -> Union[List[ImageInstance], Dict]:
         """Import data or generate a summary of what would be imported."""
         try:
@@ -762,7 +760,6 @@ class Importer:
         # Construct the hierarchical structure
         # 1. Extract ImageImport data (InstancePOST fields + image + attributes)
         exclude_fields = {
-            "project_name",
             "patient_identifier",
             "sex",
             "birth_date",
@@ -790,7 +787,6 @@ class Importer:
         )
 
         patient_item = PatientImport(
-            project_name=data_obj.project_name,
             patient_identifier=data_obj.patient_identifier,
             sex=data_obj.sex,
             birth_date=data_obj.birth_date,

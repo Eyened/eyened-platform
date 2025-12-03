@@ -361,6 +361,12 @@ class ImageInstance(Base):
         bounds = get_cfi_bounds(pixel_array)
         return bounds
 
+    def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
+        if self.bounds is None:
+            return None
+        M, bounds = self.bounds.crop(diameter)
+        return M.warp(self.pixel_array, (diameter, diameter))
+
     @property
     def cropping_matrix(self) -> Optional[np.ndarray]:
         """3x3 transformation matrix from original image to 1024x1024 square space"""
