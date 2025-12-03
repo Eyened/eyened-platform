@@ -75,6 +75,7 @@ class StudyImport(BaseModel):
 
 
 class PatientImport(BaseModel):
+    project_name: str = Field(..., description="Name of the project")
     patient_identifier: Optional[str] = None
     studies: List[StudyImport] = Field(default_factory=list)
 
@@ -85,6 +86,7 @@ class PatientImport(BaseModel):
 
 class InstancePOSTFlat(InstancePOST):
     # Flattened version of PatientImport -> StudyImport -> SeriesImport -> ImageImport
+    project_name: str = Field(..., description="Name of the project")
     patient_identifier: Optional[str] = Field(None, description="Patient identifier")
     sex: Optional[SexEnum] = None
     birth_date: Optional[date] = None
