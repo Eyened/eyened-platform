@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -27,6 +27,19 @@ class InstancePOST(BaseModel):
     device_description: Optional[str] = None
     device_manufacturer: Optional[str] = None
     device_model: Optional[str] = None
+
+    # New fields
+    scan_mode: Optional[str] = None
+    source_info_id: Optional[int] = None
+    anatomic_region: Optional[int] = None
+    acquisition_date_time: Optional[datetime] = None
+    angiography: Optional[str] = None
+    samples_per_pixel: Optional[int] = None
+    horizontal_field_of_view: Optional[float] = None
+    sop_class_uid: Optional[str] = None
+    photometric_interpretation: Optional[str] = None
+    pupil_dilated: Optional[str] = None
+    fda_identifier: Optional[str] = None
 
 
 class SegmentationImport(BaseModel):
@@ -75,6 +88,7 @@ class StudyImport(BaseModel):
 
 
 class PatientImport(BaseModel):
+    project_name: str = Field(..., description="Name of the project")
     patient_identifier: Optional[str] = None
     studies: List[StudyImport] = Field(default_factory=list)
 
@@ -85,6 +99,7 @@ class PatientImport(BaseModel):
 
 class InstancePOSTFlat(InstancePOST):
     # Flattened version of PatientImport -> StudyImport -> SeriesImport -> ImageImport
+    project_name: str = Field(..., description="Name of the project")
     patient_identifier: Optional[str] = Field(None, description="Patient identifier")
     sex: Optional[SexEnum] = None
     birth_date: Optional[date] = None
