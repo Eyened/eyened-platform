@@ -29,7 +29,7 @@ type ProjectiveTransform = {
     Matrix: number[];
 }
 type ParabolicTransform = {
-    type: 'ParabolicTransform';
+    type: 'ParabolicTransform' | 'Polynomial2DTransform';
     dx: number[];
     dy: number[];
 }
@@ -47,6 +47,7 @@ function getTransform(source: string, target: string, item: Transform): Registra
             const [a, b, c, d, e, f, g, h, i] = item.Matrix;
             return new AffineRegistration(source, target, new Matrix(a, b, c, d, e, f, g, h, i));
         case 'ParabolicTransform':
+        case 'Polynomial2DTransform':
             return new ParabolicRegistration(source, target, item.dx, item.dy);
         default:
             throw new Error(`Unknown transform type: ${item.type}`);
