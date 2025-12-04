@@ -51,7 +51,6 @@ export class SegmentationContext {
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage,
     ) {
-        console.log(this.axis);
     }
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
