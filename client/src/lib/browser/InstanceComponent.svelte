@@ -9,7 +9,6 @@
 
 	const browserContext = getContext<BrowserContext>("browserContext");
 	const globalContext = getContext<GlobalContext>("globalContext");
-	const { user: creator } = globalContext;
 
 	interface Props {
 		instance: InstanceGET | InstanceMeta;
@@ -58,20 +57,27 @@
 	</div>
 	<div
 		class="tile flex flex-col flex-1 items-center justify-center"
-		onclick={toggleSelect}
+		onpointerdown={toggleSelect}
 	>
-		{#if image_url}
-			<div class="thumbnail-container" style="width: {size}; height: {size};">
-				<img src={image_url} alt="Thumbnail" loading="lazy" class="thumbnail" />
-			</div>
-			<!-- {#if instance.dicom_modality == "OPT"}
+		<div class="thumbnail-container" style="width: {size}; height: {size};">
+			{#if image_url}
+				<img
+					src={image_url}
+					alt="Thumbnail"
+					loading="lazy"
+					class="thumbnail"
+					draggable="false"
+				/>
+			{/if}
+		</div>
+		<!-- {#if instance.dicom_modality == "OPT"}
                     <div class="oct-info text-[10px] text-white/70">
                         [{instance.anatomic_region}] ({instance.nr_of_frames} x {instance.columns})
                     </div>
                 {/if}
             </div> -->
 
-			<!-- {#if showSegmentationInfo && $segmentations.length}
+		<!-- {#if showSegmentationInfo && $segmentations.length}
                 <ul>
                     {#each Object.entries($creatorCounts) as [c, count]}
                         <li class:has-own-segmentations={creator.name == c}>
@@ -80,7 +86,6 @@
                     {/each}
                 </ul>
             {/if} -->
-		{/if}
 	</div>
 
 	<Dialog.Root bind:open={popupOpen}>
