@@ -185,6 +185,21 @@ class Base(DeclarativeBase):
         return cls.__table__.columns
 
     @classmethod
+    def all_columns(cls) -> List[Column]:
+        """Return all columns including columns from parent classes in the inheritance hierarchy."""
+        columns = []
+        seen_names = set()
+        # Traverse MRO to collect columns from all Base subclasses
+        for base_cls in cls.__mro__:
+            if issubclass(base_cls, Base) and hasattr(base_cls, '__table__'):
+                for col in base_cls.__table__.columns:
+                    # Avoid duplicates (child classes may redefine parent columns)
+                    if col.name not in seen_names:
+                        columns.append(col)
+                        seen_names.add(col.name)
+        return columns
+
+    @classmethod
     def local_columns(cls) -> List[Column]:
         """Return columns that are not foreign keys."""
         return [c for c in cls.columns() if not c.foreign_keys]
@@ -213,11 +228,16 @@ class Base(DeclarativeBase):
             return val.value
         return val
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert the object to a dictionary, skipping columns marked private."""
+    def to_dict(self, include_parents: bool = False) -> Dict[str, Any]:
+        """Convert the object to a dictionary, skipping columns marked private.
+        
+        Args:
+            include_parents: If True, include columns from parent classes in inheritance hierarchy.
+        """
+        columns = self.all_columns() if include_parents else self.columns()
         return {
             c.name: self.get_value(c)
-            for c in self.columns()
+            for c in columns
             if not (getattr(c, "info", None) or {}).get("private", False)
         }
 
@@ -232,8 +252,10 @@ class Base(DeclarativeBase):
 
     def _repr_html_(self) -> str:
         """HTML representation for Jupyter notebook display in table format."""            
-        printer = TablePrinter(title=f'{self.__class__.__name__} {self.get_value(self.primary_key())}')
-        return printer.print_table(self.to_dict())
+        pk_values = tuple(self.get_value(pk) for pk in self.primary_keys())
+        pk_str = pk_values[0] if len(pk_values) == 1 else pk_values
+        printer = TablePrinter(title=f'{self.__class__.__name__} {pk_str}')
+        return printer.print_table(self.to_dict(include_parents=True))
 
     def __hash__(self):
         return id(self)

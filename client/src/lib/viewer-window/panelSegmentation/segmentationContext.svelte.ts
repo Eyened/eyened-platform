@@ -12,14 +12,17 @@ export type Segmentation = SegmentationGET | ModelSegmentationGET;
 export function getSegmentationKey(segmentation: Segmentation): string {
     return `${segmentation.annotation_type}_${segmentation.id}`;
 }
+function matchesAxis(segmentation: Segmentation, axis: number): boolean {
+    return segmentation.sparse_axis == null || segmentation.sparse_axis == undefined || segmentation.sparse_axis == axis;
+}
 export class SegmentationContext {
 
     public graderSegmentations: SegmentationGET[] = $derived(
-        segmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+        segmentations.filter((s) => s.image_instance_id == this.instanceId && matchesAxis(s, this.axis))
     );
 
     public modelSegmentations: ModelSegmentationGET[] = $derived(
-        modelSegmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+        modelSegmentations.filter((s) => s.image_instance_id == this.instanceId && matchesAxis(s, this.axis))
     );
 
     public creatorVisible = new SvelteSet<number>();
@@ -47,7 +50,9 @@ export class SegmentationContext {
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage,
-    ) { }
+    ) {
+        console.log(this.axis);
+    }
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         return this.image.getOrCreateSegmentationItem(segmentation);

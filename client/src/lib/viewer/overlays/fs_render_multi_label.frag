@@ -95,7 +95,7 @@ void main() {
                 if((u_highlighted_feature_index == feature_index) || (u_active_feature_mask & mask) > 0u) {
                     layer_alpha = 1.0f;
                 } else {
-                    layer_alpha = 0.3f;
+                    layer_alpha = 0.5f;
                 }
                 // accumulate possibly overlapping colors
                 accumulated_color += layer_color * layer_alpha;

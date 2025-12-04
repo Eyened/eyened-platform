@@ -183,15 +183,24 @@ def run_registration(image_set, graph, form_data):
     return registrator, reference
 
 
-def run_registration_patient(patient, formAnnotation):
+def run_registration_patient(patient, formAnnotation, skip_ids=None):
     print(
         f"Running registration for patient {patient.PatientID} {patient.PatientIdentifier}"
     )
-    enface_images = patient.get_images(
-        where=ImageInstance.Modality.in_(
-            ["ColorFundus", "InfraredReflectance", "Autofluorescence"]
-        )
+    
+    # Build the where clause to filter by modality and exclude skipped images
+    modality_filter = ImageInstance.Modality.in_(
+        ["ColorFundus", "InfraredReflectance", "Autofluorescence"]
     )
+    
+    if skip_ids:
+        skip_filter = ~ImageInstance.ImageInstanceID.in_(skip_ids)
+        where_clause = modality_filter & skip_filter
+        print(f"Skipping {len(skip_ids)} imageInstanceIDs: {skip_ids}")
+    else:
+        where_clause = modality_filter
+    
+    enface_images = patient.get_images(where=where_clause)
     print(f"Found {len(enface_images)} enface images")
     graph = get_processed_edges(formAnnotation)
     print(f"Found {len(graph)} processed pairs")
@@ -228,17 +237,9 @@ def run_registration_patient(patient, formAnnotation):
         ):
             # register the two reference images
             registration = Registration()
-            registration.M0 = register_f1.M0
-            registration.kp0_005 = register_f1.kp0_005
-            registration.des0_005 = register_f1.des0_005
-            registration.kp0_01 = register_f1.kp0_01
-            registration.des0_01 = register_f1.des0_01
+            registration.set_reference(get_pixel_array(reference_f1))
+            registration.set_target(get_pixel_array(reference_f2))
 
-            registration.M1 = register_f2.M0
-            registration.kp1_005 = register_f2.kp0_005
-            registration.des1_005 = register_f2.des0_005
-            registration.kp1_01 = register_f2.kp0_01
-            registration.des1_01 = register_f2.des0_01
             try:
                 transform = registration.run()
                 graph[reference_f1.ImageInstanceID].add(reference_f2.ImageInstanceID)
@@ -258,12 +259,12 @@ def run_registration_patient(patient, formAnnotation):
     return all_transforms
 
 
-def run_patient(session, patient, schema, creator, replace):
+def run_patient(session, patient, schema, creator, replace, skip_ids=None):
     formAnnotation = get_or_create_FormAnnotation(session, patient, schema, creator)
     if replace:
         formAnnotation.FormData = []
 
-    all_transforms = run_registration_patient(patient, formAnnotation)
+    all_transforms = run_registration_patient(patient, formAnnotation, skip_ids)
     formAnnotation.FormData = all_transforms
 
     session.add(formAnnotation)

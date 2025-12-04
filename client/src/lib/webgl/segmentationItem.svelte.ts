@@ -14,14 +14,14 @@ export class SegmentationItem {
     segmentationStates: SvelteMap<number, SegmentationState> = new SvelteMap();
     loading: boolean = $state(false);
     ready: Promise<void> | null = null;
-    
+
     // Reactive threshold state for immediate UI updates
     threshold: number = $state(0.5);
 
     constructor(
         readonly image: AbstractImage,
         readonly segmentation: SegmentationGET | ModelSegmentationGET) {
-        
+
         // Initialize threshold from segmentation or default to 0.5
         this.threshold = this.segmentation.threshold ?? 0.5;
 
@@ -43,28 +43,33 @@ export class SegmentationItem {
             const array: NPYArray = this.segmentation.annotation_type === 'model_segmentation'
                 ? await getModelSegmentationData(this.segmentation.id)
                 : await getSegmentationData(this.segmentation.id);
-            
+
             const shape = array.shape as number[];
             // Expecting [depth, height, width]
             if (shape.length != 3) {
                 throw new Error('Invalid shape: ' + shape.join(', '));
             }
-            const [depth, height, width] = shape;            
+            const [depth, height, width] = shape;
 
             let planeSize = height * width;
 
             let scanIndices = this.segmentation.scan_indices;
             if (!scanIndices) {
                 let length;
-                
-                if (this.segmentation.sparse_axis == 0) { 
+                if (this.segmentation.sparse_axis == null || this.segmentation.sparse_axis == undefined) {
+                    length = this.image.depth;
+                    planeSize = this.image.height * this.image.width;
+                    if (depth != this.image.depth || height != this.image.height || width != this.image.width) {
+                        throw new Error('Invalid shape: ' + shape.join(', '));
+                    }
+                } else if (this.segmentation.sparse_axis == 0) {
                     // sparse along depth, slices of width x height
                     length = depth;
                     planeSize = height * width;
                     if (height != this.image.height || width != this.image.width) {
                         throw new Error('Invalid shape: ' + shape.join(', '));
                     }
-                } else if (this.segmentation.sparse_axis == 1) { 
+                } else if (this.segmentation.sparse_axis == 1) {
                     // sparse along height, slices of width x depth
                     length = height;
                     planeSize = width * depth;
@@ -168,7 +173,7 @@ export class SegmentationItem {
         // Create output texture for accumulation (width × depth, R32F)
         // Each horizontal line (y) corresponds to one slice (scanNr)
         const outputTexture = new TextureData(gl, width, depth, 'R32F');
-        
+
         // Initialize to zero
         outputTexture.clearData();
 
@@ -177,7 +182,7 @@ export class SegmentationItem {
             const scanNr = slicesWithData[i];
             const state = this.segmentationStates.get(scanNr)!;
             const mask = state.mask;
-            
+
             // Get the mask texture - ensure it's synced to GPU
             let maskTexture: WebGLTexture;
             if ('textureData' in mask && (mask as any).textureData) {
@@ -190,7 +195,7 @@ export class SegmentationItem {
             } else {
                 throw new Error(`Cannot get texture from mask type: ${mask.constructor.name}`);
             }
-            
+
             // Get bitmask for this mask
             let maskBitmask = 1;
             if ('bitmask' in mask) {

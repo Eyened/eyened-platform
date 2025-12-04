@@ -69,8 +69,8 @@ void main(){
         // highlight layer if u_highlighted_feature_index is 0 (none specified) or if this is the highlighted layer
         float show_highlight=float(u_highlighted_feature_index==int(annotation) || (u_active_feature_mask == annotation));
 
-        // 0.3f is the default alpha value, u_alpha is the alpha value for the highlight
-        color_out=vec4(color,mix(.3f,u_alpha,show_highlight));
+        // 0.5f is the default alpha value, u_alpha is the alpha value for the highlight
+        color_out=vec4(color,mix(.5f,u_alpha,show_highlight));
     }else{
         color_out=vec4(0.);
     }
