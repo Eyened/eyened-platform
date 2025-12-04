@@ -113,7 +113,8 @@ def database_mirror_full(config_file):
     "-e", "--env", type=str, help="Path to .env file for environment configuration"
 )
 @click.option("--failed", is_flag=True, default=False)
-def update_thumbnails(env, failed):
+@click.option("--print-errors", is_flag=True, default=False)
+def update_thumbnails(env, failed, print_errors):
     """Update thumbnails for all images in the database."""
 
     from eyened_orm import Database
@@ -127,7 +128,7 @@ def update_thumbnails(env, failed):
 
     with database.get_session() as session:
         images = get_missing_thumbnail_images(session, failed)
-        update_thumbnails(session, images)
+        update_thumbnails(session, images, print_errors=print_errors)
 
 
 @eorm.command()
@@ -386,9 +387,23 @@ def update_hashes(env, print_errors):
 @click.option(
     "--replace", is_flag=True, required=False, default=False, help="Replace existing registration"
 )
-def run_registration(env, patient, project, schema, creator, replace):
+@click.option(
+    "--skip", type=str, required=False, help="Comma-separated list of ImageInstanceIDs to skip during registration (e.g. --skip 1811325,1811324,1811323)"
+)
+
+def run_registration(env, patient, project, schema, creator, replace, skip):
     from eyened_orm import Database, Patient, Project
     from eyened_orm.utils.registration import get_or_create_schema, get_or_create_creator, run_patient
+
+    # Parse skip list from comma-separated string
+    skip_ids = None
+    if skip:
+        try:
+            skip_ids = [int(id.strip()) for id in skip.split(",") if id.strip()]
+            print(f"Skipping {len(skip_ids)} imageInstanceIDs: {skip_ids}")
+        except ValueError as e:
+            print(f"Error parsing skip list: {e}. Expected comma-separated integers.")
+            return
 
     config = load_config(env)
     database = Database(config)
@@ -399,12 +414,12 @@ def run_registration(env, patient, project, schema, creator, replace):
         if patient:
             patients = Patient.where(session, Patient.PatientIdentifier == patient)
             for patient in patients:
-                run_patient(session, patient, schema, creator, replace)
+                run_patient(session, patient, schema, creator, replace, skip_ids)
         elif project:
             project = Project.by_id(session, project)
             patients = Patient.where(session, Patient.ProjectID == project.ProjectID)
             for patient in patients:
-                run_patient(session, patient, schema, creator, replace)
+                run_patient(session, patient, schema, creator, replace, skip_ids)
         else:
             print("No patient or project provided")
         

@@ -563,6 +563,7 @@ class Feature(Base):
 
 class Model(Base):
     __tablename__ = "Model"
+    _name_column: ClassVar[str] = "ModelName"
 
     __table_args__ = (UniqueConstraint("ModelName", "Version"),)
     __mapper_args__ = {"polymorphic_on": "ModelType"}
