@@ -1,12 +1,10 @@
 version: "3.1"
 
-name: eyened-platform
-
 services:
 
   database:
-    container_name: eyened_database_testenv
     image: mysql:8.0.27
+    # user: "${USERID:-1000}:${GROUPID:-1000}"
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
     volumes:
@@ -32,28 +30,22 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     environment:
       - IMAGES_BASEPATH=/images
-      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
-      - THUMBNAILS_PATH=/storage/thumbnails
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - DATABASE_HOST=database
-      - DATABASE_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_PORT=3306
-      - DATABASE_NAME=${DATABASE_NAME}
+      - DB_HOST=database
+      - DB_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
+      - DB_USER=${DATABASE_USER}
+      - DB_PASSWORD=${DATABASE_PASSWORD}
+      - DB_PORT=3306
+      - DB_NAME=eyened_database_testenv
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY}
     restart: always
     volumes:
       - ${IMAGES_BASEPATH}:/images
-      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
-      - ${THUMBNAILS_PATH}:/storage/thumbnails
+      - ${STORAGE_BASEPATH}:/storage
 
   redis:
     user: "${USERID:-1000}:${GROUPID:-1000}"
@@ -64,7 +56,6 @@ services:
       timeout: 5s
       retries: 10
 
-# REDIS_HOST is set to redis container name #TODO: check if adjustment below is correct.
   worker:
     user: "${USERID:-1000}:${GROUPID:-1000}"
     build:
@@ -73,17 +64,14 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - DATABASE_HOST=database
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_PORT=3306
-      - DATABASE_NAME=eyened_database
+      - DB_HOST=database
+      - DB_USER=${DATABASE_USER}
+      - DB_PASSWORD=${DATABASE_PASSWORD}
+      - DB_PORT=3306
+      - DB_NAME=eyened_database_testenv
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - IMAGES_BASEPATH=/images
-      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
-      - THUMBNAILS_PATH=/storage/thumbnails
-      - SECRET_KEY=${SECRET_KEY}
     depends_on:
       redis:
         condition: service_healthy
@@ -91,9 +79,8 @@ services:
         condition: service_healthy
     volumes:
       - ${IMAGES_BASEPATH}:/images
-      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
-      - ${THUMBNAILS_PATH}:/storage/thumbnails
-    restart: on-failure:5
+      - ${STORAGE_BASEPATH}:/storage
+    restart: always
 
   fileserver:
     build:
@@ -104,18 +91,18 @@ services:
         condition: service_healthy
     volumes:
       - ${IMAGES_BASEPATH}:/images
-      - ${THUMBNAILS_PATH}:/thumbnails
+      - ${STORAGE_BASEPATH}/thumbnails:/thumbnails
     ports:
       - ${PORT}:80
 
-  adminer:
-    image: adminer:latest
-    restart: always
-    ports:
-      - "18080:8080"
-    depends_on:
-      database:
-        condition: service_healthy
-    environment:
-      - ADMINER_DEFAULT_SERVER=database
+  # adminer:
+  #   image: adminer:latest
+  #   restart: always
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     database:
+  #       condition: service_healthy
+  #   environment:
+  #     - ADMINER_DEFAULT_SERVER=database
 

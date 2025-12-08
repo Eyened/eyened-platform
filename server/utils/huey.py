@@ -10,7 +10,8 @@ logging.basicConfig(
 logger = logging.getLogger('eyened.huey')
 
 # Initialize huey with Redis storage
-redis_host = os.environ.get('REDIS_HOST', 'localhost')
+# redis_host = os.environ.get('REDIS_HOST', 'localhost') #TODO: check if adjustment below is correct
+redis_host = os.environ.get('REDIS_HOST', 'redis')
 redis_port = int(os.environ.get('REDIS_PORT', 6379))
 huey = RedisHuey(
     'eyened-tasks',
