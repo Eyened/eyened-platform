@@ -2,8 +2,10 @@ from typing import Optional
 import yaml
 from pathlib import Path
 import click
+import random
+import string
 
-from .utils.testdb import DatabaseTransfer
+from .utils.testdb import DatabaseTransfer, drop_create_db, load_db
 from tqdm import tqdm
 from .utils.config import (
     DatabaseSettings,
@@ -21,6 +23,7 @@ The following commands are available:
 - run-models: Run the models on the database.
 - zarr-tree: Display the structure of the zarr store, showing groups and array shapes.
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
+- load-dump: Load a database dump file, replacing the entire database.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -422,4 +425,71 @@ def run_registration(env, patient, project, schema, creator, replace, skip):
                 run_patient(session, patient, schema, creator, replace, skip_ids)
         else:
             print("No patient or project provided")
+
+
+@eorm.command()
+@click.option(
+    "-e", "--env", type=str, help="Path to .env file for environment configuration"
+)
+@click.option(
+    "--dump-path",
+    "-d",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to SQL dump file to load",
+)
+def load_dump(env, dump_path):
+    """Load a database dump file, replacing the entire database.
+    
+    This command will:
+    1. Drop and recreate the database (clearing all data)
+    2. Load the SQL dump file into the database
+    
+    WARNING: This will permanently delete all existing data in the database.
+    """
+    from pathlib import Path
+    
+    config = load_config(env)
+    db_config = config.database
+    
+    dump_path = Path(dump_path)
+    if not dump_path.exists():
+        print(f"Error: Dump file not found: {dump_path}")
+        return
+    
+    print(f"Loading database dump from: {dump_path}")
+    print(f"Target database: {db_config.database} on {db_config.host}:{db_config.port}")
+    print("WARNING: This will replace the entire database!")
+    
+    # Security confirmation
+    print("\n" + "=" * 60)
+    print(f"Database to be cleared: {db_config.database} on {db_config.host}:{db_config.port}")
+    print("=" * 60)
+    
+    # Generate random confirmation code
+    confirmation_code = ''.join(random.choices(string.ascii_uppercase, k=4))
+    print(f"\nDo you want to proceed? Type '{confirmation_code}' to confirm:")
+    
+    user_input = click.prompt("", type=str)
+    
+    if user_input != confirmation_code:
+        print("Confirmation code does not match. Operation cancelled.")
+        return
+    
+    print("Confirmation received. Proceeding with database load...\n")
+    
+    # Drop and recreate the database
+    print("Clearing database...")
+    if not drop_create_db(db_config):
+        print("Error: Failed to clear database")
+        return
+    
+    # Load the dump file
+    print("\nLoading dump file...")
+    with open(dump_path, "r", encoding="utf-8") as dump_file:
+        if not load_db(db_config, dump_file, force=True):
+            print("Error: Failed to load database dump")
+            return
+    
+    print("\nDatabase dump loaded successfully!")
         
