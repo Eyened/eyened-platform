@@ -36,7 +36,6 @@
 			: "",
 	);
 
-	// const dateStr = $derived(new Date(study.date).toISOString().slice(0, 10));
 	const urlByDate = $derived(
 		globalContext.makeStudiesBrowserURL({
 			variable: "Study Date",
@@ -97,14 +96,20 @@
 					>
 						{study.date}
 					</a>
-					<span class="ml-1"
-						>[{study.patient.sex}
-						{study.age ? Math.round(study.age) : "?"} years]</span
-					>
+					<span class="ml-1">
+						[{study.patient.sex}
+						{study.age ? Math.round(study.age) : "?"} years]
+					</span>
 				</div>
-				<div class="info text-[12px]">
-					<span>Round {study.round}: {study.description}</span>
-				</div>
+				{#if study.round !== undefined || study.description !== undefined}
+					<div class="info text-[12px]">
+						<span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded z-10">
+							{#if study.round !== undefined}Round {study.round}
+							{/if}
+							{#if study.description !== undefined}{study.description}{/if}
+						</span>
+					</div>
+				{/if}
 			</div>
 
 			<div class="ml-4">
