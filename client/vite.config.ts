@@ -8,4 +8,12 @@ import glsl from "vite-plugin-glsl";
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit(), glsl(), Icons({ compiler: "svelte" })],
   server: { allowedHosts: true },
+  build: {
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.logs in production
+      },
+    },
+  },
 });

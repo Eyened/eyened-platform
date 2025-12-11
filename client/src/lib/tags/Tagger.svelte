@@ -176,7 +176,7 @@
 				Add tag...
 			</Button>
 		</PopoverTrigger>
-		<PopoverContent class="w-40" portalProps={{ disabled: true }}>
+		<PopoverContent class="w-80" portalProps={{ disabled: true }}>
 			<Command bind:value onkeydown={handleCommandKeydown}>
 				<CommandInput bind:value={textValue} placeholder="Search tags..." />
 				<CommandList>
