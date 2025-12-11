@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from eyened_orm.image_instance import ETDRSField, Laterality, Modality, ModalityType
 from eyened_orm.patient import SexEnum as Sex
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from .dtos_aux import TagMeta
 from .dtos_main import FormAnnotationGET, ModelSegmentationGET, SegmentationGET
@@ -37,16 +37,27 @@ class PatientGET(BaseModel):
     birth_date: Optional[date] = None
     sex: Optional[Sex] = None
 
+    @field_serializer('birth_date')
+    def serialize_birth_date(self, value: Optional[date]) -> Optional[str]:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat() if value is not None else None
+
 
 class StudyGET(BaseModel):
     id: int
     description: Optional[str] = None
-    date: datetime
+    date: date
+    round: Optional[int] = None
     age: Optional[float] = None  # patient age in years
     project: "ProjectMeta"
     patient: "PatientMeta"
     series: Optional[List["SeriesGET"]] = None
     tags: List[TagMeta]
+
+    @field_serializer('date')
+    def serialize_date(self, value: date) -> str:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat()
 
 
 class SeriesGET(BaseModel):
@@ -69,11 +80,22 @@ class PatientMeta(BaseModel):
     id: int
     identifier: str
     birth_date: Optional[date] = None
+    sex: Optional[Sex] = None
+
+    @field_serializer('birth_date')
+    def serialize_birth_date(self, value: Optional[date]) -> Optional[str]:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat() if value is not None else None
 
 
 class StudyMeta(BaseModel):
     id: int
-    date: datetime
+    date: date
+
+    @field_serializer('date')
+    def serialize_date(self, value: date) -> str:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat()
 
 
 class SeriesMeta(BaseModel):

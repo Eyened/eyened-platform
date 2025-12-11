@@ -110,12 +110,14 @@ class DTOConverter:
             id=study.Patient.PatientID,
             identifier=study.Patient.PatientIdentifier or "",
             birth_date=study.Patient.BirthDate,
+            sex=study.Patient.Sex,
         )
 
         dto = StudyGET(
             id=study.StudyID,
             description=study.StudyDescription,
             date=study.StudyDate,
+            round=study.StudyRound,
             age=study.age_years,
             project=project_meta,
             patient=patient_meta,
@@ -184,6 +186,7 @@ class DTOConverter:
             id=image_instance.Series.Study.Patient.PatientID,
             identifier=image_instance.Series.Study.Patient.PatientIdentifier,
             birth_date=image_instance.Series.Study.Patient.BirthDate,
+            sex=image_instance.Series.Study.Patient.Sex,
         )
         study_meta = StudyMeta(
             id=image_instance.Series.Study.StudyID,
