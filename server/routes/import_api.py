@@ -12,6 +12,7 @@ from server.routes.auth import CurrentUser, get_current_user
 
 from ..config import settings
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
 from ..utils.huey import task_run_inference, task_update_thumbnails
 
 router = APIRouter()
@@ -90,6 +91,24 @@ async def import_single_image(
     # Execute the import
     try:
         images = importer.import_one(request.data)
+        
+        # Log import summary (not individual images)
+        logger = get_db_logger()
+        if logger:
+            logger.log_insert(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint="POST /api/import/image",
+                entity="Import",
+                summary={
+                    "project_name": request.data.project_name,
+                    "images_created": len(images),
+                    "create_patients": request.options.create_patients,
+                    "create_studies": request.options.create_studies,
+                    "create_series": request.options.create_series,
+                    "create_project": request.options.create_project,
+                },
+            )
 
     except Exception as e:
         include_stack_trace = request.options.include_stack_trace

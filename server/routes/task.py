@@ -5,6 +5,7 @@ from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
 from eyened_orm import Task, SubTask, SubTaskImageLink, ImageInstance, SubTaskState
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_tasks import (
     TaskPUT, TaskPATCH, TaskGET,
@@ -31,6 +32,24 @@ async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user:
         .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
         .where(Task.TaskID == task.TaskID)
     ).scalars().first()
+    
+    # Log task creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint="POST /api/task",
+            entity="Task",
+            entity_id=task.TaskID,
+            fields={
+                "name": task.TaskName,
+                "description": task.Description,
+                "contact_id": task.ContactID,
+                "task_definition_id": task.TaskDefinitionID,
+            },
+        )
+    
     return DTOConverter.task_to_get(task)
 
 
@@ -70,15 +89,21 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(404, "Task not found")
+    changes = {}
     if dto.name is not None:
+        changes["name"] = f"{task.TaskName} -> {dto.name}"
         task.TaskName = dto.name
     if dto.description is not None:
+        changes["description"] = f"{task.Description} -> {dto.description}"
         task.Description = dto.description
     if dto.contact_id is not None:
+        changes["contact_id"] = f"{task.ContactID} -> {dto.contact_id}"
         task.ContactID = dto.contact_id
     if dto.task_definition_id is not None:
+        changes["task_definition_id"] = f"{task.TaskDefinitionID} -> {dto.task_definition_id}"
         task.TaskDefinitionID = dto.task_definition_id
     if dto.task_state is not None:
+        changes["task_state"] = f"{task.TaskState} -> {dto.task_state}"
         task.TaskState = dto.task_state
 
     db.commit(); db.refresh(task)
@@ -90,14 +115,54 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
         .where(Task.TaskID == task_id)
     ).scalars().first()
     
+    # Log task update
+    logger = get_db_logger()
+    if logger:
+        logger.log_update(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PATCH /api/task/{task_id}",
+            entity="Task",
+            entity_id=task_id,
+            changes=changes if changes else None,
+        )
+    
     return DTOConverter.task_to_get(task)
 
 @router.delete("/task/{task_id}", status_code=204)
 async def delete_task(task_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+    # Get task data before deletion
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    
+    # Save task data for logging before deletion
+    deleted_data = {
+        "name": task.TaskName,
+        "description": task.Description,
+        "contact_id": task.ContactID,
+        "task_definition_id": task.TaskDefinitionID,
+        "creator_id": task.CreatorID,
+        "task_state": str(task.TaskState) if hasattr(task, 'TaskState') and task.TaskState else None,
+    }
+    
     res = db.execute(delete(Task).where(Task.TaskID == task_id))
     if res.rowcount == 0:
         raise HTTPException(404, "Task not found")
     db.commit()
+    
+    # Log task deletion
+    logger = get_db_logger()
+    if logger:
+        logger.log_delete(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"DELETE /api/task/{task_id}",
+            entity="Task",
+            entity_id=task_id,
+            deleted_data=deleted_data,
+        )
+    
     return Response(status_code=204)
 
 
