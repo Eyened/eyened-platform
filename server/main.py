@@ -82,6 +82,10 @@ async def lifespan(app: FastAPI):
     print("Starting up with settings:")
     print(settings)
     
+    # Validate secret key is set (required for JWT token validation)
+    if not settings.secret_key:
+        raise RuntimeError("SECRET_KEY must be set in environment variables for JWT token validation")
+    
     if settings.public_auth_disabled:
         print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
 
