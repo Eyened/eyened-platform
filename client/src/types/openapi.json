@@ -5440,7 +5440,6 @@
           "schema": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5549,7 +5548,6 @@
           "data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5681,7 +5679,6 @@
           "cf_roi": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5693,7 +5690,6 @@
           "cf_keypoints": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5815,14 +5811,12 @@
           },
           "model_attrs": {
             "additionalProperties": {
-              "additionalProperties": true,
               "type": "object"
             },
             "type": "object",
             "title": "Model Attrs"
           },
           "attrs": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Attrs"
           }
@@ -5973,17 +5967,6 @@
               }
             ]
           },
-          "angio_graphy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Angio Graphy"
-          },
           "laterality": {
             "anyOf": [
               {
@@ -5994,7 +5977,7 @@
               }
             ]
           },
-          "rows": {
+          "height": {
             "anyOf": [
               {
                 "type": "integer"
@@ -6003,9 +5986,9 @@
                 "type": "null"
               }
             ],
-            "title": "Rows"
+            "title": "Height"
           },
-          "columns": {
+          "width": {
             "anyOf": [
               {
                 "type": "integer"
@@ -6014,9 +5997,9 @@
                 "type": "null"
               }
             ],
-            "title": "Columns"
+            "title": "Width"
           },
-          "nr_of_frames": {
+          "depth": {
             "anyOf": [
               {
                 "type": "integer"
@@ -6025,7 +6008,7 @@
                 "type": "null"
               }
             ],
-            "title": "Nr Of Frames"
+            "title": "Depth"
           },
           "resolution_horizontal": {
             "anyOf": [
@@ -6126,10 +6109,132 @@
             ],
             "title": "Device Model"
           },
+          "scan_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Mode"
+          },
+          "source_info_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Info Id"
+          },
+          "anatomic_region": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anatomic Region"
+          },
+          "acquisition_date_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquisition Date Time"
+          },
+          "angiography": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Angiography"
+          },
+          "samples_per_pixel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Samples Per Pixel"
+          },
+          "horizontal_field_of_view": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontal Field Of View"
+          },
+          "sop_class_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sop Class Uid"
+          },
+          "photometric_interpretation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photometric Interpretation"
+          },
+          "pupil_dilated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pupil Dilated"
+          },
+          "fda_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fda Identifier"
+          },
           "project_name": {
             "type": "string",
             "title": "Project Name",
-            "description": "Required project name"
+            "description": "Name of the project"
           },
           "patient_identifier": {
             "anyOf": [
@@ -6227,7 +6332,6 @@
             "description": "Path to the image file"
           },
           "attributes": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Attributes",
             "description": "Optional key-value properties"
@@ -6500,14 +6604,23 @@
           "birth_date": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "date"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Birth Date"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SexEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7005,8 +7118,18 @@
           },
           "date": {
             "type": "string",
-            "format": "date-time",
             "title": "Date"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round"
           },
           "age": {
             "anyOf": [
@@ -7065,7 +7188,6 @@
           },
           "date": {
             "type": "string",
-            "format": "date-time",
             "title": "Date"
           }
         },
@@ -7670,7 +7792,6 @@
             "title": "Id"
           },
           "config": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           },
