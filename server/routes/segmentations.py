@@ -170,6 +170,30 @@ async def create_segmentation(
 
     db.commit()
     db.refresh(segmentation)
+    
+    # Log segmentation creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint="POST /api/segmentations",
+            entity="Segmentation",
+            entity_id=segmentation.SegmentationID,
+            fields={
+                "image_instance_id": segmentation.ImageInstanceID,
+                "feature_id": segmentation.FeatureID,
+                "subtask_id": segmentation.SubTaskID,
+                "creator_id": segmentation.CreatorID,
+                "data_type": str(segmentation.DataType),
+                "data_representation": str(segmentation.DataRepresentation),
+                "shape": segmentation.shape,
+                "sparse_axis": segmentation.SparseAxis,
+                "threshold": segmentation.Threshold,
+                "reference_segmentation_id": segmentation.ReferenceSegmentationID,
+            },
+        )
+    
     return DTOConverter.segmentation_to_get(segmentation)
 
 
@@ -274,16 +298,16 @@ async def update_segmentation_data(
     # return the updated segmentation
     db.refresh(segmentation)
     
-    # Log segmentation data update
+    # Log segmentation data update (simple one-line format for high-frequency operations)
     logger = get_db_logger()
     if logger:
-        logger.log_update(
+        logger.log_simple(
             user=current_user.username,
             user_id=current_user.id,
             endpoint=f"PUT /api/segmentations/{segmentation_id}/data",
+            operation="UPDATE",
             entity="Segmentation",
             entity_id=segmentation_id,
-            changes={"data": "updated", "axis": axis, "scan_nr": scan_nr},
         )
     
     return segmentation

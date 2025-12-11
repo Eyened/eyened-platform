@@ -260,16 +260,16 @@ async def update_form_annotation_value(
     annotation.FormData = form_data
     db.commit()
     
-    # Log form annotation value update
+    # Log form annotation value update (simple one-line format for high-frequency operations)
     logger = get_db_logger()
     if logger:
-        logger.log_update(
+        logger.log_simple(
             user=current_user.username,
             user_id=current_user.id,
             endpoint=f"PUT /api/form-annotations/{form_annotation_id}/value",
+            operation="UPDATE",
             entity="FormAnnotation",
             entity_id=form_annotation_id,
-            changes={"form_data": "updated"},
         )
     
     return Response(status_code=204)
