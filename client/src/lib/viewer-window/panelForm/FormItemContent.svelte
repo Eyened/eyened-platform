@@ -25,6 +25,7 @@
     // Value initializes from form ONCE on mount, then becomes independent for editing
     let value: any = $state(undefined);
     let status = $state("loaded");
+    let saveTimeout: ReturnType<typeof setTimeout> | null = null;
     
     onMount(() => {
         // Initialize value from form data once
@@ -41,9 +42,20 @@
     async function onchange() {
         if (!canEdit) return;
         if (value) {
+            // Clear existing timeout
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+            
+            // Show "saving" status immediately for user feedback
             status = "saving";
-            await setFormAnnotationValue(form.id, value);
-            status = "synced";
+            
+            // Debounce: wait 500ms after last keystroke before saving
+            saveTimeout = setTimeout(async () => {
+                await setFormAnnotationValue(form.id, value);
+                status = "synced";
+                saveTimeout = null;
+            }, 500);
         }
     }
 
