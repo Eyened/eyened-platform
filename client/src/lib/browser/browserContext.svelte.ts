@@ -105,6 +105,12 @@ export class BrowserContext {
                 api.GET('/instances/search/signature', {}),
                 api.GET('/studies/search/signature', {})
             ]);
+            if (instRes.error) {
+                throw new Error(`Failed to load instances signature: ${instRes.response.status}`);
+            }
+            if (studRes.error) {
+                throw new Error(`Failed to load studies signature: ${studRes.response.status}`);
+            }
             this.instancesSignature = (instRes.data ?? []) as SignatureField[];
             this.studiesSignature = (studRes.data ?? []) as SignatureField[];
         } finally {
@@ -118,6 +124,12 @@ export class BrowserContext {
             api.GET('/instances/search/signature', {}),
             api.GET('/studies/search/signature', {})
         ]);
+        if (instRes.error) {
+            throw new Error(`Failed to refresh instances signature: ${instRes.response.status}`);
+        }
+        if (studRes.error) {
+            throw new Error(`Failed to refresh studies signature: ${studRes.response.status}`);
+        }
         this.instancesSignature = (instRes.data ?? []) as SignatureField[];
         this.studiesSignature = (studRes.data ?? []) as SignatureField[];
     }
@@ -240,6 +252,9 @@ export class BrowserContext {
 
         if (this.queryMode === 'instances') {
             const res = await api.POST('/instances/search', { body: baseBody as SearchQuery });
+            if (res.error) {
+                throw new Error(`Failed to search instances: ${res.response.status}`);
+            }
             return res.data;
         } else {
             const res = await api.POST('/studies/search', {
@@ -248,6 +263,9 @@ export class BrowserContext {
                     conditions: query as unknown as StudySearchCondition[]
                 } as StudySearchQuery
             });
+            if (res.error) {
+                throw new Error(`Failed to search studies: ${res.response.status}`);
+            }
             return res.data;
         }
     }
