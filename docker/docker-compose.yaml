@@ -47,6 +47,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
+      - WORKERS=${WORKERS:-4}
     restart: always
     volumes:
       - ${IMAGES_BASEPATH}:/images

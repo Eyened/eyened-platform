@@ -1,6 +1,7 @@
 fastapi==0.115.8
 fastapi-cli==0.0.7
 uvicorn==0.34.0
+gunicorn==23.0.0
 mysql-connector-python==8.0.31
 pyodbc>=4.0.35
 numpy==2.0.0
