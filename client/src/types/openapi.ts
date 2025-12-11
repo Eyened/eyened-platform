@@ -1128,9 +1128,7 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Schema */
-            schema?: {
-                [key: string]: unknown;
-            } | null;
+            schema?: Record<string, never> | null;
             entity_type?: components["schemas"]["EntityType"] | null;
             /** Id */
             id: number;
@@ -1188,9 +1186,7 @@ export interface components {
             /** Message */
             message: string;
             /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
+            data?: Record<string, never> | null;
             /** Error */
             error?: string | null;
             /** Stack Trace */
@@ -1227,13 +1223,9 @@ export interface components {
             /** Resolution Axial */
             resolution_axial: number;
             /** Cf Roi */
-            cf_roi?: {
-                [key: string]: unknown;
-            } | null;
+            cf_roi?: Record<string, never> | null;
             /** Cf Keypoints */
-            cf_keypoints?: {
-                [key: string]: unknown;
-            } | null;
+            cf_keypoints?: Record<string, never> | null;
             /** Cf Quality */
             cf_quality?: number | null;
             /**
@@ -1263,14 +1255,10 @@ export interface components {
             form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
             /** Model Attrs */
             model_attrs: {
-                [key: string]: {
-                    [key: string]: unknown;
-                };
+                [key: string]: Record<string, never>;
             };
             /** Attrs */
-            attrs: {
-                [key: string]: unknown;
-            };
+            attrs: Record<string, never>;
         };
         /** InstanceMeta */
         InstanceMeta: {
@@ -1295,15 +1283,13 @@ export interface components {
             modality?: components["schemas"]["Modality"] | null;
             dicom_modality?: components["schemas"]["ModalityType"] | null;
             etdrs_field?: components["schemas"]["ETDRSField"] | null;
-            /** Angio Graphy */
-            angio_graphy?: string | null;
             laterality?: components["schemas"]["Laterality"] | null;
-            /** Rows */
-            rows?: number | null;
-            /** Columns */
-            columns?: number | null;
-            /** Nr Of Frames */
-            nr_of_frames?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Width */
+            width?: number | null;
+            /** Depth */
+            depth?: number | null;
             /** Resolution Horizontal */
             resolution_horizontal?: number | null;
             /** Resolution Vertical */
@@ -1322,9 +1308,31 @@ export interface components {
             device_manufacturer?: string | null;
             /** Device Model */
             device_model?: string | null;
+            /** Scan Mode */
+            scan_mode?: string | null;
+            /** Source Info Id */
+            source_info_id?: number | null;
+            /** Anatomic Region */
+            anatomic_region?: number | null;
+            /** Acquisition Date Time */
+            acquisition_date_time?: string | null;
+            /** Angiography */
+            angiography?: string | null;
+            /** Samples Per Pixel */
+            samples_per_pixel?: number | null;
+            /** Horizontal Field Of View */
+            horizontal_field_of_view?: number | null;
+            /** Sop Class Uid */
+            sop_class_uid?: string | null;
+            /** Photometric Interpretation */
+            photometric_interpretation?: string | null;
+            /** Pupil Dilated */
+            pupil_dilated?: string | null;
+            /** Fda Identifier */
+            fda_identifier?: string | null;
             /**
              * Project Name
-             * @description Required project name
+             * @description Name of the project
              */
             project_name: string;
             /**
@@ -1354,9 +1362,7 @@ export interface components {
              * Attributes
              * @description Optional key-value properties
              */
-            attributes?: {
-                [key: string]: unknown;
-            };
+            attributes?: Record<string, never>;
         };
         /**
          * Laterality
@@ -1443,6 +1449,7 @@ export interface components {
             identifier: string;
             /** Birth Date */
             birth_date?: string | null;
+            sex?: components["schemas"]["SexEnum"] | null;
         };
         /** ProjectMeta */
         ProjectMeta: {
@@ -1607,11 +1614,10 @@ export interface components {
             id: number;
             /** Description */
             description?: string | null;
-            /**
-             * Date
-             * Format: date-time
-             */
+            /** Date */
             date: string;
+            /** Round */
+            round?: number | null;
             /** Age */
             age?: number | null;
             project: components["schemas"]["ProjectMeta"];
@@ -1625,10 +1631,7 @@ export interface components {
         StudyMeta: {
             /** Id */
             id: number;
-            /**
-             * Date
-             * Format: date-time
-             */
+            /** Date */
             date: string;
         };
         /** StudySearchCondition */
@@ -1838,9 +1841,7 @@ export interface components {
             /** Id */
             id: number;
             /** Config */
-            config: {
-                [key: string]: unknown;
-            };
+            config: Record<string, never>;
             /**
              * Date Inserted
              * Format: date-time
