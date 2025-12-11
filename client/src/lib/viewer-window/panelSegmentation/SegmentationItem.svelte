@@ -15,7 +15,10 @@
 	import ImportPanel from "./ImportPanel.svelte";
 	import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
 	import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
-	import { getSegmentationKey, type Segmentation } from "./segmentationContext.svelte";
+	import {
+		getSegmentationKey,
+		type Segmentation,
+	} from "./segmentationContext.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
 	const globalContext = getContext<GlobalContext>("globalContext");
@@ -35,7 +38,9 @@
 	const image = viewerContext.image;
 
 	const visible = $derived(
-		segmentationContext.shownSegmentations.has(getSegmentationKey(segmentation)),
+		segmentationContext.shownSegmentations.has(
+			getSegmentationKey(segmentation),
+		),
 	);
 
 	const segmentationItem =
@@ -44,6 +49,7 @@
 	const segmentationState = $derived(
 		segmentationItem.getSegmentationState(viewerContext.index),
 	);
+	const syncState = $derived(segmentationState?.syncState ?? null);
 	const isEditable = globalContext.canEdit(segmentation);
 	let collapsed = $state(true);
 
@@ -183,10 +189,22 @@
 	{/if}
 	{#if active}
 		<button type="button" class="open" onclick={() => (collapsed = !collapsed)}>
-			{#if collapsed}
-				&#9654;
-			{:else}
-				&#9660;
+			<div class="handle">
+				{#if collapsed}
+					&#9654;
+				{:else}
+					&#9660;
+				{/if}
+			</div>
+			{#if segmentationState && syncState && isEditable}
+				<div
+					class="sync-indicator"
+					class:synced={syncState === "synced"}
+					class:saving={syncState === "saving"}
+					class:error={syncState === "error"}
+				>
+					<div class="traffic-light"></div>
+				</div>
 			{/if}
 		</button>
 
@@ -310,5 +328,37 @@
 	}
 	button.duplicate-button:hover {
 		background-color: rgba(255, 255, 255, 0.3);
+	}
+
+	div.sync-indicator {
+		margin-right: 0.5em;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	div.traffic-light {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background-color: gray;
+		transition: background-color 0.2s ease;
+	}
+
+	div.handle {
+		flex: 1;
+        padding-left: 0.5em;
+	}
+
+	div.sync-indicator.synced .traffic-light {
+		background-color: #22c55e; /* green */
+	}
+
+	div.sync-indicator.saving .traffic-light {
+		background-color: #f59e0b; /* orange */
+	}
+
+	div.sync-indicator.error .traffic-light {
+		background-color: #ef4444; /* red */
 	}
 </style>

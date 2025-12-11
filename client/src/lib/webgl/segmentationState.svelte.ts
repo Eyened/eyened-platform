@@ -8,7 +8,6 @@ import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
 import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
-import { writable, type Writable } from "svelte/store";
 
 type MaskConstructor = new (image: AbstractImage, segmentation: SegmentationGET) => Mask;
 export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'MultiClass' | 'MultiLabel', MaskConstructor> = {
@@ -31,7 +30,7 @@ export class SegmentationState {
     private hasInitialCheckpoint = false;
     private updateTimeout: ReturnType<typeof setTimeout> | null = null;
     private pendingUpdateResolve: (() => void) | null = null;
-    public readonly syncState: Writable<SyncState> = writable<SyncState>("synced");
+    public syncState = $state<SyncState>("synced");
 
     constructor(
         readonly image: AbstractImage,
@@ -146,7 +145,7 @@ export class SegmentationState {
         }
         
         // Set sync state to "saving" when update is triggered
-        this.syncState.set("saving");
+        this.syncState = "saving";
         
         // Debounce: wait 2 seconds after last update before sending to server
         // The last call wins - it will export the current mask state, so no data is lost
@@ -157,9 +156,9 @@ export class SegmentationState {
                 const sparse_axis = this.segmentation.sparse_axis ?? undefined;
                 const scan_nr = this.image.image_id.endsWith('proj') ? undefined : this.scanNr;
                 await updateSegmentationData(this.segmentation.id, buffer, { sparse_axis, scan_nr });
-                this.syncState.set("synced");
+                this.syncState = "synced";
             } catch (error) {
-                this.syncState.set("error");
+                this.syncState = "error";
                 console.error("Failed to update segmentation data:", error);
             } finally {
                 this.updateTimeout = null;

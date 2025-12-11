@@ -4,7 +4,7 @@ import { getSegmentationData, getModelSegmentationData } from "../data/helpers";
 import type { NPYArray } from "../utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
 import type { Mask, PaintSettings } from "./mask.svelte";
-import { SegmentationState } from "./segmentationState";
+import { SegmentationState } from "./segmentationState.svelte";
 import { TextureData } from "./texture";
 
 // manages the segmentation states (one per scan) for a single segmentation
