@@ -29,6 +29,7 @@ from server.utils.database_init import (
     create_database,
     init_admin,
 )
+from server.utils.db_logging import init_db_logger
 from eyened_orm import Database
 
 app_api = FastAPI(title="Eyened API", default_response_class=ORJSONResponse)
@@ -107,6 +108,8 @@ async def lifespan(app: FastAPI):
     else:
         logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
     
+    # Initialize database modification logger
+    init_db_logger(settings)
     
     db = Database(settings)
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
 
 # Password hashing configuration
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -267,6 +268,17 @@ def check_login(username: str, password: str, db: Session) -> Creator:
             creator.Password = None
             db.commit()
             db.refresh(creator)
+            # Log password migration
+            logger = get_db_logger()
+            if logger:
+                logger.log_update(
+                    user=creator.CreatorName,
+                    user_id=creator.CreatorID,
+                    endpoint="POST /api/auth/login",
+                    entity="Creator",
+                    entity_id=creator.CreatorID,
+                    changes={"password_hash": "migrated from legacy"},
+                )
             return creator
 
     raise HTTPException(
@@ -399,6 +411,18 @@ async def change_password(
     creator.PasswordHash = hash_password(change_password_data.new_password)
     creator.Password = None  # Clear old hash if it exists
     session.commit()
+    
+    # Log password change
+    logger = get_db_logger()
+    if logger:
+        logger.log_update(
+            user=creator.CreatorName,
+            user_id=creator.CreatorID,
+            endpoint="POST /api/auth/change-password",
+            entity="Creator",
+            entity_id=creator.CreatorID,
+            changes={"password_hash": "updated"},
+        )
 
     return creator_to_response(creator, session)
 
@@ -410,6 +434,22 @@ async def register_user(
 ):
     """Register a new user."""
     new_user = create_user(session, user_data.username, user_data.password)
+    
+    # Log user creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user="system",  # Registration doesn't require auth
+            user_id=0,
+            endpoint="POST /api/auth/register",
+            entity="Creator",
+            entity_id=new_user.CreatorID,
+            fields={
+                "username": new_user.CreatorName,
+                "is_human": new_user.IsHuman,
+            },
+        )
+    
     return creator_to_response(new_user, session)
 
 

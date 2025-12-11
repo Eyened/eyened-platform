@@ -14,6 +14,7 @@ from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
 
 from .auth import CurrentUser, get_current_user, is_authenticated
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
 
 router = APIRouter()
 
@@ -106,10 +107,38 @@ async def tag_instance(instance_id: int, body: ObjectTagPOST, db: Session = Depe
         link = ImageInstanceTagLink(TagID=tag.TagID, ImageInstanceID=instance_id, CreatorID=current_user.id, Comment=body.comment)
         db.add(link); db.commit(); db.refresh(link)
         link.Tag = tag  # optional: avoid Tag lazy-load
+        
+        # Log tag link creation
+        logger = get_db_logger()
+        if logger:
+            logger.log_insert(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"POST /api/instances/{instance_id}/tags",
+                entity="ImageInstanceTagLink",
+                fields={
+                    "tag_id": tag.TagID,
+                    "image_instance_id": instance_id,
+                    "comment": body.comment,
+                },
+            )
     else:
         if body.comment is not None:
+            old_comment = link.Comment
             link.Comment = body.comment
             db.commit(); db.refresh(link)
+            
+            # Log tag link update
+            logger = get_db_logger()
+            if logger:
+                logger.log_update(
+                    user=current_user.username,
+                    user_id=current_user.id,
+                    endpoint=f"POST /api/instances/{instance_id}/tags",
+                    entity="ImageInstanceTagLink",
+                    fields={"tag_id": tag.TagID, "image_instance_id": instance_id},
+                    changes={"comment": f"{old_comment} -> {body.comment}"},
+                )
 
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -137,8 +166,22 @@ async def patch_instance_tag(
         raise HTTPException(404, "Link not found")
 
     if body.comment is not None:
+        old_comment = link.Comment
         link.Comment = body.comment
         db.commit(); db.refresh(link)
+        
+        # Log tag link update
+        logger = get_db_logger()
+        if logger:
+            logger.log_update(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"PATCH /api/instances/{instance_id}/tags/{tag_id}",
+                entity="ImageInstanceTagLink",
+                fields={"tag_id": tag_id, "image_instance_id": instance_id},
+                changes={"comment": f"{old_comment} -> {body.comment}"},
+            )
+    
     link.Tag = tag
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -150,5 +193,26 @@ async def untag_instance(instance_id: int, tag_id: int, db: Session = Depends(ge
         raise HTTPException(404, "ImageInstance not found")
     link = db.get(ImageInstanceTagLink, {"TagID": tag_id, "ImageInstanceID": instance_id})
     if link:
+        # Save link data for logging before deletion
+        deleted_data = {
+            "tag_id": tag_id,
+            "image_instance_id": instance_id,
+            "comment": link.Comment,
+            "creator_id": link.CreatorID,
+        }
+        
         db.delete(link); db.commit()
+        
+        # Log tag link deletion
+        logger = get_db_logger()
+        if logger:
+            logger.log_delete(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"DELETE /api/instances/{instance_id}/tags/{tag_id}",
+                entity="ImageInstanceTagLink",
+                fields={"tag_id": tag_id, "image_instance_id": instance_id},
+                deleted_data=deleted_data,
+            )
+    
     return Response(status_code=204)

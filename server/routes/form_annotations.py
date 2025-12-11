@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
 from ..dtos.dtos_main import FormAnnotationGET, FormAnnotationPATCH, FormAnnotationPUT
@@ -46,6 +47,25 @@ async def create_form_annotation(
     db.add(new_annotation)
     db.commit()
     db.refresh(new_annotation)
+    
+    # Log form annotation creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint="POST /api/form-annotations",
+            entity="FormAnnotation",
+            entity_id=new_annotation.FormAnnotationID,
+            fields={
+                "form_schema_id": new_annotation.FormSchemaID,
+                "patient_id": new_annotation.PatientID,
+                "study_id": new_annotation.StudyID,
+                "image_instance_id": new_annotation.ImageInstanceID,
+                "sub_task_id": new_annotation.SubTaskID,
+            },
+        )
+    
     return DTOConverter.form_annotation_to_get(new_annotation)
 
 
@@ -156,6 +176,20 @@ async def update_form_annotation(
 
     db.commit()
     db.refresh(existing_annotation)
+    
+    # Log form annotation update
+    logger = get_db_logger()
+    if logger:
+        changes = {k: f"{getattr(existing_annotation, k, None)} -> {v}" for k, v in payload.items()}
+        logger.log_update(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PATCH /api/form-annotations/{annotation_id}",
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+            changes=changes if changes else None,
+        )
+    
     return DTOConverter.form_annotation_to_get(existing_annotation)
 
 
@@ -169,8 +203,32 @@ async def delete_form_annotation(
     if annotation is None:
         raise HTTPException(status_code=404, detail="FormAnnotation not found")
 
+    # Save annotation data for logging before soft delete
+    deleted_data = {
+        "form_schema_id": annotation.FormSchemaID,
+        "patient_id": annotation.PatientID,
+        "study_id": annotation.StudyID,
+        "image_instance_id": annotation.ImageInstanceID,
+        "sub_task_id": annotation.SubTaskID,
+        "laterality": annotation.Laterality,
+        "creator_id": annotation.CreatorID,
+    }
+    
     annotation.Inactive = True
     db.commit()
+    
+    # Log form annotation deletion (soft delete)
+    logger = get_db_logger()
+    if logger:
+        logger.log_delete(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"DELETE /api/form-annotations/{annotation_id}",
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+            deleted_data=deleted_data,
+        )
+    
     return Response(status_code=204)
 
 
@@ -201,6 +259,19 @@ async def update_form_annotation_value(
     form_data = await request.json()
     annotation.FormData = form_data
     db.commit()
+    
+    # Log form annotation value update
+    logger = get_db_logger()
+    if logger:
+        logger.log_update(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PUT /api/form-annotations/{form_annotation_id}/value",
+            entity="FormAnnotation",
+            entity_id=form_annotation_id,
+            changes={"form_data": "updated"},
+        )
+    
     return Response(status_code=204)
 
 
@@ -235,11 +306,38 @@ async def tag_form_annotation(
         db.commit()
         db.refresh(link)
         link.Tag = tag
+        
+        # Log tag link creation
+        logger = get_db_logger()
+        if logger:
+            logger.log_insert(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
+                entity="FormAnnotationTagLink",
+                fields={
+                    "tag_id": tag.TagID,
+                    "form_annotation_id": annotation_id,
+                    "comment": body.comment,
+                },
+            )
     else:
         if body.comment is not None:
             link.Comment = body.comment
             db.commit()
             db.refresh(link)
+            
+            # Log tag link update
+            logger = get_db_logger()
+            if logger:
+                logger.log_update(
+                    user=current_user.username,
+                    user_id=current_user.id,
+                    endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
+                    entity="FormAnnotationTagLink",
+                    fields={"tag_id": tag.TagID, "form_annotation_id": annotation_id},
+                    changes={"comment": f"{link.Comment} -> {body.comment}"},
+                )
 
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -259,8 +357,29 @@ async def untag_form_annotation(
         FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id}
     )
     if link:
+        # Save link data for logging before deletion
+        deleted_data = {
+            "tag_id": tag_id,
+            "form_annotation_id": annotation_id,
+            "comment": link.Comment,
+            "creator_id": link.CreatorID,
+        }
+        
         db.delete(link)
         db.commit()
+        
+        # Log tag link deletion
+        logger = get_db_logger()
+        if logger:
+            logger.log_delete(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"DELETE /api/form-annotations/{annotation_id}/tags/{tag_id}",
+                entity="FormAnnotationTagLink",
+                fields={"tag_id": tag_id, "form_annotation_id": annotation_id},
+                deleted_data=deleted_data,
+            )
+    
     return Response(status_code=204)
 
 
@@ -289,8 +408,22 @@ async def patch_form_annotation_tag(
         raise HTTPException(404, "Link not found")
 
     if body.comment is not None:
+        old_comment = link.Comment
         link.Comment = body.comment
         db.commit()
         db.refresh(link)
+        
+        # Log tag link update
+        logger = get_db_logger()
+        if logger:
+            logger.log_update(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"PATCH /api/form-annotations/{annotation_id}/tags/{tag_id}",
+                entity="FormAnnotationTagLink",
+                fields={"tag_id": tag_id, "form_annotation_id": annotation_id},
+                changes={"comment": f"{old_comment} -> {body.comment}"},
+            )
+    
     link.Tag = tag
     return DTOConverter.link_to_tag_metadata(link)

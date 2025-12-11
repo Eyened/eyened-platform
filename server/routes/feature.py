@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from eyened_orm import Feature
 from eyened_orm.segmentation import FeatureFeatureLink, Segmentation
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import FeaturePUT, FeaturePATCH, FeatureGET
 from ..dtos.dto_converter import DTOConverter
@@ -40,6 +41,22 @@ async def create_feature(dto: FeaturePUT, db: Session = Depends(get_db), current
     db.add(feature); db.flush()
     set_subfeatures(db, feature.FeatureID, dto.subfeature_ids)
     db.commit(); db.refresh(feature)
+    
+    # Log feature creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint="POST /api/features",
+            entity="Feature",
+            entity_id=feature.FeatureID,
+            fields={
+                "name": feature.FeatureName,
+                "subfeature_ids": dto.subfeature_ids or [],
+            },
+        )
+    
     return DTOConverter.feature_to_get(feature)
 
 @router.get("/features/{feature_id}", response_model=FeatureGET)
@@ -54,11 +71,34 @@ async def patch_feature(feature_id: int, dto: FeaturePATCH, db: Session = Depend
     feature = db.get(Feature, feature_id)
     if not feature:
         raise HTTPException(404, "Feature not found")
+    changes = {}
     if dto.name is not None:
+        changes["name"] = f"{feature.FeatureName} -> {dto.name}"
         feature.FeatureName = dto.name
     if dto.subfeature_ids is not None:
+        # Get current subfeatures for logging
+        from sqlalchemy import select
+        current_subfeatures = db.execute(
+            select(FeatureFeatureLink.ChildFeatureID)
+            .where(FeatureFeatureLink.ParentFeatureID == feature_id)
+            .order_by(FeatureFeatureLink.FeatureIndex)
+        ).scalars().all()
+        changes["subfeature_ids"] = f"{list(current_subfeatures)} -> {dto.subfeature_ids}"
         set_subfeatures(db, feature_id, dto.subfeature_ids)
     db.commit(); db.refresh(feature)
+    
+    # Log feature update
+    logger = get_db_logger()
+    if logger:
+        logger.log_update(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PATCH /api/features/{feature_id}",
+            entity="Feature",
+            entity_id=feature_id,
+            changes=changes if changes else None,
+        )
+    
     return DTOConverter.feature_to_get(feature)
 
 @router.delete("/features/{feature_id}", status_code=204)
@@ -97,7 +137,25 @@ async def delete_feature(feature_id: int, db: Session = Depends(get_db), current
             },
         )
 
+    # Save feature data for logging before deletion
+    deleted_data = {
+        "name": feature.FeatureName,
+    }
+    
     # Safe to delete; ORM cascade removes parent->child links, children remain intact
     db.delete(feature)
     db.commit()
+    
+    # Log feature deletion
+    logger = get_db_logger()
+    if logger:
+        logger.log_delete(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"DELETE /api/features/{feature_id}",
+            entity="Feature",
+            entity_id=feature_id,
+            deleted_data=deleted_data,
+        )
+    
     return Response(status_code=204)

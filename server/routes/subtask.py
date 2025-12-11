@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel
 from eyened_orm import SubTask, SubTaskImageLink, ImageInstance
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_tasks import (
     SubTasksResponse, SubTasksWithImagesResponse,
@@ -52,11 +53,27 @@ async def patch_subtask(
     st = db.get(SubTask, subtaskid)
     if not st:
         raise HTTPException(404, "SubTask not found")
+    changes = {}
     if dto.comments is not None:
+        changes["comments"] = f"{st.Comments} -> {dto.comments}"
         st.Comments = dto.comments
     if dto.task_state is not None:
+        changes["task_state"] = f"{st.TaskState} -> {dto.task_state}"
         st.TaskState = dto.task_state
     db.commit(); db.refresh(st)
+    
+    # Log subtask update
+    logger = get_db_logger()
+    if logger:
+        logger.log_update(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PATCH /api/subtasks/{subtaskid}",
+            entity="SubTask",
+            entity_id=subtaskid,
+            changes=changes if changes else None,
+        )
+    
     return DTOConverter.subtask_to_get(st)
 
 @router.delete("/subtasks/{subtaskid}", status_code=204)
@@ -65,10 +82,36 @@ async def delete_subtask(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    # Get subtask data before deletion
+    st = db.get(SubTask, subtaskid)
+    if not st:
+        raise HTTPException(404, "SubTask not found")
+    
+    # Save subtask data for logging before deletion
+    deleted_data = {
+        "task_id": st.TaskID,
+        "comments": st.Comments,
+        "task_state": str(st.TaskState) if st.TaskState else None,
+        "creator_id": st.CreatorID,
+    }
+    
     res = db.execute(delete(SubTask).where(SubTask.SubTaskID == subtaskid))
     if res.rowcount == 0:
         raise HTTPException(404, "SubTask not found")
     db.commit()
+    
+    # Log subtask deletion
+    logger = get_db_logger()
+    if logger:
+        logger.log_delete(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"DELETE /api/subtasks/{subtaskid}",
+            entity="SubTask",
+            entity_id=subtaskid,
+            deleted_data=deleted_data,
+        )
+    
     return Response(status_code=204)
 
 @router.post("/subtasks/{subtaskid}/images", response_model=SubTaskWithImagesGET)
@@ -87,6 +130,20 @@ async def add_subtask_image(
     link = SubTaskImageLink(SubTaskID=subtaskid, ImageInstanceID=body.instance_id)
     db.add(link); db.commit()
     
+    # Log image link creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"POST /api/subtasks/{subtaskid}/images",
+            entity="SubTaskImageLink",
+            fields={
+                "subtask_id": subtaskid,
+                "image_instance_id": body.instance_id,
+            },
+        )
+    
     # Fetch the updated subtask with images
     st = db.execute(
         select(SubTask)
@@ -102,6 +159,16 @@ async def remove_subtask_image(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    # Get link data before deletion (for logging)
+    link = db.get(SubTaskImageLink, {"SubTaskID": subtaskid, "ImageInstanceID": instance_id})
+    if not link:
+        raise HTTPException(404, "Link not found")
+    
+    deleted_data = {
+        "subtask_id": subtaskid,
+        "image_instance_id": instance_id,
+    }
+    
     res = db.execute(
         delete(SubTaskImageLink).where(
             SubTaskImageLink.SubTaskID == subtaskid,
@@ -111,6 +178,18 @@ async def remove_subtask_image(
     if res.rowcount == 0:
         raise HTTPException(404, "Link not found")
     db.commit()
+    
+    # Log image link deletion
+    logger = get_db_logger()
+    if logger:
+        logger.log_delete(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"DELETE /api/subtasks/{subtaskid}/images/{instance_id}",
+            entity="SubTaskImageLink",
+            fields=deleted_data,
+            deleted_data=deleted_data,
+        )
     
     # Fetch the updated subtask with images
     st = db.execute(
