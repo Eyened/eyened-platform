@@ -61,8 +61,8 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
-    restart: always
 
+# REDIS_HOST is set to redis container name #TODO: check if adjustment below is correct.
   worker:
     user: "${USERID:-1000}:${GROUPID:-1000}"
     build:
@@ -91,7 +91,7 @@ services:
       - ${IMAGES_BASEPATH}:/images
       - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
       - ${THUMBNAILS_PATH}:/storage/thumbnails
-    restart: always
+    restart: on-failure:5
 
   fileserver:
     build:
