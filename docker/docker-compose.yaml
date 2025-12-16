@@ -105,7 +105,6 @@ services:
       - ${THUMBNAILS_PATH}:/thumbnails
     ports:
       - ${PORT}:80
-    restart: always
 
   adminer:
     image: adminer:latest
