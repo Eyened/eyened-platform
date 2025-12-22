@@ -154,16 +154,15 @@ export class ViewerContext {
             try {
                 ({ center, radius, min_x, max_x, min_y, max_y } = instance.cf_roi as any);
                 ([cx, cy] = center as [number, number]);
+                x_min = Math.max(x_min, cx - radius, min_x);
+                x_max = Math.min(x_max, cx + radius, max_x);
+                y_min = Math.max(y_min, cy - radius, min_y);
+                y_max = Math.min(y_max, cy + radius, max_y);
             } catch (e) {
                 console.warn('Error in cfROI', e);
-
             }
-            x_min = Math.max(x_min, cx - radius, min_x);
-            x_max = Math.min(x_max, cx + radius, max_x);
-            y_min = Math.max(y_min, cy - radius, min_y);
-            y_max = Math.min(y_max, cy + radius, max_y);
+            
         }
-
         const { x: x0, y: y0 } = this.image.transform.apply({ x: x_min, y: y_min });
         const { x: x1, y: y1 } = this.image.transform.apply({ x: x_max, y: y_max });
         x_max = Math.max(x0, x1);
@@ -181,7 +180,7 @@ export class ViewerContext {
 
         const tx = (w - scale * roiWidth) / 2 - x_min * scale;
         const ty = (h - this.stretch * scale * roiHeight) / 2 - y_min * scale;
-
+        
         return Matrix.from_translate_scale(tx, ty, scale, scale);
 
     }
