@@ -17,6 +17,7 @@ from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
+from .types import OptionalEnum
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series
@@ -120,7 +121,7 @@ class ImageInstance(Base):
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
 
     # Image modality
-    Modality: Mapped[Optional[Modality]] = mapped_column(SAEnum(Modality))
+    Modality: Mapped[Optional[Modality]] = mapped_column(OptionalEnum(Modality))
 
     # DICOM metadata
     SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64))
@@ -163,16 +164,16 @@ class ImageInstance(Base):
     HorizontalFieldOfView: Mapped[Optional[float]]  # in degrees
 
     Laterality: Mapped[Optional[Laterality]] = mapped_column(
-        SAEnum(Laterality)
+        OptionalEnum(Laterality)
     )  # L or R
     DICOMModality: Mapped[Optional[ModalityType]] = mapped_column(
-        SAEnum(ModalityType)
+        OptionalEnum(ModalityType)
     )  # OP, OPT, SC
     AnatomicRegion: Mapped[
         Optional[int]
     ]  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
     ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(
-        SAEnum(ETDRSField)
+        OptionalEnum(ETDRSField)
     )  # F1-F7
     Angiography: Mapped[Optional[int]]  # 0 = non-angiography, 1 = angiography
 
