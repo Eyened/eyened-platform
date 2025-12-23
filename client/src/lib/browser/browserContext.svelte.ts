@@ -62,30 +62,30 @@ export class BrowserContext {
         this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
     );
 
-	// Helper: Get instance from either store (full InstanceGET or lightweight InstanceMeta)
-	private getInstance(id: number): InstanceGET | InstanceMeta | undefined {
-		return instances.get(id) ?? instanceMetas.get(id);
-	}
+    // Helper: Get instance from either store (full InstanceGET or lightweight InstanceMeta)
+    private getInstance(id: number): InstanceGET | InstanceMeta | undefined {
+        return instances.get(id) ?? instanceMetas.get(id);
+    }
 
-	selectedInstances = $derived(
-		this.selectedIds
-			.map(id => this.getInstance(id))
-			.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
-	);
+    selectedInstances = $derived(
+        this.selectedIds
+            .map(id => this.getInstance(id))
+            .filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+    );
 
-	// Derived: ordered instances for rendering
-	orderedInstances = $derived(
-	    this.orderedInstanceIds
-		.map(id => this.getInstance(id))
-		.filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
-);
+    // Derived: ordered instances for rendering
+    orderedInstances = $derived(
+        this.orderedInstanceIds
+            .map(id => this.getInstance(id))
+            .filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+    );
 
-	// Derived: ordered studies for rendering
-	orderedStudies = $derived(
-		this.orderedStudyIds
-			.map(id => studies.get(id))
-			.filter((x): x is StudyGET => x !== undefined)
-	);
+    // Derived: ordered studies for rendering
+    orderedStudies = $derived(
+        this.orderedStudyIds
+            .map(id => studies.get(id))
+            .filter((x): x is StudyGET => x !== undefined)
+    );
 
     toggleFilterMode() {
         this.filterMode = this.filterMode === 'basic' ? 'advanced' : 'basic';
@@ -95,6 +95,124 @@ export class BrowserContext {
     getValueOptions(fieldName: string): string[] {
         const f = this.activeSignature.find(s => s.name === fieldName);
         return Array.isArray(f?.values) ? (f!.values as string[]) : [];
+    }
+
+    // Get signature field by variable name (handles attribute encoding)
+    private getFieldSignature(fieldValue: string): SignatureField | undefined {
+        if (fieldValue.includes('__')) {
+            const parts = fieldValue.split('__');
+            if (parts.length === 3) {
+                const [model, feature, name] = parts;
+                return this.activeSignature.find(s =>
+                    s.name === name &&
+                    s.model === model &&
+                    (feature === 'none' ? !s.feature : s.feature === feature)
+                );
+            }
+        }
+        return this.activeSignature.find(s => s.name === fieldValue);
+    }
+
+    // Get operator options for a field based on its signature
+    private getOperatorOptions(fieldName: string): Condition['operator'][] {
+        const sig = this.getFieldSignature(fieldName);
+        if (!sig) return [];
+
+        const ops: Condition['operator'][] = [];
+
+        if (Array.isArray(sig.values)) {
+            ops.push('IN');
+        } else {
+            switch (sig.values) {
+                case 'string':
+                    ops.push('==');
+                    break;
+                case 'int':
+                case 'float':
+                case 'date':
+                    ops.push('>', '<', '==');
+                    break;
+                default:
+                    ops.push('==');
+            }
+        }
+
+        if ((sig as any).nullable) {
+            ops.push('IS NULL' as Condition['operator']);
+        }
+
+        return ops;
+    }
+
+    // Get default operator for a field
+    private getDefaultOperator(fieldName: string): Condition['operator'] {
+        const sig = this.getFieldSignature(fieldName);
+        if (!sig) return '==';
+        return Array.isArray(sig.values) ? 'IN' : '==';
+    }
+
+    // Coerce value based on field type
+    private coerceValue(value: any, fieldType: string | string[]): Condition['value'] {
+        if (Array.isArray(fieldType)) {
+            return Array.isArray(value) ? value : [];
+        }
+
+        switch (fieldType) {
+            case 'int':
+                return typeof value === 'string' ? parseInt(value, 10) || 0 : value;
+            case 'float':
+                return typeof value === 'string' ? parseFloat(value) || 0 : value;
+            case 'date':
+            case 'string':
+            default:
+                return value;
+        }
+    }
+
+    // Normalize a single condition against current signature
+    private normalizeCondition(condition: Condition): Condition | null {
+        const sig = this.getFieldSignature(condition.variable);
+        if (!sig) return null; // Drop unknown fields
+
+        const allowedOps = this.getOperatorOptions(condition.variable);
+        const operator = allowedOps.includes(condition.operator)
+            ? condition.operator
+            : this.getDefaultOperator(condition.variable);
+
+        let value = condition.value;
+        if (operator !== 'IS NULL') {
+            value = this.coerceValue(condition.value, sig.values);
+        }
+
+        if ((condition as any).type === 'attribute') {
+            return {
+                type: 'attribute',
+                model: (condition as any).model || '',
+                variable: condition.variable as any,
+                operator: operator as any,
+                value,
+                feature: (condition as any).feature ?? undefined
+            } as any;
+        } else {
+            return {
+                type: 'default',
+                variable: condition.variable as any,
+                operator: operator as any,
+                value
+            } as any;
+        }
+    }
+
+    // Normalize conditions array against current signature (public for use in components)
+    normalizeConditions(conditions: Condition[]): Condition[] {
+        return conditions
+            .map(c => this.normalizeCondition(c))
+            .filter((c): c is Condition => c !== null);
+    }
+
+    // Set advanced conditions with normalization
+    setAdvancedConditions(conditions: Condition[]) {
+        this.advancedConditions = this.normalizeConditions(conditions);
     }
 
     // Load both signatures
@@ -117,7 +235,7 @@ export class BrowserContext {
             this.loading = false;
         }
     }
-    
+
     // Refresh signatures (e.g., after creating/modifying tags)
     async refreshSignatures() {
         const [instRes, studRes] = await Promise.all([
@@ -183,7 +301,8 @@ export class BrowserContext {
     // Method to load conditions from external source (like URL)
     loadConditions(conds: Condition[]) {
         // Preserve legacy callers; default these into advanced
-        this.advancedConditions = conds ?? [];
+        // Normalize conditions when loading from external source
+        this.advancedConditions = this.normalizeConditions(conds ?? []);
         // If it looks like a single basic condition, also set basic
         this.basicCondition = conds?.length === 1 ? conds[0] : this.basicCondition;
     }
@@ -202,8 +321,8 @@ export class BrowserContext {
             return;
         }
 
-        // persist conditions for pagination
-        this.advancedConditions = query;
+        // persist conditions for pagination (normalize before storing)
+        this.advancedConditions = this.normalizeConditions(query);
 
         // reflect in URL
         if (updateUrl) {
@@ -270,40 +389,40 @@ export class BrowserContext {
         }
     }
 
-	private processSearchResults(res: any) {
-		// Add/update search results in GLOBAL repos
-		ingestStudies(res.studies ?? []);
-		
-		// Important: Instance type depends on query mode!
-		if (this.queryMode === 'instances') {
-			// SearchResponse has instances: InstanceGET[] (full data)
-			ingestInstances(res.instances ?? []);
-		} else {
-			// StudySearchResponse has instances: InstanceMeta[] (lightweight references)
-			ingestInstanceMetas(res.instances ?? []);
-		}
+    private processSearchResults(res: any) {
+        // Add/update search results in GLOBAL repos
+        ingestStudies(res.studies ?? []);
 
-		// Track which items are current search results
-		this.resultIds = new Set(res.result_ids ?? []);
-		this.count = res.count ?? 0;
+        // Important: Instance type depends on query mode!
+        if (this.queryMode === 'instances') {
+            // SearchResponse has instances: InstanceGET[] (full data)
+            ingestInstances(res.instances ?? []);
+        } else {
+            // StudySearchResponse has instances: InstanceMeta[] (lightweight references)
+            ingestInstanceMetas(res.instances ?? []);
+        }
 
-		// Set ordered IDs based on query mode
-		let studyIds;
-		if (this.queryMode === 'instances') {
-			this.orderedInstanceIds = res.result_ids ?? [];
-			studyIds = (res.studies ?? []).map((s: any) => s.id);
-		} else {
-			studyIds = res.result_ids ?? [];
-			this.orderedInstanceIds = [];
-		}
+        // Track which items are current search results
+        this.resultIds = new Set(res.result_ids ?? []);
+        this.count = res.count ?? 0;
 
-		// Sort studies by date
-		const get_date = (studyId: number) => {
-			const study = studies.get(studyId);
-			return study ? new Date(study.date).getTime() : 0;
-		}
-		this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
-	}
+        // Set ordered IDs based on query mode
+        let studyIds;
+        if (this.queryMode === 'instances') {
+            this.orderedInstanceIds = res.result_ids ?? [];
+            studyIds = (res.studies ?? []).map((s: any) => s.id);
+        } else {
+            studyIds = res.result_ids ?? [];
+            this.orderedInstanceIds = [];
+        }
+
+        // Sort studies by date
+        const get_date = (studyId: number) => {
+            const study = studies.get(studyId);
+            return study ? new Date(study.date).getTime() : 0;
+        }
+        this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
+    }
 
     openTab(instances: number[]) {
         const suffix_string = `?instances=${instances}`;
@@ -349,11 +468,11 @@ export function decodeConditions(urlString: string): Condition[] {
         const model = m ? decodeURIComponent(m) : undefined;
         const feature = f ? decodeURIComponent(f) : undefined;  // Decode feature
         if (type === 'attribute') {
-            return { 
-                type: 'attribute', 
-                variable, 
-                operator: operator as any, 
-                value, 
+            return {
+                type: 'attribute',
+                variable,
+                operator: operator as any,
+                value,
                 model,
                 feature: feature || undefined  // Include feature, convert empty string to undefined
             } as any;

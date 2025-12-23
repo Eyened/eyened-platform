@@ -1,56 +1,35 @@
 <script lang="ts">
-	import SelectWithSearch from '$lib/components/SelectWithSearch.svelte';
-	import * as Input from '$lib/components/ui/input';
-	import { getContext, onMount, tick } from 'svelte';
-	import DatePicker from '../components/DatePicker.svelte';
-	import { BrowserContext, type Condition } from './browserContext.svelte';
+	import SelectWithSearch from "$lib/components/SelectWithSearch.svelte";
+	import * as Input from "$lib/components/ui/input";
+	import { getContext, onMount, tick } from "svelte";
+	import DatePicker from "../components/DatePicker.svelte";
+	import { BrowserContext, type Condition } from "./browserContext.svelte";
 
-	const browserContext = getContext<BrowserContext>('browserContext');
+	const browserContext = getContext<BrowserContext>("browserContext");
 
-	// bindable single basic condition
+	// bindable single basic condition - this is the root state
 	let { condition = $bindable<Condition | null>(null) } = $props();
 
-	let patientIdentifier = $state('');
-	let studyDate = $state('');
-	let projectName = $state('');
-	
-	// Track previous values to detect which field changed
-	let prev = $state({ patient: '', date: '', project: '' });
+	// Factory to generate getter/setter objects for condition variable equality
+	function conditionValueAccessor(variable: string) {
+		return {
+			get value() {
+				return condition?.variable === variable
+					? String(condition.value ?? "")
+					: "";
+			},
+			set value(val: string) {
+				condition = val
+					? { variable, operator: "==", value: val }
+					: null;
+			},
+		};
+	}
 
-	// Single effect: clear other fields when one changes, and set condition
-	$effect(() => {
-		// Check which field changed
-		if (patientIdentifier !== prev.patient) {
-			if (patientIdentifier) {
-				studyDate = '';
-				projectName = '';
-			}
-			prev.patient = patientIdentifier;
-		} else if (studyDate !== prev.date) {
-			if (studyDate) {
-				patientIdentifier = '';
-				projectName = '';
-			}
-			prev.date = studyDate;
-		} else if (projectName !== prev.project) {
-			if (projectName) {
-				patientIdentifier = '';
-				studyDate = '';
-			}
-			prev.project = projectName;
-		}
-		
-		// Set condition based on which field has a value
-		if (patientIdentifier) {
-			condition = { variable: 'Patient Identifier', operator: '==', value: patientIdentifier };
-		} else if (studyDate) {
-			condition = { variable: 'Study Date', operator: '==', value: studyDate };
-		} else if (projectName) {
-			condition = { variable: 'Project Name', operator: '==', value: projectName };
-		} else {
-			condition = null;
-		}
-	});
+	const patientIdentifier = conditionValueAccessor("Patient Identifier");
+	const studyDate = conditionValueAccessor("Study Date");
+	const projectName = conditionValueAccessor("Project Name");
+
 
 	// Form submit handler
 	function handleSubmit(e: Event) {
@@ -68,27 +47,31 @@
 	});
 
 	const projectOptions = $derived(
-		browserContext.getValueOptions('Project Name').map(v => ({ label: v, value: v }))
+		browserContext
+			.getValueOptions("Project Name")
+			.map((v) => ({ label: v, value: v })),
 	);
 </script>
 
 <form onsubmit={handleSubmit}>
-	<div class="w-full grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 items-center">
-		<!-- Inputs bind to state, single effect derives condition -->
+	<div
+		class="w-full grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 items-center"
+	>
+		<!-- Inputs bind to getter/setter objects that derive from condition -->
 		<label>Patient Identifier:</label>
-		<Input.Input 
-			bind:value={patientIdentifier} 
-			placeholder="Patient Identifier" 
+		<Input.Input
+			bind:value={patientIdentifier.value}
+			placeholder="Patient Identifier"
 			bind:ref={patientInputRef}
 		/>
 
 		<label>Study Date:</label>
-		<DatePicker bind:value={studyDate} />
+		<DatePicker bind:value={studyDate.value} />
 
 		<label>Project Name:</label>
-		<SelectWithSearch 
-			options={projectOptions} 
-			bind:value={projectName} 
+		<SelectWithSearch
+			options={projectOptions}
+			bind:value={projectName.value}
 			placeholder="Project Name"
 		/>
 	</div>
