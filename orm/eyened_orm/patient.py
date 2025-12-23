@@ -7,6 +7,7 @@ from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
+from .types import OptionalEnum
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -47,7 +48,7 @@ class Patient(Base):
     PatientID: Mapped[int] = mapped_column(primary_key=True)
     PatientIdentifier: Mapped[str] = mapped_column(String(255))
     BirthDate: Mapped[Optional[date]]
-    Sex: Mapped[Optional[SexEnum]] = mapped_column(SAEnum(SexEnum))
+    Sex: Mapped[Optional[SexEnum]] = mapped_column(OptionalEnum(SexEnum))
     ProjectID: Mapped[int] = mapped_column(
         ForeignKey("Project.ProjectID", ondelete="CASCADE")
     )

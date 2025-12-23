@@ -26,6 +26,7 @@ from eyened_orm.series import Series
 
 from .base import Base
 from .image_instance import Laterality
+from .types import OptionalEnum
 
 
 class AttributeDataType(Enum):
@@ -213,7 +214,7 @@ class AttributeValue(Base):
     )
     PatientID: Mapped[Optional[int]] = mapped_column(ForeignKey("Patient.PatientID"))
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
-    Laterality: Mapped[Optional[Laterality]] = mapped_column(SAEnum(Laterality))
+    Laterality: Mapped[Optional[Laterality]] = mapped_column(OptionalEnum(Laterality))
 
     ValueFloat: Mapped[Optional[float]]
     ValueInt: Mapped[Optional[int]]

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
 from .image_instance import Laterality
+from .types import OptionalEnum
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -35,7 +36,7 @@ class FormSchema(Base):
     FormSchemaID: Mapped[int] = mapped_column(primary_key=True)
     SchemaName: Mapped[str] = mapped_column(String(255), unique=True)
     Schema: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    EntityType: Mapped[Optional[EntityType]] = mapped_column(SAEnum(EntityType), default=None)
+    EntityType: Mapped[Optional[EntityType]] = mapped_column(OptionalEnum(EntityType), default=None)
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="FormSchema")
 
@@ -70,7 +71,7 @@ class FormAnnotation(Base):
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
     ImageInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"))
-    Laterality: Mapped[Optional[Laterality]] = mapped_column(SAEnum(Laterality))
+    Laterality: Mapped[Optional[Laterality]] = mapped_column(OptionalEnum(Laterality))
     
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="SET NULL"))
