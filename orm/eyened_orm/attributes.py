@@ -113,7 +113,7 @@ class AttributeDefinition(Base):
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         back_populates="AttributeDefinition",
-        lazy="selectin",
+        lazy="noload",
     )
     ProducingModels: Mapped[List["AttributesModel"]] = relationship(
         "eyened_orm.attributes.AttributesModel",

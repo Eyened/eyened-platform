@@ -166,18 +166,77 @@ class Base(DeclarativeBase):
         }
 
     @classmethod
+    def _build_where_stmt(cls, **kwargs):
+        """Build a select statement with where conditions from kwargs."""
+        conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
+        return select(cls).where(*conditions)
+
+    @classmethod
     def by_column(cls: type[T], session: Session, **kwargs) -> Optional[T]:
         """Generic method to query by any column."""
-        conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
-        stmt = select(cls).where(*conditions)
-        return session.scalar(stmt)
+        return session.scalar(cls._build_where_stmt(**kwargs))
 
     @classmethod
     def by_columns(cls: type[T], session: Session, **kwargs) -> List[T]:
         """Generic method to query by any columns."""
-        conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
-        stmt = select(cls).where(*conditions)
-        return session.scalars(stmt).all()
+        return session.scalars(cls._build_where_stmt(**kwargs)).all()
+
+    @classmethod
+    def get_or_create(
+        cls: type[T],
+        session: Session,
+        match_by: Dict[str, Any],
+        create_kwargs: Optional[Dict[str, Any]] = None,
+        must_match: Optional[Dict[str, Any]] = None,
+        verbose: bool = False,
+    ) -> T:
+        """
+        Get an existing instance matching the criteria, or create a new one if not found.
+
+        Args:
+            session: SQLAlchemy session.
+            match_by: Dict of field names to values to match on (for "get").
+            create_kwargs: Dict of values to use when creating (if not exist).
+                If None, uses match_by values.
+            must_match: Optional dict of fields that must match *if* found, else raises error.
+                Useful for type checking or ensuring consistency.
+            verbose: If True, print log messages about found/created instances.
+
+        Returns:
+            The found or created instance.
+
+        Raises:
+            ValueError: If an existing instance is found but doesn't match must_match criteria.
+        """
+        # Try to find existing instance
+        instance = cls.by_column(session, **match_by)
+
+        display_name = cls.__name__
+        if instance:
+            # Optionally, check for required matches (e.g. data type)
+            if must_match:
+                errors = [
+                    f"{attr}: existing={actual}, requested={expect}"
+                    for attr, expect in must_match.items()
+                    if (actual:= getattr(instance, attr)) != expect
+                ]
+                if errors:
+                    raise ValueError(
+                        f"{display_name} exists with different parameters: "
+                        + "; ".join(errors)
+                    )
+            if verbose:
+                print(f"Found existing {display_name}: {repr(instance)}")
+            return instance
+
+        # Create new instance
+        create_kwargs = create_kwargs or match_by
+        instance = cls(**create_kwargs)
+        session.add(instance)
+        session.flush()
+        if verbose:
+            print(f"Created {display_name}: {repr(instance)}")
+        return instance
 
     @classmethod
     def columns(cls) -> List[Column]:
@@ -191,7 +250,7 @@ class Base(DeclarativeBase):
         seen_names = set()
         # Traverse MRO to collect columns from all Base subclasses
         for base_cls in cls.__mro__:
-            if issubclass(base_cls, Base) and hasattr(base_cls, '__table__'):
+            if issubclass(base_cls, Base) and hasattr(base_cls, "__table__"):
                 for col in base_cls.__table__.columns:
                     # Avoid duplicates (child classes may redefine parent columns)
                     if col.name not in seen_names:
@@ -208,9 +267,11 @@ class Base(DeclarativeBase):
     def _base_joins(cls, statement):
         """Override this method to add custom joins to queries."""
         return statement
-    
+
     @classmethod
-    def where(cls: Type[T], session: Session, condition, include_inactive=False, **kwargs) -> List[T]:
+    def where(
+        cls: Type[T], session: Session, condition, include_inactive=False, **kwargs
+    ) -> List[T]:
         """Query objects with a custom condition and optional joins."""
         statement = select(cls)
 
@@ -230,7 +291,7 @@ class Base(DeclarativeBase):
 
     def to_dict(self, include_parents: bool = False) -> Dict[str, Any]:
         """Convert the object to a dictionary, skipping columns marked private.
-        
+
         Args:
             include_parents: If True, include columns from parent classes in inheritance hierarchy.
         """
@@ -251,10 +312,10 @@ class Base(DeclarativeBase):
         return f"{self.__class__.__name__}({args})"
 
     def _repr_html_(self) -> str:
-        """HTML representation for Jupyter notebook display in table format."""            
+        """HTML representation for Jupyter notebook display in table format."""
         pk_values = tuple(self.get_value(pk) for pk in self.primary_keys())
         pk_str = pk_values[0] if len(pk_values) == 1 else pk_values
-        printer = TablePrinter(title=f'{self.__class__.__name__} {pk_str}')
+        printer = TablePrinter(title=f"{self.__class__.__name__} {pk_str}")
         return printer.print_table(self.to_dict(include_parents=True))
 
     def __hash__(self):
