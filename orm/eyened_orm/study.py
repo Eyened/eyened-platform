@@ -78,6 +78,10 @@ class Study(Base):
             return None
         return (self.StudyDate - self.Patient.BirthDate).days / 365.25
 
+    @property
+    def images(self) -> List["ImageInstance"]:
+        return self.get_images()
+
     def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
         from eyened_orm import ImageInstance, Series
 
