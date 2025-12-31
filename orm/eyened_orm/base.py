@@ -111,6 +111,43 @@ class Base(DeclarativeBase):
         return session.scalars(select(cls)).all()
 
     @classmethod
+    def query_column(
+        cls,
+        session: Session,
+        column: Column | str,
+        distinct: bool = True,
+        where: Any = None,
+    ) -> List[Any]:
+        """
+        Query distinct values from a single column of this table, with optional filtering.
+        
+        Args:
+            session: SQLAlchemy session.
+            column: Column attribute (e.g., cls.ColumnName) or column name string.
+            distinct: If True, return only distinct values (default: True).
+            where: Optional SQLAlchemy filter expression(s) to apply.
+            
+        Returns:
+            List of column values.
+            
+        Example:
+            >>> Creator.query_column(session, Creator.CreatorName)
+            ['Alice', 'Bob', 'Charlie']
+            >>> Project.query_column(session, 'ProjectName', distinct=False)
+            ['Project1', 'Project1', 'Project2', ...]
+            >>> Creator.query_column(session, Creator.CreatorName, where=(Creator.Inactive == False))
+            ['Alice', 'Bob']
+        """
+        if isinstance(column, str):
+            column = getattr(cls, column)
+        stmt = select(column)
+        if where is not None:
+            stmt = stmt.where(where)
+        if distinct:
+            stmt = stmt.distinct()
+        return session.scalars(stmt).all()
+
+    @classmethod
     def primary_keys(cls) -> List[Column]:
         """Return the list of primary key columns."""
         return list(cls.__table__.primary_key.columns)

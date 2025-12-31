@@ -37,7 +37,7 @@ from eyened_orm.patient import SexEnum as PatientSex
 from eyened_orm.segmentation import ModelSegmentation, SegmentationModel
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, literal, or_, select, true, union_all
+from sqlalchemy import and_, exists, func, literal, or_, select, true, union_all
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session, aliased, selectinload
 
@@ -787,9 +787,9 @@ def _build_instance_select(
 
     # Split conditions into default and attribute-based based on discriminator
     static_conds_raw: List[Dict[str, Any]] = []
-    attr_conds_raw: List[
-        Tuple[Optional[str], str, Optional[str], Dict[str, Any]]
-    ] = []  # (model_name, attr_name, feature_name, cond)
+    attr_conds_raw: List[Tuple[Optional[str], str, Optional[str], Dict[str, Any]]] = (
+        []
+    )  # (model_name, attr_name, feature_name, cond)
 
     for c in conditions:
         if c.get("type") == "attribute":
@@ -1086,210 +1086,91 @@ async def search_studies(
     }
 
 
+def _query_tag_names(db: Session, link_table: Any) -> List[str]:
+    """Helper to query distinct tag names from a link table."""
+    return sorted(
+        db.scalars(select(Tag.TagName).join(link_table, link_table.TagID == Tag.TagID).distinct()).all()
+    )
+
+
 @router.get("/instances/search/signature", response_model=list[SignatureField])
 async def instances_signature(
     db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)
 ):
     """Return signature metadata for instance search fields."""
-    items: list[SignatureField] = []
 
-    # Enum-backed
-    items.append(
+    creator_names = sorted(Creator.query_column(db, Creator.CreatorName, where=(Creator.IsHuman == True)))
+    items: list[SignatureField] = [
+        # Enum-backed
+        SignatureField(name="Laterality", values=[e.value for e in ImgLaterality], nullable=True),
+        SignatureField(name="Modality", values=[e.value for e in ImgModality], nullable=True),
+        SignatureField(name="ETDRS Field", values=[e.value for e in ImgETDRS], nullable=True),
+        SignatureField(name="Patient Sex", values=[e.value for e in PatientSex], nullable=True),
+        # DB-derived simple columns
+        SignatureField(name="Project Name", values=sorted(Project.query_column(db, Project.ProjectName))),
         SignatureField(
-            name="Laterality", values=[e.value for e in ImgLaterality], nullable=True
-        )
-    )
-    items.append(
+            name="Device Model ID",
+            values=[str(v) for v in sorted(DeviceModel.query_column(db, DeviceModel.DeviceModelID))],
+        ),
         SignatureField(
-            name="Modality", values=[e.value for e in ImgModality], nullable=True
-        )
-    )
-    items.append(
+            name="Segmentation Feature Name",
+            values=sorted(Feature.query_column(db, Feature.FeatureName)),
+        ),
         SignatureField(
-            name="ETDRS Field", values=[e.value for e in ImgETDRS], nullable=True
-        )
-    )
-    items.append(
+            name="Segmentation Creator Name",
+            values=creator_names,
+        ),
+        SignatureField(name="Segmentation Tag Name", values=_query_tag_names(db, SegmentationTagLink)),
         SignatureField(
-            name="Patient Sex", values=[e.value for e in PatientSex], nullable=True
-        )
-    )
-
-    # DB-derived lists
-    projects = db.execute(select(Project.ProjectName).distinct()).scalars().all()
-    items.append(SignatureField(name="Project Name", values=sorted(projects)))
-
-    model_ids = db.execute(select(DeviceModel.DeviceModelID).distinct()).scalars().all()
-    items.append(
+            name="Form Schema Name",
+            values=sorted(FormSchema.query_column(db, FormSchema.SchemaName)),
+        ),
         SignatureField(
-            name="Device Model ID", values=[str(v) for v in sorted(model_ids)]
-        )
-    )
+            name="Form Creator Name",
+            values=creator_names,
+        ),
+        SignatureField(name="Form Tag Name", values=_query_tag_names(db, FormAnnotationTagLink)),
+        SignatureField(name="Image Tag Name", values=_query_tag_names(db, ImageInstanceTagLink)),
+    ]
 
-    feat_names = db.execute(select(Feature.FeatureName).distinct()).scalars().all()
-    items.append(
-        SignatureField(name="Segmentation Feature Name", values=sorted(feat_names))
-    )
-
-    seg_creators = (
-        db.execute(
-            select(Creator.CreatorName)
-            .join(Segmentation, Segmentation.CreatorID == Creator.CreatorID)
-            .where(~Segmentation.Inactive)
-            .distinct()
-        )
-        .scalars()
-        .all()
-    )
-    items.append(
-        SignatureField(name="Segmentation Creator Name", values=sorted(seg_creators))
-    )
-
-    seg_tag_names = (
-        db.execute(
-            select(Tag.TagName)
-            .join(SegmentationTagLink, SegmentationTagLink.TagID == Tag.TagID)
-            .distinct()
-        )
-        .scalars()
-        .all()
-    )
-    items.append(
-        SignatureField(name="Segmentation Tag Name", values=sorted(seg_tag_names))
-    )
-
-    form_schema_names = (
-        db.execute(select(FormSchema.SchemaName).distinct()).scalars().all()
-    )
-    items.append(
-        SignatureField(name="Form Schema Name", values=sorted(form_schema_names))
-    )
-
-    form_creators = (
-        db.execute(
-            select(Creator.CreatorName)
-            .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
-            .where(~FormAnnotation.Inactive)
-            .distinct()
-        )
-        .scalars()
-        .all()
-    )
-    items.append(SignatureField(name="Form Creator Name", values=sorted(form_creators)))
-
-    form_tag_names = (
-        db.execute(
-            select(Tag.TagName)
-            .join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID)
-            .distinct()
-        )
-        .scalars()
-        .all()
-    )
-    items.append(SignatureField(name="Form Tag Name", values=sorted(form_tag_names)))
-
-    image_tag_names = (
-        db.execute(
-            select(Tag.TagName)
-            .join(ImageInstanceTagLink, ImageInstanceTagLink.TagID == Tag.TagID)
-            .distinct()
-        )
-        .scalars()
-        .all()
-    )
-    items.append(SignatureField(name="Image Tag Name", values=sorted(image_tag_names)))
-
-    # Attributes signature with feature context
-    # Query existing AttributeValues to find which model+feature combinations exist
-
-    # Query 1: AttributeValues linked to Segmentation
-    seg_query = (
+    # Attributes
+    attr_query = (
         select(
             AttrDef.AttributeName,
             AttrDef.AttributeDataType,
             AttributesModel.ModelName,
-            Feature.FeatureName,
         )
-        .select_from(AttrVal)
-        .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
-        .outerjoin(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
-        .join(Segmentation, AttrVal.SegmentationID == Segmentation.SegmentationID)
-        .join(Feature, Segmentation.FeatureID == Feature.FeatureID)
+        .select_from(AttrDef)
+        .outerjoin(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID)
+        .outerjoin(AttributesModel, AttributesModelOutput.ModelID == AttributesModel.ModelID)
         .where(AttrDef.AttributeDataType != AttributeDataType.JSON)
+        .distinct()
     )
+    attr_rows = db.execute(attr_query).all()
 
-    # Query 2: AttributeValues linked to ModelSegmentation
-    modelseg_query = (
-        select(
-            AttrDef.AttributeName,
-            AttrDef.AttributeDataType,
-            AttributesModel.ModelName,
-            Feature.FeatureName,
-        )
-        .select_from(AttrVal)
-        .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
-        .outerjoin(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
-        .join(
-            ModelSegmentation,
-            AttrVal.ModelSegmentationID == ModelSegmentation.ModelSegmentationID,
-        )
-        .join(SegmentationModel, ModelSegmentation.ModelID == SegmentationModel.ModelID)
-        .join(Feature, SegmentationModel.FeatureID == Feature.FeatureID)
-        .where(AttrDef.AttributeDataType != AttributeDataType.JSON)
-    )
-
-    # Query 3: AttributeValues directly linked to ImageInstance (no feature)
-    # Use literal(None) for better cross-database compatibility
-    direct_query = (
-        select(
-            AttrDef.AttributeName,
-            AttrDef.AttributeDataType,
-            AttributesModel.ModelName,
-            literal(None).label("FeatureName"),  # NULL as FeatureName
-        )
-        .select_from(AttrVal)
-        .join(AttrDef, AttrVal.AttributeID == AttrDef.AttributeID)
-        .outerjoin(AttributesModel, AttrVal.ModelID == AttributesModel.ModelID)
-        .where(AttrVal.ImageInstanceID.is_not(None))
-        .where(AttrDef.AttributeDataType != AttributeDataType.JSON)
-    )
-
-    # Combine all three with UNION and get distinct results
-    combined_query = union_all(seg_query, modelseg_query, direct_query).subquery()
-    distinct_query = select(combined_query).distinct()
-    attr_rows = db.execute(distinct_query).all()
-
-    # Convert to SignatureFields with deduplication
-    seen = set()
-    for name, dtype, model_name, feature_name in attr_rows:
-        key = (name, model_name, feature_name)
-        if key in seen:
-            continue
-        seen.add(key)
-
-        val = (
-            "string"
-            if dtype == AttributeDataType.String
-            else ("int" if dtype == AttributeDataType.Int else "float")
-        )
+    # Convert to SignatureFields
+    dtype_map = {
+        AttributeDataType.String: "string",
+        AttributeDataType.Int: "int",
+        AttributeDataType.Float: "float",
+    }
+    for name, dtype, model_name in attr_rows:
         items.append(
             SignatureField(
                 name=name,
-                values=val,
+                values=dtype_map.get(dtype, "string"),
                 type="attribute",
                 model=model_name,
-                feature=feature_name,  # Will be None for direct image attributes
             )
         )
-
     # Free-text/number defaults
-    items.append(SignatureField(name="Image DBID", values="int"))
-    items.append(
-        SignatureField(name="Color Fundus Quality", values="float", nullable=True)
-    )
-    items.append(SignatureField(name="Study Date", values="date"))
-    items.append(SignatureField(name="Patient Identifier", values="string"))
-    items.append(SignatureField(name="Patient Birthdate", values="date", nullable=True))
+    items.extend([
+        SignatureField(name="Image DBID", values="int"),
+        SignatureField(name="Color Fundus Quality", values="float", nullable=True),
+        SignatureField(name="Study Date", values="date"),
+        SignatureField(name="Patient Identifier", values="string"),
+        SignatureField(name="Patient Birthdate", values="date", nullable=True),
+    ])
 
     return items
 
