@@ -4,6 +4,49 @@ from eyened_orm import ImageInstance
 from sqlalchemy import update
 from tqdm import tqdm
 
+from eyened_orm import AttributesModel, AttributeDataType
+
+
+def get_or_create_attributes_model(
+    session, model_name: str, version: str, description: str, verbose=False
+):
+
+    model = AttributesModel.by_name(session, model_name)
+    if model is None:
+        model = AttributesModel()
+        model.ModelName = model_name
+        model.Version = version
+        model.Description = description
+        session.add(model)
+        session.commit()
+        if verbose:
+            print(f"Created {model_name} model")
+    else:
+        if verbose:
+            print(f"{model_name} model already exists")
+
+    return model
+
+
+def get_or_create_attribute_definition(
+    session, attribute_name: str, attribute_data_type: AttributeDataType, verbose=False
+):
+    from eyened_orm import AttributeDefinition
+
+    attribute_definition = AttributeDefinition.by_name(session, attribute_name)
+    if attribute_definition is None:
+        attribute_definition = AttributeDefinition()
+        attribute_definition.AttributeName = attribute_name
+        attribute_definition.AttributeDataType = attribute_data_type
+        session.add(attribute_definition)
+        session.commit()
+        if verbose:
+            print(f"Created {attribute_name} attribute")
+    else:
+        if verbose:
+            print(f"{attribute_name} attribute already exists")
+    return attribute_definition
+
 
 def transform_kps(colname):
     from rtnls_fundusprep.cfi_bounds import CFIBounds
@@ -22,6 +65,7 @@ def transform_kps(colname):
 def logits_to_continuous_score(logits, temperature=3.0):
     import torch
     import torch.nn.functional as F
+
     logits = torch.tensor(logits, dtype=torch.float32) / temperature
     probs = F.softmax(logits, dim=-1)
     num_classes = len(logits)
@@ -87,10 +131,10 @@ def clear_unsuccessfull(session, df, commit=True):
         session.commit()
 
 
-
 def auto_device():
     import GPUtil
     import torch
+
     # Attempt to select a free GPU
     try:
         deviceID = GPUtil.getFirstAvailable(order="memory")[

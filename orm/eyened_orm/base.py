@@ -276,6 +276,55 @@ class Base(DeclarativeBase):
         return instance
 
     @classmethod
+    def upsert(
+        cls: type[T],
+        session: Session,
+        match_by: Dict[str, Any],
+        update_values: Dict[str, Any],
+        verbose: bool = False,
+    ) -> T:
+        """
+        Update an existing instance matching the criteria, or create a new one if not found.
+
+        Args:
+            session: SQLAlchemy session.
+            match_by: Dict of field names to values to match on (for finding existing record).
+            update_values: Dict of field names to values to update (if found) or set (if created).
+            verbose: If True, print log messages about found/updated/created instances.
+
+        Returns:
+            The updated or created instance.
+
+        Example:
+            >>> AttributeValue.upsert(
+            ...     session,
+            ...     match_by={
+            ...         "AttributeID": 1,
+            ...         "ModelID": 2,
+            ...         "ImageInstanceID": 3,
+            ...     },
+            ...     update_values={"ValueFloat": 42.5}
+            ... )
+        """
+        instance = cls.by_column(session, **match_by)
+        
+        if instance:
+            # Update existing instance
+            for key, value in update_values.items():
+                setattr(instance, key, value)
+            if verbose:
+                print(f"Updated {cls.__name__}: {repr(instance)}")
+            return instance
+        
+        # Create new instance with merged values
+        instance = cls(**{**match_by, **update_values})
+        session.add(instance)
+        session.flush()
+        if verbose:
+            print(f"Created {cls.__name__}: {repr(instance)}")
+        return instance
+
+    @classmethod
     def columns(cls) -> List[Column]:
         """Return all columns of the table."""
         return cls.__table__.columns
