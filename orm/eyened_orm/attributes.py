@@ -60,9 +60,16 @@ class AttributesModel(Model):
 
     __mapper_args__ = {"polymorphic_identity": ModelKind.Attributes}
 
-    def export_to_csv(self, session: Session, output_path: str, attributes: List[AttributeDefinition], project_names: List[str]):
+    def export_to_csv(
+        self,
+        session: Session,
+        output_path: str,
+        attributes: List[AttributeDefinition],
+        project_names: List[str],
+    ):
 
-        attribute_values = (session.query(
+        attribute_values = (
+            session.query(
                 AttributeValue.ValueFloat,
                 AttributeValue.ValueInt,
                 AttributeValue.ValueText,
@@ -72,28 +79,57 @@ class AttributesModel(Model):
                 Patient.PatientIdentifier,
                 Study.StudyDate,
                 Project.ProjectName,
-            ).join(AttributeDefinition).filter(AttributeDefinition.AttributeName.in_(attributes))
+            )
+            .join(AttributeDefinition)
+            .filter(AttributeDefinition.AttributeName.in_(attributes))
             .filter(AttributeDefinition.AttributeDataType != AttributeDataType.JSON)
-            .join(AttributesModel).filter(AttributesModel.ModelID == self.ModelID)
-            .join(ImageInstance, AttributeValue.ImageInstanceID == ImageInstance.ImageInstanceID)
+            .join(AttributesModel)
+            .filter(AttributesModel.ModelID == self.ModelID)
+            .join(
+                ImageInstance,
+                AttributeValue.ImageInstanceID == ImageInstance.ImageInstanceID,
+            )
             .join(Series, ImageInstance.SeriesID == Series.SeriesID)
             .join(Study, Series.StudyID == Study.StudyID)
             .join(Patient, Study.PatientID == Patient.PatientID)
             .join(Project, Patient.ProjectID == Project.ProjectID)
-            .filter(Project.ProjectName.in_(project_names)))
+            .filter(Project.ProjectName.in_(project_names))
+        )
 
         results = attribute_values.all()
-        df = pd.DataFrame(results, columns=['ValueFloat', 'ValueInt', 'ValueJSON', 'AttributeName', 'ImageInstanceID', 'Laterality', 'PatientIdentifier', 'StudyDate', 'ProjectName'])
+        df = pd.DataFrame(
+            results,
+            columns=[
+                "ValueFloat",
+                "ValueInt",
+                "ValueJSON",
+                "AttributeName",
+                "ImageInstanceID",
+                "Laterality",
+                "PatientIdentifier",
+                "StudyDate",
+                "ProjectName",
+            ],
+        )
 
         df_pivot = df.pivot(
-                index=['ImageInstanceID', 'PatientIdentifier', 'Laterality', 'ProjectName', 'StudyDate'],
-                columns='AttributeName',
-                values=['ValueFloat', 'ValueInt', 'ValueJSON']
-            )
+            index=[
+                "ImageInstanceID",
+                "PatientIdentifier",
+                "Laterality",
+                "ProjectName",
+                "StudyDate",
+            ],
+            columns="AttributeName",
+            values=["ValueFloat", "ValueInt", "ValueJSON"],
+        )
         df_pivot.reset_index(inplace=True)
-        df_pivot.dropna(axis=1, how='all', inplace=True)
+        df_pivot.dropna(axis=1, how="all", inplace=True)
         # Remove the top-level ('ValueFloat', ...), keep only 'AttributeName' in columns
-        df_pivot.columns = [col[1] if isinstance(col, tuple) and col[1] else col[0] for col in df_pivot.columns.values]
+        df_pivot.columns = [
+            col[1] if isinstance(col, tuple) and col[1] else col[0]
+            for col in df_pivot.columns.values
+        ]
         df_pivot.to_csv(output_path, index=False)
 
 
@@ -102,6 +138,8 @@ class AttributeDefinition(Base):
     __table_args__ = (
         UniqueConstraint("AttributeName", name="uq_AttributeDefinition_AttributeName"),
     )
+
+    _name_column = "AttributeName"
 
     AttributeID: Mapped[int] = mapped_column(primary_key=True)
     AttributeName: Mapped[str] = mapped_column(String(255))
@@ -261,6 +299,20 @@ class AttributeValue(Base):
         secondaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.OutputAttributeValueID",
         back_populates="InputValues",
     )
+
+    @property
+    def value(self):
+        attr_type = self.AttributeDefinition.AttributeDataType
+        if attr_type == AttributeDataType.Float:
+            return self.ValueFloat
+        elif attr_type == AttributeDataType.Int:
+            return self.ValueInt
+        elif attr_type == AttributeDataType.String:
+            return self.ValueText
+        elif attr_type == AttributeDataType.JSON:
+            return self.ValueJSON
+        else:
+            raise ValueError(f"Unsupported attribute data type: {attr_type}")
 
 
 # Junction table for model output declarations

@@ -70,7 +70,7 @@ def database_mirror_test(config_file):
         # Load config from nested dicts (with secret_key override if needed)
         target_config = load_config(config["target"])
         source_config = load_config(config["source"])
-        
+
         target_db = Database(target_config)
         source_db = Database(source_config)
 
@@ -167,6 +167,127 @@ def run_models(env, device):
             print(f"Running inference with cfi_cache_path: {cfi_cache_path}")
         run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
 
+
+@eorm.command()
+@click.option(
+    "-e", "--env", type=str, help="Path to .env file for environment configuration"
+)
+@click.option("-d", "--device", type=str, default=None)
+@click.option("-b", "--batch-size", type=int, default=8)
+@click.option(
+    "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
+)
+@click.option(
+    "-m",
+    "--model-version",
+    type=str,
+    required=True,
+    help="Version of the model",
+    default="odfd_march25",
+)
+@click.option(
+    "-s",
+    "--skip-existing",
+    is_flag=True,
+    default=True,
+    help="Skip existing attribute values",
+)
+def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
+
+    import torch
+    from rtnls_inference import RegressionEnsemble
+    from rtnls_inference.utils import decollate_batch
+    from eyened_orm import Database, ImageInstance
+    from eyened_orm.inference.utils import (
+        get_or_create_attributes_model,
+        get_or_create_attribute_definition,
+    )
+    from eyened_orm.attributes import AttributeDataType, AttributeValue
+    from dotenv import load_dotenv
+    from sqlalchemy import select
+    import os
+
+    load_dotenv(env)
+
+    with open(path, "r") as f:
+        image_ids = {int(line.strip()) for line in f.readlines()}
+
+    database = Database(env)
+    db_config = database.config.database
+    print(f"Connected to database {db_config.database} on {db_config.host}:{db_config.port}")
+
+    with database.get_session() as session:
+
+        model = get_or_create_attributes_model(
+            session,
+            "ODFD",
+            model_version,
+            "Estimates the distance from the fovea to optic disc border in pixels",
+        )
+        attr_definition = get_or_create_attribute_definition(
+            session, "ODFD", AttributeDataType.Float
+        )
+        model_id = model.ModelID
+        attr_id = attr_definition.AttributeID
+
+        if skip_existing:
+
+            existing_ids = set(session.scalars(
+                select(AttributeValue.ImageInstanceID).where(
+                    AttributeValue.AttributeID == attr_id,
+                    AttributeValue.ModelID == model_id,
+                    AttributeValue.ImageInstanceID.in_(image_ids),
+                )
+            ).all())
+            print(f"Skipping {len(existing_ids)} existing images")
+            image_ids = image_ids - existing_ids
+
+        if not image_ids:
+            print("No images to run on")
+            return
+        else:
+            print(f"Running {len(image_ids)} images")
+        images = ImageInstance.by_ids(session, image_ids)
+        paths = [image.path for image in images]
+        ids = [image.ImageInstanceID for image in images]
+
+    print(f"Loading model {model_version} from {os.getenv('RTNLS_MODEL_RELEASES')}")
+    ensemble = RegressionEnsemble.from_release(f"{model_version}.pt").to(device)
+
+    dataloader = ensemble._make_inference_dataloader(
+        paths,
+        ids=ids,
+        num_workers=batch_size,
+        preprocess=True,
+        batch_size=batch_size,
+    )
+    with torch.no_grad():
+        for batch in tqdm(dataloader):
+            if len(batch) == 0:
+                continue
+
+            im = batch["image"].to(device)
+            val = (
+                ensemble.forward(im).mean(dim=0).detach().cpu()
+            )  # average the model dimension
+
+            batch["val"] = val
+            items = decollate_batch(batch)
+
+            for item in items:
+                scaling_factor = item["metadata"]["bounds"]["radius"] / 512
+                val = item["val"] * 1024 * scaling_factor
+                image_id = item["id"]
+                AttributeValue.upsert(
+                    session,
+                    match_by={
+                        "AttributeID": attr_id,
+                        "ModelID": model_id,
+                        "ImageInstanceID": image_id,
+                    },
+                    update_values={"ValueFloat": val},
+                )
+            session.commit()
 
 @eorm.command()
 @click.option(
@@ -376,27 +497,48 @@ def update_hashes(env, print_errors):
     "-e", "--env", type=str, help="Path to .env file for environment configuration"
 )
 @click.option(
-    "--patient", type=str, required=False, help="Patient identifier to run registration for"
+    "--patient",
+    type=str,
+    required=False,
+    help="Patient identifier to run registration for",
 )
 @click.option(
     "--project", type=int, required=False, help="Project ID to run registration for"
 )
 @click.option(
-    "--schema", type=str, required=False, default="RegistrationSet", help="SchemaName to run registration for"
+    "--schema",
+    type=str,
+    required=False,
+    default="RegistrationSet",
+    help="SchemaName to run registration for",
 )
 @click.option(
-    "--creator", type=str, required=False, default="registration model", help="CreatorName to run registration for"
+    "--creator",
+    type=str,
+    required=False,
+    default="registration model",
+    help="CreatorName to run registration for",
 )
 @click.option(
-    "--replace", is_flag=True, required=False, default=False, help="Replace existing registration"
+    "--replace",
+    is_flag=True,
+    required=False,
+    default=False,
+    help="Replace existing registration",
 )
 @click.option(
-    "--skip", type=str, required=False, help="Comma-separated list of ImageInstanceIDs to skip during registration (e.g. --skip 1811325,1811324,1811323)"
+    "--skip",
+    type=str,
+    required=False,
+    help="Comma-separated list of ImageInstanceIDs to skip during registration (e.g. --skip 1811325,1811324,1811323)",
 )
-
 def run_registration(env, patient, project, schema, creator, replace, skip):
     from eyened_orm import Database, Patient, Project
-    from eyened_orm.utils.registration import get_or_create_schema, get_or_create_creator, run_patient
+    from eyened_orm.utils.registration import (
+        get_or_create_schema,
+        get_or_create_creator,
+        run_patient,
+    )
 
     # Parse skip list from comma-separated string
     skip_ids = None
@@ -411,7 +553,7 @@ def run_registration(env, patient, project, schema, creator, replace, skip):
     config = load_config(env)
     database = Database(config)
     with database.get_session() as session:
-            
+
         schema = get_or_create_schema(session, schema)
         creator = get_or_create_creator(session, creator)
         if patient:
@@ -440,56 +582,57 @@ def run_registration(env, patient, project, schema, creator, replace, skip):
 )
 def load_dump(env, dump_path):
     """Load a database dump file, replacing the entire database.
-    
+
     This command will:
     1. Drop and recreate the database (clearing all data)
     2. Load the SQL dump file into the database
-    
+
     WARNING: This will permanently delete all existing data in the database.
     """
     from pathlib import Path
-    
+
     config = load_config(env)
     db_config = config.database
-    
+
     dump_path = Path(dump_path)
     if not dump_path.exists():
         print(f"Error: Dump file not found: {dump_path}")
         return
-    
+
     print(f"Loading database dump from: {dump_path}")
     print(f"Target database: {db_config.database} on {db_config.host}:{db_config.port}")
     print("WARNING: This will replace the entire database!")
-    
+
     # Security confirmation
     print("\n" + "=" * 60)
-    print(f"Database to be cleared: {db_config.database} on {db_config.host}:{db_config.port}")
+    print(
+        f"Database to be cleared: {db_config.database} on {db_config.host}:{db_config.port}"
+    )
     print("=" * 60)
-    
+
     # Generate random confirmation code
-    confirmation_code = ''.join(random.choices(string.ascii_uppercase, k=4))
+    confirmation_code = "".join(random.choices(string.ascii_uppercase, k=4))
     print(f"\nDo you want to proceed? Type '{confirmation_code}' to confirm:")
-    
+
     user_input = click.prompt("", type=str)
-    
+
     if user_input != confirmation_code:
         print("Confirmation code does not match. Operation cancelled.")
         return
-    
+
     print("Confirmation received. Proceeding with database load...\n")
-    
+
     # Drop and recreate the database
     print("Clearing database...")
     if not drop_create_db(db_config):
         print("Error: Failed to clear database")
         return
-    
+
     # Load the dump file
     print("\nLoading dump file...")
     with open(dump_path, "r", encoding="utf-8") as dump_file:
         if not load_db(db_config, dump_file, force=True):
             print("Error: Failed to load database dump")
             return
-    
+
     print("\nDatabase dump loaded successfully!")
-        
