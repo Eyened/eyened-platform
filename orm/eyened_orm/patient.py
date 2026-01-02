@@ -41,6 +41,7 @@ class Patient(Base):
             "Sex",
             "BirthDate",
         ),
+        Index("ix_Patient_PatientIdentifier", "PatientIdentifier"),
     )
 
     _name_column: ClassVar[str] = "PatientIdentifier"
