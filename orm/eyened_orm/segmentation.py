@@ -195,7 +195,7 @@ class SegmentationBase(Base):
 
     def read_data(
         self, axis: Optional[int] = None, slice_index: Optional[int] = None
-    ) -> np.ndarray:
+    ) -> Optional[np.ndarray]:
         if self.ZarrArrayIndex is None:
             return None
 
@@ -359,7 +359,7 @@ class Segmentation(SegmentationBase):
 
     Inactive: Mapped[bool] = mapped_column(default=False)
 
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+    ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="Segmentations"
     )
     Creator: Mapped["Creator"] = relationship(
@@ -370,7 +370,7 @@ class Segmentation(SegmentationBase):
         back_populates="Segmentations",
         lazy="selectin",
     )
-    SubTask: Mapped["SubTask"] = relationship(
+    SubTask: Mapped[Optional["SubTask"]] = relationship(
         "eyened_orm.task.SubTask", back_populates="Segmentations"
     )
     SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
@@ -569,7 +569,7 @@ class Model(Base):
     __mapper_args__ = {"polymorphic_on": "ModelType"}
 
     ModelID: Mapped[int] = mapped_column(primary_key=True)
-    ModelName: Mapped[str] = mapped_column(String(255), unique=True)
+    ModelName: Mapped[str] = mapped_column(String(255))
     Version: Mapped[str] = mapped_column(String(255))
     ModelType: Mapped[ModelKind] = mapped_column(
         SAEnum(
@@ -623,7 +623,7 @@ class ModelSegmentation(SegmentationBase):
         back_populates="Segmentations",
         lazy="selectin",
     )
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+    ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="ModelSegmentations"
     )
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
