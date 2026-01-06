@@ -85,7 +85,7 @@ class Task(Base):
         imagesets: List[List[int]],
         creator_name: str | None = None,
     ) -> "Task":
-        from .Annotation import Creator
+        from eyened_orm import Creator
 
         subtasks = [
             SubTask.create_from_image_ids(session, imset) for imset in imagesets

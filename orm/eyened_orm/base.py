@@ -8,12 +8,13 @@ from typing import (
     Optional,
     Type,
     TypeVar,
+    Iterable,
 )
 
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from eyened_orm.utils.table_printer import TablePrinter
 from sqlalchemy import Column, Index, UniqueConstraint, select
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import DeclarativeBase, Session, InstrumentedAttribute
 
 
 def _convert_property_name(name: str) -> str:
@@ -114,7 +115,7 @@ class Base(DeclarativeBase):
     def query_column(
         cls,
         session: Session,
-        column: Column | str,
+        column: Column | InstrumentedAttribute | str,
         distinct: bool = True,
         where: Any = None,
     ) -> List[Any]:
@@ -168,7 +169,7 @@ class Base(DeclarativeBase):
         return session.scalar(stmt)
 
     @classmethod
-    def by_ids(cls: Type[T], session: Session, ids: List[int]) -> List[T]:
+    def by_ids(cls: Type[T], session: Session, ids: Iterable[int]) -> List[T]:
         """Fetch objects by single-column primary key."""
         if not ids:
             return []
@@ -280,7 +281,7 @@ class Base(DeclarativeBase):
         cls: type[T],
         session: Session,
         match_by: Dict[str, Any],
-        update_values: Dict[str, Any],
+        update_values: Optional[Dict[str, Any]] = None,
         verbose: bool = False,
     ) -> T:
         """
@@ -307,21 +308,24 @@ class Base(DeclarativeBase):
             ... )
         """
         instance = cls.by_column(session, **match_by)
+        was_created = False
         
-        if instance:
-            # Update existing instance
+        if not instance:
+            instance = cls(**match_by)
+            was_created = True
+            if verbose:
+                print(f"Created {cls.__name__}: {repr(instance)}")
+            session.add(instance)
+        
+        if update_values is not None:
             for key, value in update_values.items():
                 setattr(instance, key, value)
-            if verbose:
+            if verbose and not was_created:
                 print(f"Updated {cls.__name__}: {repr(instance)}")
-            return instance
         
-        # Create new instance with merged values
-        instance = cls(**{**match_by, **update_values})
-        session.add(instance)
         session.flush()
-        if verbose:
-            print(f"Created {cls.__name__}: {repr(instance)}")
+        if verbose and was_created and update_values is not None:
+            print(f"Created and initialized {cls.__name__}: {repr(instance)}")
         return instance
 
     @classmethod
@@ -394,7 +398,8 @@ class Base(DeclarativeBase):
 
     def __repr__(self) -> str:
         """String representation of the object."""
-        args = ", ".join([f"{c.name}={getattr(self, c.name)}" for c in self.columns()])
+        cols = self.all_columns()  # include parent-table columns (joined inheritance)
+        args = ", ".join([f"{c.name}={self.get_value(c)}" for c in cols])
         return f"{self.__class__.__name__}({args})"
 
     def _repr_html_(self) -> str:
