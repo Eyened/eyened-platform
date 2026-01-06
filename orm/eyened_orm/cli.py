@@ -262,8 +262,27 @@ def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
         batch_size=batch_size,
     )
     with torch.no_grad():
-        for batch in tqdm(dataloader):
+        # Note: DataLoader errors can be raised during iteration (__next__) before the loop body runs.
+        # To be able to catch-and-continue, we need to manually call next() on the iterator.
+        it = iter(dataloader)
+        try:
+            total = len(dataloader)
+        except TypeError:
+            total = None
+        pbar = tqdm(total=total)
+
+        while True:
+            try:
+                batch = next(it)
+            except StopIteration:
+                break
+            except Exception as e:
+                print(e)
+                pbar.update(1)
+                continue
+
             if len(batch) == 0:
+                pbar.update(1)
                 continue
 
             im = batch["image"].to(device)
@@ -288,6 +307,9 @@ def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
                     update_values={"ValueFloat": val},
                 )
             session.commit()
+            pbar.update(1)
+
+        pbar.close()
 
 @eorm.command()
 @click.option(
