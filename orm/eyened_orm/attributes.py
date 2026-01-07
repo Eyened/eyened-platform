@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import pandas as pd
 
@@ -15,7 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from eyened_orm.segmentation import Model, ModelKind
 from eyened_orm.image_instance import ImageInstance
@@ -49,7 +49,7 @@ class AttributesModel(Model):
         back_populates="Model",
         cascade="all, delete-orphan",
     )
-    OutputAttributes: Mapped[List["AttributeDefinition"]] = relationship(
+    OutputAttributes: Mapped[Set["AttributeDefinition"]] = relationship(
         "eyened_orm.attributes.AttributeDefinition",
         secondary="AttributesModelOutput",
         back_populates="ProducingModels",
@@ -153,7 +153,7 @@ class AttributeDefinition(Base):
         back_populates="AttributeDefinition",
         lazy="noload",
     )
-    ProducingModels: Mapped[List["AttributesModel"]] = relationship(
+    ProducingModels: Mapped[Set["AttributesModel"]] = relationship(
         "eyened_orm.attributes.AttributesModel",
         secondary="AttributesModelOutput",
         back_populates="OutputAttributes",
@@ -285,14 +285,14 @@ class AttributeValue(Base):
     )  # type: ignore[name-defined]
 
     # Provenance tracking
-    InputValues: Mapped[List["AttributeValue"]] = relationship(
+    InputValues: Mapped[Set["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         secondary="AttributeValueInput",
         primaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.OutputAttributeValueID",
         secondaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.InputAttributeValueID",
         back_populates="UsedByValues",
     )
-    UsedByValues: Mapped[List["AttributeValue"]] = relationship(
+    UsedByValues: Mapped[Set["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         secondary="AttributeValueInput",
         primaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.InputAttributeValueID",

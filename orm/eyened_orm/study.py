@@ -1,5 +1,5 @@
 import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Set
 
 from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -58,7 +58,7 @@ class Study(Base):
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue", back_populates="Study"
     )
-    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
+    StudyTagLinks: Mapped[Set["StudyTagLink"]] = relationship(
         "eyened_orm.tag.StudyTagLink", back_populates="Study", lazy="selectin"
     )
 

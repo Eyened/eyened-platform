@@ -127,7 +127,16 @@ async def add_subtask_image(
     inst = db.get(ImageInstance, body.instance_id)
     if not inst:
         raise HTTPException(404, "ImageInstance not found")
-    link = SubTaskImageLink(SubTaskID=subtaskid, ImageInstanceID=body.instance_id)
+    # Get the next available ImageIndex for this subtask
+    max_index = db.scalar(
+        select(func.max(SubTaskImageLink.ImageIndex))
+        .where(SubTaskImageLink.SubTaskID == subtaskid)
+    ) or -1
+    link = SubTaskImageLink(
+        SubTaskID=subtaskid,
+        ImageInstanceID=body.instance_id,
+        ImageIndex=max_index + 1
+    )
     db.add(link); db.commit()
     
     # Log image link creation

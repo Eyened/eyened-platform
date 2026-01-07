@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event, func
@@ -212,6 +212,57 @@ class SegmentationBase(Base):
         )
 
     @property
+    def binary_mask(self) -> np.ndarray:
+        """
+        Return a boolean segmentation mask.
+
+        Notes:
+        - Stored segmentation data is always shaped (Depth, Height, Width).
+        - For 2D segmentations (i.e. any singleton axis), we automatically drop
+          singleton axes and return the squeezed mask (typically 2D).
+        - For 3D segmentations (Depth > 1), this returns the full 3D volume.
+        """
+        if (
+            self.DataRepresentation == DataRepresentation.MultiClass
+            or self.DataRepresentation == DataRepresentation.MultiLabel
+        ):
+            raise ValueError(
+                "MultiClass and MultiLabel data representations are not supported for binary masks"
+            )
+
+        data = self.read_data()
+        if data is None:
+            # no data stored in array, indicates empty segmentation
+            mask = np.zeros(self.shape, dtype=np.bool_)
+        elif self.DataRepresentation == DataRepresentation.Binary:
+            mask = data > 0
+        elif self.DataRepresentation == DataRepresentation.DualBitMask:
+            mask = (data & 1) > 0
+        elif self.DataRepresentation == DataRepresentation.Probability:
+            threshold = self.Threshold or 0
+            if self.DataType in (Datatype.R8, Datatype.R8UI):
+                mask = data > 255 * threshold
+            elif self.DataType == Datatype.R32F:
+                mask = data > threshold
+            else:
+                raise ValueError(f"Unsupported data type: {self.DataType}")
+        else:
+            raise ValueError(f"Unsupported data representation: {self.DataRepresentation}")
+
+        # Convenience: for "2D" segmentations (any singleton axis), return the squeezed mask.
+        # Examples:
+        #   (1, H, W) -> (H, W)
+        #   (D, 1, W) -> (D, W)
+        #   (D, H, 1) -> (D, H)
+        if mask.ndim == 3 and self.is_2d:
+            singleton_axes = tuple(i for i, s in enumerate(mask.shape) if s == 1)
+            assert len(singleton_axes) == 1, "Expected exactly one singleton axis"
+            if singleton_axes:
+                return np.squeeze(mask, axis=singleton_axes)
+        return mask
+        
+
+    @property
     def shape_matches_image_shape(self):
         image_shape = self.ImageInstance.shape
         annotation_shape = self.shape
@@ -373,7 +424,7 @@ class Segmentation(SegmentationBase):
     SubTask: Mapped[Optional["SubTask"]] = relationship(
         "eyened_orm.task.SubTask", back_populates="Segmentations"
     )
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+    SegmentationTagLinks: Mapped[Set["SegmentationTagLink"]] = relationship(
         "eyened_orm.tag.SegmentationTagLink",
         back_populates="Segmentation",
         lazy="selectin",

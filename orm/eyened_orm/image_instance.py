@@ -4,7 +4,7 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 import pydicom
@@ -266,7 +266,7 @@ class ImageInstance(Base):
         passive_deletes=True,
     )
 
-    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
+    ImageInstanceTagLinks: Mapped[Set["ImageInstanceTagLink"]] = relationship(
         "eyened_orm.tag.ImageInstanceTagLink",
         back_populates="ImageInstance",
         lazy="selectin",
