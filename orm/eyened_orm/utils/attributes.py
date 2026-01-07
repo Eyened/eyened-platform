@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from pandas.api import types as pdt
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from eyened_orm.attributes import (
     AttributeDataType,
     AttributeDefinition,
-    AttributesModelOutput,
+    AttributesModel,
     AttributeValue,
 )
-from eyened_orm.segmentation import Model
 
 
 def _is_nullish(value: Any) -> bool:
@@ -39,13 +37,55 @@ def _infer_column_type(col: pd.Series) -> AttributeDataType:
     return AttributeDataType.String
 
 
+def ensure_model_output_attribute(
+    db: Session, model: AttributesModel, attr: AttributeDefinition
+) -> None:
+    """
+    Idempotently ensure `attr` is declared as an output of `model`.
+
+    Uses the ORM relationship (`model.OutputAttributes`) for brevity.
+    """
+    db.flush()  # ensure PKs are available
+    if attr.AttributeID is None:
+        raise ValueError(
+            "AttributeDefinition must have AttributeID (flush before linking)"
+        )
+    # Avoid duplicates even if `attr` is a different instance with the same PK.
+    if any(a.AttributeID == attr.AttributeID for a in model.OutputAttributes):
+        return
+    model.OutputAttributes.append(attr)
+    db.flush()
+
+
+def _build_attribute_update_values(
+    dtype: AttributeDataType, raw_val: Any
+) -> Dict[str, Any]:
+    """Build update_values dict for AttributeValue based on dtype."""
+    if dtype == AttributeDataType.Int:
+        return {"ValueInt": int(raw_val)}
+    elif dtype == AttributeDataType.Float:
+        return {"ValueFloat": float(raw_val)}
+    elif dtype == AttributeDataType.String:
+        return {"ValueText": str(raw_val)}
+    else:
+        raise ValueError(
+            f"Unsupported AttributeDataType for df_to_attributes(): {dtype}"
+        )
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    """Best-effort int conversion; returns None if conversion fails."""
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
 def df_to_attributes(
-    db: Session, df: pd.DataFrame, *, model_name: str, version: str
+    session: Session, df: pd.DataFrame, *, model_name: str, version: str
 ) -> List[AttributeValue]:
     """Convert a DataFrame to AttributeDefinition and AttributeValue objects for a model; return the AttributeValue objects touched."""
-    model = db.scalar(
-        select(Model).where(Model.ModelName == model_name, Model.Version == version)
-    )
+    model = AttributesModel.by_column(session, ModelName=model_name, Version=version)
     if not model:
         raise ValueError(f"Model not found: {model_name} / {version}")
 
@@ -54,118 +94,71 @@ def df_to_attributes(
         return []
 
     # infer types using pandas dtype
-    col_types = {col: _infer_column_type(df[col]) for col in cols}
+    col_types = {name: _infer_column_type(df[name]) for name in cols}
 
     # upsert AttributeDefinitions (globally, not per-model)
-    existing_attrs = {
-        a.AttributeName: a for a in db.scalars(select(AttributeDefinition)).all()
-    }
-    attrs_by_name: Dict[str, AttributeDefinition] = {}
-    for col in cols:
-        if col in existing_attrs:
-            # validate type consistency
-            if existing_attrs[col].AttributeDataType != col_types[col]:
-                raise ValueError(
-                    f"Attribute type mismatch for {col}: existing={existing_attrs[col].AttributeDataType} new={col_types[col]}"
-                )
-            attrs_by_name[col] = existing_attrs[col]
-        else:
-            a = AttributeDefinition(AttributeName=col, AttributeDataType=col_types[col])
-            db.add(a)
-            attrs_by_name[col] = a  # pending
-
-    # Ensure AttributesModelOutput entries exist for this model
-    db.flush()  # Get AttributeIDs for pending attributes
-    for attr in attrs_by_name.values():
-        existing_link = db.scalar(
-            select(AttributesModelOutput).where(
-                AttributesModelOutput.ModelID == model.ModelID,
-                AttributesModelOutput.AttributeID == attr.AttributeID,
-            )
+    attrs_by_name: Dict[str, AttributeDefinition] = {
+        name: AttributeDefinition.get_or_create(
+            session, match_by={"AttributeName": name, "AttributeDataType": dtype}
         )
-        if not existing_link:
-            db.add(
-                AttributesModelOutput(
-                    ModelID=model.ModelID, AttributeID=attr.AttributeID
-                )
-            )
+        for name, dtype in col_types.items()
+    }
+
+    # Ensure model declares these outputs (idempotent)
+    for attr in attrs_by_name.values():
+        ensure_model_output_attribute(session, model, attr)
 
     # load images
-    image_ids: List[int] = []
-    idx_values: List[Any] = []
-    for idx in df.index:
-        try:
-            iid = int(idx)
-        except Exception:
-            continue
-        image_ids.append(iid)
-        idx_values.append(idx)
+    # Map DataFrame index values to ImageInstanceIDs (skip non-int-like indices).
+    idx_to_image_id: Dict[Any, int] = {
+        idx: iid for idx in df.index if (iid := _safe_int(idx)) is not None
+    }
+    image_ids = set(idx_to_image_id.values())
 
-    # preload existing AttributeValues for persistent AttributeDefinitions only
-    persistent_attr_ids = [
-        a.AttributeID for a in attrs_by_name.values() if not sa_inspect(a).pending
-    ]
-    existing_av: Dict[
-        Tuple[int, int, int], AttributeValue
-    ] = {}  # (ImageInstanceID, AttributeID, ModelID)
-    if persistent_attr_ids and image_ids:
-        q = select(AttributeValue).where(
-            AttributeValue.ImageInstanceID.in_(set(image_ids)),
-            AttributeValue.AttributeID.in_(set(persistent_attr_ids)),
-            AttributeValue.ModelID == model.ModelID,
-        )
-        for av in db.scalars(q).all():
-            existing_av[(av.ImageInstanceID, av.AttributeID, av.ModelID)] = av
+    # Prefetch existing AttributeValues
+    attr_ids = {
+        a.AttributeID for a in attrs_by_name.values() if a.AttributeID is not None
+    }
+    existing_av: Dict[Tuple[int, int, int], AttributeValue] = {}
+    if attr_ids and image_ids:
+        existing_av = {
+            (av.ImageInstanceID, av.AttributeID, av.ModelID): av
+            for av in AttributeValue.where(
+                session,
+                (AttributeValue.ImageInstanceID.in_(image_ids))
+                & (AttributeValue.AttributeID.in_(attr_ids))
+                & (AttributeValue.ModelID == model.ModelID),
+            )
+        }
 
     touched: List[AttributeValue] = []
-    for idx, image_id in zip(idx_values, image_ids):
-        for col, attr in attrs_by_name.items():
-            if col not in df.columns:
-                continue
-            raw_val = df.at[idx, col]
+    for idx, image_id in idx_to_image_id.items():
+        for name, attr in attrs_by_name.items():
+            raw_val = df.at[idx, name]
             if _is_nullish(raw_val):
                 continue
 
-            dtype = attr.AttributeDataType
-            if sa_inspect(attr).pending:
-                av = AttributeValue(
-                    ImageInstanceID=image_id,
-                    AttributeID=attr.AttributeID,
-                    ModelID=model.ModelID,
-                )
-            else:
-                key = (image_id, attr.AttributeID, model.ModelID)
-                av = existing_av.get(key)
-                if av is None:
-                    av = AttributeValue(
-                        ImageInstanceID=image_id,
-                        AttributeID=attr.AttributeID,
-                        ModelID=model.ModelID,
-                    )
+            update_values = _build_attribute_update_values(
+                attr.AttributeDataType, raw_val
+            )
+            key = (image_id, attr.AttributeID, model.ModelID)
 
-            # assign per dtype
-            if dtype == AttributeDataType.Int:
-                av.ValueInt = (
-                    int(raw_val)
-                    if not isinstance(raw_val, bool)
-                    else (1 if raw_val else 0)
-                )
-                av.ValueFloat = None
-                av.ValueText = None
-                av.ValueJSON = None
-            elif dtype == AttributeDataType.Float:
-                av.ValueFloat = float(raw_val)
-                av.ValueInt = None
-                av.ValueText = None
-                av.ValueJSON = None
+            # Use prefetched instance if available
+            av = existing_av.get(key)
+            if av:
+                # Update prefetched instance directly (no DB query needed)
+                for k, v in update_values.items():
+                    setattr(av, k, v)
             else:
-                av.ValueText = str(raw_val)
-                av.ValueInt = None
-                av.ValueFloat = None
-                av.ValueJSON = None
-
-            if sa_inspect(av).transient:
-                db.add(av)
+                av = AttributeValue.upsert(
+                    session,
+                    match_by={
+                        "ImageInstanceID": image_id,
+                        "AttributeID": attr.AttributeID,
+                        "ModelID": model.ModelID,
+                    },
+                    update_values=update_values,
+                )
             touched.append(av)
 
     return touched
@@ -178,8 +171,11 @@ def print_import_summary(
     # group by AttributeDefinition
     groups: Dict[AttributeDefinition, List[AttributeValue]] = defaultdict(list)
     for av in attribute_values:
-        attr_def = getattr(av, "AttributeDefinition", None)
-        if attr_def is None:
+        # AttributeDefinition is a required relationship (AttributeID is NOT NULL)
+        # Skip if relationship not accessible (e.g., transient object or session closed)
+        try:
+            attr_def = av.AttributeDefinition
+        except (AttributeError, RuntimeError):
             continue
         groups[attr_def].append(av)
 
