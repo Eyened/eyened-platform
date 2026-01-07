@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Set
 
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, Index, String, func
@@ -59,38 +59,38 @@ class Tag(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    CreatorTagLinks: Mapped[List["CreatorTagLink"]] = relationship(
+    CreatorTagLinks: Mapped[Set["CreatorTagLink"]] = relationship(
         "eyened_orm.tag.CreatorTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
 
-    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
+    StudyTagLinks: Mapped[Set["StudyTagLink"]] = relationship(
         "eyened_orm.tag.StudyTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
+    ImageInstanceTagLinks: Mapped[Set["ImageInstanceTagLink"]] = relationship(
         "eyened_orm.tag.ImageInstanceTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    AnnotationTagLinks: Mapped[List["AnnotationTagLink"]] = relationship(
+    AnnotationTagLinks: Mapped[Set["AnnotationTagLink"]] = relationship(
         "eyened_orm.tag.AnnotationTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+    SegmentationTagLinks: Mapped[Set["SegmentationTagLink"]] = relationship(
         "eyened_orm.tag.SegmentationTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(
+    FormAnnotationTagLinks: Mapped[Set["FormAnnotationTagLink"]] = relationship(
         "eyened_orm.tag.FormAnnotationTagLink",
         back_populates="Tag",
         passive_deletes=True,

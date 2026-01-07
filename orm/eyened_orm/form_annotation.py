@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 from enum import Enum
 from pandas import DataFrame, json_normalize
 from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func, Enum as SAEnum
@@ -88,7 +88,7 @@ class FormAnnotation(Base):
     ImageInstance: Mapped["ImageInstance"] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="FormAnnotations")
     Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="FormAnnotations")
     SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="FormAnnotations")
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship("eyened_orm.tag.FormAnnotationTagLink", back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
+    FormAnnotationTagLinks: Mapped[Set["FormAnnotationTagLink"]] = relationship("eyened_orm.tag.FormAnnotationTagLink", back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
 
     def make_tag(
         self,
