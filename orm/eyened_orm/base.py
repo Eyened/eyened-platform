@@ -121,16 +121,16 @@ class Base(DeclarativeBase):
     ) -> List[Any]:
         """
         Query distinct values from a single column of this table, with optional filtering.
-        
+
         Args:
             session: SQLAlchemy session.
             column: Column attribute (e.g., cls.ColumnName) or column name string.
             distinct: If True, return only distinct values (default: True).
             where: Optional SQLAlchemy filter expression(s) to apply.
-            
+
         Returns:
             List of column values.
-            
+
         Example:
             >>> Creator.query_column(session, Creator.CreatorName)
             ['Alice', 'Bob', 'Charlie']
@@ -169,13 +169,13 @@ class Base(DeclarativeBase):
         return session.scalar(stmt)
 
     @classmethod
-    def by_ids(cls: Type[T], session: Session, ids: Iterable[int]) -> List[T]:
+    def by_ids(cls: Type[T], session: Session, ids: Iterable[int]) -> Dict[int, T]:
         """Fetch objects by single-column primary key."""
         if not ids:
-            return []
+            return {}
         pk_col = cls.primary_key()
         stmt = select(cls).where(pk_col.in_(set(ids)))
-        return session.scalars(stmt).all()
+        return {getattr(obj, pk_col.name): obj for obj in session.scalars(stmt).all()}
 
     @classmethod
     def by_pk(cls: type[T], session: Session, pk: int | tuple) -> Optional[T]:
@@ -205,8 +205,18 @@ class Base(DeclarativeBase):
 
     @classmethod
     def _build_where_stmt(cls, **kwargs):
-        """Build a select statement with where conditions from kwargs."""
-        conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
+        """Build a select statement with where conditions from kwargs.
+        
+        Automatically uses in_ operator for iterable values (list, tuple, set) but not strings.
+        """
+        conditions = []
+        for k, v in kwargs.items():
+            col = getattr(cls, k)
+            # Use in_ for iterables (but not strings)
+            if isinstance(v, (list, tuple, set)) and not isinstance(v, str):
+                conditions.append(col.in_(v))
+            else:
+                conditions.append(col == v)
         return select(cls).where(*conditions)
 
     @classmethod
@@ -216,7 +226,15 @@ class Base(DeclarativeBase):
 
     @classmethod
     def by_columns(cls: type[T], session: Session, **kwargs) -> List[T]:
-        """Generic method to query by any columns."""
+        """
+        Generic method to query by any columns.
+        
+        Automatically uses in_ operator when values are iterables (list, tuple, set) but not strings.
+        
+        Example:
+            >>> AttributeValue.by_columns(session, ModelID=32, ImageInstanceID=selected_images)
+            # Uses: ModelID == 32 AND ImageInstanceID.in_(selected_images)
+        """
         return session.scalars(cls._build_where_stmt(**kwargs)).all()
 
     @classmethod
@@ -226,10 +244,12 @@ class Base(DeclarativeBase):
         match_by: Dict[str, Any],
         create_kwargs: Optional[Dict[str, Any]] = None,
         must_match: Optional[Dict[str, Any]] = None,
+        update_values: Optional[Dict[str, Any]] = None,
         verbose: bool = False,
     ) -> T:
         """
         Get an existing instance matching the criteria, or create a new one if not found.
+        Optionally update the instance if found or set values when creating.
 
         Args:
             session: SQLAlchemy session.
@@ -238,6 +258,7 @@ class Base(DeclarativeBase):
                 If None, uses match_by values.
             must_match: Optional dict of fields that must match *if* found, else raises error.
                 Useful for type checking or ensuring consistency.
+            update_values: Optional dict of fields to update (if found) or set (if created).
             verbose: If True, print log messages about found/created instances.
 
         Returns:
@@ -250,30 +271,37 @@ class Base(DeclarativeBase):
         instance = cls.by_column(session, **match_by)
 
         display_name = cls.__name__
+        is_new = False
         if instance:
             # Optionally, check for required matches (e.g. data type)
             if must_match:
                 errors = [
                     f"{attr}: existing={actual}, requested={expect}"
                     for attr, expect in must_match.items()
-                    if (actual:= getattr(instance, attr)) != expect
+                    if (actual := getattr(instance, attr)) != expect
                 ]
                 if errors:
                     raise ValueError(
                         f"{display_name} exists with different parameters: "
                         + "; ".join(errors)
                     )
-            if verbose:
-                print(f"Found existing {display_name}: {repr(instance)}")
-            return instance
+        else:
+            # Create new instance
+            create_kwargs = create_kwargs or match_by
+            instance = cls(**create_kwargs)
+            session.add(instance)
+            is_new = True
 
-        # Create new instance
-        create_kwargs = create_kwargs or match_by
-        instance = cls(**create_kwargs)
-        session.add(instance)
+        # Apply updates if provided (works for both existing and new instances)
+        if update_values is not None:
+            for key, value in update_values.items():
+                setattr(instance, key, value)
+
         session.flush()
+
         if verbose:
-            print(f"Created {display_name}: {repr(instance)}")
+            action = "Created" if is_new else "Found existing"
+            print(f"{action} {display_name}: {repr(instance)}")
         return instance
 
     @classmethod
@@ -282,51 +310,22 @@ class Base(DeclarativeBase):
         session: Session,
         match_by: Dict[str, Any],
         update_values: Optional[Dict[str, Any]] = None,
-        verbose: bool = False,
     ) -> T:
         """
         Update an existing instance matching the criteria, or create a new one if not found.
+
+        This is a convenience wrapper around get_or_create that always applies update_values.
 
         Args:
             session: SQLAlchemy session.
             match_by: Dict of field names to values to match on (for finding existing record).
             update_values: Dict of field names to values to update (if found) or set (if created).
-            verbose: If True, print log messages about found/updated/created instances.
 
         Returns:
             The updated or created instance.
 
-        Example:
-            >>> AttributeValue.upsert(
-            ...     session,
-            ...     match_by={
-            ...         "AttributeID": 1,
-            ...         "ModelID": 2,
-            ...         "ImageInstanceID": 3,
-            ...     },
-            ...     update_values={"ValueFloat": 42.5}
-            ... )
         """
-        instance = cls.by_column(session, **match_by)
-        was_created = False
-        
-        if not instance:
-            instance = cls(**match_by)
-            was_created = True
-            if verbose:
-                print(f"Created {cls.__name__}: {repr(instance)}")
-            session.add(instance)
-        
-        if update_values is not None:
-            for key, value in update_values.items():
-                setattr(instance, key, value)
-            if verbose and not was_created:
-                print(f"Updated {cls.__name__}: {repr(instance)}")
-        
-        session.flush()
-        if verbose and was_created and update_values is not None:
-            print(f"Created and initialized {cls.__name__}: {repr(instance)}")
-        return instance
+        return cls.get_or_create(session, match_by, update_values=update_values)
 
     @classmethod
     def columns(cls) -> List[Column]:
