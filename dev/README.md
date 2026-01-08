@@ -51,6 +51,16 @@ copy_objects:
 - You can fill out the list of object to copy (`copy_objects`). Linked objects from other tables (via foreign keys) are also automatically included.
 - The `source` is the source database (e.g. production), `target` is the development database (use `port=DATABASE_PORT` from the `.env`).
 
+### Full database mirror (fast, destructive)
+If you want a full database copy (schema + all data) and you have the MySQL CLI tools installed (`mysqldump`, `mysql`), you can stream directly from source to target:
+
+```bash
+eorm database-mirror-stream -c transfer-config.yml
+```
+
+This will **DROP and recreate** the target database, then run a streaming pipeline:
+`mysqldump (source) | mysql (target)` (no intermediate dump file).
+
 ### Apply Pending Migrations (if needed)
 Working from `orm/migrations`:
 ```

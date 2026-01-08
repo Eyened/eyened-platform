@@ -40,6 +40,7 @@ setup(
         "retinalysis-fundusprep",
         "zarr==3.1.0",
         "pyyaml==6.*",
+        "google_crc32c==1.8.0",
     ],
     python_requires=">=3.10",
 )

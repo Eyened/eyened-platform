@@ -5,7 +5,7 @@ import click
 import random
 import string
 
-from .utils.testdb import DatabaseTransfer, drop_create_db, load_db
+from .utils.testdb import DatabaseTransfer, drop_create_db, load_db, stream_mirror_database
 from tqdm import tqdm
 from .utils.config import (
     DatabaseSettings,
@@ -110,6 +110,58 @@ def database_mirror_full(config_file):
     transfer, config = transfer_db(config_file)
     transfer.create_test_db(no_data=False)
 
+
+@eorm.command()
+@click.option(
+    "--config-file",
+    "-c",
+    type=click.Path(exists=True),
+    help="Path to YAML file containing database configuration",
+)
+@click.option("--force", is_flag=True, default=False, help="Continue on SQL errors while loading")
+@click.option("--no-routines", is_flag=True, default=False, help="Do not include stored routines")
+@click.option("--no-triggers", is_flag=True, default=False, help="Do not include triggers")
+@click.option("--no-events", is_flag=True, default=False, help="Do not include events")
+def database_mirror_stream(config_file, force, no_routines, no_triggers, no_events):
+    """Mirror the entire source database into the target database via a streaming pipe.
+
+    This will DROP and recreate the target database, then stream:
+      mysqldump (source) | mysql (target)
+    """
+
+    transfer, _config = transfer_db(config_file)
+
+    print("WARNING: This will permanently delete all existing data in the target database.")
+    print("\n" + "=" * 60)
+    print(
+        f"Target to be cleared: {transfer.test_db.database} on {transfer.test_db.host}:{transfer.test_db.port}"
+    )
+    print("=" * 60)
+
+    confirmation_code = "".join(random.choices(string.ascii_uppercase, k=4))
+    print(f"\nDo you want to proceed? Type '{confirmation_code}' to confirm:")
+    user_input = click.prompt("", type=str)
+    if user_input != confirmation_code:
+        print("Confirmation code does not match. Operation cancelled.")
+        return
+
+    print("Confirmation received. Proceeding with database mirror...\n")
+
+    print("Clearing target database...")
+    if not drop_create_db(transfer.test_db):
+        print("Error: Failed to clear target database")
+        return
+
+    print("\nStreaming full mirror...")
+    stream_mirror_database(
+        transfer.source_db,
+        transfer.test_db,
+        include_routines=not no_routines,
+        include_triggers=not no_triggers,
+        include_events=not no_events,
+        force=force,
+    )
+    print("\nDatabase mirror completed successfully!")
 
 @eorm.command()
 @click.option(
