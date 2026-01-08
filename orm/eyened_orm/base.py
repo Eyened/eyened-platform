@@ -141,12 +141,7 @@ class Base(DeclarativeBase):
         """
         if isinstance(column, str):
             column = getattr(cls, column)
-        stmt = select(column)
-        if where is not None:
-            stmt = stmt.where(where)
-        if distinct:
-            stmt = stmt.distinct()
-        return session.scalars(stmt).all()
+        return cls.select(session, column, distinct=distinct, where=where)
 
     @classmethod
     def primary_keys(cls) -> List[Column]:
@@ -204,19 +199,31 @@ class Base(DeclarativeBase):
         }
 
     @classmethod
-    def _build_where_stmt(cls, **kwargs):
-        """Build a select statement with where conditions from kwargs.
-        
+    def _build_conditions(cls, **filters):
+        """Build WHERE conditions from kwargs.
+
         Automatically uses in_ operator for iterable values (list, tuple, set) but not strings.
+
+        Returns:
+            List of SQLAlchemy condition expressions.
         """
         conditions = []
-        for k, v in kwargs.items():
+        for k, v in filters.items():
             col = getattr(cls, k)
             # Use in_ for iterables (but not strings)
             if isinstance(v, (list, tuple, set)) and not isinstance(v, str):
                 conditions.append(col.in_(v))
             else:
                 conditions.append(col == v)
+        return conditions
+
+    @classmethod
+    def _build_where_stmt(cls, **kwargs):
+        """Build a select statement with where conditions from kwargs.
+
+        Automatically uses in_ operator for iterable values (list, tuple, set) but not strings.
+        """
+        conditions = cls._build_conditions(**kwargs)
         return select(cls).where(*conditions)
 
     @classmethod
@@ -228,14 +235,67 @@ class Base(DeclarativeBase):
     def by_columns(cls: type[T], session: Session, **kwargs) -> List[T]:
         """
         Generic method to query by any columns.
-        
+
         Automatically uses in_ operator when values are iterables (list, tuple, set) but not strings.
-        
+
         Example:
             >>> AttributeValue.by_columns(session, ModelID=32, ImageInstanceID=selected_images)
             # Uses: ModelID == 32 AND ImageInstanceID.in_(selected_images)
         """
         return session.scalars(cls._build_where_stmt(**kwargs)).all()
+
+    @classmethod
+    def select(
+        cls,
+        session: Session,
+        *columns: Column | InstrumentedAttribute | str,
+        distinct: bool = False,
+        where: Any = None,
+        **filters,
+    ) -> List[Any] | List[tuple]:
+        """
+        Select specific columns from the table with optional filtering.
+
+        SQL-like interface for selecting column values. Automatically uses IN operator
+        for iterable values (list, tuple, set) but not strings.
+
+        Args:
+            session: SQLAlchemy session.
+            *columns: One or more column attributes (e.g., cls.ColumnName) or column name strings.
+                If one column: returns list[Any]
+                If multiple columns: returns list[tuple]
+            distinct: If True, return only distinct values (default: False).
+            where: Optional SQLAlchemy filter expression(s) to apply in addition to filters.
+            **filters: Column filters as kwargs. Automatically uses IN for iterables.
+
+        Returns:
+            list[Any] for single column, list[tuple] for multiple columns.
+
+        """
+        if not columns:
+            raise ValueError("At least one column must be specified")
+
+        # Convert string column names to column attributes
+        resolved_columns = [
+            getattr(cls, col) if isinstance(col, str) else col for col in columns
+        ]
+
+        stmt = select(*resolved_columns)
+
+        if filters:
+            conditions = cls._build_conditions(**filters)
+            stmt = stmt.where(*conditions)
+
+        if where is not None:
+            stmt = stmt.where(where)
+
+        if distinct:
+            stmt = stmt.distinct()
+
+        if len(resolved_columns) == 1:
+            return session.scalars(stmt).all()
+        else:
+            return session.execute(stmt).all()
 
     @classmethod
     def get_or_create(
@@ -287,8 +347,7 @@ class Base(DeclarativeBase):
                     )
         else:
             # Create new instance
-            create_kwargs = create_kwargs or match_by
-            instance = cls(**create_kwargs)
+            instance = cls(**match_by, **(create_kwargs or {}))
             session.add(instance)
             is_new = True
 
