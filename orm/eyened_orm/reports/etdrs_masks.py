@@ -56,7 +56,7 @@ class ETDRS_masks:
 
     def calculate_largest_area(self, labeled_image):
         regions = measure.regionprops(labeled_image)
-        return max((r.area for r in regions), default=0) * self.pixel_area
+        return float(max((r.area for r in regions), default=0) * self.pixel_area)
 
     def get_summary(self, binary_image, fields, include_area=True, include_count=True, include_largest=True):
         if binary_image is None:
