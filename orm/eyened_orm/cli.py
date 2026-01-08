@@ -1,15 +1,13 @@
-from typing import Optional
 import yaml
 from pathlib import Path
 import click
 import random
 import string
 
-from .utils.testdb import DatabaseTransfer, drop_create_db, load_db, stream_mirror_database
+from .utils.testdb import drop_create_db, load_db, stream_mirror_database
 from tqdm import tqdm
 from .utils.config import (
     DatabaseSettings,
-    EyenedORMConfig,
     load_config,
 )
 
@@ -17,12 +15,15 @@ from .utils.config import (
 Command utilities for the eyened ORM.
 
 The following commands are available:
-- test: Create a test database for ORM testing, developing new features or running alembic migrations.
-- full: Create a test database for ORM testing, developing new features or running alembic migrations.
+- database-mirror: Mirror the entire source database into the target database via a streaming pipe.
 - update-thumbnails: Update thumbnails for all images in the database.
-- run-models: Run the models on the database.
+- run-models: Run inference models on the database.
+- run-odfd-model: Run ODFD model to estimate distance from fovea to optic disc border.
+- validate-forms: Validate form annotations and schemas in the database.
 - zarr-tree: Display the structure of the zarr store, showing groups and array shapes.
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
+- update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
+- run-registration: Run image registration for patients or projects.
 - load-dump: Load a database dump file, replacing the entire database.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
@@ -47,68 +48,13 @@ def transfer_db(config_file):
     print("to:")
     print(f"{target.host}:{target.port}/{target.database} ({target.user})")
 
-    transfer = DatabaseTransfer(source, target)
-    return transfer, config
-
-
-@eorm.command()
-@click.option(
-    "--config-file",
-    "-c",
-    type=click.Path(exists=True),
-    help="Path to YAML file containing database configuration",
-)
-def database_mirror_test(config_file):
-    """Create a test database for ORM testing, with selected tables populated."""
-    transfer, config = transfer_db(config_file)
-    transfer.create_test_db(no_data=True)
-    transfer.populate(copy_objects=config["copy_objects"])
-
-    if config["copy_segmentation_data"]:
-        from eyened_orm import Database, ModelSegmentation
-
-        # Load config from nested dicts (with secret_key override if needed)
-        target_config = load_config(config["target"])
-        source_config = load_config(config["source"])
-
-        target_db = Database(target_config)
-        source_db = Database(source_config)
-
-        print("target db zarr store", target_db.config.segmentations_zarr_store)
-        print("source db zarr store", source_db.config.segmentations_zarr_store)
-
-        with target_db.get_session() as target_session:
-
-            segs = ModelSegmentation.fetch_all(target_session)
-
-            with source_db.get_session() as source_session:
-                for seg in segs:
-                    source_seg = ModelSegmentation.by_id(
-                        source_session, seg.ModelSegmentationID
-                    )
-                    print("transfer data from", source_seg.ModelSegmentationID)
-                    print("seg", seg.config.segmentations_zarr_store)
-                    print(
-                        "seg.storage_manager.store_path", seg.storage_manager.store_path
-                    )
-                    print("source_seg", source_seg.config.segmentations_zarr_store)
-
-                    seg.ZarrArrayIndex = None
-                    seg.write_data(source_seg.read_data())
-
-                target_session.commit()
-
-
-@eorm.command()
-@click.option(
-    "--config-file",
-    "-c",
-    type=click.Path(exists=True),
-    help="Path to YAML file containing database configuration",
-)
-def database_mirror_full(config_file):
-    transfer, config = transfer_db(config_file)
-    transfer.create_test_db(no_data=False)
+    # Return a simple namespace-like object with source_db and test_db attributes
+    class TransferConfig:
+        def __init__(self, source_db, test_db):
+            self.source_db = source_db
+            self.test_db = test_db
+    
+    return TransferConfig(source, target), config
 
 
 @eorm.command()
@@ -119,17 +65,17 @@ def database_mirror_full(config_file):
     help="Path to YAML file containing database configuration",
 )
 @click.option("--force", is_flag=True, default=False, help="Continue on SQL errors while loading")
-@click.option("--no-routines", is_flag=True, default=False, help="Do not include stored routines")
-@click.option("--no-triggers", is_flag=True, default=False, help="Do not include triggers")
-@click.option("--no-events", is_flag=True, default=False, help="Do not include events")
-def database_mirror_stream(config_file, force, no_routines, no_triggers, no_events):
+@click.option("--no-routines", is_flag=True, default=True, help="Do not include stored routines")
+@click.option("--no-triggers", is_flag=True, default=True, help="Do not include triggers")
+@click.option("--no-events", is_flag=True, default=True, help="Do not include events")
+def database_mirror(config_file, force, no_routines, no_triggers, no_events):
     """Mirror the entire source database into the target database via a streaming pipe.
 
     This will DROP and recreate the target database, then stream:
       mysqldump (source) | mysql (target)
     """
 
-    transfer, _config = transfer_db(config_file)
+    transfer, _ = transfer_db(config_file)
 
     print("WARNING: This will permanently delete all existing data in the target database.")
     print("\n" + "=" * 60)
@@ -257,11 +203,15 @@ def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
         AttributeDataType,
         AttributeValue,
     )
-    from dotenv import load_dotenv
-    from sqlalchemy import select
+    from dotenv import load_doten
     import os
 
     load_dotenv(env)
+
+    if device is None:
+        device = "cpu"
+    else:
+        device = torch.device(device)
 
     with open(path, "r") as f:
         image_ids = {int(line.strip()) for line in f.readlines()}
@@ -622,12 +572,10 @@ def update_hashes(env, print_errors):
     help="Comma-separated list of ImageInstanceIDs to skip during registration (e.g. --skip 1811325,1811324,1811323)",
 )
 def run_registration(env, patient, project, schema, creator, replace, skip):
-    from eyened_orm import Database, Patient, Project
-    from eyened_orm.utils.registration import (
-        get_or_create_schema,
-        get_or_create_creator,
-        run_patient,
-    )
+    from eyened_orm import Database, Patient, Project, FormSchema, Creator
+    from eyened_orm.utils.registration import run_patient
+    import json
+    from pathlib import Path
 
     # Parse skip list from comma-separated string
     skip_ids = None
@@ -643,8 +591,26 @@ def run_registration(env, patient, project, schema, creator, replace, skip):
     database = Database(config)
     with database.get_session() as session:
 
-        schema = get_or_create_schema(session, schema)
-        creator = get_or_create_creator(session, creator)
+        # Get or create schema - load JSON file if creating
+        schema_name = schema
+        schema_path = Path(__file__).parent / "utils" / "registration_schema.json"
+        with open(schema_path, "r") as f:
+            schema_dict = json.load(f)
+        schema = FormSchema.get_or_create(
+            session,
+            match_by={"SchemaName": schema_name},
+            create_kwargs={"SchemaName": schema_name, "Schema": schema_dict},
+            verbose=True
+        )
+
+        # Get or create creator
+        creator_name = creator
+        creator = Creator.get_or_create(
+            session,
+            match_by={"CreatorName": creator_name},
+            create_kwargs={"CreatorName": creator_name, "IsHuman": True},
+            verbose=True
+        )
         if patient:
             patients = Patient.where(session, Patient.PatientIdentifier == patient)
             for patient in patients:
