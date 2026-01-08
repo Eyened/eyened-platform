@@ -198,11 +198,13 @@ def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
     from rtnls_inference import RegressionEnsemble
     from rtnls_inference.utils import decollate_batch
     from eyened_orm import Database, ImageInstance
-    from eyened_orm.inference.utils import (
-        get_or_create_attributes_model,
-        get_or_create_attribute_definition,
+
+    from eyened_orm import (
+        AttributesModel,
+        AttributeDefinition,
+        AttributeDataType,
+        AttributeValue,
     )
-    from eyened_orm.attributes import AttributeDataType, AttributeValue
     from dotenv import load_dotenv
     from sqlalchemy import select
     import os
@@ -214,31 +216,40 @@ def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
 
     database = Database(env)
     db_config = database.config.database
-    print(f"Connected to database {db_config.database} on {db_config.host}:{db_config.port}")
+    print(
+        f"Connected to database {db_config.database} on {db_config.host}:{db_config.port}"
+    )
 
     with database.get_session() as session:
 
-        model = get_or_create_attributes_model(
+        model = AttributesModel.get_or_create(
             session,
-            "ODFD",
-            model_version,
-            "Estimates the distance from the fovea to optic disc border in pixels",
+            match_by={"ModelName": "ODFD", "Version": model_version},
+            create_kwargs={
+                "Description": "Estimates the distance from the fovea to optic disc border in pixels"
+            },
         )
-        attr_definition = get_or_create_attribute_definition(
-            session, "ODFD", AttributeDataType.Float
+        attr_definition = AttributeDefinition.get_or_create(
+            session,
+            match_by={
+                "AttributeName": "ODFD",
+                "AttributeDataType": AttributeDataType.Float,
+            },
         )
         model_id = model.ModelID
         attr_id = attr_definition.AttributeID
 
         if skip_existing:
 
-            existing_ids = set(session.scalars(
-                select(AttributeValue.ImageInstanceID).where(
-                    AttributeValue.AttributeID == attr_id,
-                    AttributeValue.ModelID == model_id,
-                    AttributeValue.ImageInstanceID.in_(image_ids),
+            existing_ids = set(
+                AttributeValue.select(
+                    session,
+                    "ImageInstanceID",
+                    AttributeID=attr_id,
+                    ModelID=model_id,
+                    ImageInstanceID=image_ids,
                 )
-            ).all())
+            )
             print(f"Skipping {len(existing_ids)} existing images")
             image_ids = image_ids - existing_ids
 
@@ -248,8 +259,11 @@ def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
         else:
             print(f"Running {len(image_ids)} images")
         images = ImageInstance.by_ids(session, image_ids)
-        paths = [image.path for image in images]
-        ids = [image.ImageInstanceID for image in images]
+        
+        # ids and paths need to be lists for the dataloader (corresponding indices)
+        ids = list(images.keys())
+        paths = [image.path for image in images.values()]
+        
 
     print(f"Loading model {model_version} from {os.getenv('RTNLS_MODEL_RELEASES')}")
     ensemble = RegressionEnsemble.from_release(f"{model_version}.pt").to(device)
@@ -310,6 +324,7 @@ def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
             pbar.update(1)
 
         pbar.close()
+
 
 @eorm.command()
 @click.option(
