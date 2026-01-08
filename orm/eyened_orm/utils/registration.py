@@ -4,63 +4,6 @@ from pathlib import Path
 from eyened_orm import Creator, FormAnnotation, FormSchema, ImageInstance
 from rtnls_registration import Registration
 
-
-def get_or_create_schema(session, schema_name):
-    schema = FormSchema.by_name(session, schema_name)
-    if schema is None:
-        import json
-
-        current_dir = Path(__file__).parent
-        schema_path = current_dir / "registration_schema.json"
-
-        with open(schema_path, "r") as f:
-            schema_dict = json.load(f)
-
-        schema = FormSchema(SchemaName=schema_name, Schema=schema_dict)
-        print(f"Created schema for registration set using name '{schema_name}'")
-        session.add(schema)
-        session.commit()
-    return schema
-
-
-def get_or_create_creator(session, creator_name):
-    creator = Creator.by_name(session, creator_name)
-    if creator is None:
-        creator = Creator(CreatorName=creator_name, IsHuman=True)
-        session.add(creator)
-        session.commit()
-        print(f"Created creator for registration set using name '{creator_name}'")
-    return creator
-
-
-def get_or_create_FormAnnotation(session, patient, schema, creator):
-    """
-    Get or create a form annotation for a patient.
-    """
-    formAnnotation = FormAnnotation.where(
-        session,
-        (FormAnnotation.FormSchemaID == schema.FormSchemaID)
-        & (FormAnnotation.CreatorID == creator.CreatorID)
-        & (FormAnnotation.PatientID == patient.PatientID),
-    )
-    if formAnnotation:
-        if len(formAnnotation) > 1:
-            print(
-                f"Found multiple form annotations for patient {patient.PatientID}, using the first one ({formAnnotation[0].FormAnnotationID})"
-            )
-        return formAnnotation[0]
-
-    formAnnotation = FormAnnotation()
-    formAnnotation.Creator = creator
-    formAnnotation.FormSchema = schema
-    formAnnotation.Patient = patient
-    formAnnotation.FormData = []
-
-    session.add(formAnnotation)
-    session.commit()
-    return formAnnotation
-
-
 def get_processed_edges(formAnnotation):
     if formAnnotation.FormData:
         processed = {(e["image1"], e["image2"]) for e in formAnnotation.FormData}
@@ -260,7 +203,20 @@ def run_registration_patient(patient, formAnnotation, skip_ids=None):
 
 
 def run_patient(session, patient, schema, creator, replace, skip_ids=None):
-    formAnnotation = get_or_create_FormAnnotation(session, patient, schema, creator)
+    formAnnotation = FormAnnotation.get_or_create(
+        session,
+        match_by={
+            "FormSchemaID": schema.FormSchemaID,
+            "CreatorID": creator.CreatorID,
+            "PatientID": patient.PatientID,
+        },
+        create_kwargs={
+            "FormSchemaID": schema.FormSchemaID,
+            "CreatorID": creator.CreatorID,
+            "PatientID": patient.PatientID,
+            "FormData": [],
+        },
+    )
     if replace:
         formAnnotation.FormData = []
 

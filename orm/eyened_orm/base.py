@@ -347,7 +347,7 @@ class Base(DeclarativeBase):
                     )
         else:
             # Create new instance
-            instance = cls(**match_by, **(create_kwargs or {}))
+            instance = cls(**(match_by | (create_kwargs or {})))
             session.add(instance)
             is_new = True
 
