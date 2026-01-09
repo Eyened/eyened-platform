@@ -641,7 +641,7 @@ def run_etdrs_model(
 
     processor = ETDRSModelProcessor(session)
     if skip_existing:
-        existing_ids = processor.get_processed_image_ids()
+        existing_ids = processor.get_processed_image_ids(selected_images)
         print(f"Skipping {len(existing_ids)} existing images")
         selected_images = selected_images - existing_ids
     print(f"Running on {len(selected_images)} images")
