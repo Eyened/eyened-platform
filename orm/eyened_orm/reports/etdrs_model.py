@@ -8,6 +8,7 @@ from eyened_orm import (
 )
 from eyened_orm.reports.etdrs_masks import ETDRS_masks
 from sqlalchemy.orm import Session, object_session
+from typing import Set
 
 model_name = "ETDRS area"
 version = "1"
@@ -74,6 +75,7 @@ def process_etdrs_model(
 class ETDRSModelProcessor:
 
     def __init__(self, session: Session):
+        self.session = session
         self.model = AttributesModel.get_or_create(
             session,
             match_by={"ModelName": model_name, "Version": version},
@@ -86,6 +88,17 @@ class ETDRSModelProcessor:
                 "AttributeName": attribute_name,
                 "AttributeDataType": attribute_data_type,
             },
+        )
+
+    def get_processed_image_ids(self, image_ids: Set[int]) -> Set[int]:
+        return set(
+            AttributeValue.select(
+                self.session,
+                "ImageInstanceID",
+                AttributeID=self.attribute_definition.AttributeID,
+                ModelID=self.model.ModelID,
+                ImageInstanceID=image_ids,
+            )
         )
 
     def process(
