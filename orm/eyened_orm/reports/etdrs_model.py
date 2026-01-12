@@ -61,7 +61,7 @@ def process_etdrs_model(
         match_by={
             "ModelID": model.ModelID,
             "AttributeID": attribute_definition.AttributeID,
-            "ImageInstanceID": image.ImageInstanceID,
+            "ModelSegmentationID": segmentation.ModelSegmentationID,
         },
         update_values={"ValueJSON": value},
     )
