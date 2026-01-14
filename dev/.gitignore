@@ -1,2 +1,4 @@
 .env
 transfer-config.yml
+dump_db.sh
+.gitignore

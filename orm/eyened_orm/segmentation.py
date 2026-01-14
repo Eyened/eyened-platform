@@ -212,15 +212,15 @@ class SegmentationBase(Base):
         )
 
     @property
-    def binary_mask(self) -> np.ndarray:
+    def binary_mask(self) -> np.ndarray | None:
         """
         Return a boolean segmentation mask.
 
         Notes:
         - Stored segmentation data is always shaped (Depth, Height, Width).
         - For 2D segmentations (i.e. any singleton axis), we automatically drop
-          singleton axes and return the squeezed mask (typically 2D).
-        - For 3D segmentations (Depth > 1), this returns the full 3D volume.
+          singleton axes and return the squeezed mask.
+        - For 3D segmentations, this returns the full 3D volume.
         """
         if (
             self.DataRepresentation == DataRepresentation.MultiClass
@@ -232,8 +232,7 @@ class SegmentationBase(Base):
 
         data = self.read_data()
         if data is None:
-            # no data stored in array, indicates empty segmentation
-            mask = np.zeros(self.shape, dtype=np.bool_)
+            return None
         elif self.DataRepresentation == DataRepresentation.Binary:
             mask = data > 0
         elif self.DataRepresentation == DataRepresentation.DualBitMask:
