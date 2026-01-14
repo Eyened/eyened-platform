@@ -51,12 +51,25 @@ class ETDRS_masks:
     def calculate_count(self, binary_image):
         return self._calculate_count(measure.label(binary_image))
 
+    def calculate_mean(self, float_image, mask=None):
+        if mask is not None:
+            float_image = float_image[mask]
+        else:
+            float_image = float_image.flatten()
+        return float(float_image.sum() / float_image.size)
+
     def _calculate_count(self, labeled_image):
         return int(np.max(labeled_image))
 
     def calculate_largest_area(self, labeled_image):
         regions = measure.regionprops(labeled_image)
         return float(max((r.area for r in regions), default=0) * self.pixel_area)
+
+    def get_summary_mean(self, float_image, fields, mask=None):
+        result = {}
+        for field in fields:
+            result[f'{field}_mean'] = self.calculate_mean(float_image, mask=getattr(self, field))
+        return result
 
     def get_summary(self, binary_image, fields, include_area=True, include_count=True, include_largest=True):
         if binary_image is None:

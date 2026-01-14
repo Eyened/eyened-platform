@@ -76,6 +76,7 @@ class AttributesModel(Model):
                 AttributeDefinition.AttributeName,
                 ImageInstance.ImageInstanceID,
                 cast(ImageInstance.Laterality, String),
+                cast(ImageInstance.ETDRSField, String),
                 Patient.PatientIdentifier,
                 Study.StudyDate,
                 Project.ProjectName,
