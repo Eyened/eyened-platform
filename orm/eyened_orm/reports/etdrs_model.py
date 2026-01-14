@@ -8,6 +8,7 @@ from eyened_orm import (
 )
 from eyened_orm.reports.etdrs_masks import ETDRS_masks
 from sqlalchemy.orm import Session, object_session
+from typing import Set
 
 model_name = "ETDRS area"
 version = "1"
@@ -50,6 +51,8 @@ def process_etdrs_model(
     etdrs_mask = _get_etdrs_mask(segmentation, keypoints_attr, odfd_attr)
     h, w = image.Rows_y, image.Columns_x
     binary_mask = segmentation.binary_mask
+    if binary_mask is None:
+        return None
 
     assert binary_mask.shape == (h, w), "Shape mismatch"
 
@@ -60,7 +63,7 @@ def process_etdrs_model(
         match_by={
             "ModelID": model.ModelID,
             "AttributeID": attribute_definition.AttributeID,
-            "ImageInstanceID": image.ImageInstanceID,
+            "ModelSegmentationID": segmentation.ModelSegmentationID,
         },
         update_values={"ValueJSON": value},
     )
@@ -74,6 +77,7 @@ def process_etdrs_model(
 class ETDRSModelProcessor:
 
     def __init__(self, session: Session):
+        self.session = session
         self.model = AttributesModel.get_or_create(
             session,
             match_by={"ModelName": model_name, "Version": version},
@@ -87,6 +91,24 @@ class ETDRSModelProcessor:
                 "AttributeDataType": attribute_data_type,
             },
         )
+
+    def get_processed_image_ids(
+        self, segmentation_model_id: int, image_ids: Set[int]
+    ) -> Set[int]:
+        from sqlalchemy import select
+
+        stmt = (
+            select(ModelSegmentation.ImageInstanceID)
+            .join(AttributeValue)
+            .where(
+                ModelSegmentation.ModelID == segmentation_model_id,
+                ModelSegmentation.ImageInstanceID.in_(image_ids),
+                AttributeValue.AttributeID == self.attribute_definition.AttributeID,
+                AttributeValue.ModelID == self.model.ModelID,
+            )
+        )
+        result = self.session.execute(stmt)
+        return set(result.scalars().all())
 
     def process(
         self,
