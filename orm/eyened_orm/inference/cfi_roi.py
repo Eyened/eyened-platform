@@ -26,7 +26,7 @@ class CFIROI:
             match_by={
                 "AttributeName": "CFI_ROI",
                 "AttributeDataType": AttributeDataType.JSON,
-            },
+            }
         )
 
     def run(self, image_ids: List[int]):

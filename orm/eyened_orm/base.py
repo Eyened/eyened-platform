@@ -10,6 +10,7 @@ from typing import (
     TypeVar,
     Iterable,
 )
+from collections.abc import Iterable
 
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from eyened_orm.utils.table_printer import TablePrinter
@@ -207,11 +208,12 @@ class Base(DeclarativeBase):
         Returns:
             List of SQLAlchemy condition expressions.
         """
+
         conditions = []
         for k, v in filters.items():
             col = getattr(cls, k)
             # Use in_ for iterables (but not strings)
-            if isinstance(v, (list, tuple, set)) and not isinstance(v, str):
+            if isinstance(v, Iterable) and not isinstance(v, str):
                 conditions.append(col.in_(v))
             else:
                 conditions.append(col == v)
