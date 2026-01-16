@@ -5,6 +5,8 @@ import click
 import random
 import string
 
+from eyened_orm.inference.multi_process_inference import MultiProcessInference
+
 from .utils.testdb import drop_create_db, load_db, stream_mirror_database
 from tqdm import tqdm
 from .utils.config import (
@@ -166,6 +168,8 @@ def run_models(env, device):
     from eyened_orm.inference.utils import auto_device
 
     database = get_database(env)
+
+    config = load_config(env)
     with database.get_session() as session:
         if device is None:
             device = auto_device()
@@ -638,14 +642,25 @@ def run_etdrs_model(
     database = get_database(env)
     session = database.create_session()
 
-
     processor = ETDRSModelProcessor(session)
     if skip_existing:
-        existing_ids = processor.get_processed_image_ids(segmentation_model_id, selected_images)
+        existing_ids = processor.get_processed_image_ids(
+            segmentation_model_id, selected_images
+        )
         print(f"Skipping {len(existing_ids)} existing images")
         selected_images = selected_images - existing_ids
+
+    empty_segmentations = ModelSegmentation.select(
+        session,
+        "ImageInstanceID",
+        ModelID=segmentation_model_id,
+        ZarrArrayIndex=None,
+        ImageInstanceID=selected_images,
+    )
+    print(f"skipping {len(empty_segmentations)} empty segmentations")
+    selected_images = selected_images - set(empty_segmentations)
+
     print(f"Running on {len(selected_images)} images")
-    
 
     kpts_model = AttributesModel.by_column(
         session, ModelName=keypoints_model_name, Version=keypoints_model_version
@@ -681,12 +696,10 @@ def run_etdrs_model(
         )
     }
 
-
     all_segmentations = ModelSegmentation.by_columns(
         session, ModelID=segmentation_model_id, ImageInstanceID=selected_images
     )
     print(f"Found {len(all_segmentations)} segmentations")
-
 
     for segmentation in tqdm(all_segmentations):
         instance_id = segmentation.ImageInstanceID
@@ -700,3 +713,171 @@ def run_etdrs_model(
 
     session.close()
     print("ETDRS model processing completed successfully!")
+
+
+@eorm.command()
+@click.option(
+    "-e", "--env", type=str, help="Path to .env file for environment configuration"
+)
+@click.option(
+    "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
+)
+@click.option(
+    "-d", "--device", type=str, default=None, help="Device to use for processing"
+)
+@click.option(
+    "--skip-existing",
+    is_flag=True,
+    default=True,
+    help="Skip existing attribute values",
+)
+@click.option(
+    "--max-workers",
+    type=int,
+    default=12,
+    help="Maximum number of workers to use for processing",
+)
+@click.option(
+    "--batch-size",
+    type=int,
+    default=8,
+    help="Batch size for processing",
+)
+def run_cfi_amd(env, path, device, skip_existing, max_workers, batch_size):
+    import numpy as np
+    from eyened_orm import (
+        Feature,
+        SegmentationModel,
+        ModelSegmentation,
+        DataRepresentation,
+        Datatype,
+        ImageInstance,
+    )
+    import torch
+    from eyened_orm.inference.utils import auto_device
+    if device is None:
+        device = auto_device()
+    else:
+        device = torch.device(device)
+
+
+    with open(path, "r") as f:
+        selected_images = {int(line.strip()) for line in f.readlines()}
+
+    print(f"Preparing to process {len(selected_images)} images")
+
+    database = get_database(env)
+    session = database.create_session()
+
+    feature_names = {
+        "drusen": ("Drusen", "Drusen"),
+        "RPD": ("Reticular pseudodrusen", "Reticular pseudodrusen"),
+        "hyperpigmentation": ("RPE hyperpigmentation", "Hyperpigmentation"),
+        "rpe_degeneration": (
+            "Retinal pigment epithelium (RPE) degeneration",
+            "RPE degeneration",
+        ),
+    }
+
+    features = {
+        name: Feature.get_or_create(session, match_by={"FeatureName": feature_name})
+        for name, (feature_name, _) in feature_names.items()
+    }
+
+    models = {
+        name: SegmentationModel.get_or_create(
+            session,
+            match_by={
+                "FeatureID": features[name].FeatureID,
+                "ModelName": model_name,
+                "Version": "3",
+            },
+            create_kwargs={"Description": "https://github.com/Eyened/cfi-amd"},
+        )
+        for name, (_, model_name) in feature_names.items()
+    }
+
+    model_id_by_feature = {name: model.ModelID for name, model in models.items()}
+    model_ids = set(model_id_by_feature.values())
+
+    processed = set(
+        ModelSegmentation.select(
+            session,
+            "ModelID",
+            "ImageInstanceID",
+            ImageInstanceID=selected_images,
+            ModelID=model_ids,
+        )
+    )
+
+    complete = {
+        i for i in selected_images if all((x, i) in processed for x in model_ids)
+    }
+    print(f"Found {len(complete)} complete images")
+
+    if skip_existing:
+        images = selected_images - complete
+    else:
+        images = selected_images
+
+    print(f"Running on {len(images)} images")
+
+    def get_model_segmentation(instance_id: int, model_id: int, h: int, w: int):
+        return ModelSegmentation.get_or_create(
+            session,
+            match_by={
+                "ImageInstanceID": instance_id,
+                "ModelID": model_id,
+            },
+            create_kwargs={
+                "ImageInstanceID": instance_id,
+                "ModelID": model_id,
+                "Depth": 1,
+                "Width": w,
+                "Height": h,
+                "SparseAxis": 0,
+                "DataType": Datatype.R8,
+                "DataRepresentation": DataRepresentation.Probability,
+                "Threshold": 0.5,
+            },
+        )
+
+    def save_results(instance_id, result):
+        # Get dimensions from model output (avoids depending on any ORM-loaded image data)
+        any_key = next(k for k in result.keys() if k != "bounds")
+        h, w = result[any_key].shape
+
+        # Ensure ImageInstance has dimensions; required for segmentation consistency checks.
+        instance = instances.get(instance_id)
+        if instance is not None:
+            if instance.Rows_y is None or instance.Columns_x is None:
+                instance.Rows_y = h
+                instance.Columns_x = w
+                session.flush()
+
+
+        for feature_name, model_id in model_id_by_feature.items():
+            m = get_model_segmentation(instance_id, model_id, h=h, w=w)
+            try:
+                arr = result[feature_name]
+                if np.any(arr >= 0.5):
+                    # convert float (0-1) to uint8 (0-255) for Datatype.R8
+                    data = (255 * arr).astype(np.uint8)
+                    m.write_data(data, axis=0)
+            finally:
+                # Prevent the session identity map from growing without bound.
+                session.flush()
+                session.expunge(m)
+
+        session.commit()
+
+    from cfi_amd.processor import Processor
+
+    processor = Processor(device)
+
+    instances = ImageInstance.by_ids(session, images)
+    items = [(iid, i.path) for iid, i in instances.items()]
+   
+    mpi = MultiProcessInference(items, processor, n_workers=max_workers, batch_size=batch_size)
+    for iid, result in mpi.run():
+        save_results(iid, result)
