@@ -10,7 +10,7 @@ from sqlalchemy import select
 from tqdm import tqdm
 
 from eyened_orm import ImageInstance, Modality
-from .utils import auto_device
+from eyened_orm.inference.utils import auto_device
 
 
 def run_basic_models(fpaths, ids, device: torch.device = None):
