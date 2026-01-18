@@ -4,6 +4,31 @@ from eyened_orm import ImageInstance
 from sqlalchemy import update
 from tqdm import tqdm
 
+from rtnls_inference.utils import load_image
+from rtnls_fundusprep.mask_extraction import get_cfi_bounds
+import numpy as np
+
+
+def normalize(im, ce=None):
+    mean = 0.485, 0.456, 0.406
+    std = 0.229, 0.224, 0.225
+    assert im.dtype == np.uint8
+
+    im_norm = (im / 255.0 - mean) / std
+    if ce is not None:
+        ce_norm = (ce / 255.0 - mean) / std
+        return np.concatenate([im_norm, ce_norm], axis=2)
+    return im_norm
+
+
+def preprocess_image(image_path, resize=512, apply_ce=False):
+    image = load_image(image_path)
+    bounds = get_cfi_bounds(image)
+    T, bounds_cropped = bounds.crop(resize)
+    im = bounds_cropped.image
+    ce = bounds_cropped.contrast_enhanced_5 if apply_ce else None
+    return T, normalize(im, ce)
+
 
 def transform_kps(colname):
     from rtnls_fundusprep.cfi_bounds import CFIBounds

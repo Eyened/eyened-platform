@@ -38,6 +38,7 @@ class AttributeDataType(Enum):
 
 class AttributesModel(Model):
     __tablename__ = "AttributesModel"
+    _name_column = "ModelName"
 
     ModelID: Mapped[int] = mapped_column(
         ForeignKey("Model.ModelID", ondelete="CASCADE"), primary_key=True
