@@ -48,6 +48,7 @@ class CFIKeypoints(AttributeInferencePipeline):
         device: torch.device,
         n_workers: int = 4,
         batch_size: int = 8,
+        **kwargs,
     ):
         super().__init__(
             session, n_workers=n_workers, batch_size=batch_size, device=device

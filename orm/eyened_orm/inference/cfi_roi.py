@@ -16,7 +16,7 @@ class CFI_ROI(AttributeInferencePipeline):
     attribute_name = "CFI_ROI"
     attribute_data_type = AttributeDataType.JSON
 
-    def __init__(self, session, n_workers: int = 8):
+    def __init__(self, session, n_workers: int = 8, **kwargs):
         super().__init__(session, n_workers=n_workers)
 
     def preprocess(self, image_path: Any) -> Optional[Dict[str, Any]]:

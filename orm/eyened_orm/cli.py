@@ -1,5 +1,4 @@
 import yaml
-from pathlib import Path
 import click
 import random
 import string
@@ -19,13 +18,14 @@ Command utilities for the eyened ORM.
 The following commands are available:
 - database-mirror: Mirror the entire source database into the target database via a streaming pipe.
 - update-thumbnails: Update thumbnails for all images in the database.
-- run-models: Run inference models on the database.
-- run-odfd-model: Run ODFD model to estimate distance from fovea to optic disc border.
+- run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
+- run-etdrs-model: Run ETDRS model processing on segmentations.
+- run-cfi-amd: Run CFI AMD segmentation models.
+- run-registration: Run image registration for patients or projects.
 - validate-forms: Validate form annotations and schemas in the database.
 - zarr-tree: Display the structure of the zarr store, showing groups and array shapes.
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
-- run-registration: Run image registration for patients or projects.
 - load-dump: Load a database dump file, replacing the entire database.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.

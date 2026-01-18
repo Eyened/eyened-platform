@@ -1,11 +1,11 @@
 import os
 from os import PathLike
-from typing import Any, Iterable, List, Optional, Set, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 
 import numpy as np
 import torch
 
-from eyened_orm import AttributeDataType, AttributeValue
+from eyened_orm import AttributeDataType
 from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
 from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference import RegressionEnsemble
@@ -28,14 +28,13 @@ class CFI_ODFD(AttributeInferencePipeline):
         device: torch.device,
         n_workers: int = 8,
         batch_size: int = 8,
-        overwrite: bool = False,
+        **kwargs,
     ):
         super().__init__(
             session,
             n_workers=n_workers,
             batch_size=batch_size,
             device=device,
-            overwrite=overwrite,
         )
         self.ensemble: Optional[RegressionEnsemble] = None
         self.resize: Optional[int] = None
@@ -61,7 +60,6 @@ class CFI_ODFD(AttributeInferencePipeline):
         """Process batch: ensemble averaging and extract first channel."""
         x_in = self._prepare_torch_batch(prep_batch)
         result = self._run_torch_forward(x_in, self.ensemble.forward)
-        print(result.shape)
 
         # Ensemble averaging: result is (num_models, batch_size, 1)
         # Average over ensemble (axis=0), extract channel [:, 0]
@@ -77,24 +75,3 @@ class CFI_ODFD(AttributeInferencePipeline):
         # Assume x/y scale is the same
         p0, p1 = T.apply_inverse(((0, 0), (x, 0)))
         return float(np.linalg.norm(p1 - p0))
-
-
-# def run_odfd_model(database, device, batch_size, path, model_version, overwrite):
-#     if device is None:
-#         device = "cpu"
-#     else:
-#         device = torch.device(device)
-
-#     with open(path, "r") as f:
-#         image_ids = {int(line.strip()) for line in f.readlines()}
-
-#     with database.get_session() as session:
-#         odfd = CFI_ODFD(
-#             session=session,
-#             model_version=model_version,
-#             device=device,
-#             n_workers=batch_size,
-#             batch_size=batch_size,
-#             overwrite=overwrite,
-#         )
-#         odfd.run(image_ids=image_ids)
