@@ -5,75 +5,164 @@ from pathlib import Path
 import click
 
 from eyened_orm.inference.multi_process_inference import MultiProcessInference
-from eyened_orm.utils.config import load_config
+from eyened_orm.inference.utils import auto_device
 
 from .shared import get_database
 
 
-@click.command(name="run-models")
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option("-d", "--device", type=str, default=None)
-def run_models(env, device):
-    import tempfile
+def _load_image_ids(path: str) -> set[int]:
+    """Load image IDs from a file (one ID per line)."""
+    with open(path, "r") as f:
+        return {int(line.strip()) for line in f.readlines() if line.strip()}
+
+
+def _get_device(device: str | None):
     import torch
 
-    from eyened_orm.inference.inference import run_inference
-    from eyened_orm.inference.utils import auto_device
-
-    database = get_database(env)
-
-    config = load_config(env)
-    with database.get_session() as session:
-        if device is None:
-            device = auto_device()
-        else:
-            device = torch.device(device)
-
-        cfi_cache_path = config.cfi_cache_path
-        if cfi_cache_path is None:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                cfi_cache_path = Path(temp_dir)
-                config.cfi_cache_path = cfi_cache_path
-
-                print(f"Using temporary cfi_cache_path: {cfi_cache_path}")
-
-        else:
-            print(f"Running inference with cfi_cache_path: {cfi_cache_path}")
-        run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
+    """Get torch device from string or auto-detect."""
+    if device is None:
+        return auto_device()
+    return torch.device(device)
 
 
-@click.command(name="run-odfd-model")
+@click.command(name="run-models")
 @click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option("-d", "--device", type=str, default=None)
-@click.option("-b", "--batch-size", type=int, default=8)
-@click.option(
-    "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
+    "-e",
+    "--env",
+    type=str,
+    help="Path to .env file for environment configuration",
 )
 @click.option(
     "-m",
-    "--model-version",
-    type=str,
-    required=True,
-    help="Version of the model",
-    default="odfd_march25",
+    "--model",
+    type=click.Choice(
+        ["cfi-roi", "cfi-keypoints", "cfi-odfd", "cfi-quality"], case_sensitive=False
+    ),
+    required=False,
+    help="Model to run (if not specified, runs all models)",
 )
 @click.option(
-    "-s",
+    "-p",
+    "--path",
+    type=str,
+    required=True,
+    help="Path to file containing image IDs (one per line)",
+)
+@click.option(
+    "-d",
+    "--device",
+    type=str,
+    default=None,
+    help="Device to use (e.g., 'cuda:0', 'cpu'). Auto-detected if not provided.",
+)
+@click.option(
+    "-b",
+    "--batch-size",
+    type=int,
+    default=8,
+    help="Batch size for processing (not used for cfi-roi)",
+)
+@click.option(
+    "-w",
+    "--n-workers",
+    type=int,
+    default=8,
+    help="Number of preprocessing worker processes",
+)
+@click.option(
     "--overwrite",
     is_flag=True,
     default=False,
-    help="Overwrite existing attribute values",
+    help="Overwrite existing attribute values (skips filtering)",
 )
-def run_odfd_model(env, device, batch_size, path, model_version, overwrite):
-    
-    from eyened_orm.inference.odfd import run_odfd_model
+def run_models(env, model, path, device, batch_size, n_workers, overwrite):
+    """Run attribute inference models on a set of image IDs.
 
+    Supported models:
+    - cfi-roi: CFI ROI detection (no device/batch-size needed)
+    - cfi-keypoints: CFI keypoints detection (fovea and disc edge)
+    - cfi-odfd: Optic Disc to Fovea Distance estimation
+    - cfi-quality: Image quality assessment
+    """
     database = get_database(env)
-    run_odfd_model(database, device, batch_size, path, model_version, overwrite)
+
+    # Load image IDs
+    image_ids = _load_image_ids(path)
+    print(f"Loaded {len(image_ids)} image IDs from {path}")
+
+    device_obj = _get_device(device)
+
+    from eyened_orm.inference.cfi_roi import CFI_ROI
+    from eyened_orm.inference.cfi_keypoints import CFIKeypoints
+    from eyened_orm.inference.cfi_odfd import CFI_ODFD
+    from eyened_orm.inference.cfi_quality import CFI_Quality
+
+    models = {
+        "cfi-roi": CFI_ROI,
+        "cfi-keypoints": CFIKeypoints,
+        "cfi-odfd": CFI_ODFD,
+        "cfi-quality": CFI_Quality,
+    }
+
+    with database.get_session() as session:
+        for model_name, model_class in models.items():
+            if model == model_name or model is None:
+                print(f"Running {model_name}")
+                pipeline = model_class(
+                    session,
+                    device=device_obj,
+                    n_workers=n_workers,
+                    batch_size=batch_size,
+                )
+
+                # Filter existing results unless overwrite is enabled
+                if not overwrite:
+                    image_ids = pipeline.filter_image_ids(image_ids)
+                    print(
+                        f"Processing {len(image_ids)} images (after filtering existing)"
+                    )
+
+                if not image_ids:
+                    print("No images to process")
+                    return
+
+                # Run inference
+                pipeline.run(image_ids)
+                session.commit()
+                print(f"Completed processing {len(image_ids)} images")
+
+
+# @click.command(name="run-models")
+# @click.option(
+#     "-e", "--env", type=str, help="Path to .env file for environment configuration"
+# )
+# @click.option("-d", "--device", type=str, default=None)
+# def run_models(env, device):
+#     """Legacy command for running basic inference models."""
+#     import tempfile
+
+#     from eyened_orm.inference.inference import run_inference
+
+#     database = get_database(env)
+
+#     config = load_config(env)
+#     with database.get_session() as session:
+#         if device is None:
+#             device = auto_device()
+#         else:
+#             device = torch.device(device)
+
+#         cfi_cache_path = config.cfi_cache_path
+#         if cfi_cache_path is None:
+#             with tempfile.TemporaryDirectory() as temp_dir:
+#                 cfi_cache_path = Path(temp_dir)
+#                 config.cfi_cache_path = cfi_cache_path
+
+#                 print(f"Using temporary cfi_cache_path: {cfi_cache_path}")
+
+#         else:
+#             print(f"Running inference with cfi_cache_path: {cfi_cache_path}")
+#         run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
 
 
 @click.command(name="run-etdrs-model")
@@ -130,6 +219,7 @@ def run_etdrs_model(
     odfd_model_version,
     overwrite,
 ):
+    """Run ETDRS model processing on segmentations."""
     from eyened_orm import AttributeValue, AttributesModel, ModelSegmentation
     from eyened_orm.reports.etdrs_model import ETDRSModelProcessor
     from tqdm import tqdm
@@ -242,6 +332,7 @@ def run_etdrs_model(
     help="Batch size for processing",
 )
 def run_cfi_amd(env, path, device, skip_existing, max_workers, batch_size):
+    """Run CFI AMD segmentation models."""
     import numpy as np
     import torch
 
@@ -253,7 +344,6 @@ def run_cfi_amd(env, path, device, skip_existing, max_workers, batch_size):
         Datatype,
         ImageInstance,
     )
-    from eyened_orm.inference.utils import auto_device
 
     if device is None:
         device = auto_device()
@@ -420,6 +510,7 @@ def run_cfi_amd(env, path, device, skip_existing, max_workers, batch_size):
     ),
 )
 def run_registration(env, patient, project, schema, creator, replace, skip):
+    """Run registration processing for patients."""
     from eyened_orm import Patient, FormSchema, Creator
     from eyened_orm.utils.registration import run_patient
     import json
@@ -471,7 +562,6 @@ def run_registration(env, patient, project, schema, creator, replace, skip):
 
 model_commands = [
     run_models,
-    run_odfd_model,
     run_etdrs_model,
     run_cfi_amd,
     run_registration,

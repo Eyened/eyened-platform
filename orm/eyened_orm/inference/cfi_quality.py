@@ -36,6 +36,7 @@ class CFI_Quality(AttributeInferencePipeline):
         device: torch.device,
         n_workers: int = 8,
         batch_size: int = 8,
+        **kwargs,
     ):
         super().__init__(
             session, n_workers=n_workers, batch_size=batch_size, device=device

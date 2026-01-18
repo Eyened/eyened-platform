@@ -191,12 +191,11 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         images = ImageInstance.by_ids(self.session, image_ids_set)
         items = [(iid, image.path) for iid, image in images.items()]
 
-        # Create MultiProcessInference
         mpi = MultiProcessInference(
             items,
             pipeline=self,
             n_workers=self.n_workers,
-            batch_size=self.batch_size,
+            batch_size=getattr(self, "batch_size", 1),
         )
         yield from mpi.run()
 
