@@ -1,213 +1,121 @@
-from eyened_orm import (
-    AttributesModel,
-    AttributeDefinition,
-    AttributeDataType,
-    AttributeValue,
-    ImageInstance,
-)
-from rtnls_fundusprep.mask_extraction import get_cfi_bounds
-from rtnls_inference.utils import load_image
-from rtnls_inference.ensembles import HeatmapRegressionEnsemble
-from multi_process_inference import MultiProcessInference, InferencePipeline
-
 from os import PathLike
-from typing import List, Tuple, Any, TypeAlias
+from typing import Any, Iterable, List, Optional, Tuple
 
-import torch
 import numpy as np
-from tqdm import tqdm
+import torch
 
-# Type aliases for CFIKeypointsPipeline
-PreprocessedItem: TypeAlias = Tuple[Any, np.ndarray]
-GPUOutput: TypeAlias = Tuple[np.ndarray, np.ndarray]
-KeypointResult: TypeAlias = Tuple[Tuple[float, float], Tuple[float, float]]
-
-
-def normalize(im, ce=None):
-    mean = 0.485, 0.456, 0.406
-    std = 0.229, 0.224, 0.225
-    assert im.dtype == np.uint8
-
-    im_norm = (im / 255.0 - mean) / std
-    if ce is not None:
-        ce_norm = (ce / 255.0 - mean) / std
-        return np.concatenate([im_norm, ce_norm], axis=2)
-    return im_norm
+from eyened_orm import AttributeDataType
+from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
+from eyened_orm.inference.utils import preprocess_image
+from rtnls_inference.ensembles import HeatmapRegressionEnsemble
 
 
-def preprocess_image(image_path, resize=512, apply_ce=True):
-    image = load_image(image_path)
-    bounds = get_cfi_bounds(image)
-    T, bounds_cropped = bounds.crop(resize)
-    im = bounds_cropped.image
-    ce = bounds_cropped.contrast_enhanced_5 if apply_ce else None
-    return T, normalize(im, ce)
+def extract_max_keypoint(heatmap):
+    """Extract the maximum keypoint location from heatmap.
 
+    Args:
+        heatmap: Heatmap array with shape (h, w) or (1, h, w)
 
-def extract_max_keypoint(heatmap_ensemble):
-    res_ensemble_mean = heatmap_ensemble.mean(axis=0)
-    _, h, w = res_ensemble_mean.shape
-    return np.unravel_index(res_ensemble_mean[0].argmax(), (h, w))
+    Returns:
+        Tuple of (y, x) coordinates of maximum value
+    """
+    # Handle both (h, w) and (1, h, w) shapes
+    if len(heatmap.shape) == 3:
+        heatmap = heatmap[0]
+    h, w = heatmap.shape
+    return np.unravel_index(heatmap.argmax(), (h, w))
 
 
 def get_coordinate(T, heatmap):
+    """Transform keypoint coordinate from resized to original image coordinates."""
     y, x = extract_max_keypoint(heatmap)
     x, y = T.apply_inverse([[x + 0.5, y + 0.5]])[0]  # + 0.5 to center the pixel
     return (float(x), float(y))
 
 
-class CFIKeypointsPipeline(
-    InferencePipeline[PreprocessedItem, GPUOutput, KeypointResult]
-):
-    """Concrete implementation of InferencePipeline for CFI keypoints detection.
+class CFIKeypoints(AttributeInferencePipeline):
+    """CFI keypoints detection pipeline - detects fovea and disc edge locations."""
 
-    This pipeline processes fundus images to detect fovea and disc edge keypoints
-    using ensemble models.
-    """
+    model_name = "CFI_Keypoints"
+    model_version = "july24"
+    model_description = "https://github.com/Eyened/retinalysis-inference Eyened/vascx:fovea Eyened/vascx:discedge"
+    attribute_name = "CFI_Keypoints"
+    attribute_data_type = AttributeDataType.JSON
 
     def __init__(
         self,
-        ensemble_fovea: HeatmapRegressionEnsemble,
-        ensemble_discedge: HeatmapRegressionEnsemble,
+        session,
         device: torch.device,
-        resize: int,
-        apply_ce: bool,
+        n_workers: int = 4,
+        batch_size: int = 8,
     ):
-        """Initialize the CFI keypoints pipeline.
-
-        Args:
-            ensemble_fovea: Ensemble model for fovea detection
-            ensemble_discedge: Ensemble model for disc edge detection
-            device: PyTorch device to run inference on
-            resize: Target resize dimension for preprocessing
-            apply_ce: Whether to apply contrast enhancement
-        """
-        self.ensemble_fovea = ensemble_fovea
-        self.ensemble_discedge = ensemble_discedge
-        self.device = device
-        self.resize = resize
-        self.apply_ce = apply_ce
-
-    def preprocess(self, image_path: PathLike[str]) -> PreprocessedItem:
-        """Preprocess a single image path.
-
-        Returns:
-            Tuple of (T, x_im) where T is the transformation matrix and
-            x_im is the normalized HWC numpy array
-        """
-        return preprocess_image(image_path, resize=self.resize, apply_ce=self.apply_ce)
-
-    def gpu_batch_process(self, prep_batch: List[PreprocessedItem]) -> List[GPUOutput]:
-        """Process a batch of preprocessed images on GPU.
-
-        Args:
-            prep_batch: List of (T, x_im) tuples where x_im is HWC numpy array
-
-        Returns:
-            List of (fovea_heatmap, disc_edge_heatmap) tuples
-        """
-        # Stack images and convert to CHW format for PyTorch
-        x_np = np.stack([x_im.transpose(2, 0, 1) for _, x_im in prep_batch], axis=0)
-        x_in = torch.from_numpy(x_np).to(device=self.device, dtype=torch.float32)
-
-        with torch.no_grad():
-            fovea_heatmap = self.ensemble_fovea.forward(x_in)
-            disc_edge_heatmap = self.ensemble_discedge.forward(x_in)
-
-        fovea_heatmap = fovea_heatmap.detach().cpu().numpy()
-        disc_edge_heatmap = disc_edge_heatmap.detach().cpu().numpy()
-
-        return list(zip(fovea_heatmap, disc_edge_heatmap))
-
-    def postprocess(
-        self,
-        prep_item: PreprocessedItem,
-        gpu_output: GPUOutput,
-    ) -> KeypointResult:
-        """Postprocess GPU outputs to extract keypoint coordinates.
-
-        Args:
-            prep_item: The (T, x_im) tuple from preprocessing
-            gpu_output: The (fovea_heatmap, disc_edge_heatmap) tuple from GPU processing
-
-        Returns:
-            Tuple of ((fovea_x, fovea_y), (disc_edge_x, disc_edge_y))
-        """
-        fovea_heatmap, disc_edge_heatmap = gpu_output
-        T, _ = prep_item
-        fovea_xy = get_coordinate(T, fovea_heatmap)
-        disc_edge_xy = get_coordinate(T, disc_edge_heatmap)
-        return fovea_xy, disc_edge_xy
-
-
-class CFIKeypoints:
-
-    def __init__(self, session):
-        self.session = session
-        self.model = AttributesModel.get_or_create(
-            session,
-            match_by={"ModelName": "CFI_Keypoints", "Version": "july24"},
-            create_kwargs={
-                "Description": "https://github.com/Eyened/retinalysis-inference Eyened/vascx:fovea Eyened/vascx:discedge"
-            },
+        super().__init__(
+            session, n_workers=n_workers, batch_size=batch_size, device=device
         )
-        self.attr_definition = AttributeDefinition.get_or_create(
-            session,
-            match_by={
-                "AttributeName": "CFI_Keypoints",
-                "AttributeDataType": AttributeDataType.JSON,
-            },
-        )
+        self.ensemble_fovea: Optional[HeatmapRegressionEnsemble] = None
+        self.ensemble_discedge: Optional[HeatmapRegressionEnsemble] = None
+        self.resize: Optional[int] = None
+        self.apply_ce: Optional[bool] = None
 
-    def run(self, image_ids: List[int], device: torch.device):
+    def _load_models(self) -> None:
+        """Load both fovea and disc edge ensemble models."""
         print("loading fovea models")
-        ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface(
+        self.ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface(
             "Eyened/vascx:fovea/fovea_july24.pt"
-        ).to(device)
+        ).to(self.device)
 
         print("loading discedge models")
-        ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface(
+        self.ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface(
             "Eyened/vascx:discedge/discedge_july24.pt"
-        ).to(device)
+        ).to(self.device)
 
-        resize = ensemble_fovea.config["datamodule"]["test_transform"]["resize"]
-        apply_ce = ensemble_fovea.config["datamodule"]["test_transform"][
+        assert (
+            self.ensemble_fovea.config["datamodule"]["test_transform"]["resize"] == 512
+        )
+        assert (
+            self.ensemble_discedge.config["datamodule"]["test_transform"]["resize"]
+            == 512
+        )
+        assert self.ensemble_fovea.config["datamodule"]["test_transform"][
+            "contrast_enhance"
+        ]
+        assert self.ensemble_discedge.config["datamodule"]["test_transform"][
             "contrast_enhance"
         ]
 
-        images = ImageInstance.by_ids(self.session, image_ids)
-        items = [(iid, image.path) for iid, image in images.items()]
+        self.resize = 512
+        self.apply_ce = True
 
-        # Create pipeline instance
-        pipeline = CFIKeypointsPipeline(
-            ensemble_fovea=ensemble_fovea,
-            ensemble_discedge=ensemble_discedge,
-            device=device,
-            resize=resize,
-            apply_ce=apply_ce,
+    def preprocess(self, image_path: PathLike[str]) -> Tuple[Any, np.ndarray]:
+        """Preprocess image for keypoint detection."""
+        return preprocess_image(image_path, resize=self.resize, apply_ce=self.apply_ce)
+
+    def process_batch(
+        self, prep_batch: List[Tuple[Any, np.ndarray]]
+    ) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
+        """Process batch with two ensembles (fovea and disc edge)."""
+        x_in = self._prepare_torch_batch(prep_batch)
+
+        fovea_heatmap = self._run_torch_forward(x_in, self.ensemble_fovea.forward)
+        disc_edge_heatmap = self._run_torch_forward(
+            x_in, self.ensemble_discedge.forward
         )
 
-        mpi = MultiProcessInference(
-            items,
-            pipeline=pipeline,
-            n_workers=4,
-            batch_size=8,
-        )
+        # Average over ensemble dimension (axis=1) to get (batch_size, _, h, w)
+        fovea_heatmap = fovea_heatmap.mean(axis=1)
+        disc_edge_heatmap = disc_edge_heatmap.mean(axis=1)
 
-        for iid, (fovea_xy, disc_edge_xy) in tqdm(
-            mpi.run(),
-            total=len(image_ids),
-        ):
-            value = {
-                "fovea_xy": fovea_xy,
-                "disc_edge_xy": disc_edge_xy,
-            }
-            AttributeValue.upsert(
-                self.session,
-                match_by={
-                    "AttributeID": self.attr_definition.AttributeID,
-                    "ModelID": self.model.ModelID,
-                    "ImageInstanceID": iid,
-                },
-                update_values={"ValueJSON": value},
-            )
+        return zip(fovea_heatmap, disc_edge_heatmap)
+
+    def postprocess(
+        self,
+        prep_item: Tuple[Any, np.ndarray],
+        batch_output: Tuple[np.ndarray, np.ndarray],
+    ) -> dict:
+        """Extract coordinates from heatmaps and return as dictionary."""
+        fovea_heatmap, disc_edge_heatmap = batch_output
+        T, _ = prep_item
+        return {
+            "fovea_xy": get_coordinate(T, fovea_heatmap),
+            "disc_edge_xy": get_coordinate(T, disc_edge_heatmap),
+        }
