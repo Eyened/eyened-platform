@@ -124,7 +124,7 @@ def run_models(env, model, path, device, batch_size, n_workers, overwrite):
 
                 if not image_ids:
                     print("No images to process")
-                    return
+                    continue
 
                 # Run inference
                 pipeline.run(image_ids)
@@ -435,7 +435,6 @@ def run_cfi_amd(env, path, device, skip_existing, max_workers, batch_size):
         # Get dimensions from model output (avoids depending on any ORM-loaded image data)
         any_key = next(k for k in result.keys() if k != "bounds")
         h, w = result[any_key].shape
-        print(any_key, h, w)
 
         for feature_name, model_id in model_id_by_feature.items():
             m = get_model_segmentation(instance_id, model_id, h=h, w=w)
