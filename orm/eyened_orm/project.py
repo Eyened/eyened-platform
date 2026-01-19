@@ -4,7 +4,16 @@ from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
 import pandas as pd
-from sqlalchemy import Column, ForeignKey, Index, Text, String, select, Enum as SAEnum, func
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    Index,
+    Text,
+    String,
+    select,
+    Enum as SAEnum,
+    func,
+)
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
@@ -19,7 +28,6 @@ class ExternalEnum(enum.Enum):
     M = "M"
 
 
-
 class Project(Base):
     """Projects group patients and images; hold metadata and contact."""
 
@@ -27,9 +35,7 @@ class Project(Base):
 
     _name_column: ClassVar[str] = "ProjectName"
 
-    __table_args__ = (
-        Index("fk_Project_Contact1_idx", "ContactID"),
-    )
+    __table_args__ = (Index("fk_Project_Contact1_idx", "ContactID"),)
 
     ProjectID: Mapped[int] = mapped_column(primary_key=True)
     ProjectName: Mapped[str] = mapped_column(String(255), unique=True)
@@ -40,11 +46,12 @@ class Project(Base):
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    Contact: Mapped[Optional["Contact"]] = relationship("eyened_orm.project.Contact", back_populates="Projects")
+    Contact: Mapped[Optional["Contact"]] = relationship(
+        "eyened_orm.project.Contact", back_populates="Projects"
+    )
 
     Patients: Mapped[List["Patient"]] = relationship(
-        "eyened_orm.patient.Patient",
-        back_populates="Project", passive_deletes=True
+        "eyened_orm.patient.Patient", back_populates="Project", passive_deletes=True
     )
 
     def make_dataframe(self, session: Session) -> pd.DataFrame:
@@ -63,6 +70,25 @@ class Project(Base):
         image_ids = [im.ImageInstanceID for im in images]
 
         return ImageInstance.make_dataframe(session, image_ids)
+
+    def get_images(
+        self, include_inactive=False, where=None
+    ) -> List["ImageInstance"]:
+        from eyened_orm import ImageInstance, Series, Study, Patient
+
+        session = Session.object_session(self)
+        q = (
+            select(ImageInstance)
+            .join(Series)
+            .join(Study)
+            .join(Patient)
+            .where(Patient.ProjectID == self.ProjectID)
+        )
+        if not include_inactive:
+            q = q.where(~ImageInstance.Inactive)
+        if where is not None:
+            q = q.where(where)
+        return session.scalars(q).all()
 
     def get_patient_by_identifier(
         self, session: Session, patient_identifier: string
@@ -91,5 +117,9 @@ class Contact(Base):
     Institute: Mapped[Optional[str]] = mapped_column(String(255))
     Orcid: Mapped[Optional[str]] = mapped_column(String(255))
 
-    Projects: Mapped[List["Project"]] = relationship("eyened_orm.project.Project", back_populates="Contact")
-    Tasks: Mapped[List["Task"]] = relationship("eyened_orm.task.Task", back_populates="Contact")
+    Projects: Mapped[List["Project"]] = relationship(
+        "eyened_orm.project.Project", back_populates="Contact"
+    )
+    Tasks: Mapped[List["Task"]] = relationship(
+        "eyened_orm.task.Task", back_populates="Contact"
+    )

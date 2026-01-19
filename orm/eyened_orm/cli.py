@@ -1,6 +1,4 @@
-from functools import lru_cache
 import yaml
-from pathlib import Path
 import click
 import random
 import string
@@ -11,8 +9,8 @@ from .utils.config import (
     DatabaseSettings,
     load_config,
 )
-from eyened_orm import Database
-from dotenv import load_dotenv
+from .commands.model_processing import model_commands
+from .commands.shared import get_database
 
 """
 Command utilities for the eyened ORM.
@@ -20,32 +18,27 @@ Command utilities for the eyened ORM.
 The following commands are available:
 - database-mirror: Mirror the entire source database into the target database via a streaming pipe.
 - update-thumbnails: Update thumbnails for all images in the database.
-- run-models: Run inference models on the database.
-- run-odfd-model: Run ODFD model to estimate distance from fovea to optic disc border.
+- run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
+- run-etdrs-model: Run ETDRS model processing on segmentations.
+- run-cfi-amd: Run CFI AMD segmentation models.
+- run-registration: Run image registration for patients or projects.
 - validate-forms: Validate form annotations and schemas in the database.
 - zarr-tree: Display the structure of the zarr store, showing groups and array shapes.
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
-- run-registration: Run image registration for patients or projects.
 - load-dump: Load a database dump file, replacing the entire database.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
 
 
-def get_database(env):
-    load_dotenv(env)
-    database = Database(env)
-    db_config = database.config.database
-    print(
-        f"Connected to database {db_config.database} on {db_config.host}:{db_config.port}"
-    )
-    return database
-
-
 @click.group(name="eorm")
 def eorm():
     pass
+
+
+for command in model_commands:
+    eorm.add_command(command)
 
 
 def transfer_db(config_file):
@@ -151,69 +144,6 @@ def update_thumbnails(env, failed, print_errors):
     with database.get_session() as session:
         images = get_missing_thumbnail_images(session, failed)
         update_thumbnails(session, images, print_errors=print_errors)
-
-
-@eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option("-d", "--device", type=str, default=None)
-def run_models(env, device):
-    import torch
-    import tempfile
-
-    from eyened_orm.inference.inference import run_inference
-    from eyened_orm.inference.utils import auto_device
-
-    database = get_database(env)
-    with database.get_session() as session:
-        if device is None:
-            device = auto_device()
-        else:
-            device = torch.device(device)
-
-        cfi_cache_path = config.cfi_cache_path
-        if cfi_cache_path is None:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                cfi_cache_path = Path(temp_dir)
-                config.cfi_cache_path = cfi_cache_path
-
-                print(f"Using temporary cfi_cache_path: {cfi_cache_path}")
-
-        else:
-            print(f"Running inference with cfi_cache_path: {cfi_cache_path}")
-        run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
-
-
-@eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option("-d", "--device", type=str, default=None)
-@click.option("-b", "--batch-size", type=int, default=8)
-@click.option(
-    "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
-)
-@click.option(
-    "-m",
-    "--model-version",
-    type=str,
-    required=True,
-    help="Version of the model",
-    default="odfd_march25",
-)
-@click.option(
-    "-s",
-    "--skip-existing",
-    is_flag=True,
-    default=True,
-    help="Skip existing attribute values",
-)
-def run_odfd_model(env, device, batch_size, path, model_version, skip_existing):
-    from eyened_orm.inference.odfd import run_odfd_model
-
-    database = get_database(env)
-    run_odfd_model(database, device, batch_size, path, model_version, skip_existing)
 
 
 @eorm.command()
@@ -422,95 +352,6 @@ def update_hashes(env, print_errors):
     "-e", "--env", type=str, help="Path to .env file for environment configuration"
 )
 @click.option(
-    "--patient",
-    type=str,
-    required=False,
-    help="Patient identifier to run registration for",
-)
-@click.option(
-    "--project", type=int, required=False, help="Project ID to run registration for"
-)
-@click.option(
-    "--schema",
-    type=str,
-    required=False,
-    default="RegistrationSet",
-    help="SchemaName to run registration for",
-)
-@click.option(
-    "--creator",
-    type=str,
-    required=False,
-    default="registration model",
-    help="CreatorName to run registration for",
-)
-@click.option(
-    "--replace",
-    is_flag=True,
-    required=False,
-    default=False,
-    help="Replace existing registration",
-)
-@click.option(
-    "--skip",
-    type=str,
-    required=False,
-    help="Comma-separated list of ImageInstanceIDs to skip during registration (e.g. --skip 1811325,1811324,1811323)",
-)
-def run_registration(env, patient, project, schema, creator, replace, skip):
-    from eyened_orm import Patient, FormSchema, Creator
-    from eyened_orm.utils.registration import run_patient
-    import json
-    from pathlib import Path
-
-    # Parse skip list from comma-separated string
-    skip_ids = None
-    if skip:
-        try:
-            skip_ids = [int(id.strip()) for id in skip.split(",") if id.strip()]
-            print(f"Skipping {len(skip_ids)} imageInstanceIDs: {skip_ids}")
-        except ValueError as e:
-            print(f"Error parsing skip list: {e}. Expected comma-separated integers.")
-            return
-
-    database = get_database(env)
-    with database.get_session() as session:
-
-        # Get or create schema - load JSON file if creating
-        schema_name = schema
-        schema_path = Path(__file__).parent / "utils" / "registration_schema.json"
-        with open(schema_path, "r") as f:
-            schema_dict = json.load(f)
-        schema = FormSchema.get_or_create(
-            session,
-            match_by={"SchemaName": schema_name},
-            create_kwargs={"SchemaName": schema_name, "Schema": schema_dict},
-            verbose=True,
-        )
-
-        # Get or create creator
-        creator_name = creator
-        creator = Creator.get_or_create(
-            session,
-            match_by={"CreatorName": creator_name},
-            create_kwargs={"CreatorName": creator_name, "IsHuman": True},
-            verbose=True,
-        )
-        if patient:
-            patients = Patient.by_column(session, PatientIdentifier=patient)
-        elif project:
-            patients = Patient.by_column(session, ProjectID=project)
-        else:
-            raise ValueError("No patient or project provided")
-        for patient in patients:
-            run_patient(session, patient, schema, creator, replace, skip_ids)
-
-
-@eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
     "--dump-path",
     "-d",
     type=click.Path(exists=True),
@@ -573,130 +414,3 @@ def load_dump(env, dump_path):
             return
 
     print("\nDatabase dump loaded successfully!")
-
-
-@eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
-    "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
-)
-@click.option(
-    "-s",
-    "--segmentation-model-id",
-    type=int,
-    help="ID of the segmentation model",
-    required=True,
-)
-@click.option(
-    "--keypoints-model-name",
-    type=str,
-    help="Name of the keypoints model",
-    default="cf_keypoints_legacy",
-)
-@click.option(
-    "--keypoints-model-version",
-    type=str,
-    help="Version of the keypoints model",
-    default="1.0",
-)
-@click.option(
-    "--odfd-model-name",
-    type=str,
-    help="Name of the odfd model",
-    default="ODFD",
-)
-@click.option(
-    "--odfd-model-version",
-    type=str,
-    help="Version of the odfd model",
-    default="odfd_march25",
-)
-@click.option(
-    "--skip-existing",
-    is_flag=True,
-    default=True,
-    help="Skip existing attribute values",
-)
-def run_etdrs_model(
-    env,
-    path,
-    segmentation_model_id,
-    keypoints_model_name,
-    keypoints_model_version,
-    odfd_model_name,
-    odfd_model_version,
-    skip_existing,
-):
-    from eyened_orm import AttributeValue, AttributesModel, ModelSegmentation
-    from eyened_orm.reports.etdrs_model import ETDRSModelProcessor
-
-    with open(path, "r") as f:
-        selected_images = {int(line.strip()) for line in f.readlines()}
-
-    database = get_database(env)
-    session = database.create_session()
-
-
-    processor = ETDRSModelProcessor(session)
-    if skip_existing:
-        existing_ids = processor.get_processed_image_ids(segmentation_model_id, selected_images)
-        print(f"Skipping {len(existing_ids)} existing images")
-        selected_images = selected_images - existing_ids
-    print(f"Running on {len(selected_images)} images")
-    
-
-    kpts_model = AttributesModel.by_column(
-        session, ModelName=keypoints_model_name, Version=keypoints_model_version
-    )
-    if kpts_model is None:
-        raise ValueError(
-            f"Keypoints model {keypoints_model_name} version {keypoints_model_version} not found"
-        )
-
-    odfd_model = AttributesModel.by_column(
-        session, ModelName=odfd_model_name, Version=odfd_model_version
-    )
-    if odfd_model is None:
-        raise ValueError(
-            f"ODFD model {odfd_model_name} version {odfd_model_version} not found"
-        )
-
-    kpts = {
-        av.ImageInstanceID: av
-        for av in AttributeValue.by_columns(
-            session,
-            ModelID=kpts_model.ModelID,
-            ImageInstanceID=selected_images,
-        )
-    }
-
-    odfds = {
-        av.ImageInstanceID: av
-        for av in AttributeValue.by_columns(
-            session,
-            ModelID=odfd_model.ModelID,
-            ImageInstanceID=selected_images,
-        )
-    }
-
-
-    all_segmentations = ModelSegmentation.by_columns(
-        session, ModelID=segmentation_model_id, ImageInstanceID=selected_images
-    )
-    print(f"Found {len(all_segmentations)} segmentations")
-
-
-    for segmentation in tqdm(all_segmentations):
-        instance_id = segmentation.ImageInstanceID
-        try:
-            keypoints = kpts[instance_id]
-            odfd = odfds[instance_id]
-            av = processor.process(segmentation, keypoints, odfd)
-            session.commit()
-        except Exception as e:
-            print(f"Error processing instance {instance_id}: {e}")
-
-    session.close()
-    print("ETDRS model processing completed successfully!")
