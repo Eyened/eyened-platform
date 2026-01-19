@@ -1,0 +1,216 @@
+{
+        "$id": "referable_glaucoma_grading_justification",
+        "type": "object",
+        "$defs": {
+            "icd_code": {
+                "enum": [
+                    "362.56: cellophane maculopathy",
+                    "363.88: nevus choroidea",
+                    "377.01: peripapillary atrophy",
+                    "377.28: myopic peripapillary atrophy",
+                    "362.57: puckering",
+                    "014.25: laser photocoagulation chorioretinal",
+                    "360.21: myopic macular changes",
+                    "379.24: mouches volantes, vitreous floaters",
+                    "379.22: asteroid hyalosis/synch. scintillans",
+                    "363.30: chorioretinal scar",
+                    "377.27: tilted disc",
+                    "362.54: macular (pseudo) hole",
+                    "362.12: exudate hard",
+                    "362.86: hemorrhages flame",
+                    "343.81: myelinated nerve fibres",
+                    "362.83: cotton wool spots (also mac. edema)",
+                    "377.42: disc hemorrhage",
+                    "362.00: diabetes mellitus",
+                    "362.31: central retinal artery occlusion",
+                    "362.35: central retinal vein occlusion",
+                    "362.32: branch retinal artery occlusion",
+                    "362.36: branch retinal vein occlusion",
+                    "362.14: aneurysmata micro",
+                    "362.17: aneurysmata macro",
+                    "377.00: papilledema",
+                    "377.21: optic disc drusen",
+                    "377.22: optic disc pit",
+                    "372.40: pterygium",
+                    "362.37: preocclusion retinal vein",
+                    "377.10: optic atrophy",
+                    "362.03: diabetes retinopathy",
+                    "377.41: ischemic optic neuropathy",
+                    "363.20: chorioretinitis",
+                    "053.21: herpes zoster infection",
+                    "173.10: tumor, malignant",
+                    "011.60: corneal transplant unspec.",
+                    "379.23: vitreous hemorrage",
+                    "239.21: tumor",
+                    "000.00: remarks"
+                ],
+                "type": "string"
+            },
+            "yes_questionable_no_cannot_grade_enum": {
+                "enum": [
+                    "No",
+                    "Yes",
+                    "Questionable",
+                    "Cannot grade"
+                ],
+                "type": "string"
+            }
+        },
+        "allOf": [
+            {
+                "if": {
+                    "type": "object",
+                    "properties": {
+                        "photo_quality": {
+                            "enum": [
+                                "Good",
+                                "Fair, bad photo",
+                                "Fair, cataract",
+                                "Fair, poor mydriasis"
+                            ]
+                        }
+                    }
+                },
+                "else": {
+                    "type": "object",
+                    "properties": {
+                        "referable_glaucoma": false
+                    }
+                },
+                "then": {
+                    "required": [
+                        "referable_glaucoma"
+                    ]
+                },
+                "type": "object",
+                "description": "If photo_quality is gradable, then referable_glaucoma is required, otherwise referable_glaucoma should be absent"
+            },
+            {
+                "if": {
+                    "type": "object",
+                    "required": [
+                        "referable_glaucoma"
+                    ],
+                    "properties": {
+                        "referable_glaucoma": {
+                            "enum": [
+                                "Yes",
+                                "Questionable"
+                            ]
+                        }
+                    }
+                },
+                "then": {
+                    "required": [
+                        "referable_glaucoma",
+                        "ANRI",
+                        "ARNS",
+                        "BCLVI",
+                        "BCLVS",
+                        "DH",
+                        "LC",
+                        "LD",
+                        "NVT",
+                        "RNFLDI",
+                        "RNFLDS"
+                    ]
+                },
+                "description": "Features required if referable_glaucoma is Yes or Questionable"
+            }
+        ],
+        "title": "Referable Glaucoma grading",
+        "_order": [
+            "photo_quality",
+            "referable_glaucoma",
+            "ANRI",
+            "ARNS",
+            "BCLVI",
+            "BCLVS",
+            "DH",
+            "LC",
+            "LD",
+            "NVT",
+            "RNFLDI",
+            "RNFLDS",
+            "other_observations",
+            "remarks"
+        ],
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "required": [
+            "photo_quality"
+        ],
+        "properties": {
+            "remarks": {
+                "type": "string",
+                "description": "Remarks"
+            },
+            "photo_quality": {
+                "enum": [
+                    "Good",
+                    "Fair, bad photo",
+                    "Fair, cataract",
+                    "Fair, poor mydriasis",
+                    "Fair, optic nerve head partially visible",
+                    "Cannot grade, bad photo",
+                    "Cannot grade, cataract",
+                    "Cannot grade, poor mydriasis",
+                    "Cannot grade, optic nerve head not visible"
+                ],
+                "type": "string",
+                "description": "Photoquality"
+            },
+            "referable_glaucoma": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Referable glaucoma"
+            },
+            "ANRI": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Appearance neuroretinal rim inferiorly"
+            },
+            "ARNS": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Appearance neuroretinal rim superiorly"
+            },
+            "BCLVI": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Baring of the circumlinear vessel inferiorly"
+            },
+            "BCLVS": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Baring of the circulinear vessel superiorly"
+            },
+            "DH": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Disc hemorrhage"
+            },
+            "LC": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Large cup"
+            },
+            "LD": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Laminar dots"
+            },
+            "NVT": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Nasalization (nasal displacement) of the vessel trunk"
+            },
+            "RNFLDI": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Retinal nerve fiber layer defect inferiorly"
+            },
+            "RNFLDS": {
+                "$ref": "#/$defs/yes_questionable_no_cannot_grade_enum",
+                "description": "Retinal nerve fiber layer defect superiorly"
+            },
+            "other_observations": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/$defs/icd_code",
+                    "title": "Other observations"
+                },
+                "description": "Other observations (ICD codes)"
+            }
+        },
+        "description": "Schema for a Referable Glaucoma grading"
+    }
