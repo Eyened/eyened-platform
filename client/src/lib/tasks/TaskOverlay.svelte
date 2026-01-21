@@ -8,9 +8,7 @@
 	import ChevronRight from "@lucide/svelte/icons/chevron-right";
 	import { toast } from "svelte-sonner";
 	import { subTaskStates } from "../../types/openapi_constants";
-	import type {
-		SubTaskState
-	} from "../../types/openapi_types";
+	import type { SubTaskState } from "../../types/openapi_types";
 	import type { TaskContext } from "./TaskContext.svelte";
 	import { TaskNavigation } from "./taskUtils.svelte";
 
@@ -21,10 +19,18 @@
 	let { taskContext }: Props = $props();
 
 	const navigation = new TaskNavigation(taskContext);
-    const { task, subTask, subTaskIndex } = taskContext;
+	const subTask = $derived(taskContext.subTask);
+	const task = $derived(taskContext.task);
+	const subTaskIndex = $derived(taskContext.subTaskIndex);
+	let isUpdatingState = $state(false);
 
 	async function setState(state: SubTaskState) {
-		await updateSubTask(subTask.id, { task_state: state });
+		isUpdatingState = true;
+		try {
+			await updateSubTask(subTask.id, { task_state: state });
+		} finally {
+			isUpdatingState = false;
+		}
 	}
 
 	async function handleViewTask() {
@@ -76,20 +82,22 @@
 			</ButtonGroup>
 		</div>
 		<div class="controls">
-			<ButtonGroup orientation="horizontal">
-				{#each subTaskStates as state}
-					{@const isActive = subTask.task_state === state}
-					<Button
-						variant={isActive ? "default" : "outline"}
-						size="sm"
-						onclick={() => !isActive && setState(state)}
-						aria-current={isActive ? "true" : "false"}
-						class={isActive ? "font-semibold" : ""}
-					>
-						{state}
-					</Button>
-				{/each}
-			</ButtonGroup>
+			<div class:busy={isUpdatingState} aria-busy={isUpdatingState}>
+				<ButtonGroup orientation="horizontal">
+					{#each subTaskStates as state}
+						{@const isActive = subTask.task_state === state}
+						<Button
+							variant={isActive ? "default" : "outline"}
+							size="sm"
+							onclick={() => !isActive && setState(state)}
+							aria-current="isActive"
+							class={isActive ? "font-semibold" : ""}
+						>
+							{state}
+						</Button>
+					{/each}
+				</ButtonGroup>
+			</div>
 		</div>
 
 		<div class="comments">
@@ -140,6 +148,11 @@
 		margin: 1em;
 		align-items: center;
 		justify-content: center;
+	}
+	.busy {
+		opacity: 0.6;
+		pointer-events: none;
+		cursor: wait;
 	}
 	div.comments {
 		display: flex;
