@@ -199,7 +199,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         )
         yield from mpi.run()
 
-    def run(self, image_ids: Iterable[int]) -> None:
+    def run(self, image_ids: Iterable[int], commit_interval: int = 100) -> None:
         """Run inference on a list of image IDs and save results.
 
         Args:
@@ -208,10 +208,13 @@ class AttributeInferencePipeline(BaseInferencePipeline):
 
         # Process results
         image_ids_set = set(image_ids)
-        for image_id, result in tqdm(
+        for i, (image_id, result) in enumerate(tqdm(
             self.process(image_ids_set), total=len(image_ids_set)
-        ):
+        )):
+            if i % commit_interval == 0:
+                self.session.commit()
             if result is None:
                 print(f"Image {image_id} failed to process")
                 continue
             self._save_result(image_id, result)
+        self.session.commit()

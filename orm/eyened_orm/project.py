@@ -58,16 +58,16 @@ class Project(Base):
         """Return a dataframe of all images in the project."""
         from eyened_orm import ImageInstance, Patient, Series, Study
 
-        images = session.execute(
-            select(ImageInstance)
-            .select_from(ImageInstance)
-            .join(Series)
-            .join(Study)
-            .join(Patient)
-            .where(Patient.ProjectID == self.ProjectID)
-        ).all()
-
-        image_ids = [im.ImageInstanceID for im in images]
+        image_ids = list(
+            session.scalars(
+                select(ImageInstance.ImageInstanceID)
+                .select_from(ImageInstance)
+                .join(Series)
+                .join(Study)
+                .join(Patient)
+                .where(Patient.ProjectID == self.ProjectID)
+            )
+        )
 
         return ImageInstance.make_dataframe(session, image_ids)
 
