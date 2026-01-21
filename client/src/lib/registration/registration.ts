@@ -51,20 +51,13 @@ export class Registration {
         this.cache.set(source, position);
     }
 
-    getPosition(image_id: string): Position | undefined {
-        
-        if (this.cache.has(image_id)) {
-            return this.cache.get(image_id);
-        }
-        
-        const source = this.pointer.image_id;
-        const target = image_id;
-        let path = this.shortestPaths[source]?.[target];
+    private mapPositionAlongPath(source: string, target: string, startPosition: Position): Position | undefined {
+        const path = this.shortestPaths[source]?.[target];
         if (!path) {
             return;
         }
         let current = source;
-        let currentPosition: Position | undefined = this.pointer.position;
+        let currentPosition: Position | undefined = startPosition;
         for (let i = 1; i < path.length; i++) {
             const next = path[i];
             const func = this.mappings.get(current, next);
@@ -78,7 +71,21 @@ export class Registration {
             }
             current = next;
         }
-        this.cache.set(image_id, currentPosition);
+        return currentPosition;
+    }
+
+    getPosition(image_id: string): Position | undefined {
+        
+        if (this.cache.has(image_id)) {
+            return this.cache.get(image_id);
+        }
+        
+        const source = this.pointer.image_id;
+        const target = image_id;
+        const currentPosition = this.mapPositionAlongPath(source, target, this.pointer.position);
+        if (currentPosition !== undefined) {
+            this.cache.set(image_id, currentPosition);
+        }
         return currentPosition;
     }
 
@@ -132,7 +139,7 @@ export class Registration {
         if (source == target) {
             return position;
         }
-        return this.mappings.get(source, target)?.(position);
+        return this.mapPositionAlongPath(source, target, position);
     }
 
 
