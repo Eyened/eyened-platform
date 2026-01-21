@@ -3,9 +3,7 @@
 	import { Button } from "$lib/components/ui/button";
 	import * as Input from "$lib/components/ui/input";
 	import * as Table from "$lib/components/ui/table";
-	import type {
-		SubTaskWithImagesGET,
-	} from "../../types/openapi_types";
+	import type { SubTaskWithImagesGET } from "../../types/openapi_types";
 	import { toast } from "svelte-sonner";
 	import {
 		addSubTaskImage,
@@ -16,10 +14,8 @@
 	type Props = {
 		subtask: SubTaskWithImagesGET;
 		taskId: number;
-		index: number;
-		start: number;
 	};
-	let { subtask, taskId, index, start }: Props = $props();
+	let { subtask, taskId }: Props = $props();
 
 	const row = $derived(subtask);
 	let newInstanceId = $state<string>("");
@@ -56,11 +52,13 @@
 </script>
 
 <Table.Row>
-	<Table.Cell>{row.id}</Table.Cell>
+	<Table.Cell>
+		<span class="text-xs">{row.id} [{row.index}]</span>
+	</Table.Cell>
 	<Table.Cell>{row.task_state ?? "-"}</Table.Cell>
 	<Table.Cell>
 		<Button
-			href={`/tasks/${taskId}/grade/${index + start}`}
+			href={`/tasks/${taskId}/grade/${row.index}`}
 			target="_blank"
 			class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
 		>

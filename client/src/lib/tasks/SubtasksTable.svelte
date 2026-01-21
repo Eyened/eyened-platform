@@ -3,11 +3,8 @@
 	import PaginatedResults from "$lib/components/PaginatedResults.svelte";
 	import * as Table from "$lib/components/ui/table";
 	import SubTaskRow from "$lib/tasks/SubTaskRow.svelte";
-	import { getContext, setContext } from "svelte";
-	import type { GlobalContext } from "$lib/data/globalContext.svelte";
-	import type {
-		SubTaskWithImagesGET,
-	} from "../../types/openapi_types";
+	import { setContext } from "svelte";
+	import type { SubTaskWithImagesGET } from "../../types/openapi_types";
 
 	let {
 		rows,
@@ -27,8 +24,6 @@
 
 	const browserContext = new BrowserContext();
 	setContext("browserContext", browserContext);
-
-	const start = $derived(page * perPage);
 </script>
 
 <PaginatedResults {count} {perPage} {page} {onPageChange}>
@@ -44,13 +39,13 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each rows as row, index (row.id)}
-					<SubTaskRow subtask={row} {taskId} {index} {start} />
+				{#each rows as row (row.id)}
+					<SubTaskRow subtask={row} {taskId} />
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan="5" class="h-24 text-center"
-							>No results.</Table.Cell
-						>
+						<Table.Cell colspan="5" class="h-24 text-center">
+							No results.
+						</Table.Cell>
 					</Table.Row>
 				{/each}
 			</Table.Body>
