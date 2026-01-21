@@ -14,12 +14,12 @@ from rtnls_inference import RegressionEnsemble
 class CFI_ODFD(AttributeInferencePipeline):
     """CFI Optic Disc to Fovea Distance estimation pipeline."""
 
-    model_name = "ODFD"
+    model_name = "CFI_ODFD"
     model_version = "odfd_march25"
     model_description = (
         "Estimates the distance from the fovea to optic disc border in pixels"
     )
-    attribute_name = "ODFD"
+    attribute_name = "CFI_ODFD"
     attribute_data_type = AttributeDataType.Float
 
     def __init__(

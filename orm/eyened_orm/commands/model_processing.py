@@ -6,6 +6,7 @@ import click
 
 from eyened_orm.inference.multi_process_inference import MultiProcessInference
 from eyened_orm.inference.utils import auto_device
+from eyened_orm.inference.etdrs_summary import run_etdrs_model
 
 from .shared import get_database
 
@@ -66,7 +67,7 @@ def _get_device(device: str | None):
     "-w",
     "--n-workers",
     type=int,
-    default=8,
+    default=16,
     help="Number of preprocessing worker processes",
 )
 @click.option(
@@ -75,7 +76,13 @@ def _get_device(device: str | None):
     default=False,
     help="Overwrite existing attribute values (skips filtering)",
 )
-def run_models(env, model, path, device, batch_size, n_workers, overwrite):
+@click.option(
+    "--commit-interval",
+    type=int,
+    default=100,
+    help="Commit interval for processing",
+)
+def run_models(env, model, path, device, batch_size, n_workers, overwrite, commit_interval):
     """Run attribute inference models on a set of image IDs.
 
     Supported models:
@@ -127,8 +134,103 @@ def run_models(env, model, path, device, batch_size, n_workers, overwrite):
                     continue
 
                 # Run inference
-                pipeline.run(image_ids)
+                pipeline.run(image_ids, commit_interval=commit_interval)
                 session.commit()
+                print(f"Completed processing {len(image_ids)} images")
+
+
+@click.command(name="run-segmentation")
+@click.option(
+    "-e",
+    "--env",
+    type=str,
+    help="Path to .env file for environment configuration",
+)
+@click.option(
+    "-m",
+    "--model",
+    type=click.Choice(["cfi-amd"], case_sensitive=False),
+    required=False,
+    help="Segmentation model to run (if not specified, runs all models)",
+)
+@click.option(
+    "-p",
+    "--path",
+    type=str,
+    required=True,
+    help="Path to file containing image IDs (one per line)",
+)
+@click.option(
+    "-d",
+    "--device",
+    type=str,
+    default=None,
+    help="Device to use (e.g., 'cuda:0', 'cpu'). Auto-detected if not provided.",
+)
+@click.option(
+    "-b",
+    "--batch-size",
+    type=int,
+    default=8,
+    help="Batch size for processing",
+)
+@click.option(
+    "-w",
+    "--n-workers",
+    type=int,
+    default=12,
+    help="Number of preprocessing worker processes",
+)
+@click.option(
+    "--skip-existing",
+    is_flag=True,
+    default=True,
+    help="Skip existing segmentations (filters out complete images)",
+)
+def run_segmentation(env, model, path, device, batch_size, n_workers, skip_existing):
+    """Run segmentation inference models on a set of image IDs.
+
+    Supported models:
+    - cfi-amd: CFI AMD segmentation (drusen, RPD, hyperpigmentation, RPE degeneration)
+    """
+    database = get_database(env)
+
+    # Load image IDs
+    image_ids = _load_image_ids(path)
+    print(f"Loaded {len(image_ids)} image IDs from {path}")
+
+    device_obj = _get_device(device)
+
+    from eyened_orm.inference.cfi_amd import CFI_AMD
+
+    models = {
+        "cfi-amd": CFI_AMD,
+    }
+
+    with database.get_session() as session:
+        for model_name, model_class in models.items():
+            if model == model_name or model is None:
+                print(f"Running {model_name}")
+                pipeline = model_class(
+                    session,
+                    device=device_obj,
+                    n_workers=n_workers,
+                    batch_size=batch_size,
+                )
+
+                # Filter existing results unless skip_existing is disabled
+                if skip_existing:
+                    image_ids = pipeline.filter_image_ids(image_ids)
+                    print(
+                        f"Processing {len(image_ids)} images (after filtering existing)"
+                    )
+
+                if not image_ids:
+                    print("No images to process")
+                    continue
+
+                # Run inference
+                pipeline.run(image_ids)
                 print(f"Completed processing {len(image_ids)} images")
 
 
@@ -163,144 +265,6 @@ def run_models(env, model, path, device, batch_size, n_workers, overwrite):
 #         else:
 #             print(f"Running inference with cfi_cache_path: {cfi_cache_path}")
 #         run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
-
-
-@click.command(name="run-etdrs-model")
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
-    "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
-)
-@click.option(
-    "-s",
-    "--segmentation-model-id",
-    type=int,
-    help="ID of the segmentation model",
-    required=True,
-)
-@click.option(
-    "--keypoints-model-name",
-    type=str,
-    help="Name of the keypoints model",
-    default="cf_keypoints_legacy",
-)
-@click.option(
-    "--keypoints-model-version",
-    type=str,
-    help="Version of the keypoints model",
-    default="1.0",
-)
-@click.option(
-    "--odfd-model-name",
-    type=str,
-    help="Name of the odfd model",
-    default="ODFD",
-)
-@click.option(
-    "--odfd-model-version",
-    type=str,
-    help="Version of the odfd model",
-    default="odfd_march25",
-)
-@click.option(
-    "--overwrite",
-    is_flag=True,
-    default=False,
-    help="Overwrite existing attribute values",
-)
-def run_etdrs_model(
-    env,
-    path,
-    segmentation_model_id,
-    keypoints_model_name,
-    keypoints_model_version,
-    odfd_model_name,
-    odfd_model_version,
-    overwrite,
-):
-    """Run ETDRS model processing on segmentations."""
-    from eyened_orm import AttributeValue, AttributesModel, ModelSegmentation
-    from eyened_orm.reports.etdrs_model import ETDRSModelProcessor
-    from tqdm import tqdm
-
-    with open(path, "r") as f:
-        selected_images = {int(line.strip()) for line in f.readlines()}
-
-    database = get_database(env)
-    session = database.create_session()
-
-    processor = ETDRSModelProcessor(session)
-    if not overwrite:
-        existing_ids = processor.get_processed_image_ids(
-            segmentation_model_id, selected_images
-        )
-        print(f"Skipping {len(existing_ids)} existing images")
-        selected_images = selected_images - existing_ids
-
-    empty_segmentations = ModelSegmentation.select(
-        session,
-        "ImageInstanceID",
-        ModelID=segmentation_model_id,
-        ZarrArrayIndex=None,
-        ImageInstanceID=selected_images,
-    )
-    print(f"skipping {len(empty_segmentations)} empty segmentations")
-    selected_images = selected_images - set(empty_segmentations)
-
-    print(f"Running on {len(selected_images)} images")
-
-    kpts_model = AttributesModel.by_column(
-        session, ModelName=keypoints_model_name, Version=keypoints_model_version
-    )
-    if kpts_model is None:
-        raise ValueError(
-            f"Keypoints model {keypoints_model_name} version {keypoints_model_version} not found"
-        )
-
-    odfd_model = AttributesModel.by_column(
-        session, ModelName=odfd_model_name, Version=odfd_model_version
-    )
-    if odfd_model is None:
-        raise ValueError(
-            f"ODFD model {odfd_model_name} version {odfd_model_version} not found"
-        )
-
-    kpts = {
-        av.ImageInstanceID: av
-        for av in AttributeValue.by_columns(
-            session,
-            ModelID=kpts_model.ModelID,
-            ImageInstanceID=selected_images,
-        )
-    }
-
-    odfds = {
-        av.ImageInstanceID: av
-        for av in AttributeValue.by_columns(
-            session,
-            ModelID=odfd_model.ModelID,
-            ImageInstanceID=selected_images,
-        )
-    }
-
-    all_segmentations = ModelSegmentation.by_columns(
-        session, ModelID=segmentation_model_id, ImageInstanceID=selected_images
-    )
-    print(f"Found {len(all_segmentations)} segmentations")
-
-    for segmentation in tqdm(all_segmentations):
-        instance_id = segmentation.ImageInstanceID
-        try:
-            keypoints = kpts[instance_id]
-            odfd = odfds[instance_id]
-            processor.process(segmentation, keypoints, odfd)
-            session.commit()
-        except Exception as e:
-            print(f"Error processing instance {instance_id}: {e}")
-
-    session.close()
-    print("ETDRS model processing completed successfully!")
 
 
 @click.command(name="run-cfi-amd")

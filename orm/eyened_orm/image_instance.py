@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
+import pandas as pd
 import pydicom
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
@@ -435,6 +436,12 @@ class ImageInstance(Base):
         :return: list of annotations
         """
         return [a for a in self.Annotations if a.CreatorID == creator.CreatorID]
+
+    @classmethod
+    def make_dataframe(cls, session: Session, image_ids: List[int]) -> pd.DataFrame:
+        """Make a dataframe of image instances"""
+        images = cls.by_ids(session, image_ids)
+        return pd.DataFrame([im.to_dict() for im in images.values()])
 
     def make_tag(
         self,
