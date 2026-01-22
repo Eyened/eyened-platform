@@ -16,7 +16,7 @@ class StudyBase(Base):
     PatientID: int = Field(foreign_key="Patient.PatientID")
     StudyRound: int | None 
     StudyDescription: str | None = Field(max_length=64, default=None)
-    StudyInstanceUid: str | None = Field(max_length=64, unique=True, default=None)
+    #StudyInstanceUid: str | None = Field(max_length=64, unique=True, default=None)
     StudyDate: datetime.date
 
 class Study(StudyBase, table=True):
@@ -41,9 +41,9 @@ class Study(StudyBase, table=True):
     Annotations: List["Annotation"] = Relationship(back_populates="Study")
     FormAnnotations: List["FormAnnotation"] = Relationship(back_populates="Study")
     
-    @classmethod
-    def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
-        return cls.by_column(session, "StudyInstanceUid", StudyInstanceUid)
+    # @classmethod
+    # def by_uid(cls, session: Session, StudyInstanceUid: str) -> Optional["Study"]:
+    #     return cls.by_column(session, "StudyInstanceUid", StudyInstanceUid)
 
     @classmethod
     def by_patient_and_date(
