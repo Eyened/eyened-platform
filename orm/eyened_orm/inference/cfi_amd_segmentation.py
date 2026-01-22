@@ -82,7 +82,7 @@ class CFI_AMD(BaseInferencePipeline):
             output_key: SegmentationModel.get_or_create(
                 session,
                 match_by={
-                    "FeatureID": self.features[name].FeatureID,
+                    "FeatureID": self.features[output_key].FeatureID,
                     "ModelName": name,
                     "Version": version,
                 },
@@ -251,9 +251,11 @@ class CFI_AMD(BaseInferencePipeline):
         if not image_ids_set:
             return
 
-        # Collect all results from process() and save them
-        results = list(self.process(image_ids_set))
-        for image_id, model, segmentation_array in tqdm(results, total=len(results)):
+        # Stream results from process() and save them as they arrive
+        total = 4 * len(image_ids_set)
+        for image_id, model, segmentation_array in tqdm(
+            self.process(image_ids_set), total=total
+        ):
             if segmentation_array is None:
                 print(f"Image {image_id}, model {model.ModelName} failed to process")
                 continue
