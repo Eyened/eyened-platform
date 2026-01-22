@@ -150,7 +150,7 @@ async def add_subtask_image(
     link = SubTaskImageLink(
         SubTaskID=subtaskid, ImageInstanceID=body.instance_id, ImageIndex=max_index + 1
     )
-    print(link)
+
     try:
         db.add(link)
         db.commit()
