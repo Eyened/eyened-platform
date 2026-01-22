@@ -550,20 +550,57 @@ class DeviceInstance(Base):
         "eyened_orm.image_instance.ImageInstance", back_populates="DeviceInstance"
     )
 
+# NEW SourceInfo Table:
+# 
+# The SourceInfo table is designed to capture metadata about data import sources
+
+from sqlalchemy.orm import validates
 
 class SourceInfo(Base):
+    '''
+    Example usage:
+
+            session.add(SourceInfo(
+            BaseFolder="dicom",
+            SourceName="ERGO Study",
+            ExampleDatasetIdentifier="ergo/TRITON_ERGO/dicom/StudyInstance_1.2.392....dcm"
+            ))
+            session.commit()
+
+            src = session.query(SourceInfo).first()
+            print(src.BasePath)   # ergo/TRITON_ERGO/dicom
+
+    '''
     __tablename__ = "SourceInfo"
-    _name_column: ClassVar[str] = "SourceName"
 
     SourceInfoID: Mapped[int] = mapped_column(primary_key=True)
-    SourceName: Mapped[str] = mapped_column(String(64), unique=True)
-
-    SourcePath: Mapped[str] = mapped_column(String(250), unique=True)
-    ThumbnailPath: Mapped[str] = mapped_column(String(250), unique=True)
+    BaseFolder: Mapped[str] = mapped_column(String(255), nullable=False)
+    SourceName: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    ExampleDatasetIdentifier: Mapped[str] = mapped_column(String(1024), nullable=False)
+    BasePath: Mapped[str] = mapped_column(String(1024), nullable=True)
 
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
-        "eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo"
+        back_populates="SourceInfo"
     )
+
+    @validates("ExampleDatasetIdentifier", "BaseFolder")
+    def _compute_basepath(self, key, value):
+        '''
+        Computes the BasePath based on the ExampleDatasetIdentifier and BaseFolder automatically.
+        '''
+        # assign the incoming value first
+        setattr(self, key, value)
+        if getattr(self, "ExampleDatasetIdentifier", None) and getattr(self, "BaseFolder", None):
+            marker = f"/{self.BaseFolder}/"
+            dataset_id = self.ExampleDatasetIdentifier
+            if marker in dataset_id:
+                self.BasePath = dataset_id.rsplit(marker, 1)[0] + f"/{self.BaseFolder}"
+            else:
+                self.BasePath = None
+        return value
+
+    def __repr__(self) -> str:
+        return f"{self.SourceName}: {self.BasePath}"
 
 
 class ModalityTable(Base):
