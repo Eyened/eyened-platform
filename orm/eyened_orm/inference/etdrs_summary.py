@@ -64,6 +64,8 @@ def run_etdrs_model(
     with open(path, "r") as f:
         selected_images = {int(line.strip()) for line in f.readlines()}
 
+    print(f"Preparing to run ETDRS model on {len(selected_images)} images")
+
     database = get_database(env)
     session = database.create_session()
 
