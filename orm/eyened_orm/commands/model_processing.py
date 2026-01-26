@@ -124,19 +124,19 @@ def run_models(env, model, path, device, batch_size, n_workers, overwrite, commi
 
                 # Filter existing results unless overwrite is enabled
                 if not overwrite:
-                    image_ids = pipeline.filter_image_ids(image_ids)
+                    filtered_image_ids = pipeline.filter_image_ids(image_ids)
                     print(
-                        f"Processing {len(image_ids)} images (after filtering existing)"
+                        f"Processing {len(filtered_image_ids)} images (after filtering existing)"
                     )
 
-                if not image_ids:
+                if not filtered_image_ids:
                     print("No images to process")
                     continue
 
                 # Run inference
-                pipeline.run(image_ids, commit_interval=commit_interval)
+                pipeline.run(filtered_image_ids, commit_interval=commit_interval)
                 session.commit()
-                print(f"Completed processing {len(image_ids)} images")
+                print(f"Completed processing {len(filtered_image_ids)} images")
 
 
 @click.command(name="run-segmentation")
