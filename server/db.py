@@ -1,8 +1,8 @@
 from eyened_orm import Database
-from eyened_orm.utils.config import load_config
 
-config = load_config()
-database = Database(config)
+from server.config import settings
+
+database = Database(settings.to_orm_config())
 
 def get_db():
     with database.get_session() as session:
