@@ -2,52 +2,42 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Mapping, Optional
 
-from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig, load_config
+from eyened_orm.utils.config import Settings, load_settings
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
 
 
-def create_connection_string(config: DatabaseSettings):
-    dbstring = (
-        f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}"
-    )
-    if config.database is not None:
-        dbstring += f"/{config.database}"
-    return dbstring
+def create_connection_string(database):
+    return f"mysql+pymysql://{database.user}:{database.password}@{database.host}:{database.port}/{database.database}"
 
 
 class EyenedSession(Session):
     """Custom session with built-in storage manager and config"""
 
-    def __init__(self, config: EyenedORMConfig, *args, **kwargs):
+    def __init__(self, config: Settings, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config = config
-        
+
     @property
     def storage_manager(self):
-        if not hasattr(self, '_storage_manager'):
-            self._storage_manager = ZarrStorageManager(self.config.segmentations_zarr_store)
+        if not hasattr(self, "_storage_manager"):
+            self._storage_manager = ZarrStorageManager(
+                self.config.segmentations_zarr_store
+            )
         return self._storage_manager
+
 
 class Database:
     """Database connection manager with built-in session and storage management"""
 
-    def __init__(self, config: Optional[EyenedORMConfig | str | Path | Mapping[str, str]] = None):
-        """
-        config: EyenedORMConfig | Path | str
-        if Path, load from .env file
-        if None, initialize with default values (taken from environment variables)
-        """
-        if isinstance(config, EyenedORMConfig):
-            # Already a config object, use as-is
-            pass
+    def __init__(self, *, config: Settings | None = None, env: str | None = None):
+        if config is not None:
+            self.config = config
+        elif env is not None:
+            self.config = load_settings(env)
         else:
-            config = load_config(config)
-            
-            
-
-        self.config = config
+            raise ValueError("Provide either config or env")
 
         conn_string = create_connection_string(self.config.database)
 
