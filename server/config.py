@@ -20,7 +20,7 @@ class Settings(EyenedORMConfig):
     database_root_password: Optional[str] = None
     public_auth_disabled: bool = False
     environment: Literal['development', 'production'] = 'production'
-    db_log_file_path: str = "/var/log/eyened/db_modifications.log"
+    db_log_file_path: str = ""
     db_log_level: int = 20  # logging.INFO
     db_log_max_bytes: int = 10 * 1024 * 1024  # 10MB
     db_log_backup_count: int = 5
@@ -59,7 +59,7 @@ def load_settings(env_file: Optional[str | Path] = None) -> Settings:
         database_root_password=os.getenv("DATABASE_ROOT_PASSWORD"),
         environment=os.getenv("EYENED_ENV", "production"),
         public_auth_disabled=os.getenv("VITE_PUBLIC_AUTH_DISABLED", "0") == "1",
-        db_log_file_path=os.getenv("DB_LOG_FILE_PATH", "/var/log/eyened/db_modifications.log"),
+        db_log_file_path=os.getenv("DB_LOG_FILE_PATH", ""),
         db_log_level=int(os.getenv("DB_LOG_LEVEL", "20")),  # logging.INFO
         db_log_max_bytes=int(os.getenv("DB_LOG_MAX_BYTES", str(10 * 1024 * 1024))),  # 10MB
         db_log_backup_count=int(os.getenv("DB_LOG_BACKUP_COUNT", "5")),
