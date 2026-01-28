@@ -510,7 +510,7 @@ By default segmentation.shape == image.shape. That is:
 - Segmentation.Depth == ImageInstance.NrOfFrames or 1 
 - Segmentation.Height == ImageInstance.Rows_y
 - Segmentation.Width == ImageInstance.Columns_x
-However, if ImageProjectionMatrix is provided, two dimensions may differ. SparseAxis must indicate the dimension that is not modified (0=Depth, 1=Height, 2=Width)
+However, if ImageProjectionMatrix is provided, two dimensions may differ and SparseAxis must indicate the dimension that is not modified (0=Depth, 1=Height, 2=Width). If only a SparseAxis is provided, the dimension in that axis can differ.
 
 SliceIndices is used to indicate which slices along SparseAxis have valid data (e.g. when annotating a subset of B-scans in an OCT volume).
 
