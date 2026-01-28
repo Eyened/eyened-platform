@@ -302,15 +302,15 @@ class SegmentationBase(Base):
         # 2. Check Dimensions
         if self.ImageProjectionMatrix is None:
             # Strict match
-            if self.Depth != img_d and self.SparseAxis is not 0:
+            if self.Depth != img_d and self.SparseAxis != 0:
                 raise ValueError(
                     f"Depth mismatch: Segmentation {self.Depth} != Image {img_d}"
                 )
-            if self.Height != img_h and self.SparseAxis is not 1:
+            if self.Height != img_h and self.SparseAxis != 1:
                 raise ValueError(
                     f"Height mismatch: Segmentation {self.Height} != Image {img_h}"
                 )
-            if self.Width != img_w and self.SparseAxis is not 2:
+            if self.Width != img_w and self.SparseAxis != 2:
                 raise ValueError(
                     f"Width mismatch: Segmentation {self.Width} != Image {img_w}"
                 )
