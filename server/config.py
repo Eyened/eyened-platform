@@ -53,7 +53,6 @@ def load_settings(env_file: Optional[str | Path] = None) -> Settings:
         thumbnails_path=base_config.thumbnails_path,
         annotations_path=base_config.annotations_path,
         default_study_date=base_config.default_study_date,
-        cfi_cache_path=base_config.cfi_cache_path,
         image_server_url=base_config.image_server_url,
         admin_username=os.getenv("ADMIN_USERNAME", ""),
         admin_password=os.getenv("ADMIN_PASSWORD", ""),

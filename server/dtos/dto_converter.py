@@ -257,39 +257,7 @@ class DTOConverter:
             ]
         # Populate attributes
         try:
-            attrs_by_model: dict[str, dict[str, object]] = {}
-            attrs_flat: dict[str, object] = {}
-
-            for av in getattr(image_instance, "AttributeValues", []) or []:
-                attr_def = getattr(av, "AttributeDefinition", None)
-                if not attr_def:
-                    continue
-
-                producing_model = getattr(av, "ProducingModel", None)
-
-                value = None
-                if av.ValueInt is not None:
-                    value = av.ValueInt
-                elif av.ValueFloat is not None:
-                    value = av.ValueFloat
-                elif av.ValueText is not None:
-                    value = av.ValueText
-                elif av.ValueJSON is not None:
-                    value = av.ValueJSON
-
-                if value is None:
-                    continue
-
-                if producing_model:
-                    model_name = producing_model.ModelName
-                    if model_name not in attrs_by_model:
-                        attrs_by_model[model_name] = {}
-                    attrs_by_model[model_name][attr_def.AttributeName] = value
-                else:
-                    attrs_flat[attr_def.AttributeName] = value
-
-            dto.model_attrs = attrs_by_model
-            dto.attrs = attrs_flat
+            dto.attrs, dto.model_attrs = image_instance.attrs
         except Exception:
             # Fail-safe: leave attributes empty if relationships not loaded
             dto.model_attrs = {}

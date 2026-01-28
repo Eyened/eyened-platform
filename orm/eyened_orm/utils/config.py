@@ -24,7 +24,6 @@ class EyenedORMConfig:
     thumbnails_path: Path
     annotations_path: Path
     default_study_date: Optional[date]
-    cfi_cache_path: Optional[Path]
     image_server_url: Optional[str]
 
 
@@ -70,7 +69,6 @@ def load_config_dict_from_env(env: Mapping[str, str]) -> dict:
         "thumbnails_path": _parse_path(get_env("THUMBNAILS_PATH", required=False, default="/storage/thumbnails")),
         "annotations_path": _parse_path(get_env("ANNOTATIONS_PATH", required=False, default="/storage/annotations")),
         "default_study_date": _parse_date(get_env("DEFAULT_STUDY_DATE", required=False, default="1970-01-01")),
-        "cfi_cache_path": _parse_path(get_env("CFI_CACHE_PATH", required=False)),
         "image_server_url": get_env("IMAGE_SERVER_URL", required=False),
     }
 

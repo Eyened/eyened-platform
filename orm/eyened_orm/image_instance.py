@@ -17,6 +17,8 @@ from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
+from rtnls_fundusprep.transformation import ProjectiveTransform
+
 from .base import Base
 from .types import OptionalEnum
 
@@ -356,18 +358,29 @@ class ImageInstance(Base):
         shape = pixel_array.shape
         if len(shape) == 3 and shape[2] > 4:
             raise ValueError("Can only handle 2D images")
-        if self.CFROI is not None:
+        if self.CFROI is None:
+            return None
+        else:
+            if 'success' in self.CFROI and self.CFROI['success'] is False:
+                return None
             # use bounds from database
-            return CFIBounds(**self.CFROI, image=pixel_array)
+            try:
+                return CFIBounds(**self.CFROI, image=pixel_array)
+            except Exception as e:
+                raise ValueError(f"Error with image {self.ImageInstanceID} with CFROI {self.CFROI}") from e
 
-        bounds = get_cfi_bounds(pixel_array)
-        return bounds
 
     def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
         if self.bounds is None:
             return None
         M, bounds = self.bounds.crop(diameter)
         return M.warp(self.pixel_array, (diameter, diameter))
+
+    @property
+    def cropping_transform(self) -> Optional[ProjectiveTransform]:
+        if self.bounds is None:
+            return None
+        return self.bounds.get_cropping_transform(1024)
 
     @property
     def cropping_matrix(self) -> Optional[np.ndarray]:
@@ -500,6 +513,43 @@ class ImageInstance(Base):
             session.flush()
 
         return link
+
+    @property
+    def attrs(self) -> Dict[str, Any]:
+        attrs_by_model: dict[str, dict[str, object]] = {}
+        attrs_flat: dict[str, object] = {}
+
+        for av in getattr(self, "AttributeValues", []) or []:
+            attr_def = getattr(av, "AttributeDefinition", None)
+            if not attr_def:
+                continue
+
+            producing_model = getattr(av, "ProducingModel", None)
+
+            value = None
+            if av.ValueInt is not None:
+                value = av.ValueInt
+            elif av.ValueFloat is not None:
+                value = av.ValueFloat
+            elif av.ValueText is not None:
+                value = av.ValueText
+            elif av.ValueJSON is not None:
+                value = av.ValueJSON
+
+            if value is None:
+                continue
+
+            if producing_model:
+                model_name = producing_model.ModelName
+                if model_name not in attrs_by_model:
+                    attrs_by_model[model_name] = {}
+                attrs_by_model[model_name][attr_def.AttributeName] = value
+            else:
+                attrs_flat[attr_def.AttributeName] = value
+
+        return attrs_flat, attrs_by_model
+
+
 
 
 class DeviceModel(Base):

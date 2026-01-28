@@ -639,7 +639,7 @@ class Importer:
             from eyened_orm.inference.inference import run_inference
 
             run_inference(
-                self.session, device=None, cfi_cache_path=self.config.cfi_cache_path
+                self.session, device=None
             )
 
     def _import(self, data: List[PatientImport]):

@@ -212,15 +212,6 @@ def zarr_tree(env):
             print(f"    Dtype: {array.dtype}")
             print(f"    Chunks: {array.chunks}")
 
-            # # Show compression info if available
-            # if hasattr(array, 'compressor') and array.compressor:
-            #     print(f"    Compressor: {array.compressor}")
-
-            # # Calculate storage efficiency
-            # if hasattr(array, 'nbytes') and hasattr(array, 'nbytes_stored'):
-            #     ratio = array.nbytes / array.nbytes_stored if array.nbytes_stored > 0 else 0
-            #     print(f"    Storage: {array.nbytes_stored:,} bytes ({ratio:.1f}x compression)")
-
 
 @eorm.command()
 @click.option(

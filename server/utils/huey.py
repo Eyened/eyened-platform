@@ -39,7 +39,7 @@ def task_run_inference():
     with database.get_session() as session:
         # Use session for database operations
 
-        run_inference(session, device=None, cfi_cache_path=None)
+        run_inference(session, device=None)
     logger.info("Inference task completed successfully")
     return True
 
