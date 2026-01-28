@@ -20,7 +20,21 @@ services:
       retries: 5
       start_period: 20s
     volumes:
-      - ${EYENED_STORAGE_ROOT}:${EYENED_STORAGE_ROOT}
+      # All storage volumes are volumes subpath mounts in ohk_researchdata
+      # Zarr segmentations
+      - type: volume
+        source: ohk_researchdata
+        target: /storage/segmentations.zarr
+        volume:
+          nocopy: true
+          subpath: "${OHK_RESEARCHDATA_STORAGE_PATH}/segmentations.zarr"
+      # Thumbnails (needed for image thumbnail generation)
+      - type: volume
+        source: ohk_researchdata
+        target: /thumbnails
+        volume:
+          nocopy: true
+          subpath: "${OHK_RESEARCHDATA_STORAGE_PATH}/thumbnails"
 
   client:
     build:
@@ -40,6 +54,28 @@ services:
     volumes:
       # nginx configuration
       - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
-      # Thumbnail directory served by nginx
-      - ${EYENED_STORAGE_ROOT}/thumbnails:/storage/thumbnails:ro
-      # Add other read-only mounts for local datasets here
+      # All storage volumes are volumes subpath mounts in ohk_researchdata
+      # Images
+      - type: volume
+        source: ohk_researchdata
+        target: /images
+        read_only: true
+        volume:
+          nocopy: true
+          subpath: "${OHK_RESEARCHDATA_IMAGES_PATH}"
+      # Thumbnails
+      - type: volume
+        source: ohk_researchdata
+        target: /thumbnails
+        read_only: true
+        volume:
+          nocopy: true
+          subpath: "${OHK_RESEARCHDATA_STORAGE_PATH}/thumbnails"
+
+volumes:
+  ohk_researchdata:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "${OHK_RESEARCHDATA_CIFS_SHARE}"
+      o: "username=${OHK_RESEARCHDATA_CIFS_USERNAME},password=${OHK_RESEARCHDATA_CIFS_PASSWORD}"
