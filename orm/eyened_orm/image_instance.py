@@ -551,7 +551,6 @@ class DeviceInstance(Base):
     )
 
 # NEW SourceInfo Table:
-# 
 # The SourceInfo table is designed to capture metadata about data import sources
 
 from sqlalchemy.orm import validates
@@ -561,7 +560,7 @@ class SourceInfo(Base):
     Example usage:
 
             session.add(SourceInfo(
-            BaseFolder="dicom",
+            BaseFolder="dicom" or "ergo/TRITON_ERGO/dicom",
             SourceName="ERGO Study",
             ExampleDatasetIdentifier="ergo/TRITON_ERGO/dicom/StudyInstance_1.2.392....dcm"
             ))
