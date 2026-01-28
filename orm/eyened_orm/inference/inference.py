@@ -13,7 +13,7 @@ from eyened_orm import ImageInstance, Modality
 from eyened_orm.inference.utils import auto_device
 
 
-def run_basic_models(fpaths, ids, device: torch.device = None):
+def run_basic_models(data, device: torch.device = None):
     if device is None:
         device = auto_device()
     ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface(
@@ -23,12 +23,12 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
         "Eyened/vascx:discedge/discedge_july24.pt"
     ).to(device)
 
+
     dataloader = ensemble_fovea._make_inference_dataloader(
-        fpaths,
-        ids=ids,
+        {"images": data},
         num_workers=8,
         preprocess=False,
-        batch_size=8,
+        batch_size=16,
     )
 
     output_ids, outputs = [], []
@@ -80,15 +80,14 @@ def run_basic_models(fpaths, ids, device: torch.device = None):
     )
 
 
-def run_quality_model(fpaths, ids, device: torch.device = None):
+def run_quality_model(data, device: torch.device = None):
     if device is None:
         device = auto_device()
     ensemble_quality = ClassificationEnsemble.from_huggingface(
         "Eyened/vascx:quality/quality.pt"
     ).to(device)
     dataloader = ensemble_quality._make_inference_dataloader(
-        fpaths,
-        ids=ids,
+        {"images": data},
         num_workers=8,
         preprocess=False,
         batch_size=16,
@@ -121,9 +120,10 @@ def run_quality_model(fpaths, ids, device: torch.device = None):
 
 
 def run_inference_for_images(
-    session, images, device: torch.device = None, cfi_cache_path=None
+    session, images, device: torch.device = None, temp_dir: str = None
 ):
     from rtnls_fundusprep.preprocessor import parallel_preprocess
+    import tempfile
 
     if device is None:
         device = auto_device()
@@ -131,67 +131,64 @@ def run_inference_for_images(
     ids = [im.ImageInstanceID for im in images]
     paths = [im.path for im in images]
 
-    bounds = parallel_preprocess(
-        paths,  # List of image files
-        ids,
-        rgb_path=(
-            f'{cfi_cache_path}/rgb' if cfi_cache_path is not None else None
-        ),  # Output path for RGB images
-        ce_path=(
-            f'{cfi_cache_path}/ce' if cfi_cache_path is not None else None
-        ),  # Output path for Contrast Enhanced images
-        n_jobs=8,  # number of preprocessing workers
-    )
+    with tempfile.TemporaryDirectory(dir=temp_dir) as temp_dir_path:
+        cfi_cache_path = Path(temp_dir_path)
+        rgb_path = cfi_cache_path / "rgb"
+        ce_path = cfi_cache_path / "ce"
+        rgb_path.mkdir(parents=True, exist_ok=True)
+        ce_path.mkdir(parents=True, exist_ok=True)
 
-    df_bounds = pd.DataFrame(bounds).set_index("id")
-
-    # Continue only with successfully preprocessed images
-    ids = df_bounds[
-        df_bounds["success"]
-    ].index.tolist()  # only run on successfully preprocessed images
-
-    if not ids:
-        print("No images to process")
-        return
-
-    fpaths = [
-        (
-            f'{cfi_cache_path}/rgb/{id}.png',
-            f'{cfi_cache_path}/ce/{id}.png',
+        bounds = parallel_preprocess(
+            paths,  # List of image files
+            ids,
+            rgb_path=str(rgb_path),  # Output path for RGB images
+            ce_path=str(ce_path),  # Output path for Contrast Enhanced images
+            n_jobs=8,  # number of preprocessing workers
         )
-        for id in ids
-    ]
 
-    # Run the models
-    df_model_outputs = run_basic_models(fpaths, ids, device)
-    fpaths = [fp[0] for fp in fpaths]
-    df_quality = run_quality_model(fpaths, ids, device)
+        df_bounds = pd.DataFrame(bounds).set_index("id")
 
-    # Update the DB
-    from .utils import clear_unsuccessfull, postprocess, update_database
+        # Continue only with successfully preprocessed images
+        ids = df_bounds[
+            df_bounds["success"]
+        ].index.tolist()  # only run on successfully preprocessed images
 
-    df = pd.merge(
-        df_bounds, df_model_outputs, left_index=True, right_index=True, how="left"
-    )
-    df = pd.merge(df, df_quality, left_index=True, right_index=True, how="left")
-    df = df.rename(
-        columns={
-            "x_fovea": "prep_fovea_x",
-            "y_fovea": "prep_fovea_y",
-            "x_disc": "prep_discedge_x",
-            "y_disc": "prep_discedge_y",
-        }
-    )
+        if not ids:
+            print("No images to process")
+            return
 
-    df_successfull = df[df["success"]]
-    df_unsucessfull = df[~df["success"]]
+        # Run the models
+        data = [{"image": f'{rgb_path}/{id}.png', "contrast_enhanced": f'{ce_path}/{id}.png', "id": id} for id in ids]
+        df_model_outputs = run_basic_models(data, device)
 
-    df_successfull = postprocess(df_successfull)
-    update_database(session, df_successfull)
-    clear_unsuccessfull(session, df_unsucessfull)
+        data = [{"image": f'{rgb_path}/{id}.png', "id": id} for id in ids]
+        df_quality = run_quality_model(data, device)
+
+        # Update the DB
+        from .utils import clear_unsuccessfull, postprocess, update_database
+
+        df = pd.merge(
+            df_bounds, df_model_outputs, left_index=True, right_index=True, how="left"
+        )
+        df = pd.merge(df, df_quality, left_index=True, right_index=True, how="left")
+        df = df.rename(
+            columns={
+                "x_fovea": "prep_fovea_x",
+                "y_fovea": "prep_fovea_y",
+                "x_disc": "prep_discedge_x",
+                "y_disc": "prep_discedge_y",
+            }
+        )
+
+        df_successfull = df[df["success"]]
+        df_unsucessfull = df[~df["success"]]
+
+        df_successfull = postprocess(df_successfull)
+        update_database(session, df_successfull)
+        clear_unsuccessfull(session, df_unsucessfull)
 
 
-def run_inference(session, device: torch.device = None, cfi_cache_path=None):
+def run_inference(session, device: torch.device = None, temp_dir: str = None):
     if device is None:
         device = auto_device()
 
@@ -208,4 +205,4 @@ def run_inference(session, device: torch.device = None, cfi_cache_path=None):
     print(f"Found {len(images)} CFI images to process")
 
     # Run inference
-    run_inference_for_images(session, images, device, cfi_cache_path=cfi_cache_path)
+    run_inference_for_images(session, images, device, temp_dir=temp_dir)
