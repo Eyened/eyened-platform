@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-import sqlmodel
 from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
@@ -36,9 +35,9 @@ def upgrade() -> None:
     # Model table: new table for model metadata
     op.create_table('Model',
         sa.Column('ModelID', sa.Integer(), nullable=False),
-        sa.Column('ModelName', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
-        sa.Column('Version', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
-        sa.Column('Description', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
+        sa.Column('ModelName', sa.String(length=255), nullable=False),
+        sa.Column('Version', sa.String(length=255), nullable=False),
+        sa.Column('Description', sa.String(length=255), nullable=True),
         sa.Column('FeatureID', sa.Integer(), nullable=False),        
         sa.Column('DateInserted', sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(['FeatureID'], ['Feature.FeatureID'], ),
@@ -128,23 +127,23 @@ def upgrade() -> None:
     # op.create_foreign_key(None, 'Annotation', 'Annotation', ['AnnotationReferenceID'], ['AnnotationID'])
 
     # Contact: add Orcid, change Name/Email/Institute to AutoString(255)
-    op.add_column('Contact', sa.Column('Orcid', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True))
+    op.add_column('Contact', sa.Column('Orcid', sa.String(length=255), nullable=True))
     op.alter_column('Contact', 'Name',
                existing_type=mysql.VARCHAR(length=256),
-               type_=sqlmodel.sql.sqltypes.AutoString(length=255),
+               type_=sa.String(length=255),
                existing_nullable=False)
     op.alter_column('Contact', 'Email',
                existing_type=mysql.VARCHAR(length=256),
-               type_=sqlmodel.sql.sqltypes.AutoString(length=255),
+               type_=sa.String(length=255),
                existing_nullable=False)
     op.alter_column('Contact', 'Institute',
                existing_type=mysql.VARCHAR(length=256),
-               type_=sqlmodel.sql.sqltypes.AutoString(length=255),
+               type_=sa.String(length=255),
                existing_nullable=True)
 
     # Creator: rename MSN to EmployeeIdentifier, add PasswordHash
-    op.alter_column('Creator', 'MSN', new_column_name='EmployeeIdentifier', existing_type=mysql.CHAR(length=6), type_=sqlmodel.sql.sqltypes.AutoString(length=255), existing_nullable=True)
-    op.add_column('Creator', sa.Column('PasswordHash', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True))
+    op.alter_column('Creator', 'MSN', new_column_name='EmployeeIdentifier', existing_type=mysql.CHAR(length=6), type_=sa.String(length=255), existing_nullable=True)
+    op.add_column('Creator', sa.Column('PasswordHash', sa.String(length=255), nullable=True))
 
 
     # Feature: drop Modality
@@ -157,7 +156,7 @@ def upgrade() -> None:
     # FormSchema: change SchemaName to AutoString(255)
     op.alter_column('FormSchema', 'SchemaName',
                existing_type=mysql.VARCHAR(length=45),
-               type_=sqlmodel.sql.sqltypes.AutoString(length=255),
+               type_=sa.String(length=255),
                nullable=False)
 
     # ImageInstance: make DeviceInstanceID non-nullable, drop ThumbnailIdentifier
@@ -169,14 +168,14 @@ def upgrade() -> None:
     # Patient: change PatientIdentifier to AutoString(255)
     op.alter_column('Patient', 'PatientIdentifier',
                existing_type=mysql.VARCHAR(length=45),
-               type_=sqlmodel.sql.sqltypes.AutoString(length=255),
+               type_=sa.String(length=255),
                nullable=False)
 
     # Project: add DOI, change ProjectName to AutoString(255)
-    op.add_column('Project', sa.Column('DOI', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True))
+    op.add_column('Project', sa.Column('DOI', sa.String(length=255), nullable=True))
     op.alter_column('Project', 'ProjectName',
                existing_type=mysql.VARCHAR(length=45),
-               type_=sqlmodel.sql.sqltypes.AutoString(length=255),
+               type_=sa.String(length=255),
                existing_nullable=False)
 
     # Series: update foreign key to Study
