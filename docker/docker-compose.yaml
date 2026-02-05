@@ -36,7 +36,7 @@ services:
       - IMAGES_BASEPATH=/images
       - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
       - THUMBNAILS_PATH=/storage/thumbnails
-      - REDIS_HOST=redis
+      - REDIS_HOST=redis. # Force absolte DNS name to avoid container name resolution issues.
       - REDIS_PORT=6379
       - DATABASE_HOST=database
       - DATABASE_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
@@ -70,7 +70,7 @@ services:
       context: ../
       dockerfile: ./docker/Dockerfile.worker
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=redis. # Force absolte DNS name to avoid container name resolution issues.
       - REDIS_PORT=6379
       - DATABASE_HOST=database
       - DATABASE_USER=${DATABASE_USER}
