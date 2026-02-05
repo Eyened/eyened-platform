@@ -36,7 +36,6 @@ setup(
         "GPUtil==1.*",
         "requests==2.*",
         "pydantic-settings==2.7.1",
-        "sqlmodel==0.0.24",
         "retinalysis-fundusprep",
         "zarr==3.1.0",
         "pyyaml==6.*",
