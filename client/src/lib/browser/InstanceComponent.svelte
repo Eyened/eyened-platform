@@ -3,7 +3,7 @@
 	import { getThumbUrl } from "$lib/data-loading/utils";
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
 	import { getContext } from "svelte";
-	import type { InstanceGET, InstanceMeta } from "../../types/openapi_types";
+import type { ImageGET } from "../../types/openapi_types";
 	import type { BrowserContext } from "./browserContext.svelte";
 	import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
 
@@ -11,7 +11,7 @@
 	const globalContext = getContext<GlobalContext>("globalContext");
 
 	interface Props {
-		instance: InstanceGET | InstanceMeta;
+		instance: ImageGET;
 		showSegmentationInfo?: boolean;
 	}
 

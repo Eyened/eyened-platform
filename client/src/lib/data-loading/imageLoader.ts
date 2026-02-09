@@ -1,10 +1,9 @@
-import { fsHost } from '$lib/config';
+import { apiUrl } from '$lib/config';
 import { Image2D } from '$lib/webgl/image2D';
 import { Image3D } from '$lib/webgl/image3D';
 import type { Dimensions } from '$lib/webgl/types';
 import type { WebGL } from '$lib/webgl/webgl';
-import type { InstanceGET } from '../../types/openapi_types';
-import { splitTail } from '../utils';
+import type { ImageGET } from '../../types/openapi_types';
 
 import * as cornerstone from 'cornerstone-core';
 import * as cornerstoneWADOImageLoader from 'cornerstone-wado-image-loader';
@@ -26,40 +25,37 @@ export class ImageLoader {
     minBscansForEnface = 5;
     constructor(public readonly webgl: WebGL) { }
 
-    async load(instance: InstanceGET): Promise<LoadedImages> {
+    async load(instance: ImageGET): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
+        console.log("load=>", instance);
+        const imageId = instance.id;
+        const dataUrl = this.buildDataUrl(imageId);
         // Convert to lowercase for case-insensitive comparison
-        const extension = instance.dataset_identifier.toLowerCase().split('.').pop();
-        const supportedFormats = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+        const dataFormat = instance.data_format;
 
-        if (extension && supportedFormats.includes(extension)) {
+        if (dataFormat === 'image') {
             return [await this.loadImage2D(instance, img_id)];
-        } else if (instance.dataset_identifier.endsWith('.binary')) {
-            const url = `${fsHost}/${instance.dataset_identifier}`;
-            const meta = await this.loadMeta(url);
-            const image = await this.loadBinary3D(instance, url, meta, img_id);
+        } else if (dataFormat === 'binary') {
+            const image = await this.loadBinary3D(instance, dataUrl, img_id);
             return this.returnImage3D(image);
 
-        } else if (instance.dataset_identifier.endsWith('.dcm')) {
-            return this.loadDicom(instance, img_id);
+        } else if (dataFormat === 'dicom') {
+            return this.loadDicom(instance, img_id, imageId);
 
-        } else if (instance.dataset_identifier.startsWith('[png_series')) {
-            const [pre, base_url] = instance.dataset_identifier.split(']');
-            const [folder, source_id] = splitTail(base_url, '/');
-            const meta_url = `${fsHost}/${folder}/metadata.json`;
+        } else if (dataFormat === 'png_series' && (instance.multi_file_count ?? 0) > 1) {
+            const source_id = instance.data_source_id ?? '';
+            const meta_url = this.buildDataUrl(imageId);
             const response = await fetch(meta_url);
             const meta = await response.json();
-            return this.loadPngSeries(instance, meta, img_id, pre, base_url, source_id);
+            return this.loadPngSeries(instance, meta, img_id, instance.multi_file_count!, source_id, imageId);
         } else {
             throw 'unsupported data format';
         }
     }
 
-    async loadPngSeries(instance: InstanceGET, meta: any, img_id: string, pre: string, base_url: string, source_id: string): Promise<LoadedImages> {
-        const n_scans = parseInt(pre.split('_')[2]);
+    async loadPngSeries(instance: ImageGET, meta: any, img_id: string, n_scans: number, source_id: string, imageId: number | string): Promise<LoadedImages> {
         const urls = Array.from({ length: n_scans }, (_, i) => {
-            const fileName = `${base_url}_${i}.png`;
-            return `${fsHost}/${fileName}`;
+            return this.buildDataUrl(imageId, { index: String(i) });
         });
         const js_images = await Promise.all(urls.map(getImage));
 
@@ -92,9 +88,10 @@ export class ImageLoader {
         }
     }
 
-    async loadImage2D(instance: InstanceGET, img_id: string): Promise<Image2D> {
+    async loadImage2D(instance: ImageGET, img_id: string): Promise<Image2D> {
 
-        const url = `${fsHost}/${instance.dataset_identifier}`;
+        const imageId = instance.id;
+        const url = this.buildDataUrl(imageId);
         const bitmap = await getImage(url);
         const dimensions = {
             width: bitmap.width,
@@ -108,38 +105,32 @@ export class ImageLoader {
         return Image2D.fromBitmap(instance, this.webgl, img_id, bitmap, dimensions, meta);
     }
 
-    async loadMeta(url: string): Promise<any> {
-        const response = await fetch(url.replace('.binary', '.json'));
-        const meta = await response.json();
-        return meta;
-    }
-
-    async loadBinary3D(instance: InstanceGET, url: string, meta: any, img_id: string): Promise<Image3D> {
+    async loadBinary3D(instance: ImageGET, url: string, img_id: string): Promise<Image3D> {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
         const pixelData = new Uint8Array(buffer);
 
         const dimensions = {
-            width: meta.oct_shape[2],
-            height: meta.oct_shape[1],
-            depth: meta.oct_shape[0],
+            width: instance.columns,
+            height: instance.rows,
+            depth: instance.nr_of_frames || 1,
 
-            width_mm: meta.resolution[2] * meta.oct_shape[2] / 1000,
-            height_mm: meta.resolution[1] * meta.oct_shape[1] / 1000,
-            depth_mm: meta.resolution[0] * meta.oct_shape[0] / 1000
+            width_mm: instance.resolution_horizontal ? instance.resolution_horizontal * instance.columns : -1,
+            height_mm: instance.resolution_vertical ? instance.resolution_vertical * instance.rows : -1,
+            depth_mm: instance.resolution_axial ? instance.resolution_axial * (instance.nr_of_frames || 1) : -1
         };
         if (instance.scan?.mode == 'Circle-Scan') {
             // this is not correct in the meta file
             dimensions.width_mm = instance.resolution_horizontal * dimensions.width;
         }
-        return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, meta);
+        return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, {});
     }
 
-    async loadDicom(instance: InstanceGET, img_id: string): Promise<LoadedImages> {
-        const url = `${fsHost}/${instance.dataset_identifier}`;
+    async loadDicom(instance: ImageGET, img_id: string, imageId?: number | string): Promise<LoadedImages> {
+        const url = this.buildDataUrl(imageId ?? instance.id);
 
-        const imageId = `wadouri:${url}`;
-        const image = await cornerstone.loadImage(imageId);
+        const dicomImageId = `wadouri:${url}`;
+        const image = await cornerstone.loadImage(dicomImageId);
 
         const meta: any = dicomParser.explicitDataSetToJS(image.data);
         const dimensions = this.extractDimensions(meta);
@@ -202,6 +193,16 @@ export class ImageLoader {
             height_mm: height * res_h,
             depth_mm: depth * res_d,
         };
+    }
+
+    private buildDataUrl(imageId: number | string, query?: Record<string, string>): string {
+        const base = apiUrl?.replace(/\/$/, '') ?? '';
+        const url = `${base}/images/${encodeURIComponent(String(imageId))}/data`;
+        if (!query) {
+            return url;
+        }
+        const search = new URLSearchParams(query);
+        return `${url}?${search.toString()}`;
     }
 }
 

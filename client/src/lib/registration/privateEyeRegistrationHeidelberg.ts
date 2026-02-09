@@ -1,10 +1,10 @@
 import { instances } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import type { InstanceGET } from "../../types/openapi_types";
+import type { ImageGET } from "../../types/openapi_types";
 import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 
-function getSourceID(instance: InstanceGET) {
-    return instance.dataset_identifier.split('/').pop()!;
+function getSourceID(instance: ImageGET) {
+    return instance.data_source_id ?? "";
 }
 export function getPrivateEyeRegistrationHeidelberg(image: AbstractImage): PhotoLocator[] {
     const { instance, meta } = image;

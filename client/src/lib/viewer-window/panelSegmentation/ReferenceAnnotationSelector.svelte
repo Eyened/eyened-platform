@@ -15,7 +15,7 @@
     let { image, segmentation, resolve, close }: Props = $props();
 
     const referenceAnnotations = $derived(
-        segmentations.filter(s => s.image_instance_id === image.instance.id)
+        segmentations.filter(s => s.image_id === image.instance.id)
             .filter(
                 (a) =>
                     a.data_representation == "Binary" ||

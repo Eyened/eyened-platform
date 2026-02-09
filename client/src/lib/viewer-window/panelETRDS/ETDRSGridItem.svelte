@@ -80,7 +80,7 @@
 		<div>
 			<dt>ImageID:</dt>
 			<dd>
-				<code class="value">{formAnnotation.image_instance_id}</code>
+				<code class="value">{formAnnotation.image_id}</code>
 			</dd>
 		</div>
 

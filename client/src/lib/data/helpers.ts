@@ -1,24 +1,17 @@
-import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, InstanceGET, InstanceMeta, SegmentationGET, StudyGET, SubTaskWithImagesGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
+import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, ImageGET, SegmentationGET, StudyGET, SubTaskWithImagesGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
 import { api, fetchApi } from '../api/client';
 import { decodeNpy } from '../utils/npy_loader';
-import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks, instanceMetas, instances, segmentations, studies, tags, tasks } from './stores.svelte';
+import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks, instances, segmentations, studies, tags, tasks } from './stores.svelte';
 
 
 // ===== Tag Helpers =====
 
-export async function tagInstance(instance: InstanceGET | InstanceMeta, tagId: number, comment?: string) {
+export async function tagInstance(instance: ImageGET, tagId: number, comment?: string) {
     const { data } = await api.POST('/instances/{instance_id}/tags' as any, {
         params: { path: { instance_id: instance.id } } as any,
         body: { tag_id: tagId, comment } as any
     });
 
-    // we attempt to update both instanceMeta and instance
-    if(instanceMetas.has(instance.id)) {
-        instanceMetas.set(instance.id, {
-            ...instanceMetas.get(instance.id)!,
-            tags: [...instanceMetas.get(instance.id)!.tags, data as any]
-        });
-    }
     // Update store with new tag
     if(instances.has(instance.id)) {
         instances.set(instance.id, {
@@ -28,9 +21,9 @@ export async function tagInstance(instance: InstanceGET | InstanceMeta, tagId: n
     }
 }
 
-export async function updateTagInstance(instanceId: number, tagId: number, comment?: string) {
+export async function updateTagInstance(instanceId: string, tagId: number, comment?: string) {
     const res = await api.PATCH('/instances/{instance_id}/tags/{tag_id}' as any, {
-        params: { path: { instance_id: Number(instanceId), tag_id: tagId } } as any,
+        params: { path: { instance_id: instanceId, tag_id: tagId } } as any,
         body: { comment } as any
     });
     const inst = instances.get(instanceId);
@@ -40,18 +33,10 @@ export async function updateTagInstance(instanceId: number, tagId: number, comme
     }
 }
 
-export async function untagInstance(instance: InstanceGET | InstanceMeta, tagId: number) {
+export async function untagInstance(instance: ImageGET, tagId: number) {
     await api.DELETE('/instances/{instance_id}/tags/{tag_id}' as any, {
-        params: { path: { instance_id: Number(instance.id), tag_id: tagId } } as any
+        params: { path: { instance_id: instance.id, tag_id: tagId } } as any
     });
-    // Update both stores when present
-    if (instanceMetas.has(instance.id)) {
-        const meta = instanceMetas.get(instance.id)!;
-        instanceMetas.set(instance.id, {
-            ...meta,
-            tags: meta.tags.filter(t => t.id !== tagId)
-        });
-    }
     if (instances.has(instance.id)) {
         const inst = instances.get(instance.id)!;
         instances.set(instance.id, {
@@ -351,7 +336,7 @@ export async function deleteTask(id: number) {
 
 // ===== SubTask Helpers =====
 
-export async function addSubTaskImage(subtaskId: number, instanceId: number) {
+export async function addSubTaskImage(subtaskId: number, instanceId: string) {
     const res = await api.POST('/subtasks/{subtaskid}/images' as any, {
         params: {
             path: {
@@ -367,7 +352,7 @@ export async function addSubTaskImage(subtaskId: number, instanceId: number) {
     return res.data;
 }
 
-export async function removeSubTaskImage(subtaskId: number, instanceId: number) {
+export async function removeSubTaskImage(subtaskId: number, instanceId: string) {
     const res = await api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
         params: {
             path: {
@@ -399,9 +384,9 @@ export async function updateSubTaskComments(subtaskId: number, comments: string)
     return res.data;
 }
 
-export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): InstanceGET | undefined {
+export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): ImageGET | undefined {
     return instances.find(inst => inst.sop_instance_uid === SOPInstanceUid);
 }
-export function getInstanceByDataSetIdentifier(datasetIdentifier: string): InstanceGET | undefined {
-    return instances.find(inst => inst.dataset_identifier === datasetIdentifier);
+export function getInstanceByDataSourceId(sourceId: string): ImageGET | undefined {
+    return instances.find(inst => inst.data_source_id === sourceId);
 }

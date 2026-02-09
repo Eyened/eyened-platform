@@ -1,6 +1,6 @@
 import { PixelShaderProgram } from '$lib/webgl/FragmentShaderProgram.js';
 import type { Image2D } from '$lib/webgl/image2D';
-import type { InstanceGET } from '../../types/openapi_types';
+import type { ImageGET } from '../../types/openapi_types';
 import fs_mirror from './shaders/mirror.frag';
 import fs_blur from './shaders/blur.frag';
 import fs_contrast_enhance from './shaders/contrast_enhance.frag';
@@ -28,7 +28,7 @@ export interface ClaheInput {
     height: number;
     webgl: WebGL;
     texture: WebGLTexture;
-    instance: InstanceGET;
+    instance: ImageGET;
 }
 
 type ROI = {

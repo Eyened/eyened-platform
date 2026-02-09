@@ -18,11 +18,11 @@ function matchesAxis(segmentation: Segmentation, axis: number): boolean {
 export class SegmentationContext {
 
     public graderSegmentations: SegmentationGET[] = $derived(
-        segmentations.filter((s) => s.image_instance_id == this.instanceId && matchesAxis(s, this.axis))
+        segmentations.filter((s) => s.image_id == this.instanceId && matchesAxis(s, this.axis))
     );
 
     public modelSegmentations: ModelSegmentationGET[] = $derived(
-        modelSegmentations.filter((s) => s.image_instance_id == this.instanceId && matchesAxis(s, this.axis))
+        modelSegmentations.filter((s) => s.image_id == this.instanceId && matchesAxis(s, this.axis))
     );
 
     public creatorVisible = new SvelteSet<number>();
@@ -46,7 +46,7 @@ export class SegmentationContext {
     public activeIndices: number | number[] = $state([]);
 
     constructor(
-        public readonly instanceId: number,
+        public readonly instanceId: string,
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage,

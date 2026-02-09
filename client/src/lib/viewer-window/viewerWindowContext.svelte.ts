@@ -7,7 +7,7 @@ import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
-import type { InstanceGET } from "../../types/openapi_types";
+import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from './MainViewer.svelte';
 
 export type MainPanelType = {
@@ -17,13 +17,12 @@ export type MainPanelType = {
 
 export class ViewerWindowContext {
 
-    private imagesIndex = new Map<number, Promise<LoadedImages>>();
-    private byDatasetIdentifier = new Map<string, LoadedImages>();
+    private imagesIndex = new Map<string, Promise<LoadedImages>>();
     private bySOPInstanceUID = new Map<string, LoadedImages>();
 
     private viewers = new Set<ViewerContext>();
 
-    public instanceIds: number[] = $state([]);
+    public instanceIds: string[] = $state([]);
 
     public mainPanels: MainPanelType[] = $state([]);
 
@@ -40,7 +39,7 @@ export class ViewerWindowContext {
         public readonly webgl: WebGL,
         public readonly registration: Registration,
         public readonly creator: unknown,
-        instanceIDs: number[] = [],
+        instanceIDs: string[] = [],
     ) {
         this.imageLoader = new ImageLoader(webgl);
 
@@ -68,7 +67,7 @@ export class ViewerWindowContext {
         this.viewers.forEach((viewer) => viewer.repaint());
     }
 
-    async setInstanceIDs(ids: number[]) {
+    async setInstanceIDs(ids: string[]) {
         // ensure metadata of all instances is loaded
         const missingIds = ids.filter((id) => !instances.get(id));
         if (missingIds.length) {
@@ -127,7 +126,6 @@ export class ViewerWindowContext {
         this.topViewers.clear();
         this.viewers.clear();
         this.imagesIndex.clear();
-        this.byDatasetIdentifier.clear();
         this.bySOPInstanceUID.clear();
         this.photoLocators.clear();
         this.photoLocatorSets = [];
@@ -135,7 +133,8 @@ export class ViewerWindowContext {
         this.instanceIds = [];
     }
 
-    async loadImage(instance: InstanceGET): Promise<LoadedImages> {
+    async loadImage(instance: ImageGET): Promise<LoadedImages> {
+        console.log("load", instance);
         // Start loading if not already in progress
         if (!this.imagesIndex.has(instance.id)) {
             const loadPromise = this.imageLoader.load(instance).then(loadedImages => {
@@ -146,7 +145,6 @@ export class ViewerWindowContext {
                 }
 
                 // Set up indices
-                this.byDatasetIdentifier.set(instance.dataset_identifier, loadedImages);
                 this.bySOPInstanceUID.set(instance.sop_instance_uid, loadedImages);
 
                 // Create viewer contexts
@@ -157,7 +155,7 @@ export class ViewerWindowContext {
                 return loadedImages;
             });
 
-            this.imagesIndex.set(instance.id, loadPromise);
+        this.imagesIndex.set(instance.id, loadPromise);
         }
 
         // Return cached promise (either existing or newly created)
@@ -201,7 +199,7 @@ export class ViewerWindowContext {
         this.mainPanels = this.mainPanels.filter((item) => item !== panel);
     }
 
-    getImages(instanceID: number): Promise<LoadedImages> {
+    getImages(instanceID: string): Promise<LoadedImages> {
         const instance = instances.get(instanceID);
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);

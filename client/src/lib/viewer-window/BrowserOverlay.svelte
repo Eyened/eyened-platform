@@ -8,7 +8,7 @@
 	import { instances } from "$lib/data/stores.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 	import { getContext, onDestroy, setContext } from "svelte";
-	import type { InstanceGET } from "../../types/openapi_types";
+	import type { ImageGET } from "../../types/openapi_types";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
 	interface Props {
@@ -34,7 +34,7 @@
 
 		// Get instances from the data stores using the instance IDs
 		for (const instanceId of initialInstanceIds) {
-			const instance = instances.get(instanceId) as InstanceGET;
+			const instance = instances.get(instanceId) as ImageGET;
 			if (instance) {
 				if (instance.patient?.identifier) {
 					patientIdentifiers.add(instance.patient.identifier);
@@ -72,7 +72,7 @@
 
 	const searching = performPatientIdentifierSearch();
 
-	function updateSubTaskImageLinks(currentInstanceIds: number[]) {
+	function updateSubTaskImageLinks(currentInstanceIds: string[]) {
 		const newInstanceIds = currentInstanceIds.filter(
 			(id) => !initialInstanceIds.includes(id),
 		);

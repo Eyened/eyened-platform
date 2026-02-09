@@ -1,7 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type {
-	InstanceGET,
-	InstanceMeta,
+	ImageGET,
 	StudyGET,
 	TagGET,
 	FeatureGET,
@@ -83,8 +82,7 @@ class ReactiveMap<K, V> extends SvelteMap<K, V> {
 }
 
 // Simple stores - just maps of plain data by ID
-export const instances = new ReactiveMap<number, InstanceGET>();
-export const instanceMetas = new ReactiveMap<number, InstanceMeta>();  // Lightweight references
+export const instances = new ReactiveMap<string, ImageGET>();
 export const studies = new ReactiveMap<number, StudyGET>();
 export const tags = new ReactiveMap<number, TagGET>();
 export const features = new ReactiveMap<number, FeatureGET>();
@@ -107,21 +105,9 @@ export function ingestStudies(studiesData: StudyGET[]) {
 	}
 }
 
-export function ingestInstances(instancesData: InstanceGET[]) {
+export function ingestInstances(instancesData: ImageGET[]) {
 	for (const inst of instancesData) {
-		// Only ingest full InstanceGET objects (from /instances/search or /instances/{id})
-		// If you have InstanceMeta, use ingestInstanceMetas() instead
-		if (!('sop_instance_uid' in inst) || !('rows' in inst)) {
-			console.error('ingestInstances() expects InstanceGET, got InstanceMeta. Use ingestInstanceMetas() instead:', inst);
-			continue;
-		}
 		instances.set(inst.id, inst);
-	}
-}
-
-export function ingestInstanceMetas(metasData: InstanceMeta[]) {
-	for (const meta of metasData) {
-		instanceMetas.set(meta.id, meta);
 	}
 }
 

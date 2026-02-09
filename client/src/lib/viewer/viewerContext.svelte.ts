@@ -4,7 +4,7 @@ import type { AbstractImage } from '$lib/webgl/abstractImage';
 import { BaseImageRenderer } from '$lib/webgl/imageRenderer';
 import type { Shaders } from '$lib/webgl/shaders';
 import { SvelteSet } from 'svelte/reactivity';
-import type { InstanceGET } from '../../types/openapi_types';
+import type { ImageGET } from '../../types/openapi_types';
 import type { Registration } from '../registration/registration';
 import type { ViewerWindowContext } from '../viewer-window/viewerWindowContext.svelte';
 import { HotKeys } from './controls/hotkeys';
@@ -64,7 +64,7 @@ export class ViewerContext {
 
     registration: Registration;
 
-    public instance: InstanceGET;
+    public instance: ImageGET;
 
     
 

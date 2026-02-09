@@ -27,7 +27,7 @@ export class MainViewerContext implements Overlay {
 
 
     constructor(
-        public readonly instanceId: number,
+        public readonly instanceId: string,
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage

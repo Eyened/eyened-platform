@@ -1,4 +1,4 @@
-import { getInstanceByDataSetIdentifier } from "$lib/data";
+import { getInstanceByDataSourceId } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 
@@ -7,7 +7,8 @@ export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
     if (!instance || !meta?.registration?.top_left || !meta?.registration?.bottom_right || !meta?.oct_shape) {
         return [];
     }
-    const enfaceInstance = getInstanceByDataSetIdentifier(instance.dataset_identifier.replace('.binary', '.png'));
+    const sourceId = instance.data_source_id ?? '';
+    const enfaceInstance = sourceId ? getInstanceByDataSourceId(sourceId) : undefined;
     if (!enfaceInstance) {
         return [];
     }

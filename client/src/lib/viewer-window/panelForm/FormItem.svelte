@@ -53,7 +53,7 @@
 			form_schema_id: form.form_schema_id,
 			patient_id: form.patient_id,
 			study_id: form.study_id ?? undefined,
-			image_instance_id: form.image_instance_id!,
+			image_id: form.image_id!,
 			laterality: form.laterality ?? undefined,
 			sub_task_id: taskContext?.subTask?.id ?? form.sub_task_id ?? undefined,
 			form_data: form.form_data,
@@ -67,7 +67,7 @@
 			window.close();
 		}
         // need to load the full instance to get the patient, study, etc.
-		await fetchInstance(form.image_instance_id!);
+		await fetchInstance(form.image_id!);
 
 		const props = {
 			formId: form.id,

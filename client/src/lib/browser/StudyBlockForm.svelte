@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { FormAnnotationGET, FormSchemaGET, StudyGET } from "../../types/openapi_types";
 	import { createFormAnnotation } from "$lib/data/api";
-	import { formAnnotations, instanceMetas } from "$lib/data/stores.svelte";
+	import { formAnnotations, instances } from "$lib/data/stores.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 	import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
 	import { Button } from "$lib/components/ui/button";
@@ -27,12 +27,12 @@
 	// forms are assigned to instances, so we find any instance id for laterality
 	// this is because we don't currently model [study + laterality] as a single entity
 	const instanceIds =
-		study?.series?.flatMap((series) => series.instance_ids as number[]) ?? [];
+		study?.series?.flatMap((series) => series.instance_ids as string[]) ?? [];
 	const left_instanceId = instanceIds.find(
-		(id) => instanceMetas.get(id)?.laterality === "L",
+		(id) => instances.get(id)?.laterality === "L",
 	);
 	const right_instanceId = instanceIds.find(
-		(id) => instanceMetas.get(id)?.laterality === "R",
+		(id) => instances.get(id)?.laterality === "R",
 	);
 	const first_instanceId = instanceIds[0];
 
@@ -47,23 +47,23 @@
 
 	const leftForms = $derived(
 		forms.filter(
-			(form) => instanceMetas.get(form.image_instance_id ?? 0)?.laterality === "L",
+			(form) => instances.get(form.image_id ?? "")?.laterality === "L",
 		),
 	);
 
 	const rightForms = $derived(
 		forms.filter(
-			(form) => instanceMetas.get(form.image_instance_id ?? 0)?.laterality === "R",
+			(form) => instances.get(form.image_id ?? "")?.laterality === "R",
 		),
 	);
 
-	async function create(instanceId: number) {
-		const laterality = instanceMetas.get(instanceId)?.laterality ?? undefined;
+	async function create(instanceId: string) {
+		const laterality = instances.get(instanceId)?.laterality ?? undefined;
 		await createFormAnnotation({
 			form_schema_id: formSchema.id,
 			patient_id: study.patient.id,
 			study_id: study.id,
-			image_instance_id: instanceId,
+			image_id: instanceId,
 			laterality: laterality,
 			sub_task_id: taskContext?.subTask?.id,
 			form_data: {},
@@ -72,7 +72,7 @@
 </script>
 
 {#snippet form_item(
-	instanceId: number | undefined,
+	instanceId: string | undefined,
 	forms: FormAnnotationGET[],
 	post_fix: string = "",
 )}

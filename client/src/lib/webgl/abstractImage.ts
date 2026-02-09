@@ -1,5 +1,5 @@
 import { Matrix } from "$lib/matrix";
-import type { InstanceGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import type { ImageGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 import { SvelteMap } from "svelte/reactivity";
@@ -20,7 +20,7 @@ export abstract class AbstractImage {
     public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
     public readonly orientation: 'axial' | 'enface';
     constructor(
-        public readonly instance: InstanceGET,
+        public readonly instance: ImageGET,
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
