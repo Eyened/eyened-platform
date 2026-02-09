@@ -58,8 +58,14 @@ def create_database():
 
 
 @eorm.command()
-@click.option("--username", type=str, required=True)
-@click.option("--password", type=str, required=True)
+@click.option("--username", type=str, prompt=True)
+@click.option(
+    "--password",
+    type=str,
+    prompt=True,
+    hide_input=True,
+    confirmation_prompt=True,
+)
 @click.option("--is-human", is_flag=True, default=True)
 @click.option("--description", type=str, required=False)
 def create_user(username: str, password: str, is_human: bool, description: str | None):
