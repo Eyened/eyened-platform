@@ -24,7 +24,10 @@ def drop_create_db(test_db):
     command = build_command("mysql", test_db, include_database=False)
 
     print("Creating empty database")
-    print(" ".join(command))
+    # Print command without exposing the password
+    safe_command = [arg if not arg.startswith("-p") else "-p*****" for arg in command]
+    print(" ".join(safe_command))
+
     result = subprocess.run(
         command, input=sql_commands, stderr=subprocess.PIPE, text=True, check=True
     )
