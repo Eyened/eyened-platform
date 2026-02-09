@@ -13,7 +13,7 @@ from ..dtos.dtos_tasks import (
     SubTaskGET,
     SubTaskWithImagesGET,
 )
-from ..dtos.dtos_instances import InstanceGET
+from ..dtos.dtos_instances import ImageGET
 from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
@@ -25,7 +25,18 @@ class SubTaskPATCH(BaseModel):
 
 
 class AddImageRequest(BaseModel):
-    instance_id: int
+    instance_id: str
+
+
+def _resolve_image_instance_id(db: Session, image_id: str) -> int:
+    item = (
+        db.query(ImageInstance)
+        .filter(ImageInstance.public_id == image_id)
+        .first()
+    )
+    if item:
+        return item.ImageInstanceID
+    raise HTTPException(status_code=404, detail="ImageInstance not found")
 
 
 @router.get(
@@ -136,7 +147,8 @@ async def add_subtask_image(
     st = db.get(SubTask, subtaskid)
     if not st:
         raise HTTPException(404, "SubTask not found")
-    inst = db.get(ImageInstance, body.instance_id)
+    image_instance_id = _resolve_image_instance_id(db, body.instance_id)
+    inst = db.get(ImageInstance, image_instance_id)
     if not inst:
         raise HTTPException(404, "ImageInstance not found")
     # Get the next available ImageIndex for this subtask
@@ -148,7 +160,9 @@ async def add_subtask_image(
     if max_index is None:
         max_index = -1
     link = SubTaskImageLink(
-        SubTaskID=subtaskid, ImageInstanceID=body.instance_id, ImageIndex=max_index + 1
+        SubTaskID=subtaskid,
+        ImageInstanceID=image_instance_id,
+        ImageIndex=max_index + 1,
     )
 
     try:
@@ -170,7 +184,7 @@ async def add_subtask_image(
             entity="SubTaskImageLink",
             fields={
                 "subtask_id": subtaskid,
-                "image_instance_id": body.instance_id,
+                "image_instance_id": image_instance_id,
             },
         )
 
@@ -196,26 +210,27 @@ async def add_subtask_image(
 )
 async def remove_subtask_image(
     subtaskid: int,
-    instance_id: int,
+    instance_id: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     # Get link data before deletion (for logging)
+    image_instance_id = _resolve_image_instance_id(db, instance_id)
     link = db.get(
-        SubTaskImageLink, {"SubTaskID": subtaskid, "ImageInstanceID": instance_id}
+        SubTaskImageLink, {"SubTaskID": subtaskid, "ImageInstanceID": image_instance_id}
     )
     if not link:
         raise HTTPException(404, "Link not found")
 
     deleted_data = {
         "subtask_id": subtaskid,
-        "image_instance_id": instance_id,
+        "image_instance_id": image_instance_id,
     }
 
     res = db.execute(
         delete(SubTaskImageLink).where(
             SubTaskImageLink.SubTaskID == subtaskid,
-            SubTaskImageLink.ImageInstanceID == instance_id,
+            SubTaskImageLink.ImageInstanceID == image_instance_id,
         )
     )
     if res.rowcount == 0:

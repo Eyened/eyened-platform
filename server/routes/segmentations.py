@@ -46,6 +46,17 @@ dtypes = {
 }
 
 
+def _resolve_image_instance_id(db: Session, image_id: str) -> int:
+    item = (
+        db.query(ImageInstance)
+        .filter(ImageInstance.public_id == image_id)
+        .first()
+    )
+    if item:
+        return item.ImageInstanceID
+    raise HTTPException(status_code=404, detail="ImageInstance not found")
+
+
 async def load_array(np_array: Optional[UploadFile]) -> Optional[np.ndarray]:
     # Read and load numpy array
     if np_array is not None:
@@ -91,9 +102,10 @@ async def create_segmentation(
 ):
     # create a new segmentation
     dto = SegmentationPOST.model_validate_json(metadata)
+    image_instance_id = _resolve_image_instance_id(db, dto.image_id)
 
     segmentation = Segmentation(
-        ImageInstanceID=dto.image_instance_id,
+        ImageInstanceID=image_instance_id,
         FeatureID=dto.feature_id,
         CreatorID=current_user.id,
         SubTaskID=dto.subtask_id,

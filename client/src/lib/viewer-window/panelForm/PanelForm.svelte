@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation, getInstanceByDataSetIdentifier, instances } from "$lib/data";
+    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation, instances } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -38,7 +38,7 @@
             }
 
             //TODO: check for other entity types
-            return annotation.image_instance_id == instance.id;     
+            return annotation.image_id == instance.id;     
         }
         
     ];
@@ -52,7 +52,7 @@
         } else if (TaskDefinitionName === "ETDRS-grid placement") {
             selectedSchema = formSchemasByName.get("ETDRS-grid coordinates");
             filters.push(
-                (annotation: FormAnnotationGET) => annotation.image_instance_id == instance.id,
+                (annotation: FormAnnotationGET) => annotation.image_id == instance.id,
             );
         } else if (TaskDefinitionName === "Glaucoma grading") {
             selectedSchema = formSchemasByName.get("Glaucoma grading");
@@ -75,7 +75,7 @@
             form_schema_id: schema.id,
             patient_id: instance.patient.id,
             study_id: instance.study?.id ?? undefined,
-            image_instance_id: instance.id,
+            image_id: instance.id,
             laterality: instance.laterality ?? undefined,
             sub_task_id: taskContext?.subTask?.id,
             form_data: {},

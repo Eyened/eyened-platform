@@ -1,11 +1,10 @@
-import type { FeatureGET, FormSchemaGET, InstanceGET, StudyGET, SubTaskWithImagesGET, TagGET, TaskGET } from '../../types/openapi_types';
+import type { FeatureGET, FormSchemaGET, ImageGET, StudyGET, SubTaskWithImagesGET, TagGET, TaskGET } from '../../types/openapi_types';
 import { api } from '../api/client';
 import {
 	formAnnotations,
 	ingestFeatures,
 	ingestFormAnnotations,
 	ingestFormSchemas,
-	ingestInstanceMetas,
 	ingestInstances,
 	ingestModelSegmentations,
 	ingestSegmentations,
@@ -99,17 +98,17 @@ export async function fetchFormSchemas(): Promise<FormSchemaGET[]> {
 }
 
 export async function fetchInstance(
-	id: number, 
+	id: string, 
 	options?: {
 		with_segmentations?: boolean;
 		with_form_annotations?: boolean;
 		with_model_segmentations?: boolean;
 		with_tag_metadata?: boolean;
 	}
-): Promise<InstanceGET> {
-	const instance = await apiGet<InstanceGET>('/instances/{instance_id}' as any, {
+): Promise<ImageGET> {
+	const instance = await apiGet<ImageGET>('/images/{image_id}' as any, {
 		params: { 
-			path: { instance_id: id },
+			path: { image_id: id },
 			query: { 
 				with_tag_metadata: true,
 				...options
@@ -169,10 +168,8 @@ export async function searchStudies(query: any): Promise<any> {
 		ingestStudies(data.studies);
 	}
 	
-	// StudySearchResponse has instances: InstanceMeta[] (lightweight references)
-	// Ingest into separate instanceMetas store
 	if (data.instances) {
-		ingestInstanceMetas(data.instances);
+		ingestInstances(data.instances);
 	}
 	
 	return data;
@@ -232,7 +229,7 @@ export async function createSegmentationFrom(
 	}
 
 	const item = {
-		image_instance_id: instance.id,
+		image_id: instance.id,
 		...shape,
 		sparse_axis,
 		image_projection_matrix: null,
@@ -261,7 +258,7 @@ export async function fetchFormAnnotation(id: number): Promise<any> {
 export async function fetchFormAnnotations(filters?: {
 	patient_id?: number;
 	study_id?: number;
-	image_instance_id?: number;
+	image_id?: string;
 	form_schema_id?: number;
 	sub_task_id?: number;
 }): Promise<any[]> {
@@ -276,7 +273,7 @@ export async function createFormAnnotation(data: {
 	form_schema_id: number;
 	patient_id: number;
 	study_id?: number;
-	image_instance_id: number;
+	image_id: string;
 	laterality?: 'L' | 'R' | null;
 	sub_task_id?: number;
 	form_data: any;

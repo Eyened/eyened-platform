@@ -55,7 +55,7 @@ class FeatureGET(FeatureBase):
 
 
 class SegmentationBase(BaseModel):
-    image_instance_id: int
+    image_id: str
     depth: int
     height: int
     width: int
@@ -141,7 +141,7 @@ class FormAnnotationBase(BaseModel):
     form_schema_id: int
     patient_id: int
     study_id: Optional[int] = None
-    image_instance_id: Optional[int] = None
+    image_id: Optional[str] = None
     laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
     form_data: Optional[Any] = None
@@ -170,7 +170,7 @@ class FormAnnotationPATCH(BaseModel):
     form_schema_id: Optional[int] = None
     patient_id: Optional[int] = None
     study_id: Optional[int] = None
-    image_instance_id: Optional[int] = None
+    image_id: Optional[str] = None
     laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
     form_data: Optional[Any] = None

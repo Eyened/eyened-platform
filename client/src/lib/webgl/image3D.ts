@@ -1,7 +1,7 @@
 import { Matrix } from "$lib/matrix";
 import { LinePhotoLocator } from "$lib/registration/photoLocators";
 import { getPrivateEyeRegistrationHeidelberg } from "$lib/registration/privateEyeRegistrationHeidelberg";
-import type { InstanceGET } from "../../types/openapi_types";
+import type { ImageGET } from "../../types/openapi_types";
 import { AbstractImage } from "./abstractImage";
 import { Image2D } from "./image2D";
 import { TextureData } from "./texture";
@@ -17,7 +17,7 @@ export class Image3D extends AbstractImage {
     // Cache for CLAHE-processed slices
     private claheSliceCache = new Map<number, TextureData>();
 
-    constructor(instance: InstanceGET,
+    constructor(instance: ImageGET,
         webgl: WebGL,
         img_id: string,
         public readonly data: Uint8Array,

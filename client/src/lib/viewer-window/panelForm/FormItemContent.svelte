@@ -15,7 +15,7 @@
     let { formId,  canEdit }: Props = $props();
     
     const form = $derived(formAnnotations.get(formId)!);
-    const instance = $derived(instances.get(form.image_instance_id!));
+    const instance = $derived(instances.get(form.image_id!));
     const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
     const schema = $derived(resolveRefs(formSchema.schema as JSONSchema));
 
@@ -34,7 +34,7 @@
         // Debug logging
         console.log('Form:', form);
         if (!instance) {
-            console.error(`Instance ${form.image_instance_id} not found`);
+            console.error(`Instance ${form.image_id} not found`);
         }
     });
 
@@ -108,7 +108,7 @@
             </tr>
             <tr>
                 <td>Instance identifier</td>
-                <td>{form.image_instance_id}</td>
+                <td>{form.image_id}</td>
             </tr>
             <tr>
                 <td>Laterality</td>
