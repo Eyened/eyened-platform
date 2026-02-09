@@ -1,29 +1,27 @@
-name: eyened-platform-dev-bart
+name: eyened-platform-dev
 
 services:
   
   fileserver:
     env_file: .env
-    build:
-      context: .
-      dockerfile: Dockerfile.fileserver
-    environment:
-      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
-      NGINX_ENVSUBST_TEMPLATE_DIR: /etc/nginx/templates
+    image: nginx:latest    
     network_mode: "host"
     volumes:
-      - ${IMAGES_BASEPATH}:/images
-      - ${THUMBNAILS_PATH}:/thumbnails
+      - ./nginx.conf:/etc/nginx/templates/nginx.conf.template:ro
+      - <thumbnails_path>:/storage/thumbnails:ro
+      - <filestorage_mount>:<filestorage_mount>:ro
 
   database:
     env_file: .env
     image: mysql:8.0.27
     environment:
-      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
-      - "${DATABASE_PORT}:3306"
+      - "${EYENED_DATABASE_PORT}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DATABASE_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 2s
       timeout: 5s
       retries: 10
@@ -40,3 +38,5 @@ services:
     environment:
       - ADMINER_DEFAULT_SERVER=database
 
+volumes:
+  db_data:
