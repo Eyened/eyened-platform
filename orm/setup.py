@@ -36,6 +36,7 @@ setup(
         "GPUtil==1.*",
         "requests==2.*",
         "pydantic-settings==2.7.1",
+        "python-dotenv==1.*",
         "retinalysis-fundusprep",
         "zarr==3.1.0",
         "pyyaml==6.*",

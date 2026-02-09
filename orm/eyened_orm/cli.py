@@ -1,22 +1,17 @@
-import yaml
 import click
 import random
 import string
 
-from .utils.testdb import drop_create_db, load_db, stream_mirror_database
+from .utils.testdb import drop_create_db, load_db
 from tqdm import tqdm
-from .utils.config import (
-    DatabaseSettings,
-    load_config,
-)
-from .commands.model_processing import model_commands
+
 from .commands.shared import get_database
+from .utils.env import load_env_file
 
 """
 Command utilities for the eyened ORM.
 
 The following commands are available:
-- database-mirror: Mirror the entire source database into the target database via a streaming pipe.
 - update-thumbnails: Update thumbnails for all images in the database.
 - run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
@@ -33,104 +28,64 @@ Important: import packages that are not dependencies of the ORM within the funct
 
 
 @click.group(name="eorm")
-def eorm():
-    pass
+@click.option(
+    "--env-file",
+    type=click.Path(exists=True, dir_okay=False),
+    required=False,
+    help="Path to a .env file to load for this command",
+)
+def eorm(env_file):
+    load_env_file(env_file, override=True)
+    _register_model_commands()
 
 
-for command in model_commands:
-    eorm.add_command(command)
+def _register_model_commands():
+    if getattr(_register_model_commands, "_done", False):
+        return
+    from .commands.model_processing import model_commands
 
-
-def transfer_db(config_file):
-    with open(config_file, "r") as f:
-        config = yaml.safe_load(f)
-
-    # Create DatabaseSettings directly from the nested dict
-    source = DatabaseSettings(**config["source"]["database"])
-    target = DatabaseSettings(**config["target"]["database"])
-
-    print("Transferring from:")
-    print(f"{source.host}:{source.port}/{source.database} ({source.user})")
-    print("to:")
-    print(f"{target.host}:{target.port}/{target.database} ({target.user})")
-
-    # Return a simple namespace-like object with source_db and test_db attributes
-    class TransferConfig:
-        def __init__(self, source_db, test_db):
-            self.source_db = source_db
-            self.test_db = test_db
-
-    return TransferConfig(source, target), config
+    for command in model_commands:
+        eorm.add_command(command)
+    _register_model_commands._done = True
 
 
 @eorm.command()
-@click.option(
-    "--config-file",
-    "-c",
-    type=click.Path(exists=True),
-    help="Path to YAML file containing database configuration",
-)
-@click.option(
-    "--force", is_flag=True, default=False, help="Continue on SQL errors while loading"
-)
-@click.option(
-    "--no-routines", is_flag=True, default=True, help="Do not include stored routines"
-)
-@click.option(
-    "--no-triggers", is_flag=True, default=True, help="Do not include triggers"
-)
-@click.option("--no-events", is_flag=True, default=True, help="Do not include events")
-def database_mirror(config_file, force, no_routines, no_triggers, no_events):
-    """Mirror the entire source database into the target database via a streaming pipe.
+def create_database():
+    """Create the database and tables if they don't exist."""
+    from eyened_orm import create_database
 
-    This will DROP and recreate the target database, then stream:
-      mysqldump (source) | mysql (target)
-    """
-
-    transfer, _ = transfer_db(config_file)
-
-    print(
-        "WARNING: This will permanently delete all existing data in the target database."
-    )
-    print("\n" + "=" * 60)
-    print(
-        f"Target to be cleared: {transfer.test_db.database} on {transfer.test_db.host}:{transfer.test_db.port}"
-    )
-    print("=" * 60)
-
-    confirmation_code = "".join(random.choices(string.ascii_uppercase, k=4))
-    print(f"\nDo you want to proceed? Type '{confirmation_code}' to confirm:")
-    user_input = click.prompt("", type=str)
-    if user_input != confirmation_code:
-        print("Confirmation code does not match. Operation cancelled.")
-        return
-
-    print("Confirmation received. Proceeding with database mirror...\n")
-
-    print("Clearing target database...")
-    if not drop_create_db(transfer.test_db):
-        print("Error: Failed to clear target database")
-        return
-
-    print("\nStreaming full mirror...")
-    stream_mirror_database(
-        transfer.source_db,
-        transfer.test_db,
-        include_routines=not no_routines,
-        include_triggers=not no_triggers,
-        include_events=not no_events,
-        force=force,
-    )
-    print("\nDatabase mirror completed successfully!")
+    create_database()
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
+@click.option("--username", type=str, required=True)
+@click.option("--password", type=str, required=True)
+@click.option("--is-human", is_flag=True, default=True)
+@click.option("--description", type=str, required=False)
+def create_user(username: str, password: str, is_human: bool, description: str | None):
+    """Create a new user with the given credentials."""
+
+    from eyened_orm.utils.db_users import create_user
+
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            create_user(
+                session,
+                username,
+                password,
+                is_human=is_human,
+                description=description,
+            )
+            print(f"User created successfully")
+        except ValueError as e:
+            print(f"Error creating user: {e}")
+
+
+@eorm.command()
 @click.option("--failed", is_flag=True, default=False)
 @click.option("--print-errors", is_flag=True, default=False)
-def update_thumbnails(env, failed, print_errors):
+def update_thumbnails(failed, print_errors):
     """Update thumbnails for all images in the database."""
 
     from eyened_orm import Database
@@ -139,7 +94,7 @@ def update_thumbnails(env, failed, print_errors):
         get_missing_thumbnail_images,
     )
 
-    database = get_database(env)
+    database = get_database()
 
     with database.get_session() as session:
         images = get_missing_thumbnail_images(session, failed)
@@ -148,12 +103,9 @@ def update_thumbnails(env, failed, print_errors):
 
 @eorm.command()
 @click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
     "--print-errors", is_flag=True, default=False, help="Print validation errors"
 )
-def validate_forms(env, print_errors):
+def validate_forms(print_errors):
     """Validate form annotations and schemas in the database.
 
     By default, validates both schemas and form data. Use --forms-only or --schemas-only
@@ -162,30 +114,27 @@ def validate_forms(env, print_errors):
 
     from .form_validation import validate_all
 
-    database = get_database(env)
+    database = get_database()
 
     with database.get_session() as session:
         validate_all(session, print_errors)
 
 
 @eorm.command()
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-def zarr_tree(env):
+def zarr_tree():
     """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
 
-    config = load_config(env)
+    settings = load_orm_settings()
 
     # Open the zarr store
     try:
-        root = zarr.open_group(store=config.segmentations_zarr_store, mode="r")
+        root = zarr.open_group(store=settings.segmentations_zarr_store, mode="r")
     except Exception as e:
-        print(f"Error opening zarr store at {config.segmentations_zarr_store}: {e}")
+        print(f"Error opening zarr store at {settings.segmentations_zarr_store}: {e}")
         return
 
-    print(f"Zarr store: {config.segmentations_zarr_store}")
+    print(f"Zarr store: {settings.segmentations_zarr_store}")
     print("=" * 50)
 
     # Iterate through groups
@@ -224,15 +173,12 @@ def zarr_tree(env):
 
 @eorm.command()
 @click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
     "--new-store-path",
     type=click.Path(),
     required=True,
     help="Path to the new zarr store directory",
 )
-def defragment_zarr(env, new_store_path):
+def defragment_zarr(new_store_path):
     """Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 
     This command creates a new zarr store and copies all existing segmentations to it,
@@ -243,16 +189,16 @@ def defragment_zarr(env, new_store_path):
 
     from orm.eyened_orm.utils.zarr.manager import ZarrStorageManager
 
-    config = load_config(env)
+    settings = load_orm_settings()
 
     # Create new store path if it doesn't exist
     new_store_path = Path(new_store_path)
     new_store_path.mkdir(parents=True, exist_ok=True)
 
     # Create annotation zarr storage manager for existing store
-    old_manager = ZarrStorageManager(config.segmentations_zarr_store)
+    old_manager = ZarrStorageManager(settings.segmentations_zarr_store)
 
-    print(f"Defragmenting zarr store from: {config.segmentations_zarr_store}")
+    print(f"Defragmenting zarr store from: {settings.segmentations_zarr_store}")
     print(f"Creating new zarr store at: {new_store_path}")
     print("=" * 50)
 
@@ -274,15 +220,12 @@ def defragment_zarr(env, new_store_path):
 
 @eorm.command()
 @click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
     "--print-errors",
     is_flag=True,
     default=False,
     help="Print errors for failed hash calculations",
 )
-def update_hashes(env, print_errors):
+def update_hashes(print_errors):
     """Update FileChecksum and DataHash for all ImageInstances in the database where they are NULL.
 
     This command will iterate over all ImageInstances in the database with FileChecksum == None
@@ -292,7 +235,7 @@ def update_hashes(env, print_errors):
     from eyened_orm import ImageInstance
     from sqlalchemy import select
 
-    database = get_database(env)
+    database = get_database()
 
     with database.get_session() as session:
         # Get all image instances with missing hashes
@@ -349,16 +292,13 @@ def update_hashes(env, print_errors):
 
 @eorm.command()
 @click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
     "--dump-path",
     "-d",
     type=click.Path(exists=True),
     required=True,
     help="Path to SQL dump file to load",
 )
-def load_dump(env, dump_path):
+def load_dump(dump_path):
     """Load a database dump file, replacing the entire database.
 
     This command will:
@@ -369,8 +309,8 @@ def load_dump(env, dump_path):
     """
     from pathlib import Path
 
-    config = load_config(env)
-    db_config = config.database
+    database = get_database()
+    db_config = database.database_settings
 
     dump_path = Path(dump_path)
     if not dump_path.exists():
@@ -414,3 +354,51 @@ def load_dump(env, dump_path):
             return
 
     print("\nDatabase dump loaded successfully!")
+
+
+@eorm.command()
+@click.option(
+    "--dump-dir",
+    "-d",
+    type=click.Path(exists=True, file_okay=False),
+    required=True,
+    help="Directory to write the dated SQL dump file",
+)
+def save_dump(dump_dir):
+    """Save a dated database dump to the given directory."""
+    from datetime import datetime
+    from pathlib import Path
+    import subprocess
+
+    database = get_database()
+    db_config = database.database_settings
+
+    dump_dir = Path(dump_dir)
+    date_stamp = datetime.now().strftime("%Y_%m_%d")
+    dump_path = dump_dir / f"eyened_db_dump_{date_stamp}.sql"
+
+    print(f"Saving database dump to: {dump_path}")
+    print(f"Source database: {db_config.database} on {db_config.host}:{db_config.port}")
+
+    dump_cmd = [
+        "mysqldump",
+        "-h",
+        db_config.host,
+        "-P",
+        str(db_config.port),
+        "--single-transaction",
+        "--routines",
+        "-u",
+        db_config.user,
+        f"-p{db_config.password}",
+        db_config.database,
+    ]
+
+    try:
+        with open(dump_path, "w", encoding="utf-8") as dump_file:
+            subprocess.run(dump_cmd, stdout=dump_file, check=True)
+    except subprocess.CalledProcessError as exc:
+        print(f"Error: mysqldump failed with exit code {exc.returncode}")
+        return
+
+    print("Database dump saved successfully!")

@@ -28,8 +28,8 @@
 		browserContext.openTab(eyeInstanceIds);
 	}
 	function hasLaterality(series: SeriesGET) {
-		const instances = series.instance_ids?.map((id) => instances.get(id));
-		return instances?.some((instance) => instance?.laterality == laterality);
+		const images = series.instance_ids?.map((id) => instances.get(id));
+		return images?.some((i) => i?.laterality == laterality);
 	}
 
 	const eyeSeries = study.series?.filter(hasLaterality) ?? [];

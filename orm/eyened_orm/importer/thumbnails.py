@@ -49,10 +49,12 @@ def get_thumbnail(im: ImageInstance):
     else:
         return pixel_array
 
-
+# TODO: fix this: use nanoid instead
 def generate_thumbnail_name(db_id, secret_key):
+    if hasattr(secret_key, "get_secret_value"):
+        secret_key = secret_key.get_secret_value()
     # default to the db_id if no secret key is provided
-    if secret_key is None:
+    if not secret_key:
         return str(db_id)
     # otherwise generate a hash of the db_id and the secret key for obfuscation
     hash_bytes = hmac.new(

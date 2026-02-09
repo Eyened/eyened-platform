@@ -16,6 +16,7 @@ from eyened_orm import (
     Study,
 )
 from eyened_orm.attributes import AttributeDataType, AttributeDefinition, AttributeValue
+
 from eyened_orm.image_instance import (
     DeviceInstance,
     DeviceModel,
@@ -26,7 +27,9 @@ from eyened_orm.image_instance import (
 from eyened_orm.importer.thumbnails import update_thumbnails
 from eyened_orm.project import ExternalEnum
 from eyened_orm.segmentation import Datatype, Segmentation
-from eyened_orm.utils.config import EyenedORMConfig
+
+# TODO: fix this!
+# from eyened_orm.utils.config import EyenedORMConfig
 
 from .importer_dtos import (
     ImageImport,
@@ -42,7 +45,6 @@ class Importer:
     def __init__(
         self,
         session,
-        config: EyenedORMConfig,
         create_patients: bool = False,
         create_studies: bool = False,
         create_series: bool = True,
@@ -57,7 +59,7 @@ class Importer:
         -----------
         session : SQLAlchemy session
             Database session to use for the import
-        config : EyenedORMConfig
+        config : ORMSettings
             Configuration to use for the import
         create_patients : bool, default=False
             If True, create patients when they don't exist
@@ -74,7 +76,7 @@ class Importer:
 
         """
         self.session = session
-        self.config = config
+        self.config = None
         self.create_patients = create_patients
         self.create_studies = create_studies
         self.create_series = create_series
@@ -82,9 +84,9 @@ class Importer:
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
 
-        assert self.config.images_basepath is not None, (
-            "images_basepath must be set when using the importer"
-        )
+        assert (
+            self.config.images_basepath is not None
+        ), "images_basepath must be set when using the importer"
 
         # Initialize empty collections
         self._clear_collections()
@@ -557,7 +559,7 @@ class Importer:
         return series
 
     def find_or_create_study(self, patient: Patient, study_item: StudyImport) -> Study:
-        default_study_date = self.config.default_study_date or datetime.date(1970, 1, 1)
+        default_study_date = self.config.default_study_date
 
         study_date = study_item.study_date or default_study_date
 
@@ -614,9 +616,9 @@ class Importer:
         fpath = Path(path_or_url)
 
         if fpath.is_absolute():
-            assert fpath.is_relative_to(basepath), (
-                f"File path {fpath} is absolute is not within the images_basepath directory {basepath}"
-            )
+            assert fpath.is_relative_to(
+                basepath
+            ), f"File path {fpath} is absolute is not within the images_basepath directory {basepath}"
         else:
             # relative path provided, make it absolute and check
             fpath = Path(basepath) / fpath
@@ -638,9 +640,7 @@ class Importer:
             # Run AI models on the images
             from eyened_orm.inference.inference import run_inference
 
-            run_inference(
-                self.session, device=None, cfi_cache_path=self.config.cfi_cache_path
-            )
+            run_inference(self.session, device=None)
 
     def _import(self, data: List[PatientImport]):
         """

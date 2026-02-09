@@ -416,8 +416,8 @@ export class BrowserContext {
         this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
     }
 
-    openTab(instances: number[]) {
-        const suffix_string = `?instances=${instances}`;
+    openTab(imageIds: string[]) {
+        const suffix_string = `?instances=${imageIds.join(',')}`;
         const url = `${window.location.origin}/view${suffix_string}`;
         window.open(url, '_blank')?.focus();
     }
