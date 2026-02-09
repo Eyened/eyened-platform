@@ -9,7 +9,6 @@ from fastapi.responses import FileResponse, JSONResponse, ORJSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
-from server.config import settings
 from server.routes import (
     auth,
     import_api,
@@ -25,12 +24,8 @@ from server.routes import (
     devices,
     studies,
 )
-from server.utils.database_init import (
-    create_database,
-    init_admin,
-)
 from server.utils.db_logging import init_db_logger
-from eyened_orm import Database
+from server.config import settings
 
 app_api = FastAPI(title="Eyened API", default_response_class=ORJSONResponse)
 app_api.include_router(auth.router)
@@ -56,9 +51,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors()},
     )
 
+
 @app_api.exception_handler(SQLAlchemyError)
 async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
-    if settings.environment == 'development':
+    if settings.debug:
         # print stack trace
         traceback.print_exc()
     return JSONResponse(
@@ -66,9 +62,10 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
         content={"detail": "A database error occurred."},
     )
 
+
 @app_api.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    if settings.environment == 'development':
+    if settings.debug:
         # print stack trace
         traceback.print_exc()
     return JSONResponse(
@@ -77,58 +74,31 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up with settings:")
     print(settings)
-    
-    # Validate secret key is set (required for JWT token validation)
-    if not settings.secret_key:
-        raise RuntimeError("SECRET_KEY must be set in environment variables for JWT token validation")
-    
+
     if settings.public_auth_disabled:
         print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
 
-    if settings.database_root_password:
-        try:
-            # create database tables and user if they don't exist
-            create_database()
-        except Exception as e:
-            raise RuntimeError(f"Error creating database: {e}") from e
-    else:
-        print("DATABASE_ROOT_PASSWORD is not set, skipping database creation")
-
-
-
     # # before startup
     logging.basicConfig()
-    if settings.environment == 'development':
-        logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    if settings.debug:
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
     else:
-        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
-    
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
     # Initialize database modification logger
     init_db_logger(settings)
-    
-    db = Database(settings)
-
-    
-
-    with db.get_session() as session:
-        init_admin(session)
-        
-
 
     yield
     # after shutdown
 
 
-
-
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(GZipMiddleware, minimum_size=1024 * 1024)
+app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
 
 app.mount("/api", app_api)
 
@@ -136,15 +106,3 @@ app.mount("/api", app_api)
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
-
-@app.get("/{path:path}")  # Catch-all route for file serving
-async def catch_all(path: str):
-    file_path = os.path.join("/client/build", path)
-
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)  # Serve existing file
-    return FileResponse(os.path.join("/client/build", "index.html"))
-
-
-

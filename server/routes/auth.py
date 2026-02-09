@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from eyened_orm import Creator
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
-from passlib.context import CryptContext
+
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -12,17 +12,6 @@ from ..db import get_db
 from ..utils.db_logging import get_db_logger
 
 # Password hashing configuration
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
-
-# JWT configuration
-JWT_SECRET_KEY = settings.secret_key
-JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
-
-# Add refresh token cookie name constant
-JWT_COOKIE_NAME = "jwt_token"
-REFRESH_COOKIE_NAME = "refresh_token"
 
 router = APIRouter()
 
@@ -73,17 +62,6 @@ class CurrentUser:
         return session.query(Creator).where(Creator.CreatorID == self.id).first()
 
 
-# Password utilities
-def hash_password(password: str) -> str:
-    """Hash a password using Argon2."""
-    return pwd_context.hash(password)
-
-
-def verify_password(password: str, stored_hash: str) -> bool:
-    """Verify a password against its hash."""
-    return pwd_context.verify(password, stored_hash)
-
-
 # JWT utilities
 def create_access_token(user_id: int, username: str, role: str | None = None) -> str:
     """Create a JWT access token."""
@@ -92,10 +70,11 @@ def create_access_token(user_id: int, username: str, role: str | None = None) ->
         "username": username,
         "role": role,
         "type": "access",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes),
         "iat": datetime.now(timezone.utc)
     }
-    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    print(payload)
+    return jwt.encode(payload, settings.secret_key_value, algorithm=settings.jwt_algorithm)
 
 
 def create_refresh_token(user_id: int) -> str:
@@ -103,39 +82,41 @@ def create_refresh_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),  # Convert to string
         "type": "refresh",
-        "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        "exp": datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
         "iat": datetime.now(timezone.utc)
     }
-    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, settings.secret_key_value, algorithm=settings.jwt_algorithm)
 
 
-def verify_token(token: str) -> dict:
-    """Verify and decode a JWT token."""
+def _decode_token_or_401(token: str, *, detail: str | None = None) -> dict:
+    """Decode JWT; raise 401 when invalid."""
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        return payload
+        return jwt.decode(token, settings.secret_key_value, algorithms=[settings.jwt_algorithm])
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
         )
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-        )
-
-def _try_decode_token(token: str) -> dict | None:
-    """Decode JWT safely; return payload or None."""
-    try:
-        return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            detail=detail,
         )
+
+
+def verify_token(token: str) -> dict:
+    """Verify and decode a JWT token."""
+    return _decode_token_or_401(token)
+
+
+def _try_decode_token(token: str) -> dict:
+    """Decode JWT safely."""
+    return _decode_token_or_401(token, detail="Invalid token")
 
 async def is_authenticated(
     authorization: str = Header(None),
@@ -165,7 +146,7 @@ async def get_current_user(
     session: Session = Depends(get_db),
 ) -> CurrentUser:
     """Get the current authenticated user from either Authorization header or cookies."""
-    
+    from eyened_orm.utils.db_users import create_user
     # Bypass authentication if disabled (development mode)
     if settings.public_auth_disabled:
         creator = session.query(Creator).where(Creator.CreatorName == settings.admin_username).first()
@@ -181,20 +162,12 @@ async def get_current_user(
     # Try Authorization header first (for API clients)
     if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "")
-        try:
-            payload = verify_token(token)
-            if payload.get("type") == "access":
-                return CurrentUser(
-                    creator_id=int(payload["sub"]),
-                    username=payload["username"],
-                    role=payload.get("role")
-                )
-        except HTTPException:
-            raise
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token"
+        payload = verify_token(token)
+        if payload.get("type") == "access":
+            return CurrentUser(
+                creator_id=int(payload["sub"]),
+                username=payload["username"],
+                role=payload.get("role")
             )
     
     # Try access token cookie (for web clients)
@@ -244,6 +217,7 @@ def creator_to_response(creator: Creator, session: Session | None = None) -> Use
 
 
 def check_login(username: str, password: str, db: Session) -> Creator:
+    from eyened_orm.utils.db_users import verify_password, hash_password
     """Verify user credentials and return the user."""
     creator = (
         db.query(Creator).where(Creator.CreatorName == username).first()
@@ -287,36 +261,6 @@ def check_login(username: str, password: str, db: Session) -> Creator:
     )
 
 
-def create_user(
-    session: Session,
-    username: str,
-    password: str,
-    is_human: bool = True,
-    description: str | None = None,
-) -> Creator:
-    """Create a new user with the given credentials."""
-    # Check if username already exists
-    existing_user = (
-        session.query(Creator).where(Creator.CreatorName == username).first()
-    )
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already exists"
-        )
-
-    # Create new user
-    new_user = Creator(
-        CreatorName=username,
-        PasswordHash=hash_password(password),
-        IsHuman=is_human,
-        Description=description,
-    )
-    session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
-    
-    return new_user
 
 
 # API endpoints
@@ -342,25 +286,25 @@ async def login(
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            "expires_in": settings.access_token_expire_minutes * 60
         }
     
     # Otherwise, set cookies (existing behavior)
     response.set_cookie(
-        key=JWT_COOKIE_NAME,
+        key=settings.jwt_cookie_name,
         value=access_token,
         httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=settings.access_token_expire_minutes * 60,
         secure=False,  # Set to True in production
         samesite="strict",
         path="/",
     )
     
     response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
+        key=settings.refresh_cookie_name,
         value=refresh_token,
         httponly=True,
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
         secure=False,  # Set to True in production
         samesite="strict",
         path="/",
@@ -384,7 +328,7 @@ async def get_token(
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires_in=settings.access_token_expire_minutes * 60,
         user=creator_to_response(creator, session)
     )
 
@@ -405,6 +349,8 @@ async def change_password(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Change user password."""
+
+    from eyened_orm.utils.db_users import hash_password
     creator = check_login(current_user.username, change_password_data.old_password, session)
 
     # Set new password using Argon2
@@ -433,6 +379,7 @@ async def register_user(
     session: Session = Depends(get_db)
 ):
     """Register a new user."""
+    from eyened_orm.utils.db_users import create_user
     new_user = create_user(session, user_data.username, user_data.password)
     
     # Log user creation
@@ -483,10 +430,10 @@ async def refresh_token(
         
         # Update access token cookie
         response.set_cookie(
-            key=JWT_COOKIE_NAME,
+            key=settings.jwt_cookie_name,
             value=new_access_token,
             httponly=True,
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            max_age=settings.access_token_expire_minutes * 60,
             secure=False,
             samesite="strict",
             path="/",
@@ -494,10 +441,10 @@ async def refresh_token(
         
         # Update refresh token cookie (extends session)
         response.set_cookie(
-            key=REFRESH_COOKIE_NAME,
+            key=settings.refresh_cookie_name,
             value=new_refresh_token,
             httponly=True,
-            max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+            max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
             secure=False,
             samesite="strict",
             path="/",
@@ -514,6 +461,6 @@ async def refresh_token(
 @router.post("/auth/logout")
 async def logout(response: Response):
     """Logout and clear both JWT cookies."""
-    response.delete_cookie(JWT_COOKIE_NAME)
-    response.delete_cookie(REFRESH_COOKIE_NAME)
+    response.delete_cookie(settings.jwt_cookie_name)
+    response.delete_cookie(settings.refresh_cookie_name)
     return {"message": "Logged out successfully"}

@@ -1,19 +1,16 @@
-# Note: this can cause issues
-# https://github.com/fastapi/sqlmodel/discussions/900
-# from future import annotations
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
-
+from eyened_orm.config import load_routing_settings
 import numpy as np
 import pandas as pd
 import pydicom
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
 from rtnls_fundusprep.mask_extraction import get_cfi_bounds
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Index, String, func, select
+import secrets
+from sqlalchemy import ForeignKey, Index, String, event, func, select
 from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -22,6 +19,12 @@ from .types import OptionalEnum
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series
+
+BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def _make_public_id(length: int = 12) -> str:
+    return "".join(secrets.choice(BASE62_ALPHABET) for _ in range(length))
 
 
 class Laterality(Enum):
@@ -73,10 +76,26 @@ class ETDRSField(Enum):
     F7 = "F7"
 
 
+class StorageBackends(Base):
+    __tablename__ = "storage_backends"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(256))
+    kind: Mapped[str] = mapped_column(String(256))
+    config: Mapped[Any] = mapped_column(JSON)
+
+    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance",
+        back_populates="storage_backend",
+        lazy="noload",
+    )
+
+
 class ImageInstance(Base):
     __tablename__ = "ImageInstance"
     __table_args__ = (
         Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
+        Index("ix_ImageInstance_public_id", "public_id", unique=True),
         Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
         Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
         Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
@@ -108,6 +127,26 @@ class ImageInstance(Base):
     )
 
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
+    public_id: Mapped[str] = mapped_column(
+        String(12),
+        unique=True,
+        nullable=False,
+    )
+
+    storage_backend_id: Mapped[int] = mapped_column(
+        ForeignKey("storage_backends.id"),
+        nullable=False,
+    )
+
+    object_prefix: Mapped[Optional[str]] = mapped_column(
+        String(256),
+        nullable=True,
+    )
+
+    object_key: Mapped[str] = mapped_column(
+        String(256),
+        nullable=False,
+    )
 
     # repeating field, but non-nullable
     SeriesID: Mapped[int] = mapped_column(
@@ -211,6 +250,11 @@ class ImageInstance(Base):
     Series: Mapped["Series"] = relationship(
         "eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin"
     )
+    storage_backend: Mapped["StorageBackends"] = relationship(
+        "eyened_orm.image_instance.StorageBackends",
+        back_populates="ImageInstances",
+        lazy="selectin",
+    )
     SourceInfo: Mapped["SourceInfo"] = relationship(
         "eyened_orm.image_instance.SourceInfo",
         back_populates="ImageInstances",
@@ -311,20 +355,29 @@ class ImageInstance(Base):
 
     @property
     def path(self) -> Path:
-        return self.config.images_basepath / self.DatasetIdentifier
+        routing_settings = load_routing_settings()
+        try:
+            root = routing_settings[self.storage_backend.key]
+        except KeyError:
+            raise ValueError(
+                f"Storage backend key {self.storage_backend.key} not found in routing settings"
+            )
+        return Path(root) / (self.object_prefix or "") / self.object_key
 
-    def get_thumbnail_path(self, size: int) -> Path:
-        return self.config.thumbnails_path / f"{self.ThumbnailPath}_{size}.jpg"
-
-    @property
-    def url(self):
-        if self.config.image_server_url is None:
-            raise RuntimeError("image_server_url not set in config")
-        return f"{self.config.image_server_url}/{self.DatasetIdentifier}"
+    def get_thumbnail_path(self, size: int) -> str:
+        routing_settings = load_routing_settings()
+        try:
+            root = routing_settings['thumbnails']
+        except KeyError:
+            raise ValueError(
+                "Thumbnails routing settings not found"
+            )
+        return f"{root}/{self.ThumbnailPath}_{size}.jpg"
 
     @property
     def device_str(self):
-        return f"{self.DeviceInstance.DeviceModel.Manufacturer} {self.DeviceInstance.DeviceModel.ManufacturerModelName}"
+        model = self.DeviceInstance.DeviceModel
+        return f"{model.Manufacturer} {model.ManufacturerModelName}"
 
     @property
     def pixel_array(self):
@@ -500,6 +553,12 @@ class ImageInstance(Base):
             session.flush()
 
         return link
+
+
+@event.listens_for(ImageInstance, "before_insert")
+def _image_instance_set_public_id(mapper, connection, target) -> None:
+    if not target.public_id:
+        target.public_id = _make_public_id()
 
 
 class DeviceModel(Base):

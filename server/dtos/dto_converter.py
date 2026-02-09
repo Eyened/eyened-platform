@@ -251,7 +251,7 @@ class DTOConverter:
             data_source_id=DTOConverter._get_data_source_id(image_instance.object_key or ""),
             multi_file_count=DTOConverter._get_multi_file_count(image_instance),
             thumbnail_identifier=image_instance.ThumbnailPath or "",
-            thumbnail_path=image_instance.ThumbnailPath or "",
+            # thumbnail_path=image_instance.ThumbnailPath or "",
             modality=image_instance.Modality,
             dicom_modality=image_instance.DICOMModality,
             etdrs_field=image_instance.ETDRSField,

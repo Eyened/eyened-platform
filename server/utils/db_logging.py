@@ -216,7 +216,7 @@ class DatabaseModificationLogger:
             log_data, default_flow_style=False, sort_keys=False, allow_unicode=True
         )
         self.logger.info(yaml_str.rstrip())  # Remove trailing newline
-    
+
     def log_simple(
         self,
         user: str,
@@ -229,7 +229,7 @@ class DatabaseModificationLogger:
     ):
         """
         Log a simple one-line operation (for high-frequency operations).
-        
+
         Args:
             user: Username who performed the operation
             user_id: User ID who performed the operation
@@ -270,18 +270,11 @@ def init_db_logger(settings) -> DatabaseModificationLogger:
     """
     global _db_logger
 
-    log_file_path = getattr(
-        settings, "db_log_file_path", "/var/log/eyened/db_modifications.log"
-    )
-    log_level = getattr(settings, "db_log_level", logging.INFO)
-    max_bytes = getattr(settings, "db_log_max_bytes", 10 * 1024 * 1024)  # 10MB
-    backup_count = getattr(settings, "db_log_backup_count", 5)
-
     _db_logger = DatabaseModificationLogger(
-        log_file_path=log_file_path,
-        log_level=log_level,
-        max_bytes=max_bytes,
-        backup_count=backup_count,
+        log_file_path=settings.db_log.file_path,
+        log_level=settings.db_log.level,
+        max_bytes=settings.db_log.max_bytes,
+        backup_count=settings.db_log.backup_count,
     )
 
     return _db_logger

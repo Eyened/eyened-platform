@@ -4,8 +4,6 @@ from pathlib import Path
 
 import click
 
-from eyened_orm.inference.multi_process_inference import MultiProcessInference
-from eyened_orm.inference.utils import auto_device
 from eyened_orm.inference.etdrs_summary import run_etdrs_model
 
 from .shared import get_database
@@ -19,6 +17,7 @@ def _load_image_ids(path: str) -> set[int]:
 
 def _get_device(device: str | None):
     import torch
+    from eyened_orm.inference.utils import auto_device
 
     """Get torch device from string or auto-detect."""
     if device is None:
@@ -27,12 +26,6 @@ def _get_device(device: str | None):
 
 
 @click.command(name="run-models")
-@click.option(
-    "-e",
-    "--env",
-    type=str,
-    help="Path to .env file for environment configuration",
-)
 @click.option(
     "-m",
     "--model",
@@ -82,7 +75,7 @@ def _get_device(device: str | None):
     default=100,
     help="Commit interval for processing",
 )
-def run_models(env, model, path, device, batch_size, n_workers, overwrite, commit_interval):
+def run_models(model, path, device, batch_size, n_workers, overwrite, commit_interval):
     """Run attribute inference models on a set of image IDs.
 
     Supported models:
@@ -91,7 +84,7 @@ def run_models(env, model, path, device, batch_size, n_workers, overwrite, commi
     - cfi-odfd: Optic Disc to Fovea Distance estimation
     - cfi-quality: Image quality assessment
     """
-    database = get_database(env)
+    database = get_database()
 
     # Load image IDs
     image_ids = _load_image_ids(path)
@@ -141,12 +134,6 @@ def run_models(env, model, path, device, batch_size, n_workers, overwrite, commi
 
 @click.command(name="run-segmentation")
 @click.option(
-    "-e",
-    "--env",
-    type=str,
-    help="Path to .env file for environment configuration",
-)
-@click.option(
     "-m",
     "--model",
     type=click.Choice(["cfi-amd"], case_sensitive=False),
@@ -187,13 +174,13 @@ def run_models(env, model, path, device, batch_size, n_workers, overwrite, commi
     default=True,
     help="Skip existing segmentations (filters out complete images)",
 )
-def run_segmentation(env, model, path, device, batch_size, n_workers, skip_existing):
+def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
     """Run segmentation inference models on a set of image IDs.
 
     Supported models:
     - cfi-amd: CFI AMD segmentation (drusen, RPD, hyperpigmentation, RPE degeneration)
     """
-    database = get_database(env)
+    database = get_database()
 
     # Load image IDs
     image_ids = _load_image_ids(path)
@@ -429,9 +416,6 @@ def run_segmentation(env, model, path, device, batch_size, n_workers, skip_exist
 
 @click.command(name="run-registration")
 @click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
-@click.option(
     "--patient",
     type=str,
     required=False,
@@ -470,7 +454,7 @@ def run_segmentation(env, model, path, device, batch_size, n_workers, skip_exist
         "(e.g. --skip 1811325,1811324,1811323)"
     ),
 )
-def run_registration(env, patient, project, schema, creator, replace, skip):
+def run_registration(patient, project, schema, creator, replace, skip):
     """Run registration processing for patients."""
     from eyened_orm import Patient, FormSchema, Creator
     from eyened_orm.utils.registration import run_patient
@@ -486,7 +470,7 @@ def run_registration(env, patient, project, schema, creator, replace, skip):
             print(f"Error parsing skip list: {e}. Expected comma-separated integers.")
             return
 
-    database = get_database(env)
+    database = get_database()
     with database.get_session() as session:
 
         # Get or create schema - load JSON file if creating

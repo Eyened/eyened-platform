@@ -1,4 +1,3 @@
-import { apiUrl } from '$lib/config';
 import { Image2D } from '$lib/webgl/image2D';
 import { Image3D } from '$lib/webgl/image3D';
 import type { Dimensions } from '$lib/webgl/types';
@@ -196,8 +195,7 @@ export class ImageLoader {
     }
 
     private buildDataUrl(imageId: number | string, query?: Record<string, string>): string {
-        const base = apiUrl?.replace(/\/$/, '') ?? '';
-        const url = `${base}/images/${encodeURIComponent(String(imageId))}/data`;
+        const url = `/api/images/${encodeURIComponent(String(imageId))}/data`;
         if (!query) {
             return url;
         }
@@ -220,7 +218,7 @@ function getArrayFromImages(js_images: ImageBitmap[]): Uint8Array {
     const pixelData = new Uint8Array(js_images.length * w * h);
     for (let i = 0; i < js_images.length; i++) {
         const img = js_images[i];
-        
+
         const ctx = new OffscreenCanvas(img.width, img.height).getContext('2d')!;
         ctx.drawImage(img, 0, 0);
         const imageData = ctx.getImageData(0, 0, img.width, img.height);

@@ -82,13 +82,6 @@ class Base(DeclarativeBase):
         return session
 
     @property
-    def config(self):
-        """Get config from the attached session."""
-        if not hasattr(self.session, "config"):
-            raise ValueError("Session not properly configured")
-        return self.session.config
-
-    @property
     def storage_manager(self) -> ZarrStorageManager:
         """Get storage manager from the attached session."""
         if not hasattr(self.session, "storage_manager"):
@@ -108,9 +101,19 @@ class Base(DeclarativeBase):
         return cls.by_column(session, **kwargs)
 
     @classmethod
-    def fetch_all(cls: Type[T], session: Session) -> List[T]:
+    def fetch_all(
+        cls: Type[T],
+        session: Session,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> List[T]:
         """Return all objects of the table."""
-        return session.scalars(select(cls)).all()
+        stmt = select(cls)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        return session.scalars(stmt).all()
 
     @classmethod
     def query_column(
