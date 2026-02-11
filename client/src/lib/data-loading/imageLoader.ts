@@ -26,22 +26,21 @@ export class ImageLoader {
 
     async load(instance: ImageGET): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
-        console.log("load=>", instance);
         const imageId = instance.id;
         const dataUrl = this.buildDataUrl(imageId);
         // Convert to lowercase for case-insensitive comparison
         const dataFormat = instance.data_format;
-
         if (dataFormat === 'image') {
             return [await this.loadImage2D(instance, img_id)];
         } else if (dataFormat === 'binary') {
-            const image = await this.loadBinary3D(instance, dataUrl, img_id);
+            const meta = await this.loadBinaryMeta(imageId);
+            const image = await this.loadBinary3D(instance, dataUrl, img_id, meta);
             return this.returnImage3D(image);
 
         } else if (dataFormat === 'dicom') {
             return this.loadDicom(instance, img_id, imageId);
 
-        } else if (dataFormat === 'png_series' && (instance.multi_file_count ?? 0) > 1) {
+        } else if (dataFormat === 'png_series') {
             const source_id = instance.data_source_id ?? '';
             const meta_url = this.buildDataUrl(imageId);
             const response = await fetch(meta_url);
@@ -52,7 +51,7 @@ export class ImageLoader {
         }
     }
 
-    async loadPngSeries(instance: ImageGET, meta: any, img_id: string, n_scans: number, source_id: string, imageId: number | string): Promise<LoadedImages> {
+    async loadPngSeries(instance: ImageGET, meta: any, img_id: string, n_scans: number, source_id: string, imageId: string): Promise<LoadedImages> {
         const urls = Array.from({ length: n_scans }, (_, i) => {
             return this.buildDataUrl(imageId, { index: String(i) });
         });
@@ -104,28 +103,37 @@ export class ImageLoader {
         return Image2D.fromBitmap(instance, this.webgl, img_id, bitmap, dimensions, meta);
     }
 
-    async loadBinary3D(instance: ImageGET, url: string, img_id: string): Promise<Image3D> {
+    async loadBinary3D(instance: ImageGET, url: string, img_id: string, meta?: any): Promise<Image3D> {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
         const pixelData = new Uint8Array(buffer);
 
-        const dimensions = {
-            width: instance.columns,
-            height: instance.rows,
-            depth: instance.nr_of_frames || 1,
+        const metaDims = meta?.oct_shape && meta?.resolution ? {
+            width: meta.oct_shape[2],
+            height: meta.oct_shape[1],
+            depth: meta.oct_shape[0],
+            width_mm: meta.resolution[2] * meta.oct_shape[2] / 1000,
+            height_mm: meta.resolution[1] * meta.oct_shape[1] / 1000,
+            depth_mm: meta.resolution[0] * meta.oct_shape[0] / 1000
+        } : null;
 
-            width_mm: instance.resolution_horizontal ? instance.resolution_horizontal * instance.columns : -1,
-            height_mm: instance.resolution_vertical ? instance.resolution_vertical * instance.rows : -1,
-            depth_mm: instance.resolution_axial ? instance.resolution_axial * (instance.nr_of_frames || 1) : -1
+        const dimensions = {
+            width: metaDims?.width ?? instance.columns,
+            height: metaDims?.height ?? instance.rows,
+            depth: metaDims?.depth ?? (instance.nr_of_frames || 1),
+
+            width_mm: metaDims?.width_mm ?? (instance.resolution_horizontal ? instance.resolution_horizontal * instance.columns : -1),
+            height_mm: metaDims?.height_mm ?? (instance.resolution_axial ? instance.resolution_axial * instance.rows : -1),
+            depth_mm: metaDims?.depth_mm ?? (instance.resolution_vertical ? instance.resolution_vertical * (instance.nr_of_frames || 1) : -1)
         };
         if (instance.scan?.mode == 'Circle-Scan') {
             // this is not correct in the meta file
             dimensions.width_mm = instance.resolution_horizontal * dimensions.width;
         }
-        return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, {});
+        return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, meta ?? {});
     }
 
-    async loadDicom(instance: ImageGET, img_id: string, imageId?: number | string): Promise<LoadedImages> {
+    async loadDicom(instance: ImageGET, img_id: string, imageId?: string): Promise<LoadedImages> {
         const url = this.buildDataUrl(imageId ?? instance.id);
 
         const dicomImageId = `wadouri:${url}`;
@@ -136,6 +144,7 @@ export class ImageLoader {
 
         const photometricInterpretation = meta.x00280004;
         const { width, height, depth } = dimensions;
+        console.log('dimensions', dimensions);
 
         if (depth > 1 || meta.x00080060 === 'OPT') { // 3D OCT
             const volume = new Uint8Array(width * height * depth);
@@ -194,13 +203,19 @@ export class ImageLoader {
         };
     }
 
-    private buildDataUrl(imageId: number | string, query?: Record<string, string>): string {
-        const url = `/api/images/${encodeURIComponent(String(imageId))}/data`;
+    private buildDataUrl(imageId: string, query?: Record<string, string>): string {
+        const url = `/api/images/${imageId}/data`;
         if (!query) {
             return url;
         }
         const search = new URLSearchParams(query);
         return `${url}?${search.toString()}`;
+    }
+
+    private async loadBinaryMeta(imageId: string): Promise<any> {
+        const url = this.buildDataUrl(imageId, { meta: '1' });
+        const response = await fetch(url);
+        return await response.json();
     }
 }
 

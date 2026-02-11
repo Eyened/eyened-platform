@@ -1,6 +1,6 @@
 import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, ImageGET, SegmentationGET, StudyGET, SubTaskWithImagesGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
 import { api, fetchApi } from '../api/client';
-import { decodeNpy } from '../utils/npy_loader';
+import { decodeNpy, NPYArray } from '../utils/npy_loader';
 import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks, instances, segmentations, studies, tags, tasks } from './stores.svelte';
 
 
@@ -13,7 +13,7 @@ export async function tagInstance(instance: ImageGET, tagId: number, comment?: s
     });
 
     // Update store with new tag
-    if(instances.has(instance.id)) {
+    if (instances.has(instance.id)) {
         instances.set(instance.id, {
             ...instances.get(instance.id)!,
             tags: [...instances.get(instance.id)!.tags, data as any]
@@ -144,7 +144,7 @@ export async function untagSegmentation(seg: SegmentationGET, tagId: number) {
 
 // ===== Segmentation Data Helpers =====
 
-export async function getSegmentationData(segmentationId: number, params?: { scan_nr?: number; sparse_axis?: number }) {
+export async function getSegmentationData(segmentationId: number, params?: { scan_nr?: number; sparse_axis?: number }): Promise<NPYArray | null> {
     const query: any = {};
 
     query.axis = params?.sparse_axis;
@@ -156,6 +156,9 @@ export async function getSegmentationData(segmentationId: number, params?: { sca
         },
         parseAs: "arrayBuffer"
     });
+    if (res.response.status == 204) {
+        return null;
+    }
     return decodeNpy(res.data!);
 }
 
@@ -177,7 +180,7 @@ export async function updateSegmentationData(segmentationId: number, data: Array
     });
 }
 
-export async function getModelSegmentationData(modelSegmentationId: number, params?: { axis?: number; scan_nr?: number; sparse_axis?: number }) {
+export async function getModelSegmentationData(modelSegmentationId: number, params?: { axis?: number; scan_nr?: number; sparse_axis?: number }): Promise<NPYArray | null> {
     // Match original logic:
     // - axis only sent if sparse_axis != null AND scan_nr != undefined
     // - scan_nr can be sent alone
@@ -197,6 +200,9 @@ export async function getModelSegmentationData(modelSegmentationId: number, para
         },
         parseAs: "arrayBuffer"
     });
+    if (res.response.status == 204) {
+        return null;
+    }
     return decodeNpy(res.data!);
 }
 

@@ -40,10 +40,19 @@ export class SegmentationItem {
 
             // Don't pass axis/scan_nr when loading full volume
             // API requires both axis AND scan_nr together, or neither
-            const array: NPYArray = this.segmentation.annotation_type === 'model_segmentation'
+            const array: (NPYArray | null) = this.segmentation.annotation_type === 'model_segmentation'
                 ? await getModelSegmentationData(this.segmentation.id)
                 : await getSegmentationData(this.segmentation.id);
-
+            if (array == null) {
+                // 204: no data - create states for each scan index; each will fetch and set isEmptyForSlice
+                const scanIndices =
+                    this.segmentation.scan_indices ??
+                    Array.from({ length: this.image.depth }, (_, i) => i);
+                for (const scanNr of scanIndices) {
+                    this.getSegmentationState(scanNr, true);
+                }
+                return;
+            }
             const shape = array.shape as number[];
             // Expecting [depth, height, width]
             if (shape.length != 3) {
@@ -103,6 +112,18 @@ export class SegmentationItem {
 
     getMask(scanNr: number): Mask | undefined {
         return this.segmentationStates.get(scanNr)?.mask;
+    }
+
+    isEmptyForSlice(scanNr: number): boolean {
+        const scanIndices = this.segmentation.scan_indices;
+        if (Array.isArray(scanIndices) && !scanIndices.includes(scanNr)) {
+            return true;
+        }
+        const state = this.segmentationStates.get(scanNr);
+        if (state?.isEmptyForSlice) {
+            return true;
+        }
+        return false;
     }
 
     getSegmentationState(scanNr: number, create: boolean = false, initialData?: Uint8Array | Uint16Array | Uint32Array | Float32Array): SegmentationState | undefined {

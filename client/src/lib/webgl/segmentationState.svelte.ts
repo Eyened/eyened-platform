@@ -31,6 +31,7 @@ export class SegmentationState {
     private updateTimeout: ReturnType<typeof setTimeout> | null = null;
     private pendingUpdateResolve: (() => void) | null = null;
     public syncState = $state<SyncState>("synced");
+    public isEmptyForSlice = $state(false);
 
     constructor(
         readonly image: AbstractImage,
@@ -58,12 +59,16 @@ export class SegmentationState {
         // Load a single slice from the server
         const sparse_axis = this.segmentation.sparse_axis ?? undefined;
         const scan_nr = this.scanNr;
-        
-        let npyArray: NPYArray;
+
+        let npyArray: NPYArray | null;
         if (this.segmentation.annotation_type == 'model_segmentation') {
             npyArray = await getModelSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
         } else {
             npyArray = await getSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
+        }
+        if (npyArray == null) {
+            this.isEmptyForSlice = true;
+            return;
         }
         this.mask.importData(npyArray.data as DrawingArray);
     }
