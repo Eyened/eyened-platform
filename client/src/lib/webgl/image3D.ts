@@ -21,7 +21,7 @@ export class Image3D extends AbstractImage {
         webgl: WebGL,
         img_id: string,
         public readonly data: Uint8Array,
-        dimensions: Dimensions,
+        dimensions: Dimensions, // w: horizontal, h: axial, d: vertical
         meta: any
     ) {
         super(instance, webgl, img_id, dimensions, meta);

@@ -51,6 +51,9 @@
 	);
 	const syncState = $derived(segmentationState?.syncState ?? null);
 	const isEditable = globalContext.canEdit(segmentation);
+	const isEmptyForCurrentSlice = $derived(
+		segmentationItem.isEmptyForSlice(viewerContext.index),
+	);
 	let collapsed = $state(true);
 
 	async function remove() {
@@ -127,6 +130,8 @@
 	class="content"
 	class:loading={segmentationItem.loading}
 	class:active
+	class:empty-non-editable={!isEditable && isEmptyForCurrentSlice}
+	class:empty-editable={isEditable && isEmptyForCurrentSlice}
 	onpointerenter={pointerEnter}
 	onpointerleave={pointerLeave}
 >
@@ -252,6 +257,15 @@
 	}
 	div.content.loading {
 		opacity: 0.5;
+	}
+
+	div.content.empty-non-editable {
+		opacity: 0.6;
+		pointer-events: none;
+	}
+
+	div.content.empty-editable {
+		background-color: rgba(100, 255, 255, 0.15);
 	}
 
 	div.row {
