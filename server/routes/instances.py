@@ -200,6 +200,7 @@ async def get_public_image(
 async def get_public_image_data(
     image_id: str,
     index: Optional[int] = None,
+    meta: bool = False,
     _: bool = Depends(is_authenticated),
     db: Session = Depends(get_db),
 ):
@@ -210,6 +211,25 @@ async def get_public_image_data(
         raise HTTPException(400, "index must be >= 0")
 
     object_key = item.object_key
+    base_path = f"/{item.storage_backend.key}/"
+
+    if meta:
+        if object_key.endswith(".binary"):
+            meta_key = object_key[: -len(".binary")] + ".json"
+            return build_storage_redirect_response(
+                item.object_prefix, meta_key, base_path
+            )
+        if object_key.startswith("[png_series_"):
+            _, base_url = object_key.split("]", 1)
+            if "/" in base_url:
+                folder = base_url.rsplit("/", 1)[0]
+                meta_key = f"{folder}/metadata.json"
+            else:
+                meta_key = "metadata.json"
+            return build_storage_redirect_response(
+                item.object_prefix, meta_key, base_path
+            )
+        raise HTTPException(400, "No metadata available for this image type")
     if object_key.startswith("[png_series_"):
         _, base_url = object_key.split("]", 1)
         if index is None:
@@ -218,15 +238,12 @@ async def get_public_image_data(
                 meta_key = f"{folder}/metadata.json"
             else:
                 meta_key = "metadata.json"
-            base_path = f"/{item.storage_backend.key}/"
             return build_storage_redirect_response(
                 item.object_prefix, meta_key, base_path
             )
         file_key = f"{base_url}_{index}.png"
-        base_path = f"/{item.storage_backend.key}/"
         return build_storage_redirect_response(item.object_prefix, file_key, base_path)
 
-    base_path = f"/{item.storage_backend.key}/"
     return build_storage_redirect_response(item.object_prefix, object_key, base_path)
 
 

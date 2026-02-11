@@ -17,3 +17,4 @@ passlib==1.7.4
 argon2_cffi==25.*
 PyJWT>=2.8.0
 orjson==3.*
+zarr==3.1.0

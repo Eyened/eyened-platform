@@ -2,7 +2,9 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
-from eyened_orm.config import load_routing_settings
+import io
+from eyened_orm.api_client import get_api_client
+
 import numpy as np
 import pandas as pd
 import pydicom
@@ -21,10 +23,11 @@ if TYPE_CHECKING:
     from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+BASE36_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
-def _make_public_id(length: int = 12) -> str:
-    return "".join(secrets.choice(BASE62_ALPHABET) for _ in range(length))
+def _make_public_id(length: int = 8, alphabet: str = BASE36_ALPHABET) -> str:
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 class Laterality(Enum):
@@ -223,6 +226,7 @@ class ImageInstance(Base):
     PupilDilated: Mapped[Optional[bool]]
 
     # Relative filepath to the image file
+    # deprecated: Use object_prefix/object_key instead
     DatasetIdentifier: Mapped[str] = mapped_column(String(256))
     # Alternative relative filepath to the image file. Typically a lower resolution version of the image.
     AltDatasetIdentifier: Mapped[Optional[str]] = mapped_column(String(256))
@@ -355,53 +359,64 @@ class ImageInstance(Base):
 
     @property
     def path(self) -> Path:
-        routing_settings = load_routing_settings()
-        try:
-            root = routing_settings[self.storage_backend.key]
-        except KeyError:
-            raise ValueError(
-                f"Storage backend key {self.storage_backend.key} not found in routing settings"
-            )
-        return Path(root) / (self.object_prefix or "") / self.object_key
+        return Path(self.object_prefix or "") / self.object_key
 
     def get_thumbnail_path(self, size: int) -> str:
-        routing_settings = load_routing_settings()
-        try:
-            root = routing_settings['thumbnails']
-        except KeyError:
-            raise ValueError(
-                "Thumbnails routing settings not found"
-            )
-        return f"{root}/{self.ThumbnailPath}_{size}.jpg"
+        return f"{self.ThumbnailPath}_{size}.jpg"
+
+    def get_thumbnail(self, size):
+        client = get_api_client()
+        resp = client.get(
+            f"/api/images/{self.public_id}/thumbnail", params={"size": size}
+        )
+        resp.raise_for_status()
+        return Image.open(io.BytesIO(resp.content))
 
     @property
     def device_str(self):
         model = self.DeviceInstance.DeviceModel
         return f"{model.Manufacturer} {model.ManufacturerModelName}"
 
+    def _download_stream(self, index: int | None = None) -> io.BytesIO:
+        client = get_api_client()
+        url = f"/api/images/{self.public_id}/data"
+        params = {"index": index} if index is not None else None
+        resp = client.get(url, params=params)
+        resp.raise_for_status()
+        return io.BytesIO(resp.content)
+
+    def _load_dicom_array(self) -> np.ndarray:
+        ds = pydicom.dcmread(self._download_stream())
+        return ds.pixel_array
+
+    def _load_binary_array(self) -> np.ndarray:
+        buf = self._download_stream()
+        arr = np.frombuffer(buf.getbuffer(), dtype=np.uint8)
+        return arr.reshape((-1, self.Rows_y, self.Columns_x), order="C")
+
+    def _load_png_series_array(self) -> np.ndarray:
+        prefix, filename = self.object_key.split("]", 1)
+        n_files = int(prefix[len("[png_series_") :])
+        client = get_api_client()
+        arrays = []
+        for i in range(n_files):
+            resp = client.get(f"/api/images/{self.public_id}/data", params={"index": i})
+            resp.raise_for_status()
+            arrays.append(np.array(Image.open(io.BytesIO(resp.content))))
+        return np.array(arrays).squeeze()
+
+    def _load_single_image_array(self) -> np.ndarray:
+        return np.array(Image.open(self._download_stream()))
+
     @property
-    def pixel_array(self):
-        """Return the raw data for this image as a numpy array"""
-        if self.DatasetIdentifier.endswith(".dcm"):
-            ds = pydicom.dcmread(self.path)
-            return ds.pixel_array
-        elif self.DatasetIdentifier.endswith(".binary"):
-            with open(self.path, "rb") as f:
-                raw = np.frombuffer(f.read(), dtype=np.uint8)
-                data = raw.reshape((-1, self.Rows_y, self.Columns_x), order="C")
-            return data
-        elif self.DatasetIdentifier.startswith("[png_series_"):
-            prefix, filename = self.DatasetIdentifier.split("]", 1)
-            n_files = int(prefix[len("[png_series_") :])
-            base_path = self.config.images_basepath / filename
-            return np.array(
-                [
-                    np.array(Image.open(base_path.parent / f"{base_path.stem}_{i}.png"))
-                    for i in range(n_files)
-                ]
-            ).squeeze()
-        else:
-            return np.array(Image.open(self.path))
+    def pixel_array(self) -> np.ndarray:
+        if self.object_key.endswith(".dcm"):
+            return self._load_dicom_array()
+        if self.object_key.endswith(".binary"):
+            return self._load_binary_array()
+        if self.object_key.startswith("[png_series_"):
+            return self._load_png_series_array()
+        return self._load_single_image_array()
 
     @property
     def bounds(self) -> CFIBounds:
@@ -440,10 +455,7 @@ class ImageInstance(Base):
         """Return the hash of the image data"""
         import hashlib
 
-        if not self.path.exists():
-            raise FileNotFoundError(f"File {self.path} does not exist")
-
-        # Get the raw data as numpy array
+        # Get the raw data as numpy array (from API via pixel_array)
         data = self.pixel_array
 
         # Ensure the array is contiguous in memory for consistent byte representation
@@ -457,14 +469,17 @@ class ImageInstance(Base):
         """Return the checksum of the file"""
         import hashlib
 
-        if not self.path.exists():
-            raise FileNotFoundError(f"File {self.path} does not exist")
-
         md5_hash = hashlib.md5()
 
-        with open(self.path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                md5_hash.update(chunk)
+        # Stream the file from the API in chunks to avoid loading entire file into memory
+        buf = self._download_stream()
+        # Reset to start just in case
+        buf.seek(0)
+        while True:
+            chunk = buf.read(4096)
+            if not chunk:
+                break
+            md5_hash.update(chunk)
         return md5_hash.digest()
 
     @classmethod
@@ -557,8 +572,20 @@ class ImageInstance(Base):
 
 @event.listens_for(ImageInstance, "before_insert")
 def _image_instance_set_public_id(mapper, connection, target) -> None:
-    if not target.public_id:
+    if target.public_id:
+        return
+
+    # Retry ID generation until we find one that is not yet used.
+    for _ in range(10):
         target.public_id = _make_public_id()
+        if not connection.scalar(
+            select(ImageInstance.public_id).where(
+                ImageInstance.public_id == target.public_id
+            )
+        ):
+            break
+    else:
+        raise ValueError("Failed to generate a unique public ID")
 
 
 class DeviceModel(Base):
