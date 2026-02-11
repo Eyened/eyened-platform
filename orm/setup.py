@@ -38,7 +38,6 @@ setup(
         "pydantic-settings==2.7.1",
         "python-dotenv==1.*",
         "retinalysis-fundusprep",
-        "zarr==3.1.0",
         "pyyaml==6.*",
         "google_crc32c==1.8.0",
     ],

@@ -52,6 +52,19 @@ def upgrade() -> None:
         sa.Column('ImageInstanceID', sa.Integer()),
         sa.Column('public_id', sa.String(length=12)),
     )
+    # Count how many ImageInstance rows we need public_ids for.
+    total_needed = connection.execute(
+        sa.select(sa.func.count(image_instance.c.ImageInstanceID))
+    ).scalar_one()
+
+    # Pre-generate that many unique public_ids, using a set to ensure uniqueness.
+    public_ids: set[str] = set()
+    while len(public_ids) < total_needed:
+        public_ids.add(_make_public_id())
+
+    public_id_iter = iter(public_ids)
+
+    # Now assign them in batches for efficient updates.
     result = connection.execute(sa.select(image_instance.c.ImageInstanceID))
     update_stmt = image_instance.update().where(
         image_instance.c.ImageInstanceID == sa.bindparam("b_ImageInstanceID")
@@ -61,8 +74,12 @@ def upgrade() -> None:
         rows = result.fetchmany(batch_size)
         if not rows:
             break
+
         params = [
-            {"b_ImageInstanceID": image_id, "public_id": _make_public_id()}
+            {
+                "b_ImageInstanceID": image_id,
+                "public_id": next(public_id_iter),
+            }
             for (image_id,) in rows
         ]
         connection.execute(update_stmt, params)

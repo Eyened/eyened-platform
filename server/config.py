@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     redis: RedisSettings = Field(default_factory=RedisSettings)
     db_log: DbLogSettings = Field(default_factory=DbLogSettings)
 
+    zarr_store: str
+
     @property
     def secret_key_value(self) -> str:
         return str(self.secret_key.get_secret_value())

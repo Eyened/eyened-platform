@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
+from ..utils.segmentation_storage import read_segmentation_data, write_segmentation_data
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import SegmentationGET, SegmentationPOST, SegmentationPATCH
 from ..dtos.dto_converter import DTOConverter
@@ -176,7 +177,7 @@ async def create_segmentation(
     db.flush()
 
     try:
-        segmentation.write_data(data)
+        write_segmentation_data(segmentation, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -296,7 +297,7 @@ async def update_segmentation_data(
     np_image = np.load(io.BytesIO(data))
 
     try:
-        segmentation.write_data(np_image, axis=axis, slice_index=scan_nr)
+        write_segmentation_data(segmentation, np_image, axis=axis, slice_index=scan_nr)
     except IndexError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ValueError as e:
@@ -338,7 +339,7 @@ async def get_segmentation_data(
         raise HTTPException(status_code=404, detail="Segmentation data not found")
 
     try:
-        arr = segmentation.read_data(axis=axis, slice_index=scan_nr)
+        arr = read_segmentation_data(segmentation, axis=axis, slice_index=scan_nr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -533,7 +534,7 @@ async def get_model_segmentation_data(
         raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
 
     try:
-        arr = model_segmentation.read_data(axis=axis, slice_index=scan_nr)
+        arr = read_segmentation_data(model_segmentation, axis=axis, slice_index=scan_nr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -551,3 +552,43 @@ async def get_model_segmentation_data(
         "Content-Length": str(len(gz)),
     }
     return Response(content=gz, media_type="application/octet-stream", headers=headers)
+
+
+@router.put("/model-segmentations/{model_segmentation_id}/data")
+async def update_model_segmentation_data(
+    model_segmentation_id: int,
+    request: Request,
+    axis: Optional[int] = None,
+    scan_nr: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    model_segmentation = ModelSegmentation.by_id(db, model_segmentation_id)
+    if model_segmentation is None:
+        raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
+
+    content_type = request.headers.get("Content-Type", "").lower()
+    if content_type != "application/octet-stream":
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported media type: {content_type}"
+        )
+
+    data = await request.body()
+    np_image = np.load(io.BytesIO(data))
+
+    try:
+        write_segmentation_data(
+            model_segmentation,
+            np_image,
+            axis=axis,
+            slice_index=scan_nr,
+        )
+    except IndexError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    db.add(model_segmentation)
+    db.commit()
+    db.refresh(model_segmentation)
+    return model_segmentation

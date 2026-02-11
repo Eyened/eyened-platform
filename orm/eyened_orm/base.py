@@ -1,5 +1,6 @@
 import enum
 import re
+from functools import lru_cache
 from typing import (
     Any,
     ClassVar,
@@ -12,7 +13,7 @@ from typing import (
 )
 from collections.abc import Iterable
 
-from eyened_orm.utils.zarr.manager import ZarrStorageManager
+
 from eyened_orm.utils.table_printer import TablePrinter
 from sqlalchemy import Column, Index, UniqueConstraint, select
 from sqlalchemy.orm import DeclarativeBase, Session, InstrumentedAttribute
@@ -80,13 +81,6 @@ class Base(DeclarativeBase):
         if not session:
             raise ValueError("Object not attached to a session")
         return session
-
-    @property
-    def storage_manager(self) -> ZarrStorageManager:
-        """Get storage manager from the attached session."""
-        if not hasattr(self.session, "storage_manager"):
-            raise ValueError("Session not properly configured")
-        return self.session.storage_manager
 
     def __getattr__(self, name: str) -> Any:
         """Resolve missing attributes by converting snake_case to CamelCase column names."""
