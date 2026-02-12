@@ -165,7 +165,9 @@ class SegmentationBase(Base):
         if model_seg_id is not None:
             return f"/api/model-segmentations/{model_seg_id}/data"
 
-        raise ValueError("Segmentation must be persisted before reading or writing data")
+        raise ValueError(
+            "Segmentation must be persisted before reading or writing data"
+        )
 
     def write_data(
         self,
@@ -245,9 +247,6 @@ class SegmentationBase(Base):
         resp.raise_for_status()
 
         raw = resp.content
-        if resp.headers.get("Content-Encoding", "").lower() == "gzip":
-            raw = gzip.decompress(raw)
-
         return np.load(io.BytesIO(raw), allow_pickle=False)
 
     @property
@@ -272,7 +271,8 @@ class SegmentationBase(Base):
         data = self.read_data()
         if data is None:
             return None
-        elif self.DataRepresentation == DataRepresentation.Binary:
+
+        if self.DataRepresentation == DataRepresentation.Binary:
             mask = data > 0
         elif self.DataRepresentation == DataRepresentation.DualBitMask:
             mask = (data & 1) > 0
@@ -285,7 +285,9 @@ class SegmentationBase(Base):
             else:
                 raise ValueError(f"Unsupported data type: {self.DataType}")
         else:
-            raise ValueError(f"Unsupported data representation: {self.DataRepresentation}")
+            raise ValueError(
+                f"Unsupported data representation: {self.DataRepresentation}"
+            )
 
         # Convenience: for "2D" segmentations (any singleton axis), return the squeezed mask.
         # Examples:
@@ -296,9 +298,15 @@ class SegmentationBase(Base):
             singleton_axes = tuple(i for i, s in enumerate(mask.shape) if s == 1)
             assert len(singleton_axes) == 1, "Expected exactly one singleton axis"
             if singleton_axes:
-                return np.squeeze(mask, axis=singleton_axes)
+                mask = np.squeeze(mask, axis=singleton_axes)
+
+        # If a reference segmentation is provided, that is interpreted as a conditional mask
+        # i.e. the final mask is the intersection of the current mask and the reference mask.
+        if self.ReferenceSegmentation:
+            reference_mask = self.ReferenceSegmentation.binary_mask
+            mask = mask & reference_mask
+
         return mask
-        
 
     @property
     def shape_matches_image_shape(self):
@@ -470,6 +478,19 @@ class Segmentation(SegmentationBase):
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         back_populates="Segmentation",
+        lazy="selectin",
+    )
+
+    ReferenceSegmentation: Mapped[Optional["Segmentation"]] = relationship(
+        "Segmentation",
+        remote_side="Segmentation.SegmentationID",
+        back_populates="ReferenceSegmentations",
+        lazy="selectin",
+    )
+
+    ReferenceSegmentations: Mapped[list["Segmentation"]] = relationship(
+        "Segmentation",
+        back_populates="ReferenceSegmentation",
         lazy="selectin",
     )
 
