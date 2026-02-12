@@ -9,57 +9,73 @@ The eyened platform provides multiple ways to import ophthalmic images into the 
 
 This method is the simplest way to import individual images using the REST API. It's ideal for smaller imports or when building integrations with other systems.
 
-The Eyened database follows a hierarchical structure where images are categorized into projects, patients, studies, and series, from top to bottom. When importing an image, you can specify identifiers for each level of this hierarchy. The API will either use existing database objects or create new ones based on the configuration options you provide.
+The Eyened database follows a hierarchical structure where images are categorized into projects, patients, studies, and series, from top to bottom. When importing an image, you specify identifiers for each level in a flat `data` object. The API will either use existing database objects or create new ones based on the `options` you provide.
 
 :::note
 For a complete example of using the import API with real images, check out our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb).
 :::
 
 :::note
-For detailed information about entity fields available for each level (Patient, Study, Series, Image), see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
+For detailed information about metadata fields (patient, study, series, image), see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
 :::
 
 ### Single Image Import
 
-The API provides an endpoint for importing individual images and their associated metadata for project, patient, study, series and the image itself:
+The API provides an endpoint for importing individual images and their associated metadata:
 
 ```
 POST /api/import/image
 ```
 
-This endpoint accepts a JSON payload with the following structure:
+This endpoint accepts a JSON payload with a flat `data` object (no nested `props`):
 
-```python
+```json
 {
   "data": {
-    "project_name": "Project Name",    # Required: name of the project
-    "patient_identifier": "Patient_1",  # Patient identifier
-    "patient_props": {},                # Optional key-value properties for patient
-    "study_date": "2023-05-15",        # Date of the study
-    "study_props": {},                  # Optional key-value properties for study
-    "series_id": "series123",           # Optional series identifier
-    "series_props": {},                 # Optional key-value properties for series
-    "image": "/path/to/image.jpg",     # Relative path to image
-    "image_props": {                    # Optional image properties
-      "Laterality": "R",               # Optional: eye laterality (R/L)
-      "Modality": "ColorFundus",       # Required: image modality
-      # Any other image properties (see Data Objects)
-    }
+    "project_name": "Project Name",
+    "patient_identifier": "Patient_1",
+    "sex": "M",
+    "birth_date": "1990-01-15",
+    "study_date": "2023-05-15",
+    "study_description": "Baseline visit",
+    "series_id": "series123",
+    "series_number": 1,
+    "series_instance_uid": "1.2.3.4.5",
+    "image": "path/to/image.jpg",
+    "modality": "ColorFundus",
+    "laterality": "R",
+    "attributes": {}
   },
   "options": {
-    "create_patients": true,           # Create patient if not exists
-    "create_studies": true,            # Create study if not exists
-    "create_series": true,             # Create series if not exists
-    "create_project": true,            # Create project if not exists
-    "include_stack_trace": true        # Include stack trace in error responses
+    "create_patients": false,
+    "create_studies": false,
+    "create_series": true,
+    "create_project": false,
+    "include_stack_trace": false
   }
 }
 ```
 
-The `props` dictionaries at each level can include any of the fields documented in the [Metadata Fields documentation](/eyened-platform/import_metadata_fields). These properties are used to populate the corresponding database objects.
+**Required fields in `data`:**
+- `project_name` (str) — Name of the project
+- `image` (str) — Path to the image file, relative to `IMAGES_BASEPATH`
+- `modality` (str) — Image modality (e.g. `"ColorFundus"`, `"OCT"`)
+
+**Optional hierarchy fields:** `patient_identifier`, `sex`, `birth_date`, `study_date`, `study_description`, `series_id`, `series_number`, `series_instance_uid`. Additional image metadata fields (e.g. `laterality`, `width`, `height`, `resolution_horizontal`) are documented in [Metadata Fields](/eyened-platform/import_metadata_fields).
+
+**`attributes`** — Key-value pairs stored as image attributes (flexible schema).
+
+**Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `create_patients` | false | Create patient if not found |
+| `create_studies` | false | Create study if not found |
+| `create_series` | true | Create series if not found |
+| `create_project` | false | Create project if not found |
+| `include_stack_trace` | false | Include stack trace in error responses |
 
 :::caution
-When importing make sure that the image path is relative to `IMAGES_BASEPATH` as specified in the [Eyened platform setup](/eyened-platform/getting_started#setup). This could mean that files need to be relocated within this folder.
+The image path must be relative to `IMAGES_BASEPATH` as configured in your [Eyened platform setup](/eyened-platform/getting_started). Ensure files are located within that folder.
 :::
 
 
