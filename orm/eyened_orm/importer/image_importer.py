@@ -42,7 +42,7 @@ class ImageImporter:
     _session: Optional[requests.Session] = field(default=None, init=False)
 
     def __post_init__(self):
-        """Initialize paths and endpoints, and perform initial login."""s
+        """Initialize paths and endpoints, and perform initial login."""
         self.base_url = f"http://{self.host}:{self.port}"
         self.image_endpoint = f"{self.base_url}/api/import/image"
         self.login_endpoint = f"{self.base_url}/api/auth/login-password"
