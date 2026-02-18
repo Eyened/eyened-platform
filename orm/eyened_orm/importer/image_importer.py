@@ -45,7 +45,7 @@ class ImageImporter:
         """Initialize paths and endpoints, and perform initial login."""
         self.base_url = f"http://{self.host}:{self.port}"
         self.image_endpoint = f"{self.base_url}/api/import/image"
-        self.login_endpoint = f"{self.base_url}/api/auth/login-password"
+        self.login_endpoint = f"{self.base_url}/api/auth/login"
         self._session = requests.Session()
         self._login()
 
@@ -60,7 +60,7 @@ class ImageImporter:
         login_data = {
             "username": self.admin_username,
             "password": self.admin_password,
-            "remember_me": False,  # will be valid for 1 hour
+            "api_client": False,
         }
         response = self._session.post(
             self.login_endpoint,
