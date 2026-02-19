@@ -15,37 +15,53 @@ RUN \
 COPY client /client
 RUN npm run build
 
-# Backend image starts here
-FROM python:3.11-slim
+# Backend staged build
+FROM python:3.11-slim AS backend_builder
 
 SHELL ["/bin/bash", "-c"]
 
-# Install dependencies
-# mssql-tools18, msodbcsql18
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglx-mesa0 \
-    libglib2.0-0 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY server/requirements.txt .
-RUN pip install --no-cache-dir --verbose -r requirements.txt
+# Create virtual env
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install the ORM
-COPY orm /libraries/eyened_orm/
-WORKDIR /libraries/eyened_orm
-RUN pip install --no-cache-dir -e .
+COPY orm /tmp/eyened_orm/
+RUN \
+  --mount=type=cache,target=/root/.cache \
+  pip install /tmp/eyened_orm
 
-# Setup the application
+# Install server dependencies
+RUN \
+  --mount=type=bind,source=server/requirements.txt,target=/requirements.txt \
+  --mount=type=cache,target=/root/.cache \
+  pip install -r /requirements.txt
+
+# Final stage starts here
+FROM python:3.11-slim AS final
+
+# Install runtime dependencies
+# TODO: document which packages in UNKNOWN_DEPS are required for which functionality
+ARG UNKNOWN_DEPS="libgl1 libglx-mesa0 libglib2.0.0"
+ARG HEALTHCHECK_DEPS="curl"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    $HEALTHCHECK_DEPS \
+    $UNKNOWN_DEPS \
+    && rm -rf /var/lib/apt/lists/*
+
+# Include the frontend (compiled code only)
+COPY --from=frontend_builder /client/build /client/build
+
+# Include backend virtualenv
+ENV VIRTUAL_ENV=/opt/venv
+COPY --from=backend_builder /opt/venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Include the application code
 COPY server /app/server
 WORKDIR /app
 
 EXPOSE 8000
-
-# Include the compiled code from the frontend
-COPY --from=frontend_builder /client/build /client/build
 
 # Use gunicorn with uvicorn workers for production
 # Worker count is configurable via WORKERS environment variable (default: 4)
