@@ -4,8 +4,6 @@ from eyened_orm import ImageInstance
 from sqlalchemy import update
 from tqdm import tqdm
 
-from rtnls_inference.utils import load_image
-from rtnls_fundusprep.mask_extraction import get_cfi_bounds
 import numpy as np
 
 
@@ -22,6 +20,9 @@ def normalize(im, ce=None):
 
 
 def preprocess_image(image_path, resize=512, apply_ce=False):
+    from rtnls_fundusprep.mask_extraction import get_cfi_bounds
+    from rtnls_inference.utils import load_image
+
     image = load_image(image_path)
     bounds = get_cfi_bounds(image)
     T, bounds_cropped = bounds.crop(resize)
