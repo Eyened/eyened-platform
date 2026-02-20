@@ -36,17 +36,16 @@ Important: import packages that are not dependencies of the ORM within the funct
 )
 def eorm(env_file):
     load_env_file(env_file, override=True)
-    _register_model_commands()
 
 
 def _register_model_commands():
-    if getattr(_register_model_commands, "_done", False):
-        return
     from .commands.model_processing import model_commands
 
     for command in model_commands:
         eorm.add_command(command)
-    _register_model_commands._done = True
+
+
+_register_model_commands()
 
 
 @eorm.command()
