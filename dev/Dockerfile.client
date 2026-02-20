@@ -1,0 +1,13 @@
+FROM node:22-slim
+
+COPY client /app/client
+WORKDIR /app/client
+
+RUN npm install
+
+COPY dev/entrypoint-client.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 5173
+
+ENTRYPOINT ["/entrypoint.sh"]
