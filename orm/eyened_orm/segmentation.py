@@ -102,9 +102,6 @@ class SegmentationBase(Base):
     DataType: Mapped[Datatype] = mapped_column(SAEnum(Datatype))
 
     Threshold: Mapped[Optional[float]]
-    ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Segmentation.SegmentationID")
-    )
 
     @property
     def dtype(self) -> np.dtype:
@@ -302,9 +299,10 @@ class SegmentationBase(Base):
 
         # If a reference segmentation is provided, that is interpreted as a conditional mask
         # i.e. the final mask is the intersection of the current mask and the reference mask.
-        if self.ReferenceSegmentation:
+        if hasattr(self, "ReferenceSegmentation") and self.ReferenceSegmentation:
             reference_mask = self.ReferenceSegmentation.binary_mask
-            mask = mask & reference_mask
+            if reference_mask is not None:
+                mask = mask & reference_mask
 
         return mask
 
@@ -407,7 +405,7 @@ class SegmentationBase(Base):
                     )
 
         # 4. Check Reference Segmentation
-        if self.ReferenceSegmentationID is not None:
+        if hasattr(self, "ReferenceSegmentationID") and self.ReferenceSegmentationID is not None:
             # We need to fetch the reference.
             # Since SegmentationBase defines the ID but not the relationship in all subclasses,
             # we might need to query safely.
@@ -453,6 +451,10 @@ class Segmentation(SegmentationBase):
 
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]]
+
+    ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("Segmentation.SegmentationID")
+    )
 
     Inactive: Mapped[bool] = mapped_column(default=False)
 

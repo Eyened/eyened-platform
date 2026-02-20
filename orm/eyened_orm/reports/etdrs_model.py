@@ -14,7 +14,7 @@ model_name = "ETDRS area"
 version = "1"
 description = "Summarize segmentation feature area in ETDRS grid subfields"
 attribute_name = "ETDRS area"
-attribute_data_type = AttributeDataType.Float
+attribute_data_type = AttributeDataType.JSON
 
 
 def _get_etdrs_mask(segmentation, keypoints_attr, odfd_attr):
