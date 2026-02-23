@@ -361,14 +361,15 @@ class ImageInstance(Base):
         if self.CFROI is None:
             return None
         else:
-            if 'success' in self.CFROI and self.CFROI['success'] is False:
+            if "success" in self.CFROI and self.CFROI["success"] is False:
                 return None
             # use bounds from database
             try:
                 return CFIBounds(**self.CFROI, image=pixel_array)
             except Exception as e:
-                raise ValueError(f"Error with image {self.ImageInstanceID} with CFROI {self.CFROI}") from e
-
+                raise ValueError(
+                    f"Error with image {self.ImageInstanceID} with CFROI {self.CFROI}"
+                ) from e
 
     def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
         if self.bounds is None:
@@ -514,6 +515,55 @@ class ImageInstance(Base):
 
         return link
 
+    def get_attribute_value(
+        self,
+        *,
+        producing_model_name: str | None = None,
+        producing_model_id: int | None = None,
+        attribute_name: str | None = None,
+    ) -> Optional[Any]:
+        """
+        Get the value of an attribute for this image instance.
+        Return the value of the first attribute that matches the criteria.
+
+        :param producing_model_name: Name of the producing model
+        :param producing_model_id: ID of the producing model
+        :param attribute_name: Name of the attribute
+        :return: The value of the attribute
+        """
+        for av in self.AttributeValues:
+            if av.ProducingModel.ModelName == producing_model_name:
+                return av.value
+            if av.ProducingModel.ModelID == producing_model_id:
+                return av.value
+            if av.AttributeDefinition.AttributeName == attribute_name:
+                return av.value
+        return None
+
+    def infer_laterality_from_keypoints(
+        self, cfi_keypoints: Dict[str, Any]
+    ) -> Optional[Laterality]:
+        x_fovea, _ = cfi_keypoints["fovea_xy"]
+        x_disc, _ = cfi_keypoints["disc_edge_xy"]
+        return Laterality.R if x_fovea < x_disc else Laterality.L
+
+    def infer_ETDRS_field_from_keypoints(
+        self, cfi_keypoints: Dict[str, Any]
+    ) -> Optional[ETDRSField]:
+        x_fovea, _ = cfi_keypoints["fovea_xy"]
+        x_disc_edge, _ = cfi_keypoints["disc_edge_xy"]
+        dx = x_disc_edge - x_fovea
+        # estimate disc centre
+        # assuming fovea is 4 disc-radii from disc edge
+        x_disc_centre = x_disc_edge + dx / 4
+
+        d = x_disc_centre / self.Columns_x
+        f = x_fovea / self.Columns_x
+
+        # F1 if disc centre is closer to image center than fovea is
+        # F2 if fovea is closest to center
+        return ETDRSField.F1 if abs(d - 0.5) < abs(f - 0.5) else ETDRSField.F2
+
     @property
     def attrs(self) -> Dict[str, Any]:
         attrs_by_model: dict[str, dict[str, object]] = {}
@@ -548,8 +598,6 @@ class ImageInstance(Base):
                 attrs_flat[attr_def.AttributeName] = value
 
         return attrs_flat, attrs_by_model
-
-
 
 
 class DeviceModel(Base):
