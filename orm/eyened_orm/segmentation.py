@@ -7,6 +7,7 @@ from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event,
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
+from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
 
 if TYPE_CHECKING:
@@ -64,7 +65,7 @@ class Datatype(Enum):
     R32F = "R32F"  # 32-bit float
 
 
-class SegmentationBase(Base):
+class SegmentationBase(AttributeValueLookupMixin, Base):
     __abstract__ = True  # This makes the class abstract
 
     # index in the zarr array of the segmentation
@@ -697,7 +698,6 @@ class ModelSegmentation(SegmentationBase):
             if base_model is not None:
                 return f"model_{base_model.ModelName}_{base_model.Version}"
         return "model_name_unknown"
-
 
 # Event Listeners
 def validate_segmentation(mapper, connection, target):
