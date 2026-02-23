@@ -48,6 +48,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
       - WORKERS=${WORKERS:-4}
+      - DB_LOG_FILE_PATH=${DB_LOG_FILE_PATH:-}
     restart: always
     volumes:
       - ${IMAGES_BASEPATH}:/images
