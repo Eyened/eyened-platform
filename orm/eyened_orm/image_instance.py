@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from rtnls_fundusprep.transformation import ProjectiveTransform
 
+from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
 from .types import OptionalEnum
 
@@ -75,7 +76,7 @@ class ETDRSField(Enum):
     F7 = "F7"
 
 
-class ImageInstance(Base):
+class ImageInstance(AttributeValueLookupMixin, Base):
     __tablename__ = "ImageInstance"
     __table_args__ = (
         Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
@@ -515,29 +516,20 @@ class ImageInstance(Base):
 
         return link
 
-    def get_attribute_value(
-        self,
-        *,
-        producing_model_name: str | None = None,
-        producing_model_id: int | None = None,
-        attribute_name: str | None = None,
-    ) -> Optional[Any]:
+    def get_model_segmentation(
+        self, *, model_name: str | None = None, model_id: int | None = None
+    ):
         """
-        Get the value of an attribute for this image instance.
-        Return the value of the first attribute that matches the criteria.
-
-        :param producing_model_name: Name of the producing model
-        :param producing_model_id: ID of the producing model
-        :param attribute_name: Name of the attribute
-        :return: The value of the attribute
+        Get the model segmentation for this image instance.
+        :param model_name: Name of the model
+        :param model_id: ID of the model
+        :return: The model segmentation
         """
-        for av in self.AttributeValues:
-            if av.ProducingModel.ModelName == producing_model_name:
-                return av.value
-            if av.ProducingModel.ModelID == producing_model_id:
-                return av.value
-            if av.AttributeDefinition.AttributeName == attribute_name:
-                return av.value
+        for ms in self.ModelSegmentations:
+            if ms.Model.ModelName == model_name:
+                return ms
+            if ms.Model.ModelID == model_id:
+                return ms
         return None
 
     def infer_laterality_from_keypoints(
