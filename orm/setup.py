@@ -37,7 +37,7 @@ setup(
         "requests==2.*",
         "pydantic-settings==2.7.1",
         "sqlmodel==0.0.24",
-        "retinalysis-fundusprep",
+        "retinalysis-fundusprep>=0.5.4",
         "zarr==3.1.0",
         "pyyaml==6.*",
         "google_crc32c==1.8.0",
