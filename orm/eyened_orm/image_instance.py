@@ -16,6 +16,9 @@ from sqlalchemy import ForeignKey, Index, String, event, func, select
 from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
+from rtnls_fundusprep.transformation import ProjectiveTransform
+
+from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
 from .types import OptionalEnum
 
@@ -94,7 +97,7 @@ class StorageBackends(Base):
     )
 
 
-class ImageInstance(Base):
+class ImageInstance(AttributeValueLookupMixin, Base):
     __tablename__ = "ImageInstance"
     __table_args__ = (
         Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
@@ -424,18 +427,30 @@ class ImageInstance(Base):
         shape = pixel_array.shape
         if len(shape) == 3 and shape[2] > 4:
             raise ValueError("Can only handle 2D images")
-        if self.CFROI is not None:
+        if self.CFROI is None:
+            return None
+        else:
+            if "success" in self.CFROI and self.CFROI["success"] is False:
+                return None
             # use bounds from database
-            return CFIBounds(**self.CFROI, image=pixel_array)
-
-        bounds = get_cfi_bounds(pixel_array)
-        return bounds
+            try:
+                return CFIBounds(**self.CFROI, image=pixel_array)
+            except Exception as e:
+                raise ValueError(
+                    f"Error with image {self.ImageInstanceID} with CFROI {self.CFROI}"
+                ) from e
 
     def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
         if self.bounds is None:
             return None
         M, bounds = self.bounds.crop(diameter)
         return M.warp(self.pixel_array, (diameter, diameter))
+
+    @property
+    def cropping_transform(self) -> Optional[ProjectiveTransform]:
+        if self.bounds is None:
+            return None
+        return self.bounds.get_cropping_transform(1024)
 
     @property
     def cropping_matrix(self) -> Optional[np.ndarray]:
@@ -568,6 +583,81 @@ class ImageInstance(Base):
             session.flush()
 
         return link
+
+    def get_model_segmentation(
+        self, *, model_name: str | None = None, model_id: int | None = None
+    ):
+        """
+        Get the model segmentation for this image instance.
+        :param model_name: Name of the model
+        :param model_id: ID of the model
+        :return: The model segmentation
+        """
+        for ms in self.ModelSegmentations:
+            if ms.Model.ModelName == model_name:
+                return ms
+            if ms.Model.ModelID == model_id:
+                return ms
+        return None
+
+    def infer_laterality_from_keypoints(
+        self, cfi_keypoints: Dict[str, Any]
+    ) -> Optional[Laterality]:
+        x_fovea, _ = cfi_keypoints["fovea_xy"]
+        x_disc, _ = cfi_keypoints["disc_edge_xy"]
+        return Laterality.R if x_fovea < x_disc else Laterality.L
+
+    def infer_ETDRS_field_from_keypoints(
+        self, cfi_keypoints: Dict[str, Any]
+    ) -> Optional[ETDRSField]:
+        x_fovea, _ = cfi_keypoints["fovea_xy"]
+        x_disc_edge, _ = cfi_keypoints["disc_edge_xy"]
+        dx = x_disc_edge - x_fovea
+        # estimate disc centre
+        # assuming fovea is 4 disc-radii from disc edge
+        x_disc_centre = x_disc_edge + dx / 4
+
+        d = x_disc_centre / self.Columns_x
+        f = x_fovea / self.Columns_x
+
+        # F1 if disc centre is closer to image center than fovea is
+        # F2 if fovea is closest to center
+        return ETDRSField.F1 if abs(d - 0.5) < abs(f - 0.5) else ETDRSField.F2
+
+    @property
+    def attrs(self) -> Dict[str, Any]:
+        attrs_by_model: dict[str, dict[str, object]] = {}
+        attrs_flat: dict[str, object] = {}
+
+        for av in getattr(self, "AttributeValues", []) or []:
+            attr_def = getattr(av, "AttributeDefinition", None)
+            if not attr_def:
+                continue
+
+            producing_model = getattr(av, "ProducingModel", None)
+
+            value = None
+            if av.ValueInt is not None:
+                value = av.ValueInt
+            elif av.ValueFloat is not None:
+                value = av.ValueFloat
+            elif av.ValueText is not None:
+                value = av.ValueText
+            elif av.ValueJSON is not None:
+                value = av.ValueJSON
+
+            if value is None:
+                continue
+
+            if producing_model:
+                model_name = producing_model.ModelName
+                if model_name not in attrs_by_model:
+                    attrs_by_model[model_name] = {}
+                attrs_by_model[model_name][attr_def.AttributeName] = value
+            else:
+                attrs_flat[attr_def.AttributeName] = value
+
+        return attrs_flat, attrs_by_model
 
 
 @event.listens_for(ImageInstance, "before_insert")

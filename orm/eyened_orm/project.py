@@ -103,6 +103,24 @@ class Project(Base):
             )
         )
 
+    def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
+        from eyened_orm import ImageInstance, Series, Study, Patient
+
+        session = Session.object_session(self)
+        q = (
+            select(ImageInstance)
+            .join(Series)
+            .join(Study)
+            .join(Patient)
+            .where(Patient.ProjectID == self.ProjectID)
+        )
+        if not include_inactive:
+            q = q.where(~ImageInstance.Inactive)
+        if where is not None:
+            q = q.where(where)
+        return session.scalars(q).all()
+
+
 
 class Contact(Base):
     __tablename__ = "Contact"
