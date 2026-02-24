@@ -201,6 +201,8 @@ class SubTask(Base):
         images: Iterable[int | ImageInstance],
         task_state: SubTaskState | None = None,
     ) -> "SubTask":
+        from eyened_orm import ImageInstance
+        
         if task_state is None:
             task_state = SubTaskState.NotStarted
 
