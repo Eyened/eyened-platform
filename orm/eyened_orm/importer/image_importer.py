@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
-from pathlib import Path
-import requests
 from typing import Optional
 
+import requests
 
 @dataclass
 class ImageImporter:
@@ -23,7 +22,6 @@ class ImageImporter:
         create_studies (bool, optional): Whether to create studies if not exist. Defaults to True.
         create_series (bool, optional): Whether to create series if not exist. Defaults to True.
         include_stack_trace (bool, optional): Whether to include stack trace in responses. Defaults to True.
-        remember_me (bool, optional): Whether to remember the user. Defaults to False, providing a 1 hour session, otherwise 30 days.
     """
 
     admin_username: str
@@ -37,7 +35,6 @@ class ImageImporter:
     create_studies: bool = True
     create_series: bool = True
     include_stack_trace: bool = True
-    remember_me: bool = False
 
     _session: Optional[requests.Session] = field(default=None, init=False)
 
@@ -57,6 +54,8 @@ class ImageImporter:
         Raises:
             requests.exceptions.HTTPError: If login request fails
         """
+        # Technically we are an API client, but because it's easier to use a cookie-authenticated session in
+        # this setting, we set 'api_client' to False.
         login_data = {
             "username": self.admin_username,
             "password": self.admin_password,
