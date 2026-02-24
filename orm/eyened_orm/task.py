@@ -109,12 +109,7 @@ class Task(Base):
 
         taskdef = TaskDefinition.by_name(session, taskdef_name)
         if taskdef is None:
-            print(f"Task definition '{taskdef_name}' not found, creating new one")
             taskdef = TaskDefinition(TaskDefinitionName=taskdef_name)
-            session.add(taskdef)
-            session.commit()
-
-        print("creating task")
 
         return cls(
             TaskName=task_name,
@@ -206,8 +201,6 @@ class SubTask(Base):
         images: Iterable[int | ImageInstance],
         task_state: SubTaskState | None = None,
     ) -> "SubTask":
-        from eyened_orm import ImageInstance
-
         if task_state is None:
             task_state = SubTaskState.NotStarted
 

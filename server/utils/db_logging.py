@@ -258,7 +258,7 @@ class YAMLFormatter(logging.Formatter):
 _db_logger: Optional[DatabaseModificationLogger] = None
 
 
-def init_db_logger(settings) -> DatabaseModificationLogger:
+def init_db_logger(settings) -> Optional[DatabaseModificationLogger]:
     """
     Initialize the global database modification logger.
 
@@ -269,6 +269,15 @@ def init_db_logger(settings) -> DatabaseModificationLogger:
         Initialized DatabaseModificationLogger instance
     """
     global _db_logger
+
+    log_file_path = getattr(settings, "db_log_file_path", "")
+    log_level = getattr(settings, "db_log_level", logging.INFO)
+    max_bytes = getattr(settings, "db_log_max_bytes", 10 * 1024 * 1024)  # 10MB
+    backup_count = getattr(settings, "db_log_backup_count", 5)
+
+    if not log_file_path:
+        # Not setting the log file path effectively disables the logger
+        return None
 
     _db_logger = DatabaseModificationLogger(
         log_file_path=settings.db_log.file_path,
