@@ -284,7 +284,7 @@ class Importer:
         patient_identifier = patient_item.patient_identifier
 
         # Try to find existing patient
-        patient = project.get_patient_by_identifier(self.session, patient_identifier)
+        patient = project.get_patient_by_identifier(patient_identifier)
 
         if patient is None:
             if not self.create_patients:

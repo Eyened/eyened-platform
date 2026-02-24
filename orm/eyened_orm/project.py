@@ -54,10 +54,11 @@ class Project(Base):
         "eyened_orm.patient.Patient", back_populates="Project", passive_deletes=True
     )
 
-    def make_dataframe(self, session: Session) -> pd.DataFrame:
+    def make_dataframe(self) -> pd.DataFrame:
         """Return a dataframe of all images in the project."""
         from eyened_orm import ImageInstance, Patient, Series, Study
 
+        session = self.session
         image_ids = list(
             session.scalars(
                 select(ImageInstance.ImageInstanceID)
@@ -90,12 +91,11 @@ class Project(Base):
             q = q.where(where)
         return session.scalars(q).all()
 
-    def get_patient_by_identifier(
-        self, session: Session, patient_identifier: string
-    ) -> Optional["Patient"]:
+    def get_patient_by_identifier(self, patient_identifier: string) -> Optional["Patient"]:
         """Return a patient with the specified ID that belongs to this project."""
         from eyened_orm import Patient
 
+        session = self.session
         return session.scalar(
             select(Patient).where(
                 Patient.PatientIdentifier == patient_identifier,
