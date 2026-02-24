@@ -100,12 +100,11 @@ class Task(Base):
 
         subtasks = [SubTask.create_from_images(imset) for imset in imagesets]
 
+        creator = None
         if creator_name is not None:
             from eyened_orm import Creator
-
             creator = Creator.by_name(session, creator_name)
-            for subtask in subtasks:
-                subtask.Creator = creator
+            
 
         taskdef = TaskDefinition.by_name(session, taskdef_name)
         if taskdef is None:
@@ -116,6 +115,7 @@ class Task(Base):
             TaskDefinition=taskdef,
             TaskState=TaskState.NotStarted,
             SubTasks=subtasks,
+            Creator=creator,
         )
 
     def get_form_annotations(
@@ -201,8 +201,6 @@ class SubTask(Base):
         images: Iterable[int | ImageInstance],
         task_state: SubTaskState | None = None,
     ) -> "SubTask":
-        from eyened_orm import ImageInstance
-        
         if task_state is None:
             task_state = SubTaskState.NotStarted
 
