@@ -53,6 +53,7 @@ def create_database():
     
     try:
         Base.metadata.create_all(database.engine)
+        print(f"Created database: {settings.database.database}")
     except Exception as e:
         # If tables already exist (e.g., created by another worker), that's fine
         # Log the error but don't fail - the tables should exist
