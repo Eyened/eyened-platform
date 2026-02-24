@@ -30,6 +30,7 @@ class Settings(EyenedORMConfig):
         settings_dict["secret_key"] = "***HIDDEN***"
         settings_dict["admin_password"] = "***HIDDEN***"
         settings_dict["database"]["password"] = "***HIDDEN***"
+        settings_dict["database_root_password"] = "***HIDDEN***"
         return yaml.safe_dump(settings_dict, default_flow_style=False, sort_keys=False)
 
 
