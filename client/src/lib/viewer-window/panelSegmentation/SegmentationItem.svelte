@@ -230,14 +230,16 @@
 					{/if}
 				</div>
 
-				<div class="row">
-					<ReferenceSegmentationPanel
-						{segmentation}
-						{image}
-						{isEditable}
-						{segmentationItem}
-					/>
-				</div>
+				{#if segmentation.annotation_type === "grader_segmentation"}
+					<div class="row">
+						<ReferenceSegmentationPanel
+							{segmentation}
+							{image}
+							{isEditable}
+							{segmentationItem}
+						/>
+					</div>
+				{/if}
 				{#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
 					<div class="row">
 						<CCPanel {segmentationItem} />

@@ -6476,17 +6476,6 @@
             ],
             "title": "Threshold"
           },
-          "reference_segmentation_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Segmentation Id"
-          },
           "data_type": {
             "$ref": "#/components/schemas/Datatype"
           },

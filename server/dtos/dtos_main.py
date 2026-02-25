@@ -54,7 +54,7 @@ class FeatureGET(FeatureBase):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-class SegmentationBase(BaseModel):
+class SegmentationCommonBase(BaseModel):
     image_id: str
     depth: int
     height: int
@@ -64,10 +64,13 @@ class SegmentationBase(BaseModel):
     image_projection_matrix: Optional[List[List[float]]] = None
     scan_indices: Optional[List[int]] = None
     threshold: Optional[float] = None
-    reference_segmentation_id: Optional[int] = None
 
     data_type: Datatype
     data_representation: DataRepresentation
+
+
+class SegmentationBase(SegmentationCommonBase):
+    reference_segmentation_id: Optional[int] = None
 
 
 class SegmentationPOST(SegmentationBase):
@@ -104,7 +107,7 @@ class ModelMeta(BaseModel):
     version: str
 
 
-class ModelSegmentationGET(SegmentationBase):
+class ModelSegmentationGET(SegmentationCommonBase):
     id: int
     annotation_type: Literal["model_segmentation"]
 
