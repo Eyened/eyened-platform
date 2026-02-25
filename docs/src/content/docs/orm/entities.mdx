@@ -73,7 +73,6 @@ Different vendors use different definitions of the Series, and which images are 
 ### ImageInstance
 
 An `ImageInstance` represents a single image or volume:
-- `DatasetIdentifier`: Path to the image file
 - `SOPInstanceUid`: DICOM SOP instance identifier
 - Image dimensions: `Rows_y`, `Columns_x`, `NrOfFrames`
 - Resolution information: `ResolutionAxial`, `ResolutionHorizontal`, `ResolutionVertical`
@@ -82,6 +81,12 @@ An `ImageInstance` represents a single image or volume:
 - `ETDRSField`: ETDRS field position (F1-F7)
 - `ThumbnailPath`: Path identifier for image thumbnails (see below)
 - Relationships to `DeviceInstance`, `SourceInfo`, `ModalityTable`, and `Scan`
+
+The location of the image is resolved by 
+- storage_backend_id (the storage_backend, currently the filesystem via nginx)
+- object_prefix 
+- object_key
+object_prefix and object_key together form the path to the image.
 
 :::note
 We do not currently support images consisting of multiple files. When there's a need for this, we should update the concept of DatasetIdentifier.

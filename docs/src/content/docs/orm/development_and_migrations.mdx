@@ -109,49 +109,21 @@ When committing migrations to production:
 This documentation overlaps with the README: https://github.com/Eyened/eyened-platform/tree/main/orm/migrations
 :::
 
-### Environment Setup
-
-The ORM includes a utility to easily create a copy of the production database into a running MySQL server for testing. For this to work, the ORM needs access to the database credentials for both production and test databases. Add `source.env` (production) and `test.env` (test) files as explained in [ORM Configuration](/eyened-platform/orm/configuration).
-
-Set up Alembic to work with your testing environment:
-```bash
-cd orm/migrations
-python set_connection_string.py test.env
-```
-This sets up the connection string in `alembic.ini` based on the variables in the specified `.env` file. Replace `test.env` with the path to your test environment file.
-
-### Create Test Database
-
-Once this is done, you have two options to populate the database:
-
-1. **Full Database Copy** (Recommended, but might take a while):
-   ```bash
-   eorm database-mirror-full -c transfer-config.yml
-   ```
-   This creates a complete copy of the production database. The configuration file should specify source and target database settings.
-
-2. **Limited Data Copy** (For a faster copy, e.g., during development work when you need to test a migration several times):
-   ```bash
-   eorm database-mirror-test -c transfer-config.yml
-   ```
-   This creates a small test database with only the data specified in `transfer-config.yml`. The configuration file should specify source and target database settings and which objects to copy.
-
-Both options will:
-1. Dump the production database to a temporary file
-2. Drop and re-create the test database
-3. Load the dump file into the new test database
 
 ### Test the Migration
 
 1. Check out the relevant `eyened_orm` commit/branch that you wish to test in your development repository (or test virtualenv set up for this purpose).
 
-2. Apply the migration on the test database (from the migrations directory):
+2. Apply the migration on the test database (from the orm/migrations directory):
    ```bash
    alembic upgrade head
    ```
-
-   :::caution
-   Make sure Alembic is pointing to the correct database (check `alembic.ini`).
+   :::note
+   alembic reads the environment for database credentials. 
+   you can pass an environemnt file like this to switch between production/development/test:
+   ```bash 
+   alembic -x env_file=/path/to/.env uograde head
+   ```
    :::
 
    This should always succeed. If there are issues with running the migration, it could be a bug or that other migrations have been applied in between. In this case, changing the `down_revision` might be necessary. Be careful!

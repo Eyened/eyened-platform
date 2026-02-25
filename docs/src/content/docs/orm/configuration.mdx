@@ -1,65 +1,54 @@
 ---
 title: Eyened ORM configuration
-description: Learn how to configure the Eyened ORM for database access and file management
+description: Learn how to configure the Eyened ORM for database and API access
 sidebar:
   order: 2
 ---
 
 ## Configuration Options
 
-The Eyened ORM can be configured through environment variables or by passing configuration parameters directly. The following sections describe all available configuration options:
+The Eyened ORM is configured through environment variables.
+The following sections describe all available configuration options:
 
 ### Database Settings
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
-| DATABASE_USER | Yes | - | Database username |
-| DATABASE_PASSWORD | Yes | - | Database password |
-| DATABASE_HOST | Yes | - | Database host address |
-| DATABASE_NAME | Yes | - | Database name |
-| DATABASE_PORT | Yes | - | Database port number |
-| DATABASE_RAISE_ON_WARNINGS | No | "true" | Whether to raise exceptions on database warnings |
+| EYENED_DATABASE_USER | Yes | - | Database username |
+| EYENED_DATABASE_PASSWORD | Yes | - | Database password |
+| EYENED_DATABASE_HOST | No | `database` | Database host address |
+| EYENED_DATABASE_DATABASE | No | `eyened_database` | Database name |
+| EYENED_DATABASE_PORT | No | `3306` | Database port number |
+| EYENED_DATABASE_RAISE_ON_WARNINGS | No | `true` | Whether to raise exceptions on database warnings |
 
-### Global Settings
+### API Client Settings
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
-| SECRET_KEY | Yes | - | Secret key used for file name obfuscation |
-| IMAGES_BASEPATH | No | "/images" | Base path for image storage (in docker deployment by default mapped to "/images") |
-| SEGMENTATIONS_ZARR_STORE | No | "/storage/segmentations.zarr" | Path to the zarr store containing segmentations. Used by the platform for reading and writing segmentations |
-| THUMBNAILS_PATH | No | "/storage/thumbnails" | Folder containing the thumbnail structure. Used by the ORM to read thumbnails and by the importer to write thumbnails on insertion |
-| ANNOTATIONS_PATH | No | "/storage/annotations" | Folder containing annotation files |
-| DEFAULT_STUDY_DATE | No | "1970-01-01" | Default date for new studies when no date is provided |
-| CFI_CACHE_PATH | No | None | Path of a cache for fundus images. Used by the importer to write a preprocessed version of the images |
-| IMAGE_SERVER_URL | No | None | URL of the image server endpoint for generating image URLs |
+| EYENED_API_URL | Yes | - | Base URL of the Eyened API |
+| EYENED_API_USERNAME | Yes | - | API login username |
+| EYENED_API_PASSWORD | Yes | - | API login password |
 
 ## Creating Environment Files
 
-The most common way to configure the ORM is through `.env` files. Create a `.env` file in your project directory with the following structure:
+The most common way to configure the ORM is through `.env` files. Create an environment file (for example `.env.dev`) with the following structure:
 
 ```bash
-# Database Settings (Required)
-DATABASE_USER=myuser
-DATABASE_PASSWORD=mypassword
-DATABASE_HOST=localhost
-DATABASE_NAME=eyened_database
-DATABASE_PORT=3306
-DATABASE_RAISE_ON_WARNINGS=true
+# Database Settings
+EYENED_DATABASE_USER=myuser
+EYENED_DATABASE_PASSWORD=mypassword
+EYENED_DATABASE_HOST=localhost
+EYENED_DATABASE_DATABASE=eyened_database
+EYENED_DATABASE_PORT=3306
+EYENED_DATABASE_RAISE_ON_WARNINGS=true
 
-# Global Settings (Required)
-SECRET_KEY=your-secret-key-here
-
-# Global Settings (Optional - defaults shown)
-IMAGES_BASEPATH=/images
-SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
-THUMBNAILS_PATH=/storage/thumbnails
-ANNOTATIONS_PATH=/storage/annotations
-DEFAULT_STUDY_DATE=1970-01-01
-CFI_CACHE_PATH=
-IMAGE_SERVER_URL=
+# API Client Settings (only needed if using APIClient)
+EYENED_API_URL=http://localhost:3000
+EYENED_API_USERNAME=myuser
+EYENED_API_PASSWORD=mypassword
 ```
 
-You can maintain multiple environment files for different environments (e.g., `development.env`, `production.env`, `test.env`).
+You can maintain multiple environment files for different environments (for example `.env.dev`, `.env.prod`, `.env.test`).
 
 ## Initialization Methods
 
@@ -67,64 +56,35 @@ The `Database` class can be initialized in several ways:
 
 ### 1. From Environment Variables
 
-If no configuration is provided, the `Database` class reads from your system's environment variables:
+Load env vars (for example with `python-dotenv`), then initialize `Database()`:
 
 ```python
 from eyened_orm import Database
+from dotenv import load_dotenv
 
-# Reads from os.environ
+# Load environment variables from a .env file
+load_dotenv("/home/bart/.env.dev")
+
+# Reads settings from os.environ
 database = Database()
 ```
 
-### 2. From a Configuration File
+### 2. From a Settings Object
 
-Load configuration from a `.env` file by passing the file path:
+Pass a `DatabaseSettings` instance directly:
 
 ```python
 from eyened_orm import Database
-from pathlib import Path
+from eyened_orm.config import DatabaseSettings
 
-# Load from a specific .env file
-database = Database("production.env")
+settings = DatabaseSettings(
+    host="eyened-supergpu",
+    port=16306,
+    user="root",
+    password="test",
+)
 
-# Or using a Path object
-database = Database(Path("/path/to/config.env"))
-```
-
-### 3. From a Dictionary
-
-Pass configuration as a dictionary. You can use either:
-
-**Flat dictionary** (environment variable style):
-```python
-config_dict = {
-    "DATABASE_USER": "myuser",
-    "DATABASE_PASSWORD": "mypassword",
-    "DATABASE_HOST": "localhost",
-    "DATABASE_NAME": "mydb",
-    "DATABASE_PORT": "3306",
-    "SECRET_KEY": "my-secret-key",
-    "IMAGES_BASEPATH": "/images",
-}
-
-database = Database(config_dict)
-```
-
-**Nested dictionary**:
-```python
-nested_config = {
-    "database": {
-        "user": "myuser",
-        "password": "mypassword",
-        "host": "localhost",
-        "database": "mydb",
-        "port": 3306,
-    },
-    "secret_key": "my-secret-key",
-    "images_basepath": "/images",
-}
-
-database = Database(nested_config)
+database = Database(settings)
 ```
 
 ## Usage
@@ -150,6 +110,3 @@ try:
 finally:
     session.close()
 ```
-
-You can easily switch between environments by maintaining multiple environment files and passing the appropriate file path when initializing the `Database` object.
-
