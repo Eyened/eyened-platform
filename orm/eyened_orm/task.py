@@ -4,7 +4,16 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar, List, Optional, Iterable
 
-from sqlalchemy import JSON, Column, ForeignKey, Index, Text, String, UniqueConstraint, select, func
+from sqlalchemy import (
+    JSON,
+    ForeignKey,
+    Index,
+    Text,
+    String,
+    UniqueConstraint,
+    select,
+    func,
+)
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
@@ -100,12 +109,11 @@ class Task(Base):
 
         subtasks = [SubTask.create_from_images(imset) for imset in imagesets]
 
+        creator = None
         if creator_name is not None:
             from eyened_orm import Creator
 
             creator = Creator.by_name(session, creator_name)
-            for subtask in subtasks:
-                subtask.Creator = creator
 
         taskdef = TaskDefinition.by_name(session, taskdef_name)
         if taskdef is None:
@@ -116,14 +124,14 @@ class Task(Base):
             TaskDefinition=taskdef,
             TaskState=TaskState.NotStarted,
             SubTasks=subtasks,
+            Creator=creator,
         )
 
-    def get_form_annotations(
-        self, session: Session, schema_id: Optional[int] = None
-    ) -> List["FormAnnotation"]:
+    def get_form_annotations(self, schema_id: Optional[int] = None) -> List["FormAnnotation"]:
         """Return all FormAnnotations for this task; filter by schema if provided."""
         from eyened_orm import FormAnnotation, SubTask
 
+        session = self.session
         q = select(FormAnnotation).join(SubTask).where(SubTask.TaskID == self.TaskID)
         if schema_id is not None:
             q = q.where(FormAnnotation.FormSchemaID == schema_id)
