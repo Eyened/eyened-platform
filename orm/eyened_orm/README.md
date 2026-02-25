@@ -212,8 +212,8 @@ The central hierarchy of the ORM follows the DICOM-inspired structure common in 
 
 **Key Methods**:
 - `Project.by_name(session, name)`: Find project by name
-- `Project.make_dataframe(session)`: Get dataframe of all images in project
-- `Project.get_patient_by_identifier(session, identifier)`: Find patient within project
+- `Project.make_dataframe()`: Get dataframe of all images in project
+- `Project.get_patient_by_identifier(identifier)`: Find patient within project
 
 #### Patient ([patient.py](patient.py))
 
