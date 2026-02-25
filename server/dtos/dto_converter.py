@@ -412,7 +412,6 @@ class DTOConverter:
             image_projection_matrix=ms.ImageProjectionMatrix,
             scan_indices=ms.ScanIndices,
             threshold=ms.Threshold,
-            reference_segmentation_id=ms.ReferenceSegmentationID,
             data_type=ms.DataType,
             data_representation=ms.DataRepresentation,
             creator=creator_meta,

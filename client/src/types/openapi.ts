@@ -1410,8 +1410,6 @@ export interface components {
             scan_indices?: number[] | null;
             /** Threshold */
             threshold?: number | null;
-            /** Reference Segmentation Id */
-            reference_segmentation_id?: number | null;
             data_type: components["schemas"]["Datatype"];
             data_representation: components["schemas"]["DataRepresentation"];
             /** Id */
