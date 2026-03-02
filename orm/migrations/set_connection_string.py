@@ -20,11 +20,11 @@ if __name__ == "__main__":
     env = dotenv_values(dotenv_path=env_path)
     # Extract required values from the provided .env file (no process env mutation)
     try:
-        user = env["DATABASE_USER"]
-        password = env["DATABASE_PASSWORD"]
-        host = env["DATABASE_HOST"]
-        port = env["DATABASE_PORT"]
-        database = env["DATABASE_NAME"]
+        user = env["EYENED_DATABASE_USER"]
+        password = env["EYENED_DATABASE_PASSWORD"]
+        host = env["EYENED_DATABASE_HOST"]
+        port = env["EYENED_DATABASE_PORT"]
+        database = env["EYENED_DATABASE_NAME"]
     except KeyError as e:
         print(f"Missing required key in env file: {e}")
         sys.exit(1)
