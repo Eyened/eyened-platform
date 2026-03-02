@@ -47,13 +47,13 @@
 
 	const leftForms = $derived(
 		forms.filter(
-			(form) => instances.get(form.image_id ?? "")?.laterality === "L",
+			(form) => form.laterality === "L",
 		),
 	);
 
 	const rightForms = $derived(
 		forms.filter(
-			(form) => instances.get(form.image_id ?? "")?.laterality === "R",
+			(form) => form.laterality === "R",
 		),
 	);
 
