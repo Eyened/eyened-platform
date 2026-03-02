@@ -85,17 +85,78 @@ class ETDRSField(Enum):
 class StorageBackend(Base):
     __tablename__ = "StorageBackend"
 
-    StorageBackendID: Mapped[int] = mapped_column("StorageBackendID", primary_key=True)
-    Key: Mapped[str] = mapped_column("Key", String(256))
-    Kind: Mapped[str] = mapped_column("Kind", String(256))
-    Config: Mapped[Any] = mapped_column("Config", JSON)
+    StorageBackendID: Mapped[int] = mapped_column(
+        "StorageBackendID",
+        primary_key=True,
+    )
+
+    Key: Mapped[str] = mapped_column(
+        "Key",
+        String(256),
+        nullable=False,
+    )
+
+    Kind: Mapped[str] = mapped_column(
+        "Kind",
+        String(256),
+        nullable=False,
+    )
+
+    Config: Mapped[Any] = mapped_column(
+        "Config",
+        JSON,
+    )
+
+    StorageInfos: Mapped[List["StorageInfo"]] = relationship(
+        "eyened_orm.image_instance.StorageInfo",
+        back_populates="StorageBackend",
+        lazy="selectin",
+    )
+
+class StorageInfo(Base):
+    __tablename__ = "StorageInfo"
+    __table_args__ = (
+        Index(
+            "ix_StorageInfo_StorageBackendID",
+            "StorageBackendID",
+        ),
+        Index(
+            "uq_StorageInfo_Backend_ObjectPrefix",
+            "StorageBackendID",
+            "ObjectPrefix",
+            unique=True,
+        ),
+    )
+
+    StorageInfoID: Mapped[int] = mapped_column(
+        "StorageInfoID",
+        primary_key=True,
+    )
+
+    StorageBackendID: Mapped[int] = mapped_column(
+        "StorageBackendID",
+        ForeignKey("StorageBackend.StorageBackendID"),
+        nullable=False,
+    )
+
+    ObjectPrefix: Mapped[Optional[str]] = mapped_column(
+        "ObjectPrefix",
+        String(256),
+        nullable=True,
+    )
+
+    StorageBackend: Mapped["StorageBackend"] = relationship(
+        "eyened_orm.image_instance.StorageBackend",
+        back_populates="StorageInfos",
+        lazy="selectin",
+    )
 
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance",
-        back_populates="storage_backend",
-        lazy="noload",
+        back_populates="StorageInfo",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
-
 
 class ImageInstance(AttributeValueLookupMixin, Base):
     __tablename__ = "ImageInstance"
@@ -132,27 +193,25 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         ),
     )
 
-    ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
-    public_id: Mapped[str] = mapped_column(
+    ImageInstanceID: Mapped[int] = mapped_column(
+        "ImageInstanceID",
+        primary_key=True,
+    )
+
+    PublicID: Mapped[str] = mapped_column(
         "PublicID",
         String(12),
         unique=True,
         nullable=False,
     )
 
-    storage_backend_id: Mapped[int] = mapped_column(
-        "StorageBackendID",
-        ForeignKey("StorageBackend.StorageBackendID"),
+    StorageInfoID: Mapped[int] = mapped_column(
+        "StorageInfoID",
+        ForeignKey("StorageInfo.StorageInfoID"),
         nullable=False,
     )
 
-    object_prefix: Mapped[Optional[str]] = mapped_column(
-        "ObjectPrefix",
-        String(256),
-        nullable=True,
-    )
-
-    object_key: Mapped[str] = mapped_column(
+    ObjectKey: Mapped[str] = mapped_column(
         "ObjectKey",
         String(256),
         nullable=False,
@@ -261,8 +320,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     Series: Mapped["Series"] = relationship(
         "eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin"
     )
-    storage_backend: Mapped["StorageBackend"] = relationship(
-        "eyened_orm.image_instance.StorageBackend",
+    StorageInfo: Mapped["StorageInfo"] = relationship(
+        "eyened_orm.image_instance.StorageInfo",
         back_populates="ImageInstances",
         lazy="selectin",
     )
