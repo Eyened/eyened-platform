@@ -82,13 +82,13 @@ class ETDRSField(Enum):
     F7 = "F7"
 
 
-class StorageBackends(Base):
-    __tablename__ = "storage_backends"
+class StorageBackend(Base):
+    __tablename__ = "StorageBackend"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    key: Mapped[str] = mapped_column(String(256))
-    kind: Mapped[str] = mapped_column(String(256))
-    config: Mapped[Any] = mapped_column(JSON)
+    StorageBackendID: Mapped[int] = mapped_column("StorageBackendID", primary_key=True)
+    Key: Mapped[str] = mapped_column("Key", String(256))
+    Kind: Mapped[str] = mapped_column("Kind", String(256))
+    Config: Mapped[Any] = mapped_column("Config", JSON)
 
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance",
@@ -101,7 +101,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     __tablename__ = "ImageInstance"
     __table_args__ = (
         Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
-        Index("ix_ImageInstance_public_id", "public_id", unique=True),
+        Index("ix_ImageInstance_PublicID", "PublicID", unique=True),
         Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
         Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
         Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
@@ -134,22 +134,26 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
     public_id: Mapped[str] = mapped_column(
+        "PublicID",
         String(12),
         unique=True,
         nullable=False,
     )
 
     storage_backend_id: Mapped[int] = mapped_column(
-        ForeignKey("storage_backends.id"),
+        "StorageBackendID",
+        ForeignKey("StorageBackend.StorageBackendID"),
         nullable=False,
     )
 
     object_prefix: Mapped[Optional[str]] = mapped_column(
+        "ObjectPrefix",
         String(256),
         nullable=True,
     )
 
     object_key: Mapped[str] = mapped_column(
+        "ObjectKey",
         String(256),
         nullable=False,
     )
@@ -257,8 +261,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     Series: Mapped["Series"] = relationship(
         "eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin"
     )
-    storage_backend: Mapped["StorageBackends"] = relationship(
-        "eyened_orm.image_instance.StorageBackends",
+    storage_backend: Mapped["StorageBackend"] = relationship(
+        "eyened_orm.image_instance.StorageBackend",
         back_populates="ImageInstances",
         lazy="selectin",
     )
@@ -776,7 +780,7 @@ class Scan(Base):
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="Scan"
     )
-
     @classmethod
     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
         return cls.by_column(session, ScanMode=ScanMode)
+
