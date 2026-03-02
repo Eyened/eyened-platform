@@ -22,3 +22,4 @@ segmentations.zarr/
 **/.ipynb_checkpoints/**
 .cursor/
 client/src/lib/extensions.ts
+**/alembic.ini
