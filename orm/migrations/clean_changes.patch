@@ -1,0 +1,574 @@
+diff --git a/orm/eyened_orm/image_instance.py b/orm/eyened_orm/image_instance.py
+index 0050ef2..2cbcb15 100644
+--- a/orm/eyened_orm/image_instance.py
++++ b/orm/eyened_orm/image_instance.py
+@@ -82,26 +82,93 @@ class ETDRSField(Enum):
+     F7 = "F7"
+ 
+ 
+-class StorageBackends(Base):
+-    __tablename__ = "storage_backends"
++class StorageBackend(Base):
++    __tablename__ = "StorageBackend"
+ 
+-    id: Mapped[int] = mapped_column(primary_key=True)
+-    key: Mapped[str] = mapped_column(String(256))
+-    kind: Mapped[str] = mapped_column(String(256))
+-    config: Mapped[Any] = mapped_column(JSON)
++    StorageBackendID: Mapped[int] = mapped_column(
++        "StorageBackendID",
++        primary_key=True,
++    )
++
++    Key: Mapped[str] = mapped_column(
++        "Key",
++        String(256),
++        nullable=False,
++    )
++
++    Kind: Mapped[str] = mapped_column(
++        "Kind",
++        String(256),
++        nullable=False,
++    )
++
++    Config: Mapped[Any] = mapped_column(
++        "Config",
++        JSON,
++    )
++
++    StorageInfos: Mapped[List["StorageInfo"]] = relationship(
++        "eyened_orm.image_instance.StorageInfo",
++        back_populates="StorageBackend",
++        lazy="selectin",
++    )
++
++class StorageInfo(Base):
++    __tablename__ = "StorageInfo"
++    __table_args__ = (
++        Index(
++            "ix_StorageInfo_StorageBackendID",
++            "StorageBackendID",
++        ),
++        Index(
++            "uq_StorageInfo_Backend_ObjectPrefix",
++            "StorageBackendID",
++            "ObjectPrefix",
++            unique=True,
++        ),
++    )
++
++    StorageInfoID: Mapped[int] = mapped_column(
++        "StorageInfoID",
++        primary_key=True,
++    )
++
++    StorageBackendID: Mapped[int] = mapped_column(
++        "StorageBackendID",
++        ForeignKey("StorageBackend.StorageBackendID"),
++        nullable=False,
++    )
++
++    ObjectName: Mapped[Optional[str]] = mapped_column(
++        "ObjectName",
++        String(64),
++        nullable=True,
++    )
++
++    ObjectPrefix: Mapped[Optional[str]] = mapped_column(
++        "ObjectPrefix",
++        String(256),
++        nullable=True,
++    )
++
++    StorageBackend: Mapped["StorageBackend"] = relationship(
++        "eyened_orm.image_instance.StorageBackend",
++        back_populates="StorageInfos",
++        lazy="selectin",
++    )
+ 
+     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
+         "eyened_orm.image_instance.ImageInstance",
+-        back_populates="storage_backend",
+-        lazy="noload",
++        back_populates="StorageInfo",
++        cascade="all, delete-orphan",
++        lazy="selectin",
+     )
+ 
+-
+ class ImageInstance(AttributeValueLookupMixin, Base):
+     __tablename__ = "ImageInstance"
+     __table_args__ = (
+         Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
+-        Index("ix_ImageInstance_public_id", "public_id", unique=True),
++        Index("ix_ImageInstance_PublicID", "PublicID", unique=True),
+         Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
+         Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
+         Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
+@@ -132,24 +199,26 @@ class ImageInstance(AttributeValueLookupMixin, Base):
+         ),
+     )
+ 
+-    ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
+-    public_id: Mapped[str] = mapped_column(
++    ImageInstanceID: Mapped[int] = mapped_column(
++        "ImageInstanceID",
++        primary_key=True,
++    )
++
++    PublicID: Mapped[str] = mapped_column(
++        "PublicID",
+         String(12),
+         unique=True,
+         nullable=False,
+     )
+ 
+-    storage_backend_id: Mapped[int] = mapped_column(
+-        ForeignKey("storage_backends.id"),
++    StorageInfoID: Mapped[int] = mapped_column(
++        "StorageInfoID",
++        ForeignKey("StorageInfo.StorageInfoID"),
+         nullable=False,
+     )
+ 
+-    object_prefix: Mapped[Optional[str]] = mapped_column(
+-        String(256),
+-        nullable=True,
+-    )
+-
+-    object_key: Mapped[str] = mapped_column(
++    ObjectKey: Mapped[str] = mapped_column(
++        "ObjectKey",
+         String(256),
+         nullable=False,
+     )
+@@ -257,8 +326,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
+     Series: Mapped["Series"] = relationship(
+         "eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin"
+     )
+-    storage_backend: Mapped["StorageBackends"] = relationship(
+-        "eyened_orm.image_instance.StorageBackends",
++    StorageInfo: Mapped["StorageInfo"] = relationship(
++        "eyened_orm.image_instance.StorageInfo",
+         back_populates="ImageInstances",
+         lazy="selectin",
+     )
+@@ -776,7 +845,7 @@ class Scan(Base):
+     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
+         "eyened_orm.image_instance.ImageInstance", back_populates="Scan"
+     )
+-
+     @classmethod
+     def by_mode(cls, ScanMode: str, session: Session) -> Optional["Scan"]:
+         return cls.by_column(session, ScanMode=ScanMode)
++
+diff --git a/orm/migrations/alembic.ini b/orm/migrations/alembic.ini
+index a639982..755982f 100644
+--- a/orm/migrations/alembic.ini
++++ b/orm/migrations/alembic.ini
+@@ -60,8 +60,7 @@ version_path_separator = os  # Use os.pathsep. Default configuration used for ne
+ # are written from script.py.mako
+ # output_encoding = utf-8
+ 
+-# will be set in env.py
+-sqlalchemy.url = 
++sqlalchemy.url = mysql+pymysql://root:test_root@eyened-gpu:23308/eyened_database
+ # on newly generated revision scripts.  See the documentation for further
+ # detail and examples
+ 
+diff --git a/orm/migrations/alembic.ini.sample b/orm/migrations/alembic.ini.sample
+new file mode 100644
+index 0000000..e345b33
+--- /dev/null
++++ b/orm/migrations/alembic.ini.sample
+@@ -0,0 +1,106 @@
++# A generic, single database configuration.
++
++[alembic]
++# path to migration scripts
++script_location = alembic
++
++# template used to generate migration file names; The default value is %%(rev)s_%%(slug)s
++# Uncomment the line below if you want the files to be prepended with date and time
++# see https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file
++# for all available tokens
++file_template = %%(year)d_%%(month).2d_%%(day).2d-%%(slug)s
++
++# sys.path path, will be prepended to sys.path if present.
++# defaults to the current working directory.
++prepend_sys_path = .
++
++# timezone to use when rendering the date within the migration file
++# as well as the filename.
++# If specified, requires the python-dateutil library that can be
++# installed by adding `alembic[tz]` to the pip requirements
++# string value is passed to dateutil.tz.gettz()
++# leave blank for localtime
++# timezone =
++
++# max length of characters to apply to the
++# "slug" field
++# truncate_slug_length = 40
++
++# set to 'true' to run the environment during
++# the 'revision' command, regardless of autogenerate
++# revision_environment = false
++
++# set to 'true' to allow .pyc and .pyo files without
++# a source .py file to be detected as revisions in the
++# versions/ directory
++# sourceless = false
++
++# version location specification; This defaults
++# to alembic/versions.  When using multiple version
++# directories, initial revisions must be specified with --version-path.
++# The path separator used here should be the separator specified by "version_path_separator" below.
++# version_locations = %(here)s/bar:%(here)s/bat:alembic/versions
++
++# version path separator; As mentioned above, this is the character used to split
++# version_locations. The default within new alembic.ini files is "os", which uses os.pathsep.
++# If this key is omitted entirely, it falls back to the legacy behavior of splitting on spaces and/or commas.
++# Valid values for version_path_separator are:
++#
++# version_path_separator = :
++# version_path_separator = ;
++# version_path_separator = space
++version_path_separator = os  # Use os.pathsep. Default configuration used for new projects.
++
++# set to 'true' to search source files recursively
++# in each "version_locations" directory
++# new in Alembic version 1.10
++# recursive_version_locations = false
++
++# the output encoding used when revision files
++# are written from script.py.mako
++# output_encoding = utf-8
++
++sqlalchemy.url = 
++# on newly generated revision scripts.  See the documentation for further
++# detail and examples
++
++# format using "black" - use the console_scripts runner, against the "black" entrypoint
++# hooks = black
++# black.type = console_scripts
++# black.entrypoint = black
++# black.options = -l 79 REVISION_SCRIPT_FILENAME
++
++# Logging configuration
++[loggers]
++keys = root,sqlalchemy,alembic
++
++[handlers]
++keys = console
++
++[formatters]
++keys = generic
++
++[logger_root]
++level = WARN
++handlers = console
++qualname =
++
++[logger_sqlalchemy]
++level = WARN
++handlers =
++qualname = sqlalchemy.engine
++
++[logger_alembic]
++level = INFO
++handlers =
++qualname = alembic
++
++[handler_console]
++class = StreamHandler
++args = (sys.stderr,)
++level = NOTSET
++formatter = generic
++
++[formatter_generic]
++format = %(levelname)-5.5s [%(name)s] %(message)s
++datefmt = %H:%M:%S
+\ No newline at end of file
+diff --git a/orm/migrations/alembic/versions/2026_02_05-update_image_storage.py b/orm/migrations/alembic/versions/2026_02_05-update_image_storage.py
+index ed2af40..a9c448e 100644
+--- a/orm/migrations/alembic/versions/2026_02_05-update_image_storage.py
++++ b/orm/migrations/alembic/versions/2026_02_05-update_image_storage.py
+@@ -21,90 +21,107 @@ depends_on: Union[str, Sequence[str], None] = None
+ 
+ 
+ def upgrade() -> None:
+-    # ### commands auto generated by Alembic - please adjust! ###
+-    op.create_table('storage_backends',
+-    sa.Column('id', sa.Integer(), nullable=False),
+-    sa.Column('key', sa.String(length=256), nullable=False),
+-    sa.Column('kind', sa.String(length=256), nullable=False),
+-    sa.Column('config', mysql.JSON(), nullable=False),
+-    sa.PrimaryKeyConstraint('id')
++    # --- Schema Changes ---
++    storage_backend_table = op.create_table('StorageBackend',
++        sa.Column('StorageBackendID', sa.Integer(), nullable=False),
++        sa.Column('Key', sa.String(length=256), nullable=False),
++        sa.Column('Kind', sa.String(length=256), nullable=False),
++        sa.Column('Config', mysql.JSON(), nullable=False),
++        sa.PrimaryKeyConstraint('StorageBackendID')
+     )
+-    connection = op.get_bind()
+-    connection.execute(
+-        sa.text(
+-            "INSERT INTO storage_backends (id, `key`, `kind`, `config`) "
+-            "VALUES (1, 'default', 'local', '{}')"
+-        )
++
++    storage_info_table = op.create_table('StorageInfo',
++        sa.Column('StorageInfoID', sa.Integer(), nullable=False),
++        sa.Column('StorageBackendID', sa.Integer(), nullable=False),
++        sa.Column('ObjectName', sa.String(length=64), nullable=True),
++        sa.Column('ObjectPrefix', sa.String(length=256), nullable=True),
++        sa.ForeignKeyConstraint(['StorageBackendID'], ['StorageBackend.StorageBackendID']),
++        sa.PrimaryKeyConstraint('StorageInfoID'),
++        sa.UniqueConstraint('StorageBackendID', 'ObjectPrefix')
+     )
+ 
++    op.add_column('ImageInstance', sa.Column('PublicID', sa.String(length=12), nullable=True))
++    op.add_column('ImageInstance', sa.Column('StorageInfoID', sa.Integer(), nullable=True))
++    op.add_column('ImageInstance', sa.Column('ObjectKey', sa.String(length=256), nullable=False))
+ 
+-    op.add_column('ImageInstance', sa.Column('public_id', sa.String(length=12), nullable=True))
+-    op.add_column('ImageInstance', sa.Column('storage_backend_id', sa.Integer(), nullable=True))
+-    op.add_column('ImageInstance', sa.Column('object_prefix', sa.String(length=256), nullable=True))
+-    op.add_column('ImageInstance', sa.Column('object_key', sa.String(length=256), nullable=False))
++    # --- Data Migration (run only in online mode) ---
++    connection = op.get_bind()
++    if hasattr(connection, 'begin'):
++        # Create a default backend
++        op.bulk_insert(storage_backend_table,
++            [
++                {'StorageBackendID': 1, 'Key': 'default', 'Kind': 'local', 'Config': '{}'}
++            ]
++        )
++        
++        # Create a default storage info with a null prefix, linked to the default backend
++        op.bulk_insert(storage_info_table,
++            [
++                {'StorageInfoID': 1, 'StorageBackendID': 1, 'ObjectPrefix': None}
++            ]
++        )
++        
++        # Update all existing images to use the default storage info
++        connection.execute(
++            sa.text("UPDATE ImageInstance SET StorageInfoID = 1")
++        )
+ 
+-    connection.execute(
+-        sa.text("UPDATE ImageInstance SET storage_backend_id = 1")
+-    )
+-    image_instance = sa.Table(
+-        'ImageInstance',
+-        sa.MetaData(),
+-        sa.Column('ImageInstanceID', sa.Integer()),
+-        sa.Column('public_id', sa.String(length=12)),
+-    )
+-    # Count how many ImageInstance rows we need public_ids for.
+-    total_needed = connection.execute(
+-        sa.select(sa.func.count(image_instance.c.ImageInstanceID))
+-    ).scalar_one()
+-
+-    # Pre-generate that many unique public_ids, using a set to ensure uniqueness.
+-    public_ids: set[str] = set()
+-    while len(public_ids) < total_needed:
+-        public_ids.add(_make_public_id())
+-
+-    public_id_iter = iter(public_ids)
+-
+-    # Now assign them in batches for efficient updates.
+-    result = connection.execute(sa.select(image_instance.c.ImageInstanceID))
+-    update_stmt = image_instance.update().where(
+-        image_instance.c.ImageInstanceID == sa.bindparam("b_ImageInstanceID")
+-    ).values(public_id=sa.bindparam("public_id"))
+-    batch_size = 1000
+-    while True:
+-        rows = result.fetchmany(batch_size)
+-        if not rows:
+-            break
+-
+-        params = [
+-            {
+-                "b_ImageInstanceID": image_id,
+-                "public_id": next(public_id_iter),
+-            }
+-            for (image_id,) in rows
+-        ]
+-        connection.execute(update_stmt, params)
+-    op.alter_column('ImageInstance', 'public_id',
++        image_instance_table = sa.Table(
++            'ImageInstance',
++            sa.MetaData(),
++            sa.Column('ImageInstanceID', sa.Integer()),
++            sa.Column('PublicID', sa.String(length=12)),
++        )
++
++        total_needed = connection.execute(
++            sa.select(sa.func.count(image_instance_table.c.ImageInstanceID))
++        ).scalar_one()
++
++        if total_needed > 0:
++            public_ids: set[str] = set()
++            while len(public_ids) < total_needed:
++                public_ids.add(_make_public_id())
++            public_id_iter = iter(public_ids)
++
++            result = connection.execute(sa.select(image_instance_table.c.ImageInstanceID))
++            update_stmt = image_instance_table.update().where(
++                image_instance_table.c.ImageInstanceID == sa.bindparam("b_ImageInstanceID")
++            ).values(PublicID=sa.bindparam("public_id_val"))
++            
++            batch_size = 1000
++            while True:
++                rows = result.fetchmany(batch_size)
++                if not rows:
++                    break
++                params = [
++                    {
++                        "b_ImageInstanceID": image_id,
++                        "public_id_val": next(public_id_iter),
++                    }
++                    for (image_id,) in rows
++                ]
++                connection.execute(update_stmt, params)
++    else:
++        op.execute("-- NOTE: Data migration for StorageInfo and PublicIDs must be run manually or in online mode.")
++
++    # --- Final Schema Changes ---
++    op.alter_column('ImageInstance', 'PublicID',
+                existing_type=mysql.VARCHAR(length=12),
+                nullable=False)
+-    op.alter_column('ImageInstance', 'storage_backend_id',
++    op.alter_column('ImageInstance', 'StorageInfoID',
+                existing_type=mysql.INTEGER(),
+                nullable=False)
+-    op.create_unique_constraint(None, 'ImageInstance', ['public_id'])
+-    op.create_index('ix_ImageInstance_public_id', 'ImageInstance', ['public_id'], unique=True)
+-    op.create_foreign_key(None, 'ImageInstance', 'storage_backends', ['storage_backend_id'], ['id'])
+-    # ### end Alembic commands ###
++    op.create_unique_constraint('uq_ImageInstance_PublicID', 'ImageInstance', ['PublicID'])
++    op.create_index('ix_ImageInstance_PublicID', 'ImageInstance', ['PublicID'], unique=True)
++    op.create_foreign_key('fk_ImageInstance_StorageInfo', 'ImageInstance', 'StorageInfo', ['StorageInfoID'], ['StorageInfoID'])
+ 
+ 
+ def downgrade() -> None:
+-    # ### commands auto generated by Alembic - please adjust! ###
+-    op.drop_constraint(None, 'ImageInstance', type_='foreignkey')
+-    op.drop_index('ix_ImageInstance_public_id', table_name='ImageInstance')
+-    op.drop_constraint(None, 'ImageInstance', type_='unique')
+-    op.alter_column('ImageInstance', 'storage_backend_id',
+-               existing_type=mysql.INTEGER(),
+-               nullable=True)
+-    op.alter_column('ImageInstance', 'public_id',
+-               existing_type=mysql.VARCHAR(length=12),
+-               nullable=True)
+-    op.drop_table('storage_backends')
+-    # ### end Alembic commands ###
++    op.drop_constraint('fk_ImageInstance_StorageInfo', 'ImageInstance', type_='foreignkey')
++    op.drop_index('ix_ImageInstance_PublicID', table_name='ImageInstance')
++    op.drop_constraint('uq_ImageInstance_PublicID', 'ImageInstance', type_='unique')
++    op.drop_column('ImageInstance', 'ObjectKey')
++    op.drop_column('ImageInstance', 'StorageInfoID')
++    op.drop_column('ImageInstance', 'PublicID')
++    op.drop_table('StorageInfo')
++    op.drop_table('StorageBackend')
+diff --git a/orm/migrations/generate_alembic_sql.sh b/orm/migrations/generate_alembic_sql.sh
+new file mode 100644
+index 0000000..634af06
+--- /dev/null
++++ b/orm/migrations/generate_alembic_sql.sh
+@@ -0,0 +1,4 @@
++#!/bin/bash
++
++echo 'y' | alembic upgrade head --sql > sql/migrations.sql
++echo "SQL for the migration generated: sql/migrations.sql"
+\ No newline at end of file
+diff --git a/orm/migrations/generate_latest_migration_sql.sh b/orm/migrations/generate_latest_migration_sql.sh
+new file mode 100755
+index 0000000..3d8db04
+--- /dev/null
++++ b/orm/migrations/generate_latest_migration_sql.sh
+@@ -0,0 +1,14 @@
++#!/bin/bash
++
++# Get the current revision from the database
++current_rev=$(alembic current | grep -oE '[a-f0-9]{12}')
++# Get the latest head revision
++head_rev=$(alembic heads | grep -oE '[a-f0-9]{12}')
++
++# Generate SQL for migrations between the current revision and head
++if [ "$current_rev" != "$head_rev" ]; then
++  echo 'y' | alembic upgrade $current_rev:$head_rev --sql > sql/latest_migration.sql
++  echo "SQL for the latest migration generated: sql/latest_migration.sql"
++else
++  echo "No new migrations to apply."
++fi
+diff --git a/orm/migrations/set_connection_string.py b/orm/migrations/set_connection_string.py
+new file mode 100644
+index 0000000..3a25ef6
+--- /dev/null
++++ b/orm/migrations/set_connection_string.py
+@@ -0,0 +1,58 @@
++import sys
++from pathlib import Path
++from dotenv import load_dotenv
++
++if __name__ == "__main__":
++    # Check if path argument is provided
++    if len(sys.argv) < 2:
++        print("Usage: python set_connection_string.py <path_to_env_file>")
++        print("Example: python set_connection_string.py ../../dev/.env")
++        sys.exit(1)
++    
++    env_path = Path(sys.argv[1]).resolve()
++    
++    if not env_path.exists():
++        print(f"Error: Environment file not found at {env_path}")
++        sys.exit(1)
++    
++    print(f"Loading environment from: {env_path}")
++    from dotenv import dotenv_values
++    env = dotenv_values(dotenv_path=env_path)
++    # Extract required values from the provided .env file (no process env mutation)
++    try:
++        user = env["EYENED_DATABASE_USER"]
++        password = env["EYENED_DATABASE_PASSWORD"]
++        host = env["EYENED_DATABASE_HOST"]
++        port = env["EYENED_DATABASE_PORT"]
++        database = env["EYENED_DATABASE_NAME"]
++    except KeyError as e:
++        print(f"Missing required key in env file: {e}")
++        sys.exit(1)
++    
++    # Use absolute path for cleaner output
++    filename = Path(__file__).parent.resolve() / "alembic.ini.sample"
++    print(f'Reading alembic template: {filename}')
++
++    with open(filename, 'r') as configfile:
++        lines = configfile.readlines()
++
++    new_url = f'mysql+pymysql://{user}:{password}@{host}:{port}/{database}'
++    print(f'New connection URL: {new_url}')
++
++    # Check if we found and updated the line
++    updated = False
++    for i, line in enumerate(lines):
++        if line.strip().startswith('sqlalchemy.url'):
++            lines[i] = f'sqlalchemy.url = {new_url}\n'
++            updated = True
++            break
++    
++    if not updated:
++        print(f"Warning: Could not find 'sqlalchemy.url' line in {filename}")
++        sys.exit(1)
++
++    filename = Path(__file__).parent.resolve() / "alembic.ini"
++    with open(filename, 'w') as configfile:
++        configfile.writelines(lines)
++    
++    print("✅ Connection string updated successfully!")
