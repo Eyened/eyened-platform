@@ -30,7 +30,7 @@ setup(
         "jsonschema==4.*",
         "tqdm==4.*",
         "alembic==1.13.2",
-        "PyMySQL==1.0.2",
+        "pymysql>=1.1.1",
         "mysql-connector-python==8.*",
         "pydicom==3.*",
         "GPUtil==1.*",
