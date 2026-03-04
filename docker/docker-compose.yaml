@@ -1,19 +1,21 @@
-version: "3.1"
-
 name: eyened-platform
 
 services:
 
   database:
-    image: mysql:8.0.27
+    user: "${USERID:-1000}:${GROUPID:-1000}"
+    image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
+      MYSQL_USER: ${DATABASE_USER}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+      MYSQL_DATABASE: eyened
     volumes:
-      - ${DATABASE_PATH}:/var/lib/mysql 
+      - ${DATABASE_PATH}:/var/lib/mysql
     ports:
       - "${DATABASE_PORT}:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DATABASE_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 2s
       timeout: 5s
       retries: 10
@@ -25,7 +27,7 @@ services:
       context: ../
       dockerfile: ./docker/Dockerfile.server
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health?src=docker-compose"]
       interval: 2s
       timeout: 5s
       retries: 10
@@ -39,11 +41,11 @@ services:
       - REDIS_HOST=redis. # Force absolte DNS name to avoid container name resolution issues.
       - REDIS_PORT=6379
       - DATABASE_HOST=database
-      - DATABASE_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
       - DATABASE_USER=${DATABASE_USER}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
       - DATABASE_PORT=3306
-      - DATABASE_NAME=eyened_database
+      - DATABASE_NAME=eyened
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}

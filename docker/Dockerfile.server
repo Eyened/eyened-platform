@@ -1,39 +1,63 @@
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1
+
+# Frontend staged build is based on python3.11-slim (=bullseye) + node20
+# TODO: upgrade Node.js to the current LTS version (24)
+FROM node:20-bullseye AS frontend_builder
+
+RUN npm install -g npm@10.8.3
+
+WORKDIR /client
+RUN \
+  --mount=type=bind,source=client/package.json,target=/client/package.json \
+  --mount=type=bind,source=client/package-lock.json,target=/client/package-lock.json,rw \
+  --mount=type=cache,target=/tmp/npm-cache \
+  npm install --cache /tmp/npm-cache --log-level=debug
+COPY client /client
+RUN npm run build
+
+# Backend staged build
+FROM python:3.11-slim AS backend_builder
 
 SHELL ["/bin/bash", "-c"]
 
-# Install dependencies
-# nodejs, mssql-tools18, msodbcsql18
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglx-mesa0 \
-    libglib2.0-0 \
-    curl \
-    gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        nodejs \
-    && npm install -g npm@10.8.3 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY server/requirements.txt .
-RUN pip install --no-cache-dir --verbose -r requirements.txt
+# Create virtual env
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install the ORM
-COPY orm /libraries/eyened_orm/
-WORKDIR /libraries/eyened_orm
-RUN pip install --no-cache-dir -e .
+COPY orm /tmp/eyened_orm/
+RUN \
+  --mount=type=cache,target=/root/.cache \
+  pip install /tmp/eyened_orm
 
-# Build the client
-COPY client /client
-WORKDIR /client
-RUN npm install
-RUN npm run build   
+# Install server dependencies
+RUN \
+  --mount=type=bind,source=server/requirements.txt,target=/requirements.txt \
+  --mount=type=cache,target=/root/.cache \
+  pip install -r /requirements.txt
 
-# Setup the application
+# Final stage starts here
+FROM python:3.11-slim AS final
+
+# Install runtime dependencies
+# TODO: document which packages in UNKNOWN_DEPS are required for which functionality
+ARG UNKNOWN_DEPS="libgl1 libglx-mesa0 libglib2.0.0"
+ARG HEALTHCHECK_DEPS="curl"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    $HEALTHCHECK_DEPS \
+    $UNKNOWN_DEPS \
+    && rm -rf /var/lib/apt/lists/*
+
+# Include the frontend (compiled code only)
+COPY --from=frontend_builder /client/build /client/build
+
+# Include backend virtualenv
+ENV VIRTUAL_ENV=/opt/venv
+COPY --from=backend_builder /opt/venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Include the application code
 COPY server /app/server
 WORKDIR /app
 
