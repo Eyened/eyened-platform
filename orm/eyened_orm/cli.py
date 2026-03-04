@@ -1,4 +1,5 @@
 import click
+import json
 import random
 import string
 
@@ -36,6 +37,26 @@ Important: import packages that are not dependencies of the ORM within the funct
 )
 def eorm(env_file):
     load_env_file(env_file, override=True)
+
+
+def _run_mysqlsh(db_config, expression: str):
+    import subprocess
+
+    cmd = [
+        "mysqlsh",
+        "--uri",
+        f"{db_config.user}@{db_config.host}:{db_config.port}",
+        "--passwords-from-stdin",
+        "--py",
+        "-e",
+        expression,
+    ]
+    subprocess.run(
+        cmd,
+        input=f"{db_config.password.get_secret_value()}\n",
+        text=True,
+        check=True,
+    )
 
 
 def _register_model_commands():
@@ -292,14 +313,20 @@ def update_hashes(print_errors):
     "-d",
     type=click.Path(exists=True),
     required=True,
-    help="Path to SQL dump file to load",
+    help="Path to dump directory (default) or SQL file with --legacy-sql",
 )
-def load_dump(dump_path):
-    """Load a database dump file, replacing the entire database.
+@click.option(
+    "--legacy-sql",
+    is_flag=True,
+    default=False,
+    help="Use legacy SQL file loader instead of mysqlsh dump directory loader",
+)
+def load_dump(dump_path, legacy_sql):
+    """Load a database dump, replacing the entire database.
 
     This command will:
     1. Drop and recreate the database (clearing all data)
-    2. Load the SQL dump file into the database
+    2. Load a mysqlsh dump directory (default) or SQL file (--legacy-sql)
 
     WARNING: This will permanently delete all existing data in the database.
     """
@@ -310,7 +337,7 @@ def load_dump(dump_path):
 
     dump_path = Path(dump_path)
     if not dump_path.exists():
-        print(f"Error: Dump file not found: {dump_path}")
+        print(f"Error: Dump path not found: {dump_path}")
         return
 
     print(f"Loading database dump from: {dump_path}")
@@ -342,11 +369,36 @@ def load_dump(dump_path):
         print("Error: Failed to clear database")
         return
 
-    # Load the dump file
-    print("\nLoading dump file...")
-    with open(dump_path, "r", encoding="utf-8") as dump_file:
-        if not load_db(db_config, dump_file, force=True):
-            print("Error: Failed to load database dump")
+    if legacy_sql:
+        if dump_path.is_dir():
+            print("Error: --legacy-sql expects --dump-path to be a .sql file")
+            return
+
+        print("\nLoading SQL dump file...")
+        with open(dump_path, "r", encoding="utf-8") as dump_file:
+            if not load_db(db_config, dump_file, force=True):
+                print("Error: Failed to load database dump")
+                return
+    else:
+        import subprocess
+
+        if not dump_path.is_dir():
+            print(
+                "Error: mysqlsh mode expects --dump-path to be a dump directory. "
+                "Use --legacy-sql for .sql files."
+            )
+            return
+
+        print("\nLoading mysqlsh dump directory...")
+        load_options = {"threads": 4}
+        load_expr = f"util.load_dump({json.dumps(str(dump_path))}, {json.dumps(load_options)})"
+        try:
+            _run_mysqlsh(db_config, load_expr)
+        except FileNotFoundError:
+            print("Error: mysqlsh is not installed. Use --legacy-sql or install MySQL Shell.")
+            return
+        except subprocess.CalledProcessError as exc:
+            print(f"Error: mysqlsh load failed with exit code {exc.returncode}")
             return
 
     print("\nDatabase dump loaded successfully!")
@@ -358,43 +410,83 @@ def load_dump(dump_path):
     "-d",
     type=click.Path(exists=True, file_okay=False),
     required=True,
-    help="Directory to write the dated SQL dump file",
+    help="Directory to write the dated dump folder (or SQL file with --legacy-sql)",
 )
-def save_dump(dump_dir):
+@click.option(
+    "--legacy-sql",
+    is_flag=True,
+    default=False,
+    help="Use legacy mysqldump SQL file output instead of mysqlsh compact dump directory",
+)
+def save_dump(dump_dir, legacy_sql):
     """Save a dated database dump to the given directory."""
     from datetime import datetime
+    import os
     from pathlib import Path
     import subprocess
+    import tempfile
 
     database = get_database()
     db_config = database.database_settings
 
     dump_dir = Path(dump_dir)
     date_stamp = datetime.now().strftime("%Y_%m_%d")
-    dump_path = dump_dir / f"eyened_db_dump_{date_stamp}.sql"
+    dump_path = dump_dir / f"eyened_db_dump_{date_stamp}"
+    if legacy_sql:
+        dump_path = dump_path.with_suffix(".sql")
 
     print(f"Saving database dump to: {dump_path}")
     print(f"Source database: {db_config.database} on {db_config.host}:{db_config.port}")
 
-    dump_cmd = [
-        "mysqldump",
-        "-h",
-        db_config.host,
-        "-P",
-        str(db_config.port),
-        "--single-transaction",
-        "--routines",
-        "-u",
-        db_config.user,
-        f"-p{db_config.password}",
-        db_config.database,
-    ]
+    if legacy_sql:
+        defaults_file_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", delete=False
+            ) as defaults_file:
+                defaults_file_path = defaults_file.name
+                defaults_file.write(
+                    "[client]\n"
+                    f"user={db_config.user}\n"
+                    f"password={db_config.password.get_secret_value()}\n"
+                    f"host={db_config.host}\n"
+                    f"port={db_config.port}\n"
+                )
+            os.chmod(defaults_file_path, 0o600)
 
-    try:
-        with open(dump_path, "w", encoding="utf-8") as dump_file:
-            subprocess.run(dump_cmd, stdout=dump_file, check=True)
-    except subprocess.CalledProcessError as exc:
-        print(f"Error: mysqldump failed with exit code {exc.returncode}")
-        return
+            dump_cmd = [
+                "mysqldump",
+                f"--defaults-extra-file={defaults_file_path}",
+                "--single-transaction",
+                "--routines",
+                db_config.database,
+            ]
+
+            with open(dump_path, "w", encoding="utf-8") as dump_file:
+                subprocess.run(dump_cmd, stdout=dump_file, check=True)
+        except subprocess.CalledProcessError as exc:
+            print(f"Error: mysqldump failed with exit code {exc.returncode}")
+            return
+        finally:
+            if defaults_file_path and os.path.exists(defaults_file_path):
+                os.remove(defaults_file_path)
+    else:
+        if dump_path.exists():
+            print(f"Error: Dump directory already exists: {dump_path}")
+            return
+
+        dump_options = {"threads": 4, "compression": "zstd"}
+        dump_expr = (
+            f"util.dump_schemas({json.dumps([db_config.database])}, "
+            f"{json.dumps(str(dump_path))}, {json.dumps(dump_options)})"
+        )
+        try:
+            _run_mysqlsh(db_config, dump_expr)
+        except FileNotFoundError:
+            print("Error: mysqlsh is not installed. Use --legacy-sql or install MySQL Shell.")
+            return
+        except subprocess.CalledProcessError as exc:
+            print(f"Error: mysqlsh dump failed with exit code {exc.returncode}")
+            return
 
     print("Database dump saved successfully!")
