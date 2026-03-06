@@ -983,7 +983,7 @@ async def search_instances(
         "limit": limit,
         "page": page,
         "count": count,
-        "result_ids": [i.public_id for i in instances],
+        "result_ids": [i.PublicID for i in instances],
         "has_more": has_more,
     }
 

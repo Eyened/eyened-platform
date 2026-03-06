@@ -50,7 +50,7 @@ dtypes = {
 def _resolve_image_instance_id(db: Session, image_id: str) -> int:
     item = (
         db.query(ImageInstance)
-        .filter(ImageInstance.public_id == image_id)
+        .filter(ImageInstance.PublicID == image_id)
         .first()
     )
     if item:

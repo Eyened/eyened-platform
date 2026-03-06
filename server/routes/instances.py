@@ -37,7 +37,7 @@ router = APIRouter()
 def _get_image_instance_by_identifier(
     db: Session, image_id: str
 ) -> Optional[ImageInstance]:
-    item = db.query(ImageInstance).filter(ImageInstance.public_id == image_id).first()
+    item = db.query(ImageInstance).filter(ImageInstance.PublicID == image_id).first()
     return item
 
 
@@ -179,7 +179,7 @@ async def get_public_image(
     item = (
         db.query(ImageInstance)
         .options(*opts)
-        .filter(ImageInstance.public_id == image_id)
+        .filter(ImageInstance.PublicID == image_id)
         .first()
     )
     if not item and image_id.isdigit():

@@ -71,7 +71,7 @@ class DTOConverter:
         from eyened_orm import ImageInstance
 
         img = sess.get(ImageInstance, instance_id)
-        return img.public_id if img else None
+        return img.PublicID if img else None
 
     @staticmethod
     def _get_data_format(object_key: str) -> str:
@@ -194,7 +194,7 @@ class DTOConverter:
             series_number=series.SeriesNumber,
             series_instance_uid=series.SeriesInstanceUid or "",
             instance_ids=[
-                img.public_id
+                img.PublicID
                 for img in (getattr(series, "ImageInstances", []) or [])
             ],
         )
@@ -245,7 +245,7 @@ class DTOConverter:
         series_meta = SeriesMeta(id=image_instance.Series.SeriesID)
 
         dto = ImageGET(
-            id=image_instance.public_id,
+            id=image_instance.PublicID,
             sop_instance_uid=image_instance.SOPInstanceUid or "",
             data_format=data_format,
             data_source_id=DTOConverter._get_data_source_id(image_instance.object_key or ""),
@@ -368,7 +368,7 @@ class DTOConverter:
         ms: "ModelSegmentation", with_tag_metadata: bool = False
     ) -> ModelSegmentationGET:
         """Convert ModelSegmentation ORM object to ModelSegmentationGET."""
-        public_image_id = getattr(getattr(ms, "ImageInstance", None), "public_id", None)
+        public_image_id = getattr(getattr(ms, "ImageInstance", None), "PublicID", None)
         if public_image_id is None:
             sess = object_session(ms)
             public_image_id = DTOConverter._get_public_id_for_instance_id(
@@ -400,7 +400,7 @@ class DTOConverter:
                 )
 
         if public_image_id is None:
-            raise ValueError("ModelSegmentation missing ImageInstance public_id")
+            raise ValueError("ModelSegmentation missing ImageInstance PublicID")
         return ModelSegmentationGET(
             id=ms.ModelSegmentationID,
             image_id=public_image_id,
@@ -494,14 +494,14 @@ class DTOConverter:
         seg: "Segmentation", with_tag_metadata: bool = False
     ) -> SegmentationGET:
         """Convert Segmentation ORM object to SegmentationGET."""
-        public_image_id = getattr(getattr(seg, "ImageInstance", None), "public_id", None)
+        public_image_id = getattr(getattr(seg, "ImageInstance", None), "PublicID", None)
         if public_image_id is None:
             sess = object_session(seg)
             public_image_id = DTOConverter._get_public_id_for_instance_id(
                 sess, seg.ImageInstanceID
             )
         if public_image_id is None:
-            raise ValueError("Segmentation missing ImageInstance public_id")
+            raise ValueError("Segmentation missing ImageInstance PublicID")
         dto = SegmentationGET(
             id=seg.SegmentationID,
             image_id=public_image_id,
@@ -547,7 +547,7 @@ class DTOConverter:
     ) -> FormAnnotationGET:
         """Convert FormAnnotation ORM object to FormAnnotationGET."""
         public_image_id = getattr(
-            getattr(annotation, "ImageInstance", None), "public_id", None
+            getattr(annotation, "ImageInstance", None), "PublicID", None
         )
         if public_image_id is None:
             sess = object_session(annotation)
@@ -556,7 +556,7 @@ class DTOConverter:
             )
         if annotation.ImageInstanceID is not None:
             if public_image_id is None:
-                raise ValueError("FormAnnotation missing ImageInstance public_id")
+                raise ValueError("FormAnnotation missing ImageInstance PublicID")
             obj_type = "image_instance"
         elif annotation.StudyID is not None:
             obj_type = "study"
