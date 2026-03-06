@@ -34,12 +34,19 @@ def upgrade() -> None:
     sa.Column('ImageInstanceID', sa.Integer(), nullable=False),
     sa.Column('StorageBackendID', sa.Integer(), nullable=False),
     sa.Column('ObjectKey', sa.String(length=256), nullable=False),
-    sa.Column('Hash', sa.String(length=256), nullable=False),
-    sa.Column('Checksum', sa.String(length=256), nullable=False),
+    sa.Column('Hash', sa.LargeBinary(length=32), nullable=True),
+    sa.Column('Checksum', sa.String(length=128), nullable=True),
     sa.Column('Format', sa.String(length=256), nullable=False),
+    sa.Column('IsPrimary', sa.Boolean(), server_default=sa.text('1'), nullable=False),
     sa.ForeignKeyConstraint(['ImageInstanceID'], ['ImageInstance.ImageInstanceID'], ),
     sa.ForeignKeyConstraint(['StorageBackendID'], ['StorageBackend.StorageBackendID'], ),
     sa.PrimaryKeyConstraint('ImageStorageID')
+    )
+    op.create_index(
+        'ix_ImageStorage_ImageInstanceID_IsPrimary',
+        'ImageStorage',
+        ['ImageInstanceID', 'IsPrimary'],
+        unique=False,
     )
     op.add_column('ImageInstance', sa.Column('PublicID', sa.CHAR(length=8), nullable=True))
 
@@ -109,6 +116,7 @@ def downgrade() -> None:
     op.drop_constraint(None, 'ImageInstance', type_='unique')
     op.drop_index('ix_ImageInstance_PublicID1_idx', table_name='ImageInstance')
     op.drop_column('ImageInstance', 'PublicID')
+    op.drop_index('ix_ImageStorage_ImageInstanceID_IsPrimary', table_name='ImageStorage')
     op.drop_table('ImageStorage')
     op.drop_table('StorageBackend')
     # ### end Alembic commands ###

@@ -11,6 +11,7 @@ from eyened_orm import (
     FormAnnotationTagLink,
     FormSchema,
     ImageInstance,
+    ImageStorage,
     ImageInstanceTagLink,
     Patient,
     Project,
@@ -909,6 +910,9 @@ async def search_instances(
         ),
         selectinload(ImageInstance.SourceInfo),
         selectinload(ImageInstance.Scan),
+        selectinload(ImageInstance.ImageStorages).selectinload(
+            ImageStorage.StorageBackend
+        ),
         selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
             ImageInstanceTagLink.Tag
         ),
@@ -1046,6 +1050,9 @@ async def search_studies(
             ),
             selectinload(ImageInstance.SourceInfo),
             selectinload(ImageInstance.Scan),
+            selectinload(ImageInstance.ImageStorages).selectinload(
+                ImageStorage.StorageBackend
+            ),
             selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
                 ImageInstanceTagLink.Tag
             ),

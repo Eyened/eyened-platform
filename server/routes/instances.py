@@ -2,19 +2,15 @@ from typing import Optional
 
 from eyened_orm import (
     ImageInstance,
+    ImageStorage,
     Tag,
     ImageInstanceTagLink,
     Series,
     Study,
     Patient,
-    Project,
     DeviceInstance,
-    DeviceModel,
-    Scan,
     Segmentation,
     ModelSegmentation,
-    Model,
-    Feature,
     FormAnnotation,
 )
 from eyened_orm.tag import SegmentationTagLink, FormAnnotationTagLink, TagType
@@ -29,7 +25,7 @@ from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
 from .auth import CurrentUser, get_current_user, is_authenticated
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
-from ..utils.storage_routing import build_storage_redirect_response
+
 
 router = APIRouter()
 
@@ -37,7 +33,16 @@ router = APIRouter()
 def _get_image_instance_by_identifier(
     db: Session, image_id: str
 ) -> Optional[ImageInstance]:
-    item = db.query(ImageInstance).filter(ImageInstance.PublicID == image_id).first()
+    item = (
+        db.query(ImageInstance)
+        .options(
+            selectinload(ImageInstance.ImageStorages).selectinload(
+                ImageStorage.StorageBackend
+            )
+        )
+        .filter(ImageInstance.PublicID == image_id)
+        .first()
+    )
     return item
 
 
@@ -61,6 +66,9 @@ async def get_instance(
             DeviceInstance.DeviceModel
         ),
         selectinload(ImageInstance.Scan),
+        selectinload(ImageInstance.ImageStorages).selectinload(
+            ImageStorage.StorageBackend
+        ),
         # instance tags
         selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
             ImageInstanceTagLink.Tag
@@ -135,6 +143,9 @@ async def get_public_image(
             DeviceInstance.DeviceModel
         ),
         selectinload(ImageInstance.Scan),
+        selectinload(ImageInstance.ImageStorages).selectinload(
+            ImageStorage.StorageBackend
+        ),
         # instance tags
         selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
             ImageInstanceTagLink.Tag
@@ -196,6 +207,13 @@ async def get_public_image(
     )
 
 
+def build_storage_redirect_response(path: str) -> Response:
+    print('path', path)
+    response = Response()
+    response.headers["X-Accel-Redirect"] = path
+    return response
+
+
 @router.get("/images/{image_id}/data")
 async def get_public_image_data(
     image_id: str,
@@ -210,41 +228,36 @@ async def get_public_image_data(
     if index is not None and index < 0:
         raise HTTPException(400, "index must be >= 0")
 
-    object_key = item.object_key
-    base_path = f"/{item.storage_backend.key}/"
+    storage = item.primary_storage
+    if not storage:
+        raise HTTPException(422, "Primary image storage not found")
+    if not storage.StorageBackend or not storage.StorageBackend.Key:
+        raise HTTPException(422, "Primary image storage has no storage backend")
+    if not storage.ObjectKey:
+        raise HTTPException(422, "Primary image storage has no ObjectKey")
 
-    if meta:
-        if object_key.endswith(".binary"):
-            meta_key = object_key[: -len(".binary")] + ".json"
-            return build_storage_redirect_response(
-                item.object_prefix, meta_key, base_path
-            )
-        if object_key.startswith("[png_series_"):
-            _, base_url = object_key.split("]", 1)
-            if "/" in base_url:
-                folder = base_url.rsplit("/", 1)[0]
-                meta_key = f"{folder}/metadata.json"
-            else:
-                meta_key = "metadata.json"
-            return build_storage_redirect_response(
-                item.object_prefix, meta_key, base_path
-            )
-        raise HTTPException(400, "No metadata available for this image type")
-    if object_key.startswith("[png_series_"):
-        _, base_url = object_key.split("]", 1)
+    base_path = f"/{storage.StorageBackend.Key}/{storage.ObjectKey}"
+    if storage.Format == "png_series":
+        path, source_id = storage.ObjectKey.rsplit("/", 1)
+        if meta:
+            return build_storage_redirect_response(f"/{storage.StorageBackend.Key}/{path}/metadata.json")
         if index is None:
-            if "/" in base_url:
-                folder = base_url.rsplit("/", 1)[0]
-                meta_key = f"{folder}/metadata.json"
-            else:
-                meta_key = "metadata.json"
-            return build_storage_redirect_response(
-                item.object_prefix, meta_key, base_path
+            raise HTTPException(
+                422, "Index is required for png_series format if not fetching metadata"
             )
-        file_key = f"{base_url}_{index}.png"
-        return build_storage_redirect_response(item.object_prefix, file_key, base_path)
-
-    return build_storage_redirect_response(item.object_prefix, object_key, base_path)
+        return build_storage_redirect_response(f"/{storage.StorageBackend.Key}/{path}/{source_id}_{index}.png")
+    elif storage.Format == "dicom":
+        return build_storage_redirect_response(f"{base_path}")
+    elif storage.Format == "binary":
+        if meta:
+            suffix = ".json"
+        else:
+            suffix = ".binary"
+        return build_storage_redirect_response(f"{base_path}{suffix}")
+    elif storage.Format == "image/png" or storage.Format == "image/jpeg":
+        return build_storage_redirect_response(f"{base_path}")
+    else:
+        raise HTTPException(422, "Primary image storage has unknown format")
 
 
 @router.get("/images/{image_id}/thumbnail")
@@ -258,9 +271,8 @@ async def get_public_image_thumbnail(
     if not item:
         raise HTTPException(404, "ImageInstance not found")
 
-    base_path = "/thumbnails/"
     return build_storage_redirect_response(
-        "", f"{item.ThumbnailPath}_{size}.jpg", base_path
+        f"/thumbnails/{item.ThumbnailPath}_{size}.jpg"
     )
 
 

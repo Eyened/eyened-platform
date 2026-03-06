@@ -73,45 +73,6 @@ class DTOConverter:
         img = sess.get(ImageInstance, instance_id)
         return img.PublicID if img else None
 
-    @staticmethod
-    def _get_data_format(object_key: str) -> str:
-        if object_key.startswith("[png_series_"):
-            return "png_series"
-        lower_key = object_key.lower()
-        if lower_key.endswith(".binary"):
-            return "binary"
-        if lower_key.endswith(".dcm"):
-            return "dicom"
-        if lower_key.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
-            return "image"
-        return "unknown"
-
-    @staticmethod
-    def _get_data_source_id(object_key: str) -> Optional[str]:
-        if not object_key:
-            return None
-        if object_key.startswith("[png_series_"):
-            try:
-                _, base_url = object_key.split("]", 1)
-                return base_url.split("/")[-1] or None
-            except ValueError:
-                return None
-        filename = object_key.split("/")[-1]
-        if "." in filename:
-            return filename.rsplit(".", 1)[0]
-        return filename or None
-
-    @staticmethod
-    def _get_multi_file_count(image_instance: "ImageInstance") -> Optional[int]:
-        object_key = image_instance.object_key or ""
-        if object_key.startswith("[png_series_"):
-            try:
-                prefix = object_key.split("]", 1)[0]
-                return int(prefix[len("[png_series_") :])
-            except (ValueError, IndexError):
-                return None
-        return None
-
     # -------------------- Core entities --------------------
     @staticmethod
     def project_to_get(project: "Project") -> ProjectGET:
@@ -194,8 +155,7 @@ class DTOConverter:
             series_number=series.SeriesNumber,
             series_instance_uid=series.SeriesInstanceUid or "",
             instance_ids=[
-                img.PublicID
-                for img in (getattr(series, "ImageInstances", []) or [])
+                img.PublicID for img in (getattr(series, "ImageInstances", []) or [])
             ],
         )
 
@@ -208,7 +168,15 @@ class DTOConverter:
         with_model_segmentations: bool = False,
     ) -> ImageGET:
         """Convert ImageInstance ORM object to ImageGET."""
-        data_format = DTOConverter._get_data_format(image_instance.object_key or "")
+        primary_storage = image_instance.primary_storage
+        if not primary_storage:
+            raise ValueError("ImageInstance has no primary storage")
+        object_key = primary_storage.ObjectKey
+        data_format = primary_storage.Format
+        if data_format == "png_series":
+            data_source_id = object_key.split("/")[-1]
+        else:
+            data_source_id = None
         device_meta = DeviceMeta(
             manufacturer=(
                 image_instance.DeviceInstance.DeviceModel.Manufacturer
@@ -248,20 +216,20 @@ class DTOConverter:
             id=image_instance.PublicID,
             sop_instance_uid=image_instance.SOPInstanceUid or "",
             data_format=data_format,
-            data_source_id=DTOConverter._get_data_source_id(image_instance.object_key or ""),
-            multi_file_count=DTOConverter._get_multi_file_count(image_instance),
+            data_source_id=data_source_id,
             thumbnail_identifier=image_instance.ThumbnailPath or "",
-            # thumbnail_path=image_instance.ThumbnailPath or "",
             modality=image_instance.Modality,
             dicom_modality=image_instance.DICOMModality,
             etdrs_field=image_instance.ETDRSField,
-            angio_graphy=str(image_instance.Angiography)
-            if image_instance.Angiography
-            else "",
+            angio_graphy=(
+                str(image_instance.Angiography) if image_instance.Angiography else ""
+            ),
             laterality=image_instance.Laterality,
-            anatomic_region=str(image_instance.AnatomicRegion)
-            if image_instance.AnatomicRegion is not None
-            else "",
+            anatomic_region=(
+                str(image_instance.AnatomicRegion)
+                if image_instance.AnatomicRegion is not None
+                else ""
+            ),
             rows=image_instance.Rows_y or 0,
             columns=image_instance.Columns_x or 0,
             nr_of_frames=image_instance.NrOfFrames or 1,
@@ -516,12 +484,16 @@ class DTOConverter:
             reference_segmentation_id=seg.ReferenceSegmentationID,
             data_type=seg.DataType,
             data_representation=seg.DataRepresentation,
-            feature=DTOConverter.feature_to_get(seg.Feature)
-            if getattr(seg, "Feature", None)
-            else None,  # type: ignore[arg-type]
-            creator=DTOConverter.creator_to_meta(seg.Creator)
-            if getattr(seg, "Creator", None)
-            else None,  # type: ignore[arg-type]
+            feature=(
+                DTOConverter.feature_to_get(seg.Feature)
+                if getattr(seg, "Feature", None)
+                else None
+            ),  # type: ignore[arg-type]
+            creator=(
+                DTOConverter.creator_to_meta(seg.Creator)
+                if getattr(seg, "Creator", None)
+                else None
+            ),  # type: ignore[arg-type]
             tags=[],
             date_inserted=seg.DateInserted,
             date_modified=seg.DateModified,
@@ -576,9 +548,11 @@ class DTOConverter:
             form_annotation_reference_id=annotation.FormAnnotationReferenceID,
             object_type=obj_type,  # type: ignore[assignment]
             tags=[],
-            creator=DTOConverter.creator_to_meta(annotation.Creator)
-            if getattr(annotation, "Creator", None)
-            else None,
+            creator=(
+                DTOConverter.creator_to_meta(annotation.Creator)
+                if getattr(annotation, "Creator", None)
+                else None
+            ),
             date_inserted=annotation.DateInserted,
             date_modified=annotation.DateModified,
         )
@@ -613,9 +587,11 @@ class DTOConverter:
             date_inserted=task.DateInserted,
             num_tasks=num_tasks,
             num_tasks_ready=num_tasks_ready,
-            creator=DTOConverter.creator_to_meta(task.Creator)
-            if getattr(task, "Creator", None)
-            else None,
+            creator=(
+                DTOConverter.creator_to_meta(task.Creator)
+                if getattr(task, "Creator", None)
+                else None
+            ),
             task_state=getattr(task, "TaskState", None),
             task_definition=DTOConverter.task_definition_to_get(task.TaskDefinition),
         )

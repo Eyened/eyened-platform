@@ -122,8 +122,6 @@ class ImageBase(BaseModel):
     sop_instance_uid: str
     data_format: str
     data_source_id: Optional[str] = None
-    multi_file_count: Optional[int] = None
-    # thumbnail_path: str
     modality: Optional[Modality] = None
     dicom_modality: Optional[ModalityType] = None
     etdrs_field: Optional[ETDRSField] = None

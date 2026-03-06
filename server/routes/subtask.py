@@ -3,17 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel
-from eyened_orm import SubTask, SubTaskImageLink, ImageInstance
+from eyened_orm import SubTask, SubTaskImageLink, ImageInstance, ImageStorage
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_tasks import (
-    SubTasksResponse,
-    SubTasksWithImagesResponse,
     SubTaskGET,
     SubTaskWithImagesGET,
 )
-from ..dtos.dtos_instances import ImageGET
 from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
@@ -29,11 +26,7 @@ class AddImageRequest(BaseModel):
 
 
 def _resolve_image_instance_id(db: Session, image_id: str) -> int:
-    item = (
-        db.query(ImageInstance)
-        .filter(ImageInstance.PublicID == image_id)
-        .first()
-    )
+    item = db.query(ImageInstance).filter(ImageInstance.PublicID == image_id).first()
     if item:
         return item.ImageInstanceID
     raise HTTPException(status_code=404, detail="ImageInstance not found")
@@ -51,9 +44,10 @@ async def get_subtask(
     q = select(SubTask).where(SubTask.SubTaskID == subtaskid)
     if with_images:
         q = q.options(
-            selectinload(SubTask.SubTaskImageLinks).selectinload(
-                SubTaskImageLink.ImageInstance
-            )
+            selectinload(SubTask.SubTaskImageLinks)
+            .selectinload(SubTaskImageLink.ImageInstance)
+            .selectinload(ImageInstance.ImageStorages)
+            .selectinload(ImageStorage.StorageBackend)
         )
     st = db.execute(q).scalars().first()
     if not st:
@@ -194,9 +188,10 @@ async def add_subtask_image(
             select(SubTask)
             .where(SubTask.SubTaskID == subtaskid)
             .options(
-                selectinload(SubTask.SubTaskImageLinks).selectinload(
-                    SubTaskImageLink.ImageInstance
-                )
+                selectinload(SubTask.SubTaskImageLinks)
+                .selectinload(SubTaskImageLink.ImageInstance)
+                .selectinload(ImageInstance.ImageStorages)
+                .selectinload(ImageStorage.StorageBackend)
             )
         )
         .scalars()
@@ -255,9 +250,10 @@ async def remove_subtask_image(
             select(SubTask)
             .where(SubTask.SubTaskID == subtaskid)
             .options(
-                selectinload(SubTask.SubTaskImageLinks).selectinload(
-                    SubTaskImageLink.ImageInstance
-                )
+                selectinload(SubTask.SubTaskImageLinks)
+                .selectinload(SubTaskImageLink.ImageInstance)
+                .selectinload(ImageInstance.ImageStorages)
+                .selectinload(ImageStorage.StorageBackend)
             )
         )
         .scalars()

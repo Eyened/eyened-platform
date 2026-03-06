@@ -3,6 +3,9 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 import io
+import warnings
+
+from sqlalchemy.types import CHAR, LargeBinary
 from eyened_orm.api_client import get_api_client
 
 import numpy as np
@@ -10,10 +13,9 @@ import pandas as pd
 import pydicom
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
-from rtnls_fundusprep.mask_extraction import get_cfi_bounds
 import secrets
 from sqlalchemy import ForeignKey, Index, String, event, func, select
-from sqlalchemy.dialects.mysql import JSON, TEXT, TINYBLOB
+from sqlalchemy.dialects.mysql import JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from rtnls_fundusprep.transformation import ProjectiveTransform
@@ -82,18 +84,48 @@ class ETDRSField(Enum):
     F7 = "F7"
 
 
-class StorageBackends(Base):
-    __tablename__ = "storage_backends"
+class StorageBackend(Base):
+    __tablename__ = "StorageBackend"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    key: Mapped[str] = mapped_column(String(256))
-    kind: Mapped[str] = mapped_column(String(256))
-    config: Mapped[Any] = mapped_column(JSON)
+    StorageBackendID: Mapped[int] = mapped_column(primary_key=True)
+    Key: Mapped[str] = mapped_column(String(256))
+    Kind: Mapped[str] = mapped_column(String(256))
+    Config: Mapped[Any] = mapped_column(JSON)
 
-    ImageInstances: Mapped[List["ImageInstance"]] = relationship(
-        "eyened_orm.image_instance.ImageInstance",
-        back_populates="storage_backend",
+    ImageStorages: Mapped[List["ImageStorage"]] = relationship(
+        "eyened_orm.image_instance.ImageStorage",
+        back_populates="StorageBackend",
         lazy="noload",
+    )
+
+
+class ImageStorage(Base):
+    __tablename__ = "ImageStorage"
+    __table_args__ = (
+        Index(
+            "ix_ImageStorage_ImageInstanceID_IsPrimary", "ImageInstanceID", "IsPrimary"
+        ),
+    )
+
+    ImageStorageID: Mapped[int] = mapped_column(primary_key=True)
+    ImageInstanceID: Mapped[int] = mapped_column(
+        ForeignKey("ImageInstance.ImageInstanceID")
+    )
+    StorageBackendID: Mapped[int] = mapped_column(
+        ForeignKey("StorageBackend.StorageBackendID")
+    )
+    ObjectKey: Mapped[str] = mapped_column(String(256))
+    Hash: Mapped[Optional[bytes]] = mapped_column(LargeBinary(32), nullable=True, default=None)
+    Checksum: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
+
+    Format: Mapped[str] = mapped_column(String(256))
+    IsPrimary: Mapped[bool] = mapped_column(default=True)
+
+    ImageInstance: Mapped["ImageInstance"] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="ImageStorages"
+    )
+    StorageBackend: Mapped["StorageBackend"] = relationship(
+        "eyened_orm.image_instance.StorageBackend", back_populates="ImageStorages"
     )
 
 
@@ -101,7 +133,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     __tablename__ = "ImageInstance"
     __table_args__ = (
         Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
-        Index("ix_ImageInstance_public_id", "public_id", unique=True),
+        Index("ix_ImageInstance_PublicID1_idx", "PublicID", unique=True),
         Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
         Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
         Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
@@ -133,26 +165,26 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     )
 
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
-    public_id: Mapped[str] = mapped_column(
-        String(12),
+    PublicID: Mapped[str] = mapped_column(
+        CHAR(8),
         unique=True,
         nullable=False,
     )
 
-    storage_backend_id: Mapped[int] = mapped_column(
-        ForeignKey("storage_backends.id"),
-        nullable=False,
-    )
+    # storage_backend_id: Mapped[int] = mapped_column(
+    #     ForeignKey("storage_backends.id"),
+    #     nullable=False,
+    # )
 
-    object_prefix: Mapped[Optional[str]] = mapped_column(
-        String(256),
-        nullable=True,
-    )
+    # object_prefix: Mapped[Optional[str]] = mapped_column(
+    #     String(256),
+    #     nullable=True,
+    # )
 
-    object_key: Mapped[str] = mapped_column(
-        String(256),
-        nullable=False,
-    )
+    # object_key: Mapped[str] = mapped_column(
+    #     String(256),
+    #     nullable=False,
+    # )
 
     # repeating field, but non-nullable
     SeriesID: Mapped[int] = mapped_column(
@@ -229,8 +261,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     PupilDilated: Mapped[Optional[bool]]
 
     # Relative filepath to the image file
-    # deprecated: Use object_prefix/object_key instead
     DatasetIdentifier: Mapped[str] = mapped_column(String(256))
+
     # Alternative relative filepath to the image file. Typically a lower resolution version of the image.
     AltDatasetIdentifier: Mapped[Optional[str]] = mapped_column(String(256))
 
@@ -250,16 +282,17 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     CFQuality: Mapped[Optional[float]]
 
     # File checksum and data hash
-    FileChecksum: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
-    DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
+    # FileChecksum: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
+    # DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
 
     # relationships:
     Series: Mapped["Series"] = relationship(
         "eyened_orm.series.Series", back_populates="ImageInstances", lazy="selectin"
     )
-    storage_backend: Mapped["StorageBackends"] = relationship(
-        "eyened_orm.image_instance.StorageBackends",
-        back_populates="ImageInstances",
+    ImageStorages: Mapped[List["ImageStorage"]] = relationship(
+        "eyened_orm.image_instance.ImageStorage",
+        back_populates="ImageInstance",
+        passive_deletes=True,
         lazy="selectin",
     )
     SourceInfo: Mapped["SourceInfo"] = relationship(
@@ -364,13 +397,31 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def path(self) -> Path:
         return Path(self.object_prefix or "") / self.object_key
 
+    @property
+    def primary_storage(self) -> Optional["ImageStorage"]:
+        storages = getattr(self, "ImageStorages", None) or []
+        for storage in storages:
+            if storage.IsPrimary:
+                return storage
+        return None
+
+    @property
+    def storage_backend(self) -> Optional["StorageBackend"]:
+        storage = self.primary_storage
+        return storage.StorageBackend if storage else None
+
+    @property
+    def object_key(self) -> str:
+        storage = self.primary_storage
+        return storage.ObjectKey if storage and storage.ObjectKey else ""
+
     def get_thumbnail_path(self, size: int) -> str:
         return f"{self.ThumbnailPath}_{size}.jpg"
 
     def get_thumbnail(self, size):
         client = get_api_client()
         resp = client.get(
-            f"/api/images/{self.public_id}/thumbnail", params={"size": size}
+            f"/api/images/{self.PublicID}/thumbnail", params={"size": size}
         )
         resp.raise_for_status()
         return Image.open(io.BytesIO(resp.content))
@@ -380,11 +431,13 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         model = self.DeviceInstance.DeviceModel
         return f"{model.Manufacturer} {model.ManufacturerModelName}"
 
-    def _download_stream(self, index: int | None = None) -> io.BytesIO:
+    @property
+    def data_endpoint(self) -> str:
+        return f"/api/images/{self.PublicID}/data"
+
+    def _download_stream(self) -> io.BytesIO:
         client = get_api_client()
-        url = f"/api/images/{self.public_id}/data"
-        params = {"index": index} if index is not None else None
-        resp = client.get(url, params=params)
+        resp = client.get(self.data_endpoint)
         resp.raise_for_status()
         return io.BytesIO(resp.content)
 
@@ -398,27 +451,39 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return arr.reshape((-1, self.Rows_y, self.Columns_x), order="C")
 
     def _load_png_series_array(self) -> np.ndarray:
-        prefix, filename = self.object_key.split("]", 1)
-        n_files = int(prefix[len("[png_series_") :])
+        storage = self.primary_storage
+        
+        meta = client.get(self.data_endpoint, params={"meta": True})
+        meta.raise_for_status()
+        meta_data = meta.json()
+        source_id =storage.ObjectKey.split("/")[-1]
+        try:
+            for image in meta_data["images"]["images"]:
+                if image["source_id"] == source_id:
+                    n_files = len(image["contents"])
+                    break
+        except Exception as e:
+            raise ValueError(f"Error parsing metadata for ImageInstance {self.ImageInstanceID}") from e
         client = get_api_client()
-        arrays = []
-        for i in range(n_files):
-            resp = client.get(f"/api/images/{self.public_id}/data", params={"index": i})
+        def load_image(index: int) -> np.ndarray:
+            resp = client.get(self.data_endpoint, params={"index": index})
             resp.raise_for_status()
-            arrays.append(np.array(Image.open(io.BytesIO(resp.content))))
-        return np.array(arrays).squeeze()
+            return np.array(Image.open(io.BytesIO(resp.content)))
+        return np.array([load_image(i) for i in range(n_files)])
 
     def _load_single_image_array(self) -> np.ndarray:
         return np.array(Image.open(self._download_stream()))
 
     @property
     def pixel_array(self) -> np.ndarray:
-        if self.object_key.endswith(".dcm"):
+        format = self.primary_storage.Format
+        if format == "dicom":
             return self._load_dicom_array()
-        if self.object_key.endswith(".binary"):
+        if format == "binary":
             return self._load_binary_array()
-        if self.object_key.startswith("[png_series_"):
+        if format == "png_series":
             return self._load_png_series_array()
+        # assuming image format that PIL can handle
         return self._load_single_image_array()
 
     @property
@@ -662,20 +727,45 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
 @event.listens_for(ImageInstance, "before_insert")
 def _image_instance_set_public_id(mapper, connection, target) -> None:
-    if target.public_id:
+    if target.PublicID:
         return
 
     # Retry ID generation until we find one that is not yet used.
     for _ in range(10):
-        target.public_id = _make_public_id()
+        target.PublicID = _make_public_id()
         if not connection.scalar(
-            select(ImageInstance.public_id).where(
-                ImageInstance.public_id == target.public_id
+            select(ImageInstance.PublicID).where(
+                ImageInstance.PublicID == target.PublicID
             )
         ):
             break
     else:
         raise ValueError("Failed to generate a unique public ID")
+
+
+def _warn_deprecated_imageinstance_attr(message: str):
+    def _listener(target, value, oldvalue, initiator):
+        warnings.warn(message, DeprecationWarning, stacklevel=3)
+        return value
+
+    return _listener
+
+
+_DEPRECATED_IMAGEINSTANCE_ATTRS = {
+    "DatasetIdentifier": "ImageInstance.DatasetIdentifier is deprecated. Use ImageStorages instead.",
+    "AltDatasetIdentifier": "ImageInstance.AltDatasetIdentifier is deprecated. Use ImageStorages instead.",
+    "ThumbnailPath": "ImageInstance.ThumbnailPath is deprecated and will be removed in a future release.",
+    "OldPath": "ImageInstance.OldPath is deprecated and will be removed in a future release.",
+    "FDAIdentifier": "ImageInstance.FDAIdentifier is deprecated and will be removed in a future release.",
+}
+
+for _attr_name, _message in _DEPRECATED_IMAGEINSTANCE_ATTRS.items():
+    event.listen(
+        getattr(ImageInstance, _attr_name),
+        "set",
+        _warn_deprecated_imageinstance_attr(_message),
+        retval=True,
+    )
 
 
 class DeviceModel(Base):
