@@ -321,7 +321,13 @@ def update_hashes(print_errors):
     default=False,
     help="Use legacy SQL file loader instead of mysqlsh dump directory loader",
 )
-def load_dump(dump_path, legacy_sql):
+@click.option(
+    "--reset-progress",
+    is_flag=True,
+    default=False,
+    help="Force mysqlsh load from scratch by discarding existing load progress.",
+)
+def load_dump(dump_path, legacy_sql, reset_progress):
     """Load a database dump, replacing the entire database.
 
     This command will:
@@ -391,7 +397,9 @@ def load_dump(dump_path, legacy_sql):
 
         print("\nLoading mysqlsh dump directory...")
         load_options = {"threads": 4}
-        load_expr = f"util.load_dump({json.dumps(str(dump_path))}, {json.dumps(load_options)})"
+        if reset_progress:
+            load_options["resetProgress"] = True
+        load_expr = f"util.load_dump({json.dumps(str(dump_path))}, {repr(load_options)})"
         try:
             _run_mysqlsh(db_config, load_expr)
         except FileNotFoundError:
