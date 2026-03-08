@@ -11,7 +11,9 @@
     const instanceProperties = {
         "Patient ID": instance.patient.identifier,
         Date: instance.study.date.split('T')[0],
+        Modality: instance.modality,
         Laterality: instance.laterality,
+        Manufacturer: instance.device?.manufacturer,
         Camera: instance.device?.model,
         "Scan mode": instance.scan?.mode,
         "ETDRS Field": instance.etdrs_field,

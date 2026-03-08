@@ -99,8 +99,16 @@
                 <td>{form.image_instance_id}</td>
             </tr>
             <tr>
+                <td>Modality</td>
+                <td>{instance?.modality}</td>
+            </tr>
+            <tr>
                 <td>Laterality</td>
                 <td>{instance?.laterality === "L" ? "OS" : instance?.laterality === "R" ? "OD" : "?"}</td>
+            </tr>
+            <tr>
+                <td>Manufacturer</td>
+                <td>{instance?.device.manufacturer}</td>
             </tr>
         </tbody>
     </table>
