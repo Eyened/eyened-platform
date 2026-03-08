@@ -174,7 +174,7 @@ class Importer:
                 raise RuntimeError(
                     f"Project with name '{project_name}' not found and create_projects=False"
                 )
-            project = Project(ProjectName=project_name, External=True)
+            project = Project(ProjectName=project_name, External='Y')
             
         # Add to our list of projects
         
@@ -251,6 +251,7 @@ class Importer:
 
     def find_or_create_study(self, patient, study_item):
         default_study_date = self.config.default_study_date or datetime.date(1970,1,1)
+        default_study_date = study_item.get("study_date", default_study_date)
         props = study_item.get("props", {})
 
         # Convert string date to datetime.date if necessary
@@ -296,7 +297,7 @@ class Importer:
          - is absolute and within the images_basepath directory
          - is relative and exists within the images_basepath directory
         """
-        basepath = self.config.images_basepath
+        basepath = Path(self.config.images_basepath)
 
         path_or_url = image_data.get("image")
         if path_or_url.startswith("http"):
