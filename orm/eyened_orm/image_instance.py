@@ -32,6 +32,9 @@ BASE36_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
 def _make_public_id(length: int = 8, alphabet: str = BASE36_ALPHABET) -> str:
+    """
+    Generates a randomPublicID. Used to identify the image in the API.
+    """
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
@@ -85,11 +88,19 @@ class ETDRSField(Enum):
 
 
 class StorageBackend(Base):
+    """
+    Represents a storage backend for the platform.
+    """
     __tablename__ = "StorageBackend"
 
     StorageBackendID: Mapped[int] = mapped_column(primary_key=True)
+    # The key of the storage backend (identifier used in nginx configuration)
     Key: Mapped[str] = mapped_column(String(256))
+    # The kind of the storage backend
+    # Currently supported kind: local (nginx fileserver), will add s3 in the future
+    # Should perhaps be an enum?
     Kind: Mapped[str] = mapped_column(String(256))
+    # placeholder for future configuration
     Config: Mapped[Any] = mapped_column(JSON)
 
     ImageStorages: Mapped[List["ImageStorage"]] = relationship(
@@ -100,6 +111,10 @@ class StorageBackend(Base):
 
 
 class ImageStorage(Base):
+    """
+    Represents a storage location for an image.
+    """
+
     __tablename__ = "ImageStorage"
     __table_args__ = (
         Index(
@@ -108,17 +123,33 @@ class ImageStorage(Base):
     )
 
     ImageStorageID: Mapped[int] = mapped_column(primary_key=True)
+    # The image instance that this storage location belongs to
     ImageInstanceID: Mapped[int] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID")
     )
+    # The storage backend that holds the image
     StorageBackendID: Mapped[int] = mapped_column(
         ForeignKey("StorageBackend.StorageBackendID")
     )
+    # The key of the object in the storage backend
     ObjectKey: Mapped[str] = mapped_column(String(256))
-    Hash: Mapped[Optional[bytes]] = mapped_column(LargeBinary(32), nullable=True, default=None)
-    Checksum: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
+    # The hash of the object
+    Hash: Mapped[Optional[bytes]] = mapped_column(
+        LargeBinary(32), nullable=True, default=None
+    )
+    # The checksum of the object
+    Checksum: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, default=None
+    )
 
+    # The format of the object
+    # Currently supported formats: image/png, image/jpeg, dicom, png_series, binary
+    # Should perhaps be an enum?
     Format: Mapped[str] = mapped_column(String(256))
+
+    # Whether this is the primary storage location for the image
+    # Each image instance can have multiple storage locations, but only one can be primary
+    # This is currently not enforced in the database however
     IsPrimary: Mapped[bool] = mapped_column(default=True)
 
     ImageInstance: Mapped["ImageInstance"] = relationship(
@@ -165,37 +196,27 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     )
 
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
+    # The public identifier of the image
+    # This is used to identify the image in the API
     PublicID: Mapped[str] = mapped_column(
         CHAR(8),
         unique=True,
         nullable=False,
     )
 
-    # storage_backend_id: Mapped[int] = mapped_column(
-    #     ForeignKey("storage_backends.id"),
-    #     nullable=False,
-    # )
-
-    # object_prefix: Mapped[Optional[str]] = mapped_column(
-    #     String(256),
-    #     nullable=True,
-    # )
-
-    # object_key: Mapped[str] = mapped_column(
-    #     String(256),
-    #     nullable=False,
-    # )
-
-    # repeating field, but non-nullable
+    # The series that the image belongs to
     SeriesID: Mapped[int] = mapped_column(
         ForeignKey("Series.SeriesID", ondelete="CASCADE")
     )
+    # The source that the image belongs to (optional, not used by platform)
     SourceInfoID: Mapped[int] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"))
+    # The device that the image was captured with
     DeviceInstanceID: Mapped[int] = mapped_column(
         ForeignKey("DeviceInstance.DeviceInstanceID")
     )
     # TODO: redundant with Modality enum
     ModalityID: Mapped[Optional[int]] = mapped_column(ForeignKey("Modality.ModalityID"))
+    # Used for OCT to identify the scan type
     ScanID: Mapped[Optional[int]] = mapped_column(ForeignKey("Scan.ScanID"))
 
     # Image modality
@@ -244,46 +265,55 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     Laterality: Mapped[Optional[Laterality]] = mapped_column(
         OptionalEnum(Laterality)
     )  # L or R
+
+    # As per DICOM specification: typically OP, OPT, SC
     DICOMModality: Mapped[Optional[ModalityType]] = mapped_column(
         OptionalEnum(ModalityType)
-    )  # OP, OPT, SC
-    AnatomicRegion: Mapped[
-        Optional[int]
-    ]  # TODO: check (1 = OD, 2 = Macula, check ETDRSField?)
-    ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(
-        OptionalEnum(ETDRSField)
-    )  # F1-F7
-    Angiography: Mapped[Optional[int]]  # 0 = non-angiography, 1 = angiography
+    )
 
-    AcquisitionDateTime: Mapped[
-        Optional[datetime]
-    ]  # Date and time the acquisition of data started
+    # Not used by platform? (1 = Optic Disc, 2 = Macula)
+    # Overlaps with ETDRSField enum?
+    AnatomicRegion: Mapped[Optional[int]]
+    # F1-F7
+    ETDRSField: Mapped[Optional[ETDRSField]] = mapped_column(OptionalEnum(ETDRSField))
+    # 0 = non-angiography, 1 = angiography
+    Angiography: Mapped[Optional[int]]
+
+    # Date and time the acquisition of data started
+    AcquisitionDateTime: Mapped[Optional[datetime]]
+
     PupilDilated: Mapped[Optional[bool]]
 
     # Relative filepath to the image file
+    # Not used anymore, will be removed in the future
     DatasetIdentifier: Mapped[str] = mapped_column(String(256))
 
-    # Alternative relative filepath to the image file. Typically a lower resolution version of the image.
+    # Alternative relative filepath to the image file
+    # Not used anymore, will be removed in the future, add multiple ImageStorage objects instead
     AltDatasetIdentifier: Mapped[Optional[str]] = mapped_column(String(256))
 
-    # identifier for the thumbnail (project_id/thumbnail_name), needs suffix for different sizes
+    # identifier for the thumbnail, needs suffix for different sizes
+    # path will be constructed as /thumbnails/{ThumbnailPath}_{size}.jpg
+    # client expects size 144
+    # see /images/{image_id}/thumbnail endpoint for more details 
+    # 
+    # Perhaps we can use an ImageStorage entry instead for more flexibility?
+    # Or the platform can assume a default location based on public_id?
     ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(256))
 
     # Used to link to IDs of the image in the source database
+    # Should be removed in the future, perhaps use ImageStorage objects instead?
     OldPath: Mapped[Optional[str]] = mapped_column(String(256))
     FDAIdentifier: Mapped[Optional[int]]
 
-    # Considered removed from the database
+    # Considered removed from the database (soft delete)
     Inactive: Mapped[bool] = mapped_column(default=False)
 
     # Fundus-specific columns
+    # will be removed in the future, using Attributes instead
     CFROI: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     CFKeypoints: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     CFQuality: Mapped[Optional[float]]
-
-    # File checksum and data hash
-    # FileChecksum: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
-    # DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
 
     # relationships:
     Series: Mapped["Series"] = relationship(
@@ -452,23 +482,27 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     def _load_png_series_array(self) -> np.ndarray:
         storage = self.primary_storage
-        
+
         meta = client.get(self.data_endpoint, params={"meta": True})
         meta.raise_for_status()
         meta_data = meta.json()
-        source_id =storage.ObjectKey.split("/")[-1]
+        source_id = storage.ObjectKey.split("/")[-1]
         try:
             for image in meta_data["images"]["images"]:
                 if image["source_id"] == source_id:
                     n_files = len(image["contents"])
                     break
         except Exception as e:
-            raise ValueError(f"Error parsing metadata for ImageInstance {self.ImageInstanceID}") from e
+            raise ValueError(
+                f"Error parsing metadata for ImageInstance {self.ImageInstanceID}"
+            ) from e
         client = get_api_client()
+
         def load_image(index: int) -> np.ndarray:
             resp = client.get(self.data_endpoint, params={"index": index})
             resp.raise_for_status()
             return np.array(Image.open(io.BytesIO(resp.content)))
+
         return np.array([load_image(i) for i in range(n_files)])
 
     def _load_single_image_array(self) -> np.ndarray:
