@@ -1,122 +1,43 @@
-version: "3.1"
-
 name: eyened-platform
 
 services:
 
-  database:
-    image: mysql:8.0.27
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
-    volumes:
-      - ${DATABASE_PATH}:/var/lib/mysql 
-    ports:
-      - "${DATABASE_PORT}:3306"
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DATABASE_ROOT_PASSWORD}"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-    restart: always
-
-  api-server:
-    user: "${USERID:-1000}:${GROUPID:-1000}"
+  server:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.server
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 2s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health?src=docker-compose"]
+      interval: 10s
       timeout: 5s
-      retries: 10
-    depends_on:
-      database:
-        condition: service_healthy
-    environment:
-      - IMAGES_BASEPATH=/images
-      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
-      - THUMBNAILS_PATH=/storage/thumbnails
-      - REDIS_HOST=redis. # Force absolte DNS name to avoid container name resolution issues.
-      - REDIS_PORT=6379
-      - DATABASE_HOST=database
-      - DATABASE_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_PORT=3306
-      - DATABASE_NAME=eyened_database
-      - ADMIN_USERNAME=${ADMIN_USERNAME}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY}
-      - WORKERS=${WORKERS:-4}
-      - DB_LOG_FILE_PATH=${DB_LOG_FILE_PATH:-}
-    restart: always
+      retries: 3
     volumes:
-      - ${IMAGES_BASEPATH}:/images
-      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
-      - ${THUMBNAILS_PATH}:/storage/thumbnails
+      # Source segmentation Zarr on host -> container path expected by server
+      - </path/to/segmentations.zarr>:/storage/segmentations.zarr
 
-  redis:
-    user: "${USERID:-1000}:${GROUPID:-1000}"
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-    restart: always
-
-  worker:
-    user: "${USERID:-1000}:${GROUPID:-1000}"
+  client:
     build:
       context: ../
-      dockerfile: ./docker/Dockerfile.worker
-    environment:
-      - REDIS_HOST=redis. # Force absolte DNS name to avoid container name resolution issues.
-      - REDIS_PORT=6379
-      - DATABASE_HOST=database
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_PORT=3306
-      - DATABASE_NAME=eyened_database
-      - ADMIN_USERNAME=${ADMIN_USERNAME}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - IMAGES_BASEPATH=/images
-      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
-      - THUMBNAILS_PATH=/storage/thumbnails
-      - SECRET_KEY=${SECRET_KEY}
-    depends_on:
-      redis:
-        condition: service_healthy
-      database:
-        condition: service_healthy
-    volumes:
-      - ${IMAGES_BASEPATH}:/images
-      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
-      - ${THUMBNAILS_PATH}:/storage/thumbnails
-    restart: always
+      dockerfile: ./docker/Dockerfile.client
 
   fileserver:
-    build:
-      context: .
-      dockerfile: Dockerfile.fileserver
+    env_file: .env
+    image: nginx:latest
+    ports:
+      - "${PORT:-80}:80"
     depends_on:
-      api-server:
+      server:
         condition: service_healthy
+      client:
+        condition: service_started
     volumes:
-      - ${IMAGES_BASEPATH}:/images
-      - ${THUMBNAILS_PATH}:/thumbnails
-    ports:
-      - ${PORT}:80
-    restart: always
-
-  adminer:
-    image: adminer:latest
-    restart: always
-    ports:
-      - "8080:8080"
-    depends_on:
-      database:
-        condition: service_healthy
-    environment:
-      - ADMINER_DEFAULT_SERVER=database
+      # nginx configuration
+      - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      # Thumbnail directory served by nginx
+      - </path/to/thumbnails>:/storage/thumbnails:ro
+      # Add other read-only mounts for local datasets here
+      - </mnt/data_source_1>:/mnt/data_source_1:ro
 

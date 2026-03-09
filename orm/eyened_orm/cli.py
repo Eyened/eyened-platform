@@ -1,7 +1,5 @@
 import click
 import json
-import random
-import string
 
 from .utils.testdb import drop_create_db, load_db
 from tqdm import tqdm
@@ -70,12 +68,14 @@ _register_model_commands()
 
 
 @eorm.command()
-def create_database():
-    """Create the database and tables if they don't exist."""
-    from eyened_orm import create_database
-
-    create_database()
-
+def initialize_database():
+    """Initialize the database by creating the database and tables if they don't exist."""
+    print("Initializing database...")
+    database = get_database(confirmation=True)
+    from eyened_orm.base import Base
+    print("Creating tables...")
+    Base.metadata.create_all(database.engine)
+    print("Database initialized successfully")
 
 @eorm.command()
 @click.option("--username", type=str, prompt=True)
@@ -338,33 +338,17 @@ def load_dump(dump_path, legacy_sql, reset_progress):
     """
     from pathlib import Path
 
-    database = get_database()
-    db_config = database.database_settings
-
     dump_path = Path(dump_path)
-    if not dump_path.exists():
-        print(f"Error: Dump path not found: {dump_path}")
-        return
 
     print(f"Loading database dump from: {dump_path}")
-    print(f"Target database: {db_config.database} on {db_config.host}:{db_config.port}")
     print("WARNING: This will replace the entire database!")
-
-    # Security confirmation
-    print("\n" + "=" * 60)
-    print(
-        f"Database to be cleared: {db_config.database} on {db_config.host}:{db_config.port}"
-    )
     print("=" * 60)
 
-    # Generate random confirmation code
-    confirmation_code = "".join(random.choices(string.ascii_uppercase, k=4))
-    print(f"\nDo you want to proceed? Type '{confirmation_code}' to confirm:")
+    database = get_database(confirmation=True)
+    db_config = database.database_settings
 
-    user_input = click.prompt("", type=str)
-
-    if user_input != confirmation_code:
-        print("Confirmation code does not match. Operation cancelled.")
+    if not dump_path.exists():
+        print(f"Error: Dump path not found: {dump_path}")
         return
 
     print("Confirmation received. Proceeding with database load...\n")
@@ -399,11 +383,15 @@ def load_dump(dump_path, legacy_sql, reset_progress):
         load_options = {"threads": 4}
         if reset_progress:
             load_options["resetProgress"] = True
-        load_expr = f"util.load_dump({json.dumps(str(dump_path))}, {repr(load_options)})"
+        load_expr = (
+            f"util.load_dump({json.dumps(str(dump_path))}, {repr(load_options)})"
+        )
         try:
             _run_mysqlsh(db_config, load_expr)
         except FileNotFoundError:
-            print("Error: mysqlsh is not installed. Use --legacy-sql or install MySQL Shell.")
+            print(
+                "Error: mysqlsh is not installed. Use --legacy-sql or install MySQL Shell."
+            )
             return
         except subprocess.CalledProcessError as exc:
             print(f"Error: mysqlsh load failed with exit code {exc.returncode}")
@@ -491,7 +479,9 @@ def save_dump(dump_dir, legacy_sql):
         try:
             _run_mysqlsh(db_config, dump_expr)
         except FileNotFoundError:
-            print("Error: mysqlsh is not installed. Use --legacy-sql or install MySQL Shell.")
+            print(
+                "Error: mysqlsh is not installed. Use --legacy-sql or install MySQL Shell."
+            )
             return
         except subprocess.CalledProcessError as exc:
             print(f"Error: mysqlsh dump failed with exit code {exc.returncode}")

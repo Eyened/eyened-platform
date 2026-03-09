@@ -1,52 +1,51 @@
-## EyeNED platform setup
+## EyeNED Docker Setup
 
-Production Docker configuration for the EyeNED platform with multi-stage builds and containerized services.
+Production stack: `server` (API), `client` (UI), `fileserver` (nginx reverse proxy + file serving).
 
-### Quick Start
-```bash
-# Run the automated setup script
-./setup.sh
+### 1) Configure before first run
+
+Edit `docker-compose.yaml`:
+- `server.volumes`: replace `</path/to/segmentations.zarr>` with a writable host path.
+- `fileserver.volumes`: replace `</path/to/thumbnails>` with your thumbnails path.
+- `fileserver.volumes`: replace/add dataset mounts (for example `</mnt/data_source_1>`).
+
+Edit `nginx.conf`:
+- Add one `location /<StorageBackend.Key>/ { ... }` block per mounted dataset path.
+- Keep `alias` paths matching the container mount paths from `docker-compose.yaml`.
+
+Create or update `.env`:
+```env
+PORT=<port to expose the app>
+EYENED_API_SECRET_KEY=<a random string>
+EYENED_DATABASE_USER=<db-user>
+EYENED_DATABASE_PASSWORD=<db-password>
+EYENED_DATABASE_HOST=<db-host, use host.docker.internal for localhost>
+EYENED_DATABASE_PORT=<db-port>
 ```
 
-### Services Overview
-
-**api-server:** FastAPI-based backend server with health checks, database connectivity, and image processing capabilities. Built from Python 3.11-slim with Node.js for client building.
-
-**worker:** Background task processor using Redis for job queuing. Handles image processing, segmentation storage, and thumbnail generation.
-
-**database:** MySQL 8.0.27 database with persistent storage and health monitoring for data integrity.
-
-**redis:** Redis 7-alpine for caching and job queue management with health checks.
-
-**fileserver:** Nginx-based file server for static content delivery and image serving with optimized configuration.
-
-**nginx:** Reverse proxy with SSL termination, load balancing, and static file serving for the web application.
-
-### Configuration
-
-The setup script (`setup.sh`) automatically configures:
-- Environment variables in `.env` file
-- Directory structure for images, storage, and thumbnails
-- Database credentials and admin accounts
-- Port mappings and volume mounts
-- User permissions and security settings
-
-### Deployment
+### 2) Build and start
 
 ```bash
-# Start all services
+docker compose build
 docker compose up -d
-
-# View logs
 docker compose logs -f
-
-# Stop services
-docker compose down
 ```
 
-### Volumes and Storage
+### 3) Initialize app
 
-- **Images:** DICOM and PNG images
-- **Segmentations:** Zarr-based annotation storage
-- **Thumbnails:** Generated image previews
-- **Database:** Persistent MySQL data storage
+Run once after services are up:
+
+Enter terminal inside the server container:
+```bash
+docker compose exec server bash
+```
+
+Initialize database
+```bash
+eorm initialize-database
+```
+
+Create user (for log in to front-end and/or api-client)
+```bash
+eorm create-user
+```
