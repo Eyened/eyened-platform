@@ -30,8 +30,8 @@ from ..utils.db_logging import get_db_logger
 router = APIRouter()
 
 
-def _get_image_instance_by_identifier(
-    db: Session, image_id: str
+def _get_image_instance_by_public_id(
+    db: Session, public_id: str
 ) -> Optional[ImageInstance]:
     item = (
         db.query(ImageInstance)
@@ -40,7 +40,7 @@ def _get_image_instance_by_identifier(
                 ImageStorage.StorageBackend
             )
         )
-        .filter(ImageInstance.PublicID == image_id)
+        .filter(ImageInstance.PublicID == public_id)
         .first()
     )
     return item
@@ -208,7 +208,6 @@ async def get_public_image(
 
 
 def build_storage_redirect_response(path: str) -> Response:
-    print('path', path)
     response = Response()
     response.headers["X-Accel-Redirect"] = path
     return response
@@ -222,7 +221,7 @@ async def get_public_image_data(
     _: bool = Depends(is_authenticated),
     db: Session = Depends(get_db),
 ):
-    item = _get_image_instance_by_identifier(db, image_id)
+    item = _get_image_instance_by_public_id(db, image_id)
     if not item:
         raise HTTPException(404, "ImageInstance not found")
     if index is not None and index < 0:
@@ -267,7 +266,7 @@ async def get_public_image_thumbnail(
     _: bool = Depends(is_authenticated),
     db: Session = Depends(get_db),
 ):
-    item = _get_image_instance_by_identifier(db, image_id)
+    item = _get_image_instance_by_public_id(db, image_id)
     if not item:
         raise HTTPException(404, "ImageInstance not found")
 
@@ -305,7 +304,7 @@ async def tag_instance(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> TagMeta:
     """Attach a Tag to an ImageInstance by tag ID (idempotent)."""
-    instance = _get_image_instance_by_identifier(db, instance_id)
+    instance = _get_image_instance_by_public_id(db, instance_id)
     if not instance:
         raise HTTPException(404, "ImageInstance not found")
     tag = db.get(Tag, body.tag_id)
@@ -375,7 +374,7 @@ async def patch_instance_tag(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> TagMeta:
     """Update comment on an existing ImageInstance tag link."""
-    instance = _get_image_instance_by_identifier(db, instance_id)
+    instance = _get_image_instance_by_public_id(db, instance_id)
     if not instance:
         raise HTTPException(404, "ImageInstance not found")
     tag = db.get(Tag, tag_id)
@@ -424,7 +423,7 @@ async def untag_instance(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Remove a Tag from an ImageInstance (idempotent)."""
-    instance = _get_image_instance_by_identifier(db, instance_id)
+    instance = _get_image_instance_by_public_id(db, instance_id)
     if not instance:
         raise HTTPException(404, "ImageInstance not found")
     link = db.get(
