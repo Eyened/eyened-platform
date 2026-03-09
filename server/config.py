@@ -1,5 +1,6 @@
 import logging
 from datetime import date
+from pathlib import Path
 from eyened_orm.utils.pretty_settings import pretty_settings
 from pydantic import Field, SecretStr
 from pydantic_settings import SettingsConfigDict, BaseSettings
@@ -10,10 +11,26 @@ class DbLogSettings(BaseSettings):
     model_config = SettingsConfigDict(
         frozen=True, extra="forbid", env_prefix="EYENED_DBLOG_"
     )
-    file_path: str = "logs/db_modifications.yaml"
-    level: int = logging.INFO
-    max_bytes: int = 10 * 1024 * 1024
-    backup_count: int = 5
+    file_path: Path | None = Field(
+        default=None,
+        description=(
+            "Optional output path for DB modification logs. "
+            "Set EYENED_DBLOG_FILE_PATH to enable file logging; "
+            "if omitted, DB logging is disabled."
+        ),
+    )
+    level: int = Field(
+        default=logging.INFO,
+        description="Log level used when DB logging is enabled.",
+    )
+    max_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        description="Maximum log file size before rotation when enabled.",
+    )
+    backup_count: int = Field(
+        default=5,
+        description="Number of rotated DB log files to keep when enabled.",
+    )
 
 
 @pretty_settings
@@ -45,7 +62,7 @@ class Settings(BaseSettings):
     redis: RedisSettings = Field(default_factory=RedisSettings)
     db_log: DbLogSettings = Field(default_factory=DbLogSettings)
 
-    zarr_store: str
+    zarr_store: str = "/storage/segmentations.zarr"
 
     @property
     def secret_key_value(self) -> str:

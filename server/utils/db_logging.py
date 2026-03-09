@@ -266,24 +266,25 @@ def init_db_logger(settings) -> Optional[DatabaseModificationLogger]:
         settings: Application settings object
 
     Returns:
-        Initialized DatabaseModificationLogger instance
+        Initialized DatabaseModificationLogger instance, or None when disabled.
     """
     global _db_logger
 
-    log_file_path = getattr(settings, "db_log_file_path", "")
-    log_level = getattr(settings, "db_log_level", logging.INFO)
-    max_bytes = getattr(settings, "db_log_max_bytes", 10 * 1024 * 1024)  # 10MB
-    backup_count = getattr(settings, "db_log_backup_count", 5)
+    db_log_settings = getattr(settings, "db_log", None)
+    if db_log_settings is None:
+        _db_logger = None
+        return None
 
-    if not log_file_path:
-        # Not setting the log file path effectively disables the logger
+    if not db_log_settings.file_path:
+        # DB logging is opt-in: no file path means no logger.
+        _db_logger = None
         return None
 
     _db_logger = DatabaseModificationLogger(
-        log_file_path=settings.db_log.file_path,
-        log_level=settings.db_log.level,
-        max_bytes=settings.db_log.max_bytes,
-        backup_count=settings.db_log.backup_count,
+        log_file_path=db_log_settings.file_path,
+        log_level=db_log_settings.level,
+        max_bytes=db_log_settings.max_bytes,
+        backup_count=db_log_settings.backup_count,
     )
 
     return _db_logger
