@@ -10,10 +10,15 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health?src=docker-compose"]
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health?src=docker-compose', timeout=2).read()
       interval: 10s
-      timeout: 5s
-      retries: 3
+      timeout: 3s
+      retries: 5
+      start_period: 20s
     volumes:
       # Source segmentation Zarr on host -> container path expected by server
       - </path/to/segmentations.zarr>:/storage/segmentations.zarr
