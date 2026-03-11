@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 import io
 import warnings
 
-from sqlalchemy.types import CHAR, LargeBinary
+from sqlalchemy.types import CHAR
 from eyened_orm.api_client import get_api_client
 
 import numpy as np
@@ -15,7 +15,7 @@ from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
 import secrets
 from sqlalchemy import ForeignKey, Index, String, event, func, select
-from sqlalchemy.dialects.mysql import JSON, TEXT
+from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from rtnls_fundusprep.transformation import ProjectiveTransform
@@ -95,13 +95,13 @@ class StorageBackend(Base):
 
     StorageBackendID: Mapped[int] = mapped_column(primary_key=True)
     # The key of the storage backend (identifier used in nginx configuration)
-    Key: Mapped[str] = mapped_column(String(256))
+    Key: Mapped[str] = mapped_column(String(256), unique=True)
     # The kind of the storage backend
     # Currently supported kind: local (nginx fileserver), will add s3 in the future
     # Should perhaps be an enum?
     Kind: Mapped[str] = mapped_column(String(256))
     # placeholder for future configuration
-    Config: Mapped[Any] = mapped_column(JSON)
+    Config: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True, default=None)
 
     ImageStorages: Mapped[List["ImageStorage"]] = relationship(
         "eyened_orm.image_instance.ImageStorage",
@@ -120,6 +120,12 @@ class ImageStorage(Base):
         Index(
             "ix_ImageStorage_ImageInstanceID_IsPrimary", "ImageInstanceID", "IsPrimary"
         ),
+        Index(
+            "ObjectKey_StorageBackendID_UNIQUE",
+            "ObjectKey",
+            "StorageBackendID",
+            unique=True,
+        ),
     )
 
     ImageStorageID: Mapped[int] = mapped_column(primary_key=True)
@@ -134,9 +140,7 @@ class ImageStorage(Base):
     # The key of the object in the storage backend
     ObjectKey: Mapped[str] = mapped_column(String(256))
     # The hash of the object
-    Hash: Mapped[Optional[bytes]] = mapped_column(
-        LargeBinary(32), nullable=True, default=None
-    )
+    Hash: Mapped[Optional[bytes]] = mapped_column(BINARY(32), nullable=True, default=None)
     # The checksum of the object
     Checksum: Mapped[Optional[str]] = mapped_column(
         String(128), nullable=True, default=None
@@ -164,7 +168,6 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     __tablename__ = "ImageInstance"
     __table_args__ = (
         Index("fk_ImageInstance_Series_Inactive1_idx", "SeriesID", "Inactive"),
-        Index("ix_ImageInstance_PublicID1_idx", "PublicID", unique=True),
         Index("fk_ImageInstance_DeviceInstance1_idx", "DeviceInstanceID"),
         Index("fk_ImageInstance_SourceInfo1_idx", "SourceInfoID"),
         Index("fk_ImageInstance_Modality1_idx", "ModalityID"),
@@ -209,7 +212,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         ForeignKey("Series.SeriesID", ondelete="CASCADE")
     )
     # The source that the image belongs to (optional, not used by platform)
-    SourceInfoID: Mapped[int] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"))
+    SourceInfoID: Mapped[Optional[int]] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"), nullable=True)
     # The device that the image was captured with
     DeviceInstanceID: Mapped[int] = mapped_column(
         ForeignKey("DeviceInstance.DeviceInstanceID")

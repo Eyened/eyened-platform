@@ -497,6 +497,18 @@ class Segmentation(SegmentationBase):
         lazy="selectin",
     )
 
+    @staticmethod
+    def infer_data_type(data: np.ndarray) -> Datatype:
+        if data.dtype == np.uint8:
+            return Datatype.R8UI # or R8?
+        if data.dtype == np.uint16:
+            return Datatype.R16UI
+        if data.dtype == np.uint32:
+            return Datatype.R32UI
+        if data.dtype == np.float32:
+            return Datatype.R32F
+        return Datatype.R8
+
     def make_tag(
         self,
         tag_name: str,

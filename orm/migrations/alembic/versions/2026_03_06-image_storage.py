@@ -26,15 +26,16 @@ def upgrade() -> None:
     sa.Column('StorageBackendID', sa.Integer(), nullable=False),
     sa.Column('Key', sa.String(length=256), nullable=False),
     sa.Column('Kind', sa.String(length=256), nullable=False),
-    sa.Column('Config', mysql.JSON(), nullable=False),
-    sa.PrimaryKeyConstraint('StorageBackendID')
+    sa.Column('Config', mysql.JSON(), nullable=True, default=None),
+    sa.PrimaryKeyConstraint('StorageBackendID'),
+    sa.UniqueConstraint('Key', name='uq_StorageBackend_Key')
     )
     op.create_table('ImageStorage',
     sa.Column('ImageStorageID', sa.Integer(), nullable=False),
     sa.Column('ImageInstanceID', sa.Integer(), nullable=False),
     sa.Column('StorageBackendID', sa.Integer(), nullable=False),
     sa.Column('ObjectKey', sa.String(length=256), nullable=False),
-    sa.Column('Hash', sa.LargeBinary(length=32), nullable=True),
+    sa.Column('Hash', sa.BINARY(length=32), nullable=True),
     sa.Column('Checksum', sa.String(length=128), nullable=True),
     sa.Column('Format', sa.String(length=256), nullable=False),
     sa.Column('IsPrimary', sa.Boolean(), server_default=sa.text('1'), nullable=False),
@@ -48,7 +49,16 @@ def upgrade() -> None:
         ['ImageInstanceID', 'IsPrimary'],
         unique=False,
     )
+    op.create_index(
+        'ObjectKey_StorageBackendID_UNIQUE',
+        'ImageStorage',
+        ['ObjectKey', 'StorageBackendID'],
+        unique=True,
+    )
     op.add_column('ImageInstance', sa.Column('PublicID', sa.CHAR(length=8), nullable=True))
+    op.alter_column('ImageInstance', 'SourceInfoID',
+               existing_type=mysql.INTEGER(),
+               nullable=True)
 
     connection = op.get_bind()
     image_instance = sa.Table(
@@ -98,7 +108,7 @@ def upgrade() -> None:
         nullable=False,
     )
 
-    op.create_index('ix_ImageInstance_PublicID1_idx', 'ImageInstance', ['PublicID'], unique=True)
+    
     op.create_unique_constraint(None, 'ImageInstance', ['PublicID'])
     op.drop_column('ImageInstance', 'FileChecksum')
     op.drop_column('ImageInstance', 'DataHash')
@@ -113,9 +123,12 @@ def downgrade() -> None:
     op.create_foreign_key('ModelSegmentation_ibfk_3', 'ModelSegmentation', 'Segmentation', ['ReferenceSegmentationID'], ['SegmentationID'])
     op.add_column('ImageInstance', sa.Column('DataHash', mysql.TINYBLOB(), nullable=True))
     op.add_column('ImageInstance', sa.Column('FileChecksum', mysql.TINYBLOB(), nullable=True))
-    op.drop_constraint(None, 'ImageInstance', type_='unique')
-    op.drop_index('ix_ImageInstance_PublicID1_idx', table_name='ImageInstance')
+    op.alter_column('ImageInstance', 'SourceInfoID',
+               existing_type=mysql.INTEGER(),
+               nullable=False)
+    op.drop_constraint(None, 'ImageInstance', type_='unique')    
     op.drop_column('ImageInstance', 'PublicID')
+    op.drop_index('ObjectKey_StorageBackendID_UNIQUE', table_name='ImageStorage')
     op.drop_index('ix_ImageStorage_ImageInstanceID_IsPrimary', table_name='ImageStorage')
     op.drop_table('ImageStorage')
     op.drop_table('StorageBackend')

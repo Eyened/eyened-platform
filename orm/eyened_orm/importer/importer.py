@@ -6,7 +6,10 @@ from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import inspect, select
+from typing import TypeVar
+from eyened_orm.base import Base
+
+T = TypeVar("T", bound=Base)
 
 from eyened_orm import (
     ImageInstance,
@@ -17,19 +20,19 @@ from eyened_orm import (
 )
 from eyened_orm.attributes import AttributeDataType, AttributeDefinition, AttributeValue
 
+from eyened_orm.base import Base
 from eyened_orm.image_instance import (
     DeviceInstance,
     DeviceModel,
+    ImageStorage,
     Modality,
     Scan,
     SourceInfo,
+    StorageBackend,
 )
 from eyened_orm.importer.thumbnails import update_thumbnails
 from eyened_orm.project import ExternalEnum
-from eyened_orm.segmentation import Datatype, Segmentation
-
-# TODO: fix this!
-# from eyened_orm.utils.config import EyenedORMConfig
+from eyened_orm import Segmentation, Creator, Feature
 
 from .importer_dtos import (
     ImageImport,
@@ -49,6 +52,7 @@ class Importer:
         create_studies: bool = False,
         create_series: bool = True,
         create_projects: bool = False,
+        create_segmentations: bool = False,
         run_ai_models: bool = False,
         generate_thumbnails: bool = True,
     ):
@@ -59,8 +63,6 @@ class Importer:
         -----------
         session : SQLAlchemy session
             Database session to use for the import
-        config : ORMSettings
-            Configuration to use for the import
         create_patients : bool, default=False
             If True, create patients when they don't exist
         create_studies : bool, default=False
@@ -69,44 +71,71 @@ class Importer:
             If True, create series when they don't exist
         create_projects : bool, default=False
             If True, create project when it doesn't exist
+        create_segmentations : bool, default=False
+            If True, create segmentations when they don't exist
         run_ai_models : bool, default=False
             If True, run AI models on the images after import
         generate_thumbnails : bool, default=True
             If True, generate thumbnails for the images after import
-
         """
         self.session = session
-        self.config = None
         self.create_patients = create_patients
         self.create_studies = create_studies
         self.create_series = create_series
         self.create_projects = create_projects
+        self.create_segmentations = create_segmentations
         self.run_ai_models = run_ai_models
         self.generate_thumbnails = generate_thumbnails
 
-        assert (
-            self.config.images_basepath is not None
-        ), "images_basepath must be set when using the importer"
-
-        # Initialize empty collections
-        self._clear_collections()
-
-    def _clear_collections(self):
-        """
-        Clear all collection attributes to reset state.
-        """
-        self.projects = []
-        self.patients = []
-        self.studies = []
-        self.series = []
-        self.images = []
-        self.attribute_definitions = {}
-        self.attribute_values = []
-        self.segmentations = []
+        self.created_entities = set()
+        self.existing_entities = set()
         self.pending_segmentation_writes = []
-        self.device_models = []
-        self.device_instances = []
-        self.scans = []
+
+    def _ensure_entity(
+        self,
+        model_cls: type[T],
+        match_by: Dict,
+        create_allowed: bool = True,
+        create_kwargs: Dict | None = None,
+        must_match: Dict | None = None,
+        update_values: Dict | None = None,
+    ) -> T:
+        """
+        Resolve an entity by keys and create it if needed using Base.get_or_create.
+        """
+
+        existed_before = True
+        if create_allowed:
+            existed_before = model_cls.by_column(self.session, **match_by) is not None
+            entity = model_cls.get_or_create(
+                self.session,
+                match_by=match_by,
+                create_kwargs=create_kwargs,
+                must_match=must_match,
+                update_values=update_values,
+            )
+        else:
+            entity = model_cls.by_column(self.session, **match_by)
+            if entity is None:
+                raise RuntimeError(
+                    f"Entity of type {model_cls.__name__} with keys {match_by} not found and create_allowed=False"
+                )
+            existed_before = True
+
+        self._track_entity_state(entity, is_new=not existed_before)
+        return entity
+
+    def _track_entity_state(self, entity: Base, is_new: bool):
+        if is_new:
+            self.created_entities.add(entity)
+            self.existing_entities.discard(entity)
+        else:
+            self.existing_entities.add(entity)
+            self.created_entities.discard(entity)
+
+    @property
+    def _all_entities(self) -> set[Base]:
+        return self.created_entities | self.existing_entities
 
     def init_objects(self, data: List[PatientImport]):
         """
@@ -126,373 +155,214 @@ class Importer:
             The project objects (either found or created)
         """
         # Clear collections before starting
-        self._clear_collections()
+        self.created_entities = set()
+        self.existing_entities = set()
+        self.pending_segmentation_writes = []
 
-        # Process each patient
         for patient_item in data:
-            # Get or create the project for this patient
-            project = self.get_or_create_project(patient_item.project_name)
+            self._import_patient_tree(patient_item)
 
-            patient = self.find_or_create_patient(patient_item, project)
-            self.patients.append(patient)
+    def _import_patient_tree(self, patient_item: PatientImport):
+        project = self._ensure_project(patient_item)
+        patient = self._ensure_patient(project, patient_item)
 
-            for study_item in patient_item.studies:
-                study = self.find_or_create_study(patient, study_item)
-                self.studies.append(study)
+        for study_item in patient_item.studies:
+            self._import_study_tree(patient, study_item)
 
-                for series_item in study_item.series:
-                    series = self.find_or_create_series(study, series_item)
-                    self.series.append(series)
+    def _import_study_tree(self, patient: Patient, study_item: StudyImport):
+        study = self._ensure_study(patient, study_item)
 
-                    for image_item in series_item.images:
-                        image = self.find_or_create_image(series, image_item)
-                        self.images.append(image)
+        for series_item in study_item.series:
+            self._import_series_tree(study, series_item)
 
-                        if image_item.attributes:
-                            self._process_attributes(image, image_item.attributes)
+    def _import_series_tree(self, study: Study, series_item: SeriesImport):
+        series = self._ensure_series(study, series_item)
 
-                        if image_item.segmentations:
-                            self._process_segmentations(image, image_item.segmentations)
+        for image_item in series_item.images:
+            self._import_image(series, image_item)
 
-        return self.projects
+    def _import_image(self, series: Series, image_item: ImageImport):
+        image = self.create_image(series, image_item)
+
+        if image_item.attributes:
+            self._process_attributes(image, image_item.attributes)
+
+        if image_item.segmentations:
+            self._process_segmentations(image, image_item.segmentations)
+
+    def _ensure_project(self, patient_item: PatientImport) -> Project:
+        return self._ensure_entity(
+            Project,
+            match_by={"ProjectName": patient_item.project_name},
+            create_allowed=self.create_projects,
+            create_kwargs={"External": ExternalEnum.Y},
+        )
+
+    def _ensure_patient(self, project: Project, patient_item: PatientImport) -> Patient:
+        return self._ensure_entity(
+            Patient,
+            match_by={
+                "ProjectID": project.ProjectID,
+                "PatientIdentifier": patient_item.patient_identifier,
+            },
+            create_allowed=self.create_patients,
+            create_kwargs={
+                "Sex": patient_item.sex,
+                "BirthDate": patient_item.birth_date,
+            },
+        )
+
+    def _ensure_study(self, patient: Patient, study_item: StudyImport) -> Study:
+        return self._ensure_entity(
+            Study,
+            match_by={
+                "PatientID": patient.PatientID,
+                "StudyDate": study_item.study_date,
+            },
+            create_allowed=self.create_studies,
+            create_kwargs={
+                "StudyDescription": study_item.description,
+            },
+        )
+
+    def _ensure_series(self, study: Study, series_item: SeriesImport) -> Series:
+        return self._ensure_entity(
+            Series,
+            match_by={
+                "StudyID": study.StudyID,
+                "SeriesID": series_item.series_id,
+            },
+            create_allowed=self.create_series,
+            create_kwargs={
+                "SeriesNumber": series_item.series_number,
+                "SeriesInstanceUid": series_item.series_instance_uid,
+            },
+        )
 
     def _process_attributes(self, image: ImageInstance, attributes_data: Dict):
         for name, value in attributes_data.items():
-            if name in self.attribute_definitions:
-                attr_def = self.attribute_definitions[name]
-            else:
-                stmt = select(AttributeDefinition).where(
-                    AttributeDefinition.AttributeName == name
-                )
-                result = self.session.execute(stmt).scalars().first()
-                if result:
-                    attr_def = result
-                else:
-                    if isinstance(value, float):
-                        dtype = AttributeDataType.Float
-                    elif isinstance(value, int):
-                        dtype = AttributeDataType.Int
-                    elif isinstance(value, (dict, list)):
-                        dtype = AttributeDataType.JSON
-                    else:
-                        dtype = AttributeDataType.String
-
-                    attr_def = AttributeDefinition(
-                        AttributeName=name, AttributeDataType=dtype
-                    )
-                self.attribute_definitions[name] = attr_def
-
-            val_kwargs = {}
-            if attr_def.AttributeDataType == AttributeDataType.Float:
-                val_kwargs["ValueFloat"] = float(value)
-            elif attr_def.AttributeDataType == AttributeDataType.Int:
-                val_kwargs["ValueInt"] = int(value)
-            elif attr_def.AttributeDataType == AttributeDataType.String:
-                val_kwargs["ValueText"] = str(value)
-            elif attr_def.AttributeDataType == AttributeDataType.JSON:
-                val_kwargs["ValueJSON"] = value
-
-            attr_val = AttributeValue(
-                AttributeDefinition=attr_def, ImageInstance=image, **val_kwargs
+            dtype = AttributeDefinition.infer_attribute_data_type(value)
+            attr_def = self._ensure_entity(
+                AttributeDefinition,
+                match_by={"AttributeName": name},
+                create_kwargs={"AttributeDataType": dtype},
             )
-            self.attribute_values.append(attr_val)
+
+            attr_val = self._ensure_entity(
+                AttributeValue,
+                match_by={
+                    "AttributeID": attr_def.AttributeID,
+                    "ImageInstanceID": image.ImageInstanceID,
+                },
+                update_values={"value": value},
+            )
 
     def _process_segmentations(
         self, image: ImageInstance, segmentations_data: List[SegmentationImport]
     ):
-        from eyened_orm import Creator, Feature
-
         for item in segmentations_data:
             data = item.data
-
-            seg = Segmentation(
-                DataType=item.data_type,
-                DataRepresentation=item.data_representation,
-                Depth=item.depth,
-                Height=item.height,
-                Width=item.width,
-                SparseAxis=item.sparse_axis,
-                ImageProjectionMatrix=item.image_projection_matrix,
-                ScanIndices=item.scan_indices,
-                Threshold=item.threshold,
-                ReferenceSegmentationID=item.reference_segmentation_id,
-                ImageInstance=image,
+            creator = self._ensure_entity(
+                Creator,
+                match_by={"CreatorName": item.creator_name},
+                create_allowed=False,
+            )
+            feature = self._ensure_entity(
+                Feature,
+                match_by={"FeatureName": item.feature_name},
+                create_allowed=False,
             )
 
-            # Set metadata if provided
-            if item.creator_name:
-                creator = Creator.by_name(self.session, item.creator_name)
-                if creator is None:
-                    raise ValueError(
-                        f"Creator '{item.creator_name}' not found in database"
-                    )
-                seg.CreatorID = creator.CreatorID
-
-            if item.feature_name:
-                feature = Feature.by_name(self.session, item.feature_name)
-                if feature is None:
-                    raise ValueError(
-                        f"Feature '{item.feature_name}' not found in database"
-                    )
-                seg.FeatureID = feature.FeatureID
-
-            # Infer DataType if missing
-            if seg.DataType is None:
-                if data.dtype == np.uint8:
-                    seg.DataType = Datatype.R8
-                elif data.dtype == np.uint16:
-                    seg.DataType = Datatype.R16UI
-                elif data.dtype == np.uint32:
-                    seg.DataType = Datatype.R32UI
-                elif data.dtype == np.float32:
-                    seg.DataType = Datatype.R32F
-                else:
-                    seg.DataType = Datatype.R8
-
-            # Set dims from image if missing
-            if seg.Width is None:
-                seg.Width = image.Columns_x
-            if seg.Height is None:
-                seg.Height = image.Rows_y
-            if seg.Depth is None:
-                seg.Depth = image.NrOfFrames if image.NrOfFrames else 1
-
-            self.segmentations.append(seg)
+            seg = self._ensure_entity(
+                Segmentation,
+                match_by={
+                    "ImageInstanceID": image.ImageInstanceID,
+                    "CreatorID": creator.CreatorID,
+                    "FeatureID": feature.FeatureID,
+                    "ReferenceSegmentationID": item.reference_segmentation_id,
+                },
+                update_values={
+                    "DataType": item.data_type,
+                    "DataRepresentation": item.data_representation,
+                    "Depth": item.depth,
+                    "Height": item.height,
+                    "Width": item.width,
+                    "SparseAxis": item.sparse_axis,
+                    "ImageProjectionMatrix": item.image_projection_matrix,
+                    "ScanIndices": item.scan_indices,
+                    "Threshold": item.threshold,
+                },
+                create_allowed=self.create_segmentations,
+            )
+            self._apply_segmentation_defaults(seg, data, image)
             self.pending_segmentation_writes.append((seg, data))
 
-    def get_or_create_project(self, project_name: str) -> Project:
-        # Check if we've already processed this project
-        for p in self.projects:
-            if p.ProjectName == project_name:
-                return p
+    @staticmethod
+    def _apply_segmentation_defaults(
+        seg: Segmentation, data: np.ndarray, image: ImageInstance
+    ):
+        if seg.DataType is None:
+            seg.DataType = Segmentation.infer_data_type(data)
 
-        # Try to find the project in the database
-        project = Project.by_name(self.session, project_name)
+        if seg.Width is None:
+            seg.Width = image.Columns_x
+        if seg.Height is None:
+            seg.Height = image.Rows_y
+        if seg.Depth is None:
+            seg.Depth = image.NrOfFrames if image.NrOfFrames else 1
 
-        # Create the project if it doesn't exist and we're allowed to
-        if project is None:
-            if not self.create_projects:
-                raise RuntimeError(
-                    f"Project with name '{project_name}' not found and create_projects=False"
-                )
-            project = Project(ProjectName=project_name, External=ExternalEnum.Y)
+    @staticmethod
+    def infer_storage_format(object_key: str) -> str:
+        suffix = Path(object_key).suffix.lower()
+        if suffix in {".dcm", ".dicom"}:
+            return "dicom"
+        if suffix == ".png":
+            return "image/png"
+        if suffix in {".jpg", ".jpeg"}:
+            return "image/jpeg"
+        return "binary"
 
-        self.projects.append(project)
-        return project
+    def create_image(self, series: Series, image_data: ImageImport) -> ImageInstance:
+        object_key = image_data.object_key
 
-    def find_or_create_patient(
-        self, patient_item: PatientImport, project: Project
-    ) -> Patient:
-        patient_identifier = patient_item.patient_identifier
-
-        # Try to find existing patient
-        patient = project.get_patient_by_identifier(patient_identifier)
-
-        if patient is None:
-            if not self.create_patients:
-                raise RuntimeError(
-                    f"Patient with identifier '{patient_identifier}' not found and create_patients=False"
-                )
-
-            # Create new patient
-            patient = Patient(
-                Sex=patient_item.sex,
-                BirthDate=patient_item.birth_date,
-                Project=project,
-                PatientIdentifier=(
-                    patient_identifier
-                    if patient_identifier is not None
-                    # default patient identifier is random
-                    else secrets.token_hex(8)
-                ),
-            )
-        # We don't warn about ignored props anymore as requested/implied by simplified logic,
-        # but could add back if needed. The original warned if props were present.
-        elif patient_item.sex is not None or patient_item.birth_date is not None:
-            warnings.warn(
-                f"Properties provided for existing patient '{patient_identifier}' will be ignored. "
-                f"The importer does not update existing patients."
-            )
-
-        return patient
-
-    def find_or_create_device_instance(
-        self,
-        device_id: Union[int, None],
-        manufacturer: Union[str, None],
-        model: Union[str, None],
-        serial_number: Union[str, None],
-        description: Union[str, None],
-    ) -> DeviceInstance:
-        # 1. Try to find by ID if provided
-        if device_id is not None:
-            # Check cache
-            for dev in self.device_instances:
-                if dev.DeviceInstanceID == device_id:
-                    return dev
-
-            # Check DB
-            device_instance = self.session.get(DeviceInstance, device_id)
-            if device_instance:
-                self.device_instances.append(device_instance)
-                return device_instance
-            warnings.warn(
-                f"DeviceInstance with ID {device_id} not found. Falling back to attributes."
-            )
-
-        # 2. Find or create by attributes
-        manufacturer = manufacturer or "Unknown"
-        model = model or "Unknown"
-        description = description or "Unknown"
-
-        # Find/Create DeviceModel
-        device_model = None
-        # Check cache
-        for dm in self.device_models:
-            if dm.Manufacturer == manufacturer and dm.ManufacturerModelName == model:
-                device_model = dm
-                break
-
-        if device_model is None:
-            device_model = DeviceModel.by_manufacturer(
-                manufacturer, model, self.session
-            )
-
-        if device_model is None:
-            device_model = DeviceModel(
-                Manufacturer=manufacturer, ManufacturerModelName=model
-            )
-
-        if device_model not in self.device_models:
-            self.device_models.append(device_model)
-
-        # Find/Create DeviceInstance
-        device_instance = None
-        # Check cache
-        for di in self.device_instances:
-            # We need to check if it matches. If it's a new object, DeviceModel might be object comparison.
-            # If existing, we might check IDs.
-            # Simplify: check description and model match
-
-            # If di has DeviceModel object
-            di_model = di.DeviceModel
-            if di_model is None and di.DeviceModelID is not None:
-                # Just in case logic, though normally we'd have object or ID
-                if (
-                    device_model.DeviceModelID == di.DeviceModelID
-                    and di.Description == description
-                ):
-                    device_instance = di
-                    break
-            elif di_model is not None:
-                if di_model == device_model and di.Description == description:
-                    device_instance = di
-                    break
-
-        if device_instance is None:
-            # Check DB
-            # We need DeviceModelID for query. If device_model is new, we can't query by ID reliably unless we flush.
-            # But we avoid flush here.
-            # If device_model is new (no ID), then device_instance MUST be new (or at least not in DB with that model).
-
-            is_model_persistent = (
-                inspect(device_model).persistent or inspect(device_model).detached
-            )
-            if is_model_persistent:
-                stmt = select(DeviceInstance).where(
-                    DeviceInstance.DeviceModelID == device_model.DeviceModelID,
-                    DeviceInstance.Description == description,
-                )
-                device_instance = self.session.scalar(stmt)
-
-            if device_instance is None:
-                device_instance = DeviceInstance(
-                    DeviceModel=device_model,
-                    Description=description,
-                    SerialNumber=serial_number,
-                )
-
-        if device_instance not in self.device_instances:
-            self.device_instances.append(device_instance)
-
-        return device_instance
-
-    def find_or_create_scan(self, scan_mode: str) -> Scan:
-        # Check cache
-        for s in self.scans:
-            if s.ScanMode == scan_mode:
-                return s
-
-        # Check DB
-        scan = self.session.execute(
-            select(Scan).where(Scan.ScanMode == scan_mode)
-        ).scalar_one_or_none()
-
-        if scan is None:
-            scan = Scan(ScanMode=scan_mode)
-
-        if scan not in self.scans:
-            self.scans.append(scan)
-
-        return scan
-
-    def find_or_create_image(
-        self, series: Series, image_data: ImageImport
-    ) -> ImageInstance:
-        device_instance = self.find_or_create_device_instance(
-            device_id=image_data.device_id,
-            manufacturer=image_data.device_manufacturer,
-            model=image_data.device_model,
-            serial_number=image_data.device_serial_number,
-            description=image_data.device_description,
+        storage_backend = self._ensure_entity(
+            StorageBackend,
+            match_by={"Key": image_data.storage_backend_key},
+            create_kwargs={"Kind": "local"},
         )
 
-        modality = image_data.modality
-        if isinstance(modality, str):
-            # Try to map string to Modality enum
-            try:
-                modality = Modality(modality)
-            except ValueError:
-                # Remove spaces and try case-insensitive matching if needed,
-                # but for now let's try direct mapping or matching name
-                found = False
-                for m in Modality:
-                    if m.value == modality or m.name == modality:
-                        modality = m
-                        found = True
-                        break
+        device_model = self._ensure_entity(
+            DeviceModel,
+            match_by={
+                "Manufacturer": image_data.device_manufacturer or "Unknown",
+                "ManufacturerModelName": image_data.device_model or "Unknown",
+            },
+        )
+        device_instance = self._ensure_entity(
+            DeviceInstance,
+            match_by={
+                "DeviceModelID": device_model.DeviceModelID,
+                "SerialNumber": image_data.device_serial_number,
+            },
+            create_kwargs={
+                "Description": image_data.device_description or "Unknown",
+            },
+        )
 
-                if not found:
-                    # Try mapping "Color Fundus" -> ColorFundus
-                    sanitized = modality.replace(" ", "")
-                    for m in Modality:
-                        if m.name.lower() == sanitized.lower():
-                            modality = m
-                            found = True
-                            break
-
-                if not found:
-                    warnings.warn(
-                        f"Could not map string '{image_data.modality}' to Modality enum. Leaving as None."
-                    )
-                    modality = None
+        try:
+            modality = image_data.modality
+        except ValueError:
+            warnings.warn(
+                f"Could not map string '{image_data.modality}' to Modality enum. Leaving as None."
+            )
+            modality = None
 
         scan = None
         if image_data.scan_mode:
-            scan = self.find_or_create_scan(image_data.scan_mode)
-
-        if image_data.source_info_id:
-            source_info_id = image_data.source_info_id
-            # We assume ID is valid or will be checked by foreign key constraint,
-            # but we need to assign it. ImageInstance takes SourceInfo object or ID.
-            # Ideally we fetch the object to be safe/consistent, or we can just set the ID on the object if we change ImageInstance constructor call.
-            # However, ImageInstance expects an object for relationships usually if we want backrefs to work immediately in memory.
-            # Let's try to fetch it to be safe.
-            source_info = self.session.get(SourceInfo, source_info_id)
-            if not source_info:
-                raise ValueError(f"SourceInfo with ID {source_info_id} not found")
-        else:
-            source_info = SourceInfo.by_name(self.session, "MISC")
+            scan = self._ensure_entity(
+                Scan,
+                match_by={"ScanMode": image_data.scan_mode},
+            )
 
         im = ImageInstance(
             SOPInstanceUid=image_data.sop_instance_uid,
@@ -507,9 +377,9 @@ class Importer:
             ResolutionVertical=image_data.resolution_vertical,
             ResolutionAxial=image_data.resolution_axial,
             OldPath=image_data.old_path,
-            DatasetIdentifier=self.get_image_path(image_data),
+            DatasetIdentifier="",
             Series=series,
-            SourceInfo=source_info,
+            SourceInfoID=image_data.source_info_id,
             DeviceInstance=device_instance,
             Scan=scan,
             # New fields
@@ -523,108 +393,22 @@ class Importer:
             PupilDilated=image_data.pupil_dilated,
             FDAIdentifier=image_data.fda_identifier,
         )
+        self.session.add(im)
+        self.session.flush([im])
+        self._track_entity_state(im, is_new=True)
+
+        image_storage = ImageStorage(
+            ImageInstance=im,
+            StorageBackend=storage_backend,
+            ObjectKey=object_key,
+            Format=self.infer_storage_format(object_key),
+            IsPrimary=True,
+        )
+        self.session.add(image_storage)
+        self.session.flush([image_storage])
+        self._track_entity_state(image_storage, is_new=True)
 
         return im
-
-    def find_or_create_series(self, study: Study, series_item: SeriesImport) -> Series:
-        series_id = series_item.series_id
-        series = None
-
-        string_repr = f"Series with identifier '{series_id}' for patient '{study.Patient.PatientIdentifier}', study '{study.StudyDate}'"
-        # Try to find existing series
-        if series_id is not None:
-            series = study.get_series_by_id(self.session, series_id)
-            if series is None:
-                warnings.warn(f"{string_repr} not found.")
-
-        if series is None:
-            if not self.create_series:
-                raise RuntimeError(f"{string_repr} not found and create_series=False")
-
-            # Create new series
-            series = Series(
-                SeriesNumber=series_item.series_number,
-                SeriesInstanceUid=series_item.series_instance_uid,
-                Study=study,
-            )
-        elif (
-            series_item.series_number is not None
-            or series_item.series_instance_uid is not None
-        ):
-            warnings.warn(
-                f"Properties provided for existing series ({string_repr}) "
-                f"will be ignored. The importer does not update existing series."
-            )
-
-        return series
-
-    def find_or_create_study(self, patient: Patient, study_item: StudyImport) -> Study:
-        default_study_date = self.config.default_study_date
-
-        study_date = study_item.study_date or default_study_date
-
-        # Convert string date to datetime.date if necessary
-        if isinstance(study_date, str):
-            # Should be handled by Pydantic, but if default_study_date from config is str...
-            # The DTO enforces date for study_item.study_date.
-            try:
-                year, month, day = map(int, study_date.split("-"))
-                study_date = datetime.date(year, month, day)
-            except ValueError:
-                raise ValueError(f"Invalid study date format: {study_date}")
-
-        if not isinstance(study_date, datetime.date):
-            # Could happen if config is wrong
-            raise ValueError(
-                f"Study date must be a datetime.date object for patient '{patient.PatientIdentifier}'"
-            )
-
-        study = patient.get_study_by_date(study_date)
-
-        if study is None:
-            if not self.create_studies:
-                raise RuntimeError(
-                    f"Study with date '{study_date}' for patient '{patient.PatientIdentifier}' not found and create_studies=False"
-                )
-
-            # Create new study
-            study = Study(
-                StudyDate=study_date,
-                StudyDescription=study_item.description,
-                Patient=patient,
-            )
-        elif study_item.description is not None:
-            warnings.warn(
-                f"Properties provided for existing study (date: '{study_date}', patient: '{patient.PatientIdentifier}') "
-                f"will be ignored. The importer does not update existing studies."
-            )
-
-        return study
-
-    def get_image_path(self, image_data: ImageImport) -> str:
-        """
-        Checks if the image path:
-         - is absolute and within the images_basepath directory
-         - is relative and exists within the images_basepath directory
-        """
-        basepath = self.config.images_basepath
-
-        path_or_url = image_data.image
-        if path_or_url.startswith("http"):
-            raise NotImplementedError()
-
-        fpath = Path(path_or_url)
-
-        if fpath.is_absolute():
-            assert fpath.is_relative_to(
-                basepath
-            ), f"File path {fpath} is absolute is not within the images_basepath directory {basepath}"
-        else:
-            # relative path provided, make it absolute and check
-            fpath = Path(basepath) / fpath
-            assert fpath.exists(), f"File does not exist: {fpath}"
-
-        return str(fpath.relative_to(basepath))
 
     def post_insert(self):
         """
@@ -659,26 +443,6 @@ class Importer:
 
         self.init_objects(data)
 
-        # Add attributes definitions that are new
-        for attr_def in self.attribute_definitions.values():
-            if not inspect(attr_def).persistent:
-                self.session.add(attr_def)
-
-        # Add all created / updated objects to the session
-        for item in [
-            *self.projects,
-            *self.patients,
-            *self.studies,
-            *self.series,
-            *self.images,
-            *self.attribute_values,
-            *self.segmentations,
-            *self.device_models,
-            *self.device_instances,
-            *self.scans,
-        ]:
-            self.session.add(item)
-
         try:
             self.session.commit()
 
@@ -697,41 +461,21 @@ class Importer:
 
         self.post_insert()
         # Save created images to return before clearing collections
-        return list(self.images)
+        # return list(self.images)
+        return [e for e in self._all_entities if isinstance(e, ImageInstance)]
 
     def _summary(self, data: List[PatientImport]) -> Dict:
         with self.session.begin_nested():
             self.init_objects(data)
 
-            class_map = {
-                "patients": Patient,
-                "studies": Study,
-                "series": Series,
-                "images": ImageInstance,
-                "attribute_definitions": AttributeDefinition,
-                "attribute_values": AttributeValue,
-                "segmentations": Segmentation,
-                "device_models": DeviceModel,
-                "device_instances": DeviceInstance,
-                "scans": Scan,
+            classes = {e.__class__ for e in self._all_entities}
+            entities = {
+                c: [e for e in self._all_entities if isinstance(e, c)] for c in classes
             }
-            entities = {}
-            entities["patients"] = self.patients
-            entities["studies"] = self.studies
-            entities["series"] = self.series
-            entities["images"] = self.images
-            entities["attribute_definitions"] = list(
-                self.attribute_definitions.values()
-            )
-            entities["attribute_values"] = self.attribute_values
-            entities["segmentations"] = self.segmentations
-            entities["device_models"] = self.device_models
-            entities["device_instances"] = self.device_instances
-            entities["scans"] = self.scans
 
             new_entities = {
-                name: [item for item in items if not inspect(item).persistent]
-                for name, items in entities.items()
+                c: [item for item in items if item in self.created_entities]
+                for c, items in entities.items()
             }
 
             # General statistics in dataframe-ready format
@@ -747,7 +491,7 @@ class Importer:
 
                 general_stats.append(
                     {
-                        "Entity": name.capitalize(),
+                        "Entity": name.__name__,
                         "Total": total,
                         "New": new,
                         "Existing": existing,
@@ -758,14 +502,12 @@ class Importer:
 
             # Column population statistics for new entities
             column_stats = {}
-            for name, items in new_entities.items():
+            for c, items in new_entities.items():
                 if items:
-                    column_stats[name] = self._get_populated_fields_stats(
-                        class_map[name], items
-                    )
+                    column_stats[c] = self._get_populated_fields_stats(c, items)
 
             # Save project names before rolling back
-            project_names = [project.ProjectName for project in self.projects]
+            project_names = [project.ProjectName for project in entities.get(Project, [])]
 
             # Complete summary
             summary = {
@@ -793,9 +535,9 @@ class Importer:
             print("- only for new entities")
             print("- values set to NULL are not considered populated")
 
-            for name, stats in column_stats.items():
+            for c, stats in column_stats.items():
                 if stats:
-                    print(f"\nPopulated {name.capitalize()} Columns:")
+                    print(f"\nPopulated {c.__name__} Columns:")
                     df_columns = pd.DataFrame(stats)
                     # Format percentage for display
                     df_columns["Percentage"] = df_columns["Percentage"].apply(
@@ -828,7 +570,10 @@ class Importer:
                 return self._import(data)
         finally:
             # Always clear collections at the end to ensure stateless behavior
-            self._clear_collections()
+            self.created_entities = set()
+            self.existing_entities = set()
+            self.pending_segmentation_writes = []
+            self.session.rollback()
 
     def import_one(
         self, data: Union[Dict, InstancePOSTFlat], summary: bool = False
@@ -938,4 +683,5 @@ class Importer:
 
     def update_thumbnails(self):
         """Update thumbnails for all images in the importer."""
-        update_thumbnails(self.session, self.images)
+        # update_thumbnails(self.session, self.images)
+        pass

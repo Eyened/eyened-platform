@@ -355,7 +355,7 @@ class Base(DeclarativeBase):
             for key, value in update_values.items():
                 setattr(instance, key, value)
 
-        session.flush()
+        session.flush([instance])
 
         if verbose:
             action = "Created" if is_new else "Found existing"
