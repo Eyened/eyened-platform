@@ -74,11 +74,6 @@ def initialize_database():
 
     print("Initializing database...")
     database = get_database(confirmation=True)
-    db_config = database.database_settings
-
-    print("Recreating empty database (drop if exists)...")
-    if not drop_create_db(db_config):
-        raise click.ClickException("Failed to recreate empty database.")
 
     print("Creating tables...")
     Base.metadata.create_all(database.engine)
