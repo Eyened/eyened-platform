@@ -18,9 +18,9 @@ class InstancePOST(BaseModel):
     dicom_modality: Optional[ModalityType] = None
     etdrs_field: Optional[ETDRSField] = None
     laterality: Optional[Laterality] = None
-    height: Optional[int] = None
-    width: Optional[int] = None
-    depth: Optional[int] = None
+    height: Optional[int] = Field(None, description="Rows_y")
+    width: Optional[int] = Field(None, description="Columns_x")
+    depth: Optional[int] = Field(None, description="NrOfFrames")
     resolution_horizontal: Optional[float] = None
     resolution_vertical: Optional[float] = None
     resolution_axial: Optional[float] = None
@@ -92,7 +92,9 @@ class StudyImport(BaseModel):
 
 class PatientImport(BaseModel):
     project_name: str = Field(..., description="Name of the project")
-    patient_identifier: str = Field(..., description="Unique patient identifier within the project")
+    patient_identifier: str = Field(
+        ..., description="Unique patient identifier within the project"
+    )
     studies: List[StudyImport] = Field(default_factory=list)
 
     # Patient properties

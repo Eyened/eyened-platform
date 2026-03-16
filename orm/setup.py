@@ -33,6 +33,8 @@ setup(
         "PyMySQL==1.0.2",
         "mysql-connector-python==8.*",
         "pydicom==3.*",
+        "pylibjpeg==2.*",
+        "pylibjpeg-libjpeg==2.*",
         "GPUtil==1.*",
         "requests==2.*",
         "pydantic-settings==2.7.1",
@@ -40,6 +42,7 @@ setup(
         "retinalysis-fundusprep>=0.5.4",
         "pyyaml==6.*",
         "google_crc32c==1.8.0",
+        "simpleitk==2.*",
     ],
     python_requires=">=3.10",
 )

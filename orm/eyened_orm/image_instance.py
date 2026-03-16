@@ -4,7 +4,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 import io
 import warnings
-
+import re
+import tempfile
+from pathlib import Path
+import SimpleITK as sitk
+import numpy as np
 from sqlalchemy.types import CHAR
 from eyened_orm.api_client import get_api_client
 
@@ -91,6 +95,7 @@ class StorageBackend(Base):
     """
     Represents a storage backend for the platform.
     """
+
     __tablename__ = "StorageBackend"
 
     StorageBackendID: Mapped[int] = mapped_column(primary_key=True)
@@ -140,7 +145,9 @@ class ImageStorage(Base):
     # The key of the object in the storage backend
     ObjectKey: Mapped[str] = mapped_column(String(256))
     # The hash of the object
-    Hash: Mapped[Optional[bytes]] = mapped_column(BINARY(32), nullable=True, default=None)
+    Hash: Mapped[Optional[bytes]] = mapped_column(
+        BINARY(32), nullable=True, default=None
+    )
     # The checksum of the object
     Checksum: Mapped[Optional[str]] = mapped_column(
         String(128), nullable=True, default=None
@@ -212,7 +219,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         ForeignKey("Series.SeriesID", ondelete="CASCADE")
     )
     # The source that the image belongs to (optional, not used by platform)
-    SourceInfoID: Mapped[Optional[int]] = mapped_column(ForeignKey("SourceInfo.SourceInfoID"), nullable=True)
+    SourceInfoID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("SourceInfo.SourceInfoID"), nullable=True
+    )
     # The device that the image was captured with
     DeviceInstanceID: Mapped[int] = mapped_column(
         ForeignKey("DeviceInstance.DeviceInstanceID")
@@ -298,8 +307,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     # identifier for the thumbnail, needs suffix for different sizes
     # path will be constructed as /thumbnails/{ThumbnailPath}_{size}.jpg
     # client expects size 144
-    # see /images/{image_id}/thumbnail endpoint for more details 
-    # 
+    # see /images/{image_id}/thumbnail endpoint for more details
+    #
     # Perhaps we can use an ImageStorage entry instead for more flexibility?
     # Or the platform can assume a default location based on public_id?
     ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(256))
@@ -511,6 +520,33 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def _load_single_image_array(self) -> np.ndarray:
         return np.array(Image.open(self._download_stream()))
 
+    def _load_mhd_array(self) -> np.ndarray:
+        client = get_api_client()
+        meta_resp = client.get(self.data_endpoint, params={"meta": True})
+        meta_resp.raise_for_status()
+        mhd_text = meta_resp.text
+        raw_resp = client.get(self.data_endpoint)
+        raw_resp.raise_for_status()
+        raw_bytes = raw_resp.content
+        # Ensure header points to the raw file we create.
+        if re.search(r"(?im)^ElementDataFile\s*=", mhd_text):
+            mhd_text = re.sub(
+                r"(?im)^ElementDataFile\s*=.*$",
+                "ElementDataFile = payload.raw",
+                mhd_text,
+            )
+        else:
+            mhd_text = mhd_text.rstrip() + "\nElementDataFile = payload.raw\n"
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            mhd_path = td_path / "image.mhd"
+            raw_path = td_path / "payload.raw"
+            mhd_path.write_text(mhd_text, encoding="ascii", errors="ignore")
+            raw_path.write_bytes(raw_bytes)
+            img = sitk.ReadImage(str(mhd_path))
+            arr = sitk.GetArrayFromImage(img)
+        return arr
+
     @property
     def pixel_array(self) -> np.ndarray:
         format = self.primary_storage.Format
@@ -520,6 +556,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             return self._load_binary_array()
         if format == "png_series":
             return self._load_png_series_array()
+        if format == "mhd":
+            return self._load_mhd_array()
         # assuming image format that PIL can handle
         return self._load_single_image_array()
 

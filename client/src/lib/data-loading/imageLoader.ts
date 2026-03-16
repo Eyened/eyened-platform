@@ -3,6 +3,7 @@ import { Image3D } from '$lib/webgl/image3D';
 import type { Dimensions } from '$lib/webgl/types';
 import type { WebGL } from '$lib/webgl/webgl';
 import type { ImageGET } from '../../types/openapi_types';
+import { loadMhdRawFromEndpoints } from './mhdLoader';
 
 import * as cornerstone from 'cornerstone-core';
 import * as cornerstoneWADOImageLoader from 'cornerstone-wado-image-loader';
@@ -43,6 +44,8 @@ export class ImageLoader {
         } else if (dataFormat === 'png_series') {
             const meta = await this.loadPngSeriesMeta(imageId);
             return this.loadPngSeries(instance, meta, img_id, imageId);
+        } else if (dataFormat === 'mhd') {
+            return this.loadMhd(instance, img_id, imageId);
         } else {
             throw 'unsupported data format';
         }
@@ -164,6 +167,14 @@ export class ImageLoader {
         }
 
         throw new Error('Unknown DICOM format');
+    }
+
+    async loadMhd(instance: ImageGET, img_id: string, imageId: string): Promise<LoadedImages> {
+        const loaded = await loadMhdRawFromEndpoints(instance, imageId, this.buildDataUrl.bind(this));
+        if (loaded.dimensions.depth <= 1) {
+            return [Image2D.fromPixelData(instance, this.webgl, img_id, loaded.pixelData, loaded.dimensions, loaded.meta)];
+        }
+        return this.returnImage3D(new Image3D(instance, this.webgl, img_id, loaded.pixelData, loaded.dimensions, loaded.meta));
     }
 
     private extractDimensions(meta: any): Dimensions {

@@ -320,6 +320,8 @@ class Importer:
             return "image/png"
         if suffix in {".jpg", ".jpeg"}:
             return "image/jpeg"
+        if suffix == ".mhd":
+            return "mhd"
         return "binary"
 
     def create_image(self, series: Series, image_data: ImageImport) -> ImageInstance:

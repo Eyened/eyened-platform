@@ -239,12 +239,16 @@ async def get_public_image_data(
     if storage.Format == "png_series":
         path, source_id = storage.ObjectKey.rsplit("/", 1)
         if meta:
-            return build_storage_redirect_response(f"/{storage.StorageBackend.Key}/{path}/metadata.json")
+            return build_storage_redirect_response(
+                f"/{storage.StorageBackend.Key}/{path}/metadata.json"
+            )
         if index is None:
             raise HTTPException(
                 422, "Index is required for png_series format if not fetching metadata"
             )
-        return build_storage_redirect_response(f"/{storage.StorageBackend.Key}/{path}/{source_id}_{index}.png")
+        return build_storage_redirect_response(
+            f"/{storage.StorageBackend.Key}/{path}/{source_id}_{index}.png"
+        )
     elif storage.Format == "dicom":
         return build_storage_redirect_response(f"{base_path}")
     elif storage.Format == "binary":
@@ -255,6 +259,10 @@ async def get_public_image_data(
         return build_storage_redirect_response(f"{base_path}{suffix}")
     elif storage.Format == "image/png" or storage.Format == "image/jpeg":
         return build_storage_redirect_response(f"{base_path}")
+    elif storage.Format == "mhd":
+        if meta:
+            return build_storage_redirect_response(base_path)
+        return build_storage_redirect_response(f"{base_path[:-4]}.raw")
     else:
         raise HTTPException(422, "Primary image storage has unknown format")
 
