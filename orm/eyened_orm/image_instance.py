@@ -457,7 +457,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         storage = self.primary_storage
         return storage.ObjectKey if storage and storage.ObjectKey else ""
 
-    def get_thumbnail_path(self, size: int) -> str:
+    def get_thumbnail_filename(self, size: int) -> str:
         return f"{self.ThumbnailPath}_{size}.jpg"
 
     def get_thumbnail(self, size):

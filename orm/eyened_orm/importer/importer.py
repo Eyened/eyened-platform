@@ -1,5 +1,3 @@
-import datetime
-import secrets
 import warnings
 from pathlib import Path
 from typing import Dict, List, Union
@@ -509,7 +507,9 @@ class Importer:
                     column_stats[c] = self._get_populated_fields_stats(c, items)
 
             # Save project names before rolling back
-            project_names = [project.ProjectName for project in entities.get(Project, [])]
+            project_names = [
+                project.ProjectName for project in entities.get(Project, [])
+            ]
 
             # Complete summary
             summary = {
@@ -683,7 +683,9 @@ class Importer:
 
         return column_stats
 
+    def images(self) -> List[ImageInstance]:
+        return [e for e in self._all_entities if isinstance(e, ImageInstance)]
+
     def update_thumbnails(self):
         """Update thumbnails for all images in the importer."""
-        # update_thumbnails(self.session, self.images)
-        pass
+        update_thumbnails(self.session, self.images)
