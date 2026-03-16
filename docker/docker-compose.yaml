@@ -28,6 +28,21 @@ services:
         volume:
           nocopy: true
           subpath: "${OHK_RESEARCHDATA_STORAGE_PATH}/segmentations.zarr"
+      # Images (needed for image import script)
+      - type: volume
+        source: ohk_researchdata
+        target: /images
+        read_only: true
+        volume:
+          nocopy: true
+          subpath: "${OHK_RESEARCHDATA_IMAGES_PATH}"
+      # Thumbnails (needed for image import script)
+      - type: volume
+        source: ohk_researchdata
+        target: /thumbnails
+        volume:
+          nocopy: true
+          subpath: "${OHK_RESEARCHDATA_STORAGE_PATH}/thumbnails"
 
   client:
     build:
