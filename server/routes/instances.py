@@ -25,6 +25,7 @@ from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
 from .auth import CurrentUser, get_current_user, is_authenticated
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
+from sqlalchemy.exc import NoResultFound
 
 
 router = APIRouter()
@@ -33,17 +34,25 @@ router = APIRouter()
 def _get_image_instance_by_public_id(
     db: Session, public_id: str
 ) -> Optional[ImageInstance]:
-    item = (
-        db.query(ImageInstance)
-        .options(
-            selectinload(ImageInstance.ImageStorages).selectinload(
-                ImageStorage.StorageBackend
+
+    try:
+        item = (
+            db.query(ImageInstance)
+            .options(
+                selectinload(ImageInstance.ImageStorages).selectinload(
+                    ImageStorage.StorageBackend
+                )
             )
+            .filter(ImageInstance.PublicID == public_id)
+            .one()
         )
-        .filter(ImageInstance.PublicID == public_id)
-        .first()
-    )
-    return item
+        return item
+    except NoResultFound:
+        print(f"Warning: ImageInstance {public_id} not found, trying to get by id")
+        item = db.get(ImageInstance, public_id)
+        if not item:
+            raise HTTPException(404, "ImageInstance not found")
+        return item
 
 
 @router.get("/instances/{instance_id}", response_model=ImageGET)

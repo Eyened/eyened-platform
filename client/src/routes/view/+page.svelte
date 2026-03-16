@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
 	import { page } from "$app/state";
-	import { fetchFormAnnotation, fetchSegmentation } from "$lib/data/api";
+	import { fetchFormAnnotation, fetchInstance, fetchSegmentation } from "$lib/data/api";
 	import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
 
 	function getURLStrings(param: string): string[] {
@@ -21,7 +21,20 @@
 	const urlDeprecatedAnnotationIDs = getURLStrings("annotations");
 
 	async function resolveInstanceIDs(): Promise<string[]> {
-		const ids = new Set<string>(urlInstanceIDs);
+		const ids = new Set<string>();
+
+		// Normalize URL-provided instance IDs to canonical public IDs.
+		// This keeps temporary backwards compatibility for legacy numeric IDs.
+		for (const id of urlInstanceIDs) {
+			try {
+				const instance = await fetchInstance(id);
+				if (instance?.id) {
+					ids.add(instance.id);
+				}
+			} catch (error) {
+                console.error(error);
+            }
+		}
 
 		// Resolve form annotation IDs to instance IDs
 		for (const id of urlFormAnnotationIDs) {
