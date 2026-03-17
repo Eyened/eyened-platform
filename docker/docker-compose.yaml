@@ -88,7 +88,7 @@ services:
       # Images
       - type: volume
         source: ohk_researchdata
-        target: /images
+        target: /ohkrdb-images
         read_only: true
         volume:
           nocopy: true
@@ -96,7 +96,7 @@ services:
       # Thumbnails
       - type: volume
         source: ohk_researchdata
-        target: /thumbnails
+        target: /storage/thumbnails
         read_only: true
         volume:
           nocopy: true
