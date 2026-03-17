@@ -1,34 +1,47 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
 	import { page } from "$app/state";
-	import { fetchFormAnnotation, fetchSegmentation } from "$lib/data/api";
+	import { fetchFormAnnotation, fetchInstance, fetchSegmentation } from "$lib/data/api";
 	import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
 
-	function getURLNums(param: string): number[] {
+	function getURLStrings(param: string): string[] {
 		const params = browser ? page.url.searchParams : new URLSearchParams();
 		return (
 			params
 				.get(param)
 				?.split(",")
-				.map((num) => parseInt(num))
-				.filter((n) => !isNaN(n)) || []
+				.map((value) => value.trim())
+				.filter((value) => value.length > 0) || []
 		);
 	}
 
-	const urlInstanceIDs = getURLNums("instances");
-	const urlFormAnnotationIDs = getURLNums("form_annotation_ids");
-	const urlSegmentationIDs = getURLNums("segmentation_ids");
-	const urlDeprecatedAnnotationIDs = getURLNums("annotations");
+	const urlInstanceIDs = getURLStrings("instances");
+	const urlFormAnnotationIDs = getURLStrings("form_annotation_ids");
+	const urlSegmentationIDs = getURLStrings("segmentation_ids");
+	const urlDeprecatedAnnotationIDs = getURLStrings("annotations");
 
-	async function resolveInstanceIDs(): Promise<number[]> {
-		const ids = new Set<number>(urlInstanceIDs);
+	async function resolveInstanceIDs(): Promise<string[]> {
+		const ids = new Set<string>();
+
+		// Normalize URL-provided instance IDs to canonical public IDs.
+		// This keeps temporary backwards compatibility for legacy numeric IDs.
+		for (const id of urlInstanceIDs) {
+			try {
+				const instance = await fetchInstance(id);
+				if (instance?.id) {
+					ids.add(instance.id);
+				}
+			} catch (error) {
+                console.error(error);
+            }
+		}
 
 		// Resolve form annotation IDs to instance IDs
 		for (const id of urlFormAnnotationIDs) {
 			try {
-				const fa = await fetchFormAnnotation(id);
-				if (fa?.image_instance_id != null) {
-					ids.add(fa.image_instance_id);
+				const fa = await fetchFormAnnotation(Number(id));
+				if (fa?.image_id != null) {
+					ids.add(fa.image_id);
 				}
 			} catch (error) {
                 console.error(error);                                
@@ -38,9 +51,9 @@
 		// Resolve segmentation IDs to instance IDs
 		for (const id of urlSegmentationIDs) {
 			try {
-				const seg = await fetchSegmentation(id);
-				if (seg?.image_instance_id != null) {
-					ids.add(seg.image_instance_id);
+				const seg = await fetchSegmentation(Number(id));
+				if (seg?.image_id != null) {
+					ids.add(seg.image_id);
 				}
 			} catch (error) {
                 console.error(error);
@@ -53,9 +66,9 @@
 
 			// Try as form annotation first
 			try {
-				const fa = await fetchFormAnnotation(id);
-				if (fa?.image_instance_id != null) {
-					ids.add(fa.image_instance_id);
+				const fa = await fetchFormAnnotation(Number(id));
+				if (fa?.image_id != null) {
+					ids.add(fa.image_id);
 					resolved = true;
 				}
 			} catch (error) {
@@ -65,9 +78,9 @@
 			// If not found as form annotation, try as segmentation
 			if (!resolved) {
 				try {
-					const seg = await fetchSegmentation(id);
-					if (seg?.image_instance_id != null) {
-						ids.add(seg.image_instance_id);
+					const seg = await fetchSegmentation(Number(id));
+					if (seg?.image_id != null) {
+						ids.add(seg.image_id);
 					}
 				} catch (error) {
                     console.error(error);

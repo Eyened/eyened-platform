@@ -7,13 +7,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
 from eyened_orm import Model, SubTaskState
-from sqlalchemy.orm import object_session
+from sqlalchemy.orm import Session, object_session
 
 from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
 from .dtos_instances import (
     DeviceMeta,
-    InstanceGET,
-    InstanceMeta,
+    ImageGET,
     PatientGET,
     PatientMeta,
     ProjectGET,
@@ -62,6 +61,17 @@ if TYPE_CHECKING:
 
 class DTOConverter:
     """Service class for converting ORM objects to DTOs."""
+
+    @staticmethod
+    def _get_public_id_for_instance_id(
+        sess: Optional["Session"], instance_id: Optional[int]
+    ) -> Optional[str]:
+        if instance_id is None or sess is None:
+            return None
+        from eyened_orm import ImageInstance
+
+        img = sess.get(ImageInstance, instance_id)
+        return img.PublicID if img else None
 
     # -------------------- Core entities --------------------
     @staticmethod
@@ -145,8 +155,7 @@ class DTOConverter:
             series_number=series.SeriesNumber,
             series_instance_uid=series.SeriesInstanceUid or "",
             instance_ids=[
-                img.ImageInstanceID
-                for img in (getattr(series, "ImageInstances", []) or [])
+                img.PublicID for img in (getattr(series, "ImageInstances", []) or [])
             ],
         )
 
@@ -157,8 +166,17 @@ class DTOConverter:
         with_segmentations: bool = False,
         with_form_annotations: bool = False,
         with_model_segmentations: bool = False,
-    ) -> InstanceGET:
-        """Convert ImageInstance ORM object to InstanceGET."""
+    ) -> ImageGET:
+        """Convert ImageInstance ORM object to ImageGET."""
+        primary_storage = image_instance.primary_storage
+        if not primary_storage:
+            raise ValueError("ImageInstance has no primary storage")
+        object_key = primary_storage.ObjectKey
+        data_format = primary_storage.Format
+        if data_format == "png_series":
+            data_source_id = object_key.split("/")[-1]
+        else:
+            data_source_id = None
         device_meta = DeviceMeta(
             manufacturer=(
                 image_instance.DeviceInstance.DeviceModel.Manufacturer
@@ -194,22 +212,24 @@ class DTOConverter:
         )
         series_meta = SeriesMeta(id=image_instance.Series.SeriesID)
 
-        dto = InstanceGET(
-            id=image_instance.ImageInstanceID,
+        dto = ImageGET(
+            id=image_instance.PublicID,
             sop_instance_uid=image_instance.SOPInstanceUid or "",
-            dataset_identifier=image_instance.DatasetIdentifier,
+            data_format=data_format,
+            data_source_id=data_source_id,
             thumbnail_identifier=image_instance.ThumbnailPath or "",
-            thumbnail_path=image_instance.ThumbnailPath or "",
             modality=image_instance.Modality,
             dicom_modality=image_instance.DICOMModality,
             etdrs_field=image_instance.ETDRSField,
-            angio_graphy=str(image_instance.Angiography)
-            if image_instance.Angiography
-            else "",
+            angio_graphy=(
+                str(image_instance.Angiography) if image_instance.Angiography else ""
+            ),
             laterality=image_instance.Laterality,
-            anatomic_region=str(image_instance.AnatomicRegion)
-            if image_instance.AnatomicRegion is not None
-            else "",
+            anatomic_region=(
+                str(image_instance.AnatomicRegion)
+                if image_instance.AnatomicRegion is not None
+                else ""
+            ),
             rows=image_instance.Rows_y or 0,
             columns=image_instance.Columns_x or 0,
             nr_of_frames=image_instance.NrOfFrames or 1,
@@ -265,37 +285,6 @@ class DTOConverter:
 
         return dto
 
-    @staticmethod
-    def image_instance_to_meta(image_instance: "ImageInstance") -> InstanceMeta:
-        """Convert ImageInstance ORM object to InstanceMeta."""
-        device_meta = DeviceMeta(
-            manufacturer=(
-                image_instance.DeviceInstance.DeviceModel.Manufacturer
-                if image_instance.DeviceInstance
-                and image_instance.DeviceInstance.DeviceModel
-                else "Unknown"
-            ),
-            model=(
-                image_instance.DeviceInstance.DeviceModel.ManufacturerModelName
-                if image_instance.DeviceInstance
-                and image_instance.DeviceInstance.DeviceModel
-                else "Unknown"
-            ),
-        )
-        return InstanceMeta(
-            id=image_instance.ImageInstanceID,
-            thumbnail_path=image_instance.ThumbnailPath or "",
-            modality=image_instance.Modality,  # type: ignore[arg-type]
-            dicom_modality=image_instance.DICOMModality,  # type: ignore[arg-type]
-            etdrs_field=image_instance.ETDRSField,  # type: ignore[arg-type]
-            laterality=image_instance.Laterality,  # type: ignore[arg-type]
-            anatomic_region=str(image_instance.AnatomicRegion)
-            if image_instance.AnatomicRegion is not None
-            else "",
-            device=device_meta,
-            tags=DTOConverter._tags_from_image_instance(image_instance),
-        )
-
     # -------------------- Auxiliary entities --------------------
     @staticmethod
     def creator_to_get(creator: "Creator") -> CreatorGET:
@@ -347,6 +336,12 @@ class DTOConverter:
         ms: "ModelSegmentation", with_tag_metadata: bool = False
     ) -> ModelSegmentationGET:
         """Convert ModelSegmentation ORM object to ModelSegmentationGET."""
+        public_image_id = getattr(getattr(ms, "ImageInstance", None), "PublicID", None)
+        if public_image_id is None:
+            sess = object_session(ms)
+            public_image_id = DTOConverter._get_public_id_for_instance_id(
+                sess, ms.ImageInstanceID
+            )
         # feature best-effort via model.Feature if relationship exists; else omit
         feat = getattr(getattr(ms, "Model", None), "Feature", None)
         if feat is not None:
@@ -372,9 +367,11 @@ class DTOConverter:
                     id=ms.ModelID, name="Unknown model", version=""
                 )
 
+        if public_image_id is None:
+            raise ValueError("ModelSegmentation missing ImageInstance PublicID")
         return ModelSegmentationGET(
             id=ms.ModelSegmentationID,
-            image_instance_id=ms.ImageInstanceID,
+            image_id=public_image_id,
             annotation_type="model_segmentation",
             depth=ms.Depth,
             height=ms.Height,
@@ -383,7 +380,6 @@ class DTOConverter:
             image_projection_matrix=ms.ImageProjectionMatrix,
             scan_indices=ms.ScanIndices,
             threshold=ms.Threshold,
-            reference_segmentation_id=ms.ReferenceSegmentationID,
             data_type=ms.DataType,
             data_representation=ms.DataRepresentation,
             creator=creator_meta,
@@ -466,9 +462,17 @@ class DTOConverter:
         seg: "Segmentation", with_tag_metadata: bool = False
     ) -> SegmentationGET:
         """Convert Segmentation ORM object to SegmentationGET."""
+        public_image_id = getattr(getattr(seg, "ImageInstance", None), "PublicID", None)
+        if public_image_id is None:
+            sess = object_session(seg)
+            public_image_id = DTOConverter._get_public_id_for_instance_id(
+                sess, seg.ImageInstanceID
+            )
+        if public_image_id is None:
+            raise ValueError("Segmentation missing ImageInstance PublicID")
         dto = SegmentationGET(
             id=seg.SegmentationID,
-            image_instance_id=seg.ImageInstanceID,
+            image_id=public_image_id,
             annotation_type="grader_segmentation",
             depth=seg.Depth,
             height=seg.Height,
@@ -480,12 +484,16 @@ class DTOConverter:
             reference_segmentation_id=seg.ReferenceSegmentationID,
             data_type=seg.DataType,
             data_representation=seg.DataRepresentation,
-            feature=DTOConverter.feature_to_get(seg.Feature)
-            if getattr(seg, "Feature", None)
-            else None,  # type: ignore[arg-type]
-            creator=DTOConverter.creator_to_meta(seg.Creator)
-            if getattr(seg, "Creator", None)
-            else None,  # type: ignore[arg-type]
+            feature=(
+                DTOConverter.feature_to_get(seg.Feature)
+                if getattr(seg, "Feature", None)
+                else None
+            ),  # type: ignore[arg-type]
+            creator=(
+                DTOConverter.creator_to_meta(seg.Creator)
+                if getattr(seg, "Creator", None)
+                else None
+            ),  # type: ignore[arg-type]
             tags=[],
             date_inserted=seg.DateInserted,
             date_modified=seg.DateModified,
@@ -510,7 +518,17 @@ class DTOConverter:
         annotation: "FormAnnotationORM", with_tag_metadata: bool = False
     ) -> FormAnnotationGET:
         """Convert FormAnnotation ORM object to FormAnnotationGET."""
+        public_image_id = getattr(
+            getattr(annotation, "ImageInstance", None), "PublicID", None
+        )
+        if public_image_id is None:
+            sess = object_session(annotation)
+            public_image_id = DTOConverter._get_public_id_for_instance_id(
+                sess, annotation.ImageInstanceID
+            )
         if annotation.ImageInstanceID is not None:
+            if public_image_id is None:
+                raise ValueError("FormAnnotation missing ImageInstance PublicID")
             obj_type = "image_instance"
         elif annotation.StudyID is not None:
             obj_type = "study"
@@ -523,16 +541,18 @@ class DTOConverter:
             form_schema_id=annotation.FormSchemaID,
             patient_id=annotation.PatientID,
             study_id=annotation.StudyID,
-            image_instance_id=annotation.ImageInstanceID,
+            image_id=public_image_id,
             laterality=annotation.Laterality,
             sub_task_id=annotation.SubTaskID,
             form_data=annotation.FormData,
             form_annotation_reference_id=annotation.FormAnnotationReferenceID,
             object_type=obj_type,  # type: ignore[assignment]
             tags=[],
-            creator=DTOConverter.creator_to_meta(annotation.Creator)
-            if getattr(annotation, "Creator", None)
-            else None,
+            creator=(
+                DTOConverter.creator_to_meta(annotation.Creator)
+                if getattr(annotation, "Creator", None)
+                else None
+            ),
             date_inserted=annotation.DateInserted,
             date_modified=annotation.DateModified,
         )
@@ -567,9 +587,11 @@ class DTOConverter:
             date_inserted=task.DateInserted,
             num_tasks=num_tasks,
             num_tasks_ready=num_tasks_ready,
-            creator=DTOConverter.creator_to_meta(task.Creator)
-            if getattr(task, "Creator", None)
-            else None,
+            creator=(
+                DTOConverter.creator_to_meta(task.Creator)
+                if getattr(task, "Creator", None)
+                else None
+            ),
             task_state=getattr(task, "TaskState", None),
             task_definition=DTOConverter.task_definition_to_get(task.TaskDefinition),
         )

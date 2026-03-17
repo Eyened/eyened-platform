@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import sys
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -7,6 +8,8 @@ from alembic import context
 
 from eyened_orm import *
 from eyened_orm.base import Base
+from eyened_orm.config import load_database_settings
+from eyened_orm.utils.env import load_env_file
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -22,10 +25,44 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+x_args = context.get_x_argument(as_dictionary=True)
+env_file = x_args.get("env_file")
+load_env_file(env_file, override=True)
+db_settings = load_database_settings()
+db_password = db_settings.password.get_secret_value()
+db_url = (
+    f"mysql+pymysql://{db_settings.user}:{db_password}"
+    f"@{db_settings.host}:{db_settings.port}/{db_settings.database}"
+)
+
+# if the command alters the database, prompt for confirmation
+cmd_opts = getattr(config, "cmd_opts", None)
+cmd = getattr(cmd_opts, "cmd", None)
+if isinstance(cmd, (list, tuple)):
+    cmd = cmd[0] if cmd else None
+if callable(cmd):
+    cmd = cmd.__name__
+no_prompt_cmds = {
+    "revision",
+    "history",
+    "current",
+    "heads",
+    "branches",
+    "show",
+    "check",
+    "list_templates",
+}
+if cmd not in no_prompt_cmds:
+    confirm_target = (
+        f"{db_settings.user}@{db_settings.host}:{db_settings.port}/{db_settings.database}"
+    )
+    response = input(
+        f"Target database: {confirm_target}. Proceed? [y/N] "
+    ).strip().lower()
+    if response not in {"y", "yes"}:
+        print("Aborted by user.")
+        sys.exit(1)
+config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:

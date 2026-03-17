@@ -909,7 +909,7 @@ export interface components {
         /** AddImageRequest */
         AddImageRequest: {
             /** Instance Id */
-            instance_id: number;
+            instance_id: string;
         };
         /** AttributeCondition */
         AttributeCondition: {
@@ -1052,8 +1052,8 @@ export interface components {
             patient_id: number;
             /** Study Id */
             study_id?: number | null;
-            /** Image Instance Id */
-            image_instance_id?: number | null;
+            /** Image Id */
+            image_id?: string | null;
             laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
@@ -1095,8 +1095,8 @@ export interface components {
             patient_id?: number | null;
             /** Study Id */
             study_id?: number | null;
-            /** Image Instance Id */
-            image_instance_id?: number | null;
+            /** Image Id */
+            image_id?: string | null;
             laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
@@ -1113,8 +1113,8 @@ export interface components {
             patient_id: number;
             /** Study Id */
             study_id?: number | null;
-            /** Image Instance Id */
-            image_instance_id?: number | null;
+            /** Image Id */
+            image_id?: string | null;
             laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
@@ -1196,8 +1196,12 @@ export interface components {
         InstanceGET: {
             /** Sop Instance Uid */
             sop_instance_uid: string;
-            /** Dataset Identifier */
-            dataset_identifier: string;
+            /** Data Format */
+            data_format: string;
+            /** Data Source Id */
+            data_source_id?: string | null;
+            /** Multi File Count */
+            multi_file_count?: number | null;
             /** Thumbnail Identifier */
             thumbnail_identifier: string;
             /** Thumbnail Path */
@@ -1238,7 +1242,7 @@ export interface components {
             /** Date Preprocessed */
             date_preprocessed?: string | null;
             /** Id */
-            id: number;
+            id: string;
             project: components["schemas"]["ProjectMeta"];
             patient: components["schemas"]["PatientMeta"];
             study: components["schemas"]["StudyMeta"];
@@ -1263,7 +1267,7 @@ export interface components {
         /** InstanceMeta */
         InstanceMeta: {
             /** Id */
-            id: number;
+            id: string;
             /** Thumbnail Path */
             thumbnail_path: string;
             modality?: components["schemas"]["Modality"] | null;
@@ -1390,8 +1394,8 @@ export interface components {
         };
         /** ModelSegmentationGET */
         ModelSegmentationGET: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -1406,8 +1410,6 @@ export interface components {
             scan_indices?: number[] | null;
             /** Threshold */
             threshold?: number | null;
-            /** Reference Segmentation Id */
-            reference_segmentation_id?: number | null;
             data_type: components["schemas"]["Datatype"];
             data_representation: components["schemas"]["DataRepresentation"];
             /** Id */
@@ -1507,14 +1509,14 @@ export interface components {
             /** Count */
             count?: number | null;
             /** Result Ids */
-            result_ids: number[];
+            result_ids: string[];
             /** Has More */
             has_more: boolean;
         };
         /** SegmentationGET */
         SegmentationGET: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -1571,7 +1573,7 @@ export interface components {
             /** Series Instance Uid */
             series_instance_uid: string;
             /** Instance Ids */
-            instance_ids?: number[];
+            instance_ids?: string[];
         };
         /** SeriesMeta */
         SeriesMeta: {
@@ -1693,7 +1695,7 @@ export interface components {
             /** Count */
             count?: number | null;
             /** Result Ids */
-            result_ids: number[];
+            result_ids: string[];
             /** Has More */
             has_more: boolean;
         };
@@ -1974,8 +1976,8 @@ export interface components {
         };
         /** SegmentationPOST */
         SegmentationPOST: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -2031,8 +2033,8 @@ export interface components {
         };
         /** SegmentationBase */
         SegmentationBase: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -2322,7 +2324,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: number;
+                instance_id: string;
             };
             cookie?: {
                 jwt_token?: string;
@@ -2428,7 +2430,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: number;
+                instance_id: string;
             };
             cookie?: {
                 jwt_token?: string;
@@ -2468,7 +2470,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: number;
+                instance_id: string;
                 tag_id: number;
             };
             cookie?: {
@@ -2503,7 +2505,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: number;
+                instance_id: string;
                 tag_id: number;
             };
             cookie?: {
@@ -2988,7 +2990,7 @@ export interface operations {
             query?: {
                 patient_id?: number | null;
                 study_id?: number | null;
-                image_instance_id?: number | null;
+                image_id?: string | null;
                 form_schema_id?: number | null;
                 sub_task_id?: number | null;
             };
@@ -4392,7 +4394,7 @@ export interface operations {
             };
             path: {
                 subtaskid: number;
-                instance_id: number;
+                instance_id: string;
             };
             cookie?: {
                 jwt_token?: string;

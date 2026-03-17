@@ -3,7 +3,14 @@ import bisect
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
-from eyened_orm import Task, SubTask, SubTaskImageLink, ImageInstance, SubTaskState
+from eyened_orm import (
+    Task,
+    SubTask,
+    SubTaskImageLink,
+    ImageInstance,
+    ImageStorage,
+    SubTaskState,
+)
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 from .auth import CurrentUser, get_current_user
@@ -215,7 +222,10 @@ async def list_subtasks(
     q = base_q.order_by(SubTask.SubTaskID)
     if with_images:
         q = q.options(
-            selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance)
+            selectinload(SubTask.SubTaskImageLinks)
+            .selectinload(SubTaskImageLink.ImageInstance)
+            .selectinload(ImageInstance.ImageStorages)
+            .selectinload(ImageStorage.StorageBackend)
         )
 
     rows = db.execute(q.limit(limit).offset(offset)).scalars().all()
@@ -256,7 +266,10 @@ async def get_subtask(
     base_q = select(SubTask).where(SubTask.TaskID == task_id).order_by(SubTask.SubTaskID)
     if with_images:
         base_q = base_q.options(
-            selectinload(SubTask.SubTaskImageLinks).selectinload(SubTaskImageLink.ImageInstance)
+            selectinload(SubTask.SubTaskImageLinks)
+            .selectinload(SubTaskImageLink.ImageInstance)
+            .selectinload(ImageInstance.ImageStorages)
+            .selectinload(ImageStorage.StorageBackend)
         )
     q = base_q.offset(subtask_index).limit(2 if with_next else 1)
     rows = db.execute(q).scalars().all()

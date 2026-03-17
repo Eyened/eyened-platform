@@ -1,75 +1,68 @@
 from contextlib import contextmanager
-from pathlib import Path
-from typing import Generator, Mapping, Optional
+from typing import Generator
 
-from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig, load_config
-from eyened_orm.utils.zarr.manager import ZarrStorageManager
+from eyened_orm.config import DatabaseSettings, load_database_settings
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 
 
-def create_connection_string(config: DatabaseSettings):
-    dbstring = (
-        f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}"
-    )
-    if config.database is not None:
-        dbstring += f"/{config.database}"
-    return dbstring
+def create_connection_string(settings: DatabaseSettings) -> str:
+    pw = settings.password.get_secret_value()
+    return f"mysql+pymysql://{settings.user}:{pw}@{settings.host}:{settings.port}/{settings.database}"
+
+
+def create_server_connection_string(settings: DatabaseSettings) -> str:
+    pw = settings.password.get_secret_value()
+    return f"mysql+pymysql://{settings.user}:{pw}@{settings.host}:{settings.port}"
 
 
 class EyenedSession(Session):
-    """Custom session with built-in storage manager and config"""
-
-    def __init__(self, config: EyenedORMConfig, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        database_settings: DatabaseSettings | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
-        self.config = config
-        
-    @property
-    def storage_manager(self):
-        if not hasattr(self, '_storage_manager'):
-            self._storage_manager = ZarrStorageManager(self.config.segmentations_zarr_store)
-        return self._storage_manager
+        self.database_settings = database_settings
+
 
 class Database:
     """Database connection manager with built-in session and storage management"""
 
-    def __init__(self, config: Optional[EyenedORMConfig | str | Path | Mapping[str, str]] = None):
-        """
-        config: EyenedORMConfig | Path | str
-        if Path, load from .env file
-        if None, initialize with default values (taken from environment variables)
-        """
-        if isinstance(config, EyenedORMConfig):
-            # Already a config object, use as-is
-            pass
-        else:
-            config = load_config(config)
-            
-            
+    database_settings: DatabaseSettings
+    engine: Engine
+    _session_factory: sessionmaker
 
-        self.config = config
+    def __init__(
+        self,
+        database_settings: DatabaseSettings | None = None,
+    ):
+        self.database_settings = database_settings or load_database_settings()
 
-        conn_string = create_connection_string(self.config.database)
-
-        # print("creating engine with connection string", conn_string)
-        self.engine = create_engine(conn_string, pool_pre_ping=True)
-
-        # Create session factory with custom session class
+        self.engine = create_engine(
+            create_connection_string(self.database_settings), pool_pre_ping=True
+        )
         self._session_factory = sessionmaker(
-            autocommit=False, autoflush=False, bind=self.engine, class_=EyenedSession
+            bind=self.engine,
+            autocommit=False,
+            autoflush=False,
+            class_=EyenedSession,
         )
 
     @contextmanager
-    def get_session(self) -> Generator[EyenedSession, None, None]:
-        session: EyenedSession = self._session_factory(config=self.config)
+    def get_session(self) -> Generator[Session, None, None]:
+        session: Session = self._session_factory(
+            database_settings=self.database_settings
+        )
         try:
             yield session
         finally:
             session.close()
 
-    def create_session(self) -> EyenedSession:
+    def create_session(self) -> Session:
         """
         For manual session management.
         User is responsible for closing the session.
         """
-        return self._session_factory(config=self.config)
+        return self._session_factory(database_settings=self.database_settings)

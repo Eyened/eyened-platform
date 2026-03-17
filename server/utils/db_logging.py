@@ -216,7 +216,7 @@ class DatabaseModificationLogger:
             log_data, default_flow_style=False, sort_keys=False, allow_unicode=True
         )
         self.logger.info(yaml_str.rstrip())  # Remove trailing newline
-    
+
     def log_simple(
         self,
         user: str,
@@ -229,7 +229,7 @@ class DatabaseModificationLogger:
     ):
         """
         Log a simple one-line operation (for high-frequency operations).
-        
+
         Args:
             user: Username who performed the operation
             user_id: User ID who performed the operation
@@ -266,24 +266,25 @@ def init_db_logger(settings) -> Optional[DatabaseModificationLogger]:
         settings: Application settings object
 
     Returns:
-        Initialized DatabaseModificationLogger instance
+        Initialized DatabaseModificationLogger instance, or None when disabled.
     """
     global _db_logger
 
-    log_file_path = getattr(settings, "db_log_file_path", "")
-    log_level = getattr(settings, "db_log_level", logging.INFO)
-    max_bytes = getattr(settings, "db_log_max_bytes", 10 * 1024 * 1024)  # 10MB
-    backup_count = getattr(settings, "db_log_backup_count", 5)
+    db_log_settings = getattr(settings, "db_log", None)
+    if db_log_settings is None:
+        _db_logger = None
+        return None
 
-    if not log_file_path:
-        # Not setting the log file path effectively disables the logger
+    if not db_log_settings.file_path:
+        # DB logging is opt-in: no file path means no logger.
+        _db_logger = None
         return None
 
     _db_logger = DatabaseModificationLogger(
-        log_file_path=log_file_path,
-        log_level=log_level,
-        max_bytes=max_bytes,
-        backup_count=backup_count,
+        log_file_path=db_log_settings.file_path,
+        log_level=db_log_settings.level,
+        max_bytes=db_log_settings.max_bytes,
+        backup_count=db_log_settings.backup_count,
     )
 
     return _db_logger

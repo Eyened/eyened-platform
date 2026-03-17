@@ -14,7 +14,6 @@ class ImageImporter:
     Args:
         admin_username (str): Username for platform authentication
         admin_password (str): Password for platform authentication
-        images_basepath (str): Base path where images are stored
         host (str): Host address of the platform (api / viewer)
         port (int): Port number of the platform (api / viewer)
         create_project (bool, optional): Whether to create project if not exists. Defaults to True.
@@ -26,9 +25,7 @@ class ImageImporter:
 
     admin_username: str
     admin_password: str
-    images_basepath: str
-    host: str
-    port: int
+    api_url: str
 
     create_project: bool = True
     create_patients: bool = True
@@ -40,9 +37,8 @@ class ImageImporter:
 
     def __post_init__(self):
         """Initialize paths and endpoints, and perform initial login."""
-        self.base_url = f"http://{self.host}:{self.port}"
-        self.image_endpoint = f"{self.base_url}/api/import/image"
-        self.login_endpoint = f"{self.base_url}/api/auth/login"
+        self.image_endpoint = f"{self.api_url}/api/import/image"
+        self.login_endpoint = f"{self.api_url}/api/auth/login"
         self._session = requests.Session()
         self._login()
 

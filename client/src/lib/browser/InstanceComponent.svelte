@@ -1,17 +1,16 @@
 <script lang="ts">
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { getThumbUrl } from "$lib/data-loading/utils";
-	import type { GlobalContext } from "$lib/data/globalContext.svelte";
+
 	import { getContext } from "svelte";
-	import type { InstanceGET, InstanceMeta } from "../../types/openapi_types";
+	import type { ImageGET } from "../../types/openapi_types";
 	import type { BrowserContext } from "./browserContext.svelte";
 	import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
 
 	const browserContext = getContext<BrowserContext>("browserContext");
-	const globalContext = getContext<GlobalContext>("globalContext");
 
 	interface Props {
-		instance: InstanceGET | InstanceMeta;
+		instance: ImageGET;
 		showSegmentationInfo?: boolean;
 	}
 
@@ -35,6 +34,34 @@
 	function toggleSelect() {
 		browserContext.toggleInstance(instance);
 	}
+	const name_map = {
+		AdaptiveOptics: "AO",
+		ColorFundus: "CFI",
+		ColorFundusStereo: "CF Stereo",
+		RedFreeFundus: "Red Free",
+		ExternalEye: "External",
+		LensPhotograph: "Lens",
+		Ophthalmoscope: "OS",
+		Autofluorescence: "AF",
+		FluoresceinAngiography: "FA",
+		ICGA: "ICGA",
+		InfraredReflectance: "IR",
+		BlueReflectance: "BR",
+		GreenReflectance: "GR",
+		OCT: "OCT",
+		OCTA: "OCTA",
+	};
+
+	let name = "";
+	if (instance.modality && name_map[instance.modality]) {
+		name += name_map[instance.modality];
+	}
+	if (instance.etdrs_field) {
+		name += ` ${instance.etdrs_field}`;
+	}
+	if (instance.modality == "OCT") {
+		name += ` [${instance.nr_of_frames}]`;
+	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -51,8 +78,8 @@
 			popupOpen = true;
 		}}
 	>
-		<div>
-			{instance.id}
+		<div class="text-xs">
+			{name}
 		</div>
 	</div>
 	<div

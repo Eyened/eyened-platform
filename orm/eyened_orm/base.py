@@ -1,5 +1,6 @@
 import enum
 import re
+from functools import lru_cache
 from typing import (
     Any,
     ClassVar,
@@ -12,7 +13,7 @@ from typing import (
 )
 from collections.abc import Iterable
 
-from eyened_orm.utils.zarr.manager import ZarrStorageManager
+
 from eyened_orm.utils.table_printer import TablePrinter
 from sqlalchemy import Column, Index, UniqueConstraint, select
 from sqlalchemy.orm import DeclarativeBase, Session, InstrumentedAttribute
@@ -81,20 +82,6 @@ class Base(DeclarativeBase):
             raise ValueError("Object not attached to a session")
         return session
 
-    @property
-    def config(self):
-        """Get config from the attached session."""
-        if not hasattr(self.session, "config"):
-            raise ValueError("Session not properly configured")
-        return self.session.config
-
-    @property
-    def storage_manager(self) -> ZarrStorageManager:
-        """Get storage manager from the attached session."""
-        if not hasattr(self.session, "storage_manager"):
-            raise ValueError("Session not properly configured")
-        return self.session.storage_manager
-
     def __getattr__(self, name: str) -> Any:
         """Resolve missing attributes by converting snake_case to CamelCase column names."""
         return _get_attribute_with_conversion(self, name)
@@ -108,9 +95,19 @@ class Base(DeclarativeBase):
         return cls.by_column(session, **kwargs)
 
     @classmethod
-    def fetch_all(cls: Type[T], session: Session) -> List[T]:
+    def fetch_all(
+        cls: Type[T],
+        session: Session,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> List[T]:
         """Return all objects of the table."""
-        return session.scalars(select(cls)).all()
+        stmt = select(cls)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        return session.scalars(stmt).all()
 
     @classmethod
     def query_column(
@@ -358,7 +355,7 @@ class Base(DeclarativeBase):
             for key, value in update_values.items():
                 setattr(instance, key, value)
 
-        session.flush()
+        session.flush([instance])
 
         if verbose:
             action = "Created" if is_new else "Found existing"

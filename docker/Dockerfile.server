@@ -2,19 +2,11 @@ FROM python:3.11-slim
 
 SHELL ["/bin/bash", "-c"]
 
-# Install dependencies
-# nodejs, mssql-tools18, msodbcsql18
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglx-mesa0 \
     libglib2.0-0 \
-    curl \
-    gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        nodejs \
-    && npm install -g npm@10.8.3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,12 +18,6 @@ RUN pip install --no-cache-dir --verbose -r requirements.txt
 COPY orm /libraries/eyened_orm/
 WORKDIR /libraries/eyened_orm
 RUN pip install --no-cache-dir -e .
-
-# Build the client
-COPY client /client
-WORKDIR /client
-RUN npm install
-RUN npm run build   
 
 # Setup the application
 COPY server /app/server

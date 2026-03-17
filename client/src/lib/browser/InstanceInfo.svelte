@@ -7,7 +7,7 @@
 	import type { BrowserContext } from './browserContext.svelte';
 
 	interface Props {
-		instanceId: number;
+		instanceId: string;
 	}
 	let { instanceId }: Props = $props();
 	

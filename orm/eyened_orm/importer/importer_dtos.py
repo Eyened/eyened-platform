@@ -10,14 +10,17 @@ from eyened_orm.segmentation import DataRepresentation, Datatype
 
 
 class InstancePOST(BaseModel):
+    storage_backend_key: str = Field(
+        ..., description="Key of an existing StorageBackend used for this image"
+    )
     sop_instance_uid: Optional[str] = None
     modality: Optional[Modality] = None
     dicom_modality: Optional[ModalityType] = None
     etdrs_field: Optional[ETDRSField] = None
     laterality: Optional[Laterality] = None
-    height: Optional[int] = None
-    width: Optional[int] = None
-    depth: Optional[int] = None
+    height: Optional[int] = Field(None, description="Rows_y")
+    width: Optional[int] = Field(None, description="Columns_x")
+    depth: Optional[int] = Field(None, description="NrOfFrames")
     resolution_horizontal: Optional[float] = None
     resolution_vertical: Optional[float] = None
     resolution_axial: Optional[float] = None
@@ -65,7 +68,7 @@ class SegmentationImport(BaseModel):
 
 
 class ImageImport(InstancePOST):
-    image: str
+    object_key: str
     attributes: Dict[str, Any] = Field(default_factory=dict)
     segmentations: List[SegmentationImport] = Field(default_factory=list)
 
@@ -89,7 +92,9 @@ class StudyImport(BaseModel):
 
 class PatientImport(BaseModel):
     project_name: str = Field(..., description="Name of the project")
-    patient_identifier: Optional[str] = None
+    patient_identifier: str = Field(
+        ..., description="Unique patient identifier within the project"
+    )
     studies: List[StudyImport] = Field(default_factory=list)
 
     # Patient properties
@@ -111,7 +116,10 @@ class InstancePOSTFlat(InstancePOST):
     series_number: Optional[int] = None
     series_instance_uid: Optional[str] = None
 
-    image: str = Field(..., description="Path to the image file")
+    object_key: str = Field(..., description="Path to the image file")
+    storage_backend_key: str = Field(
+        ..., description="Key of an existing StorageBackend used for this image"
+    )
     attributes: Dict[str, Any] = Field(
         default_factory=dict, description="Optional key-value properties"
     )

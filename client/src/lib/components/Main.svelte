@@ -1,29 +1,30 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
-	import { authEnabled } from '$lib/config';
-	import { getContext } from 'svelte';
-	import type { GlobalContext } from '../data/globalContext.svelte';
-	import TopMenu from './TopMenu.svelte';
-	import UserMenu from './UserMenu.svelte';
-	import * as Tooltip from './ui/tooltip';
+	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
+	import { getContext } from "svelte";
+	import type { GlobalContext } from "../data/globalContext.svelte";
+	import TopMenu from "./TopMenu.svelte";
+	import UserMenu from "./UserMenu.svelte";
+	import * as Tooltip from "./ui/tooltip";
 
 	let { children }: { children: any } = $props();
 
-	const {userManager} = getContext<GlobalContext>('globalContext');;
+	const { userManager } = getContext<GlobalContext>("globalContext");
 
-	console.log('userManager.loggedIn', authEnabled,  userManager.loggedIn);
-	if(authEnabled && !userManager.loggedIn) {
+	console.log("userManager.loggedIn", userManager.loggedIn);
+	if (!userManager.loggedIn) {
 		// redirect to login page if user not logged
-		console.log('User not logged in. Redirecting..')
-		goto(`/users/login?redirect=${encodeURIComponent(page.url.pathname + page.url.search)}`);
+		console.log("User not logged in. Redirecting..");
+		goto(
+			`/users/login?redirect=${encodeURIComponent(page.url.pathname + page.url.search)}`,
+		);
 	}
 </script>
 
 <Tooltip.Provider>
 	<TopMenu />
 	<div class="page-container">
-		{#if !authEnabled || (authEnabled && userManager.loggedIn)}
+		{#if userManager.loggedIn}
 			{@render children?.()}
 		{/if}
 	</div>

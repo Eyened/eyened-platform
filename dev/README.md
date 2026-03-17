@@ -3,8 +3,24 @@
 **Prerequisites:** npm, python .venv with required packages, docker, docker compose  
 **Working dir:** `dev` (cd dev)
 
-## 1. Configure Environment Variables
+## 0. Install Dependencies (first time only)
+- Python deps:
+  ```bash
+  python -m pip install -r ../server/requirements.txt
+  ```
+- Client deps:
+  ```bash
+  (cd ../client && npm install)
+  ```
+
+## 1. Configure Settings and Secrets
 - Copy `sample.env` to `.env` and fill out the required values.
+- Ensure these are set:
+  - `EYENED_API_SECRET_KEY` (JWT signing key)
+  - `EYENED_DATABASE_*` (host, port, password; must match docker-compose)
+  - `DEV_*` ports (nginx, server, client, adminer)
+  - `EYENED_ROUTING_CONFIG=dev/nginx.conf`
+- Update `nginx.conf` and `docker-compose.yml` volume paths with your storage roots.
 
 ## 2. Start Docker Services
 - [Optional] You may want to update the name in docker-compose.yml
@@ -16,50 +32,19 @@
   - nginx fileserver that takes care of the routing (api, frontend and files)
   - start a database service
   - start an adminer service (for accessing the database through a browser)
+  Notes:
+  - `fileserver` uses `network_mode: host`, so `DEV_NGINX_PORT` is opened directly on the host.
+  - Database root password is hard-coded to `test` in `dev/docker-compose.yml` (match `EYENED_DATABASE_PASSWORD`).
 
 ## 3. Populate the Database [Optional]
-To copy over some data (for example from a production environment), run this:
+To copy over data (for example from a production environment), run this:
 ```bash
-eorm database-mirror-test -c transfer-config.yml
+eorm load-dump -p path_to_dump
 ```
-
-where `transfer-config.yml` has the following structure:
-```yaml
-source:
-  host: 
-  port: 
-  user: 
-  password: 
-  database: eyened_database
-
-target:
-  host: 
-  port: 
-  user: root
-  password: 
-  database: eyened_database
-
-copy_objects:
-  - table: Patient
-    clause:
-      PatientIdentifier: '1'
-  - table: Patient
-    clause:
-      PatientIdentifier: '2'
-```
-**Note:** 
-- You can fill out the list of object to copy (`copy_objects`). Linked objects from other tables (via foreign keys) are also automatically included.
-- The `source` is the source database (e.g. production), `target` is the development database (use `port=DATABASE_PORT` from the `.env`).
-
-### Full database mirror (fast, destructive)
-If you want a full database copy (schema + all data) and you have the MySQL CLI tools installed (`mysqldump`, `mysql`), you can stream directly from source to target:
-
+A dump can be created like this:
 ```bash
-eorm database-mirror-stream -c transfer-config.yml
+eorm save-dump -p path_to_dump
 ```
-
-This will **DROP and recreate** the target database, then run a streaming pipeline:
-`mysqldump (source) | mysql (target)` (no intermediate dump file).
 
 ### Apply Pending Migrations (if needed)
 Working from `orm/migrations`:
@@ -69,20 +54,11 @@ cd ../orm/migrations
 
 Assuming the migration you want to run is found in `orm/migrations/alembic/versions`:
 
-1. Set the connection string in `orm/migrations/alembic.ini` by running:
-   ```bash
-   python set_connection_string.py ../../dev/.env
-   ```
-
-2. Double check if the connection string is correct:
-   ```bash
-   cat alembic.ini | grep url
-   ```
-
-3. Run the migration:
-   ```bash
-   alembic upgrade head
-   ```
+Run the migration:
+```bash
+alembic -x env_file=../../dev/.env upgrade head
+```
+You will be prompted to confirm the target database before the migration runs.
 
 ## 4. Start the Development Server & Client
 Working from `dev` 
@@ -103,4 +79,3 @@ cd ../../dev
   ./start_client_dev.sh
   ```
   This will start the client in development mode, using vite hot-reload 
-

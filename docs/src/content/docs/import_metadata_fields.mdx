@@ -1,64 +1,65 @@
 ---
 title: Import Metadata Fields
-description: Detailed documentation of metadata fields available when importing data into the eyened platform
+description: Metadata fields available when importing data into the Eyened platform
 ---
 
-The following fields may be provided in the `props` dictionary of the Patient, Study, Series or Image when importing data into the eyened platform.
+When importing via the [Import API](/eyened-platform/importing_data), metadata is provided in a flat `data` object using **snake_case** field names. The tables below list the supported fields for each entity level.
 
 ## Patient
 
-The `Patient` model contains the following non-relationship fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `BirthDate` | date | Patient's date of birth |
-| `Sex` | SexEnum | Patient's sex (M=1, F=2) |
-| `PatientIdentifier` | str | Unique identifier for the patient (within a project) |
+| API Field | Type | Description |
+|----------|------|-------------|
+| `patient_identifier` | str | Unique identifier for the patient (within a project) |
+| `birth_date` | date | Patient's date of birth |
+| `sex` | str | Patient's sex: `"M"` or `"F"` |
 
 ## Study
 
-The `Study` model contains the following non-relationship fields:
+| API Field | Type | Description |
+|----------|------|-------------|
+| `study_date` | date | Date when the study was performed |
+| `study_description` | str | Description of the study |
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `StudyRound` | int | Project round of this study |
-| `StudyDescription` | str | Description of the study |
-| `StudyDate` | date | Date when the study was performed |
+:::note
+`StudyRound` exists in the database model but is not currently exposed in the Import API.
+:::
 
 ## Series
 
-The `Series` model contains the following non-relationship fields:
+| API Field | Type | Description |
+|----------|------|-------------|
+| `series_id` | str | Identifier used to match or create the series |
+| `series_number` | int | Series number |
+| `series_instance_uid` | str | Unique identifier for the series (DICOM) |
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `SeriesNumber` | int | Series number |
-| `SeriesInstanceUid` | str | Unique identifier for the series (DICOM) |
-| `StudyInstanceUid` | str | Unique identifier for the study (DICOM) |
+:::note
+`StudyInstanceUid` exists in the database model but is not currently exposed in the Import API.
+:::
 
-## ImageInstance
+## Image
 
-The `ImageInstance` model contains the following non-relationship fields:
+| API Field | Type | Description |
+|----------|------|-------------|
+| `image` | str | **Required.** Path to the image file (relative to IMAGES_BASEPATH) |
+| `modality` | str | **Required.** Type of image: `ColorFundus`, `OCT`, `OCTA`, etc. |
+| `laterality` | str | Side of body: `"L"` or `"R"` |
+| `height` | int | Number of rows (image height in pixels) |
+| `width` | int | Number of columns (image width in pixels) |
+| `depth` | int | Number of frames (e.g. B-scans in OCT) |
+| `sop_instance_uid` | str | Unique identifier for SOP instance (DICOM) |
+| `sop_class_uid` | str | Service-object pair class (DICOM) |
+| `photometric_interpretation` | str | Pixel interpretation (RGB, MONOCHROME, etc.) |
+| `samples_per_pixel` | int | Number of color components per pixel |
+| `dicom_modality` | str | Equipment type: `OP`, `OPT`, `SC` |
+| `etdrs_field` | str | ETDRS field position: `F1`–`F7` |
+| `anatomic_region` | int | Body part examined |
+| `angiography` | str | Angiography type indicator |
+| `acquisition_date_time` | datetime | Date/time of acquisition |
+| `pupil_dilated` | str | Whether pupil was dilated |
+| `horizontal_field_of_view` | float | Field of view in millimeters |
+| `resolution_axial` | float | Axial resolution (mm) |
+| `resolution_horizontal` | float | Horizontal resolution (mm) |
+| `resolution_vertical` | float | Vertical resolution (mm) |
+| `attributes` | object | Key-value attributes (flexible schema) |
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `Modality` | Modality | Type of image (ColorFundus, OCT, etc.) |
-| `SOPInstanceUid` | str | Unique identifier for SOP instance (DICOM) |
-| `SOPClassUid` | str | Identifies the service-object pair class (DICOM) |
-| `PhotometricInterpretation` | str | Specifies the intended interpretation of pixel data (RGB, MONOCHROME, etc.) |
-| `SamplesPerPixel` | int | Number of color components in each pixel |
-| `NrOfFrames` | int | Number of frames in a multi-frame image |
-| `SliceThickness` | float | Nominal slice thickness, in millimeters |
-| `Rows_y` | int | Number of rows (height) in the image |
-| `Columns_x` | int | Number of columns (width) in the image |
-| `Laterality` | Laterality | Side of body examined (L=1, R=2) |
-| `DICOMModality` | ModalityType | Type of equipment that acquired the data (OP, OPT, SC) |
-| `AnatomicRegion` | int | Body part examined |
-| `ETDRSField` | ETDRSField | Early Treatment Diabetic Retinopathy Study field position |
-| `Angiography` | int | Indicates angiography type |
-| `AcquisitionDateTime` | datetime | Date and time the acquisition of data started |
-| `PupilDilated` | bool | Indicates if pupil was dilated during image acquisition |
-| `HorizontalFieldOfView` | float | Horizontal dimension of field of view in millimeters |
-| `ResolutionAxial` | float | Axial resolution in millimeters |
-| `ResolutionHorizontal` | float | Horizontal resolution in millimeters |
-| `ResolutionVertical` | float | Vertical resolution in millimeters |
-
+The `attributes` dictionary can hold arbitrary key-value pairs for image-level metadata not covered by the above fields.

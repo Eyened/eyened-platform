@@ -43,13 +43,13 @@
 		formAnnotations.filter((formAnnotation) => {
 			if (formAnnotation.form_schema_id !== etdrsSchema.id) return false;
 
-			if (formAnnotation.image_instance_id == instance.id) return true;
+			if (formAnnotation.image_id == instance.id) return true;
 
 			// also show annotations on linked images
 			// TODO: this should be reactive?
 			const linkedIDs = registration.getLinkedImgIds(image_id);
-			if (linkedIDs.has(`${formAnnotation.image_instance_id}`)) return true;
-			if (linkedIDs.has(`${formAnnotation.image_instance_id}_proj`))
+			if (linkedIDs.has(`${formAnnotation.image_id}`)) return true;
+			if (linkedIDs.has(`${formAnnotation.image_id}_proj`))
 				return true;
 			return false;
 		}),
@@ -124,7 +124,7 @@
 			form_schema_id: etdrsSchema.id,
 			patient_id: instance.patient.id,
 			study_id: instance.study?.id ?? undefined,
-			image_instance_id: instance.id,
+			image_id: instance.id,
 			laterality: instance.laterality ?? undefined,
 			sub_task_id: taskContext?.subTask?.id,
 			form_data: {},
@@ -144,7 +144,7 @@
 		const [fx, fy] = instance.cf_keypoints.fovea_xy as [number, number];
 		const [odx, ody] = instance.cf_keypoints.disc_edge_xy as [number, number];
 		return {
-			image_instance_id: String(image_id),
+			image_id: String(image_id),
 			form_data: {
 				fovea: { x: fx, y: fy },
 				disc_edge: { x: odx, y: ody },

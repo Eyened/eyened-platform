@@ -27,7 +27,7 @@ export class MainViewerContext implements Overlay {
 
 
     constructor(
-        public readonly instanceId: number,
+        public readonly instanceId: string,
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage
@@ -83,7 +83,7 @@ export class MainViewerContext implements Overlay {
         uniforms.u_mask = null;
         uniforms.u_mask_bitmask = 0;
         const applyMask = this.applyMasking.has(segmentationItem);
-        if (applyMask && segmentation.reference_segmentation_id) {
+        if (applyMask && segmentation.annotation_type === "grader_segmentation" && segmentation.reference_segmentation_id) {
             const referenceSegmentationItem = this.segmentationContext.getSegmentationItemById(segmentation.reference_segmentation_id);
             if (referenceSegmentationItem) {
                 const referenceMask = referenceSegmentationItem.getMask(index);

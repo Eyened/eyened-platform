@@ -2,12 +2,11 @@
     import { segmentations } from "$lib/data/stores.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import type { SegmentationGET } from "../../../types/openapi_types";
-    import { type Segmentation } from "./segmentationContext.svelte";
     
 
     interface Props {
         image: AbstractImage;
-        segmentation: Segmentation;
+        segmentation: SegmentationGET;
         resolve: (segmentation: SegmentationGET) => void;
         close: () => void;
     }
@@ -15,7 +14,7 @@
     let { image, segmentation, resolve, close }: Props = $props();
 
     const referenceAnnotations = $derived(
-        segmentations.filter(s => s.image_instance_id === image.instance.id)
+        segmentations.filter(s => s.image_id === image.instance.id)
             .filter(
                 (a) =>
                     a.data_representation == "Binary" ||

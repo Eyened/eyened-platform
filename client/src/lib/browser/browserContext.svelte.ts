@@ -2,8 +2,8 @@ import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 
 import { api } from '../api/client';
-import { ingestInstanceMetas, ingestInstances, ingestStudies, instanceMetas, instances, studies } from '$lib/data/stores.svelte';
-import type { InstanceGET, InstanceMeta, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
+import { ingestInstances, ingestStudies, instances, studies } from '$lib/data/stores.svelte';
+import type { ImageGET, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
 
 export type QueryMode = 'studies' | 'instances';
 export type DisplayMode = 'instance' | 'study';
@@ -26,7 +26,7 @@ export class BrowserContext {
     limitOptionsStudies = [10, 20, 30, 40, 50];
     limitOptionsInstances = [100, 200, 500, 1000];
 
-    selectedIds: number[] = $state([]);
+    selectedIds: string[] = $state([]);
     queryMode: QueryMode = $state('studies');
     displayMode: DisplayMode = $state('study');
     loading: boolean = $state(false);
@@ -41,7 +41,7 @@ export class BrowserContext {
     resultIds: Set<number> = $state(new Set());
 
     // NEW: ordered arrays for rendering
-    orderedInstanceIds: number[] = $state([]);
+    orderedInstanceIds: string[] = $state([]);
     orderedStudyIds: number[] = $state([]);
 
 
@@ -62,22 +62,21 @@ export class BrowserContext {
         this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
     );
 
-    // Helper: Get instance from either store (full InstanceGET or lightweight InstanceMeta)
-    private getInstance(id: number): InstanceGET | InstanceMeta | undefined {
-        return instances.get(id) ?? instanceMetas.get(id);
+    private getInstance(id: string): ImageGET | undefined {
+        return instances.get(id);
     }
 
     selectedInstances = $derived(
         this.selectedIds
             .map(id => this.getInstance(id))
-            .filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+            .filter((x): x is ImageGET => x !== undefined)
     );
 
     // Derived: ordered instances for rendering
     orderedInstances = $derived(
         this.orderedInstanceIds
             .map(id => this.getInstance(id))
-            .filter((x): x is InstanceGET | InstanceMeta => x !== undefined)
+            .filter((x): x is ImageGET => x !== undefined)
     );
 
     // Derived: ordered studies for rendering
@@ -307,7 +306,7 @@ export class BrowserContext {
         this.basicCondition = conds?.length === 1 ? conds[0] : this.basicCondition;
     }
 
-    toggleInstance(instance: InstanceMeta) {
+    toggleInstance(instance: ImageGET) {
         const i = this.selectedIds.indexOf(instance.id);
         if (i !== -1) {
             this.selectedIds.splice(i, 1);
@@ -393,14 +392,7 @@ export class BrowserContext {
         // Add/update search results in GLOBAL repos
         ingestStudies(res.studies ?? []);
 
-        // Important: Instance type depends on query mode!
-        if (this.queryMode === 'instances') {
-            // SearchResponse has instances: InstanceGET[] (full data)
-            ingestInstances(res.instances ?? []);
-        } else {
-            // StudySearchResponse has instances: InstanceMeta[] (lightweight references)
-            ingestInstanceMetas(res.instances ?? []);
-        }
+        ingestInstances(res.instances ?? []);
 
         // Track which items are current search results
         this.resultIds = new Set(res.result_ids ?? []);
@@ -409,7 +401,7 @@ export class BrowserContext {
         // Set ordered IDs based on query mode
         let studyIds;
         if (this.queryMode === 'instances') {
-            this.orderedInstanceIds = res.result_ids ?? [];
+            this.orderedInstanceIds = (res.result_ids ?? []).map((id) => String(id));
             studyIds = (res.studies ?? []).map((s: any) => s.id);
         } else {
             studyIds = res.result_ids ?? [];
@@ -424,8 +416,8 @@ export class BrowserContext {
         this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
     }
 
-    openTab(instances: number[]) {
-        const suffix_string = `?instances=${instances}`;
+    openTab(imageIds: string[]) {
+        const suffix_string = `?instances=${imageIds.join(',')}`;
         const url = `${window.location.origin}/view${suffix_string}`;
         window.open(url, '_blank')?.focus();
     }

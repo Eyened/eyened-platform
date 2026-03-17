@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { InstanceGET } from '../../types/openapi_types';
+import type { ImageGET } from '../../types/openapi_types';
 
 	interface Props {
-		instance: InstanceGET;
+		instance: ImageGET;
 	}
 
 	let { instance }: Props = $props();

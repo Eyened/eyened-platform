@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from server.routes.auth import CurrentUser, get_current_user
 
-from ..config import settings
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 from ..utils.huey import task_run_inference, task_update_thumbnails
@@ -75,7 +74,6 @@ def make_importer(session, options: ImportOptions):
         create_projects=options.create_project,
         generate_thumbnails=True,
         run_ai_models=False,  # We handle this separately via background tasks
-        config=settings,
     )
 
 

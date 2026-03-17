@@ -24,6 +24,18 @@ from .auth import CurrentUser, get_current_user
 router = APIRouter()
 
 
+def _resolve_image_instance_id(db: Session, image_id: Optional[str]) -> Optional[int]:
+    if image_id is None:
+        return None
+    item = (
+        db.query(ImageInstance)
+        .filter(ImageInstance.PublicID == image_id)
+        .first()
+    )
+    if item:
+        return item.ImageInstanceID
+    raise HTTPException(status_code=404, detail="ImageInstance not found")
+
 @router.post("/form-annotations", response_model=FormAnnotationGET)
 async def create_form_annotation(
     annotation: FormAnnotationPUT,
@@ -32,11 +44,12 @@ async def create_form_annotation(
 ):
     # Map DTO snake_case to ORM PascalCase fields
     payload = annotation.dict()
+    image_instance_id = _resolve_image_instance_id(db, payload.get("image_id"))
     new_annotation = FormAnnotation(
         FormSchemaID=payload.get("form_schema_id"),
         PatientID=payload.get("patient_id"),
         StudyID=payload.get("study_id"),
-        ImageInstanceID=payload.get("image_instance_id"),
+        ImageInstanceID=image_instance_id,
         Laterality=payload.get("laterality"),
         CreatorID=current_user.id,
         SubTaskID=payload.get("sub_task_id"),
@@ -73,7 +86,7 @@ async def create_form_annotation(
 async def get_form_annotations(
     patient_id: Optional[int] = None,
     study_id: Optional[int] = None,
-    image_instance_id: Optional[int] = None,
+    image_id: Optional[str] = None,
     form_schema_id: Optional[int] = None,
     sub_task_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -108,8 +121,9 @@ async def get_form_annotations(
         query = query.filter(FormAnnotation.PatientID == patient_id)
     if study_id is not None:
         query = query.filter(FormAnnotation.StudyID == study_id)
-    if image_instance_id is not None:
-        query = query.filter(FormAnnotation.ImageInstanceID == image_instance_id)
+    if image_id is not None:
+        resolved_id = _resolve_image_instance_id(db, image_id)
+        query = query.filter(FormAnnotation.ImageInstanceID == resolved_id)
     if form_schema_id is not None:
         query = query.filter(FormAnnotation.FormSchemaID == form_schema_id)
     if sub_task_id is not None:
@@ -161,8 +175,10 @@ async def update_form_annotation(
         existing_annotation.PatientID = payload["patient_id"]
     if "study_id" in payload:
         existing_annotation.StudyID = payload["study_id"]
-    if "image_instance_id" in payload:
-        existing_annotation.ImageInstanceID = payload["image_instance_id"]
+    if "image_id" in payload:
+        existing_annotation.ImageInstanceID = _resolve_image_instance_id(
+            db, payload["image_id"]
+        )
     if "laterality" in payload:
         existing_annotation.Laterality = payload["laterality"]
     if "sub_task_id" in payload:

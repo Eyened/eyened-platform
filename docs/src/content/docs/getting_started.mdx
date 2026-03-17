@@ -17,53 +17,15 @@ The Eyened platform is a modern web platform for visualization and annotation of
 
 ## Quick Setup
 
-The easiest way to get started with the eyened platform is by configuring and running our docker-compose. The platform will then be accessible from any machine within your network. 
+The easiest way to get started with the Eyened platform is by configuring and running Docker Compose. The platform will then be accessible from any machine within your network.
 
 With this setup you will be able to:
 - Run the client / viewer, initially on an empty database.
-- Run our import script to import local images and associated metadata into the system. 
+- Import images and associated metadata via the [Import API](/eyened-platform/importing_data) or Python ORM.
 
-You can set up the Eyened platform in two ways:
+**Prerequisite:** Ensure Docker and Docker Compose are installed.
 
-### Option 1: Automated Setup (Recommended)
-
-We provide a setup script that automates the installation process and includes enhanced security features:
-Prerequisite: ensure docker and docker-compose is installed
-
-1. Clone our repository:
-
-    ```bash
-    git clone https://github.com/Eyened/eyened-platform.git 
-    ```
-
-2. Run the setup script:
-
-    ```bash
-    cd eyened-platform/docker
-    chmod +x setup.sh
-    ./setup.sh
-    ```
-
-The setup script will:
-- Prompt you for configuration settings or use defaults
-- Create and configure the `.env` file
-- Create necessary directories for images, storage, and database
-- Build and start the containers
-- Display the URLs for accessing the platform
-
-:::note
-**Running Multiple Instances:** If you want to run multiple instances of the platform on the same host:
-- Change the name in docker-compose.yaml to something unique for every project
-- Change the port of adminer in docker-compose.yaml (or remove this service) to avoid conflicts
-- Assign different folders for storage for each instance
-- Assign different ports to expose mysql docker
-:::
-
-### Option 2: Manual Setup
-
-If you prefer to set up manually:
-
-1. Clone our repository:
+1. Clone the repository:
 
     ```bash
     git clone https://github.com/Eyened/eyened-platform.git
@@ -74,6 +36,11 @@ If you prefer to set up manually:
     ```bash
     cd eyened-platform/docker
     ```
+
+:::caution
+**This section is outdated.**  
+The instructions and environment variable list below may not reflect the latest setup or required variables. 
+:::
 
 3. Create a `.env` file with the following variables:
 
@@ -86,9 +53,9 @@ If you prefer to set up manually:
     | IMAGES_BASEPATH | Local folder to serve images from (may be read-only) |
     | SEGMENTATIONS_ZARR_STORE | Local path to store segmentations (zarr format) |
     | THUMBNAILS_PATH | Local path to store generated thumbnails |
-    | DATABASE_PATH | Path to the database files |
+    | DATABASE_PATH | Path to MySQL data files |
     | DATABASE_PORT | Port to access the database from outside |
-    | DATABASE_ROOT_PASSWORD | Root password for external database access |
+    | DATABASE_ROOT_PASSWORD | Root password for MySQL |
     | DATABASE_USER | Username for database access |
     | DATABASE_PASSWORD | Password for database access |
 
@@ -101,8 +68,16 @@ If you prefer to set up manually:
 5. Start the platform:
 
     ```bash
-    USERID=$(id -u) GROUPID=$(id -g) docker-compose up -d
+    USERID=$(id -u) GROUPID=$(id -g) docker compose up -d
     ```
+
+:::note
+**Running Multiple Instances:** If you want to run multiple instances of the platform on the same host:
+- Change the name in docker-compose.yaml to something unique for every project
+- Change the port of Adminer in docker-compose.yaml (or remove this service) to avoid conflicts
+- Assign different folders for storage for each instance
+- Assign different ports to expose MySQL
+:::
 
 ## Accessing the Platform
 
@@ -113,49 +88,36 @@ Once the platform is running:
 
 To manage the platform:
 
-- To view logs: `docker-compose logs -f`
-- To stop the platform: `docker-compose down`
-- To start the platform: `USERID=$(id -u) GROUPID=$(id -g) docker-compose up -d`
+- To view logs: `docker compose logs -f`
+- To stop the platform: `docker compose down`
+- To start the platform: `USERID=$(id -u) GROUPID=$(id -g) docker compose up -d`
 
 :::caution
 Make sure to set up regular back ups for both the MySQL database and storage folders.
 :::
 
 :::tip
-**Using eyened_orm python package**
+**Using the eyened_orm Python package**
 
-The eyened_orm python package can be installed by running:
+Install the ORM for database access and batch imports:
+
 ```bash
 cd orm
 pip install -e .
 ```
 
-To use the eyened_orm package for database access, copy the `.env` file from the docker folder to the eyened_orm/environments folder:
+Create an environment file with database credentials. The ORM expects variables with the `EYENED_DATABASE_` prefix (e.g. `EYENED_DATABASE_USER`, `EYENED_DATABASE_PASSWORD`, `EYENED_DATABASE_HOST`, etc.). Load it and connect:
 
-```bash
-cp docker/.env orm/eyened_orm/environments
-```
-
-**Multiple Database Environments**
-
-You can create different environment files to connect to different databases or use different database users. For example, to set up a read-only database user:
-
-1. Copy the existing environment file:
-```bash
-cp orm/eyened_orm/environments/.env orm/eyened_orm/environments/read-only.env
-```
-
-2. Update the database credentials in `read-only.env`:
-```bash
-DATABASE_USER=readonly_user
-DATABASE_PASSWORD=your_password
-```
-
-3. Use the environment in your code:
 ```python
+from dotenv import load_dotenv
 from eyened_orm import Database
-database = Database("read-only")  # Will automatically read from 'eyened_orm/environments/read-only.env'
+
+load_dotenv("path/to/your.env")  # or set vars in the environment
+database = Database()
+session = database.create_session()
 ```
+
+See [ORM Configuration](/eyened-platform/orm/configuration) for full options.
 :::
 
 ## Next Steps

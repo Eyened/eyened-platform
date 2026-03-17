@@ -3,17 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel
-from eyened_orm import SubTask, SubTaskImageLink, ImageInstance
+from eyened_orm import SubTask, SubTaskImageLink, ImageInstance, ImageStorage
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_tasks import (
-    SubTasksResponse,
-    SubTasksWithImagesResponse,
     SubTaskGET,
     SubTaskWithImagesGET,
 )
-from ..dtos.dtos_instances import InstanceGET
 from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
@@ -25,7 +22,14 @@ class SubTaskPATCH(BaseModel):
 
 
 class AddImageRequest(BaseModel):
-    instance_id: int
+    instance_id: str
+
+
+def _resolve_image_instance_id(db: Session, image_id: str) -> int:
+    item = db.query(ImageInstance).filter(ImageInstance.PublicID == image_id).first()
+    if item:
+        return item.ImageInstanceID
+    raise HTTPException(status_code=404, detail="ImageInstance not found")
 
 
 @router.get(
@@ -40,9 +44,10 @@ async def get_subtask(
     q = select(SubTask).where(SubTask.SubTaskID == subtaskid)
     if with_images:
         q = q.options(
-            selectinload(SubTask.SubTaskImageLinks).selectinload(
-                SubTaskImageLink.ImageInstance
-            )
+            selectinload(SubTask.SubTaskImageLinks)
+            .selectinload(SubTaskImageLink.ImageInstance)
+            .selectinload(ImageInstance.ImageStorages)
+            .selectinload(ImageStorage.StorageBackend)
         )
     st = db.execute(q).scalars().first()
     if not st:
@@ -136,7 +141,8 @@ async def add_subtask_image(
     st = db.get(SubTask, subtaskid)
     if not st:
         raise HTTPException(404, "SubTask not found")
-    inst = db.get(ImageInstance, body.instance_id)
+    image_instance_id = _resolve_image_instance_id(db, body.instance_id)
+    inst = db.get(ImageInstance, image_instance_id)
     if not inst:
         raise HTTPException(404, "ImageInstance not found")
     # Get the next available ImageIndex for this subtask
@@ -148,7 +154,9 @@ async def add_subtask_image(
     if max_index is None:
         max_index = -1
     link = SubTaskImageLink(
-        SubTaskID=subtaskid, ImageInstanceID=body.instance_id, ImageIndex=max_index + 1
+        SubTaskID=subtaskid,
+        ImageInstanceID=image_instance_id,
+        ImageIndex=max_index + 1,
     )
 
     try:
@@ -170,7 +178,7 @@ async def add_subtask_image(
             entity="SubTaskImageLink",
             fields={
                 "subtask_id": subtaskid,
-                "image_instance_id": body.instance_id,
+                "image_instance_id": image_instance_id,
             },
         )
 
@@ -180,9 +188,10 @@ async def add_subtask_image(
             select(SubTask)
             .where(SubTask.SubTaskID == subtaskid)
             .options(
-                selectinload(SubTask.SubTaskImageLinks).selectinload(
-                    SubTaskImageLink.ImageInstance
-                )
+                selectinload(SubTask.SubTaskImageLinks)
+                .selectinload(SubTaskImageLink.ImageInstance)
+                .selectinload(ImageInstance.ImageStorages)
+                .selectinload(ImageStorage.StorageBackend)
             )
         )
         .scalars()
@@ -196,26 +205,27 @@ async def add_subtask_image(
 )
 async def remove_subtask_image(
     subtaskid: int,
-    instance_id: int,
+    instance_id: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     # Get link data before deletion (for logging)
+    image_instance_id = _resolve_image_instance_id(db, instance_id)
     link = db.get(
-        SubTaskImageLink, {"SubTaskID": subtaskid, "ImageInstanceID": instance_id}
+        SubTaskImageLink, {"SubTaskID": subtaskid, "ImageInstanceID": image_instance_id}
     )
     if not link:
         raise HTTPException(404, "Link not found")
 
     deleted_data = {
         "subtask_id": subtaskid,
-        "image_instance_id": instance_id,
+        "image_instance_id": image_instance_id,
     }
 
     res = db.execute(
         delete(SubTaskImageLink).where(
             SubTaskImageLink.SubTaskID == subtaskid,
-            SubTaskImageLink.ImageInstanceID == instance_id,
+            SubTaskImageLink.ImageInstanceID == image_instance_id,
         )
     )
     if res.rowcount == 0:
@@ -240,9 +250,10 @@ async def remove_subtask_image(
             select(SubTask)
             .where(SubTask.SubTaskID == subtaskid)
             .options(
-                selectinload(SubTask.SubTaskImageLinks).selectinload(
-                    SubTaskImageLink.ImageInstance
-                )
+                selectinload(SubTask.SubTaskImageLinks)
+                .selectinload(SubTaskImageLink.ImageInstance)
+                .selectinload(ImageInstance.ImageStorages)
+                .selectinload(ImageStorage.StorageBackend)
             )
         )
         .scalars()

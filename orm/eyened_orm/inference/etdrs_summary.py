@@ -1,15 +1,7 @@
 import click
-from tqdm import tqdm
-
-from eyened_orm import AttributeValue, AttributesModel, ModelSegmentation
-from eyened_orm.commands.shared import get_database
-from eyened_orm.reports.etdrs_model import ETDRSModelProcessor
 
 
 @click.command(name="run-etdrs-model")
-@click.option(
-    "-e", "--env", type=str, help="Path to .env file for environment configuration"
-)
 @click.option(
     "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
 )
@@ -51,7 +43,6 @@ from eyened_orm.reports.etdrs_model import ETDRSModelProcessor
     help="Overwrite existing attribute values",
 )
 def run_etdrs_model(
-    env,
     path,
     segmentation_model_id,
     keypoints_model_name,
@@ -61,12 +52,17 @@ def run_etdrs_model(
     overwrite,
 ):
     """Run ETDRS model processing on segmentations."""
+    from tqdm import tqdm
+    from eyened_orm import AttributeValue, AttributesModel, ModelSegmentation
+    from eyened_orm.commands.shared import get_database
+    from eyened_orm.reports.etdrs_model import ETDRSModelProcessor
+
     with open(path, "r") as f:
         selected_images = {int(line.strip()) for line in f.readlines()}
 
     print(f"Preparing to run ETDRS model on {len(selected_images)} images")
 
-    database = get_database(env)
+    database = get_database()
     session = database.create_session()
 
     processor = ETDRSModelProcessor(session)

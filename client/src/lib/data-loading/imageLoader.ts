@@ -1,10 +1,9 @@
-import { fsHost } from '$lib/config';
 import { Image2D } from '$lib/webgl/image2D';
 import { Image3D } from '$lib/webgl/image3D';
 import type { Dimensions } from '$lib/webgl/types';
 import type { WebGL } from '$lib/webgl/webgl';
-import type { InstanceGET } from '../../types/openapi_types';
-import { splitTail } from '../utils';
+import type { ImageGET } from '../../types/openapi_types';
+import { loadMhdRawFromEndpoints } from './mhdLoader';
 
 import * as cornerstone from 'cornerstone-core';
 import * as cornerstoneWADOImageLoader from 'cornerstone-wado-image-loader';
@@ -26,44 +25,45 @@ export class ImageLoader {
     minBscansForEnface = 5;
     constructor(public readonly webgl: WebGL) { }
 
-    async load(instance: InstanceGET): Promise<LoadedImages> {
+    async load(instance: ImageGET): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
+        const imageId = instance.id;
+        const dataUrl = this.buildDataUrl(imageId);
         // Convert to lowercase for case-insensitive comparison
-        const extension = instance.dataset_identifier.toLowerCase().split('.').pop();
-        const supportedFormats = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
-
-        if (extension && supportedFormats.includes(extension)) {
+        const dataFormat = instance.data_format;
+        if (dataFormat === 'image/png' || dataFormat === 'image/jpeg') {
             return [await this.loadImage2D(instance, img_id)];
-        } else if (instance.dataset_identifier.endsWith('.binary')) {
-            const url = `${fsHost}/${instance.dataset_identifier}`;
-            const meta = await this.loadMeta(url);
-            const image = await this.loadBinary3D(instance, url, meta, img_id);
+        } else if (dataFormat === 'binary') {
+            const meta = await this.loadBinaryMeta(imageId);
+            const image = await this.loadBinary3D(instance, dataUrl, img_id, meta);
             return this.returnImage3D(image);
 
-        } else if (instance.dataset_identifier.endsWith('.dcm')) {
-            return this.loadDicom(instance, img_id);
+        } else if (dataFormat === 'dicom') {
+            return this.loadDicom(instance, img_id, imageId);
 
-        } else if (instance.dataset_identifier.startsWith('[png_series')) {
-            const [pre, base_url] = instance.dataset_identifier.split(']');
-            const [folder, source_id] = splitTail(base_url, '/');
-            const meta_url = `${fsHost}/${folder}/metadata.json`;
-            const response = await fetch(meta_url);
-            const meta = await response.json();
-            return this.loadPngSeries(instance, meta, img_id, pre, base_url, source_id);
+        } else if (dataFormat === 'png_series') {
+            const meta = await this.loadPngSeriesMeta(imageId);
+            return this.loadPngSeries(instance, meta, img_id, imageId);
+        } else if (dataFormat === 'mhd') {
+            return this.loadMhd(instance, img_id, imageId);
         } else {
             throw 'unsupported data format';
         }
     }
 
-    async loadPngSeries(instance: InstanceGET, meta: any, img_id: string, pre: string, base_url: string, source_id: string): Promise<LoadedImages> {
-        const n_scans = parseInt(pre.split('_')[2]);
-        const urls = Array.from({ length: n_scans }, (_, i) => {
-            const fileName = `${base_url}_${i}.png`;
-            return `${fsHost}/${fileName}`;
+    async loadPngSeries(instance: ImageGET, meta: any, img_id: string, imageId: string): Promise<LoadedImages> {
+        const sourceId = instance.data_source_id;
+
+        const metaImages = meta?.images?.images;
+        const image = Array.isArray(metaImages)
+            ? (metaImages.find((img: any) => img.source_id == sourceId) ?? metaImages[0])
+            : null;
+        const n_scans = image?.contents.length;
+        const urls = Array.from({ length: n_scans }, (_, index) => {
+            return this.buildDataUrl(imageId, { index });
         });
         const js_images = await Promise.all(urls.map(getImage));
 
-        const image = meta.images.images.find((img: any) => img.source_id == source_id);
 
         if (image) {
             const dimensions = {
@@ -81,7 +81,7 @@ export class ImageLoader {
             return await this.returnImage3D(img3d);
         }
 
-        throw 'no images found?'
+        throw new Error('No image metadata found for png_series');
     }
 
     async returnImage3D(img3d: Image3D): Promise<LoadedImages> {
@@ -92,9 +92,10 @@ export class ImageLoader {
         }
     }
 
-    async loadImage2D(instance: InstanceGET, img_id: string): Promise<Image2D> {
+    async loadImage2D(instance: ImageGET, img_id: string): Promise<Image2D> {
 
-        const url = `${fsHost}/${instance.dataset_identifier}`;
+        const imageId = instance.id;
+        const url = this.buildDataUrl(imageId);
         const bitmap = await getImage(url);
         const dimensions = {
             width: bitmap.width,
@@ -108,38 +109,41 @@ export class ImageLoader {
         return Image2D.fromBitmap(instance, this.webgl, img_id, bitmap, dimensions, meta);
     }
 
-    async loadMeta(url: string): Promise<any> {
-        const response = await fetch(url.replace('.binary', '.json'));
-        const meta = await response.json();
-        return meta;
-    }
-
-    async loadBinary3D(instance: InstanceGET, url: string, meta: any, img_id: string): Promise<Image3D> {
+    async loadBinary3D(instance: ImageGET, url: string, img_id: string, meta?: any): Promise<Image3D> {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
         const pixelData = new Uint8Array(buffer);
 
-        const dimensions = {
+        const metaDims = meta?.oct_shape && meta?.resolution ? {
             width: meta.oct_shape[2],
             height: meta.oct_shape[1],
             depth: meta.oct_shape[0],
-
             width_mm: meta.resolution[2] * meta.oct_shape[2] / 1000,
             height_mm: meta.resolution[1] * meta.oct_shape[1] / 1000,
             depth_mm: meta.resolution[0] * meta.oct_shape[0] / 1000
+        } : null;
+
+        const dimensions = {
+            width: metaDims?.width ?? instance.columns,
+            height: metaDims?.height ?? instance.rows,
+            depth: metaDims?.depth ?? (instance.nr_of_frames || 1),
+
+            width_mm: metaDims?.width_mm ?? (instance.resolution_horizontal ? instance.resolution_horizontal * instance.columns : -1),
+            height_mm: metaDims?.height_mm ?? (instance.resolution_axial ? instance.resolution_axial * instance.rows : -1),
+            depth_mm: metaDims?.depth_mm ?? (instance.resolution_vertical ? instance.resolution_vertical * (instance.nr_of_frames || 1) : -1)
         };
         if (instance.scan?.mode == 'Circle-Scan') {
             // this is not correct in the meta file
             dimensions.width_mm = instance.resolution_horizontal * dimensions.width;
         }
-        return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, meta);
+        return new Image3D(instance, this.webgl, img_id, pixelData, dimensions, meta ?? {});
     }
 
-    async loadDicom(instance: InstanceGET, img_id: string): Promise<LoadedImages> {
-        const url = `${fsHost}/${instance.dataset_identifier}`;
+    async loadDicom(instance: ImageGET, img_id: string, imageId: string): Promise<LoadedImages> {
+        const url = this.buildDataUrl(imageId);
 
-        const imageId = `wadouri:${url}`;
-        const image = await cornerstone.loadImage(imageId);
+        const dicomImageId = `wadouri:${url}`;
+        const image = await cornerstone.loadImage(dicomImageId);
 
         const meta: any = dicomParser.explicitDataSetToJS(image.data);
         const dimensions = this.extractDimensions(meta);
@@ -163,6 +167,14 @@ export class ImageLoader {
         }
 
         throw new Error('Unknown DICOM format');
+    }
+
+    async loadMhd(instance: ImageGET, img_id: string, imageId: string): Promise<LoadedImages> {
+        const loaded = await loadMhdRawFromEndpoints(instance, imageId, this.buildDataUrl.bind(this));
+        if (loaded.dimensions.depth <= 1) {
+            return [Image2D.fromPixelData(instance, this.webgl, img_id, loaded.pixelData, loaded.dimensions, loaded.meta)];
+        }
+        return this.returnImage3D(new Image3D(instance, this.webgl, img_id, loaded.pixelData, loaded.dimensions, loaded.meta));
     }
 
     private extractDimensions(meta: any): Dimensions {
@@ -203,6 +215,40 @@ export class ImageLoader {
             depth_mm: depth * res_d,
         };
     }
+
+    private buildDataUrl(imageId: string, query?: Record<string, string | number | boolean | undefined>): string {
+        const url = `/api/images/${imageId}/data`;
+        if (!query) {
+            return url;
+        }
+        const search = new URLSearchParams();
+        for (const [key, value] of Object.entries(query)) {
+            if (value !== undefined && value !== null) {
+                search.set(key, String(value));
+            }
+        }
+        return `${url}?${search.toString()}`;
+    }
+
+    private async loadBinaryMeta(imageId: string): Promise<any> {
+        const url = this.buildDataUrl(imageId, { meta: true });
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to load binary metadata (${response.status})`);
+        }
+        return await response.json();
+    }
+
+    private async loadPngSeriesMeta(imageId: string): Promise<any> {
+        const metaUrl = this.buildDataUrl(imageId, { meta: true });
+        const response = await fetch(metaUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to load png_series metadata (${response.status})`);
+        }
+        return await response.json();
+    }
+
+
 }
 
 async function getImage(url: string): Promise<ImageBitmap> {
@@ -219,7 +265,7 @@ function getArrayFromImages(js_images: ImageBitmap[]): Uint8Array {
     const pixelData = new Uint8Array(js_images.length * w * h);
     for (let i = 0; i < js_images.length; i++) {
         const img = js_images[i];
-        
+
         const ctx = new OffscreenCanvas(img.width, img.height).getContext('2d')!;
         ctx.drawImage(img, 0, 0);
         const imageData = ctx.getImageData(0, 0, img.width, img.height);

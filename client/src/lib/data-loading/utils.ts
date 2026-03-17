@@ -1,6 +1,4 @@
-import { thumbnailHost } from '$lib/config.js';
-// import type { Instance } from '$lib/datamodel/instance.svelte';
-import type { InstanceGET, InstanceMeta } from '../../types/openapi_types';
+import type { ImageGET } from '../../types/openapi_types';
 
 export class DefaultDict<T, Q> extends Map<T, Q> {
     defaultFactory: () => Q;
@@ -27,12 +25,8 @@ export function parseDate(dateString: string): Date | undefined {
     }
 }
 
-export function getThumbUrl(Instance: InstanceGET | InstanceMeta, size: number = 144) {
-    if (!Instance.thumbnail_path) return;
-
-    let image_url = [thumbnailHost, Instance.thumbnail_path].join('/') + `_${size}.jpg`;
-
-    return encodeURI(image_url);
+export function getThumbUrl(image: ImageGET, size: number = 144) {
+    return `/api/images/${image.id}/thumbnail?size=${size}`;
 }
 
 export function arraysEqual(a: any[], b: any[]): boolean {

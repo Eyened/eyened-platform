@@ -22,7 +22,7 @@
 
 	async function addImage() {
 		try {
-			const id = Number(newInstanceId);
+			const id = newInstanceId.trim();
 			if (!id) {
 				toast.error("Please enter a valid instance id");
 				return;
@@ -34,7 +34,7 @@
 		}
 	}
 
-	async function removeImage(instance_id: number) {
+	async function removeImage(instance_id: string) {
 		try {
 			await removeSubTaskImage(row.id, instance_id);
 		} catch (e) {

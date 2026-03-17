@@ -11,6 +11,7 @@ from eyened_orm import (
     FormAnnotationTagLink,
     FormSchema,
     ImageInstance,
+    ImageStorage,
     ImageInstanceTagLink,
     Patient,
     Project,
@@ -42,7 +43,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session, aliased, selectinload
 
 from ..db import get_db
-from ..dtos import InstanceGET, InstanceMeta, StudyGET
+from ..dtos import ImageGET, StudyGET
 from ..dtos.dto_converter import DTOConverter
 from .auth import CurrentUser, get_current_user
 
@@ -690,12 +691,12 @@ class SearchQuery(BaseModel):
 
 
 class SearchResponse(BaseModel):
-    instances: List[InstanceGET]
+    instances: List[ImageGET]
     studies: List[StudyGET]
     limit: int
     page: int
     count: Optional[int] = None
-    result_ids: List[int]
+    result_ids: List[str]
     has_more: bool
 
 
@@ -717,7 +718,7 @@ class StudySearchQuery(BaseModel):
 
 class StudySearchResponse(BaseModel):
     studies: List[StudyGET]
-    instances: List[InstanceMeta]
+    instances: List[ImageGET]
     limit: int
     page: int
     count: Optional[int] = None
@@ -909,6 +910,9 @@ async def search_instances(
         ),
         selectinload(ImageInstance.SourceInfo),
         selectinload(ImageInstance.Scan),
+        selectinload(ImageInstance.ImageStorages).selectinload(
+            ImageStorage.StorageBackend
+        ),
         selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
             ImageInstanceTagLink.Tag
         ),
@@ -983,7 +987,7 @@ async def search_instances(
         "limit": limit,
         "page": page,
         "count": count,
-        "result_ids": [i.ImageInstanceID for i in instances],
+        "result_ids": [i.PublicID for i in instances],
         "has_more": has_more,
     }
 
@@ -1046,6 +1050,9 @@ async def search_studies(
             ),
             selectinload(ImageInstance.SourceInfo),
             selectinload(ImageInstance.Scan),
+            selectinload(ImageInstance.ImageStorages).selectinload(
+                ImageStorage.StorageBackend
+            ),
             selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
                 ImageInstanceTagLink.Tag
             ),

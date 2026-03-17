@@ -12,23 +12,32 @@ The Eyened platform consists of several interconnected services that work togeth
 ## Core Services
 
 ### Client
-- Web-based viewer built with Svelte and webgl2
+- Web-based viewer built with Svelte and WebGL2
 - Browser-based rendering of images and annotations
 
 ### API Server
 - FastAPI backend for data management and business logic
-- Task queue system (Huey/Redis) for managing long-running operations
+- Task queue system (Huey/Redis) for managing long-running operations (inference, thumbnail generation)
 
 ### Data Management
-- MySQL database (8.0.27) for structured data storage
-- Adminer interface for database management (accessible on port 8080)
-- Local filesystem storage for:
-  - Original images
-  - Generated thumbnails
-  - Annotation data
+- **MySQL** (8.0.27) for structured data storage
+- **Adminer** for database management (accessible on port 8080)
+- **Storage:**
+  - Original images (mounted at `IMAGES_BASEPATH`)
+  - Generated thumbnails (zarr-compatible storage)
+  - Segmentations (zarr format at `SEGMENTATIONS_ZARR_STORE`)
+
+### Fileserver
+- Nginx-based service for serving images and thumbnails
+- Exposes the platform on the configured `PORT`
+
+### Worker
+- Background task processor (Huey)
+- Handles image processing, segmentation storage, and thumbnail generation
 
 ### Development Tools
-- API-calls and Python-based import script for loading images and associated metadata
-- ORM layer for data scientists to interact with the database
+- [Import API](/eyened-platform/importing_data) for loading images and metadata via REST
+- Python ORM (`eyened_orm`) for database access and batch imports
+- `ImageImporter` utility for API-based imports from Python
 
 For detailed setup instructions, see the [Getting Started](/eyened-platform/getting_started) guide.

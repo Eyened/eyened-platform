@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional, get_origin
 from pydantic import BaseModel
 from eyened_orm import TaskState, SubTaskState
 
-from .dtos_instances import InstanceGET
+from .dtos_instances import ImageGET
 from .dtos_aux import CreatorMeta
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -81,7 +81,7 @@ class SubTaskGET(SubTaskBase):
 
 class SubTaskWithImagesGET(SubTaskGET):
     """SubTask with associated images included."""
-    images: List[InstanceGET]
+    images: List[ImageGET]
 
 
 class SubTasksResponse(BaseModel):

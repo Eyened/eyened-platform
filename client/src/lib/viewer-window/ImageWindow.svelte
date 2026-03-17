@@ -4,12 +4,12 @@
     import { Registration } from "$lib/registration/registration";
     import type { WebGL } from "$lib/webgl/webgl";
     import { getContext, setContext } from "svelte";
-    import type { InstanceGET } from "../../types/openapi_types";
+    import type { ImageGET } from "../../types/openapi_types";
     import BaseViewer from "./BaseViewer.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     interface Props {
-        instance: InstanceGET;
+        instance: ImageGET;
         webgl: WebGL;
     }
 

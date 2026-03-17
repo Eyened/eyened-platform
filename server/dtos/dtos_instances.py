@@ -65,7 +65,7 @@ class SeriesGET(BaseModel):
     laterality: Optional[Laterality] = None
     series_number: Optional[int] = None
     series_instance_uid: str
-    instance_ids: List[int] = Field(default_factory=list)
+    instance_ids: List[str] = Field(default_factory=list)
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -112,17 +112,16 @@ class ScanMeta(BaseModel):
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# ========================= INSTANCES =========================
+# ========================= IMAGES ============================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-class InstanceBase(BaseModel):
-    """Instance frontend object"""
+class ImageBase(BaseModel):
+    """Image metadata exposed via public id."""
 
     sop_instance_uid: str
-    dataset_identifier: str
-    thumbnail_identifier: str
-    thumbnail_path: str
+    data_format: str
+    data_source_id: Optional[str] = None
     modality: Optional[Modality] = None
     dicom_modality: Optional[ModalityType] = None
     etdrs_field: Optional[ETDRSField] = None
@@ -143,20 +142,8 @@ class InstanceBase(BaseModel):
     date_preprocessed: Optional[datetime] = None
 
 
-class InstanceMeta(BaseModel):
-    id: int
-    thumbnail_path: str
-    modality: Optional[Modality] = None
-    dicom_modality: Optional[ModalityType] = None
-    etdrs_field: Optional[ETDRSField] = None
-    laterality: Optional[Laterality] = None
-    anatomic_region: AnatomicRegion
-    device: DeviceMeta
-    tags: List[TagMeta]
-
-
-class InstanceGET(InstanceBase):
-    id: int
+class ImageGET(ImageBase):
+    id: str
     project: ProjectMeta
     patient: PatientMeta
     study: StudyMeta
@@ -168,10 +155,6 @@ class InstanceGET(InstanceBase):
     segmentations: Optional[List[SegmentationGET]] = None
     model_segmentations: Optional[List[ModelSegmentationGET]] = None
     form_annotations: Optional[List[FormAnnotationGET]] = None
-
-    date_inserted: datetime
-    date_modified: Optional[datetime] = None
-    date_preprocessed: Optional[datetime] = None
 
     # Nested attributes by model name then attribute name
     model_attrs: Dict[str, Dict[str, Any]]

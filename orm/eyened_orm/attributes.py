@@ -27,6 +27,7 @@ from eyened_orm.series import Series
 from .base import Base
 from .image_instance import Laterality
 from .types import OptionalEnum
+from typing import Any
 
 
 class AttributeDataType(Enum):
@@ -160,6 +161,17 @@ class AttributeDefinition(Base):
         secondary="AttributesModelOutput",
         back_populates="OutputAttributes",
     )
+
+    @staticmethod
+    def infer_attribute_data_type(value: Any) -> AttributeDataType:
+        if isinstance(value, float):
+            return AttributeDataType.Float
+        elif isinstance(value, int):
+            return AttributeDataType.Int
+        elif isinstance(value, (dict, list)):
+            return AttributeDataType.JSON
+        else:
+            return AttributeDataType.String
 
 
 class AttributeValue(Base):
@@ -302,19 +314,47 @@ class AttributeValue(Base):
         back_populates="InputValues",
     )
 
-    @property
-    def value(self):
+    def _value_column_name(self) -> str:
+        if self.AttributeDefinition is None:
+            raise ValueError("AttributeDefinition must be set before accessing value.")
+
         attr_type = self.AttributeDefinition.AttributeDataType
         if attr_type == AttributeDataType.Float:
-            return self.ValueFloat
+            return "ValueFloat"
         elif attr_type == AttributeDataType.Int:
-            return self.ValueInt
+            return "ValueInt"
         elif attr_type == AttributeDataType.String:
-            return self.ValueText
+            return "ValueText"
         elif attr_type == AttributeDataType.JSON:
-            return self.ValueJSON
-        else:
-            raise ValueError(f"Unsupported attribute data type: {attr_type}")
+            return "ValueJSON"
+        raise ValueError(f"Unsupported attribute data type: {attr_type}")
+
+    @staticmethod
+    def _coerce_value(column_name: str, raw_value: Any) -> Any:
+        if column_name == "ValueFloat":
+            return float(raw_value)
+        if column_name == "ValueInt":
+            return int(raw_value)
+        if column_name == "ValueText":
+            return str(raw_value)
+        return raw_value
+
+    def _clear_value_columns(self):
+        self.ValueFloat = None
+        self.ValueInt = None
+        self.ValueText = None
+        self.ValueJSON = None
+
+    @property
+    def value(self):
+        return getattr(self, self._value_column_name())
+
+    @value.setter
+    def value(self, raw_value: Any):
+        column_name = self._value_column_name()
+        coerced_value = self._coerce_value(column_name, raw_value)
+        self._clear_value_columns()
+        setattr(self, column_name, coerced_value)
 
 
 # Junction table for model output declarations
