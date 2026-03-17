@@ -19,6 +19,7 @@ services:
       timeout: 3s
       retries: 5
       start_period: 20s
+    restart: unless-stopped
     volumes:
       # All storage volumes are volumes subpath mounts in ohk_researchdata
       # Zarr segmentations
@@ -48,6 +49,7 @@ services:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.client
+    restart: unless-stopped
 
   fileserver:
     env_file: .env
@@ -61,6 +63,7 @@ services:
         condition: service_healthy
       client:
         condition: service_started
+    restart: unless-stopped
     volumes:
       # nginx configuration
       - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
