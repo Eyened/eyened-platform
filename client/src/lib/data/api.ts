@@ -99,11 +99,16 @@ export async function fetchFormSchemas(): Promise<FormSchemaGET[]> {
 
 export async function fetchInstance(
 	id: string, 
-	options?: {
+	options: {
 		with_segmentations?: boolean;
 		with_form_annotations?: boolean;
 		with_model_segmentations?: boolean;
 		with_tag_metadata?: boolean;
+	} = {
+		with_segmentations: true,
+		with_form_annotations: true,
+		with_model_segmentations: true,
+		with_tag_metadata: true
 	}
 ): Promise<ImageGET> {
 	const instance = await apiGet<ImageGET>('/images/{image_id}' as any, {
