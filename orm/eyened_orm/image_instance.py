@@ -494,7 +494,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     def _load_png_series_array(self) -> np.ndarray:
         storage = self.primary_storage
-
+        client = get_api_client()
         meta = client.get(self.data_endpoint, params={"meta": True})
         meta.raise_for_status()
         meta_data = meta.json()
