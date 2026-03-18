@@ -1,11 +1,7 @@
 <script lang="ts">
 	import type { GlobalContext } from "$lib/data/globalContext.svelte";
-	// import type { FormAnnotationObject } from "$lib/data/objects.svelte";
-	// import type { FormAnnotationsRepo } from "$lib/data/repos.svelte";
-	import { createFormAnnotation, deleteFormAnnotation, fetchInstance } from "$lib/data";
-	import {
-		formSchemas
-	} from "$lib/data/stores.svelte";
+	import { createFormAnnotation, deleteFormAnnotation } from "$lib/data";
+	import { formSchemas } from "$lib/data/stores.svelte";
 	import { openNewWindow } from "$lib/newWindow";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 	import { getContext } from "svelte";
@@ -13,7 +9,7 @@
 	import Duplicate from "../icons/Duplicate.svelte";
 	import { PanelIcon, Trash } from "../icons/icons";
 	import FormItemContent from "./FormItemContent.svelte";
-	
+
 	const taskContext = getContext<TaskContext>("taskContext");
 	const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -23,10 +19,9 @@
 	}
 
 	let { form, theme = "dark" }: Props = $props();
-	
-	
+
 	const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
-	
+
 	// Compute permissions and schema/date display from form.$
 	const canEditForm = globalContext.canEdit(form);
 
@@ -66,11 +61,8 @@
 		if (window) {
 			window.close();
 		}
-        // need to load the full instance to get the patient, study, etc.
-		await fetchInstance(form.image_id!);
-
 		const props = {
-			formId: form.id,
+			form,
 			canEdit: canEditForm,
 		};
 
