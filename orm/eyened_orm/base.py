@@ -1,22 +1,21 @@
 import enum
 import re
-from functools import lru_cache
+from collections.abc import Iterable
 from typing import (
     Any,
     ClassVar,
     Dict,
+    Iterable,
     List,
     Optional,
     Type,
     TypeVar,
-    Iterable,
 )
-from collections.abc import Iterable
 
+from sqlalchemy import Column, Index, UniqueConstraint, select
+from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute, Session
 
 from eyened_orm.utils.table_printer import TablePrinter
-from sqlalchemy import Column, Index, UniqueConstraint, select
-from sqlalchemy.orm import DeclarativeBase, Session, InstrumentedAttribute
 
 
 def _convert_property_name(name: str) -> str:
@@ -162,13 +161,13 @@ class Base(DeclarativeBase):
         return session.scalar(stmt)
 
     @classmethod
-    def by_ids(cls: Type[T], session: Session, ids: Iterable[int]) -> Dict[int, T]:
+    def by_ids(cls: Type[T], session: Session, ids: List[int]) -> List[T]:
         """Fetch objects by single-column primary key."""
         if not ids:
-            return {}
+            return []
         pk_col = cls.primary_key()
         stmt = select(cls).where(pk_col.in_(set(ids)))
-        return {getattr(obj, pk_col.name): obj for obj in session.scalars(stmt).all()}
+        return session.scalars(stmt).all()
 
     @classmethod
     def by_pk(cls: type[T], session: Session, pk: int | tuple) -> Optional[T]:

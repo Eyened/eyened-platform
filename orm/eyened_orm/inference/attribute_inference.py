@@ -1,13 +1,13 @@
-from typing import Any, Iterator, Iterable, List, Set, Tuple
+from typing import Any, Iterable, Iterator, List, Set, Tuple
 
-import torch
 import numpy as np
+import torch
 from tqdm import tqdm
 
 from eyened_orm import (
-    AttributesModel,
-    AttributeDefinition,
     AttributeDataType,
+    AttributeDefinition,
+    AttributesModel,
     AttributeValue,
     ImageInstance,
 )
@@ -189,7 +189,8 @@ class AttributeInferencePipeline(BaseInferencePipeline):
 
         # Fetch images from database
         images = ImageInstance.by_ids(self.session, image_ids_set)
-        items = [(iid, image.path) for iid, image in images.items()]
+        items = [(img.ImageInstanceID, img.path) for img in images]
+        # items = [(iid, image.path) for iid, image in images.items()]
 
         mpi = MultiProcessInference(
             items,
@@ -208,9 +209,9 @@ class AttributeInferencePipeline(BaseInferencePipeline):
 
         # Process results
         image_ids_set = set(image_ids)
-        for i, (image_id, result) in enumerate(tqdm(
-            self.process(image_ids_set), total=len(image_ids_set)
-        )):
+        for i, (image_id, result) in enumerate(
+            tqdm(self.process(image_ids_set), total=len(image_ids_set))
+        ):
             if i % commit_interval == 0:
                 self.session.commit()
             if result is None:

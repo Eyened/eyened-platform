@@ -1,28 +1,25 @@
+import io
+import re
+import secrets
+import tempfile
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
-import io
-import warnings
-import re
-import tempfile
-from pathlib import Path
-import SimpleITK as sitk
-import numpy as np
-from sqlalchemy.types import CHAR
-from eyened_orm.api_client import get_api_client
 
 import numpy as np
 import pandas as pd
 import pydicom
+import SimpleITK as sitk
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
-import secrets
-from sqlalchemy import ForeignKey, Index, String, event, func, select
+from rtnls_fundusprep.transformation import ProjectiveTransform
+from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.types import CHAR
 
-from rtnls_fundusprep.transformation import ProjectiveTransform
+from eyened_orm.api_client import get_api_client
 
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
@@ -469,6 +466,19 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return Image.open(io.BytesIO(resp.content))
 
     @property
+    def roi(self):
+        roi = None
+        if self.CFROI is not None:
+            roi = self.CFROI
+        _, attrs = self.attrs
+        if "CFI_ROI" in attrs:
+            roi = attrs["CFI_ROI"]["CFI_ROI"]
+
+        if roi is not None:
+            roi["hw"] = (self.Rows_y, self.Columns_x)
+        return roi
+
+    @property
     def device_str(self):
         model = self.DeviceInstance.DeviceModel
         return f"{model.Manufacturer} {model.ManufacturerModelName}"
@@ -563,22 +573,51 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def bounds(self) -> CFIBounds:
-        pixel_array = self.pixel_array
-        shape = pixel_array.shape
-        if len(shape) == 3 and shape[2] > 4:
-            raise ValueError("Can only handle 2D images")
-        if self.CFROI is None:
+        # pixel_array = self.pixel_array
+        # shape = pixel_array.shape
+        # if len(shape) == 3 and shape[2] > 4:
+        #     raise ValueError("Can only handle 2D images")
+        if self.roi is None:
             return None
         else:
-            if "success" in self.CFROI and self.CFROI["success"] is False:
+            if "success" in self.roi and self.roi["success"] is False:
                 return None
             # use bounds from database
-            try:
-                return CFIBounds(**self.CFROI, image=pixel_array)
-            except Exception as e:
-                raise ValueError(
-                    f"Error with image {self.ImageInstanceID} with CFROI {self.CFROI}"
-                ) from e
+            return CFIBounds(**self.roi)
+
+    @property
+    def _attrs_keypoints(self):
+        _, attrs = self.attrs
+        if "CFI_Keypoints" in attrs:
+            kps = attrs["CFI_Keypoints"]["CFI_Keypoints"]
+            bounds = self.bounds
+            kps["prep_fovea_xy"] = (
+                bounds.get_cropping_transform(1024)
+                .apply([[kps["fovea_xy"][0], kps["fovea_xy"][1]]])[0]
+                .tolist()
+            )
+            kps["prep_disc_edge_xy"] = (
+                bounds.get_cropping_transform(1024)
+                .apply([[kps["disc_edge_xy"][0], kps["disc_edge_xy"][1]]])[0]
+                .tolist()
+            )
+            return kps
+        return None
+
+    @property
+    def keypoints(self):
+        if self.CFKeypoints is not None:
+            return self.CFKeypoints
+        return self._attrs_keypoints
+
+    @property
+    def quality(self):
+        if self.CFQuality is not None:
+            return self.CFQuality
+        _, attrs = self.attrs
+        if "CFI_Quality" in attrs:
+            return attrs["CFI_Quality"]["CFI_Quality"]
+        return None
 
     def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
         if self.bounds is None:
@@ -798,49 +837,6 @@ class ImageInstance(AttributeValueLookupMixin, Base):
                 attrs_flat[attr_def.AttributeName] = value
 
         return attrs_flat, attrs_by_model
-
-
-@event.listens_for(ImageInstance, "before_insert")
-def _image_instance_set_public_id(mapper, connection, target) -> None:
-    if target.PublicID:
-        return
-
-    # Retry ID generation until we find one that is not yet used.
-    for _ in range(10):
-        target.PublicID = _make_public_id()
-        if not connection.scalar(
-            select(ImageInstance.PublicID).where(
-                ImageInstance.PublicID == target.PublicID
-            )
-        ):
-            break
-    else:
-        raise ValueError("Failed to generate a unique public ID")
-
-
-def _warn_deprecated_imageinstance_attr(message: str):
-    def _listener(target, value, oldvalue, initiator):
-        warnings.warn(message, DeprecationWarning, stacklevel=3)
-        return value
-
-    return _listener
-
-
-_DEPRECATED_IMAGEINSTANCE_ATTRS = {
-    "DatasetIdentifier": "ImageInstance.DatasetIdentifier is deprecated. Use ImageStorages instead.",
-    "AltDatasetIdentifier": "ImageInstance.AltDatasetIdentifier is deprecated. Use ImageStorages instead.",
-    "ThumbnailPath": "ImageInstance.ThumbnailPath is deprecated and will be removed in a future release.",
-    "OldPath": "ImageInstance.OldPath is deprecated and will be removed in a future release.",
-    "FDAIdentifier": "ImageInstance.FDAIdentifier is deprecated and will be removed in a future release.",
-}
-
-for _attr_name, _message in _DEPRECATED_IMAGEINSTANCE_ATTRS.items():
-    event.listen(
-        getattr(ImageInstance, _attr_name),
-        "set",
-        _warn_deprecated_imageinstance_attr(_message),
-        retval=True,
-    )
 
 
 class DeviceModel(Base):

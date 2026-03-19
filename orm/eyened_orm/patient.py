@@ -2,7 +2,6 @@ import enum
 from datetime import date, datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -14,7 +13,6 @@ if TYPE_CHECKING:
         Annotation,
         AttributeValue,
         FormAnnotation,
-        ImageInstance,
         Project,
         Study,
     )
@@ -101,19 +99,3 @@ class Patient(Base):
         return next(
             (study for study in self.Studies if study.StudyDate == study_date), None
         )
-
-    def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
-        from eyened_orm import ImageInstance, Series, Study
-
-        session = Session.object_session(self)
-        q = (
-            select(ImageInstance)
-            .join(Series)
-            .join(Study)
-            .where(Study.PatientID == self.PatientID)
-        )
-        if not include_inactive:
-            q = q.where(~ImageInstance.Inactive)
-        if where is not None:
-            q = q.where(where)
-        return session.scalars(q).all()
