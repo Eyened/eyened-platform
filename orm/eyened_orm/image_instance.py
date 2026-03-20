@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,7 @@ import SimpleITK as sitk
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
 from rtnls_fundusprep.transformation import ProjectiveTransform
-from sqlalchemy import ForeignKey, Index, String, func, select
+from sqlalchemy import event, ForeignKey, Index, String, func, select
 from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import CHAR
@@ -32,7 +33,7 @@ BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 BASE36_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
-def _make_public_id(length: int = 8, alphabet: str = BASE36_ALPHABET) -> str:
+def _make_public_id(length: int = 12, alphabet: str = BASE36_ALPHABET) -> str:
     """
     Generates a randomPublicID. Used to identify the image in the API.
     """
@@ -160,6 +161,11 @@ class ImageStorage(Base):
     # This is currently not enforced in the database however
     IsPrimary: Mapped[bool] = mapped_column(default=True)
 
+    # Datetimes - automatically filled
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+
+
     ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="ImageStorages"
     )
@@ -194,19 +200,13 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             "SOPInstanceUid",
             unique=True,
         ),
-        Index(
-            "SourceInfoIDDatasetIdentifier_UNIQUE",
-            "DatasetIdentifier",
-            "SourceInfoID",
-            unique=True,
-        ),
     )
 
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
     # The public identifier of the image
     # This is used to identify the image in the API
     PublicID: Mapped[str] = mapped_column(
-        CHAR(8),
+        CHAR(12),
         unique=True,
         nullable=False,
     )
@@ -839,6 +839,49 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return attrs_flat, attrs_by_model
 
 
+@event.listens_for(ImageInstance, "before_insert")
+def _image_instance_set_public_id(mapper, connection, target) -> None:
+    if target.PublicID:
+        return
+
+    # Retry ID generation until we find one that is not yet used.
+    for _ in range(10):
+        target.PublicID = _make_public_id()
+        if not connection.scalar(
+            select(ImageInstance.PublicID).where(
+                ImageInstance.PublicID == target.PublicID
+            )
+        ):
+            break
+    else:
+        raise ValueError("Failed to generate a unique public ID")
+
+
+def _warn_deprecated_imageinstance_attr(message: str):
+    def _listener(target, value, oldvalue, initiator):
+        warnings.warn(message, DeprecationWarning, stacklevel=3)
+        return value
+
+    return _listener
+
+
+_DEPRECATED_IMAGEINSTANCE_ATTRS = {
+    "DatasetIdentifier": "ImageInstance.DatasetIdentifier is deprecated. Use ImageStorages instead.",
+    "AltDatasetIdentifier": "ImageInstance.AltDatasetIdentifier is deprecated. Use ImageStorages instead.",
+    "ThumbnailPath": "ImageInstance.ThumbnailPath is deprecated and will be removed in a future release.",
+    "OldPath": "ImageInstance.OldPath is deprecated and will be removed in a future release.",
+    "FDAIdentifier": "ImageInstance.FDAIdentifier is deprecated and will be removed in a future release.",
+}
+
+for _attr_name, _message in _DEPRECATED_IMAGEINSTANCE_ATTRS.items():
+    event.listen(
+        getattr(ImageInstance, _attr_name),
+        "set",
+        _warn_deprecated_imageinstance_attr(_message),
+        retval=True,
+    )
+
+
 class DeviceModel(Base):
     __tablename__ = "DeviceModel"
     __table_args__ = (
@@ -904,7 +947,7 @@ class SourceInfo(Base):
     SourceName: Mapped[str] = mapped_column(String(64), unique=True)
 
     SourcePath: Mapped[str] = mapped_column(String(250), unique=True)
-    ThumbnailPath: Mapped[str] = mapped_column(String(250), unique=True)
+    ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(250), unique=True, nullable=True)
 
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo"
