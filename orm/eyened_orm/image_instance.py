@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,7 @@ import SimpleITK as sitk
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
 from rtnls_fundusprep.transformation import ProjectiveTransform
-from sqlalchemy import ForeignKey, Index, String, func, select
+from sqlalchemy import event, ForeignKey, Index, String, func, select
 from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import CHAR
@@ -837,6 +838,49 @@ class ImageInstance(AttributeValueLookupMixin, Base):
                 attrs_flat[attr_def.AttributeName] = value
 
         return attrs_flat, attrs_by_model
+
+
+@event.listens_for(ImageInstance, "before_insert")
+def _image_instance_set_public_id(mapper, connection, target) -> None:
+    if target.PublicID:
+        return
+
+    # Retry ID generation until we find one that is not yet used.
+    for _ in range(10):
+        target.PublicID = _make_public_id()
+        if not connection.scalar(
+            select(ImageInstance.PublicID).where(
+                ImageInstance.PublicID == target.PublicID
+            )
+        ):
+            break
+    else:
+        raise ValueError("Failed to generate a unique public ID")
+
+
+def _warn_deprecated_imageinstance_attr(message: str):
+    def _listener(target, value, oldvalue, initiator):
+        warnings.warn(message, DeprecationWarning, stacklevel=3)
+        return value
+
+    return _listener
+
+
+_DEPRECATED_IMAGEINSTANCE_ATTRS = {
+    "DatasetIdentifier": "ImageInstance.DatasetIdentifier is deprecated. Use ImageStorages instead.",
+    "AltDatasetIdentifier": "ImageInstance.AltDatasetIdentifier is deprecated. Use ImageStorages instead.",
+    "ThumbnailPath": "ImageInstance.ThumbnailPath is deprecated and will be removed in a future release.",
+    "OldPath": "ImageInstance.OldPath is deprecated and will be removed in a future release.",
+    "FDAIdentifier": "ImageInstance.FDAIdentifier is deprecated and will be removed in a future release.",
+}
+
+for _attr_name, _message in _DEPRECATED_IMAGEINSTANCE_ATTRS.items():
+    event.listen(
+        getattr(ImageInstance, _attr_name),
+        "set",
+        _warn_deprecated_imageinstance_attr(_message),
+        retval=True,
+    )
 
 
 class DeviceModel(Base):

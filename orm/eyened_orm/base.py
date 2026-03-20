@@ -1,6 +1,6 @@
 import enum
 import re
-from collections.abc import Iterable
+from collections.abc import Hashable, Iterable
 from typing import (
     Any,
     ClassVar,
@@ -13,9 +13,17 @@ from typing import (
 )
 
 from sqlalchemy import Column, Index, UniqueConstraint, select
-from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute, Session
+from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute, Session, lazyload
 
 from eyened_orm.utils.table_printer import TablePrinter
+
+
+def _many(x):
+    if x is None:
+        return ()
+    if isinstance(x, (list, tuple)):
+        return tuple(x)
+    return (x,)
 
 
 def _convert_property_name(name: str) -> str:
@@ -54,6 +62,7 @@ def _get_attribute_with_conversion(obj, name: str) -> Any:
 
 
 T = TypeVar("T", bound="Base")
+PK = TypeVar("PK", bound=Hashable)
 
 
 def ForeignKeyIndex(src_table: str, ref_table: str, column_name: str) -> Index:
@@ -86,12 +95,12 @@ class Base(DeclarativeBase):
         return _get_attribute_with_conversion(self, name)
 
     @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional[T]:
+    def by_name(cls, session: Session, name: str, lazy: bool = False) -> Optional[T]:
         """Find an object by its name column value."""
         if cls._name_column is None:
             raise AttributeError(f"{cls.__name__} has no name column")
         kwargs = {cls._name_column: name}
-        return cls.by_column(session, **kwargs)
+        return cls.by_column(session, lazy=lazy, **kwargs)
 
     @classmethod
     def fetch_all(
@@ -99,9 +108,12 @@ class Base(DeclarativeBase):
         session: Session,
         limit: int | None = None,
         offset: int | None = None,
+        lazy: bool = False,
     ) -> List[T]:
         """Return all objects of the table."""
         stmt = select(cls)
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
         if limit is not None:
             stmt = stmt.limit(limit)
         if offset is not None:
@@ -154,23 +166,40 @@ class Base(DeclarativeBase):
         return pks[0]
 
     @classmethod
-    def by_id(cls: type[T], session: Session, id: int) -> Optional[T]:
+    def by_id(cls: type[T], session: Session, id: PK, lazy: bool = False) -> Optional[T]:
         """Get object by single-column primary key."""
         pk_col = cls.primary_key()
         stmt = select(cls).where(pk_col == id)
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
         return session.scalar(stmt)
 
     @classmethod
-    def by_ids(cls: Type[T], session: Session, ids: List[int]) -> List[T]:
+    def by_ids(cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False) -> List[T]:
         """Fetch objects by single-column primary key."""
-        if not ids:
+        ids_set = set(ids)
+        if not ids_set:
             return []
         pk_col = cls.primary_key()
-        stmt = select(cls).where(pk_col.in_(set(ids)))
+        stmt = select(cls).where(pk_col.in_(ids_set))
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
         return session.scalars(stmt).all()
 
     @classmethod
-    def by_pk(cls: type[T], session: Session, pk: int | tuple) -> Optional[T]:
+    def by_ids_dict(cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False) -> Dict[PK, T]:
+        """Fetch objects by single-column primary key."""
+        ids_set = set(ids)
+        if not ids_set:
+            return {}
+        pk_col = cls.primary_key()
+        stmt = select(pk_col, cls).where(pk_col.in_(ids_set))
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
+        return {id: obj for id, obj in session.execute(stmt).all()}
+
+    @classmethod
+    def by_pk(cls: type[T], session: Session, pk: Any | tuple, lazy: bool = False) -> Optional[T]:
         """Generic lookup by primary key (supports single or composite keys via tuple)."""
         pks = cls.primary_keys()
 
@@ -185,7 +214,59 @@ class Base(DeclarativeBase):
 
         conditions = [col == val for col, val in zip(pks, pk)]
         stmt = select(cls).where(*conditions)
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
         return session.scalar(stmt)
+
+    @classmethod
+    def query(
+        cls,
+        session: Session,
+        *,
+        columns=(),
+        joins=(),
+        where=(),
+        order_by=(),
+        lazy: bool = False,
+        include_inactive: bool = False,
+        as_mappings: bool = False,
+    ):
+        """
+        Query objects from the table with optional joins, filtering, and ordering.
+
+        Args:
+            session: SQLAlchemy session.
+            columns: List of columns to select from the table.
+            joins: List of joins to apply to the query.
+            where: List of where conditions to apply to the query.
+            order_by: List of order by conditions to apply to the query.
+            lazy: If True, use lazy loading for the query (avoids expensive select_in joins).
+            include_inactive: If True, include inactive objects in the query.
+            as_mappings: If True, return the query as a list of dictionaries.
+
+        Returns:
+            List of objects.
+
+        """
+        cols = tuple(_many(columns))
+        stmt = select(*cols).select_from(cls) if cols else select(cls)
+        if lazy and not cols:  # lazyload("*") only meaningful for ORM entity loads
+            # this avoids expensive select_in joins
+            stmt = stmt.options(lazyload("*"))
+        for j in _many(joins):
+            stmt = stmt.join(j)
+        if not include_inactive and hasattr(cls, "Inactive"):
+            stmt = stmt.where(~cls.Inactive)
+        stmt = stmt.where(*_many(where))
+        stmt = stmt.order_by(*_many(order_by))
+        if not cols:
+            return session.scalars(stmt).all()
+        result = session.execute(stmt)
+        if as_mappings:
+            return result.mappings().all()  # list[RowMapping]
+        if len(cols) == 1:
+            return result.scalars().all()  # list[value]
+        return result.all()  # list[tuple]
 
     @classmethod
     def name_to_id(cls, session: Session) -> dict[str, int]:
@@ -216,21 +297,24 @@ class Base(DeclarativeBase):
         return conditions
 
     @classmethod
-    def _build_where_stmt(cls, **kwargs):
+    def _build_where_stmt(cls, lazy: bool = False, **kwargs):
         """Build a select statement with where conditions from kwargs.
 
         Automatically uses in_ operator for iterable values (list, tuple, set) but not strings.
         """
         conditions = cls._build_conditions(**kwargs)
-        return select(cls).where(*conditions)
+        stmt = select(cls).where(*conditions)
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
+        return stmt
 
     @classmethod
-    def by_column(cls: type[T], session: Session, **kwargs) -> Optional[T]:
+    def by_column(cls: type[T], session: Session, lazy: bool = False, **kwargs) -> Optional[T]:
         """Generic method to query by any column."""
-        return session.scalar(cls._build_where_stmt(**kwargs))
+        return session.scalar(cls._build_where_stmt(lazy=lazy, **kwargs))
 
     @classmethod
-    def by_columns(cls: type[T], session: Session, **kwargs) -> List[T]:
+    def by_columns(cls: type[T], session: Session, lazy: bool = False, **kwargs) -> List[T]:
         """
         Generic method to query by any columns.
 
@@ -240,7 +324,7 @@ class Base(DeclarativeBase):
             >>> AttributeValue.by_columns(session, ModelID=32, ImageInstanceID=selected_images)
             # Uses: ModelID == 32 AND ImageInstanceID.in_(selected_images)
         """
-        return session.scalars(cls._build_where_stmt(**kwargs)).all()
+        return session.scalars(cls._build_where_stmt(lazy=lazy, **kwargs)).all()
 
     @classmethod
     def select(
@@ -416,10 +500,12 @@ class Base(DeclarativeBase):
 
     @classmethod
     def where(
-        cls: Type[T], session: Session, condition, include_inactive=False, **kwargs
+        cls: Type[T], session: Session, condition, include_inactive=False, lazy: bool = False, **kwargs
     ) -> List[T]:
         """Query objects with a custom condition and optional joins."""
         statement = select(cls)
+        if lazy:
+            statement = statement.options(lazyload("*"))
 
         if not include_inactive and hasattr(cls, "Inactive"):
             statement = statement.where(~cls.Inactive)
