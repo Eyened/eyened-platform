@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { EventName } from "./viewer-utils";
+    import type { EventName, ViewerModifiers, ViewerWheelData } from "./viewer-utils";
     import type { ViewerContext } from "./viewerContext.svelte";
     import { getContext, onDestroy, onMount } from "svelte";
     import { ViewerWindowContext } from "$lib/viewer-window/viewerWindowContext.svelte";
@@ -52,13 +52,73 @@
     };
 
     let pointerDown = false;
+    let modifierState: ViewerModifiers = {
+        shift: false,
+        ctrl: false,
+        alt: false,
+        meta: false,
+    };
+
+    function wheelDeltaToPixels(event: WheelEvent, value: number): number {
+        switch (event.deltaMode) {
+            case WheelEvent.DOM_DELTA_LINE:
+                return value * 16;
+            case WheelEvent.DOM_DELTA_PAGE:
+                return value * window.innerHeight;
+            default:
+                return value;
+        }
+    }
+
+    function buildModifiers(event: Event): ViewerModifiers {
+        const eventWithModifiers = event as KeyboardEvent | MouseEvent | WheelEvent | PointerEvent;
+        if (typeof eventWithModifiers.shiftKey === "boolean") {
+            return {
+                shift: modifierState.shift || eventWithModifiers.shiftKey,
+                ctrl: modifierState.ctrl || eventWithModifiers.ctrlKey,
+                alt: modifierState.alt || eventWithModifiers.altKey,
+                meta: modifierState.meta || eventWithModifiers.metaKey,
+            };
+        }
+        return modifierState;
+    }
+
+    function buildWheelData(event: WheelEvent, modifiers: ViewerModifiers): ViewerWheelData {
+        const deltaXPx = wheelDeltaToPixels(event, event.deltaX);
+        const deltaYPx = wheelDeltaToPixels(event, event.deltaY);
+        const primaryDeltaPx = Math.abs(deltaYPx) > 0.001 ? deltaYPx : deltaXPx;
+        return {
+            deltaXPx,
+            deltaYPx,
+            primaryDeltaPx,
+            zoomIntent: modifiers.shift || modifiers.ctrl || modifiers.meta,
+        };
+    }
+
+    function updateModifierState(event: KeyboardEvent, value: boolean) {
+        if (event.key === "Shift") modifierState.shift = value;
+        if (event.key === "Control") modifierState.ctrl = value;
+        if (event.key === "Alt") modifierState.alt = value;
+        if (event.key === "Meta") modifierState.meta = value;
+    }
+
+    function resetModifierState() {
+        modifierState = { shift: false, ctrl: false, alt: false, meta: false };
+    }
+
     function forwardEvent(eventName: EventName, event: Event) {
         const position = viewerContext.viewerToImageCoordinates(cursor);
+        const modifiers = buildModifiers(event);
+        const wheel = event instanceof WheelEvent
+            ? buildWheelData(event, modifiers)
+            : undefined;
         viewerContext.forwardEvent(eventName, {
             event,
             viewerContext,
             cursor,
             position,
+            modifiers,
+            wheel,
         });
     }
 
@@ -72,6 +132,7 @@
         if (!pointerDown) {
             viewerContext.active = false;
         }
+        resetModifierState();
         forwardEvent("pointerleave", e);
     }
 
@@ -90,10 +151,12 @@
     }
 
     function onkeydown(e: KeyboardEvent) {
+        updateModifierState(e, true);
         forwardEvent("keydown", e);
     }
 
     function onkeyup(e: KeyboardEvent) {
+        updateModifierState(e, false);
         forwardEvent("keyup", e);
     }
 
@@ -115,6 +178,10 @@
 
     function oncontextmenu(e: MouseEvent) {
         e.preventDefault();
+    }
+
+    function onblur() {
+        resetModifierState();
     }
 
     let index = $state({
@@ -143,6 +210,7 @@
         {ondblclick}
         {onkeydown}
         {onkeyup}
+        {onblur}
         {oncontextmenu}
     ></div>
 

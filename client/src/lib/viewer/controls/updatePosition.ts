@@ -5,7 +5,7 @@ export class UpdatePosition implements ViewerEventListener {
     constructor() { }
 
     pointermove(e: ViewerEvent<PointerEvent>) {
-        if (e.event.shiftKey) return;
+        if (e.modifiers.shift) return;
         const { viewerContext, viewerContext: { registration, image, index }, cursor } = e;
 
         if (!viewerContext.updatePosition) {

@@ -38,11 +38,11 @@ export class BrushTool extends SegmentationTool {
 
 
 	pointerdown(e: ViewerEvent<PointerEvent>) {
-		const { event, position, viewerContext } = e;
+		const { event, position, viewerContext, modifiers } = e;
 
 		this.lastPosition = position;
 
-		if (event.altKey || event.shiftKey) return;
+		if (modifiers.alt || modifiers.shift) return;
 
 		if (event.button === 0) this.drawingState = 'paint';
 		else if (event.button === 2) this.drawingState = 'erase';
@@ -58,9 +58,9 @@ export class BrushTool extends SegmentationTool {
 
 
 	pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
-		const { event, position, viewerContext } = pointerEvent;
+		const { position, viewerContext, modifiers } = pointerEvent;
 
-		if (event.altKey) {
+		if (modifiers.alt) {
 			return;
 		} else {
 			this.lastPosition = position;
