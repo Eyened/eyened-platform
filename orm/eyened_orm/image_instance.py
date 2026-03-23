@@ -33,7 +33,7 @@ BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 BASE36_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
-def _make_public_id(length: int = 8, alphabet: str = BASE36_ALPHABET) -> str:
+def _make_public_id(length: int = 12, alphabet: str = BASE36_ALPHABET) -> str:
     """
     Generates a randomPublicID. Used to identify the image in the API.
     """
@@ -161,6 +161,11 @@ class ImageStorage(Base):
     # This is currently not enforced in the database however
     IsPrimary: Mapped[bool] = mapped_column(default=True)
 
+    # Datetimes - automatically filled
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+
+
     ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="ImageStorages"
     )
@@ -195,19 +200,13 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             "SOPInstanceUid",
             unique=True,
         ),
-        Index(
-            "SourceInfoIDDatasetIdentifier_UNIQUE",
-            "DatasetIdentifier",
-            "SourceInfoID",
-            unique=True,
-        ),
     )
 
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
     # The public identifier of the image
     # This is used to identify the image in the API
     PublicID: Mapped[str] = mapped_column(
-        CHAR(8),
+        CHAR(12),
         unique=True,
         nullable=False,
     )
@@ -948,7 +947,7 @@ class SourceInfo(Base):
     SourceName: Mapped[str] = mapped_column(String(64), unique=True)
 
     SourcePath: Mapped[str] = mapped_column(String(250), unique=True)
-    ThumbnailPath: Mapped[str] = mapped_column(String(250), unique=True)
+    ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(250), unique=True, nullable=True)
 
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo"
