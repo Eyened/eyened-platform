@@ -1,3 +1,7 @@
+Target database: root@eyened-gpu:23308/eyened_database. Proceed? [y/N] -- Running upgrade a231a5374a36 -> 7b36f07198ee
+
+ALTER TABLE `ImageInstance` MODIFY `PublicID` CHAR(12) NOT NULL;
+
 DROP INDEX `SourceInfoIDDatasetIdentifier_UNIQUE` ON `ImageInstance`;
 
 ALTER TABLE `ImageStorage`
@@ -7,8 +11,8 @@ ALTER TABLE `ImageStorage`
 ADD COLUMN `DateModified` DATETIME
 DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
+
 ALTER TABLE `SourceInfo` MODIFY `ThumbnailPath` VARCHAR(250) NULL;
 
-UPDATE alembic_version SET version_num='2e6c7213bd90' WHERE alembic_version.version_num = 'a231a5374a36';
-
+UPDATE alembic_version SET version_num='7b36f07198ee' WHERE alembic_version.version_num = 'a231a5374a36';
 
