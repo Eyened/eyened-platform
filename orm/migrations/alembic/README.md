@@ -1,4 +1,4 @@
-# Alembic migrations
+` # Alembic migrations
 
 Alembic reads database settings from the environment. You can pass a specific
 env file like this:
