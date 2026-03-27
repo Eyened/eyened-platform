@@ -15,12 +15,6 @@
 
 ## 1. Configure Settings and Secrets
 - Copy `sample.env` to `.env` and fill out the required values.
-- Ensure these are set:
-  - `EYENED_API_SECRET_KEY` (JWT signing key)
-  - `EYENED_DATABASE_*` (host, port, password; must match docker-compose)
-  - `DEV_*` ports (nginx, server, client, adminer)
-  - `EYENED_ROUTING_CONFIG=dev/nginx.conf`
-- Update `nginx.conf` and `docker-compose.yml` volume paths with your storage roots.
 
 ## 2. Start Docker Services
 - [Optional] You may want to update the name in docker-compose.yml
