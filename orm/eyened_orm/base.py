@@ -15,6 +15,7 @@ from typing import (
 from sqlalchemy import Column, Index, UniqueConstraint, select
 from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute, Session, lazyload
 
+from eyened_orm.display_meta import EyeNedDeclarativeDisplayMeta
 from eyened_orm.utils.table_printer import TablePrinter
 
 
@@ -75,7 +76,7 @@ def CompositeUniqueConstraint(name: str, *column_names: str) -> UniqueConstraint
     return UniqueConstraint(*column_names, name=name)
 
 
-class Base(DeclarativeBase):
+class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
     """SQLAlchemy Declarative base with common helpers and utilities."""
 
     _name_column: ClassVar[str | None] = None

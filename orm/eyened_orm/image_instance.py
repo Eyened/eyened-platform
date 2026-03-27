@@ -201,6 +201,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             unique=True,
         ),
     )
+    _name_column = "PublicID"
 
     ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
     # The public identifier of the image
