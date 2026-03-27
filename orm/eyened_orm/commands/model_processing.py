@@ -388,7 +388,7 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
 #             h, w = arr.shape
 #             m = get_model_segmentation(instance_id, model_id, h=h, w=w)
 #             try:
-                
+
 #                 if np.any(arr >= 0.5):
 #                     # convert float (0-1) to uint8 (0-255) for Datatype.R8
 #                     data = (255 * arr).astype(np.uint8)
@@ -425,20 +425,6 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
     "--project", type=int, required=False, help="Project ID to run registration for"
 )
 @click.option(
-    "--schema",
-    type=str,
-    required=False,
-    default="RegistrationSet",
-    help="SchemaName to run registration for",
-)
-@click.option(
-    "--creator",
-    type=str,
-    required=False,
-    default="registration model",
-    help="CreatorName to run registration for",
-)
-@click.option(
     "--replace",
     is_flag=True,
     required=False,
@@ -454,11 +440,11 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
         "(e.g. --skip 1811325,1811324,1811323)"
     ),
 )
-def run_registration(patient, project, schema, creator, replace, skip):
+def run_registration(patient, project, replace, skip):
     """Run registration processing for patients."""
-    from eyened_orm import Patient, FormSchema, Creator
+    from eyened_orm import Patient, AttributeDefinition, AttributesModel
     from eyened_orm.utils.registration import run_patient
-    import json
+    import rtnls_registration
 
     # Parse skip list from comma-separated string
     skip_ids = None
@@ -472,29 +458,22 @@ def run_registration(patient, project, schema, creator, replace, skip):
 
     database = get_database()
     with database.get_session() as session:
-
-        # Get or create schema - load JSON file if creating
-        schema_name = schema
-        schema_path = (
-            Path(__file__).resolve().parents[1] / "utils" / "registration_schema.json"
-        )
-        with open(schema_path, "r") as f:
-            schema_dict = json.load(f)
-        schema = FormSchema.get_or_create(
+        definition = AttributeDefinition.get_or_create(
             session,
-            match_by={"SchemaName": schema_name},
-            create_kwargs={"SchemaName": schema_name, "Schema": schema_dict},
-            verbose=True,
+            match_by={"AttributeName": "Registration"},
+            create_kwargs={"AttributeDataType": "JSON"},
+        )
+        model = AttributesModel.get_or_create(
+            session,
+            match_by={
+                "ModelName": "retinalysis-registration",
+                "Version": rtnls_registration.__version__,
+            },
+            create_kwargs={
+                "Description": "Pairwise image registration for CFI, AF and IR"
+            },
         )
 
-        # Get or create creator
-        creator_name = creator
-        creator = Creator.get_or_create(
-            session,
-            match_by={"CreatorName": creator_name},
-            create_kwargs={"CreatorName": creator_name, "IsHuman": True},
-            verbose=True,
-        )
         if patient:
             patients = Patient.by_column(session, PatientIdentifier=patient)
         elif project:
@@ -502,7 +481,7 @@ def run_registration(patient, project, schema, creator, replace, skip):
         else:
             raise ValueError("No patient or project provided")
         for patient in patients:
-            run_patient(session, patient, schema, creator, replace, skip_ids)
+            run_patient(session, patient, definition, model, replace, skip_ids)
 
 
 model_commands = [

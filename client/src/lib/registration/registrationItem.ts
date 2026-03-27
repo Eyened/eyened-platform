@@ -14,7 +14,7 @@ export interface RegistrationItem {
 
 export type mappingFunction = (from: Position) => Position | undefined;
 
-interface RegistrationSet {
+export interface RegistrationSet {
     image1: string;
     image2: string;
     transform: Transform;

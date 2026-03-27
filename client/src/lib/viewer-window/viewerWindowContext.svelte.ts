@@ -1,5 +1,5 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { fetchInstance, fetchFormAnnotations } from "$lib/data/api";
+import { fetchInstance, fetchFormAnnotations, fetchPatient } from "$lib/data/api";
 import { instances } from "$lib/data/stores.svelte";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
@@ -93,6 +93,24 @@ export class ViewerWindowContext {
                     .filter((pid) => !this.loadedPatientIds.has(pid))
                     .map(async (pid) => {
                         await fetchFormAnnotations({ patient_id: pid });
+
+                        const patient = await fetchPatient(pid, {
+                            include_attributes: true,
+                        });
+                        for (const instanceId of ids) {
+                            const instance = instances.get(instanceId);
+                            if (!instance || instance.patient.id !== pid) {
+                                continue;
+                            }
+                            instances.set(instanceId, {
+                                ...instance,
+                                patient: {
+                                    ...instance.patient,
+                                    attrs: patient.attrs ?? {},
+                                },
+                            } as ImageGET);
+                        }
+
                         this.loadedPatientIds.add(pid);
                     })
             );

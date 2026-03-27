@@ -13,6 +13,7 @@ from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
 from .dtos_instances import (
     DeviceMeta,
     ImageGET,
+    PatientDetailGET,
     PatientGET,
     PatientMeta,
     ProjectGET,
@@ -92,6 +93,34 @@ class DTOConverter:
             identifier=patient.PatientIdentifier or "",
             birth_date=patient.BirthDate,
             sex=patient.Sex,
+        )
+
+    @staticmethod
+    def patient_to_detail_get(
+        patient: "Patient", include_attributes: bool = True
+    ) -> PatientDetailGET:
+        """Convert Patient ORM object to PatientDetailGET."""
+        attrs = {}
+        if include_attributes:
+            for av in getattr(patient, "AttributeValues", []) or []:
+                attr_def = getattr(av, "AttributeDefinition", None)
+                if not attr_def:
+                    continue
+                try:
+                    attrs[attr_def.AttributeName] = av.value
+                except Exception:
+                    continue
+
+        return PatientDetailGET(
+            id=patient.PatientID,
+            identifier=patient.PatientIdentifier or "",
+            birth_date=patient.BirthDate,
+            sex=patient.Sex,
+            project=ProjectMeta(
+                id=patient.Project.ProjectID,
+                name=patient.Project.ProjectName,
+            ),
+            attrs=attrs,
         )
 
     @staticmethod

@@ -1,8 +1,7 @@
 from collections import defaultdict, deque
-from pathlib import Path
-
-from eyened_orm import Creator, FormAnnotation, FormSchema, ImageInstance
+from eyened_orm import ImageInstance, AttributeValue
 from rtnls_registration import Registration
+
 
 def get_processed_edges(formAnnotation):
     if formAnnotation.FormData:
@@ -130,19 +129,19 @@ def run_registration_patient(patient, formAnnotation, skip_ids=None):
     print(
         f"Running registration for patient {patient.PatientID} {patient.PatientIdentifier}"
     )
-    
+
     # Build the where clause to filter by modality and exclude skipped images
     modality_filter = ImageInstance.Modality.in_(
         ["ColorFundus", "InfraredReflectance", "Autofluorescence"]
     )
-    
+
     if skip_ids:
         skip_filter = ~ImageInstance.ImageInstanceID.in_(skip_ids)
         where_clause = modality_filter & skip_filter
         print(f"Skipping {len(skip_ids)} imageInstanceIDs: {skip_ids}")
     else:
         where_clause = modality_filter
-    
+
     enface_images = patient.get_images(where=where_clause)
     print(f"Found {len(enface_images)} enface images")
     graph = get_processed_edges(formAnnotation)
@@ -151,7 +150,9 @@ def run_registration_patient(patient, formAnnotation, skip_ids=None):
     all_transforms = [*formAnnotation.FormData] if formAnnotation.FormData else []
     for eye in "RL":
 
-        eye_images = [i for i in enface_images if i.Laterality and i.Laterality.name == eye]
+        eye_images = [
+            i for i in enface_images if i.Laterality and i.Laterality.name == eye
+        ]
 
         # split images into F1 and F2
         sorted_images = sort_images(eye_images)
@@ -169,7 +170,6 @@ def run_registration_patient(patient, formAnnotation, skip_ids=None):
             register_f2, reference_f2 = run_registration(
                 sorted_images["F2"], graph, all_transforms
             )
-
 
         if (
             register_f1
@@ -202,26 +202,20 @@ def run_registration_patient(patient, formAnnotation, skip_ids=None):
     return all_transforms
 
 
-def run_patient(session, patient, schema, creator, replace, skip_ids=None):
-    formAnnotation = FormAnnotation.get_or_create(
+def run_patient(session, patient, definition, model, replace, skip_ids=None):
+    attribute_value = AttributeValue.get_or_create(
         session,
         match_by={
-            "FormSchemaID": schema.FormSchemaID,
-            "CreatorID": creator.CreatorID,
+            "AttributeID": definition.AttributeID,
+            "ModelID": model.ModelID,
             "PatientID": patient.PatientID,
-        },
-        create_kwargs={
-            "FormSchemaID": schema.FormSchemaID,
-            "CreatorID": creator.CreatorID,
-            "PatientID": patient.PatientID,
-            "FormData": [],
         },
     )
     if replace:
-        formAnnotation.FormData = []
+        attribute_value.ValueJSON = []
 
-    all_transforms = run_registration_patient(patient, formAnnotation, skip_ids)
-    formAnnotation.FormData = all_transforms
+    all_transforms = run_registration_patient(patient, attribute_value, skip_ids)
+    attribute_value.ValueJSON = all_transforms
 
-    session.add(formAnnotation)
+    session.add(attribute_value)
     session.commit()

@@ -161,6 +161,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/images/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Image */
+        get: operations["get_public_image_images__image_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{image_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Image Data */
+        get: operations["get_public_image_data_images__image_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{image_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Image Thumbnail */
+        get: operations["get_public_image_thumbnail_images__image_id__thumbnail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instances/images/{dataset_identifier}": {
         parameters: {
             query?: never;
@@ -342,7 +393,8 @@ export interface paths {
         };
         /** Get Model Segmentation Data */
         get: operations["get_model_segmentation_data_model_segmentations__model_segmentation_id__data_get"];
-        put?: never;
+        /** Update Model Segmentation Data */
+        put: operations["update_model_segmentation_data_model_segmentations__model_segmentation_id__data_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -902,6 +954,23 @@ export interface paths {
         patch: operations["patch_study_tag_studies__study_id__tags__tag_id__patch"];
         trace?: never;
     };
+    "/patients/{patient_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Patient */
+        get: operations["get_patient_patients__patient_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1128,7 +1197,9 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Schema */
-            schema?: Record<string, never> | null;
+            schema?: {
+                [key: string]: unknown;
+            } | null;
             entity_type?: components["schemas"]["EntityType"] | null;
             /** Id */
             id: number;
@@ -1137,6 +1208,80 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** ImageGET */
+        ImageGET: {
+            /** Sop Instance Uid */
+            sop_instance_uid: string;
+            /** Data Format */
+            data_format: string;
+            /** Data Source Id */
+            data_source_id?: string | null;
+            modality?: components["schemas"]["Modality"] | null;
+            dicom_modality?: components["schemas"]["ModalityType"] | null;
+            etdrs_field?: components["schemas"]["ETDRSField"] | null;
+            /** Angio Graphy */
+            angio_graphy: string;
+            laterality?: components["schemas"]["Laterality"] | null;
+            /** Anatomic Region */
+            anatomic_region: string;
+            /** Rows */
+            rows: number;
+            /** Columns */
+            columns: number;
+            /** Nr Of Frames */
+            nr_of_frames: number;
+            /** Resolution Horizontal */
+            resolution_horizontal: number;
+            /** Resolution Vertical */
+            resolution_vertical: number;
+            /** Resolution Axial */
+            resolution_axial: number;
+            /** Cf Roi */
+            cf_roi?: {
+                [key: string]: unknown;
+            } | null;
+            /** Cf Keypoints */
+            cf_keypoints?: {
+                [key: string]: unknown;
+            } | null;
+            /** Cf Quality */
+            cf_quality?: number | null;
+            /**
+             * Date Inserted
+             * Format: date-time
+             */
+            date_inserted: string;
+            /** Date Modified */
+            date_modified?: string | null;
+            /** Date Preprocessed */
+            date_preprocessed?: string | null;
+            /** Id */
+            id: string;
+            project: components["schemas"]["ProjectMeta"];
+            patient: components["schemas"]["PatientMeta"];
+            study: components["schemas"]["StudyMeta"];
+            series: components["schemas"]["SeriesMeta"];
+            device: components["schemas"]["DeviceMeta"];
+            scan: components["schemas"]["ScanMeta"];
+            /** Tags */
+            tags: components["schemas"]["TagMeta"][];
+            /** Segmentations */
+            segmentations?: components["schemas"]["SegmentationGET"][] | null;
+            /** Model Segmentations */
+            model_segmentations?: components["schemas"]["ModelSegmentationGET"][] | null;
+            /** Form Annotations */
+            form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
+            /** Model Attrs */
+            model_attrs: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Attrs */
+            attrs: {
+                [key: string]: unknown;
+            };
         };
         /**
          * ImportOptions
@@ -1186,113 +1331,41 @@ export interface components {
             /** Message */
             message: string;
             /** Data */
-            data?: Record<string, never> | null;
+            data?: {
+                [key: string]: unknown;
+            } | null;
             /** Error */
             error?: string | null;
             /** Stack Trace */
             stack_trace?: string | null;
         };
-        /** InstanceGET */
-        InstanceGET: {
-            /** Sop Instance Uid */
-            sop_instance_uid: string;
-            /** Data Format */
-            data_format: string;
-            /** Data Source Id */
-            data_source_id?: string | null;
-            /** Multi File Count */
-            multi_file_count?: number | null;
-            /** Thumbnail Identifier */
-            thumbnail_identifier: string;
-            /** Thumbnail Path */
-            thumbnail_path: string;
-            modality?: components["schemas"]["Modality"] | null;
-            dicom_modality?: components["schemas"]["ModalityType"] | null;
-            etdrs_field?: components["schemas"]["ETDRSField"] | null;
-            /** Angio Graphy */
-            angio_graphy: string;
-            laterality?: components["schemas"]["Laterality"] | null;
-            /** Anatomic Region */
-            anatomic_region: string;
-            /** Rows */
-            rows: number;
-            /** Columns */
-            columns: number;
-            /** Nr Of Frames */
-            nr_of_frames: number;
-            /** Resolution Horizontal */
-            resolution_horizontal: number;
-            /** Resolution Vertical */
-            resolution_vertical: number;
-            /** Resolution Axial */
-            resolution_axial: number;
-            /** Cf Roi */
-            cf_roi?: Record<string, never> | null;
-            /** Cf Keypoints */
-            cf_keypoints?: Record<string, never> | null;
-            /** Cf Quality */
-            cf_quality?: number | null;
-            /**
-             * Date Inserted
-             * Format: date-time
-             */
-            date_inserted: string;
-            /** Date Modified */
-            date_modified?: string | null;
-            /** Date Preprocessed */
-            date_preprocessed?: string | null;
-            /** Id */
-            id: string;
-            project: components["schemas"]["ProjectMeta"];
-            patient: components["schemas"]["PatientMeta"];
-            study: components["schemas"]["StudyMeta"];
-            series: components["schemas"]["SeriesMeta"];
-            device: components["schemas"]["DeviceMeta"];
-            scan: components["schemas"]["ScanMeta"];
-            /** Tags */
-            tags: components["schemas"]["TagMeta"][];
-            /** Segmentations */
-            segmentations?: components["schemas"]["SegmentationGET"][] | null;
-            /** Model Segmentations */
-            model_segmentations?: components["schemas"]["ModelSegmentationGET"][] | null;
-            /** Form Annotations */
-            form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
-            /** Model Attrs */
-            model_attrs: {
-                [key: string]: Record<string, never>;
-            };
-            /** Attrs */
-            attrs: Record<string, never>;
-        };
-        /** InstanceMeta */
-        InstanceMeta: {
-            /** Id */
-            id: string;
-            /** Thumbnail Path */
-            thumbnail_path: string;
-            modality?: components["schemas"]["Modality"] | null;
-            dicom_modality?: components["schemas"]["ModalityType"] | null;
-            etdrs_field?: components["schemas"]["ETDRSField"] | null;
-            laterality?: components["schemas"]["Laterality"] | null;
-            /** Anatomic Region */
-            anatomic_region: string;
-            device: components["schemas"]["DeviceMeta"];
-            /** Tags */
-            tags: components["schemas"]["TagMeta"][];
-        };
         /** InstancePOSTFlat */
         InstancePOSTFlat: {
+            /**
+             * Storage Backend Key
+             * @description Key of an existing StorageBackend used for this image
+             */
+            storage_backend_key: string;
             /** Sop Instance Uid */
             sop_instance_uid?: string | null;
             modality?: components["schemas"]["Modality"] | null;
             dicom_modality?: components["schemas"]["ModalityType"] | null;
             etdrs_field?: components["schemas"]["ETDRSField"] | null;
             laterality?: components["schemas"]["Laterality"] | null;
-            /** Height */
+            /**
+             * Height
+             * @description Rows_y
+             */
             height?: number | null;
-            /** Width */
+            /**
+             * Width
+             * @description Columns_x
+             */
             width?: number | null;
-            /** Depth */
+            /**
+             * Depth
+             * @description NrOfFrames
+             */
             depth?: number | null;
             /** Resolution Horizontal */
             resolution_horizontal?: number | null;
@@ -1358,15 +1431,17 @@ export interface components {
             /** Series Instance Uid */
             series_instance_uid?: string | null;
             /**
-             * Image
+             * Object Key
              * @description Path to the image file
              */
-            image: string;
+            object_key: string;
             /**
              * Attributes
              * @description Optional key-value properties
              */
-            attributes?: Record<string, never>;
+            attributes?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * Laterality
@@ -1443,6 +1518,21 @@ export interface components {
             /** Comment */
             comment?: string | null;
         };
+        /** PatientDetailGET */
+        PatientDetailGET: {
+            /** Id */
+            id: number;
+            /** Identifier */
+            identifier: string;
+            /** Birth Date */
+            birth_date?: string | null;
+            sex?: components["schemas"]["SexEnum"] | null;
+            project: components["schemas"]["ProjectMeta"];
+            /** Attrs */
+            attrs?: {
+                [key: string]: unknown;
+            };
+        };
         /** PatientMeta */
         PatientMeta: {
             /** Id */
@@ -1499,7 +1589,7 @@ export interface components {
         /** SearchResponse */
         SearchResponse: {
             /** Instances */
-            instances: components["schemas"]["InstanceGET"][];
+            instances: components["schemas"]["ImageGET"][];
             /** Studies */
             studies: components["schemas"]["StudyGET"][];
             /** Limit */
@@ -1531,10 +1621,10 @@ export interface components {
             scan_indices?: number[] | null;
             /** Threshold */
             threshold?: number | null;
-            /** Reference Segmentation Id */
-            reference_segmentation_id?: number | null;
             data_type: components["schemas"]["Datatype"];
             data_representation: components["schemas"]["DataRepresentation"];
+            /** Reference Segmentation Id */
+            reference_segmentation_id?: number | null;
             /** Id */
             id: number;
             /**
@@ -1687,7 +1777,7 @@ export interface components {
             /** Studies */
             studies: components["schemas"]["StudyGET"][];
             /** Instances */
-            instances: components["schemas"]["InstanceMeta"][];
+            instances: components["schemas"]["ImageGET"][];
             /** Limit */
             limit: number;
             /** Page */
@@ -1695,7 +1785,7 @@ export interface components {
             /** Count */
             count?: number | null;
             /** Result Ids */
-            result_ids: string[];
+            result_ids: number[];
             /** Has More */
             has_more: boolean;
         };
@@ -1751,7 +1841,7 @@ export interface components {
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;
             /** Images */
-            images: components["schemas"]["InstanceGET"][];
+            images: components["schemas"]["ImageGET"][];
         };
         /**
          * SubTasksResponse
@@ -1843,7 +1933,9 @@ export interface components {
             /** Id */
             id: number;
             /** Config */
-            config: Record<string, never>;
+            config: {
+                [key: string]: unknown;
+            };
             /**
              * Date Inserted
              * Format: date-time
@@ -2004,13 +2096,13 @@ export interface components {
              * @default null
              */
             threshold: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
             /**
              * Reference Segmentation Id
              * @default null
              */
             reference_segmentation_id: number | null;
-            data_type: components["schemas"]["Datatype"];
-            data_representation: components["schemas"]["DataRepresentation"];
             /** Feature Id */
             feature_id: number;
             /**
@@ -2061,13 +2153,13 @@ export interface components {
              * @default null
              */
             threshold: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
             /**
              * Reference Segmentation Id
              * @default null
              */
             reference_segmentation_id: number | null;
-            data_type: components["schemas"]["Datatype"];
-            data_representation: components["schemas"]["DataRepresentation"];
             $defs: {
                 /**
                  * DataRepresentation
@@ -2324,7 +2416,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: string;
+                instance_id: number;
             };
             cookie?: {
                 jwt_token?: string;
@@ -2339,7 +2431,123 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InstanceGET"];
+                    "application/json": components["schemas"]["ImageGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_image_images__image_id__get: {
+        parameters: {
+            query?: {
+                with_segmentations?: boolean;
+                with_form_annotations?: boolean;
+                with_model_segmentations?: boolean;
+                with_tag_metadata?: boolean;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_image_data_images__image_id__data_get: {
+        parameters: {
+            query?: {
+                index?: number | null;
+                meta?: boolean;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_image_thumbnail_images__image_id__thumbnail_get: {
+        parameters: {
+            query?: {
+                size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2841,6 +3049,45 @@ export interface operations {
         };
     };
     get_model_segmentation_data_model_segmentations__model_segmentation_id__data_get: {
+        parameters: {
+            query?: {
+                axis?: number | null;
+                scan_nr?: number | null;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                model_segmentation_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_model_segmentation_data_model_segmentations__model_segmentation_id__data_put: {
         parameters: {
             query?: {
                 axis?: number | null;
@@ -4560,6 +4807,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TagMeta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_patient_patients__patient_id__get: {
+        parameters: {
+            query?: {
+                include_attributes?: boolean;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                patient_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientDetailGET"];
                 };
             };
             /** @description Validation Error */

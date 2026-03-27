@@ -393,8 +393,260 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InstanceGET"
+                  "$ref": "#/components/schemas/ImageGET"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}": {
+      "get": {
+        "summary": "Get Public Image",
+        "operationId": "get_public_image_images__image_id__get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "with_segmentations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Segmentations"
+            }
+          },
+          {
+            "name": "with_form_annotations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Form Annotations"
+            }
+          },
+          {
+            "name": "with_model_segmentations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Model Segmentations"
+            }
+          },
+          {
+            "name": "with_tag_metadata",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Tag Metadata"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageGET"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/data": {
+      "get": {
+        "summary": "Get Public Image Data",
+        "operationId": "get_public_image_data_images__image_id__data_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Index"
+            }
+          },
+          {
+            "name": "meta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Meta"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/thumbnail": {
+      "get": {
+        "summary": "Get Public Image Thumbnail",
+        "operationId": "get_public_image_thumbnail_images__image_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 144,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -532,7 +784,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -609,7 +861,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -693,7 +945,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -1445,6 +1697,100 @@
             }
           }
         }
+      },
+      "put": {
+        "summary": "Update Model Segmentation Data",
+        "operationId": "update_model_segmentation_data_model_segmentations__model_segmentation_id__data_put",
+        "parameters": [
+          {
+            "name": "model_segmentation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Segmentation Id"
+            }
+          },
+          {
+            "name": "axis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Axis"
+            }
+          },
+          {
+            "name": "scan_nr",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scan Nr"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/import/image": {
@@ -1731,19 +2077,19 @@
             }
           },
           {
-            "name": "image_instance_id",
+            "name": "image_id",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Image Instance Id"
+              "title": "Image Id"
             }
           },
           {
@@ -4335,7 +4681,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -4682,6 +5028,82 @@
           }
         }
       }
+    },
+    "/patients/{patient_id}": {
+      "get": {
+        "summary": "Get Patient",
+        "operationId": "get_patient_patients__patient_id__get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "include_attributes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Attributes"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientDetailGET"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4689,7 +5111,7 @@
       "AddImageRequest": {
         "properties": {
           "instance_id": {
-            "type": "integer",
+            "type": "string",
             "title": "Instance Id"
           }
         },
@@ -5140,16 +5562,16 @@
             ],
             "title": "Study Id"
           },
-          "image_instance_id": {
+          "image_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Image Instance Id"
+            "title": "Image Id"
           },
           "laterality": {
             "anyOf": [
@@ -5286,16 +5708,16 @@
             ],
             "title": "Study Id"
           },
-          "image_instance_id": {
+          "image_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Image Instance Id"
+            "title": "Image Id"
           },
           "laterality": {
             "anyOf": [
@@ -5364,16 +5786,16 @@
             ],
             "title": "Study Id"
           },
-          "image_instance_id": {
+          "image_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Image Instance Id"
+            "title": "Image Id"
           },
           "laterality": {
             "anyOf": [
@@ -5440,6 +5862,7 @@
           "schema": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5482,127 +5905,26 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ImportOptions": {
-        "properties": {
-          "create_patients": {
-            "type": "boolean",
-            "title": "Create Patients",
-            "description": "If True, create patients when they don't exist",
-            "default": false
-          },
-          "create_studies": {
-            "type": "boolean",
-            "title": "Create Studies",
-            "description": "If True, create studies when they don't exist",
-            "default": false
-          },
-          "create_series": {
-            "type": "boolean",
-            "title": "Create Series",
-            "description": "If True, create series when they don't exist",
-            "default": true
-          },
-          "create_project": {
-            "type": "boolean",
-            "title": "Create Project",
-            "description": "If True, create project when it doesn't exist",
-            "default": false
-          },
-          "include_stack_trace": {
-            "type": "boolean",
-            "title": "Include Stack Trace",
-            "description": "If True, include stack trace in the error response",
-            "default": false
-          }
-        },
-        "type": "object",
-        "title": "ImportOptions",
-        "description": "Options for the import process"
-      },
-      "ImportRequest": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/InstancePOSTFlat"
-          },
-          "options": {
-            "$ref": "#/components/schemas/ImportOptions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "data",
-          "options"
-        ],
-        "title": "ImportRequest"
-      },
-      "ImportResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "stack_trace": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stack Trace"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "message"
-        ],
-        "title": "ImportResponse"
-      },
-      "InstanceGET": {
+      "ImageGET": {
         "properties": {
           "sop_instance_uid": {
             "type": "string",
             "title": "Sop Instance Uid"
           },
-          "dataset_identifier": {
+          "data_format": {
             "type": "string",
-            "title": "Dataset Identifier"
+            "title": "Data Format"
           },
-          "thumbnail_identifier": {
-            "type": "string",
-            "title": "Thumbnail Identifier"
-          },
-          "thumbnail_path": {
-            "type": "string",
-            "title": "Thumbnail Path"
+          "data_source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Source Id"
           },
           "modality": {
             "anyOf": [
@@ -5679,6 +6001,7 @@
           "cf_roi": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5690,6 +6013,7 @@
           "cf_keypoints": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5739,7 +6063,7 @@
             "title": "Date Preprocessed"
           },
           "id": {
-            "type": "integer",
+            "type": "string",
             "title": "Id"
           },
           "project": {
@@ -5811,12 +6135,14 @@
           },
           "model_attrs": {
             "additionalProperties": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "object",
             "title": "Model Attrs"
           },
           "attrs": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Attrs"
           }
@@ -5824,9 +6150,7 @@
         "type": "object",
         "required": [
           "sop_instance_uid",
-          "dataset_identifier",
-          "thumbnail_identifier",
-          "thumbnail_path",
+          "data_format",
           "angio_graphy",
           "anatomic_region",
           "rows",
@@ -5847,85 +6171,120 @@
           "model_attrs",
           "attrs"
         ],
-        "title": "InstanceGET"
+        "title": "ImageGET"
       },
-      "InstanceMeta": {
+      "ImportOptions": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
+          "create_patients": {
+            "type": "boolean",
+            "title": "Create Patients",
+            "description": "If True, create patients when they don't exist",
+            "default": false
           },
-          "thumbnail_path": {
-            "type": "string",
-            "title": "Thumbnail Path"
+          "create_studies": {
+            "type": "boolean",
+            "title": "Create Studies",
+            "description": "If True, create studies when they don't exist",
+            "default": false
           },
-          "modality": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Modality"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "create_series": {
+            "type": "boolean",
+            "title": "Create Series",
+            "description": "If True, create series when they don't exist",
+            "default": true
           },
-          "dicom_modality": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModalityType"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "create_project": {
+            "type": "boolean",
+            "title": "Create Project",
+            "description": "If True, create project when it doesn't exist",
+            "default": false
           },
-          "etdrs_field": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ETDRSField"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "include_stack_trace": {
+            "type": "boolean",
+            "title": "Include Stack Trace",
+            "description": "If True, include stack trace in the error response",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ImportOptions",
+        "description": "Options for the import process"
+      },
+      "ImportRequest": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InstancePOSTFlat"
           },
-          "laterality": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Laterality"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "anatomic_region": {
-            "type": "string",
-            "title": "Anatomic Region"
-          },
-          "device": {
-            "$ref": "#/components/schemas/DeviceMeta"
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagMeta"
-            },
-            "type": "array",
-            "title": "Tags"
+          "options": {
+            "$ref": "#/components/schemas/ImportOptions"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "thumbnail_path",
-          "anatomic_region",
-          "device",
-          "tags"
+          "data",
+          "options"
         ],
-        "title": "InstanceMeta"
+        "title": "ImportRequest"
+      },
+      "ImportResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "stack_trace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stack Trace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "ImportResponse"
       },
       "InstancePOSTFlat": {
         "properties": {
+          "storage_backend_key": {
+            "type": "string",
+            "title": "Storage Backend Key",
+            "description": "Key of an existing StorageBackend used for this image"
+          },
           "sop_instance_uid": {
             "anyOf": [
               {
@@ -5986,7 +6345,8 @@
                 "type": "null"
               }
             ],
-            "title": "Height"
+            "title": "Height",
+            "description": "Rows_y"
           },
           "width": {
             "anyOf": [
@@ -5997,7 +6357,8 @@
                 "type": "null"
               }
             ],
-            "title": "Width"
+            "title": "Width",
+            "description": "Columns_x"
           },
           "depth": {
             "anyOf": [
@@ -6008,7 +6369,8 @@
                 "type": "null"
               }
             ],
-            "title": "Depth"
+            "title": "Depth",
+            "description": "NrOfFrames"
           },
           "resolution_horizontal": {
             "anyOf": [
@@ -6326,12 +6688,13 @@
             ],
             "title": "Series Instance Uid"
           },
-          "image": {
+          "object_key": {
             "type": "string",
-            "title": "Image",
+            "title": "Object Key",
             "description": "Path to the image file"
           },
           "attributes": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Attributes",
             "description": "Optional key-value properties"
@@ -6339,8 +6702,9 @@
         },
         "type": "object",
         "required": [
+          "storage_backend_key",
           "project_name",
-          "image"
+          "object_key"
         ],
         "title": "InstancePOSTFlat"
       },
@@ -6407,9 +6771,9 @@
       },
       "ModelSegmentationGET": {
         "properties": {
-          "image_instance_id": {
-            "type": "integer",
-            "title": "Image Instance Id"
+          "image_id": {
+            "type": "string",
+            "title": "Image Id"
           },
           "depth": {
             "type": "integer",
@@ -6524,7 +6888,7 @@
         },
         "type": "object",
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",
@@ -6579,6 +6943,54 @@
           "tag_id"
         ],
         "title": "ObjectTagPOST"
+      },
+      "PatientDetailGET": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "identifier": {
+            "type": "string",
+            "title": "Identifier"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SexEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectMeta"
+          },
+          "attrs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "identifier",
+          "project"
+        ],
+        "title": "PatientDetailGET"
       },
       "PatientMeta": {
         "properties": {
@@ -6718,7 +7130,7 @@
         "properties": {
           "instances": {
             "items": {
-              "$ref": "#/components/schemas/InstanceGET"
+              "$ref": "#/components/schemas/ImageGET"
             },
             "type": "array",
             "title": "Instances"
@@ -6751,7 +7163,7 @@
           },
           "result_ids": {
             "items": {
-              "type": "integer"
+              "type": "string"
             },
             "type": "array",
             "title": "Result Ids"
@@ -6774,9 +7186,9 @@
       },
       "SegmentationGET": {
         "properties": {
-          "image_instance_id": {
-            "type": "integer",
-            "title": "Image Instance Id"
+          "image_id": {
+            "type": "string",
+            "title": "Image Id"
           },
           "depth": {
             "type": "integer",
@@ -6843,6 +7255,12 @@
             ],
             "title": "Threshold"
           },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
           "reference_segmentation_id": {
             "anyOf": [
               {
@@ -6853,12 +7271,6 @@
               }
             ],
             "title": "Reference Segmentation Id"
-          },
-          "data_type": {
-            "$ref": "#/components/schemas/Datatype"
-          },
-          "data_representation": {
-            "$ref": "#/components/schemas/DataRepresentation"
           },
           "id": {
             "type": "integer",
@@ -6902,7 +7314,7 @@
         },
         "type": "object",
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",
@@ -6989,7 +7401,7 @@
           },
           "instance_ids": {
             "items": {
-              "type": "integer"
+              "type": "string"
             },
             "type": "array",
             "title": "Instance Ids"
@@ -7317,7 +7729,7 @@
           },
           "instances": {
             "items": {
-              "$ref": "#/components/schemas/InstanceMeta"
+              "$ref": "#/components/schemas/ImageGET"
             },
             "type": "array",
             "title": "Instances"
@@ -7542,7 +7954,7 @@
           },
           "images": {
             "items": {
-              "$ref": "#/components/schemas/InstanceGET"
+              "$ref": "#/components/schemas/ImageGET"
             },
             "type": "array",
             "title": "Images"
@@ -7781,6 +8193,7 @@
             "title": "Id"
           },
           "config": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           },
@@ -8205,9 +8618,9 @@
           }
         },
         "properties": {
-          "image_instance_id": {
-            "title": "Image Instance Id",
-            "type": "integer"
+          "image_id": {
+            "title": "Image Id",
+            "type": "string"
           },
           "depth": {
             "title": "Depth",
@@ -8278,6 +8691,12 @@
             "default": null,
             "title": "Threshold"
           },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
           "reference_segmentation_id": {
             "anyOf": [
               {
@@ -8289,12 +8708,6 @@
             ],
             "default": null,
             "title": "Reference Segmentation Id"
-          },
-          "data_type": {
-            "$ref": "#/components/schemas/Datatype"
-          },
-          "data_representation": {
-            "$ref": "#/components/schemas/DataRepresentation"
           },
           "feature_id": {
             "title": "Feature Id",
@@ -8314,7 +8727,7 @@
           }
         },
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",
@@ -8351,9 +8764,9 @@
           }
         },
         "properties": {
-          "image_instance_id": {
-            "title": "Image Instance Id",
-            "type": "integer"
+          "image_id": {
+            "title": "Image Id",
+            "type": "string"
           },
           "depth": {
             "title": "Depth",
@@ -8424,6 +8837,12 @@
             "default": null,
             "title": "Threshold"
           },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
           "reference_segmentation_id": {
             "anyOf": [
               {
@@ -8435,16 +8854,10 @@
             ],
             "default": null,
             "title": "Reference Segmentation Id"
-          },
-          "data_type": {
-            "$ref": "#/components/schemas/Datatype"
-          },
-          "data_representation": {
-            "$ref": "#/components/schemas/DataRepresentation"
           }
         },
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",

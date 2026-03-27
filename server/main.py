@@ -23,6 +23,7 @@ from server.routes import (
     search,
     devices,
     studies,
+    patients,
 )
 from server.utils.db_logging import init_db_logger
 from server.config import settings
@@ -41,6 +42,7 @@ app_api.include_router(task.router)
 app_api.include_router(subtask.router)
 app_api.include_router(devices.router)
 app_api.include_router(studies.router)
+app_api.include_router(patients.router)
 
 
 ### Exception handlers

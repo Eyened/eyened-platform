@@ -29,6 +29,7 @@ export type ImageGET = components['schemas']['InstanceGET'];
 export type Laterality = components['schemas']['Laterality'];
 export type Modality = components['schemas']['Modality'];
 export type ModalityType = components['schemas']['ModalityType'];
+export type PatientDetailGET = components['schemas']['PatientDetailGET'];
 export type PatientMeta = components['schemas']['PatientMeta'];
 export type ProjectMeta = components['schemas']['ProjectMeta'];
 export type ScanMeta = components['schemas']['ScanMeta'];

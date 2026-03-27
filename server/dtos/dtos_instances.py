@@ -43,6 +43,20 @@ class PatientGET(BaseModel):
         return value.isoformat() if value is not None else None
 
 
+class PatientDetailGET(BaseModel):
+    id: int
+    identifier: str
+    birth_date: Optional[date] = None
+    sex: Optional[Sex] = None
+    project: "ProjectMeta"
+    attrs: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_serializer("birth_date")
+    def serialize_birth_date(self, value: Optional[date]) -> Optional[str]:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat() if value is not None else None
+
+
 class StudyGET(BaseModel):
     id: int
     description: Optional[str] = None

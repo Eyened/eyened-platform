@@ -1,4 +1,13 @@
-import type { FeatureGET, FormSchemaGET, ImageGET, StudyGET, SubTaskWithImagesGET, TagGET, TaskGET } from '../../types/openapi_types';
+import type {
+	FeatureGET,
+	FormSchemaGET,
+	ImageGET,
+	PatientDetailGET,
+	StudyGET,
+	SubTaskWithImagesGET,
+	TagGET,
+	TaskGET
+} from '../../types/openapi_types';
 import { api } from '../api/client';
 import {
 	formAnnotations,
@@ -145,6 +154,18 @@ export async function fetchStudy(id: number): Promise<StudyGET> {
 	// This will auto-ingest embedded series
 	ingestStudies([study]);
 	return study;
+}
+
+export async function fetchPatient(
+	id: number,
+	options: { include_attributes?: boolean } = { include_attributes: true }
+): Promise<PatientDetailGET> {
+	return await apiGet<PatientDetailGET>('/patients/{patient_id}' as any, {
+		params: {
+			path: { patient_id: id },
+			query: { include_attributes: options.include_attributes ?? true }
+		} as any
+	});
 }
 
 // ===== Search Functions =====
