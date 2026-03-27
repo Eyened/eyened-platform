@@ -26,6 +26,10 @@ class Mapper<T> {
     sourceEntries(): Iterable<[string, Map<string, T>]> {
         return this.mappings.entries();
     }
+
+    targets(source: string): Iterable<string> {
+        return this.mappings.get(source)?.keys() ?? [];
+    }
 }
 
 export class Registration {
@@ -33,10 +37,11 @@ export class Registration {
 
     private pointer: Pointer = { image_id: '', position: { x: 0, y: 0, index: 0 } };
     private cache = new Map<string, Position | undefined>();
+    private loadedImageIds = new Set<string>();
 
     private readonly mappings = new Mapper<mappingFunction>();
     private readonly registrationItems = new Mapper<RegistrationItem>();
-    private shortestPaths: { [node: string]: { [node: string]: string[] } } = allPairsShortestPaths(this.mappings);
+    private shortestPaths: { [node: string]: { [node: string]: string[] } } = allPairsShortestPaths(this.mappings, this.loadedImageIds);
 
     // Debounce state for coalescing path recomputation across multiple imports
     private pathsDirty = false;
@@ -96,7 +101,12 @@ export class Registration {
             this.recomputeScheduled = false;
             if (!this.pathsDirty) return;
             this.pathsDirty = false;
-            this.shortestPaths = allPairsShortestPaths(this.mappings);
+
+            console.log('recomputing shortest paths', this.mappings, this.loadedImageIds);
+            const start = performance.now();
+            this.shortestPaths = allPairsShortestPaths(this.mappings, this.loadedImageIds);
+            const duration = performance.now() - start;
+            console.log(`allPairsShortestPaths computation took ${duration.toFixed(2)} ms`);
         });
     }
 
@@ -104,7 +114,13 @@ export class Registration {
     public recomputePathsNow() {
         this.pathsDirty = false;
         this.recomputeScheduled = false;
-        this.shortestPaths = allPairsShortestPaths(this.mappings);
+        this.shortestPaths = allPairsShortestPaths(this.mappings, this.loadedImageIds);
+    }
+
+    public setLoadedImageIds(ids: Iterable<string>) {
+        this.loadedImageIds = new Set(ids);
+        this.pathsDirty = true;
+        this.scheduleRecompute();
     }
 
     async addImage(image: AbstractImage, photoLocators: PhotoLocator[]) {
@@ -149,70 +165,64 @@ export class Registration {
 }
 
 
-function allPairsShortestPaths(graph: Mapper<mappingFunction>): { [node: string]: { [node: string]: string[] } } {
-
-    const distances: { [node: string]: { [node: string]: number } } = {};
-    const predecessors: { [node: string]: { [node: string]: string } } = {};
-
-    const nodeSet = new Set<string>();
-    for (const [k, v] of graph.sourceEntries()) {
-        nodeSet.add(k);
-        for (const k of v.keys())
-            nodeSet.add(k);
-    }
-    const keys: string[] = [...nodeSet];
-
-    // Initialize the distances to Infinity for all pairs of nodes
-    for (const node1 of keys) {
-        distances[node1] = {};
-        predecessors[node1] = {};
-        for (const node2 of keys) {
-            distances[node1][node2] = Infinity;
-        }
-        distances[node1][node1] = 0;
-    }
-
-    // Set the distances for the edges in the graph
-    for (const [node1, neighbors] of graph.sourceEntries()) {
-        for (const node2 of neighbors.keys()) {
-            distances[node1][node2] = 1;
-            predecessors[node1][node2] = node1;
+function allPairsShortestPaths(
+    graph: Mapper<mappingFunction>,
+    allowedNodes?: ReadonlySet<string>
+): { [node: string]: { [node: string]: string[] } } {
+    const allNodes = new Set<string>();
+    for (const [source, neighbors] of graph.sourceEntries()) {
+        allNodes.add(source);
+        for (const target of neighbors.keys()) {
+            allNodes.add(target);
         }
     }
+    const keys = [...allNodes];
+    const endpoints = allowedNodes ? keys.filter((node) => allowedNodes.has(node)) : keys;
 
-    // Compute the shortest path between every pair of nodes
-    for (const k of keys) {
-        for (const i of keys) {
-            for (const j of keys) {
-                if (distances[i][j] > distances[i][k] + distances[k][j]) {
-                    distances[i][j] = distances[i][k] + distances[k][j];
-                    predecessors[i][j] = predecessors[k][j];
-                }
+    const paths: { [node: string]: { [node: string]: string[] } } = {};
+
+    function reconstructPath(source: string, target: string, prev: Map<string, string | null>): string[] | null {
+        if (!prev.has(target)) {
+            return null;
+        }
+        const path: string[] = [];
+        let current: string | null = target;
+        while (current !== null) {
+            path.push(current);
+            if (current === source) {
+                break;
             }
+            current = prev.get(current) ?? null;
         }
-    }
-
-    function getPath(start: string, end: string) {
-        const path = [end];
-        let current = end;
-        while (current !== start) {
-            current = predecessors[start][current];
-            if (!current) {
-                return null;
-            }
-            path.unshift(current);
+        if (path[path.length - 1] !== source) {
+            return null;
         }
+        path.reverse();
         return path;
     }
 
-    // Construct the shortest path between every pair of nodes
-    const paths: { [node: string]: { [node: string]: string[] } } = {};
-    for (const node1 of keys) {
-        paths[node1] = {};
-        for (const node2 of keys) {
-            const path = getPath(node1, node2);
+    for (const source of endpoints) {
+        const prev = new Map<string, string | null>();
+        const queue: string[] = [source];
+        prev.set(source, null);
+
+        // BFS shortest paths in unweighted directed graph
+        for (let i = 0; i < queue.length; i++) {
+            const current = queue[i];
+            for (const next of graph.targets(current)) {
+                if (prev.has(next)) {
+                    continue;
+                }
+                prev.set(next, current);
+                queue.push(next);
+            }
+        }
+
+        paths[source] = {};
+        for (const target of endpoints) {
+            const path = reconstructPath(source, target, prev);
             if (path) {
-                paths[node1][node2] = path;
+                paths[source][target] = path;
             }
         }
     }

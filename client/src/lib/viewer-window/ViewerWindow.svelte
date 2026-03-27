@@ -11,7 +11,7 @@ Keeps track of the main panels and the top row of images.
 	import TopRowImages from "./TopRowImages.svelte";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 	import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
-	import { formAnnotations, instances } from "$lib/data";
+	import { formAnnotations, instances, patients } from "$lib/data";
 	import type { RegistrationSet } from "$lib/registration/registrationItem";
 
 	interface Props {
@@ -39,22 +39,24 @@ Keeps track of the main panels and the top row of images.
 
 	let main: HTMLDivElement | undefined = $state();
 	let isResizing = false;
-	const registrationSets = $derived(
-		(() => {
-			const perPatient = new Map<number, RegistrationSet[]>();
-			for (const instanceId of viewerWindowContext.instanceIds) {
-				const patient = instances.get(instanceId)?.patient as
-					| { id: number; attrs?: { Registration?: RegistrationSet[] } }
-					| undefined;
-				if (!patient || perPatient.has(patient.id)) continue;
-				const patientRegistration = patient.attrs?.Registration;
-				if (patientRegistration?.length) {
-					perPatient.set(patient.id, patientRegistration);
-				}
+	let registrationSet: RegistrationSet[] = $derived.by(() => {
+		const result: RegistrationSet[] = [];
+		const patientIds = new Set<number>([
+			...instanceIds.map((id) => instances.get(id)?.patient.id),
+		]);
+		// TODO: check if patient can be fetched with promise directly?
+		for (const patientId of patientIds) {
+			const patient = patients.get(patientId);
+			if (patient) {
+				console.log("patient", patient);
 			}
-			return Array.from(perPatient.values());
-		})(),
-	);
+			if (patient?.attrs?.Registration) {
+				result.push(...(patient.attrs.Registration as RegistrationSet[]));
+			}
+		}
+		console.log("result", result);
+		return result;
+	});
 
 	function startResize(event: PointerEvent) {
 		isResizing = true;
@@ -92,9 +94,7 @@ Keeps track of the main panels and the top row of images.
 	<RegistrationItemLoader {registration} {formAnnotation} />
 {/each}
 
-{#each registrationSets as registrationSet}
-	<RegistrationItemLoader {registration} {registrationSet} />
-{/each}
+<RegistrationItemLoader {registration} {registrationSet} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div id="main" bind:this={main} class="dark">

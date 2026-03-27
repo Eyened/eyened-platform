@@ -80,6 +80,8 @@ export class ViewerWindowContext {
         }
 
         this.instanceIds = ids;
+        // TODO: perhaps registration should derive from instanceIds, rather than syncing here
+        this.registration.setLoadedImageIds(ids);
 
         // Fetch all form annotations for the involved patient(s)
         const patientIds = Array.from(new Set(
@@ -93,24 +95,9 @@ export class ViewerWindowContext {
                     .filter((pid) => !this.loadedPatientIds.has(pid))
                     .map(async (pid) => {
                         await fetchFormAnnotations({ patient_id: pid });
-
-                        const patient = await fetchPatient(pid, {
+                        await fetchPatient(pid, {
                             include_attributes: true,
                         });
-                        for (const instanceId of ids) {
-                            const instance = instances.get(instanceId);
-                            if (!instance || instance.patient.id !== pid) {
-                                continue;
-                            }
-                            instances.set(instanceId, {
-                                ...instance,
-                                patient: {
-                                    ...instance.patient,
-                                    attrs: patient.attrs ?? {},
-                                },
-                            } as ImageGET);
-                        }
-
                         this.loadedPatientIds.add(pid);
                     })
             );
@@ -130,7 +117,7 @@ export class ViewerWindowContext {
     destroy() {
         // Cancel animation frame
         cancelAnimationFrame(this.frame);
-        
+
         // Dispose all images and their resources
         for (const [image, viewer] of this.topViewers.entries()) {
             try {
@@ -139,7 +126,7 @@ export class ViewerWindowContext {
                 console.error(`Error disposing image ${image.image_id}:`, error);
             }
         }
-        
+
         // Clear all maps and sets
         this.topViewers.clear();
         this.viewers.clear();
@@ -173,7 +160,7 @@ export class ViewerWindowContext {
                 return loadedImages;
             });
 
-        this.imagesIndex.set(instance.id, loadPromise);
+            this.imagesIndex.set(instance.id, loadPromise);
         }
 
         // Return cached promise (either existing or newly created)

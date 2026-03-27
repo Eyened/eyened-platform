@@ -9,7 +9,8 @@ import type {
 	ModelSegmentationGET,
 	FormAnnotationGET,
 	TaskGET,
-	SubTaskWithImagesGET
+	SubTaskWithImagesGET,
+    PatientDetailGET
 } from '../../types/openapi_types';
 
 // ReactiveMap extends SvelteMap with array-like iteration methods
@@ -92,6 +93,7 @@ export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>(
 export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>();
 export const tasks = new ReactiveMap<number, TaskGET>();
 export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>();
+export const patients = new ReactiveMap<number, PatientDetailGET>();
 
 // Secondary indexes for common lookups
 export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>();
@@ -99,6 +101,12 @@ export const featuresByName = new ReactiveMap<string, FeatureGET>();
 export const tagsByName = new ReactiveMap<string, TagGET>();
 
 // Ingest functions handle embedded data extraction
+export function ingestPatients(patientsData: PatientDetailGET[]) {
+	for (const patient of patientsData) {
+		patients.set(patient.id, patient);
+	}
+}
+
 export function ingestStudies(studiesData: StudyGET[]) {
 	for (const study of studiesData) {
 		studies.set(study.id, study);
