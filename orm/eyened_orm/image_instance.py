@@ -202,8 +202,8 @@ class ImageInstance(Base):
     CFQuality: Mapped[Optional[float]]
 
     # File checksum and data hash
-    FileChecksum: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
-    DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
+    # FileChecksum: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
+    # DataHash: Mapped[Optional[bytes]] = mapped_column(TINYBLOB)
 
     # relationships:
     Series: Mapped["Series"] = relationship(
