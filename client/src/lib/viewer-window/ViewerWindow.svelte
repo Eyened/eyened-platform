@@ -47,14 +47,11 @@ Keeps track of the main panels and the top row of images.
 		// TODO: check if patient can be fetched with promise directly?
 		for (const patientId of patientIds) {
 			const patient = patients.get(patientId);
-			if (patient) {
-				console.log("patient", patient);
-			}
+			
 			if (patient?.attrs?.Registration) {
 				result.push(...(patient.attrs.Registration as RegistrationSet[]));
 			}
 		}
-		console.log("result", result);
 		return result;
 	});
 

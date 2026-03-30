@@ -167,7 +167,9 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         return pks[0]
 
     @classmethod
-    def by_id(cls: type[T], session: Session, id: PK, lazy: bool = False) -> Optional[T]:
+    def by_id(
+        cls: type[T], session: Session, id: PK, lazy: bool = False
+    ) -> Optional[T]:
         """Get object by single-column primary key."""
         pk_col = cls.primary_key()
         stmt = select(cls).where(pk_col == id)
@@ -176,7 +178,9 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         return session.scalar(stmt)
 
     @classmethod
-    def by_ids(cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False) -> List[T]:
+    def by_ids(
+        cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False
+    ) -> List[T]:
         """Fetch objects by single-column primary key."""
         ids_set = set(ids)
         if not ids_set:
@@ -188,7 +192,9 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         return session.scalars(stmt).all()
 
     @classmethod
-    def by_ids_dict(cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False) -> Dict[PK, T]:
+    def by_ids_dict(
+        cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False
+    ) -> Dict[PK, T]:
         """Fetch objects by single-column primary key."""
         ids_set = set(ids)
         if not ids_set:
@@ -200,7 +206,9 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         return {id: obj for id, obj in session.execute(stmt).all()}
 
     @classmethod
-    def by_pk(cls: type[T], session: Session, pk: Any | tuple, lazy: bool = False) -> Optional[T]:
+    def by_pk(
+        cls: type[T], session: Session, pk: Any | tuple, lazy: bool = False
+    ) -> Optional[T]:
         """Generic lookup by primary key (supports single or composite keys via tuple)."""
         pks = cls.primary_keys()
 
@@ -310,12 +318,16 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         return stmt
 
     @classmethod
-    def by_column(cls: type[T], session: Session, lazy: bool = False, **kwargs) -> Optional[T]:
+    def by_column(
+        cls: type[T], session: Session, lazy: bool = False, **kwargs
+    ) -> Optional[T]:
         """Generic method to query by any column."""
         return session.scalar(cls._build_where_stmt(lazy=lazy, **kwargs))
 
     @classmethod
-    def by_columns(cls: type[T], session: Session, lazy: bool = False, **kwargs) -> List[T]:
+    def by_columns(
+        cls: type[T], session: Session, lazy: bool = False, **kwargs
+    ) -> List[T]:
         """
         Generic method to query by any columns.
 
@@ -334,6 +346,8 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         *columns: Column | InstrumentedAttribute | str,
         distinct: bool = False,
         where: Any = None,
+        limit: int | None = None,
+        offset: int | None = None,
         **filters,
     ) -> List[Any] | List[tuple]:
         """
@@ -364,7 +378,10 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         ]
 
         stmt = select(*resolved_columns)
-
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        if offset is not None:
+            stmt = stmt.offset(offset)
         if filters:
             conditions = cls._build_conditions(**filters)
             stmt = stmt.where(*conditions)
@@ -501,7 +518,12 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
 
     @classmethod
     def where(
-        cls: Type[T], session: Session, condition, include_inactive=False, lazy: bool = False, **kwargs
+        cls: Type[T],
+        session: Session,
+        condition,
+        include_inactive=False,
+        lazy: bool = False,
+        **kwargs,
     ) -> List[T]:
         """Query objects with a custom condition and optional joins."""
         statement = select(cls)

@@ -393,6 +393,3 @@ export async function updateSubTaskComments(subtaskId: number, comments: string)
 export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): ImageGET | undefined {
     return instances.find(inst => inst.sop_instance_uid === SOPInstanceUid);
 }
-export function getInstanceByDataSourceId(sourceId: string): ImageGET | undefined {
-    return instances.find(inst => inst.data_source_id === sourceId);
-}

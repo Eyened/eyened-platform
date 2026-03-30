@@ -80,9 +80,7 @@ export class ViewerWindowContext {
         }
 
         this.instanceIds = ids;
-        // TODO: perhaps registration should derive from instanceIds, rather than syncing here
-        this.registration.setLoadedImageIds(ids);
-
+        
         // Fetch all form annotations for the involved patient(s)
         const patientIds = Array.from(new Set(
             ids
@@ -139,7 +137,6 @@ export class ViewerWindowContext {
     }
 
     async loadImage(instance: ImageGET): Promise<LoadedImages> {
-        console.log("load", instance);
         // Start loading if not already in progress
         if (!this.imagesIndex.has(instance.id)) {
             const loadPromise = this.imageLoader.load(instance).then(loadedImages => {

@@ -37,11 +37,10 @@ export class Registration {
 
     private pointer: Pointer = { image_id: '', position: { x: 0, y: 0, index: 0 } };
     private cache = new Map<string, Position | undefined>();
-    private loadedImageIds = new Set<string>();
 
     private readonly mappings = new Mapper<mappingFunction>();
     private readonly registrationItems = new Mapper<RegistrationItem>();
-    private shortestPaths: { [node: string]: { [node: string]: string[] } } = allPairsShortestPaths(this.mappings, this.loadedImageIds);
+    private shortestPaths: { [node: string]: { [node: string]: string[] } } = allPairsShortestPaths(this.mappings);
 
     // Debounce state for coalescing path recomputation across multiple imports
     private pathsDirty = false;
@@ -101,26 +100,15 @@ export class Registration {
             this.recomputeScheduled = false;
             if (!this.pathsDirty) return;
             this.pathsDirty = false;
-
-            console.log('recomputing shortest paths', this.mappings, this.loadedImageIds);
-            const start = performance.now();
-            this.shortestPaths = allPairsShortestPaths(this.mappings, this.loadedImageIds);
-            const duration = performance.now() - start;
-            console.log(`allPairsShortestPaths computation took ${duration.toFixed(2)} ms`);
+            this.shortestPaths = allPairsShortestPaths(this.mappings);
         });
     }
 
     // Expose an explicit synchronous recomputation when needed by callers
     public recomputePathsNow() {
         this.pathsDirty = false;
-        this.recomputeScheduled = false;
-        this.shortestPaths = allPairsShortestPaths(this.mappings, this.loadedImageIds);
-    }
-
-    public setLoadedImageIds(ids: Iterable<string>) {
-        this.loadedImageIds = new Set(ids);
-        this.pathsDirty = true;
-        this.scheduleRecompute();
+        this.recomputeScheduled = false;        
+        this.shortestPaths = allPairsShortestPaths(this.mappings);
     }
 
     async addImage(image: AbstractImage, photoLocators: PhotoLocator[]) {
@@ -167,7 +155,6 @@ export class Registration {
 
 function allPairsShortestPaths(
     graph: Mapper<mappingFunction>,
-    allowedNodes?: ReadonlySet<string>
 ): { [node: string]: { [node: string]: string[] } } {
     const allNodes = new Set<string>();
     for (const [source, neighbors] of graph.sourceEntries()) {
@@ -177,7 +164,7 @@ function allPairsShortestPaths(
         }
     }
     const keys = [...allNodes];
-    const endpoints = allowedNodes ? keys.filter((node) => allowedNodes.has(node)) : keys;
+    const endpoints = keys;
 
     const paths: { [node: string]: { [node: string]: string[] } } = {};
 
