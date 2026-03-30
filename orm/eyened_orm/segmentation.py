@@ -1,11 +1,9 @@
 from datetime import datetime
 from enum import Enum
-import gzip
-import io
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
-from eyened_orm.api_client import get_api_client
+from eyened_orm.data_access import get_data_access_adapter
 from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
@@ -173,49 +171,14 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
         axis: Optional[int] = None,
         slice_index: Optional[int] = None,
     ) -> int:
-        """Write annotation data (D, H, W) through the API."""
+        """Write annotation data (D, H, W) through configured data access."""
 
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
-
-        client = get_api_client()
-        params = None
-        if axis is not None or slice_index is not None:
-            params = {"axis": axis, "scan_nr": slice_index}
-
-        np_buf = io.BytesIO()
-        np.save(np_buf, data)
-        payload = np_buf.getvalue()
-
-        resp = client.put(
-            self._api_data_path(),
-            params=params,
-            headers={"Content-Type": "application/octet-stream"},
-            data=payload,
+        adapter = get_data_access_adapter()
+        return adapter.write_segmentation_data(
+            self, data, axis=axis, slice_index=slice_index
         )
-        resp.raise_for_status()
-
-        zarr_index = self.ZarrArrayIndex
-        try:
-            body = resp.json()
-            if isinstance(body, dict):
-                if "ZarrArrayIndex" in body:
-                    zarr_index = body["ZarrArrayIndex"]
-                elif "zarr_array_index" in body:
-                    zarr_index = body["zarr_array_index"]
-        except ValueError:
-            pass
-
-        # for sparse annotations, we need to update the ScanIndices list
-        if self.ScanIndices is not None and self.is_sparse and axis == self.SparseAxis:
-            if slice_index not in self.ScanIndices:
-                # copy necessary to ensure update is picked up by the ORM
-                scan_indices = self.ScanIndices.copy()
-                scan_indices.append(slice_index)
-                self.ScanIndices = scan_indices
-
-        self.ZarrArrayIndex = zarr_index
-        return zarr_index
 
     def write_empty(
         self, axis: Optional[int] = None, slice_index: Optional[int] = None
@@ -228,24 +191,13 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
     def read_data(
         self, axis: Optional[int] = None, slice_index: Optional[int] = None
     ) -> Optional[np.ndarray]:
-        if self.ZarrArrayIndex is None:
-            return None
-
+        """Read segmentation data through configured data access."""
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
-
-        client = get_api_client()
-        params = None
-        if axis is not None or slice_index is not None:
-            params = {"axis": axis, "scan_nr": slice_index}
-
-        resp = client.get(self._api_data_path(), params=params)
-        if resp.status_code == 204:
-            return None
-        resp.raise_for_status()
-
-        raw = resp.content
-        return np.load(io.BytesIO(raw), allow_pickle=False)
+        adapter = get_data_access_adapter()
+        return adapter.read_segmentation_data(
+            self, axis=axis, slice_index=slice_index
+        )
 
     @property
     def binary_mask(self) -> np.ndarray | None:

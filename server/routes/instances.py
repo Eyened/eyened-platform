@@ -14,6 +14,7 @@ from eyened_orm import (
     FormAnnotation,
 )
 from eyened_orm.tag import SegmentationTagLink, FormAnnotationTagLink, TagType
+from eyened_orm.storage_access import resolve_image_data_ref, resolve_thumbnail_ref
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from sqlalchemy.orm import Session, selectinload
@@ -235,45 +236,11 @@ async def get_public_image_data(
         raise HTTPException(404, "ImageInstance not found")
     if index is not None and index < 0:
         raise HTTPException(400, "index must be >= 0")
-
-    storage = item.primary_storage
-    if not storage:
-        raise HTTPException(422, "Primary image storage not found")
-    if not storage.StorageBackend or not storage.StorageBackend.Key:
-        raise HTTPException(422, "Primary image storage has no storage backend")
-    if not storage.ObjectKey:
-        raise HTTPException(422, "Primary image storage has no ObjectKey")
-
-    base_path = f"/{storage.StorageBackend.Key}/{storage.ObjectKey}"
-    if storage.Format == "png_series":
-        path, source_id = storage.ObjectKey.rsplit("/", 1)
-        if meta:
-            return build_storage_redirect_response(
-                f"/{storage.StorageBackend.Key}/{path}/metadata.json"
-            )
-        if index is None:
-            raise HTTPException(
-                422, "Index is required for png_series format if not fetching metadata"
-            )
-        return build_storage_redirect_response(
-            f"/{storage.StorageBackend.Key}/{path}/{source_id}_{index}.png"
-        )
-    elif storage.Format == "dicom":
-        return build_storage_redirect_response(f"{base_path}")
-    elif storage.Format == "binary":
-        if meta:
-            suffix = ".json"
-        else:
-            suffix = ".binary"
-        return build_storage_redirect_response(f"{base_path}{suffix}")
-    elif storage.Format == "image/png" or storage.Format == "image/jpeg":
-        return build_storage_redirect_response(f"{base_path}")
-    elif storage.Format == "mhd":
-        if meta:
-            return build_storage_redirect_response(base_path)
-        return build_storage_redirect_response(f"{base_path[:-4]}.raw")
-    else:
-        raise HTTPException(422, "Primary image storage has unknown format")
+    try:
+        ref = resolve_image_data_ref(item, index=index, meta=meta)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return build_storage_redirect_response(ref.nginx_path)
 
 
 @router.get("/images/{image_id}/thumbnail")
@@ -287,9 +254,11 @@ async def get_public_image_thumbnail(
     if not item:
         raise HTTPException(404, "ImageInstance not found")
 
-    return build_storage_redirect_response(
-        f"/thumbnails/{item.ThumbnailPath}_{size}.jpg"
-    )
+    try:
+        ref = resolve_thumbnail_ref(item, size=size)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return build_storage_redirect_response(ref.nginx_path)
 
 
 @router.get("/instances/images/{dataset_identifier:path}")

@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
-from ..utils.segmentation_storage import read_segmentation_data, write_segmentation_data
+from eyened_orm.segmentation_storage import read_segmentation_data, write_segmentation_data
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import SegmentationGET, SegmentationPOST, SegmentationPATCH
 from ..dtos.dto_converter import DTOConverter

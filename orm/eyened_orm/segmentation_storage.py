@@ -1,29 +1,33 @@
+from __future__ import annotations
+
+import os
+from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from eyened_orm import ModelSegmentation, Segmentation
 
-from server.utils.zarr.manager import ZarrStorageManager
-from functools import lru_cache
+from eyened_orm.utils.zarr.manager import ZarrStorageManager
+
+
+def _resolve_zarr_store_path() -> str:
+    storage_root = os.getenv("EYENED_STORAGE_ROOT", "").strip()
+    if not storage_root:
+        return "/storage/segmentations.zarr"
+    return str(Path(storage_root) / "segmentations.zarr")
 
 
 @lru_cache
 def get_zarr_storage_manager() -> ZarrStorageManager:
-    from server.config import settings
-
-    return ZarrStorageManager(settings.zarr_store)
-
-
-SegmentationLike = Segmentation | ModelSegmentation
+    return ZarrStorageManager(_resolve_zarr_store_path())
 
 
 def write_segmentation_data(
-    segmentation: SegmentationLike,
+    segmentation,
     data: np.ndarray,
     axis: Optional[int] = None,
     slice_index: Optional[int] = None,
 ) -> int:
-    """Write segmentation data through the configured storage backend."""
     if not segmentation.ImageInstance:
         raise ValueError("Segmentation has no associated ImageInstance")
     storage_manager = get_zarr_storage_manager()
@@ -38,7 +42,6 @@ def write_segmentation_data(
         slice_index=slice_index,
     )
 
-    # For sparse annotations, append newly written slice index.
     if (
         segmentation.ScanIndices is not None
         and segmentation.is_sparse
@@ -54,11 +57,10 @@ def write_segmentation_data(
 
 
 def read_segmentation_data(
-    segmentation: SegmentationLike,
+    segmentation,
     axis: Optional[int] = None,
     slice_index: Optional[int] = None,
 ) -> Optional[np.ndarray]:
-    """Read segmentation data through the configured storage backend."""
     if segmentation.ZarrArrayIndex is None:
         return None
 

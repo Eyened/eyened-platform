@@ -2,6 +2,27 @@
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
 
+// API types (different from the PhotoLocator interface):
+// type Point = {
+//     x: number;
+//     y: number;
+// };
+// type LinePhotoLocator = {
+//     image_id: string;
+//     type: "LinePhotoLocator";
+//     index: number;
+//     start: Point;
+//     end: Point;
+// };
+// type CirclePhotoLocator = {
+//     image_id: string;
+//     type: "CirclePhotoLocator";
+//     index: number;
+//     center: Point;
+//     radius: number;
+//     start_angle: number;
+// };
+// export type PhotoLocator = LinePhotoLocator | CirclePhotoLocator;
 
 export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
     const { instance, meta } = image;

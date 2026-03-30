@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from pathlib import Path
-import os
+from eyened_orm.data_access import load_storage_root
 from tqdm import tqdm
 
 from eyened_orm import ImageInstance, Modality
@@ -56,7 +56,7 @@ def get_thumbnail_identifier(im: ImageInstance) -> str:
 
 
 def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
-    thumnails_folder = os.environ.get("EYENED_THUMBNAILS_FOLDER")
+    thumbnails_folder = load_storage_root() / "thumbnails"
     if im.Modality == Modality.ColorFundus:
         _, bounds_cropped = im.bounds.crop(max(sizes))
         np_im = bounds_cropped.image
@@ -70,7 +70,7 @@ def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
         thumb = pil_im.copy()
         thumb.thumbnail((size, size))
         thumb_filename = im.get_thumbnail_filename(size)
-        thumb_path = Path(thumnails_folder) / thumb_filename
+        thumb_path = Path(thumbnails_folder) / thumb_filename
         thumb_path.parent.mkdir(parents=True, exist_ok=True)
         thumb.save(
             thumb_path,

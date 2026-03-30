@@ -29,6 +29,7 @@ Important: import packages that are not dependencies of the ORM within the funct
 @click.group(name="eorm")
 @click.option(
     "--env-file",
+    "-e",
     type=click.Path(exists=True, dir_okay=False),
     required=False,
     help="Path to a .env file to load for this command",

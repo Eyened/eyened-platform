@@ -1,4 +1,5 @@
 import io
+import json
 import re
 import secrets
 import tempfile
@@ -20,7 +21,7 @@ from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import CHAR
 
-from eyened_orm.api_client import get_api_client
+from eyened_orm.data_access import get_data_access_adapter
 
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
@@ -435,7 +436,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def path(self) -> Path:
-        return Path(self.object_prefix or "") / self.object_key
+        adapter = get_data_access_adapter()
+        return adapter.image_path(self)
 
     @property
     def primary_storage(self) -> Optional["ImageStorage"]:
@@ -459,12 +461,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return f"{self.ThumbnailPath}_{size}.jpg"
 
     def get_thumbnail(self, size):
-        client = get_api_client()
-        resp = client.get(
-            f"/api/images/{self.PublicID}/thumbnail", params={"size": size}
-        )
-        resp.raise_for_status()
-        return Image.open(io.BytesIO(resp.content))
+        adapter = get_data_access_adapter()
+        raw = adapter.read_thumbnail(self, size=size)
+        return Image.open(io.BytesIO(raw))
 
     @property
     def roi(self):
@@ -489,10 +488,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return f"/api/images/{self.PublicID}/data"
 
     def _download_stream(self) -> io.BytesIO:
-        client = get_api_client()
-        resp = client.get(self.data_endpoint)
-        resp.raise_for_status()
-        return io.BytesIO(resp.content)
+        adapter = get_data_access_adapter()
+        raw = adapter.read_image_data(self)
+        return io.BytesIO(raw)
 
     def _load_dicom_array(self) -> np.ndarray:
         ds = pydicom.dcmread(self._download_stream())
@@ -505,10 +503,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     def _load_png_series_array(self) -> np.ndarray:
         storage = self.primary_storage
-        client = get_api_client()
-        meta = client.get(self.data_endpoint, params={"meta": True})
-        meta.raise_for_status()
-        meta_data = meta.json()
+        adapter = get_data_access_adapter()
+        meta_bytes = adapter.read_image_data(self, meta=True)
+        meta_data = json.loads(meta_bytes.decode("utf-8"))
         source_id = storage.ObjectKey.split("/")[-1]
         try:
             for image in meta_data["images"]["images"]:
@@ -519,12 +516,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             raise ValueError(
                 f"Error parsing metadata for ImageInstance {self.ImageInstanceID}"
             ) from e
-        client = get_api_client()
-
         def load_image(index: int) -> np.ndarray:
-            resp = client.get(self.data_endpoint, params={"index": index})
-            resp.raise_for_status()
-            return np.array(Image.open(io.BytesIO(resp.content)))
+            raw = adapter.read_image_data(self, index=index)
+            return np.array(Image.open(io.BytesIO(raw)))
 
         return np.array([load_image(i) for i in range(n_files)])
 
@@ -532,13 +526,10 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return np.array(Image.open(self._download_stream()))
 
     def _load_mhd_array(self) -> np.ndarray:
-        client = get_api_client()
-        meta_resp = client.get(self.data_endpoint, params={"meta": True})
-        meta_resp.raise_for_status()
-        mhd_text = meta_resp.text
-        raw_resp = client.get(self.data_endpoint)
-        raw_resp.raise_for_status()
-        raw_bytes = raw_resp.content
+        adapter = get_data_access_adapter()
+        mhd_bytes = adapter.read_image_data(self, meta=True)
+        raw_bytes = adapter.read_image_data(self)
+        mhd_text = mhd_bytes.decode("ascii", errors="ignore")
         # Ensure header points to the raw file we create.
         if re.search(r"(?im)^ElementDataFile\s*=", mhd_text):
             mhd_text = re.sub(
