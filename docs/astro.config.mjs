@@ -9,12 +9,13 @@ dotenv.config();
 // https://astro.build/config
 export default defineConfig({
     site: 'https://eyened.github.io',
-    base: 'eyened-platform/',
+    base: '/eyened-platform/',
     integrations: [
         starlight({
-            title: 'Eyened Platform',
+            title: 'EyeNED Platform',
             social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/eyened/eyened-platform' }],
             sidebar: [
+                { slug: 'about' },
                 { slug: 'getting_started' },
                 { slug: 'importing_data' },
                 { slug: 'import_metadata_fields' },
