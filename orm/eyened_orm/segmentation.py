@@ -188,6 +188,42 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
             np.zeros(self.shape, dtype=self.dtype), axis, slice_index
         )
 
+    def remove_slice(self, session, slice_index: int) -> List[int]:
+
+        if slice_index < 0:
+            raise ValueError("slice_index must be >= 0")
+
+        if not self.is_sparse:
+            raise ValueError("remove_slice is only supported for sparse segmentations")
+
+        if self.SparseAxis not in (0, 1, 2):
+            raise ValueError(f"Invalid SparseAxis={self.SparseAxis}; expected 0, 1 or 2")
+
+        if self.ScanIndices is None:
+            raise ValueError(
+                "Sparse segmentation has no ScanIndices; refusing to remove slice"
+            )
+
+        scan_indices = list(self.ScanIndices)
+        if slice_index not in scan_indices:
+            raise ValueError(
+                f"slice_index {slice_index} not present in ScanIndices={scan_indices}"
+            )
+
+        axis = self.SparseAxis
+
+        current_slice = self.read_data(axis=axis, slice_index=slice_index)
+        if current_slice is not None:
+            empty_slice = np.zeros_like(current_slice)
+            self.write_data(empty_slice, axis=axis, slice_index=slice_index)
+
+        self.ScanIndices = [idx for idx in scan_indices if idx != slice_index]
+
+        ## Always commit after removing the data to ensure databse consistency
+        session.commit()
+
+        return self.ScanIndices
+
     def read_data(
         self, axis: Optional[int] = None, slice_index: Optional[int] = None
     ) -> Optional[np.ndarray]:
