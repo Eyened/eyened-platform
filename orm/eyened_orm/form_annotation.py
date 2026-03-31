@@ -193,7 +193,9 @@ class FormAnnotation(Base):
             "Creator": self.Creator.CreatorName,
             "Created": self.DateInserted,
             "PatientIdentifier": self.Patient.PatientIdentifier,
-            "ImageInstance": self.ImageInstanceID,
+            "ImageInstance": self.ImageInstance.PublicID if self.ImageInstance else None,
+            "StudyDate": self.Study.StudyDate if self.Study else None,
+            "ProjectName": self.Patient.Project.ProjectName,
             "Laterality": (
                 str(self.Laterality.name)
                 if self.Laterality
