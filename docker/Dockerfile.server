@@ -1,30 +1,21 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
-SHELL ["/bin/bash", "-c"]
-
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglx-mesa0 \
-    libglib2.0-0 \
-    && apt-get clean \
+    libxcb1 libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY server/requirements.txt .
-RUN pip install --no-cache-dir --verbose -r requirements.txt
 
-# Install the ORM
-COPY orm /libraries/eyened_orm/
-WORKDIR /libraries/eyened_orm
-RUN pip install --no-cache-dir -e .
+COPY orm /app/orm
+RUN pip install -e /app/orm
 
-# Setup the application
 COPY server /app/server
-WORKDIR /app
+RUN pip install --no-cache-dir -r /app/server/requirements.txt
 
 EXPOSE 8000
 
+WORKDIR /app
+
+CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/server", "--reload-dir", "/app/orm"]
 # Use gunicorn with uvicorn workers for production
 # Worker count is configurable via WORKERS environment variable (default: 4)
 CMD gunicorn server.main:app \

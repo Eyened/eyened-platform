@@ -1,11 +1,10 @@
 import logging
-import os
 import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, ORJSONResponse
+from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -28,7 +27,7 @@ from server.routes import (
 from server.utils.db_logging import init_db_logger
 from server.config import settings
 
-app_api = FastAPI(title="Eyened API", default_response_class=ORJSONResponse)
+app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
 app_api.include_router(instances.router)
 app_api.include_router(segmentations.router)
@@ -108,3 +107,9 @@ app.mount("/api", app_api)
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+from redis import Redis
+from rq import Queue
+redis_conn = Redis(host='redis', port=6379)
+queue = Queue("default", connection=redis_conn)

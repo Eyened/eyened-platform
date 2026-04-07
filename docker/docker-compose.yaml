@@ -20,8 +20,7 @@ services:
       retries: 5
       start_period: 20s
     volumes:
-      # Source segmentation Zarr on host -> container path expected by server
-      - </path/to/segmentations.zarr>:/storage/segmentations.zarr
+      - ${EYENED_STORAGE_ROOT}:${EYENED_STORAGE_ROOT}
 
   client:
     build:
@@ -42,7 +41,5 @@ services:
       # nginx configuration
       - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
       # Thumbnail directory served by nginx
-      - </path/to/thumbnails>:/storage/thumbnails:ro
+      - ${EYENED_STORAGE_ROOT}/thumbnails:/storage/thumbnails:ro
       # Add other read-only mounts for local datasets here
-      - </mnt/data_source_1>:/mnt/data_source_1:ro
-

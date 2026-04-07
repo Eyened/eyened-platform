@@ -9,10 +9,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from server.routes.auth import CurrentUser, get_current_user
+import uuid
+from rq.job import Job
+from rq.exceptions import NoSuchJobError
 
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
-from ..utils.huey import task_run_inference, task_update_thumbnails
+from ..utils.tasks import update_thumbnails
 
 router = APIRouter()
 security = HTTPBasic()
@@ -127,31 +130,53 @@ async def import_single_image(
     )
 
 
-@router.post("/import/run_inference", response_model=TaskResponse)
-async def run_inference(current_user: CurrentUser = Depends(get_current_user)):
-    try:
-        task = task_run_inference()
+# @router.post("/import/run_inference", response_model=TaskResponse)
+# async def run_inference(current_user: CurrentUser = Depends(get_current_user)):
+#     try:
+#         task = task_run_inference()
 
-        return TaskResponse(
-            success=True, message="Inference task queued successfully", task_id=task.id
-        )
-    except Exception as e:
-        return TaskResponse(
-            success=False, message="Failed to queue inference task", error=str(e)
-        )
+#         return TaskResponse(
+#             success=True, message="Inference task queued successfully", task_id=task.id
+#         )
+#     except Exception as e:
+#         return TaskResponse(
+#             success=False, message="Failed to queue inference task", error=str(e)
+#         )
 
 
 @router.post("/import/update_thumbnails", response_model=TaskResponse)
 async def update_thumbnails(current_user: CurrentUser = Depends(get_current_user)):
+    from ..main import queue
+ 
     try:
-        task = task_update_thumbnails()
+        task_id = str(uuid.uuid4())
+
+        job = queue.enqueue(
+                update_thumbnails,
+                task_id,
+                job_id=task_id
+            )
+
 
         return TaskResponse(
             success=True,
             message="Thumbnail update task queued successfully",
-            task_id=task.id,
+            task_id=task_id,
         )
     except Exception as e:
         return TaskResponse(
             success=False, message="Failed to queue thumbnail update task", error=str(e)
         )
+
+@router.get("/import/status/{task_id}")
+def get_status(task_id: str):
+    from ..main import redis_conn
+    try:
+        job = Job.fetch(task_id, connection=redis_conn)
+        return {
+            "task_id": task_id,
+            "status": job.get_status(),
+            "result": job.result
+        }
+    except NoSuchJobError:
+        return {"error": "job not found"}
