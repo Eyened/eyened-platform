@@ -96,7 +96,7 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         return _get_attribute_with_conversion(self, name)
 
     @classmethod
-    def by_name(cls, session: Session, name: str, lazy: bool = False) -> Optional[T]:
+    def by_name(cls: type[T], session: Session, name: str, lazy: bool = False) -> Optional[T]:
         """Find an object by its name column value."""
         if cls._name_column is None:
             raise AttributeError(f"{cls.__name__} has no name column")

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 class TaskDefinition(Base):
     __tablename__ = "TaskDefinition"
-    _name_column: ClassVar[str] = "TaskDefinitionName"
+    _name_column: ClassVar[str | None] = "TaskDefinitionName"
 
     TaskDefinitionID: Mapped[int] = mapped_column(primary_key=True)
     TaskDefinitionName: Mapped[str] = mapped_column(String(256))
@@ -65,7 +65,7 @@ class Task(Base):
         Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),
         Index("ix_Task_Creator_TaskDefinition", "CreatorID", "TaskDefinitionID"),
     )
-    _name_column: ClassVar[str] = "TaskName"
+    _name_column: ClassVar[str | None] = "TaskName"
 
     TaskID: Mapped[int] = mapped_column(primary_key=True)
     TaskName: Mapped[str] = mapped_column(String(256))
@@ -99,7 +99,7 @@ class Task(Base):
 
     @classmethod
     def create_from_imagesets(
-        cls: "Task",
+        cls: type["Task"],
         session: Session,
         taskdef_name: str,
         task_name: str,
