@@ -190,7 +190,6 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         # Fetch images from database
         images = ImageInstance.by_ids(self.session, image_ids_set)
         items = [(img.ImageInstanceID, img.path) for img in images]
-        # items = [(iid, image.path) for iid, image in images.items()]
 
         mpi = MultiProcessInference(
             items,
