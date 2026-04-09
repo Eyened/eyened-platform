@@ -181,7 +181,7 @@ class CFI_AMD(BaseInferencePipeline):
 
         # Fetch images from database
         images = ImageInstance.by_ids(self.session, image_ids_set)
-        items = [(iid, image.path) for iid, image in images.items()]
+        items = [(image.ImageInstanceID, image.path) for image in images]
 
         # Use MultiProcessInference to process images
         mpi = MultiProcessInference(

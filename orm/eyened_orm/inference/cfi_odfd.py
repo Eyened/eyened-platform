@@ -41,9 +41,9 @@ class CFI_ODFD(AttributeInferencePipeline):
 
     def _load_models(self) -> None:
         """Load regression ensemble model."""
-        print(
-            f"Loading model {self.model_version} from {os.getenv('RTNLS_MODEL_RELEASES')}"
-        )
+        # print(
+        #     f"Loading model {self.model_version} from {os.getenv('RTNLS_MODEL_RELEASES')}"
+        # )
         self.ensemble = RegressionEnsemble.from_release(f"{self.model_version}.pt").to(
             self.device
         )
