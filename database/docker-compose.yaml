@@ -1,0 +1,29 @@
+name: eyened-platform-database-bart
+
+services:
+  database:
+    env_file: .env
+    image: mysql:8.0.27
+    ports:
+      - "${EYENED_DATABASE_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # optional: adminer for simple database management in the browser
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - "${EYENED_ADMINER_PORT:-8080}:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
+
+  # optional: xtrabackup for fast database backups
+  xtrabackup:
+    image: percona/percona-xtrabackup:8.0
+    profiles: ["backup"]
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:
