@@ -651,7 +651,7 @@ class Feature(Base):
                     FeatureFeatureLink(
                         ParentFeatureID=feature.FeatureID,
                         ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
-                        FeatureIndex=i,
+                        FeatureIndex=i+1,
                     )
                 )
         else:
