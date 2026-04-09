@@ -466,14 +466,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return Image.open(io.BytesIO(raw))
 
     @property
-    def roi(self):
-        roi = None
-        if self.CFROI is not None:
-            roi = self.CFROI
-        _, attrs = self.attrs
-        if "CFI_ROI" in attrs:
-            roi = attrs["CFI_ROI"]["CFI_ROI"]
-
+    def roi(self) -> Optional[Dict[str, Any]]:
+        roi = self.get_attribute_value(attribute_name="CFI_ROI") 
         if roi is not None:
             roi["hw"] = (self.Rows_y, self.Columns_x)
         return roi
@@ -564,7 +558,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return self._load_single_image_array()
 
     @property
-    def bounds(self) -> CFIBounds:
+    def bounds(self) -> Optional[CFIBounds]:
         # pixel_array = self.pixel_array
         # shape = pixel_array.shape
         # if len(shape) == 3 and shape[2] > 4:
@@ -575,7 +569,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             if "success" in self.roi and self.roi["success"] is False:
                 return None
             # use bounds from database
-            return CFIBounds(**self.roi)
+            return CFIBounds(**self.roi, image=self.pixel_array)
 
     @property
     def _attrs_keypoints(self):

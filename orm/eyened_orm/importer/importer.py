@@ -685,6 +685,7 @@ class Importer:
 
         return column_stats
 
+    @property
     def images(self) -> List[ImageInstance]:
         return [e for e in self._all_entities if isinstance(e, ImageInstance)]
 
