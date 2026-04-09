@@ -1,4 +1,4 @@
-name: eyened-platform-database-bart
+name: eyened-platform-database
 
 services:
   database:

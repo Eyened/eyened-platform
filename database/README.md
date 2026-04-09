@@ -8,3 +8,8 @@ Run:
 ```bash
 docker compose up -d
 ```
+
+Optionally import data dump from other database:
+```bash
+./load_dump.sh /path/to/dump
+```
