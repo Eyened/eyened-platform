@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -7,13 +8,16 @@ from eyened_orm.importer.importer_dtos import PatientImport, ImageImport, Series
 from eyened_orm.importer.importer import Importer
 from eyened_orm.utils.config import load_config, EyenedORMConfig
 
-# TODO: move to common conftest file
-@pytest.fixture(scope="session")
-def config():
+@pytest.fixture
+def datadir():
+    return Path(__file__).parent / "assets"
+
+@pytest.fixture
+def config(datadir) -> EyenedORMConfig:
     config_dict = {
         "database": {"host": "localhost", "port": "3306", "user": "eyened", "password": "eyened", "database": "eyened_database",},
         "secret_key": "secret",
-        "images_basepath": "",
+        "images_basepath": datadir,
         "segmentations_zarr_store": "",
         "thumbnails_path": "",
         "annotations_path": "",
@@ -22,7 +26,6 @@ def config():
     }
     return load_config(config_dict)
 
-# TODO: move to common conftest file
 @pytest.fixture
 def db_session(config: EyenedORMConfig):
     """Set up a database session for testing (using the mysql database from the dev docker setup)"""
@@ -43,7 +46,7 @@ def test_importer_reuse_existing_series(db_session, config):
 
     # Create a minimal patient: 1 image, 1 series, 1 study, 1 patient, 1 project
     image = ImageImport(
-        image = "/tmp/image-1.dcm",
+        image = "image-1.dcm",
         sop_instance_uid=f"image-1",
     )
     # Setting the SeriesImport.series_instance_uid here is the crux

@@ -93,6 +93,9 @@ class Study(Base):
         session = Session.object_session(self)
         return session.scalars(q).all()
 
+    def get_series_by_instance_uid(self, series_instance_uid: str) -> "Series":
+        return next((series for series in self.series if series.SeriesInstanceUid == series_instance_uid), None)
+
     def make_tag(
         self,
         tag_name: str,

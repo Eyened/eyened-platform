@@ -526,14 +526,19 @@ class Importer:
 
     def find_or_create_series(self, study: Study, series_item: SeriesImport) -> Series:
         series_id = series_item.series_id
+        series_instance_uid = series_item.series_instance_uid
         series = None
 
         string_repr = f"Series with identifier '{series_id}' for patient '{study.Patient.PatientIdentifier}', study '{study.StudyDate}'"
         # Try to find existing series
         if series_id is not None:
+            # TODO: this method does not exist
             series = study.get_series_by_id(self.session, series_id)
-            if series is None:
-                warnings.warn(f"{string_repr} not found.")
+        elif series_instance_uid is not None:
+            series = study.get_series_by_instance_uid(series_instance_uid)
+
+        if series is None:
+            warnings.warn(f"{string_repr} not found.")
 
         if series is None:
             if not self.create_series:
