@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, Mapping, Optional
+from typing import Generator, Mapping, Optional, Any
 
 from eyened_orm.utils.config import DatabaseSettings, EyenedORMConfig, load_config
 from eyened_orm.utils.zarr.manager import ZarrStorageManager
@@ -33,7 +33,7 @@ class EyenedSession(Session):
 class Database:
     """Database connection manager with built-in session and storage management"""
 
-    def __init__(self, config: Optional[EyenedORMConfig | str | Path | Mapping[str, str]] = None):
+    def __init__(self, config: Optional[EyenedORMConfig | str | Path | Mapping[str, Any]] = None):
         """
         config: EyenedORMConfig | Path | str
         if Path, load from .env file
