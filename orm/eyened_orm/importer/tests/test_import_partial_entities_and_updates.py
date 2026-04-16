@@ -284,3 +284,177 @@ def test_import_image_then_update_device_fk(session):
     assert img2 is not None
     assert img2.DeviceInstance is not None
     assert img2.DeviceInstance.Description == "dev-B"
+
+
+def test_image_instance_can_be_looked_up_by_sop_uid_public_id_or_pk(session):
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "mfr",
+        "manufacturer_model_name": "model",
+        "device_description": "dev",
+        "dataset_identifier": "",
+        "storage_backend_kind": "kind",
+    }
+    d = date(2026, 4, 15)
+
+    run1 = plan_import(
+        session,
+        [
+            ImportRow(
+                project_name="proj-img-keys",
+                patient_identifier="pat",
+                study_date=d,
+                series_instance_uid="SER-1",
+                sop_instance_uid="SOP-1",
+                storage_backend_key="sb-1",
+                object_key="img-1.png",
+                modality="ColorFundus",
+                laterality="L",
+            )
+        ],
+        defaults=defaults,
+    )
+    run1.apply()
+    session.commit()
+
+    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    assert img1 is not None
+
+    image_instance_id = img1.ImageInstanceID
+    public_id = img1.PublicID
+
+    run2 = plan_import(
+        session,
+        [
+            ImportRow(
+                public_id=public_id,
+                modality="OCT",
+                laterality="R",
+            ),
+        ],
+        defaults=defaults,
+    )
+    run2.apply()
+    session.commit()
+
+    assert _count(session, ImageInstance) == 1
+
+    img2 = session.scalar(select(ImageInstance))
+    assert img2 is not None
+    assert img2.ImageInstanceID == image_instance_id
+    assert img2.PublicID == public_id
+    assert img2.SOPInstanceUid == "SOP-1"
+    assert img2.Modality.value == "OCT"
+    assert img2.Laterality.value == "R"
+
+
+def test_import_image_public_id_cannot_be_changed(session):
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "mfr",
+        "manufacturer_model_name": "model",
+        "device_description": "dev",
+        "dataset_identifier": "",
+        "storage_backend_kind": "kind",
+    }
+    d = date(2026, 4, 15)
+
+    run1 = plan_import(
+        session,
+        [
+            ImportRow(
+                project_name="proj-public-id",
+                patient_identifier="pat",
+                study_date=d,
+                series_instance_uid="SER-1",
+                sop_instance_uid="SOP-1",
+                storage_backend_key="sb-1",
+                object_key="img-1.png",
+                modality="ColorFundus",
+                laterality="L",
+            )
+        ],
+        defaults=defaults,
+    )
+    run1.apply()
+    session.commit()
+
+    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    assert img1 is not None
+    public_id = img1.PublicID
+
+    run2 = plan_import(
+        session,
+        [
+            ImportRow(
+                image_instance_id=img1.ImageInstanceID,
+                public_id="cannot_be_changed",
+                laterality="R",
+            )
+        ],
+        defaults=defaults,
+    )
+    run2.apply()
+    session.commit()
+
+    img2 = session.scalar(
+        select(ImageInstance).where(ImageInstance.ImageInstanceID == img1.ImageInstanceID)
+    )
+    assert img2 is not None
+    assert img2.PublicID == public_id
+    assert img2.Laterality.value == "R"
+
+
+def test_import_image_lookup_by_pk_can_edit_sop_instance_uid(session):
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "mfr",
+        "manufacturer_model_name": "model",
+        "device_description": "dev",
+        "dataset_identifier": "",
+        "storage_backend_kind": "kind",
+    }
+    d = date(2026, 4, 15)
+
+    run1 = plan_import(
+        session,
+        [
+            ImportRow(
+                project_name="proj-sop-pk",
+                patient_identifier="pat",
+                study_date=d,
+                series_instance_uid="SER-1",
+                sop_instance_uid="SOP-OLD",
+                storage_backend_key="sb-1",
+                object_key="img-1.png",
+                modality="ColorFundus",
+                laterality="L",
+            )
+        ],
+        defaults=defaults,
+    )
+    run1.apply()
+    session.commit()
+
+    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-OLD")
+    assert img1 is not None
+
+    run2 = plan_import(
+        session,
+        [
+            ImportRow(
+                image_instance_id=img1.ImageInstanceID,
+                sop_instance_uid="SOP-NEW",
+            )
+        ],
+        defaults=defaults,
+    )
+    run2.apply()
+    session.commit()
+
+    assert ImageInstance.by_column(session, SOPInstanceUid="SOP-OLD") is None
+
+    img2 = ImageInstance.by_column(session, SOPInstanceUid="SOP-NEW")
+    assert img2 is not None
+    assert img2.ImageInstanceID == img1.ImageInstanceID
+

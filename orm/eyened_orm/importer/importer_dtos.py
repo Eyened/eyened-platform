@@ -30,9 +30,7 @@ class InstancePOST(BaseModel):
     device_description: Optional[str] = Field(
         None, description="Description of the device"
     )
-    manufacturer: Optional[str] = Field(
-        None, description="Manufacturer of the device"
-    )
+    manufacturer: Optional[str] = Field(None, description="Manufacturer of the device")
     manufacturer_model_name: Optional[str] = Field(
         None, description="Model name of the device"
     )
@@ -170,9 +168,11 @@ class ImportRow(InstancePOST):
     # DeviceModel (matched by either device_model_id or manufacturer and manufacturer_model_name)
     device_model_id: Optional[int] = None
 
-    # ImageInstance (matched by either image_instance_id or sop_instance_uid)
+    # ImageInstance (matched by either image_instance_id, sop_instance_uid, or public_id)
     image_instance_id: Optional[int] = None
-    
+    public_id: Optional[str] = None
+    inactive: Optional[bool] = None
+
     # Batch-local grouping key for creating or reusing the same anonymous ImageInstance across multiple rows.
     # This can be used to create multiple ImageStorages for the same ImageInstance (even when sop_instance_uid is absent).
     image_anonymous_identity: Optional[int] = Field(

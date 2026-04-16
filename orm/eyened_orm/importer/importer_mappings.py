@@ -23,23 +23,41 @@ class LookupPart:
     source: Entity | None
 
 
+@dataclass(frozen=True, slots=True)
+class Lookup:
+    parts: tuple[LookupPart, ...]
+
+    @property
+    def columns(self) -> tuple[str, ...]:
+        return tuple(part.column for part in self.parts)
+
+    @property
+    def tokens(self) -> tuple[Entity | None, ...]:
+        return tuple(part.source for part in self.parts)
+
+
 @dataclass(slots=True, eq=False)
 class Entity:
     model: type[Base]
     pk_column: str
     pk_row_field: str
-    lookup: tuple[LookupPart, ...]
+    lookups: tuple[Lookup, ...]
     fields: Mapping[str, str]
+    non_mutable: frozenset[str] = frozenset()
     anonymous_identity: str | None = None
     implies: tuple[tuple[Entity, str], ...] = ()
 
     @property
+    def lookup(self) -> Lookup:
+        return self.lookups[0]
+
+    @property
     def lookup_columns(self) -> tuple[str, ...]:
-        return tuple(part.column for part in self.lookup)
+        return self.lookup.columns
 
     @property
     def lookup_tokens(self) -> tuple[str | Entity, ...]:
-        return tuple(part.source for part in self.lookup)
+        return self.lookup.tokens
 
     @property
     def name(self) -> str:
@@ -53,11 +71,15 @@ def key(column: str, source: Entity | None = None) -> LookupPart:
     return LookupPart(column=column, source=source)
 
 
+def lookup(*parts: LookupPart) -> Lookup:
+    return Lookup(parts=parts)
+
+
 PROJECT = Entity(
     model=Project,
     pk_column="ProjectID",
     pk_row_field="project_id",
-    lookup=(key("ProjectName"),),
+    lookups=(lookup(key("ProjectName")),),
     anonymous_identity="project_name",  # this will make the importer create a new project using this name as fallback if not found
     fields={
         "ProjectName": "project_name",
@@ -72,9 +94,11 @@ PATIENT = Entity(
     model=Patient,
     pk_column="PatientID",
     pk_row_field="patient_id",
-    lookup=(
-        key("ProjectID", PROJECT),
-        key("PatientIdentifier"),
+    lookups=(
+        lookup(
+            key("ProjectID", PROJECT),
+            key("PatientIdentifier"),
+        ),
     ),
     implies=((PROJECT, "Project"),),
     fields={
@@ -88,9 +112,11 @@ STUDY = Entity(
     model=Study,
     pk_column="StudyID",
     pk_row_field="study_id",
-    lookup=(
-        key("PatientID", PATIENT),
-        key("StudyDate"),
+    lookups=(
+        lookup(
+            key("PatientID", PATIENT),
+            key("StudyDate"),
+        ),
     ),
     implies=((PATIENT, "Patient"),),
     fields={
@@ -104,7 +130,7 @@ SERIES = Entity(
     model=Series,
     pk_column="SeriesID",
     pk_row_field="series_id",
-    lookup=(key("SeriesInstanceUid"),),
+    lookups=(lookup(key("SeriesInstanceUid")),),
     anonymous_identity="series_anonymous_identity",
     implies=((STUDY, "Study"),),
     fields={
@@ -118,7 +144,7 @@ STORAGE_BACKEND = Entity(
     model=StorageBackend,
     pk_column="StorageBackendID",
     pk_row_field="storage_backend_id",
-    lookup=(key("Key"),),
+    lookups=(lookup(key("Key")),),
     fields={
         "Key": "storage_backend_key",
         "Kind": "storage_backend_kind",
@@ -129,9 +155,11 @@ DEVICE_MODEL = Entity(
     model=DeviceModel,
     pk_column="DeviceModelID",
     pk_row_field="device_model_id",
-    lookup=(
-        key("Manufacturer"),
-        key("ManufacturerModelName"),
+    lookups=(
+        lookup(
+            key("Manufacturer"),
+            key("ManufacturerModelName"),
+        ),
     ),
     fields={
         "Manufacturer": "manufacturer",
@@ -143,9 +171,11 @@ DEVICE_INSTANCE = Entity(
     model=DeviceInstance,
     pk_column="DeviceInstanceID",
     pk_row_field="device_id",
-    lookup=(
-        key("DeviceModelID", DEVICE_MODEL),
-        key("Description"),
+    lookups=(
+        lookup(
+            key("DeviceModelID", DEVICE_MODEL),
+            key("Description"),
+        ),
     ),
     implies=((DEVICE_MODEL, "DeviceModel"),),
     fields={
@@ -158,7 +188,10 @@ IMAGE_INSTANCE = Entity(
     model=ImageInstance,
     pk_column="ImageInstanceID",
     pk_row_field="image_instance_id",
-    lookup=(key("SOPInstanceUid"),),
+    lookups=(
+        lookup(key("SOPInstanceUid")),
+        lookup(key("PublicID")),
+    ),
     anonymous_identity="image_anonymous_identity",
     implies=(
         (SERIES, "Series"),
@@ -166,6 +199,7 @@ IMAGE_INSTANCE = Entity(
     ),
     fields={
         "SOPInstanceUid": "sop_instance_uid",
+        "PublicID": "public_id",
         "Modality": "modality",
         "DICOMModality": "dicom_modality",
         "ETDRSField": "etdrs_field",
@@ -190,16 +224,20 @@ IMAGE_INSTANCE = Entity(
         "FDAIdentifier": "fda_identifier",
         "ModalityID": "modality_id",
         "ScanID": "scan_id",
+        "Inactive": "inactive",
     },
+    non_mutable=frozenset({"PublicID"}),
 )
 
 IMAGE_STORAGE = Entity(
     model=ImageStorage,
     pk_column="ImageStorageID",
     pk_row_field="image_storage_id",
-    lookup=(
-        key("StorageBackendID", STORAGE_BACKEND),
-        key("ObjectKey"),
+    lookups=(
+        lookup(
+            key("StorageBackendID", STORAGE_BACKEND),
+            key("ObjectKey"),
+        ),
     ),
     implies=(
         (STORAGE_BACKEND, "StorageBackend"),

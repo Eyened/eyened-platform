@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -13,6 +13,8 @@ import uuid
 from sqlalchemy.orm import Session
 
 from eyened_orm.base import Base
+
+from eyened_orm.utils.table_printer import format_table_html
 
 
 def _serialize(value: Any) -> Any:
@@ -194,6 +196,8 @@ class ImportRun:
         Flushes the changes to the database, but does not commit the transaction.
         """
         try:
+            self.session.add_all([change.entity for change in self.changes])
+
             with self.session.begin_nested():
                 for change in self.changes:
                     change.apply(self.session)
@@ -213,6 +217,7 @@ class ImportRun:
                 f"Cannot undo import: run status is {self.status!r}, expected 'done'"
             )
         try:
+            self.session.add_all([change.entity for change in self.changes])
             with self.session.begin_nested():
                 for change in reversed(self.changes):
                     change.undo(self.session)
@@ -277,20 +282,48 @@ class ImportRun:
             lines.append(f"{i}. {change.summary()}")
         return "\n".join(lines)
 
-    def summary(self) -> str:
-        lines = [
-            f"Import run {self.import_run_id}",
-            f"Status: {self.status}",
-            f"Change count: {len(self.changes)}",
-        ]
-        entity_counts = Counter(
-            change.entity.__class__.__name__ for change in self.changes
+    def display_summary(self) -> None:
+        per = defaultdict(lambda: {"Update": 0, "Create": 0})
+        for ch in self.changes:
+            name = ch.entity.__class__.__name__
+            per[name]["Create" if ch.name == "CREATE" else "Update"] += 1
+        rows = sorted(
+            per.items(), key=lambda kv: kv[1]["Update"] + kv[1]["Create"], reverse=True
         )
-        entity_counts = sorted(entity_counts.items(), key=lambda x: x[1], reverse=True)
-        max_len = max((len(entity_name) for entity_name, _ in entity_counts), default=0)
-        for entity_name, count in entity_counts:
-            lines.append(f"  {entity_name:<{max_len}} : {count}")
-        return "\n".join(lines) + "\n"
+        entity_data = [
+            (
+                entity,
+                c["Update"] or "",
+                c["Create"] or "",
+                (c["Update"] + c["Create"]) or "",
+            )
+            for entity, c in rows
+        ]
+
+        from IPython.display import display, HTML
+
+        display(
+            HTML(
+                f"Import run: <strong>{self.import_run_id}</strong> <br> Status: <strong>{self.status}</strong> <br> Total changes: <strong>{len(self.changes)}</strong>"
+            )
+        )
+        headers = ["Entity", "Update", "Create", "Total"]
+        display(HTML(format_table_html(headers, entity_data)))
+
+    # def summary(self) -> str:
+    #     lines = [
+    #         f"Import run {self.import_run_id}",
+    #         f"Status: {self.status}",
+    #         f"Change count: {len(self.changes)}",
+    #     ]
+    #     entity_counts = Counter(
+    #         change.entity.__class__.__name__ for change in self.changes
+    #     )
+    #     entity_counts = sorted(entity_counts.items(), key=lambda x: x[1], reverse=True)
+    #     max_len = max((len(entity_name) for entity_name, _ in entity_counts), default=0)
+    #     for entity_name, count in entity_counts:
+    #         lines.append(f"  {entity_name:<{max_len}} : {count}")
+    #     return "\n".join(lines) + "\n"
 
     def print_summary(self, full: bool = False) -> None:
         if full:

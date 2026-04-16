@@ -11,7 +11,7 @@ from eyened_orm.base import Base
 from .import_run import ImportRun, Update
 
 from .importer_dtos import ImportRow
-from .importer_mappings import Entity, ENTITY_SPECS
+from .importer_mappings import Entity, ENTITY_SPECS, Lookup, LookupPart
 
 
 def infer_storage_format(object_key: str) -> str:
@@ -67,11 +67,7 @@ def prepare_rows(
     prepared: list[ImportRow] = []
     for row in rows:
         updates: dict[str, Any] = {}
-        if (
-            infer_image_format
-            and row.object_key
-            and not row.image_storage_format
-        ):
+        if infer_image_format and row.object_key and not row.image_storage_format:
             updates["image_storage_format"] = infer_storage_format(row.object_key)
         for key, value in _defaults.items():
             if getattr(row, key, None) is None:
@@ -139,30 +135,76 @@ class Cache:
         self._for_entity(entity)[row] = obj
 
     def lookup_natural(self, entity: Entity, row: ImportRow) -> Any | None:
-        return self._lookup(entity, row, resolve_column=False)
+        resolved = self._first_lookup(entity, row, resolve_column=False)
+        if resolved is None:
+            return None
+        _, lookup_value = resolved
+        return lookup_value
 
-    def lookup_db(self, entity: Entity, row: ImportRow) -> Any | None:
-        return self._lookup(entity, row, resolve_column=True)
+    def resolved_lookup_natural(
+        self, entity: Entity, row: ImportRow
+    ) -> tuple[Lookup, Any] | None:
+        return self._first_lookup(entity, row, resolve_column=False)
 
-    def _lookup(
-        self, entity: Entity, row: ImportRow, resolve_column: bool
+    def lookup_db(self, entity: Entity, row: ImportRow) -> tuple[Lookup, Any] | None:
+        return self._first_lookup(entity, row, resolve_column=True)
+
+    def _resolve_lookup_part(
+        self,
+        entity: Entity,
+        part: LookupPart,
+        row: ImportRow,
+        *,
+        resolve_column: bool,
     ) -> Any | None:
-        def get_value(part, row: ImportRow) -> Any | None:
-            if part.source is None:
-                field = entity.fields[part.column]
-                return getattr(row, field, None)
-            parent_obj = self.get(part.source, row)
-            if parent_obj is None:
-                return None
-            if resolve_column:
-                return getattr(parent_obj, part.column, None)
-            else:
-                return parent_obj
+        if part.source is None:
+            return getattr(row, entity.fields[part.column], None)
 
-        values = tuple(get_value(part, row) for part in entity.lookup)
+        parent_obj = self.get(part.source, row)
+        if parent_obj is None:
+            return None
+        if resolve_column:
+            return getattr(parent_obj, part.column, None)
+        return parent_obj
+
+    def _resolve_lookup(
+        self,
+        entity: Entity,
+        lookup: Lookup,
+        row: ImportRow,
+        *,
+        resolve_column: bool,
+    ) -> Any | None:
+        values = tuple(
+            self._resolve_lookup_part(
+                entity,
+                part,
+                row,
+                resolve_column=resolve_column,
+            )
+            for part in lookup.parts
+        )
         if any(v is None for v in values):
             return None
         return values[0] if len(values) == 1 else values
+
+    def _first_lookup(
+        self,
+        entity: Entity,
+        row: ImportRow,
+        *,
+        resolve_column: bool,
+    ) -> tuple[Lookup, Any] | None:
+        for lookup in entity.lookups:
+            values = self._resolve_lookup(
+                entity,
+                lookup,
+                row,
+                resolve_column=resolve_column,
+            )
+            if values is not None:
+                return lookup, values
+        return None
 
     def seed(self, entity: Entity, row: ImportRow, obj: Base) -> None:
         # store the object in the cache
@@ -212,10 +254,10 @@ class Seeder:
 
     def scan_rows(self, entity: Entity) -> tuple[
         dict[Any, list[ImportRow]],
-        dict[Any, list[ImportRow]],
+        dict[Lookup, dict[Any, list[ImportRow]]],
     ]:
         pk_values = defaultdict(list)
-        lookup_values = defaultdict(list)
+        lookup_values = {lookup: defaultdict(list) for lookup in entity.lookups}
 
         for row in self.data:
             if self.cache.get(entity, row) is not None:
@@ -227,9 +269,10 @@ class Seeder:
                 # don't check lookups for rows with a primary key
                 continue
 
-            lookup_value = self.cache.lookup_db(entity, row)
-            if lookup_value is not None:
-                lookup_values[lookup_value].append(row)
+            resolved_lookup = self.cache.lookup_db(entity, row)
+            if resolved_lookup is not None:
+                lookup, lookup_value = resolved_lookup
+                lookup_values[lookup][lookup_value].append(row)
 
         return pk_values, lookup_values
 
@@ -240,11 +283,6 @@ class Seeder:
             key_columns=entity.pk_column,
             keys=pk_values.keys(),
         )
-        by_lookup = self.fetch(
-            entity.model,
-            key_columns=entity.lookup_columns,
-            keys=lookup_values.keys(),
-        )
         for pk_value, rows in pk_values.items():
             obj = by_pk.get(pk_value)
             if obj is None:
@@ -253,13 +291,19 @@ class Seeder:
                 )
             for row in rows:
                 self.cache.seed(entity, row, obj)
-        for lookup_value, rows in lookup_values.items():
-            obj = by_lookup.get(lookup_value)
-            if obj is None:
-                # these will have to be created
-                continue
-            for row in rows:
-                self.cache.seed(entity, row, obj)
+        for lookup, grouped_rows in lookup_values.items():
+            by_lookup = self.fetch(
+                entity.model,
+                key_columns=lookup.columns,
+                keys=grouped_rows.keys(),
+            )
+            for lookup_value, rows in grouped_rows.items():
+                obj = by_lookup.get(lookup_value)
+                if obj is None:
+                    # these will have to be created
+                    continue
+                for row in rows:
+                    self.cache.seed(entity, row, obj)
 
 
 class Builder:
@@ -290,6 +334,8 @@ class Builder:
     ) -> dict[str, Update]:
         updates = {}
         for orm_field, row_field in entity.fields.items():
+            if orm_field in entity.non_mutable:
+                continue
             new_value = getattr(row, row_field, None)
             if new_value is None:
                 continue
@@ -301,10 +347,11 @@ class Builder:
         return updates
 
     def build_key(self, entity: Entity, row: ImportRow) -> tuple[Any, ...]:
-        lookup_value = self.cache.lookup_natural(entity, row)
-        if lookup_value is not None:
+        resolved_lookup = self.cache.resolved_lookup_natural(entity, row)
+        if resolved_lookup is not None:
             # identity is defined by the lookup key
-            return (entity, "lookup", lookup_value)
+            lookup, lookup_value = resolved_lookup
+            return (entity, "lookup", lookup.columns, lookup_value)
 
         anonymous_field = entity.anonymous_identity
         if anonymous_field is None:
