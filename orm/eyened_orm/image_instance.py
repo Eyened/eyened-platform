@@ -124,6 +124,12 @@ class ImageStorage(Base):
         Index(
             "ix_ImageStorage_ImageInstanceID_IsPrimary", "ImageInstanceID", "IsPrimary"
         ),
+        # define indexes for both (StorageBackendID, ObjectKey) and (ObjectKey, StorageBackendID)
+        Index(
+            "ix_ImageStorage_StorageBackendID_ObjectKey",
+            "StorageBackendID",
+            "ObjectKey",
+        ),
         Index(
             "ObjectKey_StorageBackendID_UNIQUE",
             "ObjectKey",
@@ -168,10 +174,14 @@ class ImageStorage(Base):
 
 
     ImageInstance: Mapped["ImageInstance"] = relationship(
-        "eyened_orm.image_instance.ImageInstance", back_populates="ImageStorages"
+        "eyened_orm.image_instance.ImageInstance",
+        back_populates="ImageStorages",
+        lazy="selectin",
     )
     StorageBackend: Mapped["StorageBackend"] = relationship(
-        "eyened_orm.image_instance.StorageBackend", back_populates="ImageStorages"
+        "eyened_orm.image_instance.StorageBackend",
+        back_populates="ImageStorages",
+        lazy="selectin",
     )
 
 
@@ -305,8 +315,11 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     # identifier for the thumbnail, needs suffix for different sizes
     # path will be constructed as /thumbnails/{ThumbnailPath}_{size}.jpg
-    # client expects size 144
+    # client expects size 144 and 540
     # see /images/{image_id}/thumbnail endpoint for more details
+    #
+    # When ThumbnailPath is NULL, the thumbnail generation code must be run on the image.
+    # When ThumbnailPath is an empty string, the thumbnail generation failed for the image.
     #
     # Perhaps we can use an ImageStorage entry instead for more flexibility?
     # Or the platform can assume a default location based on public_id?
@@ -559,10 +572,6 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def bounds(self) -> Optional[CFIBounds]:
-        # pixel_array = self.pixel_array
-        # shape = pixel_array.shape
-        # if len(shape) == 3 and shape[2] > 4:
-        #     raise ValueError("Can only handle 2D images")
         if self.roi is None:
             return None
         else:
@@ -917,7 +926,9 @@ class DeviceInstance(Base):
     Description: Mapped[str] = mapped_column(String(256))
 
     DeviceModel: Mapped["DeviceModel"] = relationship(
-        "eyened_orm.image_instance.DeviceModel", back_populates="DeviceInstances"
+        "eyened_orm.image_instance.DeviceModel",
+        back_populates="DeviceInstances",
+        lazy="selectin",
     )
 
     ImageInstances: Mapped[List[ImageInstance]] = relationship(
