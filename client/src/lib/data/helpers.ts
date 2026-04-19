@@ -162,7 +162,11 @@ export async function getSegmentationData(segmentationId: number, params?: { sca
     return decodeNpy(res.data!);
 }
 
-export async function updateSegmentationData(segmentationId: number, data: ArrayBuffer, params?: { scan_nr?: number; sparse_axis?: number }) {
+export async function updateSegmentationData(
+    segmentationId: number,
+    data: ArrayBuffer,
+    params?: { scan_nr?: number; sparse_axis?: number; keepalive?: boolean }
+) {
     const urlParams = new URLSearchParams();
     const sparseAxis = params?.sparse_axis;
     if (sparseAxis != null) {
@@ -172,11 +176,15 @@ export async function updateSegmentationData(segmentationId: number, data: Array
         urlParams.append('scan_nr', params.scan_nr.toString());
     }
 
+    const keepalive = params?.keepalive ?? false;
     return fetchApi(`/segmentations/${segmentationId}/data`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: data,
-        query: urlParams
+        query: urlParams,
+        keepalive,
+        // Avoid async token refresh during page unload; cookies still sent.
+        skipAuthRetry: keepalive,
     });
 }
 
