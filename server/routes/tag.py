@@ -1,7 +1,7 @@
-from eyened_orm import CreatorTagLink, Tag
+from eyened_orm import Creator, CreatorTagLink, Tag
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only, noload, selectinload
 
 from ..db import get_db
 from ..dtos.dto_converter import DTOConverter
@@ -51,7 +51,29 @@ async def create_tag(
 async def list_tags(
     db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)
 ):
-    rows = db.scalars(select(Tag)).all()
+    # Tag has several lazy="selectin" link collections; disable them here since TagGET
+    # only needs Tag columns + Creator (id, name for CreatorMeta).
+    stmt = (
+        select(Tag)
+        .options(
+            load_only(
+                Tag.TagID,
+                Tag.TagName,
+                Tag.TagType,
+                Tag.TagDescription,
+                Tag.CreatorID,
+                Tag.DateInserted,
+            ),
+            noload(Tag.CreatorTagLinks),
+            noload(Tag.StudyTagLinks),
+            noload(Tag.ImageInstanceTagLinks),
+            noload(Tag.AnnotationTagLinks),
+            noload(Tag.SegmentationTagLinks),
+            noload(Tag.FormAnnotationTagLinks),
+            selectinload(Tag.Creator).load_only(Creator.CreatorID, Creator.CreatorName),
+        )
+    )
+    rows = db.scalars(stmt).all()
     return [DTOConverter.tag_to_get(t) for t in rows]
 
 
