@@ -17,22 +17,6 @@ services:
       - server
       - client
 
-  database:
-    env_file: .env
-    image: mysql:8.0.27
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    ports:
-      # in case you want to expose the database port to the host
-      - "${DEV_DATABASE_PORT}:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
- 
   server:
     env_file: .env
     build:
@@ -55,18 +39,5 @@ services:
       - ../client:/app/client
       - client_node_modules:/app/client/node_modules
 
-    # optional, uncomment if you want to use adminer
-    #   adminer:
-    #     image: adminer:latest
-    #     restart: always
-    #     ports:
-    #       - "${DEV_ADMINER_PORT}:8080"
-    #     depends_on:
-    #       database:
-    #         condition: service_healthy
-    #     environment:
-    #       - ADMINER_DEFAULT_SERVER=database
-
 volumes:
-  db_data:
   client_node_modules:
