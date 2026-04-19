@@ -225,6 +225,7 @@ IMAGE_INSTANCE = Entity(
         "ModalityID": "modality_id",
         "ScanID": "scan_id",
         "Inactive": "inactive",
+        "ThumbnailPath": "thumbnail_path",
     },
     non_mutable=frozenset({"PublicID"}),
 )
@@ -247,6 +248,8 @@ IMAGE_STORAGE = Entity(
         "ObjectKey": "object_key",
         "Format": "image_storage_format",
         "IsPrimary": "image_storage_is_primary",
+        "Hash": "image_storage_hash",
+        "Checksum": "image_storage_checksum",
     },
 )
 

@@ -1,32 +1,18 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
 from sqlalchemy.orm import Session
 
+from eyened_orm import ImageInstance
 from eyened_orm.base import Base
 
 from .import_run import ImportRun, Update
 
 from .importer_dtos import ImportRow
 from .importer_mappings import Entity, ENTITY_SPECS, Lookup, LookupPart
-
-
-def infer_storage_format(object_key: str) -> str:
-    suffix = Path(object_key).suffix.lower()
-    if suffix in {".dcm", ".dicom"}:
-        return "dicom"
-    if suffix == ".png":
-        return "image/png"
-    if suffix in {".jpg", ".jpeg"}:
-        return "image/jpeg"
-    if suffix == ".mhd":
-        return "mhd"
-    if suffix == "":
-        return "png_series"
-    return "binary"
+from .preparation import PreparationOptions, prepare_rows
 
 
 def _build_order() -> tuple[Entity, ...]:
@@ -54,26 +40,6 @@ def _build_order() -> tuple[Entity, ...]:
 
 BUILD_ORDER = _build_order()
 SEED_PK_ORDER = tuple(reversed(BUILD_ORDER))
-
-
-def prepare_rows(
-    rows: Sequence[ImportRow],
-    *,
-    infer_image_format: bool = True,
-    defaults: Optional[dict[str, Any]] = None,
-) -> list[ImportRow]:
-    _defaults = defaults or {}
-
-    prepared: list[ImportRow] = []
-    for row in rows:
-        updates: dict[str, Any] = {}
-        if infer_image_format and row.object_key and not row.image_storage_format:
-            updates["image_storage_format"] = infer_storage_format(row.object_key)
-        for key, value in _defaults.items():
-            if getattr(row, key, None) is None:
-                updates[key] = value
-        prepared.append(ImportRow(**{**row.model_dump(), **updates}))
-    return prepared
 
 
 def seed_cache(session: Session, rows: Sequence[ImportRow]) -> Cache:

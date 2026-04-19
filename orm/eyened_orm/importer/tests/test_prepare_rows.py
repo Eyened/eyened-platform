@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from eyened_orm.importer.importer import infer_storage_format, prepare_rows
+from eyened_orm.importer.preparation import infer_storage_format, prepare_rows
 from eyened_orm.importer.importer_dtos import ImportRow
 
 

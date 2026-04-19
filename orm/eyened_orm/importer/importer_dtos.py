@@ -201,6 +201,16 @@ class ImportRow(InstancePOST):
     image_storage_is_primary: Optional[bool] = Field(
         None, description="If set, maps to ImageStorage.IsPrimary"
     )
+    image_storage_hash: Optional[bytes] = Field(
+        None, description="SHA-256 digest (32 bytes); maps to ImageStorage.Hash"
+    )
+    image_storage_checksum: Optional[str] = Field(
+        None, description="Checksum string (e.g. MD5 hex); maps to ImageStorage.Checksum"
+    )
+    thumbnail_path: Optional[str] = Field(
+        None,
+        description="Thumbnail identifier under storage root; maps to ImageInstance.ThumbnailPath",
+    )
 
     @model_validator(mode="after")
     def _validate_row(self) -> "ImportRow":

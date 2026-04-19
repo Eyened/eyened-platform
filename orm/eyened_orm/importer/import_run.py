@@ -310,21 +310,6 @@ class ImportRun:
         headers = ["Entity", "Update", "Create", "Total"]
         display(HTML(format_table_html(headers, entity_data)))
 
-    # def summary(self) -> str:
-    #     lines = [
-    #         f"Import run {self.import_run_id}",
-    #         f"Status: {self.status}",
-    #         f"Change count: {len(self.changes)}",
-    #     ]
-    #     entity_counts = Counter(
-    #         change.entity.__class__.__name__ for change in self.changes
-    #     )
-    #     entity_counts = sorted(entity_counts.items(), key=lambda x: x[1], reverse=True)
-    #     max_len = max((len(entity_name) for entity_name, _ in entity_counts), default=0)
-    #     for entity_name, count in entity_counts:
-    #         lines.append(f"  {entity_name:<{max_len}} : {count}")
-    #     return "\n".join(lines) + "\n"
-
     def print_summary(self, full: bool = False) -> None:
         if full:
             print(self.full_summary())

@@ -6,6 +6,10 @@ from eyened_orm.data_access import load_storage_root
 from tqdm import tqdm
 
 from eyened_orm import ImageInstance, Modality
+from eyened_orm.importer.preparation.thumbnail_util import (
+    allocate_thumbnail_path,
+    persist_thumbnail_images,
+)
 
 
 def get_thumbnail(im: ImageInstance):
@@ -50,35 +54,56 @@ def get_thumbnail(im: ImageInstance):
 
 def get_thumbnail_identifier(im: ImageInstance) -> str:
     """Generate a unique identifier for the thumbnail."""
-    project_id = str(im.Patient.Project.ProjectID)
-    thumbnail_name = im.PublicID
-    return f"{project_id}/{thumbnail_name}"
+    return allocate_thumbnail_path(im.Patient.Project.ProjectID)
 
 
-def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
-    thumbnails_folder = load_storage_root() / "thumbnails"
+def generate_thumbnail_base_image(im: ImageInstance, *, max_size: int) -> Image.Image:
+    """
+    Generate a base PIL image from which thumbnails are derived.
+    """
     if im.Modality == Modality.ColorFundus:
-        _, bounds_cropped = im.bounds.crop(max(sizes))
+        bounds = im.bounds
+        if bounds is None:
+            raise ValueError("Bounds are not available for color fundus images")
+        _, bounds_cropped = bounds.crop(max_size)
         np_im = bounds_cropped.image
     else:
         np_im = get_thumbnail(im)
-    pil_im = Image.fromarray(np_im)
+    return Image.fromarray(np_im)
 
-    # Save thumbnails for each size
 
-    for size in sizes:
-        thumb = pil_im.copy()
-        thumb.thumbnail((size, size))
-        thumb_filename = im.get_thumbnail_filename(size)
-        thumb_path = Path(thumbnails_folder) / thumb_filename
-        thumb_path.parent.mkdir(parents=True, exist_ok=True)
-        thumb.save(
-            thumb_path,
-            format="JPEG",
-            optimize=True,
-            quality=75,
-            progressive=True,
-        )
+def generate_thumbnails(
+    pil_im: Image.Image, sizes: list[int]
+) -> dict[int, Image.Image]:
+    """Generate resized thumbnail images keyed by their size."""
+    return {size: pil_im.copy().resize((size, size)) for size in sizes}
+
+
+def save_thumbnail_images(
+    im: ImageInstance,
+    thumbnails: dict[int, Image.Image],
+    *,
+    thumbnails_folder: Path,
+) -> dict[int, Path]:
+    """Persist thumbnail images to disk and return the written paths."""
+    if not im.ThumbnailPath:
+        raise ValueError("ThumbnailPath must be set before saving thumbnails")
+    return persist_thumbnail_images(
+        im.ThumbnailPath, thumbnails, thumbnails_folder=thumbnails_folder
+    )
+
+
+def save_thumbnails(
+    im: ImageInstance, sizes: list[int] | None = None
+) -> dict[int, Path]:
+    if sizes is None:
+        sizes = [144, 540]
+    sizes = sorted(set(sizes))
+
+    thumbnails_folder = load_storage_root() / "thumbnails"
+    pil_im = generate_thumbnail_base_image(im, max_size=max(sizes))
+    thumbs = generate_thumbnails(pil_im, sizes)
+    return save_thumbnail_images(im, thumbs, thumbnails_folder=thumbnails_folder)
 
 
 def get_missing_thumbnail_images(session, include_failed=False):

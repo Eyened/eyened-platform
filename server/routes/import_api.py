@@ -1,8 +1,9 @@
 import traceback
 from typing import Any, Dict, Optional
 
-from eyened_orm.importer.importer import Importer
-from eyened_orm.importer.importer_dtos import InstancePOSTFlat
+from eyened_orm import ImageInstance
+from eyened_orm.importer import ImportRow, run_import
+from eyened_orm.importer.import_run import ImportCreate
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBasic
 from pydantic import BaseModel, Field
@@ -22,7 +23,7 @@ security = HTTPBasic()
 
 
 # Pydantic models for request and response schemas
-# InstancePOSTFlat is used as ImageImportData replacement
+# ImportRow (alias InstancePOSTFlat) is the flat per-image import payload
 
 
 class ImportOptions(BaseModel):
@@ -30,25 +31,13 @@ class ImportOptions(BaseModel):
     Options for the import process
     """
 
-    create_patients: bool = Field(
-        False, description="If True, create patients when they don't exist"
-    )
-    create_studies: bool = Field(
-        False, description="If True, create studies when they don't exist"
-    )
-    create_series: bool = Field(
-        True, description="If True, create series when they don't exist"
-    )
-    create_project: bool = Field(
-        False, description="If True, create project when it doesn't exist"
-    )
     include_stack_trace: bool = Field(
         False, description="If True, include stack trace in the error response"
     )
 
 
 class ImportRequest(BaseModel):
-    data: InstancePOSTFlat
+    data: ImportRow
     options: ImportOptions
 
 
@@ -67,33 +56,25 @@ class TaskResponse(BaseModel):
     error: Optional[str] = None
 
 
-def make_importer(session, options: ImportOptions):
-    # Create importer with options
-    return Importer(
-        session=session,
-        create_patients=options.create_patients,
-        create_studies=options.create_studies,
-        create_series=options.create_series,
-        create_projects=options.create_project,
-        generate_thumbnails=True,
-        run_ai_models=False,  # We handle this separately via background tasks
-    )
-
-
 @router.post("/import/image", response_model=ImportResponse)
 async def import_single_image(
     request: ImportRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    # Create importer with options
-    importer = make_importer(session, request.options)
-
-    # Execute the import
     try:
-        images = importer.import_one(request.data)
-        
-        # Log import summary (not individual images)
+        # Run the new importer on a single row
+        import_run = run_import(session=session, rows=[request.data])
+
+        # Count created image instances for logging/response
+        image_creates = [
+            change
+            for change in import_run.changes
+            if isinstance(change, ImportCreate)
+            and isinstance(change.entity, ImageInstance)
+        ]
+        image_count = len(image_creates)
+
         logger = get_db_logger()
         if logger:
             logger.log_insert(
@@ -103,11 +84,7 @@ async def import_single_image(
                 entity="Import",
                 summary={
                     "project_name": request.data.project_name,
-                    "images_created": len(images),
-                    "create_patients": request.options.create_patients,
-                    "create_studies": request.options.create_studies,
-                    "create_series": request.options.create_series,
-                    "create_project": request.options.create_project,
+                    "images_created": image_count,
                 },
             )
 
@@ -126,7 +103,11 @@ async def import_single_image(
     return ImportResponse(
         success=True,
         message="Import completed successfully",
-        data={"project_name": request.data.project_name, "image_count": len(images)},
+        data={
+            "project_name": request.data.project_name,
+            "image_count": image_count,
+            "import_run_id": import_run.import_run_id,
+        },
     )
 
 
