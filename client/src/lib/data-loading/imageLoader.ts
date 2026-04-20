@@ -144,12 +144,23 @@ export class ImageLoader {
 
         const dicomImageId = `wadouri:${url}`;
         const image = await cornerstone.loadImage(dicomImageId);
+        const ds = image.data;
 
-        const meta: any = dicomParser.explicitDataSetToJS(image.data);
+
+        const meta: any = dicomParser.explicitDataSetToJS(ds);
         const dimensions = this.extractDimensions(meta);
 
         const photometricInterpretation = meta.x00280004;
         const { width, height, depth } = dimensions;
+
+        const pixelData = ds.elements.x7fe00010;
+
+        // pixeldata is already in the correct format
+        if (pixelData.length === (width * height * depth)) {
+            const dicomBytes = ds.byteArray as Uint8Array;
+            const volume = dicomBytes.subarray(pixelData.dataOffset, pixelData.dataOffset + pixelData.length);
+            return this.returnImage3D(new Image3D(instance, this.webgl, img_id, volume, dimensions, meta));
+        }
 
         if (depth > 1 || meta.x00080060 === 'OPT') { // 3D OCT
             const volume = new Uint8Array(width * height * depth);
