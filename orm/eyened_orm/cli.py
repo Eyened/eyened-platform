@@ -69,17 +69,19 @@ _register_model_commands()
 
 
 @eorm.command()
-def initialize_database():
-    """Initialize an empty database, create ORM tables, and stamp Alembic head."""
+@click.option("--recreate", is_flag=True, default=False, help="Drop and create the database before creating the models")
+def initialize_database(recreate: bool):
+    """Initialize an empty database and create ORM tables."""
     from eyened_orm.base import Base
 
     print("Initializing database...")
     database = get_database(confirmation=True)
     db_config = database.database_settings
 
-    print("Recreating empty database (drop if exists)...")
-    if not drop_create_db(db_config):
-        raise click.ClickException("Failed to recreate empty database.")
+    if recreate:
+        print("Recreating empty database (drop if exists)...")
+        if not drop_create_db(db_config):
+            raise click.ClickException("Failed to recreate empty database.")
 
     print("Creating tables...")
     Base.metadata.create_all(database.engine)
