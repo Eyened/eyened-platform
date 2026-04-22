@@ -227,15 +227,15 @@ class ETDRS_masks:
         res = self.resolution_x
         for r in (0.5, 1.5, 3):
             ax.add_artist(
-                plt.Circle((fx, fy), r * res, color=color, fill=False, alpha=alpha)
+                plt.Circle((fx, fy), r / res, color=color, fill=False, alpha=alpha)
             )
         for th in range(45, 360, 90):
             dx = np.cos(np.radians(th))
             dy = np.sin(np.radians(th))
             ax.add_artist(
                 plt.Line2D(
-                    (fx + 0.5 * res * dx, fx + 3 * res * dx),
-                    (fy + 0.5 * res * dy, fy + 3 * res * dy),
+                    (fx + 0.5 * dx / res, fx + 3 * dx / res),
+                    (fy + 0.5 * dy / res, fy + 3 * dy / res),
                     color=color,
                     alpha=alpha,
                 )
