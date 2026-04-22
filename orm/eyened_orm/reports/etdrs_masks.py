@@ -68,7 +68,9 @@ class ETDRS_masks:
     def get_summary_mean(self, float_image, fields, mask=None):
         result = {}
         for field in fields:
-            result[f'{field}_mean'] = self.calculate_mean(float_image, mask=getattr(self, field))
+            result[f"{field}_mean"] = self.calculate_mean(
+                float_image, mask=getattr(self, field)
+            )
         return result
 
     def get_summary(
@@ -216,6 +218,28 @@ class ETDRS_masks:
     @cached_property
     def IOM(self):
         return self.inferior & self.outer
+
+    def plot(self, ax, color="white", alpha=0.5):
+        from matplotlib import pyplot as plt
+
+        fx = self.fovea_x
+        fy = self.fovea_y
+        res = self.resolution_x
+        for r in (0.5, 1.5, 3):
+            ax.add_artist(
+                plt.Circle((fx, fy), r * res, color=color, fill=False, alpha=alpha)
+            )
+        for th in range(45, 360, 90):
+            dx = np.cos(np.radians(th))
+            dy = np.sin(np.radians(th))
+            ax.add_artist(
+                plt.Line2D(
+                    (fx + 0.5 * res * dx, fx + 3 * res * dx),
+                    (fy + 0.5 * res * dy, fy + 3 * res * dy),
+                    color=color,
+                    alpha=alpha,
+                )
+            )
 
     def create_svg(self, text_dict=None, crop=True, color="black"):
         id_ = f"id_{uuid.uuid4().hex}"
