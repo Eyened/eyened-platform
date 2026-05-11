@@ -63,6 +63,10 @@ class CurrentUser:
     def get_creator(self, session: Session) -> Creator:
         return session.query(Creator).where(Creator.CreatorID == self.id).first()
 
+class AuthOptionsResponse(BaseModel):
+    password_enabled: bool
+    oidc_enabled: bool
+
 
 # JWT utilities
 def create_access_token(user_id: int, username: str, role: str | None = None) -> str:
@@ -482,3 +486,14 @@ async def logout(response: Response):
     response.delete_cookie(settings.jwt_cookie_name)
     response.delete_cookie(settings.refresh_cookie_name)
     return {"message": "Logged out successfully"}
+
+
+@router.get("/auth/options")
+async def get_auth_options():
+    """Options and settings for authentication."""
+    oidc_auth_enabled = settings.auth_oidc_enabled and await settings.oidc.get_authorize_url() is not None
+
+    return AuthOptionsResponse(
+        password_enabled=settings.auth_password_enabled,
+        oidc_enabled=oidc_auth_enabled,
+    )
