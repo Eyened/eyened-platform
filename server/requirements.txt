@@ -1,6 +1,8 @@
+anyio>=4.13.0
 fastapi==0.115.8
 uvicorn==0.33.0
 gunicorn==23.0.0
+httpxyz>=0.31.2
 numpy==2.0.0
 pandas>=1.5.3
 pydantic-settings==2.7.1
