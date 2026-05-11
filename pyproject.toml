@@ -1,0 +1,6 @@
+[tool.pytest]
+minversion = "9.0"
+testpaths = [
+    "server",
+    "orm",
+]
