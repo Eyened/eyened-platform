@@ -5,6 +5,7 @@
     import { Input } from "$lib/components/ui/input/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext } from "svelte";
+    import { authClient } from "../auth";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -30,9 +31,22 @@
                 err instanceof Error ? err.message : "Unknown error occurred";
         }
     }
+
+    // Query the API for available authentication options
+    let passwordModalEnabled = $state(false);
+    let oidcModalEnabled = $state(false);
+    let oidcProviderName = $state("");
+    async function getAuthOptions() {
+        let options = await authClient.options();
+        passwordModalEnabled = options.password_enabled;
+        oidcModalEnabled = options.oidc_enabled;
+        oidcProviderName = options.oidc_provider_name;
+    }
+    getAuthOptions();
 </script>
 
 <div class="min-h-screen flex items-center justify-center p-4">
+    {#if passwordModalEnabled }
     <div class="w-[440px] border border-gray-200 rounded-xl shadow-sm p-8 bg-white">
         <form onsubmit={handleLogin} class="space-y-6">
             <Field.Set>
@@ -63,7 +77,11 @@
             <Button type="submit" class="w-full">Login</Button>
         </form>
     </div>
+    {/if}
+    <!-- TODO: add styling to render the modals correctly when both are visible -->
+    {#if oidcModalEnabled }
+    <div class="w-[440px] border border-gray-200 rounded-xl shadow-sm p-8 bg-white">
+        <Button class="w-full">Login with {oidcProviderName}</Button>
+    </div>
+    {/if}
 </div>
-
-<style>
-</style>

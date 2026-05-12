@@ -50,8 +50,13 @@ class RedisSettings(BaseSettings):
 class OIDCSettings(BaseSettings):
     model_config = SettingsConfigDict(frozen=True, extra="forbid", env_prefix="EYENED_OIDC_")
     client_id: str = ""
-    client_secret: str = ""
+    client_secret: SecretStr = ""
     connect_url: str = ""
+    provider_name: str = "OpenID Connect"
+
+    @property
+    def client_secret_value(self) -> str:
+        return str(self.client_secret.get_secret_value())
 
     @lru_cache
     async def _get_config_data(self):

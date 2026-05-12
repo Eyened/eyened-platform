@@ -18,6 +18,12 @@ interface ChangePasswordRequest {
     new_password: string;
 }
 
+interface AuthOptions {
+    password_enabled: boolean;
+    oidc_enabled: boolean;
+    oidc_provider_name: string;
+}
+
 class AuthClient {
     private baseUrl: string;
 
@@ -122,6 +128,18 @@ class AuthClient {
 
         return response.json();
     }
+
+    async options(): Promise<AuthOptions> {
+        const response= await fetchApi(`${this.baseUrl}/options`, {
+            skipAuthRetry: true,
+        });
+
+        if (!response.ok) {
+            throw new Error('Could not fetch authentication options');
+        }
+
+        return response.json();
+	}
 }
 
 export const authClient = new AuthClient(); 

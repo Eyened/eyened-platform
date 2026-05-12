@@ -66,6 +66,7 @@ class CurrentUser:
 class AuthOptionsResponse(BaseModel):
     password_enabled: bool
     oidc_enabled: bool
+    oidc_provider_name: str
 
 
 # JWT utilities
@@ -496,4 +497,5 @@ async def get_auth_options():
     return AuthOptionsResponse(
         password_enabled=settings.auth_password_enabled,
         oidc_enabled=oidc_auth_enabled,
+        oidc_provider_name=settings.oidc.provider_name,
     )
