@@ -63,11 +63,11 @@ def prepare_rows(
     rows: Sequence[ImportRow],
     *,
     infer_image_format: bool = True,
-    defaults: Optional[dict[str, Any]] = None,
+    defaults: Optional[dict[str, Any]] = None,  
     options: Optional[PreparationOptions] = None,
 ) -> list[ImportRow]:
-    """
-    Enrich ``ImportRow`` instances in-memory before ``plan_import`` / ``run_import``.
+    """ 
+    Enrich ``ImportRow`` instances in-memory before ``plan_import``.
 
     If ``options`` is given, it fully defines behavior (``infer_image_format`` /
     ``defaults`` keyword args are ignored). Otherwise keywords build a

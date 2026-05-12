@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -47,15 +48,28 @@ def _parse_datetime(value: str | None) -> datetime | None:
     return None if v is None else datetime.fromisoformat(v)  # ISO 8601
 
 
+def _parse_json(value: str | None) -> Any | None:
+    v = _none_if_empty(value)
+    if v is None:
+        return None
+    return json.loads(v)
+
+
 DEFAULT_CSV_CONVERTERS: Mapping[str, Callable[[str | None], Any]] = {
     # IDs / ints
     "project_id": _parse_int,
+    "contact_id": _parse_int,
     "patient_id": _parse_int,
     "study_id": _parse_int,
     "series_id": _parse_int,
     "image_instance_id": _parse_int,
+    "scan_id": _parse_int,
+    "modality_id": _parse_int,
     "storage_backend_id": _parse_int,
     "image_storage_id": _parse_int,
+    "source_info_id": _parse_int,
+    "anatomic_region": _parse_int,
+    "samples_per_pixel": _parse_int,
     "series_number": _parse_int,
     "series_anonymous_identity": _parse_int,
     "image_anonymous_identity": _parse_int,
@@ -68,12 +82,21 @@ DEFAULT_CSV_CONVERTERS: Mapping[str, Callable[[str | None], Any]] = {
     "resolution_vertical": _parse_float,
     "resolution_axial": _parse_float,
     "horizontal_field_of_view": _parse_float,
+    "slice_thickness": _parse_float,
+    "cf_quality": _parse_float,
     "threshold": _parse_float,
     # dates / datetimes
     "study_date": _parse_date,
     "acquisition_date_time": _parse_datetime,
+    "date_inserted": _parse_datetime,
+    "date_modified": _parse_datetime,
+    "date_preprocessed": _parse_datetime,
+    # JSON (ImageInstance CF* columns)
+    "cf_roi": _parse_json,
+    "cf_keypoints": _parse_json,
     # bools
     "image_storage_is_primary": _parse_bool,
+    "inactive": _parse_bool,
 }
 
 

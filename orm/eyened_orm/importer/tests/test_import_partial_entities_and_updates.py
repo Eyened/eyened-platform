@@ -9,13 +9,15 @@ from eyened_orm import (
     DeviceModel,
     ImageInstance,
     ImageStorage,
+    ModalityTable,
     Patient,
     Project,
+    Scan,
     Series,
     StorageBackend,
     Study,
 )
-from eyened_orm.importer.importer import plan_import
+from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
 
 
@@ -29,7 +31,7 @@ def test_import_project_only_then_update_description(session):
         "project_description": "initial project description",
     }
 
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [ImportRow(project_name="proj-only")],
         defaults=defaults,
@@ -48,7 +50,7 @@ def test_import_project_only_then_update_description(session):
     assert proj is not None
     assert proj.Description == "initial project description"
 
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -70,7 +72,7 @@ def test_import_project_and_patient_only_then_update_patient_fields(session):
     defaults = {
         "project_external": "Y",
     }
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -91,7 +93,7 @@ def test_import_project_and_patient_only_then_update_patient_fields(session):
     assert _count(session, ImageStorage) == 0
 
     # Second pass: update just project/patient-level fields (no study/image keys).
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -113,7 +115,7 @@ def test_import_project_and_patient_only_then_update_patient_fields(session):
 def test_import_device_only_then_update_serial_number(session):
     defaults = {}
 
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -138,7 +140,7 @@ def test_import_device_only_then_update_serial_number(session):
     assert dev is not None
     assert dev.SerialNumber == "SERIAL-A"
 
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -169,7 +171,7 @@ def test_import_image_then_update_modality(session):
     }
     d = date(2026, 4, 15)
 
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -193,7 +195,7 @@ def test_import_image_then_update_modality(session):
     assert img1 is not None
     assert getattr(img1.Modality, "value", img1.Modality) == "ColorFundus"
 
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -228,7 +230,7 @@ def test_import_image_then_update_device_fk(session):
     }
     d = date(2026, 4, 15)
 
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -257,7 +259,7 @@ def test_import_image_then_update_device_fk(session):
 
     # Second pass: same image, but now updating the devicedescription
     # Lookup key changes, but device instance should be reused rather than created again
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -297,7 +299,7 @@ def test_image_instance_can_be_looked_up_by_sop_uid_public_id_or_pk(session):
     }
     d = date(2026, 4, 15)
 
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -323,7 +325,7 @@ def test_image_instance_can_be_looked_up_by_sop_uid_public_id_or_pk(session):
     image_instance_id = img1.ImageInstanceID
     public_id = img1.PublicID
 
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -359,7 +361,7 @@ def test_import_image_public_id_cannot_be_changed(session):
     }
     d = date(2026, 4, 15)
 
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -383,7 +385,7 @@ def test_import_image_public_id_cannot_be_changed(session):
     assert img1 is not None
     public_id = img1.PublicID
 
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -398,7 +400,9 @@ def test_import_image_public_id_cannot_be_changed(session):
     session.commit()
 
     img2 = session.scalar(
-        select(ImageInstance).where(ImageInstance.ImageInstanceID == img1.ImageInstanceID)
+        select(ImageInstance).where(
+            ImageInstance.ImageInstanceID == img1.ImageInstanceID
+        )
     )
     assert img2 is not None
     assert img2.PublicID == public_id
@@ -416,7 +420,7 @@ def test_import_image_lookup_by_pk_can_edit_sop_instance_uid(session):
     }
     d = date(2026, 4, 15)
 
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -439,7 +443,7 @@ def test_import_image_lookup_by_pk_can_edit_sop_instance_uid(session):
     img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-OLD")
     assert img1 is not None
 
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(
@@ -458,3 +462,198 @@ def test_import_image_lookup_by_pk_can_edit_sop_instance_uid(session):
     assert img2 is not None
     assert img2.ImageInstanceID == img1.ImageInstanceID
 
+
+def test_import_device_only(session):
+    run = plan_image_import(
+        session,
+        [
+            ImportRow(
+                manufacturer="mfr",
+                manufacturer_model_name="model",
+                device_description="dev",
+                device_serial_number="SERIAL-A",
+            )
+        ],
+    )
+    run.apply()
+    session.commit()
+
+    assert _count(session, DeviceModel) == 1
+    assert _count(session, DeviceInstance) == 1
+
+    run = plan_image_import(
+        session,
+        [
+            ImportRow(
+                manufacturer="mfr",
+                manufacturer_model_name="model",
+                device_description="dev-B",
+                device_serial_number="SERIAL-Ab",
+            )
+        ],
+    )
+    run.apply()
+    session.commit()
+
+    assert _count(session, DeviceModel) == 1
+    assert _count(session, DeviceInstance) == 2
+
+    run = plan_image_import(
+        session,
+        [
+            ImportRow(
+                project_name="proj-img",
+                project_external="Y",
+                patient_identifier="pat",
+                study_date=date(2026, 4, 16),
+                storage_backend_key="sb-1",
+                storage_backend_kind="local",
+                object_key="img-1.png",
+                dataset_identifier="",
+                manufacturer="mfr",
+                manufacturer_model_name="model",
+                device_description="dev-B",
+            )
+        ],
+    )
+    run.apply()
+    session.commit()
+    
+    assert _count(session, ImageStorage) == 1
+    assert _count(session, ImageInstance) == 1
+    assert _count(session, DeviceModel) == 1    
+    assert _count(session, DeviceInstance) == 2
+
+
+def test_import_scan_mode_creates_scan_and_links_image(session):
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "mfr",
+        "manufacturer_model_name": "model",
+        "device_description": "dev",
+        "dataset_identifier": "",
+        "storage_backend_kind": "kind",
+    }
+    d = date(2026, 4, 15)
+
+    run = plan_image_import(
+        session,
+        [
+            ImportRow(
+                project_name="proj-scan",
+                patient_identifier="pat",
+                study_date=d,
+                series_instance_uid="SER-SCAN",
+                sop_instance_uid="SOP-SCAN-1",
+                storage_backend_key="sb-1",
+                object_key="oct.png",
+                modality="OCT",
+                laterality="L",
+                scan_mode="Radial",
+            )
+        ],
+        defaults=defaults,
+    )
+    run.apply()
+    session.commit()
+
+    assert _count(session, Scan) == 1
+    scan = session.scalar(select(Scan))
+    assert scan is not None
+    assert scan.ScanMode == "Radial"
+
+    img = ImageInstance.by_column(session, SOPInstanceUid="SOP-SCAN-1")
+    assert img is not None
+    assert img.ScanID == scan.ScanID
+    assert img.Scan is not None
+
+
+def test_import_same_scan_mode_reuses_single_scan_row(session):
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "mfr",
+        "manufacturer_model_name": "model",
+        "device_description": "dev",
+        "dataset_identifier": "",
+        "storage_backend_kind": "kind",
+    }
+    d = date(2026, 4, 15)
+
+    run = plan_image_import(
+        session,
+        [
+            ImportRow(
+                project_name="proj-scan2",
+                patient_identifier="pat",
+                study_date=d,
+                series_instance_uid="SER-SCAN2",
+                sop_instance_uid="SOP-SCAN-A",
+                storage_backend_key="sb-1",
+                object_key="a.png",
+                modality="OCT",
+                laterality="L",
+                scan_mode="Cube",
+            ),
+            ImportRow(
+                project_name="proj-scan2",
+                patient_identifier="pat",
+                study_date=d,
+                series_instance_uid="SER-SCAN2",
+                sop_instance_uid="SOP-SCAN-B",
+                storage_backend_key="sb-1",
+                object_key="b.png",
+                modality="OCT",
+                laterality="R",
+                scan_mode="Cube",
+            ),
+        ],
+        defaults=defaults,
+    )
+    run.apply()
+    session.commit()
+
+    assert _count(session, Scan) == 1
+    assert _count(session, ImageInstance) == 2
+
+
+def test_import_modality_tag_creates_modality_row_and_links(session):
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "mfr",
+        "manufacturer_model_name": "model",
+        "device_description": "dev",
+        "dataset_identifier": "",
+        "storage_backend_kind": "kind",
+    }
+    d = date(2026, 4, 15)
+
+    run = plan_image_import(
+        session,
+        [
+            ImportRow(
+                project_name="proj-mtag",
+                patient_identifier="pat",
+                study_date=d,
+                series_instance_uid="SER-MTAG",
+                sop_instance_uid="SOP-MTAG-1",
+                storage_backend_key="sb-1",
+                object_key="img.png",
+                modality="ColorFundus",
+                laterality="L",
+                modality_tag="VendorRaw_OCT",
+            )
+        ],
+        defaults=defaults,
+    )
+    run.apply()
+    session.commit()
+
+    assert _count(session, ModalityTable) == 1
+    mt = session.scalar(select(ModalityTable))
+    assert mt is not None
+    assert mt.ModalityTag == "VendorRaw_OCT"
+
+    img = ImageInstance.by_column(session, SOPInstanceUid="SOP-MTAG-1")
+    assert img is not None
+    assert img.ModalityID == mt.ModalityID
+    assert img._Modality is not None

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from eyened_orm.base import Base
 
+from eyened_orm.image_instance import ImageInstance
 from eyened_orm.utils.table_printer import format_table_html
 
 
@@ -178,6 +179,26 @@ def parse_import_update(d: dict[str, Any], session: Session) -> ImportUpdate:
         raise ValueError(f"Unknown import update type: {d['type']}")
 
 
+def color_fundus_image_ids_from_import_run(import_run: ImportRun) -> list[int]:
+    """Collect ``ImageInstanceID``s for ColorFundus images created in this run.
+
+    Only considers ``ImportCreate`` changes whose entity is an ``ImageInstance``.
+    Use after ``apply()`` (and typically after IDs are flushed) so PKs are set.
+    """
+    from eyened_orm import ImageInstance
+    from eyened_orm.image_instance import Modality
+
+    ids: list[int] = []
+    for change in import_run.changes:
+        if not isinstance(change, ImportCreate):
+            continue
+        if not isinstance(change.entity, ImageInstance):
+            continue
+        if change.entity.Modality == Modality.ColorFundus:
+            ids.append(change.entity.ImageInstanceID)
+    return ids
+
+
 class ImportRun:
     def __init__(
         self,
@@ -226,6 +247,14 @@ class ImportRun:
         except Exception:
             self.status = "failed"
             raise
+
+    def get_new_images(self) -> list[ImageInstance]:
+        return [
+            change.entity
+            for change in self.changes
+            if isinstance(change, ImportCreate)
+            and isinstance(change.entity, ImageInstance)
+        ]
 
     def add_update(self, entity: Base, updates: dict[str, Update]):
         update = ImportUpdate(entity=entity, updates=updates)

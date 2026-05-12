@@ -16,7 +16,7 @@ from eyened_orm import (
     StorageBackend,
     Study,
 )
-from eyened_orm.importer.importer import plan_import
+from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
 
 
@@ -24,7 +24,7 @@ def _count(session, model) -> int:
     return session.scalar(select(func.count()).select_from(model))
 
 
-def test_plan_import_apply_creates_expected_entities_with_defaults(session):
+def test_plan_image_import_apply_creates_expected_entities_with_defaults(session):
     defaults = {
         "project_external": "Y",
         "manufacturer": "test-manufacturer",
@@ -47,7 +47,7 @@ def test_plan_import_apply_creates_expected_entities_with_defaults(session):
         for i in range(3)
     ]
 
-    run = plan_import(session, rows, defaults=defaults)
+    run = plan_image_import(session, rows, defaults=defaults)
     run.apply()
     session.commit()
 

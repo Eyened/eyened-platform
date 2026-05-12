@@ -1,7 +1,11 @@
+from os import PathLike
 import cv2
 import numpy as np
 from PIL import Image
 from pathlib import Path
+
+from sqlalchemy.orm import Session
+from eyened_orm.commands.model_processing import run_cfi_attribute_pipeline
 from eyened_orm.data_access import load_storage_root
 from tqdm import tqdm
 
@@ -13,6 +17,7 @@ from eyened_orm.importer.preparation.thumbnail_util import (
 
 
 def get_thumbnail(im: ImageInstance):
+
     pixel_array = im.pixel_array
     shape = pixel_array.shape
     if len(shape) == 3:
@@ -62,7 +67,7 @@ def generate_thumbnail_base_image(im: ImageInstance, *, max_size: int) -> Image.
     Generate a base PIL image from which thumbnails are derived.
     """
     if im.Modality == Modality.ColorFundus:
-        bounds = im.bounds
+        bounds = im.bounds_with_image
         if bounds is None:
             raise ValueError("Bounds are not available for color fundus images")
         _, bounds_cropped = bounds.crop(max_size)
@@ -115,12 +120,29 @@ def get_missing_thumbnail_images(session, include_failed=False):
     return images
 
 
+def ensure_cfi_roi(session: Session, images: list[ImageInstance]):
+    cfi_image_ids = [
+        image.ImageInstanceID
+        for image in images
+        if image.Modality == Modality.ColorFundus
+    ]
+    if not cfi_image_ids:
+        return
+    run_cfi_attribute_pipeline(
+        session,
+        cfi_image_ids,
+        "cfi-roi",
+    )
+
+
 def update_thumbnails(
-    session,
-    images,
+    session: Session,
+    images: list[ImageInstance],
     print_errors=False,
-    N=100,
+    commit_interval=100,
 ):
+    ensure_cfi_roi(session, images)
+
     for i, image in enumerate(tqdm(images)):
         try:
             image.ThumbnailPath = get_thumbnail_identifier(image)
@@ -133,6 +155,61 @@ def update_thumbnails(
                 )
 
         session.add(image)
-        if (i + 1) % N == 0:
+        if (i + 1) % commit_interval == 0:
             session.commit()
     session.commit()
+
+
+def run_update_thumbnails_job(
+    database=None,
+    *,
+    failed: bool = False,
+    print_errors: bool = False,
+) -> None:
+    """Find images missing thumbnails, generate and persist them.
+
+    Used by the ``eorm update-thumbnails`` CLI and the API RQ worker. Pass a
+    :class:`~eyened_orm.Database` from :func:`~eyened_orm.commands.shared.get_database`
+    in the CLI so connection info is printed; workers pass ``None`` and a new
+    ``Database()`` is created from the environment.
+    """
+    from eyened_orm import Database
+
+    db = database if database is not None else Database()
+    with db.get_session() as session:
+        images = get_missing_thumbnail_images(session, failed)
+        update_thumbnails(session, images, print_errors=print_errors)
+
+
+def run_update_thumbnails_for_image_ids_job(
+    image_ids: list[int],
+    *,
+    database=None,
+    print_errors: bool = False,
+) -> None:
+    """Generate thumbnails for the given instance IDs (regardless of prior ``ThumbnailPath``)."""
+    from eyened_orm import Database
+
+    db = database if database is not None else Database()
+    with db.get_session() as session:
+        run_update_thumbnails_for_image_ids(
+            session, image_ids, print_errors=print_errors
+        )
+
+
+def run_update_thumbnails_for_image_ids(
+    session: Session, image_ids: list[int], print_errors: bool = False
+) -> None:
+    ids = set(image_ids)
+    images = ImageInstance.by_ids(session, ids)
+    if len(images) != len(ids):
+        found = {im.ImageInstanceID for im in images}
+        missing = ids - found
+        print(
+            f"Thumbnail job: skipping {len(missing)} unknown ImageInstanceID(s): "
+            f"{sorted(missing)[:20]}{'...' if len(missing) > 20 else ''}"
+        )
+    if not images:
+        print("No images to process")
+        return
+    update_thumbnails(session, images, print_errors=print_errors)

@@ -1,125 +1,144 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from graphlib import CycleError, TopologicalSorter
 from typing import Any, Iterable, Optional, Sequence
 
 from sqlalchemy.orm import Session
-
-from eyened_orm import ImageInstance
 from eyened_orm.base import Base
 
 from .import_run import ImportRun, Update
-
 from .importer_dtos import ImportRow
-from .importer_mappings import Entity, ENTITY_SPECS, Lookup, LookupPart
+from .importer_mappings_base import Entity, Lookup, LookupPart
+from .importer_mappings_image import ENTITY_SPECS
 from .preparation import PreparationOptions, prepare_rows
 
 
-def _build_order() -> tuple[Entity, ...]:
-    ordered: list[Entity] = []
-    remaining = set(ENTITY_SPECS)
+def entity_build_order(entity_specs: tuple[Entity, ...]) -> tuple[Entity, ...]:
+    """
+    Topological order: every ``implies`` parent appears before its child.
 
-    while remaining:
-        progress = False
-        for entity in ENTITY_SPECS:
-            if entity not in remaining:
-                continue
-            parents = {parent for parent, _ in entity.implies}
-            if not parents.issubset(ordered):
-                continue
-            ordered.append(entity)
-            remaining.remove(entity)
-            progress = True
-        if progress:
-            continue
-        unresolved = ", ".join(entity.name for entity in remaining)
-        raise RuntimeError(f"Could not determine entity build order: {unresolved}")
-
-    return tuple(ordered)
-
-
-BUILD_ORDER = _build_order()
-SEED_PK_ORDER = tuple(reversed(BUILD_ORDER))
+    ``entity_specs`` must list every entity that appears as an implication parent.
+    """
+    spec_set = set(entity_specs)
+    graph: dict[Entity, frozenset[Entity]] = {}
+    for entity in entity_specs:
+        parents = frozenset({imp.parent for imp in entity.implies})
+        missing = set(parents) - spec_set
+        if missing:
+            names = ", ".join(sorted(e.name for e in missing))
+            raise RuntimeError(
+                f"Entity {entity.name!r} implies parent(s) not in entity_specs: {names}"
+            )
+        graph[entity] = parents
+    ts = TopologicalSorter(graph)
+    try:
+        return tuple(ts.static_order())
+    except CycleError as e:
+        raise RuntimeError("Cycle in entity implies graph (cannot build order)") from e
 
 
-def seed_cache(session: Session, rows: Sequence[ImportRow]) -> Cache:
-    seeder = Seeder(session, rows)
-    seeder.seed()
-    return seeder.cache
+def build_image_import_rows(
+    rows: Sequence[ImportRow],
+    *,
+    defaults: Optional[dict[str, Any]] = None,
+    infer_storage_format: bool = True,
+    options: Optional[PreparationOptions] = None,
+) -> list[ImportRow]:
+    """
+    Turn raw :class:`~eyened_orm.importer.importer_dtos.ImportRow` inputs into
+    rows ready for :func:`plan_import` (defaults, optional format inference, …).
+
+    Pass ``options`` for full control; otherwise ``defaults`` and
+    ``infer_storage_format`` build a :class:`~eyened_orm.importer.preparation.PreparationOptions`.
+    """
+    if options is not None:
+        return prepare_rows(rows, options=options)
+    return prepare_rows(
+        rows,
+        options=PreparationOptions(
+            infer_image_format=infer_storage_format,
+            defaults=defaults,
+        ),
+    )
+
+
+def plan_image_import(
+    session: Session,
+    rows: Sequence[ImportRow],
+    *,
+    defaults: Optional[dict[str, Any]] = None,
+    infer_storage_format: bool = True,
+    entity_specs: tuple[Entity, ...] = ENTITY_SPECS,
+    options: Optional[PreparationOptions] = None,
+) -> ImportRun:
+    """Prepare image rows, then :func:`plan_import` (same defaults / inference knobs as :func:`build_image_import_rows`)."""
+    prepared = build_image_import_rows(
+        rows,
+        defaults=defaults,
+        infer_storage_format=infer_storage_format,
+        options=options,
+    )
+    return plan_import(session, prepared, entity_specs=entity_specs)
 
 
 def plan_import(
     session: Session,
-    rows: Sequence[ImportRow],
+    rows: Sequence[Any],
     *,
-    infer_storage_format: bool = True,
-    defaults: Optional[dict[str, Any]] = None,
+    entity_specs: tuple[Entity, ...] = ENTITY_SPECS,
 ) -> ImportRun:
-    prepared = prepare_rows(
-        rows,
-        infer_image_format=infer_storage_format,
-        defaults=defaults,
-    )
-    cache = seed_cache(session, prepared)
-    builder = Builder(prepared, cache)
+    """
+    Plan creates/updates for ``rows`` against ``entity_specs``.
+
+    Image rows should normally be built with :func:`build_image_import_rows` or
+    planned in one step via :func:`plan_image_import`. Task imports pass
+    :class:`~eyened_orm.importer.importer_dtos.ImportTaskRow` sequences and
+    ``entity_specs=TASK_ENTITY_SPECS``.
+    """
+    prepared = list(rows)
+
+    build_order = entity_build_order(entity_specs)
+    cache = Cache(entity_specs)
     run = ImportRun(session=session)
+
+    seeder = Seeder(session, prepared, cache, build_order)
+    seeder.seed()
+
+    builder = Builder(prepared, cache, build_order)
     builder.build(run)
     return run
 
 
-def run_import(
-    session: Session,
-    rows: Sequence[ImportRow],
-    *,
-    infer_image_storage_format: bool = True,
-    defaults: Optional[dict[str, Any]] = None,
-) -> ImportRun:
-    run = plan_import(
-        session,
-        rows,
-        infer_storage_format=infer_image_storage_format,
-        defaults=defaults,
-    )
-    run.apply()
-    return run
-
-
 class Cache:
-    def __init__(self, session: Session):
-        self.session = session
-        self.by_entity: dict[Entity, dict[ImportRow, Base]] = {
-            entity_cls: {} for entity_cls in ENTITY_SPECS
+    def __init__(self, entity_specs: tuple[Entity, ...]):
+        self.entity_specs = entity_specs
+        self.by_entity: dict[Entity, dict[Any, Base]] = {
+            entity_cls: {} for entity_cls in entity_specs
         }
 
-    def _for_entity(self, entity: Entity) -> dict[ImportRow, Base]:
+    def _for_entity(self, entity: Entity) -> dict[Any, Base]:
         return self.by_entity[entity]
 
-    def get(self, entity: Entity, row: ImportRow) -> Base | None:
+    def get(self, entity: Entity, row: Any) -> Base | None:
         return self._for_entity(entity).get(row)
 
-    def set(self, entity: Entity, row: ImportRow, obj: Base) -> None:
+    def set(self, entity: Entity, row: Any, obj: Base) -> None:
         self._for_entity(entity)[row] = obj
 
-    def lookup_natural(self, entity: Entity, row: ImportRow) -> Any | None:
-        resolved = self._first_lookup(entity, row, resolve_column=False)
-        if resolved is None:
-            return None
-        _, lookup_value = resolved
-        return lookup_value
-
-    def resolved_lookup_natural(
-        self, entity: Entity, row: ImportRow
+    def lookup_natural(
+        self, entity: Entity, row: Any
     ) -> tuple[Lookup, Any] | None:
         return self._first_lookup(entity, row, resolve_column=False)
 
-    def lookup_db(self, entity: Entity, row: ImportRow) -> tuple[Lookup, Any] | None:
+    def lookup_db(self, entity: Entity, row: Any) -> tuple[Lookup, Any] | None:
         return self._first_lookup(entity, row, resolve_column=True)
 
     def _resolve_lookup_part(
         self,
         entity: Entity,
         part: LookupPart,
-        row: ImportRow,
+        row: Any,
         *,
         resolve_column: bool,
     ) -> Any | None:
@@ -137,7 +156,7 @@ class Cache:
         self,
         entity: Entity,
         lookup: Lookup,
-        row: ImportRow,
+        row: Any,
         *,
         resolve_column: bool,
     ) -> Any | None:
@@ -157,7 +176,7 @@ class Cache:
     def _first_lookup(
         self,
         entity: Entity,
-        row: ImportRow,
+        row: Any,
         *,
         resolve_column: bool,
     ) -> tuple[Lookup, Any] | None:
@@ -172,7 +191,7 @@ class Cache:
                 return lookup, values
         return None
 
-    def seed(self, entity: Entity, row: ImportRow, obj: Base) -> None:
+    def seed(self, entity: Entity, row: Any, obj: Base) -> None:
         # store the object in the cache
         # also traverse the implied entities and store them in the cache
         # e.g. if seeding a Study, also seed the Patient and Project recursively
@@ -189,19 +208,27 @@ class Cache:
             )
         self.set(entity, row, obj)
 
-        for implied_entity, attr in entity.implies:
-            # e.g. Patient.Project
-            implied_obj = getattr(obj, attr, None)
+        for imp in entity.implies:
+            implied_obj = getattr(obj, imp.attribute, None)
             if implied_obj is None:
-                raise RuntimeError(f"missing parent {implied_entity.name} for row")
-            self.seed(implied_entity, row, implied_obj)
+                if imp.required:
+                    raise RuntimeError(f"missing parent {imp.parent.name} for row")
+                continue
+            self.seed(imp.parent, row, implied_obj)
 
 
 class Seeder:
-    def __init__(self, session: Session, data: Sequence[ImportRow]):
+    def __init__(
+        self,
+        session: Session,
+        data: Sequence[Any],
+        cache: Cache,
+        build_order: tuple[Entity, ...],
+    ):
         self.session = session
         self.data = data
-        self.cache = Cache(session)
+        self.cache = cache
+        self.build_order = build_order
 
     def fetch(
         self, model: type[Base], key_columns: str | tuple[str, ...], keys: Iterable[Any]
@@ -211,16 +238,19 @@ class Seeder:
         return model.fetch_dict(self.session, key_columns=key_columns, keys=keys)
 
     def seed(self) -> None:
-        for entity in SEED_PK_ORDER:
-            # 'bottom up' (ImageStorage -> ImageInstance -> Series -> Study -> Patient -> Project)
+        for entity in reversed(self.build_order):
+            # Building bottom up allows seeding of existing parents via implied entities.
+            # For example: fetching an existing Series, Study, Patient, Project etc via ImageInstance.
+            # This ensures that existing relationships are preserved and inconsistencies are detected.
+            # For instance, if both a Series and an ImageInstance are identified in the same row,
+            # they should already be linked in the database (i.e., we cannot update an ImageInstance belonging to another Series).
             self.seed_existing_rows(entity)
-        for entity in BUILD_ORDER:
-            # 'top down' (Project -> Patient -> Study -> Series -> ImageInstance -> ImageStorage)
+        for entity in self.build_order:
             self.seed_existing_rows(entity)
 
     def scan_rows(self, entity: Entity) -> tuple[
-        dict[Any, list[ImportRow]],
-        dict[Lookup, dict[Any, list[ImportRow]]],
+        dict[Any, list[Any]],
+        dict[Lookup, dict[Any, list[Any]]],
     ]:
         pk_values = defaultdict(list)
         lookup_values = {lookup: defaultdict(list) for lookup in entity.lookups}
@@ -249,6 +279,7 @@ class Seeder:
             key_columns=entity.pk_column,
             keys=pk_values.keys(),
         )
+        # retrieve existing objects by primary key
         for pk_value, rows in pk_values.items():
             obj = by_pk.get(pk_value)
             if obj is None:
@@ -257,6 +288,9 @@ class Seeder:
                 )
             for row in rows:
                 self.cache.seed(entity, row, obj)
+
+        # retrieve existing objects by lookup
+        # e.g. Series via SeriesInstanceUID or Patient via (Project + PatientIdentifier)
         for lookup, grouped_rows in lookup_values.items():
             by_lookup = self.fetch(
                 entity.model,
@@ -275,28 +309,32 @@ class Seeder:
 class Builder:
     def __init__(
         self,
-        data: Sequence[ImportRow],
+        data: Sequence[Any],
         cache: Cache,
+        build_order: tuple[Entity, ...],
     ):
         self.cache = cache
         self.data = data
+        self.build_order = build_order
 
     def attach_parents(
-        self, entity: Entity, row: ImportRow, obj: Base
+        self, entity: Entity, row: Any, obj: Base
     ) -> dict[str, Update]:
         result = {}
-        for parent_entity, attr in entity.implies:
-            parent = self.cache.get(parent_entity, row)
+        for imp in entity.implies:
+            parent = self.cache.get(imp.parent, row)
             if parent is None:
-                raise RuntimeError(
-                    f"Missing parent {parent_entity.name} for {entity.name}"
-                )
-            result[attr] = Update(old_value=None, new_value=parent)
-            setattr(obj, attr, parent)
+                if imp.required:
+                    raise RuntimeError(
+                        f"Missing parent {imp.parent.name} for {entity.name}"
+                    )
+                continue
+            result[imp.attribute] = Update(old_value=None, new_value=parent)
+            setattr(obj, imp.attribute, parent)
         return result
 
     def get_updates(
-        self, entity: Entity, row: ImportRow, obj: Base
+        self, entity: Entity, row: Any, obj: Base
     ) -> dict[str, Update]:
         updates = {}
         for orm_field, row_field in entity.fields.items():
@@ -312,8 +350,8 @@ class Builder:
             setattr(obj, orm_field, new_value)
         return updates
 
-    def build_key(self, entity: Entity, row: ImportRow) -> tuple[Any, ...]:
-        resolved_lookup = self.cache.resolved_lookup_natural(entity, row)
+    def build_key(self, entity: Entity, row: Any) -> tuple[Any, ...]:
+        resolved_lookup = self.cache.lookup_natural(entity, row)
         if resolved_lookup is not None:
             # identity is defined by the lookup key
             lookup, lookup_value = resolved_lookup
@@ -335,9 +373,9 @@ class Builder:
         # even when series_instance_uid is absent
         anonymous_identity = getattr(row, anonymous_field, None)
         if anonymous_identity is None:
-            if not entity.implies or any(
-                self.cache.get(parent_entity, row) is None
-                for parent_entity, _ in entity.implies
+            required_implies = [imp for imp in entity.implies if imp.required]
+            if not required_implies or any(
+                self.cache.get(imp.parent, row) is None for imp in required_implies
             ):
                 # if we're about to create an anonymous per-row entity,
                 # but required parents weren't built for this row, just skip it
@@ -378,5 +416,5 @@ class Builder:
                 pass
 
     def build(self, import_run: ImportRun) -> None:
-        for entity in BUILD_ORDER:
+        for entity in self.build_order:
             self.build_entity(entity, import_run)

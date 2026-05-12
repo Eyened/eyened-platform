@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 
 from eyened_orm import ImageStorage, Patient, Project
-from eyened_orm.importer.importer import plan_import
+from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
 
 
@@ -34,7 +34,7 @@ def test_missing_project_identification_rejected(session):
     ]
 
     with pytest.raises(RuntimeError, match="Missing parent"):
-        plan_import(session, rows)
+        plan_image_import(session, rows)
 
 
 def test_anonymous_project_creation_creates_project_and_links_downstream(session):
@@ -56,7 +56,7 @@ def test_anonymous_project_creation_creates_project_and_links_downstream(session
         )
     ]
 
-    run = plan_import(session, rows)
+    run = plan_image_import(session, rows)
     run.apply()
     session.commit()
 
@@ -111,7 +111,7 @@ def test_two_rows_same_image_storage_lookup_key_dedupes_and_merges_updates(sessi
         ),
     ]
 
-    run = plan_import(session, rows)
+    run = plan_image_import(session, rows)
     run.apply()
     session.commit()
 
@@ -151,7 +151,7 @@ def test_idempotency_same_import_twice_produces_no_changes_second_time(session):
         )
     ]
 
-    run1 = plan_import(session, rows)
+    run1 = plan_image_import(session, rows)
     assert len(run1.changes) > 0
     run1.apply()
     session.commit()
@@ -162,7 +162,7 @@ def test_idempotency_same_import_twice_produces_no_changes_second_time(session):
         "storages": _count(session, ImageStorage),
     }
 
-    run2 = plan_import(session, rows)
+    run2 = plan_image_import(session, rows)
     assert run2.changes == []
     run2.apply()
     session.commit()
@@ -177,7 +177,7 @@ def test_idempotency_same_import_twice_produces_no_changes_second_time(session):
 
 def test_provided_pk_wins_over_lookup_allows_changing_lookup_fields(session):
     # Pass 1: create Project + Patient via lookup keys.
-    run1 = plan_import(
+    run1 = plan_image_import(
         session,
         [
             ImportRow(
@@ -202,7 +202,7 @@ def test_provided_pk_wins_over_lookup_allows_changing_lookup_fields(session):
 
     # Pass 2: provide PKs, but change the lookup fields. This must update the
     # existing rows rather than creating new ones based on the new lookup keys.
-    run2 = plan_import(
+    run2 = plan_image_import(
         session,
         [
             ImportRow(

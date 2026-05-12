@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Mapping
-
-from eyened_orm.base import Base
 from eyened_orm import (
     Project,
     Patient,
@@ -14,66 +10,11 @@ from eyened_orm import (
     DeviceInstance,
     ImageInstance,
     ImageStorage,
+    ModalityTable,
+    Scan,
 )
 
-
-@dataclass(frozen=True, slots=True)
-class LookupPart:
-    column: str
-    source: Entity | None
-
-
-@dataclass(frozen=True, slots=True)
-class Lookup:
-    parts: tuple[LookupPart, ...]
-
-    @property
-    def columns(self) -> tuple[str, ...]:
-        return tuple(part.column for part in self.parts)
-
-    @property
-    def tokens(self) -> tuple[Entity | None, ...]:
-        return tuple(part.source for part in self.parts)
-
-
-@dataclass(slots=True, eq=False)
-class Entity:
-    model: type[Base]
-    pk_column: str
-    pk_row_field: str
-    lookups: tuple[Lookup, ...]
-    fields: Mapping[str, str]
-    non_mutable: frozenset[str] = frozenset()
-    anonymous_identity: str | None = None
-    implies: tuple[tuple[Entity, str], ...] = ()
-
-    @property
-    def lookup(self) -> Lookup:
-        return self.lookups[0]
-
-    @property
-    def lookup_columns(self) -> tuple[str, ...]:
-        return self.lookup.columns
-
-    @property
-    def lookup_tokens(self) -> tuple[str | Entity, ...]:
-        return self.lookup.tokens
-
-    @property
-    def name(self) -> str:
-        return self.model.__tablename__
-
-    def __repr__(self) -> str:
-        return f"Entity({self.name})"
-
-
-def key(column: str, source: Entity | None = None) -> LookupPart:
-    return LookupPart(column=column, source=source)
-
-
-def lookup(*parts: LookupPart) -> Lookup:
-    return Lookup(parts=parts)
-
+from .importer_mappings_base import CONTACT, Entity, key, lookup, opt, req
 
 PROJECT = Entity(
     model=Project,
@@ -81,6 +22,7 @@ PROJECT = Entity(
     pk_row_field="project_id",
     lookups=(lookup(key("ProjectName")),),
     anonymous_identity="project_name",  # this will make the importer create a new project using this name as fallback if not found
+    implies=(opt(CONTACT, "Contact"),),
     fields={
         "ProjectName": "project_name",
         "External": "project_external",
@@ -100,7 +42,7 @@ PATIENT = Entity(
             key("PatientIdentifier"),
         ),
     ),
-    implies=((PROJECT, "Project"),),
+    implies=(req(PROJECT, "Project"),),
     fields={
         "PatientIdentifier": "patient_identifier",
         "Sex": "sex",
@@ -118,7 +60,7 @@ STUDY = Entity(
             key("StudyDate"),
         ),
     ),
-    implies=((PATIENT, "Patient"),),
+    implies=(req(PATIENT, "Patient"),),
     fields={
         "StudyDate": "study_date",
         "StudyDescription": "study_description",
@@ -132,7 +74,7 @@ SERIES = Entity(
     pk_row_field="series_id",
     lookups=(lookup(key("SeriesInstanceUid")),),
     anonymous_identity="series_anonymous_identity",
-    implies=((STUDY, "Study"),),
+    implies=(req(STUDY, "Study"),),
     fields={
         "SeriesNumber": "series_number",
         "SeriesInstanceUid": "series_instance_uid",
@@ -177,10 +119,30 @@ DEVICE_INSTANCE = Entity(
             key("Description"),
         ),
     ),
-    implies=((DEVICE_MODEL, "DeviceModel"),),
+    implies=(req(DEVICE_MODEL, "DeviceModel"),),
     fields={
         "Description": "device_description",
         "SerialNumber": "device_serial_number",
+    },
+)
+
+SCAN = Entity(
+    model=Scan,
+    pk_column="ScanID",
+    pk_row_field="scan_id",
+    lookups=(lookup(key("ScanMode")),),
+    fields={
+        "ScanMode": "scan_mode",
+    },
+)
+
+MODALITY_TABLE = Entity(
+    model=ModalityTable,
+    pk_column="ModalityID",
+    pk_row_field="modality_id",
+    lookups=(lookup(key("ModalityTag")),),
+    fields={
+        "ModalityTag": "modality_tag",
     },
 )
 
@@ -194,8 +156,10 @@ IMAGE_INSTANCE = Entity(
     ),
     anonymous_identity="image_anonymous_identity",
     implies=(
-        (SERIES, "Series"),
-        (DEVICE_INSTANCE, "DeviceInstance"),
+        req(SERIES, "Series"),
+        req(DEVICE_INSTANCE, "DeviceInstance"),
+        opt(SCAN, "Scan"),
+        opt(MODALITY_TABLE, "_Modality"),
     ),
     fields={
         "SOPInstanceUid": "sop_instance_uid",
@@ -207,11 +171,13 @@ IMAGE_INSTANCE = Entity(
         "Rows_y": "height",
         "Columns_x": "width",
         "NrOfFrames": "depth",
+        "SliceThickness": "slice_thickness",
         "ResolutionHorizontal": "resolution_horizontal",
         "ResolutionVertical": "resolution_vertical",
         "ResolutionAxial": "resolution_axial",
         "OldPath": "old_path",
         "DatasetIdentifier": "dataset_identifier",
+        "AltDatasetIdentifier": "alt_dataset_identifier",
         "SourceInfoID": "source_info_id",
         "AnatomicRegion": "anatomic_region",
         "AcquisitionDateTime": "acquisition_date_time",
@@ -222,10 +188,14 @@ IMAGE_INSTANCE = Entity(
         "PhotometricInterpretation": "photometric_interpretation",
         "PupilDilated": "pupil_dilated",
         "FDAIdentifier": "fda_identifier",
-        "ModalityID": "modality_id",
-        "ScanID": "scan_id",
         "Inactive": "inactive",
         "ThumbnailPath": "thumbnail_path",
+        "DateInserted": "date_inserted",
+        "DateModified": "date_modified",
+        "DatePreprocessed": "date_preprocessed",
+        "CFROI": "cf_roi",
+        "CFKeypoints": "cf_keypoints",
+        "CFQuality": "cf_quality",
     },
     non_mutable=frozenset({"PublicID"}),
 )
@@ -241,8 +211,8 @@ IMAGE_STORAGE = Entity(
         ),
     ),
     implies=(
-        (STORAGE_BACKEND, "StorageBackend"),
-        (IMAGE_INSTANCE, "ImageInstance"),
+        req(STORAGE_BACKEND, "StorageBackend"),
+        req(IMAGE_INSTANCE, "ImageInstance"),
     ),
     fields={
         "ObjectKey": "object_key",
@@ -254,6 +224,7 @@ IMAGE_STORAGE = Entity(
 )
 
 ENTITY_SPECS = (
+    CONTACT,
     STORAGE_BACKEND,
     IMAGE_STORAGE,
     IMAGE_INSTANCE,
@@ -263,4 +234,6 @@ ENTITY_SPECS = (
     PROJECT,
     DEVICE_INSTANCE,
     DEVICE_MODEL,
+    SCAN,
+    MODALITY_TABLE,
 )

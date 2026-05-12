@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 
 from eyened_orm import ImageStorage, Project
-from eyened_orm.importer.importer import plan_import
+from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
 from eyened_orm.importer.import_run import ImportRun
 
@@ -38,7 +38,7 @@ def test_import_run_json_roundtrip_undo_new_session(SessionLocal, tmp_path):
     ]
 
     with SessionLocal() as s1:
-        run = plan_import(s1, rows, defaults=defaults)
+        run = plan_image_import(s1, rows, defaults=defaults)
         run.apply()
         s1.commit()
 

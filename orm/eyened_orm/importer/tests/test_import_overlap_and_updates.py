@@ -15,7 +15,7 @@ from eyened_orm import (
     StorageBackend,
     Study,
 )
-from eyened_orm.importer.importer import plan_import
+from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
 
 
@@ -75,7 +75,7 @@ def test_two_phase_import_partial_overlap_reuses_and_updates(session):
         ),
     ]
 
-    run1 = plan_import(session, rows_phase1, defaults=DEFAULTS)
+    run1 = plan_image_import(session, rows_phase1, defaults=DEFAULTS)
     run1.apply()
     session.commit()
 
@@ -155,7 +155,7 @@ def test_two_phase_import_partial_overlap_reuses_and_updates(session):
         ),
     ]
 
-    run2 = plan_import(session, rows_phase2, defaults=DEFAULTS)
+    run2 = plan_image_import(session, rows_phase2, defaults=DEFAULTS)
     run2.apply()
     session.commit()
 
@@ -237,7 +237,7 @@ def test_mixed_keying_strategies_in_one_batch(session):
         ),
     ]
 
-    run = plan_import(session, rows, defaults=DEFAULTS)
+    run = plan_image_import(session, rows, defaults=DEFAULTS)
     run.apply()
     session.commit()
 
