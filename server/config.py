@@ -52,6 +52,7 @@ class OIDCSettings(BaseSettings):
     client_id: str = ""
     client_secret: SecretStr = ""
     connect_url: str = ""
+    redirect_url: str = ""
     provider_name: str = "OpenID Connect"
 
     @property
