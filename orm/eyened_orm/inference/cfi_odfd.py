@@ -6,12 +6,12 @@ import numpy as np
 import torch
 
 from eyened_orm import AttributeDataType
-from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
+from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
 from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference import RegressionEnsemble
 
 
-class CFI_ODFD(AttributeInferencePipeline):
+class CFI_ODFD(TorchAttributeInferencePipeline):
     """CFI Optic Disc to Fovea Distance estimation pipeline."""
 
     model_name = "CFI_ODFD"

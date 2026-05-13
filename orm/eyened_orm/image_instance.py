@@ -172,7 +172,6 @@ class ImageStorage(Base):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
 
-
     ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance",
         back_populates="ImageStorages",
@@ -480,9 +479,11 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def roi(self) -> Optional[Dict[str, Any]]:
-        roi = self.get_attribute_value(attribute_name="CFI_ROI") 
+        roi = self.get_attribute_value(attribute_name="CFI_ROI")
         if roi is not None:
-            roi["hw"] = (self.Rows_y, self.Columns_x)
+            # this may be missing in the database for older images
+            if "hw" not in roi:
+                roi["hw"] = (self.Rows_y, self.Columns_x)
         return roi
 
     @property
@@ -523,6 +524,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             raise ValueError(
                 f"Error parsing metadata for ImageInstance {self.ImageInstanceID}"
             ) from e
+
         def load_image(index: int) -> np.ndarray:
             raw = adapter.read_image_data(self, index=index)
             return np.array(Image.open(io.BytesIO(raw)))
@@ -558,20 +560,69 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def pixel_array(self) -> np.ndarray:
+        array = None
         format = self.primary_storage.Format
         if format == "dicom":
-            return self._load_dicom_array()
-        if format == "binary":
-            return self._load_binary_array()
-        if format == "png_series":
-            return self._load_png_series_array()
-        if format == "mhd":
-            return self._load_mhd_array()
-        # assuming image format that PIL can handle
-        return self._load_single_image_array()
+            array = self._load_dicom_array()
+        elif format == "binary":
+            array = self._load_binary_array()
+        elif format == "png_series":
+            array = self._load_png_series_array()
+        elif format == "mhd":
+            array = self._load_mhd_array()
+        else:
+            # assuming image format that PIL can handle
+            array = self._load_single_image_array()
+        self._update_image_dimensions(array)
+        return array
+
+    def _update_image_dimensions(self, array: np.ndarray):
+        shape = array.shape
+        h = None
+        w = None
+        n_frames = None
+        if len(shape) == 2:
+            h, w = shape
+        elif len(shape) == 3:
+            if shape[2] > 4:
+                n_frames, h, w = shape
+            else:
+                h, w, _ = shape
+        else:
+            print(f"Invalid shape: {shape}")
+        if self.Rows_y is None:
+            self.Rows_y = h
+        else:
+            if self.Rows_y != h:
+                print(f"Rows_y mismatch: {self.Rows_y} != {h}")
+        if self.Columns_x is None:
+            self.Columns_x = w
+        else:
+            if self.Columns_x != w:
+                print(f"Columns_x mismatch: {self.Columns_x} != {w}")
+        if self.NrOfFrames is None:
+            self.NrOfFrames = n_frames
+        else:
+            if self.NrOfFrames != n_frames:
+                if n_frames is None and self.NrOfFrames == 1:
+                    # we don't really have a convention for how to set NrOfFrames for single-frame images 
+                    # e.g. for CFI or other 2D images, both None and 1 seem valid
+                    pass
+                else:
+                    print(f"NrOfFrames mismatch: {self.NrOfFrames} != {n_frames}")
 
     @property
     def bounds(self) -> Optional[CFIBounds]:
+        if self.roi is None:
+            return None
+        else:
+            if "success" in self.roi and self.roi["success"] is False:
+                return None
+            # use bounds from database
+            return CFIBounds(**self.roi)
+
+    @property
+    def bounds_with_image(self) -> Optional[CFIBounds]:
         if self.roi is None:
             return None
         else:
@@ -944,7 +995,9 @@ class SourceInfo(Base):
     SourceName: Mapped[str] = mapped_column(String(64), unique=True)
 
     SourcePath: Mapped[str] = mapped_column(String(250), unique=True)
-    ThumbnailPath: Mapped[Optional[str]] = mapped_column(String(250), unique=True, nullable=True)
+    ThumbnailPath: Mapped[Optional[str]] = mapped_column(
+        String(250), unique=True, nullable=True
+    )
 
     ImageInstances: Mapped[List["ImageInstance"]] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="SourceInfo"

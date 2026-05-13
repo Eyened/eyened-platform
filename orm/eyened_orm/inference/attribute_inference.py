@@ -1,7 +1,6 @@
 from typing import Any, Iterable, Iterator, List, Set, Tuple
 
 import numpy as np
-import torch
 from tqdm import tqdm
 
 from eyened_orm import (
@@ -31,7 +30,9 @@ class AttributeInferencePipeline(BaseInferencePipeline):
     - _load_models() - called before processing starts
     - filter_image_ids(image_ids) - filter/skip existing (return filtered set)
     - _save_result(image_id, result) - customize how results are saved
-    - _normalize_device() - customize device initialization
+
+    PyTorch-based pipelines should subclass :class:`TorchAttributeInferencePipeline`
+    instead (so environments without torch can import this module).
     """
 
     # Subclasses should define these class attributes
@@ -116,38 +117,6 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             update_values=update_values,
         )
 
-    def _prepare_torch_batch(
-        self,
-        prep_batch: List[Any],
-    ) -> torch.Tensor:
-        """Prepare preprocessed batch for torch processing.
-
-        Args:
-            prep_batch: List of preprocessed items (should be tuples of (_, image_array))
-
-        Returns:
-            Torch tensor ready for model forward pass
-        """
-        x_np = np.stack([x_im.transpose(2, 0, 1) for _, x_im in prep_batch], axis=0)
-        return torch.from_numpy(x_np).to(device=self.device, dtype=torch.float32)
-
-    def _run_torch_forward(
-        self,
-        x_in: torch.Tensor,
-        model_forward_fn,
-    ) -> np.ndarray:
-        """Run torch model forward pass.
-
-        Args:
-            x_in: Input torch tensor
-            model_forward_fn: Function that takes torch tensor and returns model output
-
-        Returns:
-            Model output as numpy array
-        """
-        with torch.no_grad():
-            return model_forward_fn(x_in).detach().cpu().numpy()
-
     def filter_image_ids(self, image_ids: Iterable[int]) -> Set[int]:
         """Filter out image IDs that already have results.
 
@@ -218,3 +187,20 @@ class AttributeInferencePipeline(BaseInferencePipeline):
                 continue
             self._save_result(image_id, result)
         self.session.commit()
+
+
+class TorchAttributeInferencePipeline(AttributeInferencePipeline):
+    """Attribute pipeline that runs PyTorch models (imports ``torch`` only when used)."""
+
+    def _prepare_torch_batch(self, prep_batch: List[Any]) -> Any:
+        """Prepare preprocessed batch for torch processing."""
+        import torch
+
+        x_np = np.stack([x_im.transpose(2, 0, 1) for _, x_im in prep_batch], axis=0)
+        return torch.from_numpy(x_np).to(device=self.device, dtype=torch.float32)
+
+    def _run_torch_forward(self, x_in: Any, model_forward_fn) -> np.ndarray:
+        import torch
+
+        with torch.no_grad():
+            return model_forward_fn(x_in).detach().cpu().numpy()

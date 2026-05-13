@@ -1,0 +1,28 @@
+FROM pytorch/pytorch:2.6.0-cuda11.8-cudnn9-runtime
+
+SHELL ["/bin/bash", "-c"]
+
+# System deps for OpenCV (common inference dependency chain)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Base server deps (includes rq/redis/etc.)
+COPY server/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ORM + server code (worker imports task entrypoints from server.utils.tasks)
+COPY orm /app/orm
+RUN pip install --no-cache-dir -e /app/orm
+COPY server /app/server
+
+# AMD segmentation dependency (provides `cfi_amd.processor`)
+RUN pip install --no-cache-dir "git+https://github.com/Eyened/cfi-amd.git"
+
+ENV PYTHONPATH=/app
+WORKDIR /app
+
+CMD ["python", "-m", "server.rq_worker"]
+

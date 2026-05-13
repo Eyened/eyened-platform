@@ -1,0 +1,20 @@
+# Slim worker: ``cfi-roi`` + ``default`` (thumbnail jobs from the API use ``default``).
+# Run beside the full GPU worker with EYENED_RQ_WORKER_QUEUES excluding ``cfi-roi`` (and
+# optionally ``default`` if thumbnails should stay on this container only).
+
+name: eyened-platform-worker-cfi-roi
+
+services:
+  worker-cfi-roi:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.cfi-roi
+    env_file: .env
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      EYENED_RQ_WORKER_QUEUES: cfi-roi,default
+    volumes:    
+      - ${EYENED_STORAGE_ROOT:?}:${EYENED_STORAGE_ROOT:?}
+      - /mnt/oogergo:/mnt/oogergo:ro
+      - /mnt/genr:/mnt/genr:ro
+    restart: unless-stopped

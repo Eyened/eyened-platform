@@ -1,7 +1,22 @@
 name: eyened-platform-dev
 
 services:
-  
+
+  redis:
+    image: redis:7-alpine
+    env_file: .env
+    environment:
+      REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
+    ports:
+      - "${EYENED_REDIS_PUBLISH_PORT:-6379}:6379"
+    command: >
+      sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   fileserver:
     env_file: .env
     image: nginx:latest
@@ -22,6 +37,10 @@ services:
     build:
       context: ..
       dockerfile: dev/Dockerfile.server
+    environment:
+      EYENED_REDIS_HOST: redis
+      EYENED_REDIS_PORT: "6379"
+      EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
     volumes:
       - ../server:/app/server
       - ../orm:/app/orm
@@ -29,6 +48,8 @@ services:
       #- <filestorage_mount>:<filestorage_mount>:ro
     depends_on:
       database:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   client:

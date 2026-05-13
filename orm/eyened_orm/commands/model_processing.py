@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from collections.abc import Iterable
 
 import click
 
@@ -16,22 +16,124 @@ def _load_image_ids(path: str) -> set[int]:
 
 
 def _get_device(device: str | None):
+    """Get torch device from string or auto-detect."""
     import torch
     from eyened_orm.inference.utils import auto_device
 
-    """Get torch device from string or auto-detect."""
     if device is None:
         return auto_device()
     return torch.device(device)
+
+
+CFI_ATTRIBUTE_MODEL_SLUGS: tuple[str, ...] = (
+    "cfi-roi",
+    "cfi-keypoints",
+    "cfi-odfd",
+    "cfi-quality",
+)
+
+CFI_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("cfi-amd",)
+
+
+def _cfi_pipeline_class(model_name: str):
+
+    if model_name == "cfi-roi":
+        from eyened_orm.inference.cfi_roi import CFI_ROI
+
+        return CFI_ROI
+    if model_name == "cfi-keypoints":
+        from eyened_orm.inference.cfi_keypoints import CFIKeypoints
+
+        return CFIKeypoints
+    if model_name == "cfi-odfd":
+        from eyened_orm.inference.cfi_odfd import CFI_ODFD
+
+        return CFI_ODFD
+    if model_name == "cfi-quality":
+        from eyened_orm.inference.cfi_quality import CFI_Quality
+
+        return CFI_Quality
+    raise ValueError(f"Unknown CFI model: {model_name!r}")
+
+
+def run_cfi_attribute_pipeline(
+    session,
+    image_ids: Iterable[int],
+    model_slug: str,
+    *,
+    device=None,
+    batch_size: int = 8,
+    n_workers: int = 16,
+    overwrite: bool = False,
+    commit_interval: int = 100,
+) -> None:
+    """Run a single CFI attribute pipeline (one slug). RQ jobs call this once per job."""
+    image_ids = set(image_ids)
+    model_class = _cfi_pipeline_class(model_slug)
+    print(f"Running {model_slug}")
+    pipeline = model_class(
+        session,
+        device=device,
+        n_workers=n_workers,
+        batch_size=batch_size,
+    )
+    if overwrite:
+        filtered = image_ids
+        print(f"Processing {len(filtered)} images (overwrite)")
+    else:
+        filtered = pipeline.filter_image_ids(image_ids)
+        print(f"Processing {len(filtered)} images (after filtering existing)")
+    if not filtered:
+        print("No images to process")
+        return
+    pipeline.run(filtered, commit_interval=commit_interval)
+    session.commit()
+    print(f"Completed processing {len(filtered)} images")
+
+
+def run_cfi_segmentation_pipeline(
+    session,
+    image_ids: Iterable[int],
+    model_slug: str,
+    *,
+    device=None,
+    batch_size: int = 8,
+    n_workers: int = 12,
+    overwrite: bool = False,
+) -> None:
+    """Run a single CFI segmentation pipeline (one slug). RQ jobs call this once per job."""
+    image_ids = set(image_ids)
+    if model_slug != "cfi-amd":
+        raise ValueError(f"Unknown CFI segmentation model: {model_slug!r}")
+
+    from eyened_orm.inference.cfi_amd_segmentation import CFI_AMD
+
+    print(f"Running {model_slug}")
+    pipeline = CFI_AMD(
+        session,
+        device=device,
+        n_workers=n_workers,
+        batch_size=batch_size,
+    )
+    if overwrite:
+        filtered = image_ids
+        print(f"Processing {len(filtered)} images (overwrite)")
+    else:
+        filtered = pipeline.filter_image_ids(image_ids)
+        print(f"Processing {len(filtered)} images (after filtering existing)")
+    if not filtered:
+        print("No images to process")
+        return
+    pipeline.run(filtered)
+    session.commit()
+    print(f"Completed processing {len(filtered)} images")
 
 
 @click.command(name="run-models")
 @click.option(
     "-m",
     "--model",
-    type=click.Choice(
-        ["cfi-roi", "cfi-keypoints", "cfi-odfd", "cfi-quality"], case_sensitive=False
-    ),
+    type=click.Choice(list(CFI_ATTRIBUTE_MODEL_SLUGS), case_sensitive=False),
     required=False,
     help="Model to run (if not specified, runs all models)",
 )
@@ -92,51 +194,25 @@ def run_models(model, path, device, batch_size, n_workers, overwrite, commit_int
 
     device_obj = _get_device(device)
 
-    from eyened_orm.inference.cfi_roi import CFI_ROI
-    from eyened_orm.inference.cfi_keypoints import CFIKeypoints
-    from eyened_orm.inference.cfi_odfd import CFI_ODFD
-    from eyened_orm.inference.cfi_quality import CFI_Quality
-
-    models = {
-        "cfi-roi": CFI_ROI,
-        "cfi-keypoints": CFIKeypoints,
-        "cfi-odfd": CFI_ODFD,
-        "cfi-quality": CFI_Quality,
-    }
-
     with database.get_session() as session:
-        for model_name, model_class in models.items():
-            if model == model_name or model is None:
-                print(f"Running {model_name}")
-                pipeline = model_class(
-                    session,
-                    device=device_obj,
-                    n_workers=n_workers,
-                    batch_size=batch_size,
-                )
-
-                # Filter existing results unless overwrite is enabled
-                if not overwrite:
-                    filtered_image_ids = pipeline.filter_image_ids(image_ids)
-                    print(
-                        f"Processing {len(filtered_image_ids)} images (after filtering existing)"
-                    )
-
-                if not filtered_image_ids:
-                    print("No images to process")
-                    continue
-
-                # Run inference
-                pipeline.run(filtered_image_ids, commit_interval=commit_interval)
-                session.commit()
-                print(f"Completed processing {len(filtered_image_ids)} images")
+        for slug in [model] if model is not None else CFI_ATTRIBUTE_MODEL_SLUGS:
+            run_cfi_attribute_pipeline(
+                session,
+                image_ids,
+                slug,
+                device=device_obj,
+                batch_size=batch_size,
+                n_workers=n_workers,
+                overwrite=overwrite,
+                commit_interval=commit_interval,
+            )
 
 
 @click.command(name="run-segmentation")
 @click.option(
     "-m",
     "--model",
-    type=click.Choice(["cfi-amd"], case_sensitive=False),
+    type=click.Choice(list(CFI_SEGMENTATION_MODEL_SLUGS), case_sensitive=False),
     required=False,
     help="Segmentation model to run (if not specified, runs all models)",
 )
@@ -188,37 +264,18 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
 
     device_obj = _get_device(device)
 
-    from eyened_orm.inference.cfi_amd_segmentation import CFI_AMD
-
-    models = {
-        "cfi-amd": CFI_AMD,
-    }
-
     with database.get_session() as session:
-        for model_name, model_class in models.items():
-            if model == model_name or model is None:
-                print(f"Running {model_name}")
-                pipeline = model_class(
-                    session,
-                    device=device_obj,
-                    n_workers=n_workers,
-                    batch_size=batch_size,
-                )
-
-                # Filter existing results unless skip_existing is disabled
-                if skip_existing:
-                    image_ids = pipeline.filter_image_ids(image_ids)
-                    print(
-                        f"Processing {len(image_ids)} images (after filtering existing)"
-                    )
-
-                if not image_ids:
-                    print("No images to process")
-                    continue
-
-                # Run inference
-                pipeline.run(image_ids)
-                print(f"Completed processing {len(image_ids)} images")
+        slugs = [model] if model is not None else CFI_SEGMENTATION_MODEL_SLUGS
+        for slug in slugs:
+            run_cfi_segmentation_pipeline(
+                session,
+                image_ids,
+                slug,
+                device=device_obj,
+                batch_size=batch_size,
+                n_workers=n_workers,
+                overwrite=not skip_existing,
+            )
 
 
 # @click.command(name="run-models")
