@@ -15,9 +15,8 @@ def _count(session, model) -> int:
 
 
 def test_missing_project_identification_rejected(session):
-    # Project requires either an existing project_id, a resolvable project_name, or a
-    # non-null project_name for anonymous creation. Leaving both empty should fail
-    # early (before apply/flush), because we can't build the required entity graph.
+    # Project requires either project_id, resolvable project_name, or enough context to build
+    # the graph. Leaving both project_id and project_name empty should fail during planning.
     rows = [
         ImportRow(
             project_name=None,
@@ -35,46 +34,6 @@ def test_missing_project_identification_rejected(session):
 
     with pytest.raises(RuntimeError, match="Missing parent"):
         plan_image_import(session, rows)
-
-
-def test_anonymous_project_creation_creates_project_and_links_downstream(session):
-    rows = [
-        ImportRow(
-            project_name="new",
-            project_id=None,
-            project_external="Y",
-            dataset_identifier="",
-            patient_identifier="p1",
-            study_date=datetime.now().date(),
-            series_anonymous_identity=1,
-            manufacturer="m",
-            manufacturer_model_name="mm",
-            device_description="d",
-            storage_backend_key="sb",
-            storage_backend_kind="test-kind",
-            object_key="x.png",
-        )
-    ]
-
-    run = plan_image_import(session, rows)
-    run.apply()
-    session.commit()
-
-    assert _count(session, Project) == 1
-    assert _count(session, Patient) == 1
-
-    proj = Project.by_name(session, "new")
-    assert proj is not None
-
-    storage = session.scalar(select(ImageStorage))
-    assert storage is not None
-
-    # Ensure the full parent chain is linked to the created Project.
-    assert storage.ImageInstance is not None
-    assert storage.ImageInstance.Series is not None
-    assert storage.ImageInstance.Series.Study is not None
-    assert storage.ImageInstance.Series.Study.Patient is not None
-    assert storage.ImageInstance.Series.Study.Patient.Project is proj
 
 
 def test_two_rows_same_image_storage_lookup_key_dedupes_and_merges_updates(session):

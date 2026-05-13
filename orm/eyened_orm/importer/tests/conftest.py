@@ -45,6 +45,7 @@ def engine():
     # Importing the package registers all ORM models on Base.metadata.
     import eyened_orm  # noqa: F401
     from eyened_orm.base import Base
+    from sqlalchemy import event
 
     _install_sqlite_type_shims()
 
@@ -54,6 +55,13 @@ def engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    @event.listens_for(engine, "connect")
+    def _sqlite_set_pragma(dbapi_connection, _connection_record):  # noqa: ANN001
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(engine)
     return engine
 

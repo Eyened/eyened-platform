@@ -17,8 +17,8 @@ def _count(session, model) -> int:
     return session.scalar(select(func.count()).select_from(model))
 
 
-def test_expand_task_import_rows_doc_example():
-    """Two groups ``[a,b,c]`` and ``[a,d,e]`` → six flat rows; anon 1 then 2; indices per group."""
+def test_expand_task_rows_replicates_template_per_image_with_subtask_grouping():
+    """Each image group gets ``subtask_anonymous_identity`` 1, 2, … and per-image ``subtask_image_index`` within the group."""
     shared = ImportTaskRow(
         task_definition_name="td",
         task_name="t1",
@@ -43,13 +43,13 @@ def test_expand_task_import_rows_doc_example():
     )
 
 
-def test_expand_empty_or_skipped_image_lists():
+def test_expand_task_rows_skips_empty_image_groups():
     assert expand_task_import_rows(ImportTaskRow(creator_name="c"), []) == []
     assert expand_task_import_rows(ImportTaskRow(creator_name="c"), [[]]) == []
 
 
-def test_plan_import_grouped_subtasks_and_images(session):
-    """Five images; two anonymous subtasks with overlapping image ids → flat expand → DB."""
+def test_expanded_overlapping_subtasks_import_six_links(session):
+    """Expanded rows with overlapping image ids across two subtasks yield six ``SubTaskImageLink`` rows."""
     defaults = {
         "project_external": "Y",
         "manufacturer": "tm",

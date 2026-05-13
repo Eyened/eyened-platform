@@ -87,7 +87,7 @@ For bulk imports, patching existing metadata, and repeatable “plan → review 
 The workflow is:
 
 - Build `ImportRow` objects (or load them from CSV)
-- `plan_import(session, rows, ...)` → returns an `ImportRun`
+- `plan_image_import(session, rows, ...)` → returns an `ImportRun` (image rows; merges defaults / inference then plans)
 - Review with `run.display_summary()` / `run.full_summary()`
 - Apply with `run.apply()` and `session.commit()`
 - Optionally write/read JSON for audit + undo (`run.write_json(...)` / `ImportRun.read_json(...)`)
@@ -183,7 +183,7 @@ For bulk imports, patching existing metadata, and repeatable “plan → review 
 The workflow is:
 
 - Build `ImportRow` objects (or load them from CSV)
-- `plan_import(session, rows, ...)` → returns an `ImportRun`
+- `plan_image_import(session, rows, ...)` → returns an `ImportRun` (image rows; merges defaults / inference then plans)
 - Review with `run.display_summary()` / `run.full_summary()`
 - Apply with `run.apply()` and `session.commit()`
 - Optionally write/read JSON for audit + undo (`run.write_json(...)` / `ImportRun.read_json(...)`)
@@ -279,7 +279,7 @@ For bulk imports, patching existing metadata, and repeatable “plan → review 
 The workflow is:
 
 - Build `ImportRow` objects (or load them from CSV)
-- `plan_import(session, rows, ...)` → returns an `ImportRun`
+- `plan_image_import(session, rows, ...)` → returns an `ImportRun` (image rows; merges defaults / inference then plans)
 - Review with `run.display_summary()` / `run.full_summary()`
 - Apply with `run.apply()` and `session.commit()`
 - Optionally write/read JSON for audit + undo (`run.write_json(...)` / `ImportRun.read_json(...)`)

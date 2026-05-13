@@ -21,7 +21,6 @@ PROJECT = Entity(
     pk_column="ProjectID",
     pk_row_field="project_id",
     lookups=(lookup(key("ProjectName")),),
-    anonymous_identity="project_name",  # this will make the importer create a new project using this name as fallback if not found
     implies=(opt(CONTACT, "Contact"),),
     fields={
         "ProjectName": "project_name",

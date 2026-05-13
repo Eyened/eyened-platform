@@ -57,18 +57,6 @@ class Entity:
     implies: tuple[Implication, ...] = ()
 
     @property
-    def lookup(self) -> Lookup:
-        return self.lookups[0]
-
-    @property
-    def lookup_columns(self) -> tuple[str, ...]:
-        return self.lookup.columns
-
-    @property
-    def lookup_tokens(self) -> tuple[str | "Entity", ...]:
-        return self.lookup.tokens
-
-    @property
     def name(self) -> str:
         return self.model.__tablename__
 
