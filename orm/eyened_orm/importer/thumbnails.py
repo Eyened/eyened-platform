@@ -1,7 +1,7 @@
 from os import PathLike
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -80,8 +80,18 @@ def generate_thumbnail_base_image(im: ImageInstance, *, max_size: int) -> Image.
 def generate_thumbnails(
     pil_im: Image.Image, sizes: list[int]
 ) -> dict[int, Image.Image]:
-    """Generate resized thumbnail images keyed by their size."""
-    return {size: pil_im.copy().resize((size, size)) for size in sizes}
+    """Generate square thumbnail images keyed by their size.
+
+    Letterboxed: full image centered, aspect ratio preserved, border filled
+    with zeros (per channel).
+    """
+    bands = pil_im.getbands()
+    pad_color = 0 if len(bands) == 1 else (0,) * len(bands)
+    resample = Image.Resampling.LANCZOS
+    return {
+        size: ImageOps.pad(pil_im, (size, size), method=resample, color=pad_color)
+        for size in sizes
+    }
 
 
 def save_thumbnail_images(
