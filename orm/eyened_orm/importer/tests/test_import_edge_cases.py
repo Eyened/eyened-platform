@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from sqlalchemy import func, select
 
-from eyened_orm import ImageStorage, Patient, Project
+from eyened_orm import ImageInstance, ImageStorage, Patient, Project
 from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
 
@@ -36,36 +36,35 @@ def test_missing_project_identification_rejected(session):
         plan_image_import(session, rows)
 
 
-def test_two_rows_same_image_storage_lookup_key_dedupes_and_merges_updates(session):
+def test_image_anonymous_identity_one_instance_two_storages(session):
+    """No SOP/PublicID: shared ``image_anonymous_identity`` merges instance; distinct ``object_key`` yields two storages."""
+    d = date(2026, 6, 15)
+    anon = 77
+    common = dict(
+        project_name="anon-img-2stor",
+        project_external="Y",
+        dataset_identifier="",
+        patient_identifier="p1",
+        study_date=d,
+        series_anonymous_identity=1,
+        image_anonymous_identity=anon,
+        manufacturer="m",
+        manufacturer_model_name="mm",
+        device_description="d",
+        storage_backend_key="sb-2stor",
+        storage_backend_kind="test-kind",
+        modality="ColorFundus",
+        laterality="L",
+    )
     rows = [
         ImportRow(
-            project_name="dedupe-proj",
-            project_external="Y",
-            dataset_identifier="",
-            patient_identifier="p1",
-            study_date=datetime.now().date(),
-            series_anonymous_identity=1,
-            image_anonymous_identity=1,
-            manufacturer="m",
-            manufacturer_model_name="mm",
-            device_description="d",
-            storage_backend_key="sb",
-            storage_backend_kind="test-kind",
-            object_key="same.png",
+            **common,
+            object_key="first.png",
+            image_storage_is_primary=False,
         ),
-        # Same (storage_backend_key, object_key) => same ImageStorage lookup key.
-        # Keep ImageInstance consistent via image_anonymous_identity.
         ImportRow(
-            project_name="dedupe-proj",
-            project_external="Y",
-            dataset_identifier="",
-            patient_identifier="p1",
-            study_date=datetime.now().date(),
-            series_anonymous_identity=1,
-            image_anonymous_identity=1,
-            storage_backend_key="sb",
-            storage_backend_kind="test-kind",
-            object_key="same.png",
+            **common,
+            object_key="second.png",
             image_storage_is_primary=True,
         ),
     ]
@@ -74,20 +73,13 @@ def test_two_rows_same_image_storage_lookup_key_dedupes_and_merges_updates(sessi
     run.apply()
     session.commit()
 
-    assert _count(session, ImageStorage) == 1
-    storage = session.scalar(select(ImageStorage))
-    assert storage is not None
-    assert storage.ObjectKey == "same.png"
-    assert storage.IsPrimary is True
-
-    # Guardrail: ensure we didn't plan multiple ImageStorage creates.
-    image_storage_creates = [
-        c
-        for c in run.changes
-        if getattr(c, "name", None) == "CREATE"
-        and getattr(getattr(c, "entity", None), "__class__", None) is ImageStorage
-    ]
-    assert len(image_storage_creates) == 1
+    assert _count(session, ImageInstance) == 1
+    assert _count(session, ImageStorage) == 2
+    storages = session.scalars(select(ImageStorage)).all()
+    keys = {s.ObjectKey for s in storages}
+    assert keys == {"first.png", "second.png"}
+    assert sum(1 for s in storages if s.IsPrimary) == 1
+    assert sum(1 for s in storages if not s.IsPrimary) == 1
 
 
 def test_idempotency_same_import_twice_produces_no_changes_second_time(session):
@@ -98,8 +90,6 @@ def test_idempotency_same_import_twice_produces_no_changes_second_time(session):
             dataset_identifier="",
             patient_identifier="p1",
             study_date=datetime.now().date(),
-            series_anonymous_identity=1,
-            image_anonymous_identity=1,
             manufacturer="m",
             manufacturer_model_name="mm",
             device_description="d",

@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 from sqlalchemy import func, select
 
-from eyened_orm import Contact, ImageInstance, Project, Series
+from eyened_orm import Contact, ImageInstance, Project, Series, Study, Patient
 from eyened_orm.importer.importer import (
     build_image_import_rows,
     entity_build_order,
@@ -103,6 +103,57 @@ def test_series_anonymous_key_groups_images_without_series_uid(session):
     s = session.scalar(select(Series))
     assert s is not None
     assert s.SeriesInstanceUid is None
+
+
+def test_series_anonymous_identity_scoped_per_study_not_across_patients(session):
+    """Same ``series_anonymous_identity`` on different studies yields separate ``Series``."""
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "m",
+        "manufacturer_model_name": "mm",
+        "device_description": "d",
+        "dataset_identifier": "",
+        "storage_backend_kind": "local",
+    }
+    d = date(2026, 6, 10)
+    anon = 9001
+    rows = [
+        ImportRow(
+            project_name="proj-anon-scope",
+            patient_identifier="pat-a",
+            study_date=d,
+            series_anonymous_identity=anon,
+            sop_instance_uid="SOP-ANON-SCOPE-A",
+            manufacturer="m",
+            manufacturer_model_name="mm",
+            device_description="d",
+            storage_backend_key="sb-scope",
+            object_key="anon-scope-a.png",
+            modality="ColorFundus",
+            laterality="L",
+        ),
+        ImportRow(
+            project_name="proj-anon-scope",
+            patient_identifier="pat-b",
+            study_date=d,
+            series_anonymous_identity=anon,
+            sop_instance_uid="SOP-ANON-SCOPE-B",
+            manufacturer="m",
+            manufacturer_model_name="mm",
+            device_description="d",
+            storage_backend_key="sb-scope",
+            object_key="anon-scope-b.png",
+            modality="ColorFundus",
+            laterality="R",
+        ),
+    ]
+    run = plan_image_import(session, rows, defaults=defaults)
+    run.apply()
+    session.commit()
+
+    assert _count(session, Patient) == 2
+    assert _count(session, Study) == 2
+    assert _count(session, Series) == 2
 
 
 def test_sop_natural_key_ignores_conflicting_public_id_on_followup_import(session):

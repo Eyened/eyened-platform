@@ -383,7 +383,13 @@ class Builder:
 
             # this effectively creates a new entity for the row
             return (entity, "row", id(row))
-        return (entity, "group", anonymous_identity)
+            
+        parent_scope = tuple(
+            self.cache.get(imp.parent, row)
+            for imp in entity.implies
+            if imp.required
+        )
+        return (entity, "group", anonymous_identity, parent_scope)
 
     def build_entity(self, entity: Entity, import_run: ImportRun) -> None:
         # local cache for deduplication
