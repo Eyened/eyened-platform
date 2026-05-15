@@ -128,13 +128,15 @@
 
 <div
 	class="content"
+	role="group"
+	aria-label="{feature.name} segmentation [{segmentation.id}]"
 	class:loading={segmentationItem.loading}
 	class:active
 	class:empty-non-editable={!isEditable && isEmptyForCurrentSlice}
 	class:empty-editable={isEditable && isEmptyForCurrentSlice}
 	onpointerenter={pointerEnter}
 	onpointerleave={pointerLeave}
->
+>    
 	<div class="row">
 		<div>
 			{#if visible}
