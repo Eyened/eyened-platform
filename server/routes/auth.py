@@ -1,3 +1,8 @@
+import json
+import random
+from typing import Annotated
+from urllib.parse import quote, urlencode
+
 import jwt
 from datetime import datetime, timedelta, timezone
 from hashlib import pbkdf2_hmac
@@ -5,6 +10,7 @@ from hashlib import pbkdf2_hmac
 from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.utils.db_users import create_user, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
+from fastapi.params import Query
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -63,6 +69,14 @@ class CurrentUser:
     def get_creator(self, session: Session) -> Creator:
         return session.query(Creator).where(Creator.CreatorID == self.id).first()
 
+class AuthOptionsResponse(BaseModel):
+    password_enabled: bool
+    oidc_enabled: bool
+    oidc_provider_name: str
+
+class OIDCAuthorizationURLResponse(BaseModel):
+    url: str
+    random: int
 
 # JWT utilities
 def create_access_token(user_id: int, username: str, role: str | None = None) -> str:
@@ -482,3 +496,42 @@ async def logout(response: Response):
     response.delete_cookie(settings.jwt_cookie_name)
     response.delete_cookie(settings.refresh_cookie_name)
     return {"message": "Logged out successfully"}
+
+
+@router.get("/auth/options")
+async def get_auth_options():
+    """Options and settings for authentication."""
+    oidc_auth_enabled = settings.auth_oidc_enabled and await settings.oidc.get_authorize_url() is not None
+
+    return AuthOptionsResponse(
+        password_enabled=settings.auth_password_enabled,
+        oidc_enabled=oidc_auth_enabled,
+        oidc_provider_name=settings.oidc.provider_name,
+    )
+
+
+@router.get("/auth/oidc/authorize")
+async def get_oidc_authorization_url(next_: Annotated[str, Query(alias="next")] = "") -> OIDCAuthorizationURLResponse:
+    """The authorization URL at the OIDC provider for authentication."""
+    # The random value in state is used to safeguard the auth roundtrip against CSRF attacks
+    random_value = random.randint(1, 1_000_000)
+    state = quote(json.dumps({
+        "next": next_,
+        "random": random_value}
+    ))
+
+    url = await settings.oidc.get_authorize_url()
+    # TODO: Add nonce parameter?
+    params = {
+        "state": state,
+        "response_type": "code",
+        "client_id": settings.oidc.client_id,
+        "redirect_uri": settings.oidc.redirect_url,
+        "scope": "openid profile email",
+    }
+
+    authorization_url = f"{url}?{urlencode(params)}"
+    return OIDCAuthorizationURLResponse(
+        url=authorization_url,
+        random=random_value,
+    )

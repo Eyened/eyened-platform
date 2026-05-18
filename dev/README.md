@@ -72,4 +72,20 @@ cd ../../dev
   ```bash
   ./start_client_dev.sh
   ```
-  This will start the client in development mode, using vite hot-reload 
+  This will start the client in development mode, using vite hot-reload.
+
+## Run unit tests
+
+First time only: install testing dependencies
+
+```shell
+pip install -r ../server/test-requirements.txt
+```
+
+Then run `pytest` from the root folder:
+
+```shell
+pytest
+# or, when in ./dev:
+pytest ..
+```

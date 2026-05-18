@@ -1,4 +1,5 @@
 import { fetchApi } from '$lib/api/client';
+import { redirect } from "@sveltejs/kit";
 
 export interface UserResponse {
     id: number;
@@ -16,6 +17,17 @@ interface UserLogin {
 interface ChangePasswordRequest {
     old_password: string;
     new_password: string;
+}
+
+interface AuthOptions {
+    password_enabled: boolean;
+    oidc_enabled: boolean;
+    oidc_provider_name: string;
+}
+
+interface OIDCAuthorizationURLResponse {
+    url: string;
+    random: number;
 }
 
 class AuthClient {
@@ -118,6 +130,30 @@ class AuthClient {
 
         if (!response.ok) {
             throw new Error('Token refresh failed');
+        }
+
+        return response.json();
+    }
+
+    async options(): Promise<AuthOptions> {
+        const response= await fetchApi(`${this.baseUrl}/options`, {
+            skipAuthRetry: true,
+        });
+
+        if (!response.ok) {
+            throw new Error('Could not fetch authentication options');
+        }
+
+        return response.json();
+    }
+
+    async OIDCAuthorize(): Promise<OIDCAuthorizationURLResponse> {
+        const response = await fetchApi(`${this.baseUrl}/oidc/authorize`, {
+            skipAuthRetry: true,
+        })
+
+        if (!response.ok) {
+            throw new Error('OIDC authorize failed');
         }
 
         return response.json();
