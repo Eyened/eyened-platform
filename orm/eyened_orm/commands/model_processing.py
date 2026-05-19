@@ -498,7 +498,11 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
     ),
 )
 def run_registration(patient, project, replace, skip):
-    """Run registration processing for patients."""
+    """Run pairwise enface registration for patients or projects.
+
+    Stores transforms in a patient-level Registration attribute (JSON).
+    Requires --patient or --project. See --help for --replace and --skip.
+    """
     from eyened_orm import Patient, AttributeDefinition, AttributesModel
     from eyened_orm.utils.registration import run_patient
     import rtnls_registration

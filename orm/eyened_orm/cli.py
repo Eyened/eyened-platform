@@ -15,7 +15,7 @@ The following commands are available:
 - run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
 - run-cfi-amd: Run CFI AMD segmentation models.
-- run-registration: Run image registration for patients or projects.
+- run-registration: Pairwise CFI/AF/IR registration per patient; scope with --patient or --project.
 - validate-forms: Validate form annotations and schemas in the database.
 - zarr-tree: Display the structure of the zarr store, showing groups and array shapes.
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.

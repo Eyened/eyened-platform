@@ -1,11 +1,47 @@
+from __future__ import annotations
+
 from collections import defaultdict, deque
+from typing import Any
+
+import numpy as np
 from eyened_orm import ImageInstance, AttributeValue
 from rtnls_registration import Registration
+from rtnls_registration.transformation import (
+    CompositeTransform,
+    Polynomial2DTransform,
+    ProjectiveTransform,
+    Transform,
+)
+from sklearn.linear_model import LinearRegression
 
 
-def get_processed_edges(formAnnotation):
-    if formAnnotation.FormData:
-        processed = {(e["image1"], e["image2"]) for e in formAnnotation.FormData}
+def transform_from_dict(d: dict[str, Any]) -> Transform:
+    """Reconstruct an rtnls_registration transform from JSON (e.g. ``AttributeValue.ValueJSON`` edge)."""
+    ttype = d["type"]
+    if ttype == "CompositeTransform":
+        return CompositeTransform([transform_from_dict(t) for t in d["transforms"]])
+    if ttype == "ProjectiveTransform":
+        return ProjectiveTransform(np.array(d["Matrix"], dtype=float).reshape(3, 3))
+    if ttype == "Polynomial2DTransform":
+
+        def _model_from_coefs(coefs: list[float]) -> LinearRegression:
+            model = LinearRegression()
+            model.intercept_ = coefs[0]
+            model.coef_ = np.array(coefs[1:], dtype=float)
+            return model
+
+        return Polynomial2DTransform(
+            _model_from_coefs(d["dx"]),
+            _model_from_coefs(d["dy"]),
+            degree=d["degree"],
+        )
+    raise ValueError(f"Unknown transform type: {ttype!r}")
+
+
+def get_processed_edges(attribute_value: AttributeValue):
+    transforms = attribute_value.ValueJSON or []
+    if transforms:
+        processed = {(e["image1"], e["image2"]) for e in transforms}
     else:
         processed = set()
 
@@ -125,7 +161,7 @@ def run_registration(image_set, graph, form_data):
     return registrator, reference
 
 
-def run_registration_patient(patient, formAnnotation, skip_ids=None):
+def run_registration_patient(patient, attribute_value: AttributeValue, skip_ids=None):
     print(
         f"Running registration for patient {patient.PatientID} {patient.PatientIdentifier}"
     )
@@ -144,10 +180,10 @@ def run_registration_patient(patient, formAnnotation, skip_ids=None):
 
     enface_images = patient.get_images(where=where_clause)
     print(f"Found {len(enface_images)} enface images")
-    graph = get_processed_edges(formAnnotation)
+    graph = get_processed_edges(attribute_value)
     print(f"Found {len(graph)} processed pairs")
 
-    all_transforms = [*formAnnotation.FormData] if formAnnotation.FormData else []
+    all_transforms = list(attribute_value.ValueJSON or [])
     for eye in "RL":
 
         eye_images = [
