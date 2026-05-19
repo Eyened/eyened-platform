@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from eyened_orm import AttributeDataType
-from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
+from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
 from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference import ClassificationEnsemble
 
@@ -21,7 +21,7 @@ def logits_to_continuous_score(logits, temperature=3.0):
     return continuous_score
 
 
-class CFI_Quality(AttributeInferencePipeline):
+class CFI_Quality(TorchAttributeInferencePipeline):
     """CFI image quality assessment pipeline."""
 
     model_name = "CFI_Quality"

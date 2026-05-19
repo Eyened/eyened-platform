@@ -1,0 +1,183 @@
+{
+  "import_run_id": "86487b619fa945e2803a3d7449210435",
+  "status": "done",
+  "changes": [
+    {
+      "type": "create",
+      "entity": {
+        "type": "entity",
+        "entity_model": "Series",
+        "primary_key": {
+          "SeriesID": 5
+        }
+      },
+      "updates": {
+        "Study": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "entity",
+            "entity_model": "Study",
+            "primary_key": {
+              "StudyID": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "create",
+      "entity": {
+        "type": "entity",
+        "entity_model": "ImageInstance",
+        "primary_key": {
+          "ImageInstanceID": 5
+        }
+      },
+      "updates": {
+        "Series": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "entity",
+            "entity_model": "Series",
+            "primary_key": {
+              "SeriesID": 5
+            }
+          }
+        },
+        "DeviceInstance": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "entity",
+            "entity_model": "DeviceInstance",
+            "primary_key": {
+              "DeviceInstanceID": 1
+            }
+          }
+        },
+        "Scan": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "entity",
+            "entity_model": "Scan",
+            "primary_key": {
+              "ScanID": 2
+            }
+          }
+        },
+        "_Modality": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "entity",
+            "entity_model": "ModalityTable",
+            "primary_key": {
+              "ModalityID": 2
+            }
+          }
+        },
+        "Modality": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "value",
+            "value": "ColorFundus"
+          }
+        },
+        "Laterality": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "value",
+            "value": "L"
+          }
+        },
+        "DatasetIdentifier": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "value",
+            "value": ""
+          }
+        }
+      }
+    },
+    {
+      "type": "create",
+      "entity": {
+        "type": "entity",
+        "entity_model": "ImageStorage",
+        "primary_key": {
+          "ImageStorageID": 5
+        }
+      },
+      "updates": {
+        "StorageBackend": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "entity",
+            "entity_model": "StorageBackend",
+            "primary_key": {
+              "StorageBackendID": 2
+            }
+          }
+        },
+        "ImageInstance": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "entity",
+            "entity_model": "ImageInstance",
+            "primary_key": {
+              "ImageInstanceID": 5
+            }
+          }
+        },
+        "ObjectKey": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "value",
+            "value": "new_image.png"
+          }
+        },
+        "Format": {
+          "old_value": {
+            "type": "value",
+            "value": null
+          },
+          "new_value": {
+            "type": "value",
+            "value": "image/png"
+          }
+        }
+      }
+    }
+  ]
+}

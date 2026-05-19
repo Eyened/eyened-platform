@@ -81,6 +81,70 @@ class APIClient:
 
         return response
 
+    def enqueue_run_cfi_models(
+        self,
+        image_ids: list[int],
+        *,
+        model: Optional[str] = None,
+        overwrite: bool = False,
+        commit_interval: int = 100,
+        batch_size: int = 8,
+        n_workers: int = 16,
+        timeout: Optional[float] = 30,
+    ) -> dict[str, Any]:
+        """
+        Queue CFI attribute inference on the API worker (``POST /api/import/run_cfi_models``).
+
+        Returns the JSON body (``success``, ``message``, ``task_id``, ``task_ids``, etc.).
+        When ``model`` is omitted, one job per model is queued; ``task_ids`` lists every job id.
+        """
+        resp = self.post(
+            "/api/import/run_cfi_models",
+            json={
+                "image_ids": image_ids,
+                "model": model,
+                "overwrite": overwrite,
+                "commit_interval": commit_interval,
+                "batch_size": batch_size,
+                "n_workers": n_workers,
+            },
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def enqueue_update_thumbnails(
+        self,
+        *,
+        failed: bool = False,
+        print_errors: bool = False,
+        timeout: Optional[float] = 30,
+    ) -> dict[str, Any]:
+        """``POST /api/import/update_thumbnails`` (CLI-equivalent query params)."""
+        resp = self.post(
+            "/api/import/update_thumbnails",
+            params={"failed": failed, "print_errors": print_errors},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def enqueue_update_thumbnails_for_image_ids(
+        self,
+        image_ids: list[int],
+        *,
+        print_errors: bool = False,
+        timeout: Optional[float] = 30,
+    ) -> dict[str, Any]:
+        """``POST /api/import/update_thumbnails_for_image_ids``."""
+        resp = self.post(
+            "/api/import/update_thumbnails_for_image_ids",
+            json={"image_ids": image_ids, "print_errors": print_errors},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def get(
         self,
         path: str,

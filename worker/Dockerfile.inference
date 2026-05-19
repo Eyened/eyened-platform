@@ -26,4 +26,8 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir retinalysis-fundusprep retinalysis-inference
 
-CMD python -m huey.bin.huey_consumer server.utils.huey.huey -w ${HUEY_WORKERS:-2} -k process
+ENV PYTHONPATH=/app
+WORKDIR /app
+
+# RQ worker: set EYENED_REDIS_* and EYENED_DATABASE_* (same as API). Queue name: default.
+CMD ["python", "-m", "server.rq_worker"]

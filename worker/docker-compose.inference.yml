@@ -1,0 +1,27 @@
+# Portable RQ worker: no ties to a specific Docker network or host.
+# Configure Redis and DB in `worker/.env` (see `.env.example`).
+#
+#   cd worker && docker compose up --build
+#
+# GPU (optional): uncomment `gpus: all` or:
+#   docker compose run --gpus all worker
+#
+# When also running `docker-compose.cfi-roi.yml`, set EYENED_RQ_WORKER_QUEUES in `.env` to omit
+# ``cfi-roi`` here so ROI jobs go only to the slim worker; omit ``default`` too if thumbnails
+# should be handled only there (API enqueues thumbnail jobs on ``default``).
+
+name: eyened-platform-worker-inference
+
+services:
+  worker:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.inference
+    env_file: .env
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ${EYENED_STORAGE_ROOT:?}:${EYENED_STORAGE_ROOT:?}
+      - /mnt/oogergo:/mnt/oogergo:ro
+      - /mnt/genr:/mnt/genr:ro
+    restart: unless-stopped
+    # gpus: all

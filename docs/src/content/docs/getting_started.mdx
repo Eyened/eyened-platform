@@ -17,7 +17,8 @@ The Eyened platform is a modern web platform for visualization and annotation of
 
 ## Quick Setup
 
-The easiest way to get started with the Eyened platform is by configuring and running Docker Compose. The platform will then be accessible from any machine within your network.
+The easiest way to get started with the Eyened platform is by configuring and running Docker Compose. 
+The platform will then be accessible from any machine within your network.
 
 With this setup you will be able to:
 - Run the client / viewer, initially on an empty database.
@@ -37,54 +38,73 @@ With this setup you will be able to:
     cd eyened-platform/docker
     ```
 
-:::caution
-**This section is outdated.**  
-The instructions and environment variable list below may not reflect the latest setup or required variables. 
-:::
+3. You will need to configure a sql database. 
+    If you already have one: just set the correct environment variables.
+    Alternatively, set the ports and volume mounts in `docker-compose-database.yaml`
+    and start a new mysql server with this command:
+    ```bash
+    docker compose up -f docker-compose-database.yaml -d
+    ```
 
-3. Create a `.env` file with the following variables:
+4. Create a `.env` file with the following variables:
 
     | Variable | Description |
     | --- | --- |
     | PORT | Port the app will be served on |
-    | ADMIN_USERNAME | Username for the default admin user |
-    | ADMIN_PASSWORD | Password for the default admin user |
-    | SECRET_KEY | Secret key for JWT token generation |
-    | IMAGES_BASEPATH | Local folder to serve images from (may be read-only) |
-    | SEGMENTATIONS_ZARR_STORE | Local path to store segmentations (zarr format) |
-    | THUMBNAILS_PATH | Local path to store generated thumbnails |
-    | DATABASE_PATH | Path to MySQL data files |
-    | DATABASE_PORT | Port to access the database from outside |
-    | DATABASE_ROOT_PASSWORD | Root password for MySQL |
-    | DATABASE_USER | Username for database access |
-    | DATABASE_PASSWORD | Password for database access |
+    | EYENED_API_SECRET_KEY | A random string |
+    | EYENED_DATABASE_HOST | Hostname of the database |
+    | EYENED_DATABASE_PORT | Port to access the database |
+    | EYENED_DATABASE_USER | Username for database access |
+    | EYENED_DATABASE_PASSWORD | Password for database access |
 
-4. Create the necessary directories:
-
+5. Configure storage
+    The server needs access to a writable directory mounted under /storage/
+    Update the docker-compose.yaml to specify the volume mount in the `server` service.
     ```bash
-    mkdir -p $HOME/eyened-platform/{images,storage,database}
+        volumes:
+        # Access to the storage directory 
+        # The application will use /storage/segmentations.zarr for segmentations
+        # And /storage/thumbnails for thumbnails
+        - </path/to/storage>:/storage/
     ```
 
-5. Start the platform:
+6. Configure the fileserver
+    Routing of files is handled by nginx.
+    Update nginx.conf by adding locations for every folder where images are stored.
+    Each `location` can later be referenced in the database as a `StorageKey`.
+    Make sure the alias for each location is mounted in the docker service.
+
+7. Start the platform:
 
     ```bash
     USERID=$(id -u) GROUPID=$(id -g) docker compose up -d
     ```
 
+8. Initialize the application
+    If this is the first time setting up the platform, you will need to initialize the database.
+    ```bash
+    docker compose exec -it server bash
+    ```
+
+    ```bash
+    eorm init-database
+    ```
+
+    ```bash
+    eorm create-user
+    ```
+    New users can be added through the user interface.
+
+
 :::note
-**Running Multiple Instances:** If you want to run multiple instances of the platform on the same host:
-- Change the name in docker-compose.yaml to something unique for every project
-- Change the port of Adminer in docker-compose.yaml (or remove this service) to avoid conflicts
-- Assign different folders for storage for each instance
-- Assign different ports to expose MySQL
+**For development there is a slightly different setup procedure
 :::
+
+
 
 ## Accessing the Platform
 
-Once the platform is running:
-
-1. The viewer will be available at `http://<HOSTNAME>:<PORT>` from within your network
-2. Adminer (database management) will be available at `http://<HOSTNAME>:8080`
+Once the platform is running the viewer will be available at `http://<HOSTNAME>:<PORT>` from within your network
 
 To manage the platform:
 
@@ -118,6 +138,8 @@ session = database.create_session()
 ```
 
 See [ORM Configuration](/eyened-platform/orm/configuration) for full options.
+
+For batch imports, patching, and audit/undo workflows, see [ORM Importer](/eyened-platform/orm/importer).
 :::
 
 ## Next Steps

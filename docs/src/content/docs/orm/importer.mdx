@@ -1,0 +1,182 @@
+---
+title: ORM Importer
+description: Import (and patch) metadata and images using ImportRow + ImportRun
+sidebar:
+  order: 4
+---
+
+The renewed ORM importer turns **flat rows** (`ImportRow`) into a consistent set of ORM entities:
+
+`Project → Patient → Study → Series → ImageInstance → ImageStorage` (plus device + storage backend)
+
+At a high level:
+
+- Build a list of `ImportRow` objects (or load them from CSV)
+- Plan the import with `plan_image_import(session, rows, ...)` (or `build_image_import_rows` + `plan_import`) to produce an `ImportRun`
+- Review the planned changes (`run.display_summary()` / `run.full_summary()`)
+- Apply the changes (`run.apply()`), then `session.commit()`
+- Optionally write the run to JSON for audit/undo (`run.write_json(...)`)
+
+::::note
+Planning may mutate ORM objects in-memory; nothing is persisted until you call `run.apply()` and commit the session.
+`run.apply()` writes to the database but does not commit.
+::::
+
+## Setup
+
+Install the ORM:
+
+```bash
+cd orm
+pip install -e .
+```
+
+Connect to your database (see [ORM Configuration](/eyened-platform/orm/configuration)):
+
+```python
+from dotenv import load_dotenv
+from eyened_orm import Database
+
+load_dotenv("path/to/your.env")
+db = Database()
+session = db.create_session()
+```
+
+## Basic import (new images)
+
+```python
+from datetime import datetime
+
+from eyened_orm.importer import plan_image_import, ImportRow
+
+defaults = {
+    "project_external": "Y",
+    "manufacturer": "UNKOWN",
+    "manufacturer_model_name": "UNKOWN",
+    "device_description": "UNKOWN",
+    "dataset_identifier": "",  # deprecated, but required by schema
+    "storage_backend_kind": "local",
+}
+
+rows = [
+    ImportRow(
+        project_name="demo-project",
+        storage_backend_key="demo-backend",
+        object_key="demo-0.png",
+        patient_identifier="patient-1",
+        study_date=datetime.now().date(),
+        modality="ColorFundus",
+        laterality="L",
+    ),
+    ImportRow(
+        project_name="demo-project",
+        storage_backend_key="demo-backend",
+        object_key="demo-1.png",
+        patient_identifier="patient-1",
+        study_date=datetime.now().date(),
+        modality="ColorFundus",
+        laterality="R",
+    ),
+]
+
+run = plan_image_import(session, rows, defaults=defaults)
+run.display_summary()  # human-friendly overview (HTML in notebooks)
+
+run.apply()
+session.commit()
+```
+
+## Import from CSV
+
+If you already have metadata in a CSV, you can load it directly into `ImportRow` objects.
+The CSV header should use `ImportRow` field names (snake_case), for example `project_name`, `patient_identifier`, `study_date`, `public_id`, `object_key`, ...
+
+```python
+from pathlib import Path
+
+from eyened_orm.importer import plan_image_import
+from eyened_orm.importer.import_csv import read_import_rows_csv
+
+csv_path = Path("rows.csv")
+rows = read_import_rows_csv(csv_path)
+
+run = plan_image_import(session, rows, defaults=defaults)
+run.display_summary()
+run.apply()
+session.commit()
+```
+
+## Attaching to existing objects
+
+If part of the hierarchy already exists, rows can attach to it using:
+
+- Primary keys (`*_id`) **or**
+- Lookup fields (for example `project_name` + `patient_identifier` + `study_date`)
+
+Primary keys take precedence when provided.
+
+## Grouping into the same Series (batch-local)
+
+When you don’t have a stable real-world identifier (for example no DICOM `series_instance_uid`), you can group rows **within the same import batch** using `*_anonymous_identity`.
+
+Rows with the same `series_anonymous_identity` will be grouped into the **same `Series`**.
+
+## Reviewing changes in detail
+
+To inspect a per-entity/per-field view of what will change:
+
+```python
+print(run.full_summary())
+```
+
+## Audit trail (write/read JSON) and undo
+
+After a successful run (`run.status == "done"`), you can write an audit/undo JSON that stores entity references by primary key:
+
+```python
+from pathlib import Path
+from eyened_orm.importer import ImportRun
+
+json_path = Path("import_run.json")
+run.write_json(json_path)
+
+loaded = ImportRun.read_json(session, json_path)
+loaded.undo()
+session.commit()
+```
+
+## Patch existing entities (example: update laterality by `public_id`)
+
+For patching, you only need enough identity to resolve the existing entity plus the fields you want to change.
+
+```python
+from eyened_orm.importer import plan_image_import, ImportRow
+
+rows_patch = [
+    ImportRow(public_id="i22rza47rkzi", laterality="R"),
+    ImportRow(public_id="ph1p02fsx4ab", laterality="R"),
+]
+
+run_patch = plan_image_import(session, rows_patch)
+run_patch.display_summary()
+run_patch.apply()
+session.commit()
+```
+
+## Special cases
+
+- **Project only**: provide `project_name` (and any project fields you want to set)
+- **Project + Patient**: add `patient_identifier`
+
+## Expected behaviors (covered by tests)
+
+- **Reject early**: missing required parent identity fails during planning.
+- **Deduplication**: rows with the same lookup key are merged into one create + updates.
+- **Idempotency**: re-running the same import should not produce any changes.
+- **Primary-key precedence**: if `*_id` is provided, it wins over lookup keys (and allows renaming lookup fields).
+
+::::note
+For a hands-on, runnable walkthrough, see the example notebook at
+`https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/importer_example.ipynb`.
+::::
+

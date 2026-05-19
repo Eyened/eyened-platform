@@ -4,7 +4,14 @@ from eyened_orm import AttributeDataType
 from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
 
 from rtnls_fundusprep.mask_extraction import get_cfi_bounds
-from rtnls_inference.utils import load_image
+from PIL import Image
+from os import PathLike
+import numpy as np
+
+
+def load_image_rgb(image_path: PathLike[str]) -> np.ndarray:
+    with Image.open(image_path) as img:
+        return np.array(img)
 
 
 class CFI_ROI(AttributeInferencePipeline):
@@ -23,11 +30,9 @@ class CFI_ROI(AttributeInferencePipeline):
         """Extract CFI bounds from image. Returns final result (no batch processing needed)."""
 
         try:
-            image = load_image(image_path)
+            image = load_image_rgb(image_path)
             bounds = get_cfi_bounds(image)
-            bounds_dict = bounds.to_dict_all()
-            bounds_dict.pop("hw", None)
-            return bounds_dict
+            return bounds.to_dict_all()
         except Exception as exc:
             print(f"CFI_ROI preprocessing failed: {exc}")
             return None

@@ -1,0 +1,19 @@
+# Slim RQ worker: CFI ROI only (fundusprep + OpenCV). No PyTorch / retinalysis-inference.
+# Listen with EYENED_RQ_WORKER_QUEUES=cfi-roi (see docker-compose.cfi-roi.yml).
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxcb1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY orm /app/orm
+RUN pip install --no-cache-dir -e /app/orm
+
+COPY server /app/server
+RUN pip install --no-cache-dir -r /app/server/requirements.txt
+
+ENV PYTHONPATH=/app
+WORKDIR /app
+
+CMD ["python", "-m", "server.rq_worker"]

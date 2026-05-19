@@ -1,0 +1,26 @@
+# Dedicated worker for the AMD segmentation model queue (`cfi-amd`).
+# Configure Redis/DB/storage in `worker/.env` (see `.env.example`).
+#
+#   cd worker && docker compose -f docker-compose.cfi-amd.yml up --build
+#
+# GPU (optional): uncomment `gpus: all` or:
+#   docker compose -f docker-compose.cfi-amd.yml run --gpus all worker-cfi-amd
+
+name: eyened-platform-worker-cfi-amd
+
+services:
+  worker-cfi-amd:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.cfi-amd
+    env_file: .env
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      EYENED_RQ_WORKER_QUEUES: cfi-amd
+    volumes:
+      - ${EYENED_STORAGE_ROOT:?}:${EYENED_STORAGE_ROOT:?}
+      - /mnt/oogergo:/mnt/oogergo:ro
+      - /mnt/genr:/mnt/genr:ro
+    restart: unless-stopped
+    # gpus: all
+

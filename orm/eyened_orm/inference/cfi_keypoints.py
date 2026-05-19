@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from eyened_orm import AttributeDataType
-from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
+from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
 from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference.ensembles import HeatmapRegressionEnsemble
 
@@ -33,7 +33,7 @@ def get_coordinate(T, heatmap):
     return (float(x), float(y))
 
 
-class CFIKeypoints(AttributeInferencePipeline):
+class CFIKeypoints(TorchAttributeInferencePipeline):
     """CFI keypoints detection pipeline - detects fovea and disc edge locations."""
 
     model_name = "CFI_Keypoints"

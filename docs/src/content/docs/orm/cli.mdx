@@ -27,12 +27,12 @@ eorm [COMMAND] --help
 
 ## Available Commands
 
-### create-database
+### initialize-database
 
 Creates the database and tables if they do not already exist.
 
 ```bash
-eorm create-database [OPTIONS]
+eorm initialize-database [OPTIONS]
 ```
 
 ### create-user
@@ -77,11 +77,20 @@ eorm run-etdrs-model [OPTIONS]
 
 ### run-registration
 
-Runs registration processing for images, scoped by patient or project as needed.
+Runs pairwise registration for enface images (color fundus, autofluorescence, and infrared reflectance) using the `retinalysis-registration` model. For each patient, transforms are stored in a patient-level **Registration** attribute as JSON: a list of `{image1, image2, transform}` records.
+
+You must scope the run with either `--patient` (patient identifier) or `--project` (project ID). Without `--replace`, existing transforms are kept and only missing pairs are computed. With `--replace`, stored transforms are cleared first. Use `--skip` to exclude specific image instance IDs (comma-separated).
+
+Requires the optional `rtnls_registration` package and ORM database configuration (see [ORM Configuration](/eyened-platform/orm/configuration)).
 
 ```bash
-eorm run-registration [OPTIONS]
+eorm run-registration --patient PATIENT_IDENTIFIER
+eorm run-registration --project 1
+eorm -e /path/to/.env run-registration --project 1 --replace
+eorm run-registration --patient PATIENT_IDENTIFIER --skip 1811325,1811324
 ```
+
+See `eorm run-registration --help` for all options.
 
 ### validate-forms
 
