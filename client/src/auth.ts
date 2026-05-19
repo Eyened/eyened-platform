@@ -25,7 +25,7 @@ interface AuthOptionsResponse {
     oidc_provider_name: string;
 }
 
-interface OIDCAuthorizationURLResponse {
+interface OIDCAuthorizationResponse {
     url: string;
     random: number;
 }
@@ -147,13 +147,30 @@ class AuthClient {
         return response.json();
     }
 
-    async OIDCAuthorize(): Promise<OIDCAuthorizationURLResponse> {
+    async OIDCAuthorize(): Promise<OIDCAuthorizationResponse> {
         const response = await fetchApi(`${this.baseUrl}/oidc/authorize`, {
             skipAuthRetry: true,
         })
 
         if (!response.ok) {
             throw new Error('OIDC authorize failed');
+        }
+
+        return response.json();
+    }
+    
+    async OIDCAuthenticate(code: string, state: string): Promise<Response> {
+        const response = await fetchApi(`${this.baseUrl}/oidc/authenticate`, {
+            method: 'POST',
+            skipAuthRetry: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code,
+                state,
+            })
+        });
+        if (!response.ok) {
+            throw new Error("OIDC authenticate failed");
         }
 
         return response.json();

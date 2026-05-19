@@ -15,7 +15,7 @@ export class UserManager {
 
 
     async init(pathname: string) {
-        if (pathname.startsWith('/users/login')) {
+        if (pathname.startsWith('/users/login') || pathname.startsWith('/users/oidc-callback')) {
             return;
         }
 
