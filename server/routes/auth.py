@@ -1,7 +1,7 @@
 import json
 import random
 from typing import Annotated
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, unquote, urlencode
 
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -69,14 +69,22 @@ class CurrentUser:
     def get_creator(self, session: Session) -> Creator:
         return session.query(Creator).where(Creator.CreatorID == self.id).first()
 
+
 class AuthOptionsResponse(BaseModel):
     password_enabled: bool
     oidc_enabled: bool
     oidc_provider_name: str
 
-class OIDCAuthorizationURLResponse(BaseModel):
+
+class OIDCAuthorizationResponse(BaseModel):
     url: str
-    random: int
+    csrf: int
+
+
+class OIDCAuthenticationRequest(BaseModel):
+    code: str
+    state: str
+
 
 # JWT utilities
 def create_access_token(user_id: int, username: str, role: str | None = None) -> str:
@@ -511,14 +519,14 @@ async def get_auth_options():
 
 
 @router.get("/auth/oidc/authorize")
-async def get_oidc_authorization_url(next_: Annotated[str, Query(alias="next")] = "") -> OIDCAuthorizationURLResponse:
+async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Query(alias="next")] = "") -> OIDCAuthorizationResponse:
     """The authorization URL at the OIDC provider for authentication."""
-    # The random value in state is used to safeguard the auth roundtrip against CSRF attacks
-    random_value = random.randint(1, 1_000_000)
+    # The csrf_token value in state is used to safeguard the auth roundtrip against CSRF attacks
+    csrf_token = random.randint(1, 1_000_000)
     state = quote(json.dumps({
         "next": next_,
-        "random": random_value}
-    ))
+        "csrf": csrf_token,
+    }))
 
     url = await settings.oidc.get_authorize_url()
     # TODO: Add nonce parameter?
@@ -531,7 +539,33 @@ async def get_oidc_authorization_url(next_: Annotated[str, Query(alias="next")] 
     }
 
     authorization_url = f"{url}?{urlencode(params)}"
-    return OIDCAuthorizationURLResponse(
-        url=authorization_url,
-        random=random_value,
+    response.set_cookie(
+        key="oidc_csrf_token",
+        value=str(csrf_token),
+        httponly=True,
+        max_age=60*15,
+        secure=False,
+        samesite="strict",
+        path="/",
     )
+    return OIDCAuthorizationResponse(
+        url=authorization_url,
+        csrf=csrf_token,
+    )
+
+@router.post("/auth/oidc/authenticate")
+async def oidc_authenticate(auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None)):
+    """Handle OIDC authentication using the code from the authorization URL."""
+    # Check state value
+    state = auth.state.strip()
+    try:
+        state = json.loads(unquote(state))
+        state_csrf = state['csrf']
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Invalid state")
+    if not oidc_csrf_token:
+        raise HTTPException(status_code=400, detail="Missing csrf token (cookie)")
+    if int(state_csrf) != int(oidc_csrf_token):
+        raise HTTPException(status_code=400, detail="Invalid csrf token")
+
+    return {"detail": "authentication WIP"}

@@ -39,7 +39,6 @@
         try {
             let resp = await authClient.OIDCAuthorize();
             authorizeUrl = resp.url;
-            // TODO: Save the value of `resp.random` to the client
         } catch (err) {
             oidcError = err instanceof Error ? err.message : "Unknown error occurred";
         }

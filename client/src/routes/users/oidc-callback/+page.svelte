@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { page } from '$app/state';
     // TODO: move authClient to lib?
     import { authClient } from '../../../auth';
@@ -11,7 +12,9 @@
         let resp = await authClient.OIDCAuthenticate(code, state);
     }
 
-    handleCallback();
+    onMount(() => {
+        handleCallback();
+    });
 </script>
 
 <h1>OIDC callback page (no content)</h1>

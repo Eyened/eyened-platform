@@ -165,8 +165,8 @@ class AuthClient {
             skipAuthRetry: true,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                code,
-                state,
+                code: code,
+                state: state,
             })
         });
         if (!response.ok) {
