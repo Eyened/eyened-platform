@@ -1,8 +1,10 @@
 import json
+import logging
 import random
 from typing import Annotated
 from urllib.parse import quote, unquote, urlencode
 
+import httpxyz
 import jwt
 from datetime import datetime, timedelta, timezone
 from hashlib import pbkdf2_hmac
@@ -562,10 +564,48 @@ async def oidc_authenticate(auth: OIDCAuthenticationRequest, oidc_csrf_token: st
         state = json.loads(unquote(state))
         state_csrf = state['csrf']
     except KeyError:
-        raise HTTPException(status_code=400, detail="Invalid state")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
     if not oidc_csrf_token:
-        raise HTTPException(status_code=400, detail="Missing csrf token (cookie)")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing csrf token (cookie)")
     if int(state_csrf) != int(oidc_csrf_token):
-        raise HTTPException(status_code=400, detail="Invalid csrf token")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid csrf token")
 
-    return {"detail": "authentication WIP"}
+    # Use code to authenticate at the provider
+    token_url = await settings.oidc.get_token_url()
+    async with httpxyz.AsyncClient() as client:
+        token_response = await client.post(
+            token_url,
+            data={
+                "grant_type": "authorization_code",
+                "code": auth.code,
+                "redirect_uri": settings.oidc.redirect_url,
+                "client_id": settings.oidc.client_id,
+                "client_secret": settings.oidc.client_secret.get_secret_value(),
+            }
+        )
+    if not token_response.is_success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token request"
+        )
+    token_data = token_response.json()
+
+    # Validate the ID token
+    try:
+        id_token = token_data["id_token"]
+        id_token = jwt.decode(
+            jwt=id_token,
+            audience=settings.oidc.client_id,  # This is what MS Entra advises
+            options={"verify_signature": False, "verify_aud": True, "verify_exp": True, "verify_iat": True, "verify_nbf": True},
+        )
+    except (KeyError, jwt.InvalidTokenError) as err:
+        logging.warning(f"Error while decoding ID Token: {err}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid ID token")
+
+    # Subject is the unique identifier for the user account at MS Entra
+    subject = id_token["sub"]
+    name = id_token["name"]
+    email = id_token["email"]
+    username = id_token["preferred_username"]
+    # TODO: validate subject/username against Creator
+
+    return {"detail": "authentication WIP", "id_token": id_token}

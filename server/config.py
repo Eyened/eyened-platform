@@ -102,6 +102,9 @@ class OIDCSettings(BaseSettings):
         config = await self._get_config_data()
         return config["authorization_endpoint"]
 
+    async def get_token_url(self) -> str:
+        config = await self._get_config_data()
+        return config["token_endpoint"]
 
 @pretty_settings
 class Settings(BaseSettings):
