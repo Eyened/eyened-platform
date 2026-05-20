@@ -15,7 +15,7 @@ export class BrushTool extends SegmentationTool {
 	constructor(
 		drawingExecutor: DrawingExecutor,
 		viewerContext: ViewerContext,
-		segmentationContext: SegmentationContext
+		segmentationContext: SegmentationContext,
 	) {
 		super(drawingExecutor, viewerContext, segmentationContext);
 		// Create an offscreen canvas for drawing the ellipses

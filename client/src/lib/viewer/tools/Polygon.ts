@@ -1,8 +1,8 @@
-import { SegmentationTool, type DrawingExecutor } from "./segmentation";
-import type { ViewerEvent } from "../viewer-utils";
-import type { RenderTarget } from "$lib/webgl/types";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+import type { RenderTarget } from "$lib/webgl/types";
+import type { ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
+import { SegmentationTool, type DrawingExecutor } from "./segmentation";
 
 const lineWidth = 2;
 
@@ -12,7 +12,8 @@ export class PolygonTool extends SegmentationTool {
 	constructor(
 		drawingExecutor: DrawingExecutor,
 		viewerContext: ViewerContext,
-		segmentationContext: SegmentationContext) {
+		segmentationContext: SegmentationContext,
+	) {
 		super(drawingExecutor, viewerContext, segmentationContext);
 	}
 
@@ -25,7 +26,7 @@ export class PolygonTool extends SegmentationTool {
 		if (event.button === 0) this.drawingState = 'paint';
 		else if (event.button === 2) this.drawingState = 'erase';
 
-		this.startDraw();
+		this.startDraw(e.viewerContext);
 	}
 
 	pointerup(e: ViewerEvent<PointerEvent>) {

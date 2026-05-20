@@ -12,6 +12,7 @@
     import NewMultiFeature from "./NewMultiFeature.svelte";
     import type { Segmentation } from "./segmentationContext.svelte";
     import { createSegmentationFrom, features } from "$lib/data";
+    import { toast } from "svelte-sonner";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -41,28 +42,34 @@
 
     async function create(feature: FeatureGET) {
         globalContext.dialogue = `Creating annotation...`;
+        try {
+            let dataType: SegmentationDataType = "R8UI";
+            if (selectedType == "P") {
+                // TODO: this could perhaps also be R32F?
+                dataType = "R8";
+            }
 
-        let dataType: SegmentationDataType = "R8UI";
-        if (selectedType == "P") {
-            // TODO: this could perhaps also be R32F?
-            dataType = "R8";
+            const segmentation = await createSegmentationFrom(
+                image,
+                feature.id,
+                dataRepresentations[selectedType],
+                dataType,
+                0.5,
+                axis,
+                taskContext?.subTask?.id
+            );
+
+            const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
+
+            segmentationContext.segmentationItem = segmentationItem;
+        } catch (err) {
+            console.error(err);
+            toast.error(
+                err instanceof Error ? err.message : "Could not create annotation",
+            );
+        } finally {
+            globalContext.dialogue = null;
         }
-
-        const segmentation = await createSegmentationFrom(
-            image,
-            feature.id,
-            dataRepresentations[selectedType],
-            dataType,
-            0.5,
-            axis,
-            taskContext?.subTask?.id
-        );
-
-        const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
-
-        segmentationContext.segmentationItem = segmentationItem
-
-        globalContext.dialogue = null;
     }
 
     const availableFeatures = features.filter((f) => true);

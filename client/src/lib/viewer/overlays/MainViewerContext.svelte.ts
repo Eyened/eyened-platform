@@ -21,7 +21,6 @@ export class MainViewerContext implements Overlay {
     public renderOutline = $state(false);
     public alpha = $state(1.0);
     public highlightedFeatureIndex = $state<number | undefined>(undefined);
-    public activeFeatureMask = $state<number | undefined>(undefined);
     public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
     public readonly segmentationContext: SegmentationContext
 
@@ -72,11 +71,11 @@ export class MainViewerContext implements Overlay {
 
         if (this.highlightedSegmentationItem == segmentationItem) {
             uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;
-            uniforms.u_active_feature_mask = this.activeFeatureMask ?? 0;
         } else {
             uniforms.u_highlighted_feature_index = 0;
-            uniforms.u_active_feature_mask = 0;
         }
+
+        uniforms.u_visible_feature_mask = this.segmentationContext.getVisibleFeatureMask(segmentation) >>> 0;
 
         // Apply masking if enabled for this segmentation item
         uniforms.u_has_mask = false;
@@ -118,7 +117,8 @@ export class MainViewerContext implements Overlay {
             u_alpha: this.alpha,
             u_smooth: true,
             u_outline: this.renderOutline,
-            activeIndices: this.segmentationContext.activeIndices
+            activeIndices: this.segmentationContext.activeIndices,
+            u_is_drawing: this.segmentationContext.isDrawing,
         };
 
         // Render grader segmentations

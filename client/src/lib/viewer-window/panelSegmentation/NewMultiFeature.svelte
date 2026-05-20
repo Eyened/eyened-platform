@@ -7,6 +7,7 @@
 	import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 	import { getContext } from "svelte";
 	import * as Select from "../../components/ui/select";
+	import { toast } from "svelte-sonner";
 
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 	const { image, axis } = viewerContext;
@@ -26,20 +27,26 @@
 			return;
 		}
 		globalContext.dialogue = `Creating annotation...`;
+		try {
+			let dataType: SegmentationDataType = "R8UI";
 
-		let dataType: SegmentationDataType = "R8UI";
-
-		await createSegmentationFrom(
-			image,
-			selectedFeatureId,
-			dataRepresentation,
-			dataType,
-			0.5,
-			axis,
-		);
-		segmentationContext.creatorHidden.set(creator.id, false);
-
-		globalContext.dialogue = null;
+			await createSegmentationFrom(
+				image,
+				selectedFeatureId,
+				dataRepresentation,
+				dataType,
+				0.5,
+				axis,
+			);
+			segmentationContext.creatorHidden.set(creator.id, false);
+		} catch (err) {
+			console.error(err);
+			toast.error(
+				err instanceof Error ? err.message : "Could not create annotation",
+			);
+		} finally {
+			globalContext.dialogue = null;
+		}
 	}
 </script>
 

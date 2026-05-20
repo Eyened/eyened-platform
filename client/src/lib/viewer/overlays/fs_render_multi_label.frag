@@ -9,6 +9,8 @@ uniform float u_alpha;
 uniform vec3[32] u_colors;
 uniform int u_highlighted_feature_index;
 uniform uint u_active_feature_mask;
+uniform uint u_visible_feature_mask;
+uniform bool u_is_drawing;
 
 uniform bool u_smooth;
 uniform usampler2D u_mask;
@@ -70,44 +72,45 @@ void main() {
     uint annotation = texture(u_annotation, v_uv).r;
 
     bool has_layer = annotation > 0u;
-    
-    float layer_alpha;
 
     color_out = vec4(0.0f);
     if(has_layer) {
-        vec3 accumulated_color = vec3(0.0f);
-        float count = 0.0f;
+        // Weighted mix (order-independent): sum(c * a) / sum(a); opacity from sum of weights.
+        vec3 weighted_rgb = vec3(0.0f);
+        float weight_sum = 0.0f;
 
         for(uint i = 0u; i < 32u; i++) {
-            // loop over bitmasks
-
             // i = 0 | mask = 0001 | feature_index 1 = 0001
             // i = 1 | mask = 0010 | feature_index 2 = 0010
-            // i = 2 | mask = 0100 | feature_index 3 = 0100
-            // i = 3 | mask = 1000 | feature_index 4 = 1000
-            // etc
+            // etc.
             uint mask = 1u << i;
-          
+
             if((annotation & mask) != 0u) {
+                if((u_visible_feature_mask & mask) == 0u) {
+                    continue;
+                }
                 int feature_index = int(i) + 1;
 
                 vec3 layer_color = u_colors[feature_index - 1];
-                if((u_highlighted_feature_index == feature_index) || (u_active_feature_mask & mask) > 0u) {
-                    layer_alpha = 1.0f;
-                } else {
-                    layer_alpha = 0.5f;
+
+                float layer_alpha = 0.1f;
+                if(!u_is_drawing) {
+                    if(u_highlighted_feature_index == feature_index)
+                        layer_alpha = 1.0f;
+                    if((u_active_feature_mask & mask) > 0u)
+                        layer_alpha = 1.0f;
                 }
-                // accumulate possibly overlapping colors
-                accumulated_color += layer_color * layer_alpha;
-                count += layer_alpha;
+
+                weighted_rgb += layer_color * layer_alpha;
+                weight_sum += layer_alpha;
             }
         }
 
-        // calculate average color
-        if(count > 0.0f) {
-            accumulated_color /= count;
+        if(weight_sum > 0.0f) {
+            vec3 rgb = weighted_rgb / weight_sum;
+            float combined_a = min(weight_sum, 1.0f);
+            color_out = vec4(rgb, combined_a * u_alpha);
         }
-        color_out = vec4(accumulated_color, u_alpha);
     }
 
 }

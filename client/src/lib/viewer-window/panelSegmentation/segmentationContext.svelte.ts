@@ -2,7 +2,7 @@
 import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { SvelteSet } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
@@ -44,6 +44,11 @@ export class SegmentationContext {
     public brushRadius = $state(4);
     public segmentationItem: SegmentationItem | undefined = $state(undefined);
     public activeIndices: number | number[] = $state([]);
+    /** True while a segmentation stroke is in progress (pointer/keyboard). Used by multi-label overlay. */
+    public isDrawing = $state(false);
+
+    /** Per-segmentation bitmask: bit (i-1) = 1 means subfeature i is shown in multi-class / multi-label shaders. */
+    private visibleFeatureMaskBySegmentationKey = new SvelteMap<string, number>();
 
     constructor(
         public readonly instanceId: string,
@@ -105,6 +110,26 @@ export class SegmentationContext {
             this.shownSegmentations.add(getSegmentationKey(segmentationItem.segmentation));
         }
 
+    }
+
+    private static readonly ALL_FEATURES_VISIBLE = 0xffffffff >>> 0;
+
+    getVisibleFeatureMask(segmentation: Segmentation): number {
+        const key = getSegmentationKey(segmentation);
+        const v = this.visibleFeatureMaskBySegmentationKey.get(key);
+        return v === undefined ? SegmentationContext.ALL_FEATURES_VISIBLE : v >>> 0;
+    }
+
+    isFeatureLayerVisible(segmentation: Segmentation, featureIndex: number): boolean {
+        const bit = (1 << (featureIndex - 1)) >>> 0;
+        return (this.getVisibleFeatureMask(segmentation) & bit) !== 0;
+    }
+
+    toggleFeatureLayerVisibility(segmentation: Segmentation, featureIndex: number): void {
+        const key = getSegmentationKey(segmentation);
+        const cur = this.getVisibleFeatureMask(segmentation) >>> 0;
+        const bit = (1 << (featureIndex - 1)) >>> 0;
+        this.visibleFeatureMaskBySegmentationKey.set(key, (cur ^ bit) >>> 0);
     }
 }
 

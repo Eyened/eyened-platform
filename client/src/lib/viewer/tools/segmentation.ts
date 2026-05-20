@@ -75,9 +75,11 @@ export abstract class SegmentationTool implements Overlay {
 
     startDraw(viewerContext: ViewerContext) {
         this.currentPoints = [this.lastPosition!];
+        this.segmentationContext.isDrawing = true;
     }
 
     endDraw(viewerContext: ViewerContext) {
+        this.segmentationContext.isDrawing = false;
         if (this.currentPoints) {
             this.syncing = true;
 

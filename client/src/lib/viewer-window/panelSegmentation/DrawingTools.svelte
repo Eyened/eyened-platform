@@ -58,6 +58,7 @@
 	onDestroy(() => {
 		segmentationContext.erodeDilateActive = false;
 		segmentationContext.questionableActive = false;
+		segmentationContext.isDrawing = false;
 		removeTool();
 	});
 
@@ -108,16 +109,8 @@
 			}
 		},
 	};
-	const brush = new BrushTool(
-		drawingExecutor,
-		viewerContext,
-		segmentationContext,
-	);
-	const polygon = new PolygonTool(
-		drawingExecutor,
-		viewerContext,
-		segmentationContext,
-	);
+	const brush = new BrushTool(drawingExecutor, viewerContext, segmentationContext);
+	const polygon = new PolygonTool(drawingExecutor, viewerContext, segmentationContext);
 	const enhance = new EnhanceTool(
 		drawingExecutor,
 		viewerContext,
