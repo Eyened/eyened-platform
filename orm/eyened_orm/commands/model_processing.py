@@ -34,6 +34,13 @@ CFI_ATTRIBUTE_MODEL_SLUGS: tuple[str, ...] = (
 
 CFI_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("cfi-amd",)
 
+OCT_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("layer-segmentation",)
+
+SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = (
+    *CFI_SEGMENTATION_MODEL_SLUGS,
+    *OCT_SEGMENTATION_MODEL_SLUGS,
+)
+
 
 def _cfi_pipeline_class(model_name: str):
 
@@ -87,44 +94,6 @@ def run_cfi_attribute_pipeline(
         print("No images to process")
         return
     pipeline.run(filtered, commit_interval=commit_interval)
-    session.commit()
-    print(f"Completed processing {len(filtered)} images")
-
-
-def run_cfi_segmentation_pipeline(
-    session,
-    image_ids: Iterable[int],
-    model_slug: str,
-    *,
-    device=None,
-    batch_size: int = 8,
-    n_workers: int = 12,
-    overwrite: bool = False,
-) -> None:
-    """Run a single CFI segmentation pipeline (one slug). RQ jobs call this once per job."""
-    image_ids = set(image_ids)
-    if model_slug != "cfi-amd":
-        raise ValueError(f"Unknown CFI segmentation model: {model_slug!r}")
-
-    from eyened_orm.inference.cfi_amd_segmentation import CFI_AMD
-
-    print(f"Running {model_slug}")
-    pipeline = CFI_AMD(
-        session,
-        device=device,
-        n_workers=n_workers,
-        batch_size=batch_size,
-    )
-    if overwrite:
-        filtered = image_ids
-        print(f"Processing {len(filtered)} images (overwrite)")
-    else:
-        filtered = pipeline.filter_image_ids(image_ids)
-        print(f"Processing {len(filtered)} images (after filtering existing)")
-    if not filtered:
-        print("No images to process")
-        return
-    pipeline.run(filtered)
     session.commit()
     print(f"Completed processing {len(filtered)} images")
 
@@ -212,7 +181,7 @@ def run_models(model, path, device, batch_size, n_workers, overwrite, commit_int
 @click.option(
     "-m",
     "--model",
-    type=click.Choice(list(CFI_SEGMENTATION_MODEL_SLUGS), case_sensitive=False),
+    type=click.Choice(list(SEGMENTATION_MODEL_SLUGS), case_sensitive=False),
     required=False,
     help="Segmentation model to run (if not specified, runs all models)",
 )
@@ -255,6 +224,7 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
 
     Supported models:
     - cfi-amd: CFI AMD segmentation (drusen, RPD, hyperpigmentation, RPE degeneration)
+    - layer-segmentation: OCT retinal layer segmentation (nnU-Net)
     """
     database = get_database()
 
@@ -265,211 +235,32 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
     device_obj = _get_device(device)
 
     with database.get_session() as session:
-        slugs = [model] if model is not None else CFI_SEGMENTATION_MODEL_SLUGS
+        slugs = [model] if model is not None else SEGMENTATION_MODEL_SLUGS
         for slug in slugs:
-            run_cfi_segmentation_pipeline(
-                session,
-                image_ids,
-                slug,
-                device=device_obj,
-                batch_size=batch_size,
-                n_workers=n_workers,
-                overwrite=not skip_existing,
-            )
+            if slug == "cfi-amd":
+                from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
 
+                print(f"Running {slug}")
+                run_for_image_ids(
+                    session,
+                    image_ids,
+                    device=device_obj,
+                    batch_size=batch_size,
+                    n_workers=n_workers,
+                    overwrite=not skip_existing,
+                )
+            elif slug == "layer-segmentation":
+                from eyened_orm.inference.layer_segmentation import run_for_image_ids
 
-# @click.command(name="run-models")
-# @click.option(
-#     "-e", "--env", type=str, help="Path to .env file for environment configuration"
-# )
-# @click.option("-d", "--device", type=str, default=None)
-# def run_models(env, device):
-#     """Legacy command for running basic inference models."""
-#     import tempfile
-
-#     from eyened_orm.inference.inference import run_inference
-
-#     database = get_database(env)
-
-#     config = load_config(env)
-#     with database.get_session() as session:
-#         if device is None:
-#             device = auto_device()
-#         else:
-#             device = torch.device(device)
-
-#         cfi_cache_path = config.cfi_cache_path
-#         if cfi_cache_path is None:
-#             with tempfile.TemporaryDirectory() as temp_dir:
-#                 cfi_cache_path = Path(temp_dir)
-#                 config.cfi_cache_path = cfi_cache_path
-
-#                 print(f"Using temporary cfi_cache_path: {cfi_cache_path}")
-
-#         else:
-#             print(f"Running inference with cfi_cache_path: {cfi_cache_path}")
-#         run_inference(session, device=device, cfi_cache_path=cfi_cache_path)
-
-
-# @click.command(name="run-cfi-amd")
-# @click.option(
-#     "-e", "--env", type=str, help="Path to .env file for environment configuration"
-# )
-# @click.option(
-#     "-p", "--path", type=str, required=True, help="Path to file containing image IDs"
-# )
-# @click.option(
-#     "-d", "--device", type=str, default=None, help="Device to use for processing"
-# )
-# @click.option(
-#     "--skip-existing",
-#     is_flag=True,
-#     default=True,
-#     help="Skip existing attribute values",
-# )
-# @click.option(
-#     "--max-workers",
-#     type=int,
-#     default=12,
-#     help="Maximum number of workers to use for processing",
-# )
-# @click.option(
-#     "--batch-size",
-#     type=int,
-#     default=8,
-#     help="Batch size for processing",
-# )
-# def run_cfi_amd(env, path, device, skip_existing, max_workers, batch_size):
-#     """Run CFI AMD segmentation models."""
-#     import numpy as np
-#     import torch
-
-#     from eyened_orm import (
-#         Feature,
-#         SegmentationModel,
-#         ModelSegmentation,
-#         DataRepresentation,
-#         Datatype,
-#         ImageInstance,
-#     )
-
-#     if device is None:
-#         device = auto_device()
-#     else:
-#         device = torch.device(device)
-
-#     with open(path, "r") as f:
-#         selected_images = {int(line.strip()) for line in f.readlines()}
-
-#     print(f"Preparing to process {len(selected_images)} images")
-
-#     database = get_database(env)
-#     session = database.create_session()
-
-#     feature_names = {
-#         "drusen": ("Drusen", "Drusen"),
-#         "RPD": ("Reticular pseudodrusen", "Reticular pseudodrusen"),
-#         "hyperpigmentation": ("RPE hyperpigmentation", "Hyperpigmentation"),
-#         "rpe_degeneration": (
-#             "Retinal pigment epithelium (RPE) degeneration",
-#             "RPE degeneration",
-#         ),
-#     }
-
-#     features = {
-#         name: Feature.get_or_create(session, match_by={"FeatureName": feature_name})
-#         for name, (feature_name, _) in feature_names.items()
-#     }
-
-#     models = {
-#         name: SegmentationModel.get_or_create(
-#             session,
-#             match_by={
-#                 "FeatureID": features[name].FeatureID,
-#                 "ModelName": model_name,
-#                 "Version": "3",
-#             },
-#             create_kwargs={"Description": "https://github.com/Eyened/cfi-amd"},
-#         )
-#         for name, (_, model_name) in feature_names.items()
-#     }
-
-#     model_id_by_feature = {name: model.ModelID for name, model in models.items()}
-#     model_ids = set(model_id_by_feature.values())
-
-#     processed = set(
-#         ModelSegmentation.select(
-#             session,
-#             "ModelID",
-#             "ImageInstanceID",
-#             ImageInstanceID=selected_images,
-#             ModelID=model_ids,
-#         )
-#     )
-
-#     complete = {
-#         i for i in selected_images if all((x, i) in processed for x in model_ids)
-#     }
-#     print(f"Found {len(complete)} complete images")
-
-#     if skip_existing:
-#         images = selected_images - complete
-#     else:
-#         images = selected_images
-
-#     print(f"Running on {len(images)} images")
-
-#     def get_model_segmentation(instance_id: int, model_id: int, h: int, w: int):
-#         return ModelSegmentation.get_or_create(
-#             session,
-#             match_by={
-#                 "ImageInstanceID": instance_id,
-#                 "ModelID": model_id,
-#             },
-#             create_kwargs={
-#                 "ImageInstanceID": instance_id,
-#                 "ModelID": model_id,
-#                 "Depth": 1,
-#                 "Width": w,
-#                 "Height": h,
-#                 "SparseAxis": 0,
-#                 "DataType": Datatype.R8,
-#                 "DataRepresentation": DataRepresentation.Probability,
-#                 "Threshold": 0.5,
-#             },
-#         )
-
-#     def save_results(instance_id, result):
-#         for feature_name, model_id in model_id_by_feature.items():
-#             arr = result[feature_name]
-#             h, w = arr.shape
-#             m = get_model_segmentation(instance_id, model_id, h=h, w=w)
-#             try:
-
-#                 if np.any(arr >= 0.5):
-#                     # convert float (0-1) to uint8 (0-255) for Datatype.R8
-#                     data = (255 * arr).astype(np.uint8)
-#                     m.write_data(data, axis=0)
-#             finally:
-#                 # Prevent the session identity map from growing without bound.
-#                 session.flush()
-#                 session.expunge(m)
-
-#         session.commit()
-
-#     from cfi_amd.processor import Processor
-
-#     processor = Processor(device)
-
-#     instances = ImageInstance.by_ids(session, images)
-#     items = [(iid, i.path) for iid, i in instances.items()]
-
-#     mpi = MultiProcessInference(
-#         items, processor, n_workers=max_workers, batch_size=batch_size
-#     )
-#     for iid, result in mpi.run():
-#         save_results(iid, result)
-
+                print(f"Running {slug}")
+                run_for_image_ids(
+                    session,
+                    image_ids,
+                    device=device_obj,
+                    overwrite=not skip_existing,
+                )
+            else:
+                raise ValueError(f"Unknown segmentation model: {slug!r}")
 
 @click.command(name="run-registration")
 @click.option(

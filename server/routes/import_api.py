@@ -18,7 +18,9 @@ from rq.exceptions import NoSuchJobError
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 from ..utils.tasks import (
+    run_cfi_amd_for_image_ids,
     run_cfi_model_for_image_ids,
+    run_layer_segmentation_for_image_ids,
     run_thumbnail_update_for_image_ids_job,
     run_thumbnail_update_job,
 )
@@ -67,7 +69,6 @@ CfiModelName = Literal[
     "cfi-keypoints",
     "cfi-odfd",
     "cfi-quality",
-    "cfi-amd",
 ]
 
 
@@ -85,7 +86,7 @@ class UpdateThumbnailsForImageIdsRequest(BaseModel):
 
 
 class RunCfiModelsRequest(BaseModel):
-    """Queue a CFI model job for the given image instance IDs."""
+    """Queue a model job for the given image instance IDs (CFI attributes or segmentation)."""
 
     image_ids: list[int] = Field(
         ...,
@@ -94,7 +95,7 @@ class RunCfiModelsRequest(BaseModel):
     )
     model: Optional[CfiModelName] = Field(
         None,
-        description="Single pipeline to run, or omit to run all in default order.",
+        description="Single CFI attribute pipeline, or omit to run all attribute models.",
     )
     overwrite: bool = Field(
         False, description="If true, re-run even when results already exist."
@@ -160,25 +161,41 @@ async def import_single_image(
     )
 
 
+class RunImageIdsJobRequest(BaseModel):
+    image_ids: list[int] = Field(..., min_length=1)
+    overwrite: bool = False
+
+
+class RunCfiAmdRequest(RunImageIdsJobRequest):
+    batch_size: int = 8
+    n_workers: int = 12
+
+
+def _queue_rq_job(queue_name: str, func, *args, ok_message: str) -> TaskResponse:
+    from ..main import get_rq_queue
+
+    try:
+        task_id = str(uuid.uuid4())
+        get_rq_queue(queue_name).enqueue(func, *args, job_id=task_id)
+        return TaskResponse(success=True, message=ok_message, task_id=task_id)
+    except Exception as e:
+        return TaskResponse(success=False, message=f"Failed to queue {queue_name}", error=str(e))
+
+
 @router.post("/import/run_cfi_models", response_model=TaskResponse)
 async def enqueue_run_cfi_models(
     body: RunCfiModelsRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Queue one RQ job per model, each on its own queue (``cfi-roi``, ...)."""
-    from rq import Queue
-
+    """Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...)."""
     from ..main import get_rq_queue
 
     try:
-        models = (
-            [body.model] if body.model is not None else list(CFI_ATTRIBUTE_MODEL_SLUGS)
-        )
+        models = [body.model] if body.model else list(CFI_ATTRIBUTE_MODEL_SLUGS)
         task_ids: list[str] = []
         for m in models:
-            q: Queue = get_rq_queue(m)
             task_id = str(uuid.uuid4())
-            q.enqueue(
+            get_rq_queue(m).enqueue(
                 run_cfi_model_for_image_ids,
                 body.image_ids,
                 m,
@@ -191,7 +208,7 @@ async def enqueue_run_cfi_models(
             task_ids.append(task_id)
         return TaskResponse(
             success=True,
-            message="CFI models task(s) queued successfully",
+            message="CFI attribute task(s) queued successfully",
             task_id=task_ids[0],
             task_ids=task_ids,
         )
@@ -201,6 +218,36 @@ async def enqueue_run_cfi_models(
             message="Failed to queue CFI models task",
             error=str(e),
         )
+
+
+@router.post("/import/run_cfi_amd", response_model=TaskResponse)
+async def enqueue_run_cfi_amd(
+    body: RunCfiAmdRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    return _queue_rq_job(
+        "cfi-amd",
+        run_cfi_amd_for_image_ids,
+        body.image_ids,
+        body.overwrite,
+        body.batch_size,
+        body.n_workers,
+        ok_message="CFI AMD task queued successfully",
+    )
+
+
+@router.post("/import/run_layer_segmentation", response_model=TaskResponse)
+async def enqueue_run_layer_segmentation(
+    body: RunImageIdsJobRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    return _queue_rq_job(
+        "layer-segmentation",
+        run_layer_segmentation_for_image_ids,
+        body.image_ids,
+        body.overwrite,
+        ok_message="Layer segmentation task queued successfully",
+    )
 
 
 @router.post("/import/update_thumbnails", response_model=TaskResponse)

@@ -28,36 +28,62 @@ def run_cfi_model_for_image_ids(
     batch_size: int = 8,
     n_workers: int = 16,
 ):
-    """Run one CFI pipeline; ``model`` is a slug (``cfi-quality``, ...). One RQ job per model."""
+    """Run one CFI attribute pipeline (``cfi-roi``, ``cfi-quality``, ...)."""
     from eyened_orm import Database
-    from eyened_orm.commands.model_processing import (
-        _get_device,
-        run_cfi_attribute_pipeline,
-        run_cfi_segmentation_pipeline,
-    )
+    from eyened_orm.commands.model_processing import _get_device, run_cfi_attribute_pipeline
 
     database = Database()
     device = _get_device(None)
     with database.get_session() as session:
-        if model == "cfi-amd":
-            run_cfi_segmentation_pipeline(
-                session,
-                image_ids,
-                model,
-                device=device,
-                batch_size=batch_size,
-                n_workers=n_workers,
-                overwrite=overwrite,
-            )
-        else:
-            run_cfi_attribute_pipeline(
-                session,
-                image_ids,
-                model,
-                device=device,
-                batch_size=batch_size,
-                n_workers=n_workers,
-                overwrite=overwrite,
-                commit_interval=commit_interval,
-            )
+        run_cfi_attribute_pipeline(
+            session,
+            image_ids,
+            model,
+            device=device,
+            batch_size=batch_size,
+            n_workers=n_workers,
+            overwrite=overwrite,
+            commit_interval=commit_interval,
+        )
+    return True
+
+
+def run_cfi_amd_for_image_ids(
+    image_ids: list[int],
+    overwrite: bool = False,
+    batch_size: int = 8,
+    n_workers: int = 12,
+):
+    """Run the CFI AMD segmentation processor (``cfi-amd`` queue)."""
+    from eyened_orm import Database
+    from eyened_orm.commands.model_processing import _get_device
+    from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
+
+    database = Database()
+    device = _get_device(None)
+    with database.get_session() as session:
+        run_for_image_ids(
+            session,
+            image_ids,
+            device=device,
+            batch_size=batch_size,
+            n_workers=n_workers,
+            overwrite=overwrite,
+        )
+    return True
+
+
+def run_layer_segmentation_for_image_ids(
+    image_ids: list[int],
+    overwrite: bool = False,
+):
+    """Run the OCT layer segmentation processor (``layer-segmentation`` queue)."""
+    from eyened_orm import Database
+    from eyened_orm.commands.model_processing import _get_device
+    from eyened_orm.inference.layer_segmentation import run_for_image_ids
+
+    database = Database()
+    device = _get_device(None)
+    with database.get_session() as session:
+        run_for_image_ids(session, image_ids, device=device, overwrite=overwrite)
     return True

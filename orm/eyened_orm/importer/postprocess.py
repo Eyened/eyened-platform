@@ -9,8 +9,14 @@ from sqlalchemy.orm import Session
 from eyened_orm.commands.model_processing import (
     CFI_ATTRIBUTE_MODEL_SLUGS,
     CFI_SEGMENTATION_MODEL_SLUGS,
+    OCT_SEGMENTATION_MODEL_SLUGS,
     run_cfi_attribute_pipeline,
-    run_cfi_segmentation_pipeline,
+)
+from eyened_orm.inference.cfi_amd_segmentation import (
+    run_for_image_ids as run_cfi_amd_for_image_ids,
+)
+from eyened_orm.inference.layer_segmentation import (
+    run_for_image_ids as run_layer_segmentation_for_image_ids,
 )
 from eyened_orm.api_client import get_api_client
 from eyened_orm.commands.model_processing import _get_device
@@ -18,7 +24,12 @@ from eyened_orm.image_instance import ImageInstance, Modality
 from eyened_orm.importer.thumbnails import run_update_thumbnails_for_image_ids
 
 
-SLUG = Literal["thumbnails", *CFI_ATTRIBUTE_MODEL_SLUGS, *CFI_SEGMENTATION_MODEL_SLUGS]
+SLUG = Literal[
+    "thumbnails",
+    *CFI_ATTRIBUTE_MODEL_SLUGS,
+    *CFI_SEGMENTATION_MODEL_SLUGS,
+    *OCT_SEGMENTATION_MODEL_SLUGS,
+]
 if TYPE_CHECKING:
     from eyened_orm.api_client import APIClient
 
@@ -54,6 +65,11 @@ class PostProcess:
             for image in self.images
             if image.Modality == Modality.ColorFundus
         ]
+        oct_image_ids = [
+            image.ImageInstanceID
+            for image in self.images
+            if image.Modality == Modality.OCT
+        ]
 
         if self.processing.get("thumbnails") == ProcessMode.ENQUEUE:
             self.client.enqueue_update_thumbnails_for_image_ids(
@@ -88,22 +104,32 @@ class PostProcess:
                         slug,
                         device=_get_device(device),
                     )
-            for slug in CFI_SEGMENTATION_MODEL_SLUGS:
-                if slug not in self.processing:
-                    continue
-                mode = self.processing[slug]
+            if "cfi-amd" in self.processing:
+                mode = self.processing["cfi-amd"]
                 if mode == ProcessMode.ENQUEUE:
-                    self.client.enqueue_run_cfi_models(
-                        image_ids=cfi_image_ids, model=slug
-                    )
+                    self.client.enqueue_run_cfi_amd(image_ids=cfi_image_ids)
                 elif mode == ProcessMode.LOCAL:
                     if session is None:
                         raise ValueError(
                             "Session is required for local CFI segmentation processing"
                         )
-                    run_cfi_segmentation_pipeline(
+                    run_cfi_amd_for_image_ids(
                         session,
                         cfi_image_ids,
-                        slug,
                         device=_get_device(device),
                     )
+
+        if oct_image_ids and "layer-segmentation" in self.processing:
+            mode = self.processing["layer-segmentation"]
+            if mode == ProcessMode.ENQUEUE:
+                self.client.enqueue_run_layer_segmentation(image_ids=oct_image_ids)
+            elif mode == ProcessMode.LOCAL:
+                if session is None:
+                    raise ValueError(
+                        "Session is required for local OCT segmentation processing"
+                    )
+                run_layer_segmentation_for_image_ids(
+                    session,
+                    oct_image_ids,
+                    device=_get_device(device),
+                )

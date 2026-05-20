@@ -3,8 +3,7 @@
 #
 #   cd worker && docker compose up --build
 #
-# GPU (optional): uncomment `gpus: all` or:
-#   docker compose run --gpus all worker
+# GPU enabled by default (`gpus: all`).
 #
 # When also running `docker-compose.cfi-roi.yml`, set EYENED_RQ_WORKER_QUEUES in `.env` to omit
 # ``cfi-roi`` here so ROI jobs go only to the slim worker; omit ``default`` too if thumbnails
@@ -24,4 +23,4 @@ services:
       - /mnt/oogergo:/mnt/oogergo:ro
       - /mnt/genr:/mnt/genr:ro
     restart: unless-stopped
-    # gpus: all
+    gpus: all

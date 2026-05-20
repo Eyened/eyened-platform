@@ -113,6 +113,52 @@ class APIClient:
         resp.raise_for_status()
         return resp.json()
 
+    def _enqueue_image_ids_job(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        timeout: Optional[float] = 30,
+    ) -> dict[str, Any]:
+        resp = self.post(path, json=payload, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+
+    def enqueue_run_cfi_amd(
+        self,
+        image_ids: list[int],
+        *,
+        overwrite: bool = False,
+        batch_size: int = 8,
+        n_workers: int = 12,
+        timeout: Optional[float] = 30,
+    ) -> dict[str, Any]:
+        """``POST /api/import/run_cfi_amd``."""
+        return self._enqueue_image_ids_job(
+            "/api/import/run_cfi_amd",
+            {
+                "image_ids": image_ids,
+                "overwrite": overwrite,
+                "batch_size": batch_size,
+                "n_workers": n_workers,
+            },
+            timeout=timeout,
+        )
+
+    def enqueue_run_layer_segmentation(
+        self,
+        image_ids: list[int],
+        *,
+        overwrite: bool = False,
+        timeout: Optional[float] = 30,
+    ) -> dict[str, Any]:
+        """``POST /api/import/run_layer_segmentation``."""
+        return self._enqueue_image_ids_job(
+            "/api/import/run_layer_segmentation",
+            {"image_ids": image_ids, "overwrite": overwrite},
+            timeout=timeout,
+        )
+
     def enqueue_update_thumbnails(
         self,
         *,

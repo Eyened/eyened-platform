@@ -1,4 +1,5 @@
-FROM pytorch/pytorch:2.6.0-cuda11.8-cudnn9-runtime
+# CUDA 12.8 + PyTorch 2.7 required for Blackwell GPUs (e.g. RTX 5090, sm_120).
+FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
 
 SHELL ["/bin/bash", "-c"]
 
@@ -20,6 +21,16 @@ COPY server /app/server
 
 # AMD segmentation dependency (provides `cfi_amd.processor`)
 RUN pip install --no-cache-dir "git+https://github.com/Eyened/cfi-amd.git"
+
+# Bake GitHub release weights (avoids ~1GB download on every `docker run --rm`).
+ENV CFI_AMD_MODELS_DIR=/models/cfi-amd
+RUN python - <<'EOF'
+from pathlib import Path
+
+from cfi_amd.resources import ensure_models_downloaded
+
+ensure_models_downloaded(Path("/models/cfi-amd"))
+EOF
 
 ENV PYTHONPATH=/app
 WORKDIR /app
