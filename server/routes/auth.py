@@ -524,6 +524,7 @@ async def get_auth_options():
 async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Query(alias="next")] = "") -> OIDCAuthorizationResponse:
     """The authorization URL at the OIDC provider for authentication."""
     # The csrf_token value in state is used to safeguard the auth roundtrip against CSRF attacks
+    # TODO: use a more random CSRF token
     csrf_token = random.randint(1, 1_000_000)
     state = quote(json.dumps({
         "next": next_,
@@ -592,6 +593,9 @@ async def oidc_authenticate(auth: OIDCAuthenticationRequest, oidc_csrf_token: st
     # Validate the ID token
     try:
         id_token = token_data["id_token"]
+        # TODO: use the JWKS endpoint to validate the token signature.
+        # TODO: validate the issuer (`iss`) and, for MS, the tenant (`tid`) claims.
+        #   Maybe make this flexible through configuration.
         id_token = jwt.decode(
             jwt=id_token,
             audience=settings.oidc.client_id,  # This is what MS Entra advises
