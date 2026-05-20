@@ -43,7 +43,10 @@ export class SegmentationContext {
     public questionableActive = $state(false);
     public brushRadius = $state(4);
     public segmentationItem: SegmentationItem | undefined = $state(undefined);
-    public activeIndices: number | number[] = $state([]);
+    public scan_indices: number[] = $derived(this.segmentationItem?.savedScanIndices ?? []);
+    
+    // active mask indices for multi-label / multi-class segmentations
+    public activeIndices: number | number[] = $state([]); 
     /** True while a segmentation stroke is in progress (pointer/keyboard). Used by multi-label overlay. */
     public isDrawing = $state(false);
 

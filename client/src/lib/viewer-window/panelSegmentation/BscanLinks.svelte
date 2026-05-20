@@ -7,9 +7,7 @@
         "mainViewerContext",
     );
     const segmentationContext = mainViewerContext.segmentationContext;
-    let segmentation = $derived(
-        segmentationContext.segmentationItem?.segmentation,
-    );
+    const scanIndices = $derived(segmentationContext.scan_indices);
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const image = viewerContext.image;
@@ -28,8 +26,8 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="row links">
-    {#if segmentation}
-        {#each segmentation.scan_indices as scanNr, i (scanNr)}
+    {#if scanIndices.length > 0}
+        {#each scanIndices as scanNr, i (scanNr)}
             {#if i > 0}|{/if}
             <span
                 class="link-scan"

@@ -1,4 +1,4 @@
-import { SvelteMap } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import { getSegmentationData, getModelSegmentationData } from "../data/helpers";
 import type { NPYArray } from "../utils/npy_loader";
@@ -12,6 +12,11 @@ export class SegmentationItem {
 
     // mapping of scanNr to SegmentationState
     segmentationStates: SvelteMap<number, SegmentationState> = new SvelteMap();
+    /** Scan indices with server data; updated on successful slice PUTs (API object stays static). */
+    private readonly savedScanIndexSet = new SvelteSet<number>();
+    readonly savedScanIndices = $derived.by(() =>
+        [...this.savedScanIndexSet].sort((a, b) => a - b),
+    );
     loading: boolean = $state(false);
     ready: Promise<void> | null = null;
 
@@ -24,6 +29,12 @@ export class SegmentationItem {
 
         // Initialize threshold from segmentation or default to 0.5
         this.threshold = this.segmentation.threshold ?? 0.5;
+
+        if (Array.isArray(this.segmentation.scan_indices)) {
+            for (const scanNr of this.segmentation.scan_indices) {
+                this.savedScanIndexSet.add(scanNr);
+            }
+        }
 
         if (Array.isArray(this.segmentation.scan_indices) && this.segmentation.scan_indices.length < 5) {
             for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
@@ -102,6 +113,7 @@ export class SegmentationItem {
                 const end = start + planeSize;
                 const slice = (array.data as any).subarray(start, end);
                 this.getSegmentationState(scanNr, true, slice);
+                this.addSavedScanIndex(scanNr);
             }
         } catch (error) {
             console.error('SegmentationItem loadFull failed', error);
@@ -114,9 +126,13 @@ export class SegmentationItem {
         return this.segmentationStates.get(scanNr)?.mask;
     }
 
+    addSavedScanIndex(scanNr: number) {
+        this.savedScanIndexSet.add(scanNr);
+    }
+
     isEmptyForSlice(scanNr: number): boolean {
-        const scanIndices = this.segmentation.scan_indices;
-        if (Array.isArray(scanIndices) && !scanIndices.includes(scanNr)) {
+        const scanIndices = this.savedScanIndices;
+        if (scanIndices.length > 0 && !scanIndices.includes(scanNr)) {
             return true;
         }
         const state = this.segmentationStates.get(scanNr);
@@ -128,7 +144,7 @@ export class SegmentationItem {
 
     getSegmentationState(scanNr: number, create: boolean = false, initialData?: Uint8Array | Uint16Array | Uint32Array | Float32Array): SegmentationState | undefined {
         if (create && !this.segmentationStates.has(scanNr)) {
-            const segmentationState = new SegmentationState(this.image, this.segmentation, scanNr, initialData);
+            const segmentationState = new SegmentationState(this.image, this.segmentation, scanNr, initialData, this);
             this.segmentationStates.set(scanNr, segmentationState);
         }
         return this.segmentationStates.get(scanNr)!;
