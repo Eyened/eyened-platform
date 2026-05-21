@@ -16,8 +16,8 @@ export abstract class AbstractImage {
     public readonly resolution: { x: number, y: number, z: number };
     transform: Matrix = Matrix.identity;
     
-    // Cache segmentation items per segmentation ID
-    public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
+    // Cache segmentation items per annotation type + id (ids can overlap across types)
+    public readonly segmentationItems = new SvelteMap<string, SegmentationItem>();
     public readonly orientation: 'axial' | 'enface';
     constructor(
         public readonly instance: ImageGET,
@@ -126,16 +126,19 @@ export abstract class AbstractImage {
         return this._ioContext;
     }
 
+    private segmentationItemKey(segmentation: SegmentationGET | ModelSegmentationGET): string {
+        return `${segmentation.annotation_type}_${segmentation.id}`;
+    }
+
     getOrCreateSegmentationItem(segmentation: SegmentationGET | ModelSegmentationGET): SegmentationItem {
-        // Use id as key (unique per segmentation)
-        const cached = this.segmentationItems.get(segmentation.id);
+        const key = this.segmentationItemKey(segmentation);
+        const cached = this.segmentationItems.get(key);
         if (cached) {
             return cached;
         }
 
-        // Create new segmentation item
         const segmentationItem = new SegmentationItem(this, segmentation);
-        this.segmentationItems.set(segmentation.id, segmentationItem);
+        this.segmentationItems.set(key, segmentationItem);
         return segmentationItem;
     }
 

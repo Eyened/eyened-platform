@@ -27,7 +27,6 @@ import type { WebGL } from "./webgl";
 
 /** Inject shared segmentation quad outline helpers before main(). */
 function withSegBoundsOutline(fragmentSource: string): string {
-    console.log(fragmentSource.replace(/^void main\(/m, `${segBoundsOutline}\nvoid main(`));
     return fragmentSource.replace(/^void main\(/m, `${segBoundsOutline}\nvoid main(`);
 }
 

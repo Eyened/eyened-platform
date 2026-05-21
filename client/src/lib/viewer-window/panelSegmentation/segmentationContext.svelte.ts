@@ -134,14 +134,37 @@ export class SegmentationContext {
         this.erodeDilateActive = false;
     }
 
+    private activeSegmentationKey(): string | undefined {
+        return this.segmentationItem
+            ? getSegmentationKey(this.segmentationItem.segmentation)
+            : undefined;
+    }
+
+    isActiveSegmentation(segmentation: Segmentation): boolean {
+        return this.activeSegmentationKey() === getSegmentationKey(segmentation);
+    }
+
     toggleActive(segmentationItem: SegmentationItem) {
-        if (this.segmentationItem == segmentationItem) {
+        const key = getSegmentationKey(segmentationItem.segmentation);
+        if (this.activeSegmentationKey() === key) {
             this.segmentationItem = undefined;
-        } else {
-            this.segmentationItem = segmentationItem;
-            this.shownSegmentations.add(getSegmentationKey(segmentationItem.segmentation));
+            this.activeIndices = [];
+            this.questionableActive = false;
+            this.erodeDilateActive = false;
+            return;
         }
 
+        this.segmentationItem = segmentationItem;
+        this.shownSegmentations.add(key);
+
+        const rep = segmentationItem.segmentation.data_representation;
+        if (rep === 'MultiClass' || rep === 'MultiLabel') {
+            this.activeIndices = 1;
+        } else {
+            this.activeIndices = [];
+        }
+        this.questionableActive = false;
+        this.erodeDilateActive = false;
     }
 
     private static readonly ALL_FEATURES_VISIBLE = 0xffffffff >>> 0;
