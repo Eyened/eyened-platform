@@ -73,6 +73,7 @@ class OIDCSettings(BaseSettings):
     connect_url: str = ""
     redirect_url: str = ""
     provider_name: str = "OpenID Connect"
+    create_new_accounts: bool = False
 
     @property
     def client_secret_value(self) -> str:

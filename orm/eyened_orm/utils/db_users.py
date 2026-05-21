@@ -20,6 +20,7 @@ def create_user(
     password: str,
     is_human: bool = True,
     description: str | None = None,
+    employee_identifier: str | None = None,
 ) -> Creator:
     """Create a new user with the given credentials."""
     # Check if username already exists
@@ -35,6 +36,7 @@ def create_user(
         PasswordHash=hash_password(password),
         IsHuman=is_human,
         Description=description,
+        EmployeeIdentifier=employee_identifier,
     )
     session.add(new_user)
     session.commit()

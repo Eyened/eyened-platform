@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+import secrets
 from typing import Annotated
 from urllib.parse import quote, unquote, urlencode
 
@@ -556,8 +557,46 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
         csrf=csrf_token,
     )
 
+def check_oidc_login(id_claims: dict[str, str], session: Session):
+    """
+    Find or create the creator matching the OIDC claims.
+
+    Args:
+        id_claims (dict[str, str]): claims from OIDC ID token
+        session (Session): database session
+    """
+    creator = None
+    for claim_name in ["sub", "email", "preferred_username"]:
+        if claim_name in id_claims:
+            claim_value = id_claims[claim_name]
+            lookup_key = f"oidc:{claim_name}:{claim_value}"
+            creator = session.query(Creator).where(Creator.EmployeeIdentifier == lookup_key).first()
+            if creator:
+                break
+
+    if creator:
+        if not creator.EmployeeIdentifier.startswith("oidc:sub:"):
+            # Update the identifier to use the 'sub' claim
+            identifier = f"oidc:sub:{id_claims['sub']}"
+            creator.EmployeeIdentifier = identifier
+            session.add(creator)
+            session.commit()
+
+    else:
+        if not settings.oidc.create_new_accounts:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OIDC account not authorized")
+
+        # Create new account from ID claims
+        username = id_claims["preferred_username"]
+        identifier = f"oidc:sub:{id_claims['sub']}"
+        # TODO: how to handle password? Preferably set an unusable one or leave it out, so password auth doesn't work
+        random_password: str = secrets.token_hex(64)
+        creator = create_user(session, username=username, password=random_password, employee_identifier=identifier)
+
+    return creator
+
 @router.post("/auth/oidc/authenticate")
-async def oidc_authenticate(auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None)):
+async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), session: Session = Depends(get_db)):
     """Handle OIDC authentication using the code from the authorization URL."""
     # Check state value
     state = auth.state.strip()
@@ -596,7 +635,7 @@ async def oidc_authenticate(auth: OIDCAuthenticationRequest, oidc_csrf_token: st
         # TODO: use the JWKS endpoint to validate the token signature.
         # TODO: validate the issuer (`iss`) and, for MS, the tenant (`tid`) claims.
         #   Maybe make this flexible through configuration.
-        id_token = jwt.decode(
+        claims = jwt.decode(
             jwt=id_token,
             audience=settings.oidc.client_id,  # This is what MS Entra advises
             options={"verify_signature": False, "verify_aud": True, "verify_exp": True, "verify_iat": True, "verify_nbf": True},
@@ -605,11 +644,32 @@ async def oidc_authenticate(auth: OIDCAuthenticationRequest, oidc_csrf_token: st
         logging.warning(f"Error while decoding ID Token: {err}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid ID token")
 
-    # Subject is the unique identifier for the user account at MS Entra
-    subject = id_token["sub"]
-    name = id_token["name"]
-    email = id_token["email"]
-    username = id_token["preferred_username"]
-    # TODO: validate subject/username against Creator
+    # Check claims with Creator database
+    creator = check_oidc_login(claims, session)
 
-    return {"detail": "authentication WIP", "id_token": id_token}
+    access_token = create_access_token(
+        creator.CreatorID, creator.CreatorName, creator.Role
+    )
+    refresh_token = create_refresh_token(creator.CreatorID)
+
+    response.set_cookie(
+        key=settings.jwt_cookie_name,
+        value=access_token,
+        httponly=True,
+        max_age=settings.access_token_expire_minutes * 60,
+        secure=False,  # Set to True in production
+        samesite="strict",
+        path="/",
+    )
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=refresh_token,
+        httponly=True,
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
+        secure=False,  # Set to True in production
+        samesite="strict",
+        path="/",
+    )
+    response.delete_cookie(key="oidc_csrf_token")
+
+    return creator_to_response(creator, session)
