@@ -148,7 +148,7 @@ class AuthClient {
     }
 
     async OIDCAuthorize(): Promise<OIDCAuthorizationResponse> {
-        let nextUrl = new URLSearchParams(window.location.search).get('redirect');
+        let nextUrl = new URLSearchParams(window.location.search).get('next');
         let queryParams = new URLSearchParams();
         if (nextUrl) {
             queryParams.append('next', nextUrl);

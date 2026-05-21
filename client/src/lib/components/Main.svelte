@@ -16,7 +16,7 @@
 		// redirect to login page if user not logged
 		console.log("User not logged in. Redirecting..");
 		goto(
-			`/users/login?redirect=${encodeURIComponent(page.url.pathname + page.url.search)}`,
+			`/users/login?next=${encodeURIComponent(page.url.pathname + page.url.search)}`,
 		);
 	}
 </script>

@@ -9,7 +9,7 @@ function redirectToLogin() {
 	// Only redirect if not already on login page
 	if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/users/login')) {
 		const currentUrl = encodeURIComponent(window.location.href);
-		window.location.href = `/users/login?redirect=${currentUrl}`;
+		window.location.href = `/users/login?next=${currentUrl}`;
 	}
 }
 
