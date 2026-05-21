@@ -33,7 +33,7 @@ Field names and types for patient, study, series, and image metadata are listed 
 }
 ```
 
-**File location:** set `storage_backend_key` and `object_key` (path within that backend). The server resolves files via configured storage mounts (`EYENED_STORAGE_MOUNTS`), not a single global `IMAGES_BASEPATH` field on the payload.
+**File location:** set `storage_backend_key` and `object_key` (path within that backend). 
 
 **Hierarchy:** provide lookup fields (`project_name`, `patient_identifier`, `study_date`, `series_instance_uid`, …) or primary keys (`project_id`, `patient_id`, …). Missing parents are created when the row supplies enough keys to identify them; existing rows are matched and reused.
 
@@ -42,10 +42,6 @@ Field names and types for patient, study, series, and image metadata are listed 
 **Options:** only `include_stack_trace` (default `false`) — when `true`, failed imports return a stack trace in the response.
 
 Authenticate first (session cookie), then call the endpoint. Example workflow: [import_api.ipynb](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb) (uses `ImageImporter` from `eyened_orm.importer.image_importer`).
-
-:::caution
-`ImageImporter` still sends legacy `create_*` flags in `options`, but the API ignores them. Creation is driven by the row content and the shared ORM planner.
-:::
 
 ## ORM importer
 

@@ -79,16 +79,16 @@ class InstancePOST(ContactImportFields):
     )
 
     slice_thickness: Optional[float] = Field(None, description="SliceThickness")
+
     alt_dataset_identifier: Optional[str] = Field(
-        None, description="AltDatasetIdentifier"
+        None,
+        description="AltDatasetIdentifier; deprecated and will be removed in a future release",
     )
-    
+
     # Note: these can be specified but should get the default values on import if not provided
     date_inserted: Optional[datetime] = Field(None, description="DateInserted")
     date_modified: Optional[datetime] = Field(None, description="DateModified")
-    date_preprocessed: Optional[datetime] = Field(
-        None, description="DatePreprocessed"
-    )
+    date_preprocessed: Optional[datetime] = Field(None, description="DatePreprocessed")
 
     # Note these are added for completeness, but will be removed in a future release
     cf_roi: Optional[Dict[str, Any]] = Field(None, description="CFROI JSON")
@@ -249,7 +249,8 @@ class ImportRow(InstancePOST):
         None, description="SHA-256 digest (32 bytes); maps to ImageStorage.Hash"
     )
     image_storage_checksum: Optional[str] = Field(
-        None, description="Checksum string (e.g. MD5 hex); maps to ImageStorage.Checksum"
+        None,
+        description="Checksum string (e.g. MD5 hex); maps to ImageStorage.Checksum",
     )
     thumbnail_path: Optional[str] = Field(
         None,

@@ -419,7 +419,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/import/run_inference": {
+    "/import/run_cfi_models": {
         parameters: {
             query?: never;
             header?: never;
@@ -428,8 +428,45 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run Inference */
-        post: operations["run_inference_import_run_inference_post"];
+        /**
+         * Enqueue Run Cfi Models
+         * @description Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...).
+         */
+        post: operations["enqueue_run_cfi_models_import_run_cfi_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/run_cfi_amd": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enqueue Run Cfi Amd */
+        post: operations["enqueue_run_cfi_amd_import_run_cfi_amd_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/run_layer_segmentation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enqueue Run Layer Segmentation */
+        post: operations["enqueue_run_layer_segmentation_import_run_layer_segmentation_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -445,8 +482,48 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Update Thumbnails */
-        post: operations["update_thumbnails_import_update_thumbnails_post"];
+        /**
+         * Post Import Update Thumbnails
+         * @description Queue a job that scans the DB for missing thumbnails (CLI-equivalent).
+         */
+        post: operations["post_import_update_thumbnails_import_update_thumbnails_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/update_thumbnails_for_image_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Import Update Thumbnails For Image Ids
+         * @description Queue thumbnail generation for the given ``image_ids`` only.
+         */
+        post: operations["post_import_update_thumbnails_for_image_ids_import_update_thumbnails_for_image_ids_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/status/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_import_status__task_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1078,6 +1155,11 @@ export interface components {
          * @enum {string}
          */
         EntityType: "Patient" | "Study" | "Eye" | "StudyEye" | "ImageInstance";
+        /**
+         * ExternalEnum
+         * @enum {string}
+         */
+        ExternalEnum: "Y" | "N" | "M";
         /** FeatureGET */
         FeatureGET: {
             /** Name */
@@ -1289,30 +1371,6 @@ export interface components {
          */
         ImportOptions: {
             /**
-             * Create Patients
-             * @description If True, create patients when they don't exist
-             * @default false
-             */
-            create_patients: boolean;
-            /**
-             * Create Studies
-             * @description If True, create studies when they don't exist
-             * @default false
-             */
-            create_studies: boolean;
-            /**
-             * Create Series
-             * @description If True, create series when they don't exist
-             * @default true
-             */
-            create_series: boolean;
-            /**
-             * Create Project
-             * @description If True, create project when it doesn't exist
-             * @default false
-             */
-            create_project: boolean;
-            /**
              * Include Stack Trace
              * @description If True, include stack trace in the error response
              * @default false
@@ -1321,7 +1379,7 @@ export interface components {
         };
         /** ImportRequest */
         ImportRequest: {
-            data: components["schemas"]["InstancePOSTFlat"];
+            data: components["schemas"]["ImportRow"];
             options: components["schemas"]["ImportOptions"];
         };
         /** ImportResponse */
@@ -1339,13 +1397,22 @@ export interface components {
             /** Stack Trace */
             stack_trace?: string | null;
         };
-        /** InstancePOSTFlat */
-        InstancePOSTFlat: {
-            /**
-             * Storage Backend Key
-             * @description Key of an existing StorageBackend used for this image
-             */
-            storage_backend_key: string;
+        /**
+         * ImportRow
+         * @description One flat record per image: project → patient → study → series → instance → storage fields.
+         *     All fields are optional until consistency rules are enforced (see model validator).
+         */
+        ImportRow: {
+            /** Contact Id */
+            contact_id?: number | null;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Contact Institute */
+            contact_institute?: string | null;
+            /** Contact Orcid */
+            contact_orcid?: string | null;
             /** Sop Instance Uid */
             sop_instance_uid?: string | null;
             modality?: components["schemas"]["Modality"] | null;
@@ -1379,14 +1446,31 @@ export interface components {
             device_id?: number | null;
             /** Device Serial Number */
             device_serial_number?: string | null;
-            /** Device Description */
+            /**
+             * Device Description
+             * @description Description of the device
+             */
             device_description?: string | null;
-            /** Device Manufacturer */
-            device_manufacturer?: string | null;
-            /** Device Model */
-            device_model?: string | null;
-            /** Scan Mode */
+            /**
+             * Manufacturer
+             * @description Manufacturer of the device
+             */
+            manufacturer?: string | null;
+            /**
+             * Manufacturer Model Name
+             * @description Model name of the device
+             */
+            manufacturer_model_name?: string | null;
+            /**
+             * Scan Mode
+             * @description Scan.ScanMode; used with SCAN importer entity for lookup/create
+             */
             scan_mode?: string | null;
+            /**
+             * Modality Tag
+             * @description Modality.ModalityTag (lookup/create Modality table row); distinct from modality enum
+             */
+            modality_tag?: string | null;
             /** Source Info Id */
             source_info_id?: number | null;
             /** Anatomic Region */
@@ -1408,40 +1492,179 @@ export interface components {
             /** Fda Identifier */
             fda_identifier?: string | null;
             /**
+             * Dataset Identifier
+             * @description Maps to ImageInstance.DatasetIdentifier, deprecated and will be removed in a future release
+             */
+            dataset_identifier?: string | null;
+            /**
+             * Modality Id
+             * @description Modality.ModalityID (SCAN-like PK for Modality table importer entity)
+             */
+            modality_id?: number | null;
+            /**
+             * Scan Id
+             * @description Scan.ScanID when referencing an existing Scan row
+             */
+            scan_id?: number | null;
+            /**
+             * Slice Thickness
+             * @description SliceThickness
+             */
+            slice_thickness?: number | null;
+            /**
+             * Alt Dataset Identifier
+             * @description AltDatasetIdentifier; deprecated and will be removed in a future release
+             */
+            alt_dataset_identifier?: string | null;
+            /**
+             * Date Inserted
+             * @description DateInserted
+             */
+            date_inserted?: string | null;
+            /**
+             * Date Modified
+             * @description DateModified
+             */
+            date_modified?: string | null;
+            /**
+             * Date Preprocessed
+             * @description DatePreprocessed
+             */
+            date_preprocessed?: string | null;
+            /**
+             * Cf Roi
+             * @description CFROI JSON
+             */
+            cf_roi?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Cf Keypoints
+             * @description CFKeypoints JSON
+             */
+            cf_keypoints?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Cf Quality
+             * @description CFQuality
+             */
+            cf_quality?: number | null;
+            /** Project Id */
+            project_id?: number | null;
+            /**
              * Project Name
              * @description Name of the project
              */
-            project_name: string;
+            project_name?: string | null;
+            /** Project Description */
+            project_description?: string | null;
+            /** Project Doi */
+            project_doi?: string | null;
+            /** Project Contact Id */
+            project_contact_id?: number | null;
+            /** @description Whether the project is external */
+            project_external?: components["schemas"]["ExternalEnum"] | null;
+            /** Patient Id */
+            patient_id?: number | null;
             /**
              * Patient Identifier
-             * @description Patient identifier
+             * @description Patient identifier (unique within the project)
              */
             patient_identifier?: string | null;
             sex?: components["schemas"]["SexEnum"] | null;
-            /** Birth Date */
+            /**
+             * Birth Date
+             * @description Patient's date of birth
+             */
             birth_date?: string | null;
-            /** Study Date */
+            /** Study Id */
+            study_id?: number | null;
+            /**
+             * Study Date
+             * @description Date when the study was performed
+             */
             study_date?: string | null;
             /** Study Description */
             study_description?: string | null;
+            /** Study Round */
+            study_round?: number | null;
             /** Series Id */
-            series_id?: string | null;
-            /** Series Number */
-            series_number?: number | null;
-            /** Series Instance Uid */
+            series_id?: number | null;
+            /**
+             * Series Instance Uid
+             * @description DICOM SeriesInstanceUID; stored on Series.SeriesInstanceUid
+             */
             series_instance_uid?: string | null;
             /**
-             * Object Key
-             * @description Path to the image file
+             * Series Anonymous Identity
+             * @description Batch-local grouping key for anonymous series creation
              */
-            object_key: string;
+            series_anonymous_identity?: number | null;
+            /** Series Number */
+            series_number?: number | null;
             /**
-             * Attributes
-             * @description Optional key-value properties
+             * Study Instance Uid
+             * @description DICOM StudyInstanceUID; stored on Series.StudyInstanceUid
              */
-            attributes?: {
-                [key: string]: unknown;
-            };
+            study_instance_uid?: string | null;
+            /** Device Model Id */
+            device_model_id?: number | null;
+            /** Image Instance Id */
+            image_instance_id?: number | null;
+            /** Public Id */
+            public_id?: string | null;
+            /** Inactive */
+            inactive?: boolean | null;
+            /**
+             * Image Anonymous Identity
+             * @description Batch-local grouping key for anonymous image instance creation
+             */
+            image_anonymous_identity?: number | null;
+            /** Storage Backend Id */
+            storage_backend_id?: number | null;
+            /**
+             * Storage Backend Key
+             * @description StorageBackend used for this image
+             */
+            storage_backend_key?: string | null;
+            /**
+             * Storage Backend Kind
+             * @description Kind of the storage backend
+             */
+            storage_backend_kind?: string | null;
+            /** Image Storage Id */
+            image_storage_id?: number | null;
+            /**
+             * Object Key
+             * @description Path to the image file within the storage backend
+             */
+            object_key?: string | null;
+            /**
+             * Image Storage Format
+             * @description If set, overrides inferred Format for ImageStorage
+             */
+            image_storage_format?: string | null;
+            /**
+             * Image Storage Is Primary
+             * @description If set, maps to ImageStorage.IsPrimary
+             */
+            image_storage_is_primary?: boolean | null;
+            /**
+             * Image Storage Hash
+             * @description SHA-256 digest (32 bytes); maps to ImageStorage.Hash
+             */
+            image_storage_hash?: string | null;
+            /**
+             * Image Storage Checksum
+             * @description Checksum string (e.g. MD5 hex); maps to ImageStorage.Checksum
+             */
+            image_storage_checksum?: string | null;
+            /**
+             * Thumbnail Path
+             * @description Thumbnail identifier under storage root; maps to ImageInstance.ThumbnailPath
+             */
+            thumbnail_path?: string | null;
         };
         /**
          * Laterality
@@ -1549,6 +1772,73 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+        };
+        /** RunCfiAmdRequest */
+        RunCfiAmdRequest: {
+            /** Image Ids */
+            image_ids: number[];
+            /**
+             * Overwrite
+             * @default false
+             */
+            overwrite: boolean;
+            /**
+             * Batch Size
+             * @default 8
+             */
+            batch_size: number;
+            /**
+             * N Workers
+             * @default 12
+             */
+            n_workers: number;
+        };
+        /**
+         * RunCfiModelsRequest
+         * @description Queue a model job for the given image instance IDs (CFI attributes or segmentation).
+         */
+        RunCfiModelsRequest: {
+            /**
+             * Image Ids
+             * @description ImageInstance IDs to process (e.g. ColorFundus IDs from a completed import).
+             */
+            image_ids: number[];
+            /**
+             * Model
+             * @description Single CFI attribute pipeline, or omit to run all attribute models.
+             */
+            model?: ("cfi-roi" | "cfi-keypoints" | "cfi-odfd" | "cfi-quality") | null;
+            /**
+             * Overwrite
+             * @description If true, re-run even when results already exist.
+             * @default false
+             */
+            overwrite: boolean;
+            /**
+             * Commit Interval
+             * @default 100
+             */
+            commit_interval: number;
+            /**
+             * Batch Size
+             * @default 8
+             */
+            batch_size: number;
+            /**
+             * N Workers
+             * @default 16
+             */
+            n_workers: number;
+        };
+        /** RunImageIdsJobRequest */
+        RunImageIdsJobRequest: {
+            /** Image Ids */
+            image_ids: number[];
+            /**
+             * Overwrite
+             * @default false
+             */
+            overwrite: boolean;
         };
         /** ScanMeta */
         ScanMeta: {
@@ -1998,6 +2288,8 @@ export interface components {
             message: string;
             /** Task Id */
             task_id?: string | null;
+            /** Task Ids */
+            task_ids?: string[] | null;
             /** Error */
             error?: string | null;
         };
@@ -2030,6 +2322,23 @@ export interface components {
             /** Expires In */
             expires_in: number;
             user: components["schemas"]["UserResponse"];
+        };
+        /**
+         * UpdateThumbnailsForImageIdsRequest
+         * @description Queue thumbnail generation for specific instances (same processing as bulk update).
+         */
+        UpdateThumbnailsForImageIdsRequest: {
+            /**
+             * Image Ids
+             * @description ImageInstance IDs to generate thumbnails for.
+             */
+            image_ids: number[];
+            /**
+             * Print Errors
+             * @description Log per-image errors to worker stdout.
+             * @default false
+             */
+            print_errors: boolean;
         };
         /** UserLogin */
         UserLogin: {
@@ -3164,9 +3473,128 @@ export interface operations {
             };
         };
     };
-    run_inference_import_run_inference_post: {
+    enqueue_run_cfi_models_import_run_cfi_models_post: {
         parameters: {
             query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCfiModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_run_cfi_amd_import_run_cfi_amd_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCfiAmdRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_run_layer_segmentation_import_run_layer_segmentation_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunImageIdsJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_import_update_thumbnails_import_update_thumbnails_post: {
+        parameters: {
+            query?: {
+                /** @description Include images with empty ThumbnailPath (failed previous run), like ``eorm update-thumbnails --failed``. */
+                failed?: boolean;
+                /** @description Print per-image errors on the worker, like ``eorm update-thumbnails --print-errors``. */
+                print_errors?: boolean;
+            };
             header?: {
                 authorization?: string;
             };
@@ -3198,7 +3626,7 @@ export interface operations {
             };
         };
     };
-    update_thumbnails_import_update_thumbnails_post: {
+    post_import_update_thumbnails_for_image_ids_import_update_thumbnails_for_image_ids_post: {
         parameters: {
             query?: never;
             header?: {
@@ -3210,7 +3638,11 @@ export interface operations {
                 refresh_token?: string;
             };
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateThumbnailsForImageIdsRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -3219,6 +3651,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_import_status__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

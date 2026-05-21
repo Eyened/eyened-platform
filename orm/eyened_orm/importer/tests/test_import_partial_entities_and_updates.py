@@ -78,6 +78,7 @@ def test_import_project_and_patient_only_then_update_patient_fields(session):
             ImportRow(
                 project_name="proj-pp",
                 patient_identifier="pat-1",
+                sex="M",
             )
         ],
         defaults=defaults,
@@ -92,6 +93,10 @@ def test_import_project_and_patient_only_then_update_patient_fields(session):
     assert _count(session, ImageInstance) == 0
     assert _count(session, ImageStorage) == 0
 
+    pat = Patient.by_name(session, "pat-1")
+    assert pat is not None
+    assert pat.Sex.name == "M"
+
     # Second pass: update just project/patient-level fields (no study/image keys).
     run2 = plan_image_import(
         session,
@@ -100,6 +105,7 @@ def test_import_project_and_patient_only_then_update_patient_fields(session):
                 project_name="proj-pp",
                 patient_identifier="pat-1",
                 project_description="proj updated",
+                sex="F",
             )
         ],
         defaults=defaults,
@@ -110,6 +116,10 @@ def test_import_project_and_patient_only_then_update_patient_fields(session):
     proj = Project.by_name(session, "proj-pp")
     assert proj is not None
     assert proj.Description == "proj updated"
+
+    pat = Patient.by_name(session, "pat-1")
+    assert pat is not None
+    assert pat.Sex.name == "F"
 
 
 def test_import_device_only_then_update_serial_number(session):
@@ -155,8 +165,12 @@ def test_import_device_only_then_update_serial_number(session):
     run2.apply()
     session.commit()
 
+    assert _count(session, DeviceInstance) == 1
+
     dev2 = session.scalar(select(DeviceInstance))
+    
     assert dev2 is not None
+    assert dev2.Description == "dev-1"
     assert dev2.SerialNumber == "SERIAL-B"
 
 
