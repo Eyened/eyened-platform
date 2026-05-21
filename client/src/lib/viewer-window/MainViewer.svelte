@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { GlobalContext } from "$lib/data/globalContext.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 	import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
 	import Viewer from "$lib/viewer/Viewer.svelte";
@@ -28,12 +29,14 @@
 	import Measure from "./icons/Measure.svelte";
 	import PanelInfo from "./panelInfo/panelInfo.svelte";
 	import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
+	import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
 	interface Props {
 		image: AbstractImage;
 	}
 
 	let { image }: Props = $props();
 
+	const globalContext = getContext<GlobalContext>("globalContext");
 	const taskContext = getContext<TaskContext>("taskContext");
 	const viewerWindowContext = getContext<ViewerWindowContext>(
 		"viewerWindowContext",
@@ -51,6 +54,11 @@
 	);
 	setContext("mainViewerContext", mainViewerContext);
 	onDestroy(viewerContext.addOverlay(mainViewerContext));
+	onDestroy(
+		viewerContext.addOverlay(
+			new FeaturePipetteOverlay(mainViewerContext, globalContext.user.id),
+		),
+	);
 
 	const { activePanels } = viewerContext;
 	// activePanels.add("Segmentation");

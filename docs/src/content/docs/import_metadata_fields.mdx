@@ -1,65 +1,104 @@
 ---
 title: Import Metadata Fields
-description: Metadata fields available when importing data into the Eyened platform
+description: Flat ImportRow fields for API and ORM image imports
 ---
 
-When importing via the [Import API](/eyened-platform/importing_data), metadata is provided in a flat `data` object using **snake_case** field names. The tables below list the supported fields for each entity level.
+Imports use one **flat** record per image ([`ImportRow`](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/importer_dtos.py)), with **snake_case** keys. The same fields apply to `POST /api/import/image` (`data`) and to `eyened_orm.importer.ImportRow` in Python.
+
+See [Importing data](/eyened-platform/importing_data) for workflows. Match existing rows with lookup fields (names, dates, UIDs) or attach with `*_id` primary keys.
+
+## Project
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `project_id` | int | Existing project primary key |
+| `project_name` | str | Project name (lookup / create) |
+| `project_description` | str | Project description |
+| `project_doi` | str | DOI |
+| `project_contact_id` | int | Contact FK |
+| `project_external` | str | `"Y"` or `"N"` |
 
 ## Patient
 
-| API Field | Type | Description |
-|----------|------|-------------|
-| `patient_identifier` | str | Unique identifier for the patient (within a project) |
-| `birth_date` | date | Patient's date of birth |
-| `sex` | str | Patient's sex: `"M"` or `"F"` |
+| Field | Type | Description |
+|-------|------|-------------|
+| `patient_id` | int | Existing patient primary key |
+| `patient_identifier` | str | Identifier unique within the project |
+| `birth_date` | date | Date of birth |
+| `sex` | str | `"M"` or `"F"` |
 
 ## Study
 
-| API Field | Type | Description |
-|----------|------|-------------|
-| `study_date` | date | Date when the study was performed |
-| `study_description` | str | Description of the study |
-
-:::note
-`StudyRound` exists in the database model but is not currently exposed in the Import API.
-:::
+| Field | Type | Description |
+|-------|------|-------------|
+| `study_id` | int | Existing study primary key |
+| `study_date` | date | Visit date (lookup with patient) |
+| `study_description` | str | Study description |
+| `study_round` | int | Study round |
 
 ## Series
 
-| API Field | Type | Description |
-|----------|------|-------------|
-| `series_id` | str | Identifier used to match or create the series |
+| Field | Type | Description |
+|-------|------|-------------|
+| `series_id` | int | Existing series primary key |
+| `series_instance_uid` | str | DICOM SeriesInstanceUID (lookup) |
 | `series_number` | int | Series number |
-| `series_instance_uid` | str | Unique identifier for the series (DICOM) |
+| `study_instance_uid` | str | DICOM StudyInstanceUID (stored on Series) |
+| `series_anonymous_identity` | int | Batch-local key to group rows into the same new series when no UID is available |
 
-:::note
-`StudyInstanceUid` exists in the database model but is not currently exposed in the Import API.
-:::
+## Device
 
-## Image
+| Field | Type | Description |
+|-------|------|-------------|
+| `device_model_id` | int | Existing device model primary key |
+| `manufacturer` | str | Device manufacturer (lookup with model name) |
+| `manufacturer_model_name` | str | Device model name |
+| `device_description` | str | Device description |
+| `device_serial_number` | str | Device serial number |
+| `device_id` | int | Device instance FK |
 
-| API Field | Type | Description |
-|----------|------|-------------|
-| `image` | str | **Required.** Path to the image file (relative to IMAGES_BASEPATH) |
-| `modality` | str | **Required.** Type of image: `ColorFundus`, `OCT`, `OCTA`, etc. |
-| `laterality` | str | Side of body: `"L"` or `"R"` |
-| `height` | int | Number of rows (image height in pixels) |
-| `width` | int | Number of columns (image width in pixels) |
-| `depth` | int | Number of frames (e.g. B-scans in OCT) |
-| `sop_instance_uid` | str | Unique identifier for SOP instance (DICOM) |
-| `sop_class_uid` | str | Service-object pair class (DICOM) |
-| `photometric_interpretation` | str | Pixel interpretation (RGB, MONOCHROME, etc.) |
-| `samples_per_pixel` | int | Number of color components per pixel |
+## Image instance
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `image_instance_id` | int | Existing image primary key (patch mode) |
+| `modality` | str | **Required for new images.** e.g. `ColorFundus`, `OCT`, `OCTA` |
+| `laterality` | str | `"L"` or `"R"` |
+| `public_id` | str | Public identifier |
+| `sop_instance_uid` | str | DICOM SOP instance UID (lookup) |
+| `height` | int | Rows (pixels) |
+| `width` | int | Columns (pixels) |
+| `depth` | int | Frame count (e.g. OCT B-scans) |
+| `sop_class_uid` | str | DICOM SOP class |
+| `photometric_interpretation` | str | e.g. RGB, MONOCHROME |
+| `samples_per_pixel` | int | Color components per pixel |
 | `dicom_modality` | str | Equipment type: `OP`, `OPT`, `SC` |
-| `etdrs_field` | str | ETDRS field position: `F1`–`F7` |
+| `etdrs_field` | str | ETDRS field `F1`–`F7` |
 | `anatomic_region` | int | Body part examined |
-| `angiography` | str | Angiography type indicator |
-| `acquisition_date_time` | datetime | Date/time of acquisition |
+| `angiography` | str | Angiography indicator |
+| `acquisition_date_time` | datetime | Acquisition timestamp |
 | `pupil_dilated` | str | Whether pupil was dilated |
-| `horizontal_field_of_view` | float | Field of view in millimeters |
+| `horizontal_field_of_view` | float | Field of view (mm) |
 | `resolution_axial` | float | Axial resolution (mm) |
 | `resolution_horizontal` | float | Horizontal resolution (mm) |
 | `resolution_vertical` | float | Vertical resolution (mm) |
-| `attributes` | object | Key-value attributes (flexible schema) |
+| `scan_mode` | str | Scan mode (Scan entity lookup) |
+| `modality_tag` | str | Modality table tag (distinct from `modality` enum) |
+| `thumbnail_path` | str | Thumbnail path under storage root |
+| `image_anonymous_identity` | int | Batch-local key to group rows into the same new instance when no SOP UID is available |
 
-The `attributes` dictionary can hold arbitrary key-value pairs for image-level metadata not covered by the above fields.
+## Storage
+
+Files are referenced by backend + path within that backend (resolved via `EYENED_STORAGE_MOUNTS` on the server).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `storage_backend_id` | int | Existing storage backend primary key |
+| `storage_backend_key` | str | Backend key (lookup / create) |
+| `storage_backend_kind` | str | Backend kind when creating |
+| `image_storage_id` | int | Existing storage row primary key |
+| `object_key` | str | **Required for new images.** Path within the storage backend |
+| `image_storage_format` | str | MIME or format string (often inferred from `object_key`) |
+| `image_storage_is_primary` | bool | Primary storage flag |
+| `image_storage_hash` | bytes | SHA-256 digest (32 bytes) |
+| `image_storage_checksum` | str | Checksum string (e.g. MD5 hex) |

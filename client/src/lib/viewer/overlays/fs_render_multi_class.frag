@@ -8,6 +8,8 @@ uniform usampler2D u_boundaries;
 
 
 uniform float u_alpha;
+uniform float u_multi_active_alpha;
+uniform float u_multi_inactive_alpha;
 uniform vec3[32] u_colors;
 uniform int u_highlighted_feature_index;
 uniform uint u_active_feature_mask;
@@ -61,8 +63,8 @@ void main(){
             // highlight layer if u_highlighted_feature_index is 0 (none specified) or if this is the highlighted layer
             float show_highlight=float(u_highlighted_feature_index==int(annotation) || (u_active_feature_mask == annotation));
 
-            // 0.5f is the default alpha value, u_alpha is the alpha value for the highlight
-            color_out=vec4(color,mix(.5f,u_alpha,show_highlight));
+            float layer_a = mix(u_multi_inactive_alpha, u_multi_active_alpha, show_highlight);
+            color_out = vec4(color, layer_a * u_alpha);
         }
     }else{
         color_out=vec4(0.);

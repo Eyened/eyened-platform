@@ -1860,11 +1860,238 @@
         }
       }
     },
-    "/import/run_inference": {
+    "/import/run_cfi_models": {
       "post": {
-        "summary": "Run Inference",
-        "operationId": "run_inference_import_run_inference_post",
+        "summary": "Enqueue Run Cfi Models",
+        "description": "Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...).",
+        "operationId": "enqueue_run_cfi_models_import_run_cfi_models_post",
         "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCfiModelsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/run_cfi_amd": {
+      "post": {
+        "summary": "Enqueue Run Cfi Amd",
+        "operationId": "enqueue_run_cfi_amd_import_run_cfi_amd_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCfiAmdRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/run_layer_segmentation": {
+      "post": {
+        "summary": "Enqueue Run Layer Segmentation",
+        "operationId": "enqueue_run_layer_segmentation_import_run_layer_segmentation_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunImageIdsJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/update_thumbnails": {
+      "post": {
+        "summary": "Post Import Update Thumbnails",
+        "description": "Queue a job that scans the DB for missing thumbnails (CLI-equivalent).",
+        "operationId": "post_import_update_thumbnails_import_update_thumbnails_post",
+        "parameters": [
+          {
+            "name": "failed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include images with empty ThumbnailPath (failed previous run), like ``eorm update-thumbnails --failed``.",
+              "default": false,
+              "title": "Failed"
+            },
+            "description": "Include images with empty ThumbnailPath (failed previous run), like ``eorm update-thumbnails --failed``."
+          },
+          {
+            "name": "print_errors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Print per-image errors on the worker, like ``eorm update-thumbnails --print-errors``.",
+              "default": false,
+              "title": "Print Errors"
+            },
+            "description": "Print per-image errors on the worker, like ``eorm update-thumbnails --print-errors``."
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -1917,10 +2144,11 @@
         }
       }
     },
-    "/import/update_thumbnails": {
+    "/import/update_thumbnails_for_image_ids": {
       "post": {
-        "summary": "Update Thumbnails",
-        "operationId": "update_thumbnails_import_update_thumbnails_post",
+        "summary": "Post Import Update Thumbnails For Image Ids",
+        "description": "Queue thumbnail generation for the given ``image_ids`` only.",
+        "operationId": "post_import_update_thumbnails_for_image_ids_import_update_thumbnails_for_image_ids_post",
         "parameters": [
           {
             "name": "authorization",
@@ -1950,6 +2178,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThumbnailsForImageIdsRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1958,6 +2196,43 @@
                 "schema": {
                   "$ref": "#/components/schemas/TaskResponse"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/status/{task_id}": {
+      "get": {
+        "summary": "Get Status",
+        "operationId": "get_status_import_status__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -5431,6 +5706,15 @@
         ],
         "title": "EntityType"
       },
+      "ExternalEnum": {
+        "type": "string",
+        "enum": [
+          "Y",
+          "N",
+          "M"
+        ],
+        "title": "ExternalEnum"
+      },
       "FeatureGET": {
         "properties": {
           "name": {
@@ -6175,30 +6459,6 @@
       },
       "ImportOptions": {
         "properties": {
-          "create_patients": {
-            "type": "boolean",
-            "title": "Create Patients",
-            "description": "If True, create patients when they don't exist",
-            "default": false
-          },
-          "create_studies": {
-            "type": "boolean",
-            "title": "Create Studies",
-            "description": "If True, create studies when they don't exist",
-            "default": false
-          },
-          "create_series": {
-            "type": "boolean",
-            "title": "Create Series",
-            "description": "If True, create series when they don't exist",
-            "default": true
-          },
-          "create_project": {
-            "type": "boolean",
-            "title": "Create Project",
-            "description": "If True, create project when it doesn't exist",
-            "default": false
-          },
           "include_stack_trace": {
             "type": "boolean",
             "title": "Include Stack Trace",
@@ -6213,7 +6473,7 @@
       "ImportRequest": {
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/InstancePOSTFlat"
+            "$ref": "#/components/schemas/ImportRow"
           },
           "options": {
             "$ref": "#/components/schemas/ImportOptions"
@@ -6278,12 +6538,62 @@
         ],
         "title": "ImportResponse"
       },
-      "InstancePOSTFlat": {
+      "ImportRow": {
         "properties": {
-          "storage_backend_key": {
-            "type": "string",
-            "title": "Storage Backend Key",
-            "description": "Key of an existing StorageBackend used for this image"
+          "contact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          },
+          "contact_institute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Institute"
+          },
+          "contact_orcid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Orcid"
           },
           "sop_instance_uid": {
             "anyOf": [
@@ -6447,9 +6757,10 @@
                 "type": "null"
               }
             ],
-            "title": "Device Description"
+            "title": "Device Description",
+            "description": "Description of the device"
           },
-          "device_manufacturer": {
+          "manufacturer": {
             "anyOf": [
               {
                 "type": "string"
@@ -6458,9 +6769,10 @@
                 "type": "null"
               }
             ],
-            "title": "Device Manufacturer"
+            "title": "Manufacturer",
+            "description": "Manufacturer of the device"
           },
-          "device_model": {
+          "manufacturer_model_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -6469,7 +6781,8 @@
                 "type": "null"
               }
             ],
-            "title": "Device Model"
+            "title": "Manufacturer Model Name",
+            "description": "Model name of the device"
           },
           "scan_mode": {
             "anyOf": [
@@ -6480,7 +6793,20 @@
                 "type": "null"
               }
             ],
-            "title": "Scan Mode"
+            "title": "Scan Mode",
+            "description": "Scan.ScanMode; used with SCAN importer entity for lookup/create"
+          },
+          "modality_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modality Tag",
+            "description": "Modality.ModalityTag (lookup/create Modality table row); distinct from modality enum"
           },
           "source_info_id": {
             "anyOf": [
@@ -6593,10 +6919,220 @@
             ],
             "title": "Fda Identifier"
           },
+          "dataset_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Identifier",
+            "description": "Maps to ImageInstance.DatasetIdentifier, deprecated and will be removed in a future release"
+          },
+          "modality_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modality Id",
+            "description": "Modality.ModalityID (SCAN-like PK for Modality table importer entity)"
+          },
+          "scan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Id",
+            "description": "Scan.ScanID when referencing an existing Scan row"
+          },
+          "slice_thickness": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slice Thickness",
+            "description": "SliceThickness"
+          },
+          "alt_dataset_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Dataset Identifier",
+            "description": "AltDatasetIdentifier; deprecated and will be removed in a future release"
+          },
+          "date_inserted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Inserted",
+            "description": "DateInserted"
+          },
+          "date_modified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Modified",
+            "description": "DateModified"
+          },
+          "date_preprocessed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Preprocessed",
+            "description": "DatePreprocessed"
+          },
+          "cf_roi": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cf Roi",
+            "description": "CFROI JSON"
+          },
+          "cf_keypoints": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cf Keypoints",
+            "description": "CFKeypoints JSON"
+          },
+          "cf_quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cf Quality",
+            "description": "CFQuality"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "project_name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Project Name",
             "description": "Name of the project"
+          },
+          "project_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Description"
+          },
+          "project_doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Doi"
+          },
+          "project_contact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Contact Id"
+          },
+          "project_external": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the project is external"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
           },
           "patient_identifier": {
             "anyOf": [
@@ -6608,7 +7144,7 @@
               }
             ],
             "title": "Patient Identifier",
-            "description": "Patient identifier"
+            "description": "Patient identifier (unique within the project)"
           },
           "sex": {
             "anyOf": [
@@ -6630,7 +7166,19 @@
                 "type": "null"
               }
             ],
-            "title": "Birth Date"
+            "title": "Birth Date",
+            "description": "Patient's date of birth"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
           },
           "study_date": {
             "anyOf": [
@@ -6642,7 +7190,8 @@
                 "type": "null"
               }
             ],
-            "title": "Study Date"
+            "title": "Study Date",
+            "description": "Date when the study was performed"
           },
           "study_description": {
             "anyOf": [
@@ -6655,7 +7204,29 @@
             ],
             "title": "Study Description"
           },
+          "study_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Round"
+          },
           "series_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "series_instance_uid": {
             "anyOf": [
               {
                 "type": "string"
@@ -6664,7 +7235,20 @@
                 "type": "null"
               }
             ],
-            "title": "Series Id"
+            "title": "Series Instance Uid",
+            "description": "DICOM SeriesInstanceUID; stored on Series.SeriesInstanceUid"
+          },
+          "series_anonymous_identity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Anonymous Identity",
+            "description": "Batch-local grouping key for anonymous series creation"
           },
           "series_number": {
             "anyOf": [
@@ -6677,7 +7261,7 @@
             ],
             "title": "Series Number"
           },
-          "series_instance_uid": {
+          "study_instance_uid": {
             "anyOf": [
               {
                 "type": "string"
@@ -6686,27 +7270,188 @@
                 "type": "null"
               }
             ],
-            "title": "Series Instance Uid"
+            "title": "Study Instance Uid",
+            "description": "DICOM StudyInstanceUID; stored on Series.StudyInstanceUid"
+          },
+          "device_model_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model Id"
+          },
+          "image_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Instance Id"
+          },
+          "public_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Id"
+          },
+          "inactive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inactive"
+          },
+          "image_anonymous_identity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Anonymous Identity",
+            "description": "Batch-local grouping key for anonymous image instance creation"
+          },
+          "storage_backend_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend Id"
+          },
+          "storage_backend_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend Key",
+            "description": "StorageBackend used for this image"
+          },
+          "storage_backend_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend Kind",
+            "description": "Kind of the storage backend"
+          },
+          "image_storage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Id"
           },
           "object_key": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Object Key",
-            "description": "Path to the image file"
+            "description": "Path to the image file within the storage backend"
           },
-          "attributes": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Attributes",
-            "description": "Optional key-value properties"
+          "image_storage_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Format",
+            "description": "If set, overrides inferred Format for ImageStorage"
+          },
+          "image_storage_is_primary": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Is Primary",
+            "description": "If set, maps to ImageStorage.IsPrimary"
+          },
+          "image_storage_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Hash",
+            "description": "SHA-256 digest (32 bytes); maps to ImageStorage.Hash"
+          },
+          "image_storage_checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Checksum",
+            "description": "Checksum string (e.g. MD5 hex); maps to ImageStorage.Checksum"
+          },
+          "thumbnail_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Path",
+            "description": "Thumbnail identifier under storage root; maps to ImageInstance.ThumbnailPath"
           }
         },
         "type": "object",
-        "required": [
-          "storage_backend_key",
-          "project_name",
-          "object_key"
-        ],
-        "title": "InstancePOSTFlat"
+        "title": "ImportRow",
+        "description": "One flat record per image: project → patient → study → series → instance → storage fields.\nAll fields are optional until consistency rules are enforced (see model validator)."
       },
       "Laterality": {
         "type": "string",
@@ -7048,6 +7793,118 @@
           "name"
         ],
         "title": "ProjectMeta"
+      },
+      "RunCfiAmdRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "default": false
+          },
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size",
+            "default": 8
+          },
+          "n_workers": {
+            "type": "integer",
+            "title": "N Workers",
+            "default": 12
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "RunCfiAmdRequest"
+      },
+      "RunCfiModelsRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids",
+            "description": "ImageInstance IDs to process (e.g. ColorFundus IDs from a completed import)."
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cfi-roi",
+                  "cfi-keypoints",
+                  "cfi-odfd",
+                  "cfi-quality"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Single CFI attribute pipeline, or omit to run all attribute models."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "description": "If true, re-run even when results already exist.",
+            "default": false
+          },
+          "commit_interval": {
+            "type": "integer",
+            "title": "Commit Interval",
+            "default": 100
+          },
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size",
+            "default": 8
+          },
+          "n_workers": {
+            "type": "integer",
+            "title": "N Workers",
+            "default": 16
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "RunCfiModelsRequest",
+        "description": "Queue a model job for the given image instance IDs (CFI attributes or segmentation)."
+      },
+      "RunImageIdsJobRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "RunImageIdsJobRequest"
       },
       "ScanMeta": {
         "properties": {
@@ -8418,6 +9275,20 @@
             ],
             "title": "Task Id"
           },
+          "task_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Ids"
+          },
           "error": {
             "anyOf": [
               {
@@ -8497,6 +9368,31 @@
           "user"
         ],
         "title": "TokenResponse"
+      },
+      "UpdateThumbnailsForImageIdsRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids",
+            "description": "ImageInstance IDs to generate thumbnails for."
+          },
+          "print_errors": {
+            "type": "boolean",
+            "title": "Print Errors",
+            "description": "Log per-image errors to worker stdout.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "UpdateThumbnailsForImageIdsRequest",
+        "description": "Queue thumbnail generation for specific instances (same processing as bulk update)."
       },
       "UserLogin": {
         "properties": {

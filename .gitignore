@@ -1,4 +1,3 @@
-orm/eyened_orm/environments/*.env
 docker/.env
 *.env
 *.zip
