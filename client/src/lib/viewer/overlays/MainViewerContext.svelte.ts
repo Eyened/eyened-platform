@@ -96,9 +96,19 @@ export class MainViewerContext implements Overlay {
         }
 
         const overlayUniforms = getSegmentationOverlayUniforms(viewerContext, segmentation);
+        const multiClassOpacity =
+            segmentation.data_representation === 'MultiClass'
+                ? {
+                      u_multi_active_alpha:
+                          this.segmentationContext.multiClassActiveAlpha,
+                      u_multi_inactive_alpha:
+                          this.segmentationContext.multiClassInactiveAlpha,
+                  }
+                : {};
         const renderUniforms = {
             ...uniforms,
             ...overlayUniforms,
+            ...multiClassOpacity,
             u_show_seg_bounds: segmentation.image_projection_matrix != null,
         };
 

@@ -43,6 +43,9 @@ export class SegmentationContext {
     public erodeDilateActive = $state(false);
     public questionableActive = $state(false);
     public brushRadius = $state(4);
+    /** Multi-class overlay opacity for the selected class vs other visible classes. */
+    public multiClassActiveAlpha = $state(1);
+    public multiClassInactiveAlpha = $state(0.2);
     public segmentationItem: SegmentationItem | undefined = $state(undefined);
     public scan_indices: number[] = $derived(this.segmentationItem?.savedScanIndices ?? []);
     
@@ -144,16 +147,9 @@ export class SegmentationContext {
         return this.activeSegmentationKey() === getSegmentationKey(segmentation);
     }
 
-    toggleActive(segmentationItem: SegmentationItem) {
+    /** Select a segmentation for editing (pipette / panel); does not toggle off if already active. */
+    activateSegmentationItem(segmentationItem: SegmentationItem) {
         const key = getSegmentationKey(segmentationItem.segmentation);
-        if (this.activeSegmentationKey() === key) {
-            this.segmentationItem = undefined;
-            this.activeIndices = [];
-            this.questionableActive = false;
-            this.erodeDilateActive = false;
-            return;
-        }
-
         this.segmentationItem = segmentationItem;
         this.shownSegmentations.add(key);
 
@@ -165,6 +161,19 @@ export class SegmentationContext {
         }
         this.questionableActive = false;
         this.erodeDilateActive = false;
+    }
+
+    toggleActive(segmentationItem: SegmentationItem) {
+        const key = getSegmentationKey(segmentationItem.segmentation);
+        if (this.activeSegmentationKey() === key) {
+            this.segmentationItem = undefined;
+            this.activeIndices = [];
+            this.questionableActive = false;
+            this.erodeDilateActive = false;
+            return;
+        }
+
+        this.activateSegmentationItem(segmentationItem);
     }
 
     private static readonly ALL_FEATURES_VISIBLE = 0xffffffff >>> 0;

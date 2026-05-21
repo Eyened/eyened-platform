@@ -23,19 +23,50 @@
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 
 	const { segmentationContext } = mainViewerContext;
+
+	let activeIndices = $state<number | number[]>(0);
+
+	function indicesEqual(
+		a: number | number[],
+		b: number | number[],
+	): boolean {
+		if (Array.isArray(a) && Array.isArray(b)) {
+			return (
+				a.length === b.length && a.every((v, i) => v === b[i])
+			);
+		}
+		if (!Array.isArray(a) && !Array.isArray(b)) {
+			return a === b;
+		}
+		if (!Array.isArray(a) && Array.isArray(b) && b.length === 1) {
+			return a === b[0];
+		}
+		if (Array.isArray(a) && a.length === 1 && !Array.isArray(b)) {
+			return a[0] === b;
+		}
+		return false;
+	}
+
+	$effect(() => {
+		if (active) {
+			segmentationContext.activeIndices = activeIndices;
+		}
+	});
+
+	$effect(() => {
+		if (!active) return;
+		const fromCtx = segmentationContext.activeIndices;
+		if (!indicesEqual(activeIndices, fromCtx)) {
+			activeIndices = fromCtx;
+		}
+	});
+
 	function pointerEnter(featureIndex: number) {
 		mainViewerContext.highlightedFeatureIndex = featureIndex;
 	}
 	function pointerLeave() {
 		mainViewerContext.highlightedFeatureIndex = undefined;
 	}
-
-	let activeIndices = $state(0);
-	$effect(() => {
-		if (active) {
-			segmentationContext.activeIndices = activeIndices;
-		}
-	});
 
 	function toggleLayerVisibility(featureIndex: number, e: MouseEvent) {
 		e.preventDefault();
@@ -49,6 +80,28 @@
 </script>
 
 <div class:hidden={!active}>
+	{#if data_representation === "MultiClass"}
+		<div class="mc-opacity" role="group" aria-label="Class overlay opacity">
+			<label class="mc-op" title="Active class opacity">
+				<input
+					type="range"
+					min="0"
+					max="1"
+					step="0.05"
+					bind:value={segmentationContext.multiClassActiveAlpha}
+				/>
+			</label>
+			<label class="mc-op" title="Other classes opacity">
+				<input
+					type="range"
+					min="0"
+					max="1"
+					step="0.05"
+					bind:value={segmentationContext.multiClassInactiveAlpha}
+				/>
+			</label>
+		</div>
+	{/if}
 	<ul>
 		{#each feature.subfeatures as subfeature}
 			<li
@@ -167,5 +220,38 @@
 	}
 	div.hidden {
 		display: none;
+	}
+	.mc-opacity {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.35em;
+		padding: 0.15em 0.25em 0.35em;
+		font-size: 0.65rem;
+		line-height: 1;
+		border-bottom: 1px solid rgba(100, 255, 255, 0.15);
+	}
+	.mc-op {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		gap: 0.25em;
+		min-width: 0;
+		margin: 0;
+		cursor: default;
+	}
+	.mc-op .k {
+		flex: 0 0 auto;
+		opacity: 0.8;
+		font-weight: 600;
+		width: 1.6em;
+	}
+	.mc-op input[type="range"] {
+		flex: 1;
+		min-width: 0;
+		height: 0.85em;
+		margin: 0;
+		padding: 0;
+		accent-color: rgb(100, 255, 255);
 	}
 </style>
