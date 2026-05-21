@@ -197,7 +197,9 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
             raise ValueError("remove_slice is only supported for sparse segmentations")
 
         if self.SparseAxis not in (0, 1, 2):
-            raise ValueError(f"Invalid SparseAxis={self.SparseAxis}; expected 0, 1 or 2")
+            raise ValueError(
+                f"Invalid SparseAxis={self.SparseAxis}; expected 0, 1 or 2"
+            )
 
         if self.ScanIndices is None:
             raise ValueError(
@@ -231,9 +233,7 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
         adapter = get_data_access_adapter()
-        return adapter.read_segmentation_data(
-            self, axis=axis, slice_index=slice_index
-        )
+        return adapter.read_segmentation_data(self, axis=axis, slice_index=slice_index)
 
     @property
     def binary_mask(self) -> np.ndarray | None:
@@ -394,7 +394,10 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
                     )
 
         # 4. Check Reference Segmentation
-        if hasattr(self, "ReferenceSegmentationID") and self.ReferenceSegmentationID is not None:
+        if (
+            hasattr(self, "ReferenceSegmentationID")
+            and self.ReferenceSegmentationID is not None
+        ):
             # We need to fetch the reference.
             # Since SegmentationBase defines the ID but not the relationship in all subclasses,
             # we might need to query safely.
@@ -488,7 +491,7 @@ class Segmentation(SegmentationBase):
     @staticmethod
     def infer_data_type(data: np.ndarray) -> Datatype:
         if data.dtype == np.uint8:
-            return Datatype.R8UI # or R8?
+            return Datatype.R8UI  # or R8?
         if data.dtype == np.uint16:
             return Datatype.R16UI
         if data.dtype == np.uint32:
@@ -651,11 +654,12 @@ class Feature(Base):
                     FeatureFeatureLink(
                         ParentFeatureID=feature.FeatureID,
                         ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
-                        FeatureIndex=i+1,
+                        FeatureIndex=i + 1,
                     )
                 )
         else:
             raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
+        session.flush()
 
         return feature
 
@@ -760,6 +764,7 @@ class ModelSegmentation(SegmentationBase):
             if base_model is not None:
                 return f"model_{base_model.ModelName}_{base_model.Version}"
         return "model_name_unknown"
+
 
 # Event Listeners
 def validate_segmentation(mapper, connection, target):

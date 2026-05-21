@@ -23,6 +23,14 @@ export class Matrix {
 		);
 	}
 
+	static fromRows(rows: number[][]): Matrix {
+		if (rows.length !== 3 || rows.some((r) => r.length !== 3)) {
+			throw new Error('Expected 3x3 matrix');
+		}
+		const [[a, b, c], [d, e, f], [g, h, i]] = rows;
+		return new Matrix(a, b, c, d, e, f, g, h, i);
+	}
+
 	get scale(): number {
 		return Math.sqrt(this.a * this.a + this.d * this.d);
 	}

@@ -35,20 +35,18 @@
 	const eyeSeries = study.series?.filter(hasLaterality) ?? [];
 </script>
 
-{#if eyeSeries?.length > 0}
-	<div class="outer flex flex-1 flex-col p-2">
-		<h3 class="m-0 text-base flex items-center gap-4">
-			{eye}
-			{#if eyeSeries?.length > 0}
-				<Button variant="outline" onclick={open}>
-					Open all {eye} images
-				</Button>
-			{/if}
-		</h3>
-		<div class="series-container flex flex-row flex-wrap content-start flex-1">
-			{#each eyeSeries as series (series.id)}
-				<SeriesComponent {series} {laterality} />
-			{/each}
-		</div>
+<div class="outer flex flex-1 flex-col p-2">
+	<h3 class="m-0 text-base flex items-center gap-4">
+		{eye}
+		{#if eyeSeries?.length > 0}
+			<Button variant="outline" onclick={open}>
+				Open all {eye} images
+			</Button>
+		{/if}
+	</h3>
+	<div class="series-container flex flex-row flex-wrap content-start flex-1">
+		{#each eyeSeries as series (series.id)}
+			<SeriesComponent {series} {laterality} />
+		{/each}
 	</div>
-{/if}
+</div>

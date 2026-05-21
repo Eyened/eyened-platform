@@ -22,6 +22,7 @@
 	import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 	import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
 	import type { PaintSettings } from "$lib/webgl/mask.svelte";
+	import { segmentationPlaneSize } from "$lib/webgl/segmentationProjection";
 
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 	const globalContext = getContext<GlobalContext>("globalContext");
@@ -36,13 +37,35 @@
 
 	$effect(() => {
 		if (!panelActive) {
-			removeTool();
-			activeTool = undefined;
+			deactivateAllEditingTools();
+		}
+	});
+
+	$effect(() => {
+		if (segmentationContext.regionToolActive) {
+			deactivateAllEditingTools();
 		}
 	});
 
 	let lock = viewerContext.lockScroll;
+
+	function deactivateAllEditingTools() {
+		if (activeTool) {
+			activeTool.endDraw(viewerContext);
+			removeTool();
+			viewerContext.lockScroll = lock;
+			activeTool = undefined;
+			removeTool = () => {};
+		}
+		segmentationContext.erodeDilateActive = false;
+		segmentationContext.questionableActive = false;
+		segmentationContext.isDrawing = false;
+	}
+
 	function activate(tool: SegmentationTool) {
+		if (segmentationContext.regionToolActive) {
+			return;
+		}
 		removeTool();
 		if (activeTool === tool) {
 			activeTool = undefined;
@@ -56,13 +79,18 @@
 		removeTool = viewerContext.addOverlay(tool);
 	}
 	onDestroy(() => {
-		segmentationContext.erodeDilateActive = false;
-		segmentationContext.questionableActive = false;
-		removeTool();
+		deactivateAllEditingTools();
 	});
 
 	const drawingExecutor = {
-		getCtx: () => image.getDrawingCtx(),
+		getCtx: () => {
+			const item = segmentationContext.segmentationItem;
+			if (!item) {
+				return image.getDrawingCtx();
+			}
+			const plane = segmentationPlaneSize(item.segmentation, image);
+			return image.getDrawingCtx(plane.width, plane.height);
+		},
 		draw: async (ctx: CanvasRenderingContext2D, mode: "paint" | "erase") => {
 			const segmentationItem = segmentationContext.segmentationItem;
 
@@ -108,16 +136,8 @@
 			}
 		},
 	};
-	const brush = new BrushTool(
-		drawingExecutor,
-		viewerContext,
-		segmentationContext,
-	);
-	const polygon = new PolygonTool(
-		drawingExecutor,
-		viewerContext,
-		segmentationContext,
-	);
+	const brush = new BrushTool(drawingExecutor, viewerContext, segmentationContext);
+	const polygon = new PolygonTool(drawingExecutor, viewerContext, segmentationContext);
 	const enhance = new EnhanceTool(
 		drawingExecutor,
 		viewerContext,
@@ -125,6 +145,9 @@
 		globalContext,
 	);
 	function toggle(key: "erodeDilateActive" | "questionableActive") {
+		if (segmentationContext.regionToolActive) {
+			return;
+		}
 		segmentationContext[key] = !segmentationContext[key];
 	}
 

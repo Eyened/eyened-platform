@@ -2,47 +2,47 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import sys
-from os import PathLike
-from typing import Any, Iterable, Iterator, List, Optional, Tuple, TypeVar
+from typing import Any, Generic, Iterable, Iterator, List, Optional, Sequence, Tuple, TypeVar
 
-T = TypeVar("T")
-S = TypeVar("S")
-U = TypeVar("U")
+InT = TypeVar("InT")
+PrepT = TypeVar("PrepT")
+BatchOutT = TypeVar("BatchOutT")
+OutT = TypeVar("OutT")
 
 
-class BaseInferencePipeline:
+class BaseInferencePipeline(Generic[InT, PrepT, BatchOutT, OutT]):
     """Inference pipeline with pass-through defaults."""
 
-    def preprocess(self, image_path: PathLike[str]) -> Any:
-        return image_path
+    def preprocess(self, item: InT) -> PrepT:
+        return item  # type: ignore[return-value]
 
-    def process_batch(self, prep_batch: List[Any]) -> List[Any]:
-        return prep_batch
+    def process_batch(self, prep_batch: List[PrepT]) -> Iterable[BatchOutT]:
+        return prep_batch  # type: ignore[return-value]
 
-    def postprocess(self, prep_item: Any, batch_output: Any) -> Any:
-        return batch_output
+    def postprocess(self, prep_item: PrepT, batch_output: BatchOutT) -> OutT:
+        return batch_output  # type: ignore[return-value]
 
 
 def prep_worker(
     work_q: mp.Queue,
     prep_q: mp.Queue,
-    pipeline: BaseInferencePipeline,
+    pipeline: BaseInferencePipeline[InT, PrepT, BatchOutT, OutT],
 ) -> None:
     for item in iter(work_q.get, None):
-        iid, image_path = item
+        iid, input_item = item
         try:
-            prep_q.put((iid, pipeline.preprocess(image_path)))
+            prep_q.put((iid, pipeline.preprocess(input_item)))
         except Exception as e:
             print(f"Error preprocessing image {iid}: {e}", file=sys.stderr)
             prep_q.put((iid, None))
     prep_q.put(None)
 
 
-class MultiProcessInference:
+class MultiProcessInference(Generic[InT, PrepT, BatchOutT, OutT]):
     def __init__(
         self,
-        items: Iterable[Tuple[int, PathLike[str]]],
-        pipeline: BaseInferencePipeline,
+        items: Iterable[Tuple[int, InT]],
+        pipeline: BaseInferencePipeline[InT, PrepT, BatchOutT, OutT],
         n_workers: int = 8,
         batch_size: int = 8,
         queue_max_size: Optional[int] = None
@@ -50,7 +50,7 @@ class MultiProcessInference:
         """Initialize MultiProcessInference.
         
         Args:
-            items: Iterable of (image_id, image_path) tuples
+            items: Iterable of (image_id, input_item) tuples
             pipeline: BaseInferencePipeline object implementing pipeline stages
             n_workers: Number of preprocessing worker processes
             batch_size: Batch size for batch processing
@@ -84,8 +84,8 @@ class MultiProcessInference:
         for p in self._workers:
             p.start()
 
-    def _batch_consumer(self) -> Iterator[Tuple[int, T, S]]:
-        buffer: List[Tuple[int, T]] = []
+    def _batch_consumer(self) -> Iterator[Tuple[int, Optional[PrepT], Optional[BatchOutT]]]:
+        buffer: List[Tuple[int, Optional[PrepT]]] = []
         finished = 0
         while finished < self.n_workers:
             item = self._prep_q.get()
@@ -99,8 +99,12 @@ class MultiProcessInference:
                 or (item is None and finished == self.n_workers)
             ):
                 # Separate successful and failed preprocessing results
-                successful_items = [(iid, prep_item) for iid, prep_item in buffer if prep_item is not None]
-                failed_items = [(iid, prep_item) for iid, prep_item in buffer if prep_item is None]
+                successful_items: List[Tuple[int, PrepT]] = [
+                    (iid, prep_item) for iid, prep_item in buffer if prep_item is not None
+                ]
+                failed_items: List[Tuple[int, None]] = [
+                    (iid, prep_item) for iid, prep_item in buffer if prep_item is None
+                ]
                 
                 # Yield None for items that failed preprocessing
                 for iid, _ in failed_items:
@@ -121,7 +125,7 @@ class MultiProcessInference:
                             yield iid, None, None
                 buffer = []
 
-    def run(self) -> Iterator[Tuple[int, U]]:
+    def run(self) -> Iterator[Tuple[int, Optional[OutT]]]:
         self._start_workers()
         try:
             for iid, prep_item, batch_output in self._batch_consumer():
@@ -129,7 +133,8 @@ class MultiProcessInference:
                     yield iid, None
                 else:
                     try:
-                        result = self.pipeline.postprocess(prep_item, batch_output)
+                        # If batch_output is not None, prep_item should also be present.
+                        result = self.pipeline.postprocess(prep_item, batch_output)  # type: ignore[arg-type]
                         yield iid, result
                     except Exception as e:
                         print(f"Error postprocessing image {iid}: {e}", file=sys.stderr)

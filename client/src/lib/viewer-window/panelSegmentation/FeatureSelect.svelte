@@ -8,57 +8,100 @@
     interface Props<T extends Named> {
         values: FeatureGET[];
         onselect: (value: T) => void;
+        /** Keep search field in sync when feature is chosen elsewhere (e.g. native select). */
+        selectedName?: string;
     }
-    let { values, onselect }: Props<any> = $props();
+    let { values, onselect, selectedName = "" }: Props<any> = $props();
     const placeholder = "Search feature...";
     let filter = $state("");
+    /** After a pick, hide matches until the user edits the search text again. */
+    let listHidden = $state(false);
+
     let filtered = $derived.by(() => {
+        if (listHidden || !filter.trim()) {
+            return [];
+        }
         const lowerFilter = filter.toLowerCase();
-        return values.filter((value) => {
-            if (filter) {
-                return value.name.toLowerCase().includes(lowerFilter);
-            } else {
-                return false;
-            }
-        });
+        return values.filter((value) =>
+            value.name.toLowerCase().includes(lowerFilter),
+        );
+    });
+
+    function onFilterInput() {
+        listHidden = false;
+    }
+
+    function pick(feature: FeatureGET) {
+        filter = feature.name;
+        listHidden = true;
+        onselect(feature);
+    }
+
+    $effect(() => {
+        if (selectedName) {
+            filter = selectedName;
+            listHidden = true;
+        }
     });
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div>
-    <div>
-        <input type="text" {placeholder} bind:value={filter} />
-    </div>
+<div class="feature-select">
+    <input
+        type="text"
+        {placeholder}
+        bind:value={filter}
+        oninput={onFilterInput}
+    />
 
-    <ul>
-        {#each filtered as feature}
-            <li class="item" onclick={() => onselect(feature)}>
-                {feature.name}
-            </li>
-        {/each}
-    </ul>
+    {#if filtered.length > 0}
+        <ul>
+            {#each filtered as feature (feature.id)}
+                <li>
+                    <button type="button" class="item" onclick={() => pick(feature)}>
+                        {feature.name}
+                    </button>
+                </li>
+            {/each}
+        </ul>
+    {/if}
 </div>
 
 <style>
+    .feature-select {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        width: 100%;
+    }
+    input[type="text"] {
+        width: 100%;
+        box-sizing: border-box;
+    }
     ul {
         padding: 0;
         margin: 0;
         list-style-type: none;
-        flex: 0;
+        max-height: 10rem;
+        overflow-y: auto;
     }
-    li.item {
+    li {
+        margin: 0;
+    }
+    button.item {
+        display: block;
+        width: 100%;
+        text-align: left;
         font-size: 0.9em;
-        color: rgba(255, 255, 255, 0.5);
+        color: rgba(255, 255, 255, 0.85);
         cursor: pointer;
-        padding: 0.1em 0.2em;
-        margin: 0.1em;
+        padding: 0.25em 0.35em;
+        margin: 0;
+        border: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 0.2em;
+        background: transparent;
     }
-    li:hover {
-        background-color: rgba(255, 255, 255, 0.3);
-        cursor: pointer;
+    button.item:hover {
+        background-color: rgba(255, 255, 255, 0.25);
     }
 </style>

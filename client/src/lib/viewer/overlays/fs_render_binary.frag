@@ -16,8 +16,8 @@ uniform usampler2D u_mask;
 uniform uint u_mask_bitmask;
 uniform bool u_has_mask;
 
-uniform bool u_smooth;
 uniform bool u_outline;
+uniform bool u_show_seg_bounds;
 uniform float u_alpha;
 uniform vec3 u_color;
 
@@ -53,26 +53,19 @@ float getAlphaQuestionable(float a, bool layer_annotation) {
 }
 
 
-float bilinear(usampler2D binary_mask, uint bitmask, vec2 pos) {
-    ivec2 ipos = ivec2(pos);
-    bool t00 = (bitmask & texelFetch(binary_mask, ipos, 0).r) > 0u;
-    bool t10 = (bitmask & texelFetch(binary_mask, ipos + ivec2(1, 0), 0).r) > 0u;
-    bool t01 = (bitmask & texelFetch(binary_mask, ipos + ivec2(0, 1), 0).r) > 0u;
-    bool t11 = (bitmask & texelFetch(binary_mask, ipos + ivec2(1, 1), 0).r) > 0u;
-
-    vec2 f = fract(pos);
-    float u0 = mix(float(t00), float(t10), f.x);
-    float u1 = mix(float(t01), float(t11), f.x);
-    float u = mix(u0, u1, f.y);
-    return u;
+bool getMask(usampler2D mask, uint bitmask, vec2 pos) {
+    return (bitmask & texelFetch(mask, ivec2(pos), 0).r) > 0u;
 }
 
-bool getMask(usampler2D mask, uint bitmask, vec2 pos) {
-    if(u_smooth) {
-        return bilinear(mask, bitmask, pos) > 0.5f;
-    } else {
-        return (bitmask & texelFetch(mask, ivec2(pos), 0).r) > 0u;
+bool isMaskEdge(usampler2D mask, uint bitmask, vec2 pos, vec2 size) {
+    if (!getMask(mask, bitmask, pos)) {
+        return false;
     }
+    if (pos.x > 0.5f && !getMask(mask, bitmask, pos - vec2(1.0, 0.0))) return true;
+    if (pos.y > 0.5f && !getMask(mask, bitmask, pos - vec2(0.0, 1.0))) return true;
+    if (pos.x < size.x - 1.5f && !getMask(mask, bitmask, pos + vec2(1.0, 0.0))) return true;
+    if (pos.y < size.y - 1.5f && !getMask(mask, bitmask, pos + vec2(0.0, 1.0))) return true;
+    return false;
 }
 
 void main() {
@@ -94,6 +87,11 @@ void main() {
         questionable = false;
     }
 
+    if (isSegPlaneOutlineScreen()) {
+        color_out = segPlaneOutlineColor();
+        return;
+    }
+
     if(!(drawing || questionable)) {
         discard;
     }
@@ -107,5 +105,10 @@ void main() {
     }
 
     color_out = mix(color_out, feature_color, a);
+
+    if (u_outline && drawing && isMaskEdge(u_binary_mask, u_bitmask, p, u_image_size.xy)) {
+        color_out = vec4(u_color, 1.0);
+    }
+    applySegPlaneOutline(color_out);
 
 }

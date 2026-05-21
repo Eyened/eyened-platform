@@ -8,6 +8,7 @@ import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
 import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
+import { segmentationPlaneSize } from "./segmentationProjection";
 import { writable, type Writable } from "svelte/store";
 
 type MaskConstructor = new (image: AbstractImage, segmentation: SegmentationGET) => Mask;
@@ -40,7 +41,8 @@ export class SegmentationState {
         initialData?: DrawingArray,
     ) {
         this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
-        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
+        const plane = segmentationPlaneSize(segmentation, image);
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, plane.width, plane.height));
         if (initialData) {
             this.mask.importData(initialData);
         } else {
@@ -153,7 +155,8 @@ export class SegmentationState {
         this.updateTimeout = setTimeout(async () => {
             try {
                 const data = this.mask.exportData();
-                const buffer = encodeNpy(data, [this.image.height, this.image.width]);
+                const { planeHeight, planeWidth } = this.mask;
+                const buffer = encodeNpy(data, [planeHeight, planeWidth]);
                 const sparse_axis = this.segmentation.sparse_axis ?? undefined;
                 const scan_nr = this.image.image_id.endsWith('proj') ? undefined : this.scanNr;
                 await updateSegmentationData(this.segmentation.id, buffer, { sparse_axis, scan_nr });

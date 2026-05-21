@@ -1,5 +1,10 @@
+import os
+import shutil
+import tempfile
+import time
 from os import PathLike
-from typing import Any, Iterable, List, Tuple, Dict, Set, Iterator
+from pathlib import Path
+from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Union
 
 import numpy as np
 import torch
@@ -19,11 +24,45 @@ from eyened_orm.inference.multi_process_inference import (
 )
 
 
+def _log(msg: str, *, minimal: bool = False) -> None:
+    from eyened_orm.inference.utils import inference_verbose
+
+    if minimal or inference_verbose():
+        print(f"[cfi-amd] {msg}", flush=True)
+
+
+def cfi_amd_maps_only(result: Dict[str, Any]) -> Dict[str, np.ndarray]:
+    """Drop non-array entries (e.g. ``bounds``) so npz round-trips without pickle."""
+    maps: Dict[str, np.ndarray] = {}
+    for key in CFI_AMD.model_output_keys:
+        if key not in result:
+            raise KeyError(f"Missing CFI AMD output {key!r}, got {list(result.keys())}")
+        arr = np.asarray(result[key])
+        if arr.dtype == object:
+            raise TypeError(f"CFI AMD output {key!r} is not a numeric array")
+        maps[key] = arr
+    return maps
+
+
+def coerce_cfi_rgb_uint8(image: np.ndarray) -> np.ndarray:
+    """Require RGB uint8 ``(H, W, 3)`` (no grayscale)."""
+    arr = np.asarray(image)
+    if arr.ndim != 3 or arr.shape[2] < 3:
+        raise ValueError(
+            f"CFI image must be RGB uint8 with shape (H, W, 3), got {arr.shape}"
+        )
+    if arr.dtype != np.uint8:
+        raise ValueError(f"CFI image must be uint8, got {arr.dtype}")
+    return np.ascontiguousarray(arr[..., :3])
+
+
 class CFI_AMD(BaseInferencePipeline):
     """CFI AMD segmentation pipeline - detects drusen, RPD, hyperpigmentation, and RPE degeneration."""
 
     # keys of the model output dictionary
-    model_output_keys = {"drusen", "RPD", "hyperpigmentation", "rpe_degeneration"}
+    model_output_keys = frozenset(
+        {"drusen", "RPD", "hyperpigmentation", "rpe_degeneration"}
+    )
     # feature names in the database
     feature_names = {
         "drusen": "Drusen",
@@ -52,50 +91,55 @@ class CFI_AMD(BaseInferencePipeline):
 
     def __init__(
         self,
-        session,
-        device: torch.device,
+        session=None,
+        device: torch.device | None = None,
         n_workers: int = 12,
         batch_size: int = 8,
         save_only_above_threshold: bool = True,
         undo_transform: bool = True,
     ):
+        from eyened_orm.inference.utils import auto_device
+
         self.session = session
         self.n_workers = n_workers
         self.batch_size = batch_size
-        self.device = device
+        self.device = device if device is not None else auto_device()
         self.save_only_above_threshold = save_only_above_threshold
         self.undo_transform = undo_transform
-
-        # Track if models have been loaded
         self._models_loaded = False
+        self.features: Dict[str, Feature] | None = None
+        self.models: Dict[str, SegmentationModel] | None = None
 
-        # Create or retrieve Features
-        self.features = {
-            output_key: Feature.get_or_create(
-                session, match_by={"FeatureName": feature_name}
-            )
-            for output_key, feature_name in self.feature_names.items()
-        }
-
-        # Create or retrieve SegmentationModels
-        self.models = {
-            output_key: SegmentationModel.get_or_create(
-                session,
-                match_by={
-                    "FeatureID": self.features[output_key].FeatureID,
-                    "ModelName": name,
-                    "Version": version,
-                },
-                update_values={"Description": description},
-            )
-            for output_key, (name, version, description) in self.model_configs.items()
-        }
+        if session is not None:
+            self.features = {
+                output_key: Feature.get_or_create(
+                    session, match_by={"FeatureName": feature_name}
+                )
+                for output_key, feature_name in self.feature_names.items()
+            }
+            self.models = {
+                output_key: SegmentationModel.get_or_create(
+                    session,
+                    match_by={
+                        "FeatureID": self.features[output_key].FeatureID,
+                        "ModelName": name,
+                        "Version": version,
+                    },
+                    update_values={"Description": description},
+                )
+                for output_key, (name, version, description) in self.model_configs.items()
+            }
 
     def _load_models(self) -> None:
         """Load the CFI AMD processor."""
         from cfi_amd.processor import Processor
 
-        self.processor = Processor(self.device)
+        from eyened_orm.inference.utils import assert_cuda_kernel_compatible
+
+        if self.device.type == "cuda":
+            assert_cuda_kernel_compatible(self.device)
+        models_dir = os.environ.get("CFI_AMD_MODELS_DIR")
+        self.processor = Processor(self.device, models_dir=models_dir)
 
     def _ensure_models_loaded(self) -> None:
         """Ensure models are loaded (only loads once)."""
@@ -122,6 +166,19 @@ class CFI_AMD(BaseInferencePipeline):
                 "Threshold": self.threshold,
             },
         )
+
+    def predict_path(self, image_path: PathLike[str]) -> Dict[str, np.ndarray]:
+        """Run preprocess → model → postprocess (no database)."""
+        t0 = time.perf_counter()
+        self._ensure_models_loaded()
+        prep = self.preprocess(image_path)
+        (batch_out,) = tuple(self.process_batch([prep]))
+        out = cfi_amd_maps_only(self.postprocess(prep, batch_out))
+        _log(
+            f"done keys={list(out.keys())} in {time.perf_counter() - t0:.1f}s",
+            minimal=True,
+        )
+        return out
 
     def _save_result(
         self, image_id: int, model: SegmentationModel, segmentation_array: np.ndarray
@@ -198,23 +255,17 @@ class CFI_AMD(BaseInferencePipeline):
                 continue
 
             for output_key, segmentation_array in result_dict.items():
-                if output_key not in self.models:
+                if self.models is None or output_key not in self.models:
                     continue
 
                 yield image_id, self.models[output_key], segmentation_array
 
     def filter_image_ids(self, image_ids: Iterable[int]) -> Set[int]:
-        """Filter out image IDs that already have all required segmentations.
-
-        Args:
-            image_ids: Iterable of image IDs to filter
-
-        Returns:
-            Set of image IDs that don't have all required segmentations
-        """
+        """Filter out image IDs that already have all required segmentations."""
+        if self.session is None or self.models is None:
+            return set(image_ids)
         image_ids_set = set(image_ids)
 
-        # Get all existing ModelSegmentation records for these images and models
         model_ids = {model.ModelID for model in self.models.values()}
         processed = set(
             ModelSegmentation.select(
@@ -260,3 +311,57 @@ class CFI_AMD(BaseInferencePipeline):
                 print(f"Image {image_id}, model {model.ModelName} failed to process")
                 continue
             self._save_result(image_id, model, segmentation_array)
+
+
+def run_for_image_ids(
+    session,
+    image_ids: Iterable[int],
+    *,
+    device=None,
+    batch_size: int = 8,
+    n_workers: int = 12,
+    overwrite: bool = False,
+) -> None:
+    """Entry point for CLI and RQ worker (``cfi-amd`` queue)."""
+    image_ids = set(image_ids)
+    processor = CFI_AMD(
+        session,
+        device=device,
+        n_workers=n_workers,
+        batch_size=batch_size,
+    )
+    if overwrite:
+        filtered = image_ids
+        print(f"Processing {len(filtered)} images (overwrite)")
+    else:
+        filtered = processor.filter_image_ids(image_ids)
+        print(f"Processing {len(filtered)} images (after filtering existing)")
+    if not filtered:
+        print("No images to process")
+        return
+    processor.run(filtered)
+    session.commit()
+    print(f"Completed processing {len(filtered)} images")
+
+
+def predict_image(
+    image: Union[np.ndarray, PathLike[str]],
+    *,
+    device: torch.device | None = None,
+) -> Dict[str, np.ndarray]:
+    """In-process CFI AMD prediction (no DB). RGB uint8 array or image file path."""
+    from eyened_orm.inference.utils import auto_device
+
+    dev = device if device is not None else auto_device()
+    processor = CFI_AMD(session=None, device=dev)
+    if isinstance(image, np.ndarray):
+        work = Path(tempfile.mkdtemp(prefix="cfi_amd_"))
+        try:
+            from PIL import Image
+
+            path = work / "input.png"
+            Image.fromarray(coerce_cfi_rgb_uint8(image)).save(path)
+            return processor.predict_path(path)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+    return processor.predict_path(image)

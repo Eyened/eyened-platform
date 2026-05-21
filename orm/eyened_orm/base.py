@@ -12,7 +12,7 @@ from typing import (
     TypeVar,
 )
 
-from sqlalchemy import Column, Index, UniqueConstraint, select
+from sqlalchemy import Column, Index, UniqueConstraint, false, select, tuple_
 from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute, Session, lazyload
 
 from eyened_orm.display_meta import EyeNedDeclarativeDisplayMeta
@@ -206,6 +206,90 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
         return {id: obj for id, obj in session.execute(stmt).all()}
 
     @classmethod
+    def fetch_dict(
+        cls: Type[T],
+        session: Session,
+        *,
+        key_columns: str | tuple[str, ...] | None = None,
+        keys: Iterable[Any] | Iterable[tuple[Any, ...]],
+        lazy: bool = False,
+    ) -> Dict[Any, T]:
+        """
+        Fetch rows matching the provided keys and return a dict keyed by the requested column(s).
+
+        If `key_columns` is not provided (or is empty), falls back to this table's primary key
+        column(s).
+
+        - For a single key column, uses an IN query on that column.
+        - For multiple key columns, uses a tuple IN query: (c1, c2, ...) IN (...)
+
+        Raises:
+            ValueError: if duplicate keys are returned from the database.
+        """
+        if key_columns is None or (isinstance(key_columns, tuple) and not key_columns):
+            pks = cls.primary_keys()
+            if not pks:
+                raise ValueError(f"{cls.__name__}.fetch_dict() could not determine primary key")
+            cols: tuple[str, ...] = tuple(pk.name for pk in pks)
+        else:
+            cols = (key_columns,) if isinstance(key_columns, str) else key_columns
+            if not cols:
+                raise ValueError("key_columns must contain at least one column name")
+
+        if len(cols) == 1:
+            col_name = cols[0]
+            values_set = {v for v in keys if v is not None}  # type: ignore[arg-type]
+            if not values_set:
+                return {}
+
+            rows = cls.by_columns(session, lazy=lazy, **{col_name: values_set})
+            out: Dict[Any, T] = {}
+            for r in rows:
+                k = getattr(r, col_name)
+                if k in out:
+                    raise ValueError(
+                        f"Duplicate key for {cls.__name__}.fetch_dict(): {col_name}={k!r}"
+                    )
+                out[k] = r
+            return out
+
+        # Composite key
+        keys_set: set[tuple[Any, ...]] = set()
+        for k in keys:  # type: ignore[assignment]
+            if k is None:
+                continue
+            if not isinstance(k, tuple):
+                raise ValueError(
+                    f"{cls.__name__}.fetch_dict() expected tuple keys for key_columns={cols}"
+                )
+            if len(k) != len(cols):
+                raise ValueError(
+                    f"{cls.__name__}.fetch_dict() expected {len(cols)} values per key, got {len(k)}"
+                )
+            if any(v is None for v in k):
+                continue
+            keys_set.add(k)
+
+        if not keys_set:
+            return {}
+
+        col_attrs = tuple(getattr(cls, c) for c in cols)
+        stmt = select(cls).where(tuple_(*col_attrs).in_(keys_set))
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
+        rows = session.scalars(stmt).all()
+
+        out: Dict[Any, T] = {}
+        for r in rows:
+            k = tuple(getattr(r, c) for c in cols)
+            if k in out:
+                raise ValueError(
+                    f"Duplicate key for {cls.__name__}.fetch_dict(): {cols}={k!r}"
+                )
+            out[k] = r
+        return out
+
+    @classmethod
     def by_pk(
         cls: type[T], session: Session, pk: Any | tuple, lazy: bool = False
     ) -> Optional[T]:
@@ -300,7 +384,11 @@ class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
             col = getattr(cls, k)
             # Use in_ for iterables (but not strings)
             if isinstance(v, Iterable) and not isinstance(v, str):
-                conditions.append(col.in_(v))
+                seq = tuple(v)
+                if len(seq) == 0:
+                    conditions.append(false())
+                else:
+                    conditions.append(col.in_(seq))
             else:
                 conditions.append(col == v)
         return conditions

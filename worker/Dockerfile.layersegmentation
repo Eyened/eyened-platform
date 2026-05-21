@@ -1,0 +1,47 @@
+# CUDA 12.8 + PyTorch 2.7 required for Blackwell GPUs (e.g. RTX 5090, sm_120).
+FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY server/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+RUN pip install --no-cache-dir nnunetv2 huggingface_hub
+
+ENV NNUNET_RESULTS=/nnUNet_results \
+    nnUNet_results=/nnUNet_results \
+    nnUNet_raw=/nnUNet_results \
+    nnUNet_preprocessed=/nnUNet_results
+
+# Eyened/LayerSegmentation -> Dataset506_layers_v2_correctedset (see plans.json on HF)
+RUN python - <<'EOF'
+from pathlib import Path
+import shutil
+
+from huggingface_hub import snapshot_download
+
+dataset_dir = Path("/nnUNet_results/Dataset506_layers_v2_correctedset")
+dataset_dir.mkdir(parents=True, exist_ok=True)
+
+repo_dir = Path(
+    snapshot_download(
+        "Eyened/LayerSegmentation",
+        allow_patterns=["nnunet_model/**"],
+    )
+)
+shutil.copytree(repo_dir / "nnunet_model", dataset_dir, dirs_exist_ok=True)
+EOF
+
+COPY orm /app/orm
+RUN pip install --no-cache-dir -e /app/orm
+COPY server /app/server
+
+ENV PYTHONPATH=/app
+WORKDIR /app
+
+CMD ["python", "-m", "server.rq_worker"]

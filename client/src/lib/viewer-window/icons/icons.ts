@@ -24,6 +24,7 @@ import Registration from './Registration.svelte';
 import Draw from './Draw.svelte';
 import Lines from './Lines.svelte';
 import Intersection from './Intersection.svelte';
+import RegionBox from './RegionBox.svelte';
 
 export {
 
@@ -37,6 +38,6 @@ export {
     ImportSegmentation, ConnectedComponents,
     Close, Rendering, Registration,
     Layers, ETDRS, Form, Info,
-    Lines, Intersection
+    Lines, Intersection, RegionBox
 
 }

@@ -10,7 +10,6 @@ uniform vec3 u_image_size;
 uniform usampler2D u_annotation;
 uniform uint u_layer_bit;
 
-uniform bool u_smooth;
 uniform bool u_outline;
 uniform float u_alpha;
 uniform vec3 u_color;
@@ -55,49 +54,13 @@ float getAlphaQuestionable(float a, bool layer_annotation) {
 	else
 		return 0.5f * brightness;
 }
-void outline() {
-	vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
-	uvec2 layer = uvec2(u_layer_bit);
-	ivec2 pos = ivec2(p);
-	bvec2 t00 = greaterThan(texelFetch(u_annotation, pos, 0).rg & layer, uvec2(0u));
-	bvec2 t10 = greaterThan(texelFetch(u_annotation, pos + ivec2(1, 0), 0).rg & layer, uvec2(0u));
-	bvec2 t01 = greaterThan(texelFetch(u_annotation, pos + ivec2(0, 1), 0).rg & layer, uvec2(0u));
-	bvec2 t11 = greaterThan(texelFetch(u_annotation, pos + ivec2(1, 1), 0).rg & layer, uvec2(0u));
-
-	int sum_drawing = int(t00.x) + int(t10.x) + int(t01.x) + int(t11.x);
-	int sum_questionable = int(t00.y) + int(t10.y) + int(t01.y) + int(t11.y);
-	bool border = sum_drawing > 0 && sum_drawing < 4;
-	
-
-}
 void main() {
-
 	color_out = vec4(0.0f);
 
-	bool drawing;
-	bool questionable;
-
-	if(u_smooth) {
-		vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
-		uvec2 layer = uvec2(u_layer_bit);
-		ivec2 pos = ivec2(p);
-		bvec2 t00 = greaterThan(texelFetch(u_annotation, pos, 0).rg & layer, uvec2(0u));
-		bvec2 t10 = greaterThan(texelFetch(u_annotation, pos + ivec2(1, 0), 0).rg & layer, uvec2(0u));
-		bvec2 t01 = greaterThan(texelFetch(u_annotation, pos + ivec2(0, 1), 0).rg & layer, uvec2(0u));
-		bvec2 t11 = greaterThan(texelFetch(u_annotation, pos + ivec2(1, 1), 0).rg & layer, uvec2(0u));
-		vec2 f = fract(p);
-		vec2 u0 = mix(vec2(t00), vec2(t10), f.x);
-		vec2 u1 = mix(vec2(t01), vec2(t11), f.x);
-		vec2 u = mix(u0, u1, f.y);
-
-		drawing = u.x > 0.5f;
-		questionable = u.y > 0.5f;
-
-	} else {
-		uvec2 tex = texture(u_annotation, v_uv).rg;
-		drawing = (u_layer_bit & tex.r) > 0u;
-		questionable = (u_layer_bit & tex.g) > 0u;
-	}
+	vec2 p = v_uv * u_image_size.xy - vec2(0.5f);
+	uvec2 tex = texelFetch(u_annotation, ivec2(p), 0).rg;
+	bool drawing = (u_layer_bit & tex.r) > 0u;
+	bool questionable = (u_layer_bit & tex.g) > 0u;
 
 	if(!(drawing || questionable)) {
 		discard;

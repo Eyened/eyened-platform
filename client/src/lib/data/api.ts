@@ -8,7 +8,7 @@ import type {
 	TagGET,
 	TaskGET
 } from '../../types/openapi_types';
-import { api } from '../api/client';
+import { ApiError, api, isUnauthorizedStatus, withAuthRetry } from '../api/client';
 import {
 	formAnnotations,
 	ingestFeatures,
@@ -34,10 +34,10 @@ import {
  * @returns The data from the response
  */
 function handleResponse<T>(res: { data?: T; error?: any; response: Response }, operation: string): T {
-	if (res.error) {
-		// If authentication error, redirect is already handled by fetchWithAuthRetry
-		// But we should still throw to prevent processing invalid data
-		throw new Error(`Failed to ${operation}: ${res.response.status}`);
+	if (res.error || isUnauthorizedStatus(res.response.status)) {
+		// Auth errors may surface as status only (fetch retried once at HTTP layer).
+		// withAuthRetry on callers can refresh and run the operation again.
+		throw new ApiError(res.response.status, `Failed to ${operation}: ${res.response.status}`);
 	}
 	return res.data as T;
 }
@@ -53,36 +53,73 @@ function getOperationName(path: string, method: string): string {
 	return `${verb} ${cleanPath}`;
 }
 
+export type ApiCallResult<T = unknown> = {
+	data?: T;
+	error?: unknown;
+	response: Response;
+};
+
 /**
- * Wrapped API GET method that automatically handles errors
+ * openapi-fetch call with HTTP-level and app-level auth retry.
  */
+export async function apiInvoke<T = unknown>(
+	call: () => Promise<ApiCallResult<T>>,
+	operation = 'request',
+): Promise<ApiCallResult<T>> {
+	return withAuthRetry(async () => {
+		const res = await call();
+		if (res.error || isUnauthorizedStatus(res.response.status)) {
+			throw new ApiError(
+				res.response.status,
+				`Failed to ${operation}: ${res.response.status}`,
+			);
+		}
+		return res;
+	});
+}
+
+/** Like apiInvoke but does not treat openapi `error` as failure (e.g. 204 No Content). */
+export async function apiInvokeAllowEmpty<T = unknown>(
+	call: () => Promise<ApiCallResult<T>>,
+): Promise<ApiCallResult<T>> {
+	return withAuthRetry(async () => {
+		const res = await call();
+		if (isUnauthorizedStatus(res.response.status)) {
+			throw new ApiError(
+				res.response.status,
+				`Request failed: ${res.response.status}`,
+			);
+		}
+		return res;
+	});
+}
+
 async function apiGet<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.GET(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'GET'));
+	return withAuthRetry(async () => {
+		const res = await api.GET(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'GET'));
+	});
 }
 
-/**
- * Wrapped API POST method that automatically handles errors
- */
 async function apiPost<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.POST(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'POST'));
+	return withAuthRetry(async () => {
+		const res = await api.POST(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'POST'));
+	});
 }
 
-/**
- * Wrapped API PATCH method that automatically handles errors
- */
 async function apiPatch<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.PATCH(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'PATCH'));
+	return withAuthRetry(async () => {
+		const res = await api.PATCH(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'PATCH'));
+	});
 }
 
-/**
- * Wrapped API DELETE method that automatically handles errors
- */
 async function apiDelete(path: string, options?: any): Promise<void> {
-	const res = await api.DELETE(path as any, options);
-	handleResponse(res, getOperationName(path, 'DELETE'));
+	return withAuthRetry(async () => {
+		const res = await api.DELETE(path as any, options);
+		handleResponse(res, getOperationName(path, 'DELETE'));
+	});
 }
 
 // ===== Fetch Functions =====
@@ -219,19 +256,30 @@ export async function getStudiesSignature(): Promise<any[]> {
 export async function createSegmentation(item: any, np_array?: any): Promise<any> {
 	const formData = new FormData();
 	formData.append('metadata', JSON.stringify(item));
-	
+
 	if (np_array) {
 		formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
 	}
-	
+
 	const data = await apiPost<any>('/segmentations' as any, {
-		body: formData
+		body: formData,
 	} as any);
-	
+
 	ingestSegmentations([data]);
-	
+
 	return data;
 }
+
+export type CreateSegmentationShape = {
+	depth: number;
+	height: number;
+	width: number;
+};
+
+export type CreateSegmentationOptions = {
+	shape?: CreateSegmentationShape;
+	image_projection_matrix?: number[][] | null;
+};
 
 export async function createSegmentationFrom(
 	image: any,  // AbstractImage type
@@ -240,28 +288,31 @@ export async function createSegmentationFrom(
 	data_type: any,
 	threshold?: number,
 	sparse_axis?: number,
-	subtask_id?: number
+	subtask_id?: number,
+	options?: CreateSegmentationOptions,
 ): Promise<any> {
 	const instance = image.instance;
 	const scan_indices = image.is3D ? [] : null;
-	let shape = {
+	let shape: CreateSegmentationShape = options?.shape ?? {
 		depth: image.depth,
 		height: image.height,
 		width: image.width,
 	};
-	
-	if (sparse_axis === 1) {
+
+	if (!options?.shape && sparse_axis === 1) {
 		// projection
-		shape.depth = image.height;
-		shape.height = 1;
-		shape.width = image.width;
+		shape = {
+			depth: image.height,
+			height: 1,
+			width: image.width,
+		};
 	}
 
 	const item = {
 		image_id: instance.id,
 		...shape,
 		sparse_axis,
-		image_projection_matrix: null,
+		image_projection_matrix: options?.image_projection_matrix ?? null,
 		scan_indices,
 		data_representation,
 		data_type,

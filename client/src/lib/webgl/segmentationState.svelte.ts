@@ -8,6 +8,8 @@ import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
 import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
+import type { SegmentationItem } from "./segmentationItem.svelte";
+import { segmentationPlaneSize } from "./segmentationProjection";
 
 function isNavigationTimeFetchFailure(error: unknown): boolean {
     return error instanceof TypeError && error.message === 'Failed to fetch';
@@ -109,9 +111,11 @@ export class SegmentationState {
         readonly segmentation: SegmentationGET | ModelSegmentationGET,
         readonly scanNr: number,
         initialData?: DrawingArray,
+        readonly segmentationItem?: SegmentationItem,
     ) {
         this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
-        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
+        const plane = segmentationPlaneSize(segmentation, image);
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, plane.width, plane.height));
         if (initialData) {
             this.mask.importData(initialData);
         } else {
@@ -146,6 +150,7 @@ export class SegmentationState {
             return;
         }
         this.mask.importData(npyArray.data as DrawingArray);
+        this.segmentationItem?.addSavedScanIndex(scan_nr);
     }
 
     async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
@@ -216,17 +221,17 @@ export class SegmentationState {
         if (this.updateTimeout) {
             clearTimeout(this.updateTimeout);
         }
-        
+
         // Resolve immediately for optimistic UI updates (don't block drawing)
         // The actual server call will be debounced and happen in the background
         const resolveImmediately = this.pendingUpdateResolve;
         if (resolveImmediately) {
             resolveImmediately();
         }
-        
+
         // Set sync state to "saving" when update is triggered
         this.syncState = "saving";
-        
+
         // Debounce: wait 2 seconds after last update before sending to server.
         // If this tick was superseded by a newer timer, skip (the newer tick will save).
         const tid = setTimeout(() => {
@@ -235,7 +240,7 @@ export class SegmentationState {
             void this.performSave();
         }, 2000);
         this.updateTimeout = tid;
-        
+
         // Return a Promise that resolves immediately for optimistic updates
         return new Promise<void>((resolve) => {
             this.pendingUpdateResolve = resolve;
@@ -247,14 +252,31 @@ export class SegmentationState {
     private async performSave(options?: { keepalive?: boolean }) {
         try {
             const data = this.mask.exportData();
-            const buffer = encodeNpy(data, [this.image.height, this.image.width]);
+            const { planeHeight, planeWidth } = this.mask;
+            const expectedLen = planeHeight * planeWidth;
+            if (data.length !== expectedLen && data.length !== expectedLen * 4) {
+                console.error(
+                    "Segmentation save: data length mismatch",
+                    { got: data.length, expected: expectedLen, planeWidth, planeHeight },
+                );
+            }
+            const buffer = encodeNpy(data, [planeHeight, planeWidth]);
             const sparse_axis = this.segmentation.sparse_axis ?? undefined;
-            const scan_nr = this.image.image_id.endsWith('proj') ? undefined : this.scanNr;
-            await updateSegmentationData(this.segmentation.id, buffer, {
+            let scan_nr: number | undefined = this.scanNr;
+            if (this.image.image_id.endsWith('proj')) {
+                scan_nr = undefined;
+            }
+            if (scan_nr !== undefined) {
+                this.segmentationItem?.addSavedScanIndex(scan_nr);
+            }
+            const resp = await updateSegmentationData(this.segmentation.id, buffer, {
                 sparse_axis,
                 scan_nr,
                 keepalive: options?.keepalive,
             });
+            await resp.json();
+
+
             this.syncState = "synced";
         } catch (error) {
             // keepalive runs around navigation; the browser often aborts these with TypeError:

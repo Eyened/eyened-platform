@@ -133,12 +133,6 @@
 		toggleTool(newAnnotation, true);
 	}
 
-	$effect(() => {
-		if (!active) {
-			deactivateAll();
-		}
-	});
-
 	const autoItem: etdrsGridType | undefined = $derived.by(() => {
 		if (!instance.cf_keypoints) return undefined;
 		const [fx, fy] = instance.cf_keypoints.fovea_xy as [number, number];

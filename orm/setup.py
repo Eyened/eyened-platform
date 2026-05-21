@@ -10,10 +10,6 @@ setup(
     description="ORM for eyened tools",
     long_description_content_type="text/markdown",
     packages=find_packages(),
-    include_package_data=True,
-    package_data={
-        "eyened_orm": ["environments/*.env"],
-    },
     zip_safe=False,
     entry_points={
         "console_scripts": [
@@ -40,6 +36,7 @@ setup(
         "pydantic-settings==2.7.1",
         "python-dotenv==1.*",
         "retinalysis-fundusprep>=0.5.4",
+        "retinalysis-registration>=0.1.4",
         "pyyaml==6.*",
         "google_crc32c==1.8.0",
         "simpleitk==2.*",

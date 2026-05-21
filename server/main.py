@@ -25,7 +25,7 @@ from server.routes import (
     patients,
 )
 from server.utils.db_logging import init_db_logger
-from server.config import settings
+from server.config import get_redis_connection, settings
 
 app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
@@ -109,7 +109,12 @@ async def health_check():
     return {"status": "healthy"}
 
 
-from redis import Redis
 from rq import Queue
-redis_conn = Redis(host='redis', port=6379)
+
+redis_conn = get_redis_connection()
 queue = Queue("default", connection=redis_conn)
+
+
+def get_rq_queue(name: str) -> Queue:
+    """Named RQ queue (e.g. ``cfi-roi`` for CFI ROI jobs)."""
+    return Queue(name, connection=redis_conn)

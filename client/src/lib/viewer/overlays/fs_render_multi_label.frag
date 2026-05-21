@@ -3,14 +3,16 @@ precision highp usampler2D;
 precision highp float;
 precision highp int;
 uniform vec3 u_image_size;
+uniform bool u_show_seg_bounds;
 
 uniform usampler2D u_annotation;
 uniform float u_alpha;
 uniform vec3[32] u_colors;
 uniform int u_highlighted_feature_index;
 uniform uint u_active_feature_mask;
+uniform uint u_visible_feature_mask;
+uniform bool u_is_drawing;
 
-uniform bool u_smooth;
 uniform usampler2D u_mask;
 uniform uint u_mask_bitmask;
 uniform bool u_has_mask;
@@ -37,26 +39,8 @@ float getAlphaQuestionable(float a, bool layer_annotation) {
 }
 
 
-float bilinear(usampler2D binary_mask, uint bitmask, vec2 pos) {
-    ivec2 ipos = ivec2(pos);
-    bool t00 = (bitmask & texelFetch(binary_mask, ipos, 0).r) > 0u;
-    bool t10 = (bitmask & texelFetch(binary_mask, ipos + ivec2(1, 0), 0).r) > 0u;
-    bool t01 = (bitmask & texelFetch(binary_mask, ipos + ivec2(0, 1), 0).r) > 0u;
-    bool t11 = (bitmask & texelFetch(binary_mask, ipos + ivec2(1, 1), 0).r) > 0u;
-
-    vec2 f = fract(pos);
-    float u0 = mix(float(t00), float(t10), f.x);
-    float u1 = mix(float(t01), float(t11), f.x);
-    float u = mix(u0, u1, f.y);
-    return u;
-}
-
 bool getMask(usampler2D mask, uint bitmask, vec2 pos) {
-    if(u_smooth) {
-        return bilinear(mask, bitmask, pos) > 0.5f;
-    } else {
-        return (bitmask & texelFetch(mask, ivec2(pos), 0).r) > 0u;
-    }
+    return (bitmask & texelFetch(mask, ivec2(pos), 0).r) > 0u;
 }
 
 void main() {
@@ -67,47 +51,55 @@ void main() {
         }
     }
 
-    uint annotation = texture(u_annotation, v_uv).r;
+    if (isSegPlaneOutlineScreen()) {
+        color_out = segPlaneOutlineColor();
+        return;
+    }
+
+    uint annotation = texelFetch(u_annotation, ivec2(p), 0).r;
 
     bool has_layer = annotation > 0u;
-    
-    float layer_alpha;
 
     color_out = vec4(0.0f);
     if(has_layer) {
-        vec3 accumulated_color = vec3(0.0f);
-        float count = 0.0f;
+        // Weighted mix (order-independent): sum(c * a) / sum(a); opacity from sum of weights.
+        vec3 weighted_rgb = vec3(0.0f);
+        float weight_sum = 0.0f;
 
         for(uint i = 0u; i < 32u; i++) {
-            // loop over bitmasks
-
             // i = 0 | mask = 0001 | feature_index 1 = 0001
             // i = 1 | mask = 0010 | feature_index 2 = 0010
-            // i = 2 | mask = 0100 | feature_index 3 = 0100
-            // i = 3 | mask = 1000 | feature_index 4 = 1000
-            // etc
+            // etc.
             uint mask = 1u << i;
-          
+
             if((annotation & mask) != 0u) {
+                if((u_visible_feature_mask & mask) == 0u) {
+                    continue;
+                }
                 int feature_index = int(i) + 1;
 
                 vec3 layer_color = u_colors[feature_index - 1];
-                if((u_highlighted_feature_index == feature_index) || (u_active_feature_mask & mask) > 0u) {
-                    layer_alpha = 1.0f;
-                } else {
-                    layer_alpha = 0.5f;
+
+                float layer_alpha = 0.1f;
+                if(!u_is_drawing) {
+                    if(u_highlighted_feature_index == feature_index)
+                        layer_alpha = 1.0f;
+                    if((u_active_feature_mask & mask) > 0u)
+                        layer_alpha = 1.0f;
                 }
-                // accumulate possibly overlapping colors
-                accumulated_color += layer_color * layer_alpha;
-                count += layer_alpha;
+
+                weighted_rgb += layer_color * layer_alpha;
+                weight_sum += layer_alpha;
             }
         }
 
-        // calculate average color
-        if(count > 0.0f) {
-            accumulated_color /= count;
+        if(weight_sum > 0.0f) {
+            vec3 rgb = weighted_rgb / weight_sum;
+            float combined_a = min(weight_sum, 1.0f);
+            color_out = vec4(rgb, combined_a * u_alpha);
         }
-        color_out = vec4(accumulated_color, u_alpha);
     }
+
+    applySegPlaneOutline(color_out);
 
 }

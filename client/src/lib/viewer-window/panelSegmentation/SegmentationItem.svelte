@@ -43,8 +43,8 @@
 		),
 	);
 
-	const segmentationItem =
-		segmentationContext.getSegmentationItem(segmentation);
+	// Must not run inside $derived: getOrCreateSegmentationItem mutates the image cache.
+	const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
 
 	const segmentationState = $derived(
 		segmentationItem.getSegmentationState(viewerContext.index),
@@ -62,8 +62,9 @@
 			if (segmentation.annotation_type === "grader_segmentation") {
 				await deleteSegmentation(segmentation.id);
 			}
-			if (segmentationContext.segmentationItem == segmentationItem) {
+			if (segmentationContext.isActiveSegmentation(segmentation)) {
 				segmentationContext.segmentationItem = undefined;
+				segmentationContext.activeIndices = [];
 			}
 		};
 
@@ -88,11 +89,12 @@
 
 	function toggleActive() {
 		segmentationContext.toggleActive(segmentationItem);
+		if (mainViewerContext.highlightedSegmentationItem === segmentationItem) {
+			mainViewerContext.highlightedSegmentationItem = undefined;
+		}
 	}
 
-	const active = $derived(
-		segmentationContext.segmentationItem == segmentationItem,
-	);
+	const isActive = $derived(segmentationContext.isActiveSegmentation(segmentation));
 
 	function pointerEnter() {
 		mainViewerContext.highlightedSegmentationItem = segmentationItem;
@@ -128,13 +130,16 @@
 
 <div
 	class="content"
+	role="group"
+	aria-label="{feature.name} segmentation [{segmentation.id}]"
 	class:loading={segmentationItem.loading}
-	class:active
+	class:active={isActive}
+	class:visible={visible}
 	class:empty-non-editable={!isEditable && isEmptyForCurrentSlice}
 	class:empty-editable={isEditable && isEmptyForCurrentSlice}
 	onpointerenter={pointerEnter}
 	onpointerleave={pointerLeave}
->
+>    
 	<div class="row">
 		<div>
 			{#if visible}
@@ -158,7 +163,7 @@
 			<FeatureColorPicker {segmentation} />
 		{/if}
 
-		<button type="button" class="expand" onclick={toggleActive}>
+		<button type="button" class="expand" class:active={isActive} onclick={toggleActive}>
 			<div class="feature-name">{feature.name}</div>
 			<div class="segmentationID">[{segmentation.id}]</div>
 			<div class="segmentationType">[{segmentationType}]</div>
@@ -170,13 +175,13 @@
 	</div>
 
 	{#if dataRepresentation == "Probability"}
-		{#if active}
+		{#if isActive}
 			<div class="row">
 				<ThresholdSlider {segmentation} {segmentationItem} />
 			</div>
 		{/if}
 	{/if}
-	{#if active && segmentation.annotation_type == "model_segmentation"}
+	{#if isActive && segmentation.annotation_type == "model_segmentation"}
 		<div class="row">
 			<button type="button" class="duplicate-button" onclick={applyDuplicateAI}>
 				Duplicate
@@ -185,14 +190,14 @@
 	{/if}
 
 	{#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
-		<MultiFeatureSelector {segmentation} {active} />
+		<MultiFeatureSelector {segmentation} active={isActive} />
 	{/if}
 	{#if segmentationItem.loading}
 		<div class="row">
 			<div class="loading">Loading segmentation…</div>
 		</div>
 	{/if}
-	{#if active}
+	{#if isActive}
 		<button type="button" class="open" onclick={() => (collapsed = !collapsed)}>
 			<div class="handle">
 				{#if collapsed}
@@ -255,7 +260,17 @@
 		display: flex;
 	}
 	div.content {
+        font-size: small;
 		flex-direction: column;
+		border-left: 3px solid transparent;
+		border-radius: 2px;
+	}
+	div.content.visible:not(.active) {
+		border-left-color: rgba(100, 255, 255, 0.35);
+	}
+	div.content.active {
+		border-left-color: rgb(100, 255, 255);
+		background-color: rgba(100, 255, 255, 0.22);
 	}
 	div.content.loading {
 		opacity: 0.5;
@@ -266,8 +281,11 @@
 		pointer-events: none;
 	}
 
-	div.content.empty-editable {
-		background-color: rgba(100, 255, 255, 0.15);
+	div.content.empty-editable:not(.active) {
+		background-color: rgba(100, 255, 255, 0.08);
+	}
+	div.content.empty-editable.active {
+		background-color: rgba(100, 255, 255, 0.22);
 	}
 
 	div.row {
@@ -291,14 +309,11 @@
 		flex: 1;
 		min-height: 2em;
 		border-radius: 2px;
-		transition: all 0.3s ease;
+		transition: background-color 0.15s ease;
 	}
-	div.active {
-		background-color: rgba(100, 255, 255, 0.3);
-	}
-	button.expand:hover {
-		background-color: rgba(100, 255, 255, 0.3);
-	}
+	button.expand:hover:not(.active) {
+		background-color: rgba(100, 255, 255, 0.12);
+	}	
 	div.feature-name {
 		flex: 1;
 		/* max-width: 12em; */

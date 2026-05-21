@@ -3,6 +3,7 @@ import type { Position2D } from "$lib/types";
 import { colorsFlat } from "$lib/viewer/overlays/colors";
 import type { SegmentationGET } from "../../types/openapi_types";
 import type { AbstractImage } from "./abstractImage";
+import { segmentationPlaneSize } from "./segmentationProjection";
 import type { TextureShaderProgram } from "./FragmentShaderProgram";
 import type { Shaders } from "./shaders";
 import { BitMaskTexture, createTextureR8UI, imageToTexture, TextureData, type ImageType } from "./texture";
@@ -24,10 +25,17 @@ export interface PaintSettings {
 }
 
 export abstract class Mask {
+    readonly planeWidth: number;
+    readonly planeHeight: number;
+
     constructor(
         readonly image: AbstractImage,
         readonly segmentation: SegmentationGET
-    ) { }
+    ) {
+        const plane = segmentationPlaneSize(segmentation, image);
+        this.planeWidth = plane.width;
+        this.planeHeight = plane.height;
+    }
 
     abstract importData(data: DrawingArray): void;
     abstract exportData(): DrawingArray;
@@ -53,7 +61,7 @@ export class BinaryMask extends Mask {
 
     get bitMaskTexture(): BitMaskTexture {
         if (!this._binaryMask) {
-            this._binaryMask = this.webgl.binaryMaskManager.allocateMask(this.image.width, this.image.height);
+            this._binaryMask = this.webgl.binaryMaskManager.allocateMask(this.planeWidth, this.planeHeight);
         }
         return this._binaryMask!;
     }
@@ -141,21 +149,20 @@ export class BinaryMask extends Mask {
 
     computeConnectedComponents() {
         const data = this.bitMaskTexture.getData();
-        const { width, height } = this.image;
-        const label = BlobExtraction(data, width, height);
+        const label = BlobExtraction(data, this.planeWidth, this.planeHeight);
         // label contains the connected components (0 = background, 1 = first component, 2 = second component, ...)
 
         // upload to texture
         const gl = this.webgl.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.connectedComponents!);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, width, height, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, label);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, this.planeWidth, this.planeHeight, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, label);
 
         this.connectedComponentsValid = true;
     }
 
     getConnectedComponents(): WebGLTexture {
         if (this.connectedComponents === undefined) {
-            this.connectedComponents = createTextureR8UI(this.webgl.gl, this.image.width, this.image.height);
+            this.connectedComponents = createTextureR8UI(this.webgl.gl, this.planeWidth, this.planeHeight);
         }
         if (this.connectedComponentsValid == false) {
             this.computeConnectedComponents();
@@ -182,15 +189,16 @@ export class QuestionableMask extends BinaryMask {
 
     get questionableMask(): BitMaskTexture {
         if (!this._questionableMask) {
-            this._questionableMask = this.webgl.binaryMaskManager.allocateMask(this.image.width, this.image.height);
+            this._questionableMask = this.webgl.binaryMaskManager.allocateMask(this.planeWidth, this.planeHeight);
         }
         return this._questionableMask!;
     }
 
     importData(data: DrawingArray): void {
-        const b = new Uint8Array(this.image.width * this.image.height);
-        const q = new Uint8Array(this.image.width * this.image.height);
-        for (let i = 0; i < this.image.width * this.image.height; i++) {
+        const planeSize = this.planeWidth * this.planeHeight;
+        const b = new Uint8Array(planeSize);
+        const q = new Uint8Array(planeSize);
+        for (let i = 0; i < planeSize; i++) {
             b[i] = data[i] & 1;
             q[i] = (data[i] >> 1) & 1;
         }
@@ -204,10 +212,11 @@ export class QuestionableMask extends BinaryMask {
      * @returns a Uint8Array with bitmask 1 for annotated pixels, bitmask 2 (1<<1) for questionable pixels and 0 for background pixels
      */
     exportData(): Uint8Array {
-        const result = new Uint8Array(this.image.width * this.image.height);
+        const planeSize = this.planeWidth * this.planeHeight;
+        const result = new Uint8Array(planeSize);
         const q = this.questionableMask.getData();
         const b = this.bitMaskTexture.getData();
-        for (let i = 0; i < this.image.width * this.image.height; i++) {
+        for (let i = 0; i < planeSize; i++) {
             let bitmask = 0;
             if (b[i] > 0) {
                 bitmask |= 1
@@ -256,7 +265,7 @@ abstract class AbstractDataMask extends Mask {
     constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
         const dataType = segmentation.data_type;
-        this.textureData = new TextureData(image.webgl.gl, image.width, image.height, dataType);
+        this.textureData = new TextureData(image.webgl.gl, this.planeWidth, this.planeHeight, dataType);
     }
 
     importData(data: DrawingArray): void {
@@ -285,22 +294,22 @@ export class ProbabilityMask extends AbstractDataMask {
     }
 
     drawEnhance(settings: {
-        brushRadius: number,
+        radiusX: number,
+        radiusY: number,
         hardness: number,
         pressure: number,
         erase: boolean,
         point: Position2D,
-        aspectRatio: number
     }): void {
 
         const uniforms = {
             u_current: this.textureData.texture,
             u_position: [settings.point.x, settings.point.y],
-            u_radius: settings.brushRadius,
+            u_radius: [settings.radiusX, settings.radiusY],
             u_pressure: settings.pressure,
             u_hardness: settings.hardness,
             u_erase: settings.erase,
-            u_aspectRatio: settings.aspectRatio
+            u_aspectRatio: 1.0,
         }
         this.u_hard = false;
         this.textureData.passShader(this.image.webgl.shaders.drawEnhance, uniforms);
@@ -325,7 +334,7 @@ export class ProbabilityMask extends AbstractDataMask {
         uniforms = {
             ...uniforms,
             u_annotation: this.textureData.texture,
-            u_hard: this.u_hard
+            u_hard: this.u_hard,
         }
         this.image.webgl.shaders.renderProbability.pass(renderTarget, uniforms);
     }

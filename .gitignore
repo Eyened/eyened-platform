@@ -22,3 +22,4 @@ segmentations.zarr/
 .cursor/
 client/src/lib/extensions.ts
 venv
+trash
