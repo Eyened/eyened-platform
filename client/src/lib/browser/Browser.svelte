@@ -23,7 +23,7 @@
 
 	const globalContext = getContext<GlobalContext>("globalContext");
 	const { user } = globalContext;
-	
+
 	const browserContext: BrowserContext = new BrowserContext();
 	setContext("browserContext", browserContext);
 
@@ -113,11 +113,11 @@
 		<div class="flex-5 flex-col min-w-0 p-4">
 			{#if browserContext.filterMode === "basic"}
 				<FilterShorcuts bind:condition={browserContext.basicCondition} />
-            {:else if browserContext.activeSignature.length}
-                <AdvancedFilters
-                    signature={browserContext.activeSignature}
-                    bind:conditions={browserContext.advancedConditions}
-                />
+			{:else if browserContext.activeSignature.length}
+				<AdvancedFilters
+					signature={browserContext.activeSignature}
+					bind:conditions={browserContext.advancedConditions}
+				/>
 			{/if}
 
 			<div class="">
@@ -219,7 +219,14 @@
 	<div id="content" class="p-4">
 		<BrowserContent />
 	</div>
+	<footer></footer>
 	{#if browserContext.selectedIds.length > 0}
 		<Selection />
 	{/if}
 </div>
+
+<style>
+	footer {
+		height: 200px;
+	}
+</style>
