@@ -1,5 +1,6 @@
 import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, ImageGET, SegmentationGET, StudyGET, SubTaskWithImagesGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
 import { api, fetchApi } from '../api/client';
+import { apiInvoke, apiInvokeAllowEmpty } from './api';
 import { decodeNpy, NPYArray } from '../utils/npy_loader';
 import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks, instances, segmentations, studies, tags, tasks } from './stores.svelte';
 
@@ -7,10 +8,12 @@ import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks,
 // ===== Tag Helpers =====
 
 export async function tagInstance(instance: ImageGET, tagId: number, comment?: string) {
-    const { data } = await api.POST('/instances/{instance_id}/tags' as any, {
-        params: { path: { instance_id: instance.id } } as any,
-        body: { tag_id: tagId, comment } as any
-    });
+    const { data } = await apiInvoke(() =>
+        api.POST('/instances/{instance_id}/tags' as any, {
+            params: { path: { instance_id: instance.id } } as any,
+            body: { tag_id: tagId, comment } as any,
+        }),
+    );
 
     // Update store with new tag
     if (instances.has(instance.id)) {
@@ -22,10 +25,12 @@ export async function tagInstance(instance: ImageGET, tagId: number, comment?: s
 }
 
 export async function updateTagInstance(instanceId: string, tagId: number, comment?: string) {
-    const res = await api.PATCH('/instances/{instance_id}/tags/{tag_id}' as any, {
-        params: { path: { instance_id: instanceId, tag_id: tagId } } as any,
-        body: { comment } as any
-    });
+    const res = await apiInvoke(() =>
+        api.PATCH('/instances/{instance_id}/tags/{tag_id}' as any, {
+            params: { path: { instance_id: instanceId, tag_id: tagId } } as any,
+            body: { comment } as any,
+        }),
+    );
     const inst = instances.get(instanceId);
     if (inst && res.data) {
         const tm = res.data as any;
@@ -34,9 +39,11 @@ export async function updateTagInstance(instanceId: string, tagId: number, comme
 }
 
 export async function untagInstance(instance: ImageGET, tagId: number) {
-    await api.DELETE('/instances/{instance_id}/tags/{tag_id}' as any, {
-        params: { path: { instance_id: instance.id, tag_id: tagId } } as any
-    });
+    await apiInvoke(() =>
+        api.DELETE('/instances/{instance_id}/tags/{tag_id}' as any, {
+            params: { path: { instance_id: instance.id, tag_id: tagId } } as any,
+        }),
+    );
     if (instances.has(instance.id)) {
         const inst = instances.get(instance.id)!;
         instances.set(instance.id, {
@@ -47,10 +54,12 @@ export async function untagInstance(instance: ImageGET, tagId: number) {
 }
 
 export async function tagStudy(study: StudyGET, tagId: number, comment?: string) {
-    const { data } = await api.POST('/studies/{study_id}/tags' as any, {
-        params: { path: { study_id: Number(study.id) } } as any,
-        body: { tag_id: tagId, comment } as any
-    });
+    const { data } = await apiInvoke(() =>
+        api.POST('/studies/{study_id}/tags' as any, {
+            params: { path: { study_id: Number(study.id) } } as any,
+            body: { tag_id: tagId, comment } as any,
+        }),
+    );
     // Update store
 
     studies.set(study.id, {
@@ -60,10 +69,12 @@ export async function tagStudy(study: StudyGET, tagId: number, comment?: string)
 }
 
 export async function updateTagStudy(studyId: number, tagId: number, comment?: string) {
-    const res = await api.PATCH('/studies/{study_id}/tags/{tag_id}' as any, {
-        params: { path: { study_id: Number(studyId), tag_id: tagId } } as any,
-        body: { comment } as any
-    });
+    const res = await apiInvoke(() =>
+        api.PATCH('/studies/{study_id}/tags/{tag_id}' as any, {
+            params: { path: { study_id: Number(studyId), tag_id: tagId } } as any,
+            body: { comment } as any,
+        }),
+    );
     const s = studies.get(studyId);
     if (s && res.data) {
         const tm = res.data as any;
@@ -72,10 +83,12 @@ export async function updateTagStudy(studyId: number, tagId: number, comment?: s
 }
 
 export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number, comment?: string) {
-    const { data } = await api.POST('/form-annotations/{form_annotation_id}/tags' as any, {
-        params: { path: { form_annotation_id: Number(formAnnotation.id) } } as any,
-        body: { tag_id: tagId, comment } as any
-    });
+    const { data } = await apiInvoke(() =>
+        api.POST('/form-annotations/{form_annotation_id}/tags' as any, {
+            params: { path: { form_annotation_id: Number(formAnnotation.id) } } as any,
+            body: { tag_id: tagId, comment } as any,
+        }),
+    );
     // Update store
     formAnnotations.set(formAnnotation.id, {
         ...formAnnotation,
@@ -84,10 +97,12 @@ export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId
 }
 
 export async function updateTagFormAnnotation(annotationId: number, tagId: number, comment?: string) {
-    const res = await api.PATCH('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
-        params: { path: { form_annotation_id: Number(annotationId), tag_id: tagId } } as any,
-        body: { comment } as any
-    });
+    const res = await apiInvoke(() =>
+        api.PATCH('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
+            params: { path: { form_annotation_id: Number(annotationId), tag_id: tagId } } as any,
+            body: { comment } as any,
+        }),
+    );
     const fa = formAnnotations.get(annotationId);
     if (fa && res.data) {
         const tm = res.data as any;
@@ -96,9 +111,11 @@ export async function updateTagFormAnnotation(annotationId: number, tagId: numbe
 }
 
 export async function untagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number) {
-    await api.DELETE('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
-        params: { path: { form_annotation_id: Number(formAnnotation.id), tag_id: tagId } } as any
-    });
+    await apiInvoke(() =>
+        api.DELETE('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
+            params: { path: { form_annotation_id: Number(formAnnotation.id), tag_id: tagId } } as any,
+        }),
+    );
     // Update store
     formAnnotations.set(formAnnotation.id, {
         ...formAnnotation,
@@ -109,9 +126,11 @@ export async function untagFormAnnotation(formAnnotation: FormAnnotationGET, tag
 
 
 export async function untagStudy(study: StudyGET, tagId: number) {
-    await api.DELETE('/studies/{study_id}/tags/{tag_id}' as any, {
-        params: { path: { study_id: Number(study.id), tag_id: tagId } } as any
-    });
+    await apiInvoke(() =>
+        api.DELETE('/studies/{study_id}/tags/{tag_id}' as any, {
+            params: { path: { study_id: Number(study.id), tag_id: tagId } } as any,
+        }),
+    );
     // Update store
     studies.set(study.id, {
         ...study,
@@ -120,10 +139,12 @@ export async function untagStudy(study: StudyGET, tagId: number) {
 }
 
 export async function tagSegmentation(seg: SegmentationGET, tagId: number, comment?: string) {
-    const { data } = await api.POST('/segmentations/{segmentation_id}/tags' as any, {
-        params: { path: { segmentation_id: Number(seg.id) } } as any,
-        body: { tag_id: tagId, comment } as any
-    });
+    const { data } = await apiInvoke(() =>
+        api.POST('/segmentations/{segmentation_id}/tags' as any, {
+            params: { path: { segmentation_id: Number(seg.id) } } as any,
+            body: { tag_id: tagId, comment } as any,
+        }),
+    );
     // Update store
     segmentations.set(seg.id, {
         ...seg,
@@ -132,9 +153,11 @@ export async function tagSegmentation(seg: SegmentationGET, tagId: number, comme
 }
 
 export async function untagSegmentation(seg: SegmentationGET, tagId: number) {
-    await api.DELETE('/segmentations/{segmentation_id}/tags/{tag_id}' as any, {
-        params: { path: { segmentation_id: Number(seg.id), tag_id: tagId } } as any
-    });
+    await apiInvoke(() =>
+        api.DELETE('/segmentations/{segmentation_id}/tags/{tag_id}' as any, {
+            params: { path: { segmentation_id: Number(seg.id), tag_id: tagId } } as any,
+        }),
+    );
     // Update store
     segmentations.set(seg.id, {
         ...seg,
@@ -149,13 +172,15 @@ export async function getSegmentationData(segmentationId: number, params?: { sca
 
     query.axis = params?.sparse_axis;
     query.scan_nr = params?.scan_nr;
-    const res = await api.GET('/segmentations/{segmentation_id}/data', {
-        params: {
-            path: { segmentation_id: segmentationId },
-            query
-        },
-        parseAs: "arrayBuffer"
-    });
+    const res = await apiInvokeAllowEmpty(() =>
+        api.GET('/segmentations/{segmentation_id}/data', {
+            params: {
+                path: { segmentation_id: segmentationId },
+                query,
+            },
+            parseAs: 'arrayBuffer',
+        }),
+    );
     if (res.response.status == 204) {
         return null;
     }
@@ -201,13 +226,15 @@ export async function getModelSegmentationData(modelSegmentationId: number, para
         query.scan_nr = params.scan_nr;
     }
 
-    const res = await api.GET('/model-segmentations/{model_segmentation_id}/data', {
-        params: {
-            path: { model_segmentation_id: modelSegmentationId },
-            query
-        },
-        parseAs: "arrayBuffer"
-    });
+    const res = await apiInvokeAllowEmpty(() =>
+        api.GET('/model-segmentations/{model_segmentation_id}/data', {
+            params: {
+                path: { model_segmentation_id: modelSegmentationId },
+                query,
+            },
+            parseAs: 'arrayBuffer',
+        }),
+    );
     if (res.response.status == 204) {
         return null;
     }
@@ -217,18 +244,22 @@ export async function getModelSegmentationData(modelSegmentationId: number, para
 // ===== Form Annotation Value Helpers =====
 
 export async function getFormAnnotationValue(annotationId: number) {
-    const res = await api.GET('/form-annotations/{form_annotation_id}/value', {
-        params: { path: { form_annotation_id: annotationId } }
-    });
+    const res = await apiInvoke(() =>
+        api.GET('/form-annotations/{form_annotation_id}/value', {
+            params: { path: { form_annotation_id: annotationId } },
+        }),
+    );
     return res.data as unknown;
 }
 
 export async function setFormAnnotationValue(annotationId: number, form_data: unknown) {
     // Save to server first (server is source of truth)
-    await api.PUT('/form-annotations/{form_annotation_id}/value', {
-        params: { path: { form_annotation_id: annotationId } },
-        body: form_data as any
-    });
+    await apiInvoke(() =>
+        api.PUT('/form-annotations/{form_annotation_id}/value', {
+            params: { path: { form_annotation_id: annotationId } },
+            body: form_data as any,
+        }),
+    );
 
     // Then update local store so other components see the change
     const existing = formAnnotations.get(annotationId);
@@ -246,7 +277,7 @@ export async function setFormAnnotationValue(annotationId: number, form_data: un
 
 /** Create a new feature on the server and update local feature stores. */
 export async function createFeature(data: FeaturePUT): Promise<FeatureGET | null> {
-    const res = await api.POST('/features' as any, { body: data });
+    const res = await apiInvoke(() => api.POST('/features' as any, { body: data }));
     if (res.data) {
         const feature = res.data as FeatureGET;
         features.set(feature.id, feature);
@@ -257,10 +288,12 @@ export async function createFeature(data: FeaturePUT): Promise<FeatureGET | null
 }
 
 export async function updateFeature(featureId: number, patch: FeaturePATCH) {
-    const res = await api.PATCH('/features/{feature_id}' as any, {
-        params: { path: { feature_id: featureId } } as any,
-        body: patch
-    });
+    const res = await apiInvoke(() =>
+        api.PATCH('/features/{feature_id}' as any, {
+            params: { path: { feature_id: featureId } } as any,
+            body: patch,
+        }),
+    );
 
     if (res.data) {
         const updatedFeature = res.data as any;
@@ -275,9 +308,11 @@ export async function deleteFeature(featureId: number) {
     // Get the feature name before deleting
     const feature = features.get(featureId);
 
-    await api.DELETE('/features/{feature_id}' as any, {
-        params: { path: { feature_id: featureId } } as any
-    });
+    await apiInvoke(() =>
+        api.DELETE('/features/{feature_id}' as any, {
+            params: { path: { feature_id: featureId } } as any,
+        }),
+    );
 
     // Remove from both stores
     features.delete(featureId);
@@ -293,13 +328,15 @@ export async function createTag(
     tagType: TagType,
     description?: string
 ) {
-    const res = await api.POST('/tags' as any, {
-        body: {
-            name,
-            description: description ?? "",
-            tag_type: tagType,
-        }
-    });
+    const res = await apiInvoke(() =>
+        api.POST('/tags' as any, {
+            body: {
+                name,
+                description: description ?? '',
+                tag_type: tagType,
+            },
+        }),
+    );
 
     // Ingest the newly created tag
     if (res.data) {
@@ -312,9 +349,11 @@ export async function createTag(
 }
 
 export async function deleteTag(tagId: number) {
-    await api.DELETE('/tags/{tag_id}' as any, {
-        params: { path: { tag_id: tagId } } as any
-    });
+    await apiInvoke(() =>
+        api.DELETE('/tags/{tag_id}' as any, {
+            params: { path: { tag_id: tagId } } as any,
+        }),
+    );
 
     // Remove from store
     tags.delete(tagId);
@@ -323,7 +362,7 @@ export async function deleteTag(tagId: number) {
 // ===== Task CRUD Helpers =====
 
 export async function createTask(data: TaskPUT) {
-    const res = await api.POST('/task', { body: data });
+    const res = await apiInvoke(() => api.POST('/task', { body: data }));
     if (res.data) {
         ingestTasks([res.data as TaskGET]);
     }
@@ -331,10 +370,12 @@ export async function createTask(data: TaskPUT) {
 }
 
 export async function updateTask(id: number, patch: TaskPATCH) {
-    const res = await api.PATCH('/task/{task_id}' as any, {
-        params: { path: { task_id: id } } as any,
-        body: patch
-    });
+    const res = await apiInvoke(() =>
+        api.PATCH('/task/{task_id}' as any, {
+            params: { path: { task_id: id } } as any,
+            body: patch,
+        }),
+    );
     if (res.data) {
         ingestTasks([res.data as TaskGET]);
     }
@@ -342,23 +383,27 @@ export async function updateTask(id: number, patch: TaskPATCH) {
 }
 
 export async function deleteTask(id: number) {
-    await api.DELETE('/task/{task_id}' as any, {
-        params: { path: { task_id: id } } as any
-    });
+    await apiInvoke(() =>
+        api.DELETE('/task/{task_id}' as any, {
+            params: { path: { task_id: id } } as any,
+        }),
+    );
     tasks.delete(id);
 }
 
 // ===== SubTask Helpers =====
 
 export async function addSubTaskImage(subtaskId: number, instanceId: string) {
-    const res = await api.POST('/subtasks/{subtaskid}/images' as any, {
-        params: {
-            path: {
-                subtaskid: subtaskId
-            }
-        } as any,
-        body: { instance_id: instanceId } as any
-    });
+    const res = await apiInvoke(() =>
+        api.POST('/subtasks/{subtaskid}/images' as any, {
+            params: {
+                path: {
+                    subtaskid: subtaskId,
+                },
+            } as any,
+            body: { instance_id: instanceId } as any,
+        }),
+    );
 
     if (res.data) {
         ingestSubTasks([res.data as any]);
@@ -367,14 +412,16 @@ export async function addSubTaskImage(subtaskId: number, instanceId: string) {
 }
 
 export async function removeSubTaskImage(subtaskId: number, instanceId: string) {
-    const res = await api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
-        params: {
-            path: {
-                subtaskid: subtaskId,
-                instance_id: instanceId
-            }
-        } as any
-    });
+    const res = await apiInvoke(() =>
+        api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
+            params: {
+                path: {
+                    subtaskid: subtaskId,
+                    instance_id: instanceId,
+                },
+            } as any,
+        }),
+    );
 
     if (res.data) {
         ingestSubTasks([res.data as any]);
@@ -383,14 +430,16 @@ export async function removeSubTaskImage(subtaskId: number, instanceId: string) 
 }
 
 export async function updateSubTaskComments(subtaskId: number, comments: string) {
-    const res = await api.PATCH('/subtasks/{subtaskid}' as any, {
-        params: {
-            path: {
-                subtaskid: subtaskId
-            }
-        } as any,
-        body: { comments } as any
-    });
+    const res = await apiInvoke(() =>
+        api.PATCH('/subtasks/{subtaskid}' as any, {
+            params: {
+                path: {
+                    subtaskid: subtaskId,
+                },
+            } as any,
+            body: { comments } as any,
+        }),
+    );
 
     if (res.data) {
         ingestSubTasks([res.data as SubTaskWithImagesGET]);

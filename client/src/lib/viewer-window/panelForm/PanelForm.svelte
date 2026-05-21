@@ -88,7 +88,7 @@
 <div class="main">
     <div class="new-form">
         <div>
-            <select bind:value={selectedSchema}>
+            <select class="schema-select" bind:value={selectedSchema}>
                 <option value={undefined} disabled>-- select form type --</option>
                 {#each formSchemas.values() as schema}
                     <option value={schema}>{schema.name}</option>
@@ -146,5 +146,18 @@
     button:not(:disabled):hover {
         cursor: pointer;
         background-color: rgba(255, 255, 255, 0.3);
+    }
+    select.schema-select {
+        /* Inherited sidebar text color breaks native <select> on Windows */
+        color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        padding: 0.2em;
+        color-scheme: dark;
+    }
+    select.schema-select option {
+        color: rgba(255, 255, 255, 0.9);
+        background-color: rgb(30, 30, 30);
     }
 </style>

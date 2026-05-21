@@ -4,9 +4,8 @@
 	import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 	import { getContext, onDestroy } from "svelte";
-	import { PanelIcon, RegionBox } from "../icons/icons";
 	import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
-	import CreateSegmentationRegionDialog from "./CreateSegmentationRegionDialog.svelte";
+	import CreateSegmentationDialog from "./CreateSegmentationDialog.svelte";
 
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 	const globalContext = getContext<GlobalContext>("globalContext");
@@ -30,34 +29,24 @@
 
 	$effect(() => {
 		const box = segmentationContext.pendingRegionBox;
-		if (box) {
-			globalContext.dialogue = {
-				component: CreateSegmentationRegionDialog,
-				props: {
-					box,
-					image,
-					axis,
-					segmentationContext,
-					subtaskId: taskContext?.subTask?.id,
-				},
-			};
-		}
+		if (!box) return;
+		segmentationContext.pendingRegionBox = undefined;
+		const snapshot = { x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1 };
+		globalContext.dialogue = {
+			component: CreateSegmentationDialog,
+			props: {
+				box: snapshot,
+				image,
+				axis,
+				segmentationContext,
+				subtaskId: taskContext?.subTask?.id,
+				initialMode: "region",
+			},
+		};
 	});
 
 	onDestroy(() => {
 		removeOverlay();
 		segmentationContext.regionToolActive = false;
 	});
-
-	function toggleRegionTool() {
-		segmentationContext.regionToolActive = !segmentationContext.regionToolActive;
-	}
 </script>
-
-<PanelIcon
-	onclick={toggleRegionTool}
-	active={segmentationContext.regionToolActive}
-	tooltip="Draw region on image (drag box)"
-	Icon={RegionBox}
-	size={2}
-/>

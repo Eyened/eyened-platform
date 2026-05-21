@@ -37,13 +37,35 @@
 
 	$effect(() => {
 		if (!panelActive) {
-			removeTool();
-			activeTool = undefined;
+			deactivateAllEditingTools();
+		}
+	});
+
+	$effect(() => {
+		if (segmentationContext.regionToolActive) {
+			deactivateAllEditingTools();
 		}
 	});
 
 	let lock = viewerContext.lockScroll;
+
+	function deactivateAllEditingTools() {
+		if (activeTool) {
+			activeTool.endDraw(viewerContext);
+			removeTool();
+			viewerContext.lockScroll = lock;
+			activeTool = undefined;
+			removeTool = () => {};
+		}
+		segmentationContext.erodeDilateActive = false;
+		segmentationContext.questionableActive = false;
+		segmentationContext.isDrawing = false;
+	}
+
 	function activate(tool: SegmentationTool) {
+		if (segmentationContext.regionToolActive) {
+			return;
+		}
 		removeTool();
 		if (activeTool === tool) {
 			activeTool = undefined;
@@ -57,10 +79,7 @@
 		removeTool = viewerContext.addOverlay(tool);
 	}
 	onDestroy(() => {
-		segmentationContext.erodeDilateActive = false;
-		segmentationContext.questionableActive = false;
-		segmentationContext.isDrawing = false;
-		removeTool();
+		deactivateAllEditingTools();
 	});
 
 	const drawingExecutor = {
@@ -126,6 +145,9 @@
 		globalContext,
 	);
 	function toggle(key: "erodeDilateActive" | "questionableActive") {
+		if (segmentationContext.regionToolActive) {
+			return;
+		}
 		segmentationContext[key] = !segmentationContext[key];
 	}
 

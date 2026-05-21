@@ -1,8 +1,13 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 
-import { api } from '../api/client';
-import { ingestInstances, ingestStudies, instances, studies } from '$lib/data/stores.svelte';
+import {
+    getInstancesSignature,
+    getStudiesSignature,
+    searchInstances,
+    searchStudies
+} from '$lib/data/api';
+import { instances, studies } from '$lib/data/stores.svelte';
 import type { ImageGET, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
 
 export type QueryMode = 'studies' | 'instances';
@@ -214,22 +219,26 @@ export class BrowserContext {
         this.advancedConditions = this.normalizeConditions(conditions);
     }
 
-    // Load both signatures
+    /** Active filter conditions for the current filter mode. */
+    getActiveConditions(): Condition[] {
+        return this.filterMode === 'advanced'
+            ? this.advancedConditions
+            : (this.basicCondition ? [this.basicCondition] : []);
+    }
+
+    private async loadSignatureFields() {
+        const [instances, studies] = await Promise.all([
+            getInstancesSignature(),
+            getStudiesSignature(),
+        ]);
+        this.instancesSignature = instances as SignatureField[];
+        this.studiesSignature = studies as SignatureField[];
+    }
+
     async loadSignatures() {
         this.loading = true;
         try {
-            const [instRes, studRes] = await Promise.all([
-                api.GET('/instances/search/signature', {}),
-                api.GET('/studies/search/signature', {})
-            ]);
-            if (instRes.error) {
-                throw new Error(`Failed to load instances signature: ${instRes.response.status}`);
-            }
-            if (studRes.error) {
-                throw new Error(`Failed to load studies signature: ${studRes.response.status}`);
-            }
-            this.instancesSignature = (instRes.data ?? []) as SignatureField[];
-            this.studiesSignature = (studRes.data ?? []) as SignatureField[];
+            await this.loadSignatureFields();
         } finally {
             this.loading = false;
         }
@@ -237,27 +246,13 @@ export class BrowserContext {
 
     // Refresh signatures (e.g., after creating/modifying tags)
     async refreshSignatures() {
-        const [instRes, studRes] = await Promise.all([
-            api.GET('/instances/search/signature', {}),
-            api.GET('/studies/search/signature', {})
-        ]);
-        if (instRes.error) {
-            throw new Error(`Failed to refresh instances signature: ${instRes.response.status}`);
-        }
-        if (studRes.error) {
-            throw new Error(`Failed to refresh studies signature: ${studRes.response.status}`);
-        }
-        this.instancesSignature = (instRes.data ?? []) as SignatureField[];
-        this.studiesSignature = (studRes.data ?? []) as SignatureField[];
+        return this.loadSignatureFields();
     }
 
 
     // Reset state when queryMode changes
     async resetForQueryModeChange(queryMode: QueryMode) {
-        // Keep current conditions - they may work with both modes
-        const currentConditions = this.filterMode === 'advanced'
-            ? this.advancedConditions
-            : (this.basicCondition ? [this.basicCondition] : []);
+        const currentConditions = this.getActiveConditions();
 
         this.page = 0;
         this.limit = this.getDefaultLimit();
@@ -281,20 +276,13 @@ export class BrowserContext {
 
         // Auto-search with previous conditions if we had any
         if (currentConditions.length > 0) {
-            await this.fetch(currentConditions);
+            await this.runSearch({ conditions: currentConditions });
         }
     }
 
-    // Compatibility method for search with current conditions
+    /** Run search using the current filter conditions (pagination, Search button, etc.). */
     async search() {
-        const query =
-            this.filterMode === 'advanced'
-                ? this.advancedConditions
-                : (this.basicCondition ? [this.basicCondition] : []);
-
-        if (!query.length) return;
-
-        return this.fetch(query);
+        return this.runSearch();
     }
 
     // Method to load conditions from external source (like URL)
@@ -315,26 +303,30 @@ export class BrowserContext {
         }
     }
 
+    /** Search with explicit conditions (e.g. URL restore, overlay patient search). */
     async fetch(query: Condition[], updateUrl: boolean = true) {
+        return this.runSearch({ conditions: query, updateUrl });
+    }
+
+    private async runSearch(options: {
+        conditions?: Condition[];
+        updateUrl?: boolean;
+    } = {}) {
+        const query = this.normalizeConditions(
+            options.conditions ?? this.getActiveConditions()
+        );
         if (!query.length) {
             return;
         }
 
-        // persist conditions for pagination (normalize before storing)
-        this.advancedConditions = this.normalizeConditions(query);
+        this.advancedConditions = query;
 
-        // reflect in URL
-        if (updateUrl) {
+        if (options.updateUrl !== false) {
             this.updateURL(query);
         }
 
         this.loading = true;
-
-        // Clear selection when performing new search
         this.selectedIds = [];
-
-        // Repos are global and persistent - search results are added via upsert
-        // resultIds will track which items are current search results
 
         try {
             const res = await this.executeSearch(query);
@@ -358,8 +350,8 @@ export class BrowserContext {
         goto(`?${params.toString()}`);
     }
 
-    private async executeSearch(query: Condition[]) {
-        const baseBody = {
+    private buildSearchBody(query: Condition[]) {
+        return {
             conditions: query,
             limit: this.limit,
             page: this.page,
@@ -367,41 +359,27 @@ export class BrowserContext {
             order: this.sortDirection ?? 'ASC',
             include_count: true
         };
+    }
 
-        if (this.queryMode === 'instances') {
-            const res = await api.POST('/instances/search', { body: baseBody as SearchQuery });
-            if (res.error) {
-                throw new Error(`Failed to search instances: ${res.response.status}`);
-            }
-            return res.data;
-        } else {
-            const res = await api.POST('/studies/search', {
-                body: {
-                    ...baseBody,
-                    conditions: query as unknown as StudySearchCondition[]
-                } as StudySearchQuery
-            });
-            if (res.error) {
-                throw new Error(`Failed to search studies: ${res.response.status}`);
-            }
-            return res.data;
-        }
+    private executeSearch(query: Condition[]) {
+        const body = this.buildSearchBody(query);
+        return this.queryMode === 'instances'
+            ? searchInstances(body as SearchQuery)
+            : searchStudies({
+                  ...body,
+                  conditions: query as unknown as StudySearchCondition[],
+              } as StudySearchQuery);
     }
 
     private processSearchResults(res: any) {
-        // Add/update search results in GLOBAL repos
-        ingestStudies(res.studies ?? []);
-
-        ingestInstances(res.instances ?? []);
-
-        // Track which items are current search results
+        // searchInstances/searchStudies already ingest; track current result set
         this.resultIds = new Set(res.result_ids ?? []);
         this.count = res.count ?? 0;
 
         // Set ordered IDs based on query mode
         let studyIds;
         if (this.queryMode === 'instances') {
-            this.orderedInstanceIds = (res.result_ids ?? []).map((id) => String(id));
+            this.orderedInstanceIds = (res.result_ids ?? []).map((id: number) => String(id));
             studyIds = (res.studies ?? []).map((s: any) => s.id);
         } else {
             studyIds = res.result_ids ?? [];

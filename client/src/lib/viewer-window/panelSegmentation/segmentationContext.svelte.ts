@@ -110,6 +110,30 @@ export class SegmentationContext {
         this.shownSegmentations.add(key);
     }
 
+    /**
+     * After creating a segmentation: activate it for drawing, show only it in the
+     * viewer, expand the current user's panel, and collapse/hide other graders + AI.
+     */
+    activateForDrawing(segmentation: Segmentation, creatorId: number) {
+        const item = this.getSegmentationItem(segmentation);
+        this.segmentationItem = item;
+        this.showOnlySegmentation(segmentation);
+
+        this.creatorVisible.clear();
+        this.creatorVisible.add(creatorId);
+
+        this.modelVisible = false;
+
+        const rep = segmentation.data_representation;
+        if (rep === "MultiClass" || rep === "MultiLabel") {
+            this.activeIndices = 1;
+        } else {
+            this.activeIndices = [];
+        }
+        this.questionableActive = false;
+        this.erodeDilateActive = false;
+    }
+
     toggleActive(segmentationItem: SegmentationItem) {
         if (this.segmentationItem == segmentationItem) {
             this.segmentationItem = undefined;

@@ -8,7 +8,7 @@ import type {
 	TagGET,
 	TaskGET
 } from '../../types/openapi_types';
-import { ApiError, api } from '../api/client';
+import { ApiError, api, isUnauthorizedStatus, withAuthRetry } from '../api/client';
 import {
 	formAnnotations,
 	ingestFeatures,
@@ -34,9 +34,9 @@ import {
  * @returns The data from the response
  */
 function handleResponse<T>(res: { data?: T; error?: any; response: Response }, operation: string): T {
-	if (res.error) {
-		// If authentication error, redirect is already handled by fetchWithAuthRetry
-		// But we should still throw to prevent processing invalid data
+	if (res.error || isUnauthorizedStatus(res.response.status)) {
+		// Auth errors may surface as status only (fetch retried once at HTTP layer).
+		// withAuthRetry on callers can refresh and run the operation again.
 		throw new ApiError(res.response.status, `Failed to ${operation}: ${res.response.status}`);
 	}
 	return res.data as T;
@@ -53,36 +53,73 @@ function getOperationName(path: string, method: string): string {
 	return `${verb} ${cleanPath}`;
 }
 
+export type ApiCallResult<T = unknown> = {
+	data?: T;
+	error?: unknown;
+	response: Response;
+};
+
 /**
- * Wrapped API GET method that automatically handles errors
+ * openapi-fetch call with HTTP-level and app-level auth retry.
  */
+export async function apiInvoke<T = unknown>(
+	call: () => Promise<ApiCallResult<T>>,
+	operation = 'request',
+): Promise<ApiCallResult<T>> {
+	return withAuthRetry(async () => {
+		const res = await call();
+		if (res.error || isUnauthorizedStatus(res.response.status)) {
+			throw new ApiError(
+				res.response.status,
+				`Failed to ${operation}: ${res.response.status}`,
+			);
+		}
+		return res;
+	});
+}
+
+/** Like apiInvoke but does not treat openapi `error` as failure (e.g. 204 No Content). */
+export async function apiInvokeAllowEmpty<T = unknown>(
+	call: () => Promise<ApiCallResult<T>>,
+): Promise<ApiCallResult<T>> {
+	return withAuthRetry(async () => {
+		const res = await call();
+		if (isUnauthorizedStatus(res.response.status)) {
+			throw new ApiError(
+				res.response.status,
+				`Request failed: ${res.response.status}`,
+			);
+		}
+		return res;
+	});
+}
+
 async function apiGet<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.GET(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'GET'));
+	return withAuthRetry(async () => {
+		const res = await api.GET(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'GET'));
+	});
 }
 
-/**
- * Wrapped API POST method that automatically handles errors
- */
 async function apiPost<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.POST(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'POST'));
+	return withAuthRetry(async () => {
+		const res = await api.POST(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'POST'));
+	});
 }
 
-/**
- * Wrapped API PATCH method that automatically handles errors
- */
 async function apiPatch<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.PATCH(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'PATCH'));
+	return withAuthRetry(async () => {
+		const res = await api.PATCH(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'PATCH'));
+	});
 }
 
-/**
- * Wrapped API DELETE method that automatically handles errors
- */
 async function apiDelete(path: string, options?: any): Promise<void> {
-	const res = await api.DELETE(path as any, options);
-	handleResponse(res, getOperationName(path, 'DELETE'));
+	return withAuthRetry(async () => {
+		const res = await api.DELETE(path as any, options);
+		handleResponse(res, getOperationName(path, 'DELETE'));
+	});
 }
 
 // ===== Fetch Functions =====
@@ -219,17 +256,17 @@ export async function getStudiesSignature(): Promise<any[]> {
 export async function createSegmentation(item: any, np_array?: any): Promise<any> {
 	const formData = new FormData();
 	formData.append('metadata', JSON.stringify(item));
-	
+
 	if (np_array) {
 		formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
 	}
-	
+
 	const data = await apiPost<any>('/segmentations' as any, {
-		body: formData
+		body: formData,
 	} as any);
-	
+
 	ingestSegmentations([data]);
-	
+
 	return data;
 }
 
