@@ -2,7 +2,10 @@
 	import { browser } from "$app/environment";
 	import {
 		formSchemas,
+		instances,
+		patients,
 		setFormAnnotationValue,
+		studies,
 		tagFormAnnotation,
 		untagFormAnnotation,
 	} from "$lib/data";
@@ -26,6 +29,23 @@
 
 	const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
 	const schema = $derived(resolveRefs(formSchema.schema as JSONSchema));
+
+	const instance = $derived(
+		form.image_id ? instances.get(form.image_id) : undefined,
+	);
+	const patient = $derived(
+		instance?.patient ?? patients.get(form.patient_id),
+	);
+	const study = $derived(
+		instance?.study ??
+			(form.study_id != null ? studies.get(form.study_id) : undefined),
+	);
+
+	function lateralityLabel(laterality: FormAnnotationGET["laterality"]) {
+		if (laterality === "L") return "OS";
+		if (laterality === "R") return "OD";
+		return "N/A";
+	}
 
 	// Keep value as independent $state (not derived from form.form_data) to:
 	// 1. Prevent reactivity loops when updating the store
@@ -106,23 +126,41 @@
 		<table>
 			<tbody>
 				<tr>
-					<td>Patient identifier </td>
-					<td>{form.patient_id}</td>
+					<td>Patient identifier</td>
+					<td>{patient?.identifier ?? "—"}</td>
 				</tr>
-				<tr>
-					<td>Instance identifier</td>
-					<td>{form.image_id || "N/A"}</td>
-				</tr>
-				<tr>
-					<td>Laterality</td>
-					<td
-						>{form.laterality === "L"
-							? "OS"
-							: form.laterality === "R"
-								? "OD"
-								: "N/A"}</td
-					>
-				</tr>
+				{#if study?.date}
+					<tr>
+						<td>Study date</td>
+						<td
+							>{new Date(study.date).toLocaleDateString()}</td
+						>
+					</tr>
+				{/if}
+				{#if form.image_id}
+					<tr>
+						<td>Image ID</td>
+						<td>{form.image_id}</td>
+					</tr>
+				{/if}
+				{#if form.laterality != null}
+					<tr>
+						<td>Laterality</td>
+						<td>{lateralityLabel(form.laterality)}</td>
+					</tr>
+				{/if}
+				{#if instance?.modality}
+					<tr>
+						<td>Modality</td>
+						<td>{instance.modality}</td>
+					</tr>
+				{/if}
+				{#if instance?.device?.manufacturer}
+					<tr>
+						<td>Manufacturer</td>
+						<td>{instance.device.manufacturer}</td>
+					</tr>
+				{/if}
 			</tbody>
 		</table>
 	</div>
