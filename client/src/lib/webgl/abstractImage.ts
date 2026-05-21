@@ -94,15 +94,17 @@ export abstract class AbstractImage {
      * it is cleared before each use
      */
     _drawingContext: CanvasRenderingContext2D | null = null;
-    getDrawingCtx() {
+    getDrawingCtx(width: number = this.width, height: number = this.height) {
         if (!this._drawingContext) {
-            // create empty canvas used from drawing annotations
             const canvas = document.createElement('canvas');
-            canvas.width = this.width;
-            canvas.height = this.height;
             this._drawingContext = canvas.getContext('2d', { willReadFrequently: true })!;
         }
-        this._drawingContext.clearRect(0, 0, this.width, this.height);
+        const canvas = this._drawingContext.canvas;
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+        this._drawingContext.clearRect(0, 0, width, height);
         return this._drawingContext;
     }
 

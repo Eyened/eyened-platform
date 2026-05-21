@@ -83,3 +83,5 @@ export function getBaseUniforms(viewerContext: ViewerContext): any {
         u_window_level: [windowLevel.min, windowLevel.max]
     };
 }
+
+export { getSegmentationOverlayUniforms } from './segmentationProjection';

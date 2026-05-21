@@ -1,6 +1,6 @@
 import { toggleInSet, type Color } from "$lib/utils";
 import { getSegmentationKey, SegmentationContext, type Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-import { getBaseUniforms } from "$lib/webgl/imageRenderer";
+import { getBaseUniforms, getSegmentationOverlayUniforms } from "$lib/webgl/imageRenderer";
 import { BinaryMask } from "$lib/webgl/mask.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
@@ -60,6 +60,7 @@ export class MainViewerContext implements Overlay {
         segmentation: Segmentation,
         index: number,
         renderTarget: RenderTarget,
+        viewerContext: ViewerContext,
         uniforms: any
     ) {
         const segmentationItem = this.segmentationContext.getSegmentationItem(segmentation);
@@ -94,10 +95,17 @@ export class MainViewerContext implements Overlay {
             }
         }
 
+        const overlayUniforms = getSegmentationOverlayUniforms(viewerContext, segmentation);
+        const renderUniforms = {
+            ...uniforms,
+            ...overlayUniforms,
+            u_show_seg_bounds: segmentation.image_projection_matrix != null,
+        };
+
         if (this.applyConnectedComponents.has(segmentationItem)) {
-            (mask as BinaryMask).renderConnectedComponents(renderTarget, uniforms);
+            (mask as BinaryMask).renderConnectedComponents(renderTarget, renderUniforms);
         } else {
-            mask.render(renderTarget, uniforms);
+            mask.render(renderTarget, renderUniforms);
         }
     }
 
@@ -115,7 +123,6 @@ export class MainViewerContext implements Overlay {
             ...baseUniforms,
             u_threshold: 0.5,
             u_alpha: this.alpha,
-            u_smooth: true,
             u_outline: this.renderOutline,
             activeIndices: this.segmentationContext.activeIndices,
             u_is_drawing: this.segmentationContext.isDrawing,
@@ -123,12 +130,12 @@ export class MainViewerContext implements Overlay {
 
         // Render grader segmentations
         for (const segmentation of this.segmentationContext.visibleGraderSegmentations) {
-            this.renderSegmentation(segmentation, index, renderTarget, uniforms);
+            this.renderSegmentation(segmentation, index, renderTarget, viewerContext, uniforms);
         }
 
         // Render model segmentations
         for (const segmentation of this.segmentationContext.visibleModelSegmentations) {
-            this.renderSegmentation(segmentation, index, renderTarget, uniforms);
+            this.renderSegmentation(segmentation, index, renderTarget, viewerContext, uniforms);
         }
     }
 }

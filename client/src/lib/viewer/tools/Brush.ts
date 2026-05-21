@@ -38,9 +38,9 @@ export class BrushTool extends SegmentationTool {
 
 
 	pointerdown(e: ViewerEvent<PointerEvent>) {
-		const { event, position, viewerContext, modifiers } = e;
+		const { event, viewerContext, modifiers } = e;
 
-		this.lastPosition = position;
+		this.lastPosition = this.eventToSegmentation(e);
 
 		if (modifiers.alt || modifiers.shift) return;
 
@@ -58,28 +58,24 @@ export class BrushTool extends SegmentationTool {
 
 
 	pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
-		const { position, viewerContext, modifiers } = pointerEvent;
+		const { viewerContext, modifiers } = pointerEvent;
 
 		if (modifiers.alt) {
 			return;
 		} else {
-			this.lastPosition = position;
+			this.lastPosition = this.eventToSegmentation(pointerEvent);
 		}
 
 		if (this.drawingState && this.currentPoints) {
 
-			// deduce brush radius in viewer coordinates
-			const p0 = this.viewerContext.imageToViewerCoordinates({ x: 0, y: 0 });
-			const p1 = this.viewerContext.imageToViewerCoordinates({ x: this.brushRadius, y: this.brushRadius * viewerContext.aspectRatio });
-			const rx = p1.x - p0.x;
-			const ry = p1.y - p0.y;
-
 			const prev = this.currentPoints[this.currentPoints.length - 1];
+			const position = this.eventToSegmentation(pointerEvent);
 
 			const dx = position.x - prev.x;
 			const dy = position.y - prev.y;
 			const length = Math.sqrt(dx * dx + dy * dy);
-			const steps = Math.ceil(8 * length / this.brushRadius);
+			const { rx: segRx } = this.imageBrushRadiiToSegmentation(prev);
+			const steps = Math.ceil(8 * length / Math.max(segRx, 1));
 			for (let i = 1; i <= steps; i++) {
 				const r = i / steps;
 				const pt = {
@@ -88,9 +84,14 @@ export class BrushTool extends SegmentationTool {
 				};
 				this.currentPoints.push(pt);
 
-				const p = viewerContext.imageToViewerCoordinates(pt);
+				const { rx, ry } = this.imageBrushRadiiToSegmentation(pt);
+				const p0 = this.segmentationToViewer(pt);
+				const p1 = this.segmentationToViewer({ x: pt.x + rx, y: pt.y });
+				const p2 = this.segmentationToViewer({ x: pt.x, y: pt.y + ry });
+				const vrx = p1.x - p0.x;
+				const vry = p2.y - p0.y;
 				const path = new Path2D();
-				path.ellipse(p.x, p.y, rx, ry, 0, 0, 2 * Math.PI);
+				path.ellipse(p0.x, p0.y, Math.abs(vrx), Math.abs(vry), 0, 0, 2 * Math.PI);
 				this.offscreenCtx.fill(path);
 			}
 		}
@@ -100,11 +101,10 @@ export class BrushTool extends SegmentationTool {
 	executeDraw(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
 
 		ctx.fillStyle = 'white';
-		const radiusX = this.brushRadius;
-		const radiusY = this.brushRadius * viewerContext.aspectRatio;
 		for (const pt of this.currentPoints!) {
+			const { rx, ry } = this.imageBrushRadiiToSegmentation(pt);
 			const path = new Path2D();
-			path.ellipse(pt.x, pt.y, radiusX, radiusY, 0, 0, 2 * Math.PI);
+			path.ellipse(pt.x, pt.y, rx, ry, 0, 0, 2 * Math.PI);
 			ctx.fill(path);
 		}
 

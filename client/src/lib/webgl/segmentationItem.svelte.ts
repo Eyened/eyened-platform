@@ -79,14 +79,20 @@ export class SegmentationItem {
                 if (this.segmentation.sparse_axis == null || this.segmentation.sparse_axis == undefined) {
                     length = this.image.depth;
                     planeSize = this.image.height * this.image.width;
-                    if (depth != this.image.depth || height != this.image.height || width != this.image.width) {
+                    if (
+                        !this.segmentation.image_projection_matrix &&
+                        (depth != this.image.depth || height != this.image.height || width != this.image.width)
+                    ) {
                         throw new Error('Invalid shape: ' + shape.join(', '));
                     }
                 } else if (this.segmentation.sparse_axis == 0) {
                     // sparse along depth, slices of width x height
                     length = depth;
                     planeSize = height * width;
-                    if (height != this.image.height || width != this.image.width) {
+                    if (
+                        !this.segmentation.image_projection_matrix &&
+                        (height != this.image.height || width != this.image.width)
+                    ) {
                         throw new Error('Invalid shape: ' + shape.join(', '));
                     }
                 } else if (this.segmentation.sparse_axis == 1) {

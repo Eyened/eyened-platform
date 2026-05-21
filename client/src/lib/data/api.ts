@@ -8,7 +8,7 @@ import type {
 	TagGET,
 	TaskGET
 } from '../../types/openapi_types';
-import { api } from '../api/client';
+import { ApiError, api } from '../api/client';
 import {
 	formAnnotations,
 	ingestFeatures,
@@ -37,7 +37,7 @@ function handleResponse<T>(res: { data?: T; error?: any; response: Response }, o
 	if (res.error) {
 		// If authentication error, redirect is already handled by fetchWithAuthRetry
 		// But we should still throw to prevent processing invalid data
-		throw new Error(`Failed to ${operation}: ${res.response.status}`);
+		throw new ApiError(res.response.status, `Failed to ${operation}: ${res.response.status}`);
 	}
 	return res.data as T;
 }
@@ -233,6 +233,17 @@ export async function createSegmentation(item: any, np_array?: any): Promise<any
 	return data;
 }
 
+export type CreateSegmentationShape = {
+	depth: number;
+	height: number;
+	width: number;
+};
+
+export type CreateSegmentationOptions = {
+	shape?: CreateSegmentationShape;
+	image_projection_matrix?: number[][] | null;
+};
+
 export async function createSegmentationFrom(
 	image: any,  // AbstractImage type
 	feature_id: number,
@@ -240,28 +251,31 @@ export async function createSegmentationFrom(
 	data_type: any,
 	threshold?: number,
 	sparse_axis?: number,
-	subtask_id?: number
+	subtask_id?: number,
+	options?: CreateSegmentationOptions,
 ): Promise<any> {
 	const instance = image.instance;
 	const scan_indices = image.is3D ? [] : null;
-	let shape = {
+	let shape: CreateSegmentationShape = options?.shape ?? {
 		depth: image.depth,
 		height: image.height,
 		width: image.width,
 	};
-	
-	if (sparse_axis === 1) {
+
+	if (!options?.shape && sparse_axis === 1) {
 		// projection
-		shape.depth = image.height;
-		shape.height = 1;
-		shape.width = image.width;
+		shape = {
+			depth: image.height,
+			height: 1,
+			width: image.width,
+		};
 	}
 
 	const item = {
 		image_id: instance.id,
 		...shape,
 		sparse_axis,
-		image_projection_matrix: null,
+		image_projection_matrix: options?.image_projection_matrix ?? null,
 		scan_indices,
 		data_representation,
 		data_type,

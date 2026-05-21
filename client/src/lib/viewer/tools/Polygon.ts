@@ -18,8 +18,8 @@ export class PolygonTool extends SegmentationTool {
 	}
 
 	pointerdown(e: ViewerEvent<PointerEvent>) {
-		const { event, position } = e;
-		this.lastPosition = position;
+		const { event } = e;
+		this.lastPosition = this.eventToSegmentation(e);
 
 		if (event.altKey || event.shiftKey) return;
 
@@ -36,14 +36,14 @@ export class PolygonTool extends SegmentationTool {
 
 
 	pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
-		const { event, position } = pointerEvent;
+		const { event } = pointerEvent;
 		if (event.altKey || event.shiftKey) {
 			return;
 		}
-		this.lastPosition = position;
+		this.lastPosition = this.eventToSegmentation(pointerEvent);
 
 		if (this.drawingState && this.currentPoints) {
-			this.currentPoints.push(position);
+			this.currentPoints.push(this.eventToSegmentation(pointerEvent));
 		}
 	}
 
@@ -74,27 +74,24 @@ export class PolygonTool extends SegmentationTool {
 		} else {
 			ctx.strokeStyle = this.eraseColor;
 		}
-		// ctx.strokeStyle = getDrawingColor(this.drawingState, flipDrawErase, paintColor, eraseColor);
 		ctx.fillStyle = this.fillColor;
 		ctx.setLineDash([]);
 
-		// stroke around the current area
 		ctx.beginPath();
-		let p = viewerContext.imageToViewerCoordinates(this.currentPoints[0]);
+		let p = this.segmentationToViewer(this.currentPoints[0]);
 		ctx.moveTo(p.x, p.y);
 		for (let i = 1; i < this.currentPoints.length; i++) {
-			p = viewerContext.imageToViewerCoordinates(this.currentPoints[i]);
+			p = this.segmentationToViewer(this.currentPoints[i]);
 			ctx.lineTo(p.x, p.y);
 		}
 		ctx.fill();
 		ctx.stroke();
 
-		// close loop with dashed line
 		ctx.setLineDash([5, 5]);
 		ctx.beginPath();
-		p = viewerContext.imageToViewerCoordinates(this.currentPoints[0]);
+		p = this.segmentationToViewer(this.currentPoints[0]);
 		ctx.moveTo(p.x, p.y);
-		p = viewerContext.imageToViewerCoordinates(this.currentPoints[this.currentPoints.length - 1]);
+		p = this.segmentationToViewer(this.currentPoints[this.currentPoints.length - 1]);
 		ctx.lineTo(p.x, p.y);
 		ctx.stroke();
 		ctx.setLineDash([]);

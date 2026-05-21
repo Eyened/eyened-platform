@@ -7,6 +7,7 @@ import fs_render_multi_class from '$lib/viewer/overlays/fs_render_multi_class.fr
 import fs_render_multi_label from '$lib/viewer/overlays/fs_render_multi_label.frag';
 import fs_render_layers_enface from '$lib/viewer/overlays/fs_render_layers_enface.frag';
 import fs_render_binary from '$lib/viewer/overlays/fs_render_binary.frag';
+import segBoundsOutline from '$lib/viewer/overlays/seg_bounds_outline.inc.glsl?raw';
 
 import fs_draw_enhance from "$lib/webgl/glsl/fs_draw_enhance.frag";
 import fs_draw_probability_hard from "$lib/webgl/glsl/fs_draw_probability_hard.frag";
@@ -23,6 +24,12 @@ import fs_minmax_reduction from './glsl/fs_minmax_reduction.frag';
 import fs_normalize from './glsl/fs_normalize.frag';
 import fs_extract_slice from './glsl/fs_extract_slice.frag';
 import type { WebGL } from "./webgl";
+
+/** Inject shared segmentation quad outline helpers before main(). */
+function withSegBoundsOutline(fragmentSource: string): string {
+    console.log(fragmentSource.replace(/^void main\(/m, `${segBoundsOutline}\nvoid main(`));
+    return fragmentSource.replace(/^void main\(/m, `${segBoundsOutline}\nvoid main(`);
+}
 
 /**
  * Centralised place for all shaders used in the viewer
@@ -56,11 +63,11 @@ export class Shaders {
 
     constructor(webgl: WebGL) {
         this.renderFeatures = new TextureShaderProgram(webgl, fs_render_features);
-        this.renderBinary = new TextureShaderProgram(webgl, fs_render_binary);
-        this.renderProbability = new TextureShaderProgram(webgl, fs_render_probability);
+        this.renderBinary = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_binary));
+        this.renderProbability = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_probability));
         this.renderConnectedComponents = new TextureShaderProgram(webgl, fs_render_connected_components);
-        this.renderMultiClass = new TextureShaderProgram(webgl, fs_render_multi_class);
-        this.renderMultiLabel = new TextureShaderProgram(webgl, fs_render_multi_label);
+        this.renderMultiClass = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_multi_class));
+        this.renderMultiLabel = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_multi_label));
         this.renderLayersEnface = new TextureShaderProgram3D(webgl, fs_render_layers_enface);
 
         this.drawEnhance = new PixelShaderProgram(webgl, fs_draw_enhance);

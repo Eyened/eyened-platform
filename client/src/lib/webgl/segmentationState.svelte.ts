@@ -9,6 +9,7 @@ import { Base64Serializer } from "./imageEncoder";
 import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
 import type { SegmentationItem } from "./segmentationItem.svelte";
+import { segmentationPlaneSize } from "./segmentationProjection";
 
 function isNavigationTimeFetchFailure(error: unknown): boolean {
     return error instanceof TypeError && error.message === 'Failed to fetch';
@@ -113,7 +114,8 @@ export class SegmentationState {
         readonly segmentationItem?: SegmentationItem,
     ) {
         this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
-        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
+        const plane = segmentationPlaneSize(segmentation, image);
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, plane.width, plane.height));
         if (initialData) {
             this.mask.importData(initialData);
         } else {
@@ -250,7 +252,15 @@ export class SegmentationState {
     private async performSave(options?: { keepalive?: boolean }) {
         try {
             const data = this.mask.exportData();
-            const buffer = encodeNpy(data, [this.image.height, this.image.width]);
+            const { planeHeight, planeWidth } = this.mask;
+            const expectedLen = planeHeight * planeWidth;
+            if (data.length !== expectedLen && data.length !== expectedLen * 4) {
+                console.error(
+                    "Segmentation save: data length mismatch",
+                    { got: data.length, expected: expectedLen, planeWidth, planeHeight },
+                );
+            }
+            const buffer = encodeNpy(data, [planeHeight, planeWidth]);
             const sparse_axis = this.segmentation.sparse_axis ?? undefined;
             let scan_nr: number | undefined = this.scanNr;
             if (this.image.image_id.endsWith('proj')) {

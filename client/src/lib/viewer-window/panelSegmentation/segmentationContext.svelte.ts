@@ -4,6 +4,7 @@ import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type { ImageBox } from "./segmentationRegion";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
 export type Segmentation = SegmentationGET | ModelSegmentationGET;
@@ -49,6 +50,10 @@ export class SegmentationContext {
     public activeIndices: number | number[] = $state([]); 
     /** True while a segmentation stroke is in progress (pointer/keyboard). Used by multi-label overlay. */
     public isDrawing = $state(false);
+
+    /** Drag-to-define region tool for new segmentations. */
+    public regionToolActive = $state(false);
+    public pendingRegionBox: ImageBox | undefined = $state(undefined);
 
     /** Per-segmentation bitmask: bit (i-1) = 1 means subfeature i is shown in multi-class / multi-label shaders. */
     private visibleFeatureMaskBySegmentationKey = new SvelteMap<string, number>();

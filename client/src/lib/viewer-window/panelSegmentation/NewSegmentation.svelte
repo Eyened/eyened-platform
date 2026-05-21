@@ -10,6 +10,8 @@
     import type { FeatureGET } from "../../../types/openapi_types";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import NewMultiFeature from "./NewMultiFeature.svelte";
+    import NewSegmentationManual from "./NewSegmentationManual.svelte";
+    import NewSegmentationRegion from "./NewSegmentationRegion.svelte";
     import type { Segmentation } from "./segmentationContext.svelte";
     import { createSegmentationFrom, features } from "$lib/data";
     import { toast } from "svelte-sonner";
@@ -110,24 +112,28 @@
         </div>
     {/if} -->
 
-    <div>
-        <span>Type:</span>
-        {#each types as type}
-            <label>
-                <input
-                    type="radio"
-                    name="type"
-                    value={type}
-                    bind:group={selectedType}
-                />
-                {type}
-            </label>
-        {/each}
+    <div class="create-row">
+        <div class="type-row">
+            <span>Type:</span>
+            {#each types as type}
+                <label>
+                    <input
+                        type="radio"
+                        name="type"
+                        value={type}
+                        bind:group={selectedType}
+                    />
+                    {type}
+                </label>
+            {/each}
+        </div>
+        <NewSegmentationRegion />
     </div>
     <FeatureSelect
         values={features.map(f => f)}
         onselect={(feature) => create(feature)}
     />
+    <NewSegmentationManual />
     <hr />
     <NewMultiFeature/>
 </div>
@@ -138,6 +144,17 @@
     }
     div.new {
         flex-direction: column;
+    }
+    div.create-row {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+    div.type-row {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        align-items: center;
     }
     hr {
         margin: 0.5em 0;

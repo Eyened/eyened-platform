@@ -22,6 +22,7 @@
 	import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 	import type { SegmentationTool } from "$lib/viewer/tools/segmentation";
 	import type { PaintSettings } from "$lib/webgl/mask.svelte";
+	import { segmentationPlaneSize } from "$lib/webgl/segmentationProjection";
 
 	const viewerContext = getContext<ViewerContext>("viewerContext");
 	const globalContext = getContext<GlobalContext>("globalContext");
@@ -63,7 +64,14 @@
 	});
 
 	const drawingExecutor = {
-		getCtx: () => image.getDrawingCtx(),
+		getCtx: () => {
+			const item = segmentationContext.segmentationItem;
+			if (!item) {
+				return image.getDrawingCtx();
+			}
+			const plane = segmentationPlaneSize(item.segmentation, image);
+			return image.getDrawingCtx(plane.width, plane.height);
+		},
 		draw: async (ctx: CanvasRenderingContext2D, mode: "paint" | "erase") => {
 			const segmentationItem = segmentationContext.segmentationItem;
 
