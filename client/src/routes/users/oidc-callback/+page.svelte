@@ -1,15 +1,25 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import {getContext, onMount} from 'svelte';
     import { page } from '$app/state';
-    // TODO: move authClient to lib?
-    import { authClient } from '../../../auth';
+    import type {GlobalContext} from "$lib/data/globalContext.svelte";
+
+    const globalContext = getContext<GlobalContext>("globalContext");
+
+    let error = '';
 
     async function handleCallback() {
-        let code = $derived(page.url.searchParams.get('code'));
-        let state = $derived(page.url.searchParams.get('state'));
-        $inspect(code, state);
+        let code = page.url.searchParams.get('code');
+        let state = page.url.searchParams.get('state');
 
-        let resp = await authClient.OIDCAuthenticate(code, state);
+        if (code === null || state === null) {
+            error = "One or more required parameters (code, state) are missing";
+            return;
+        }
+        try {
+            await globalContext.userManager.OIDCLogin(code, state);
+        } catch (err) {
+            error = err instanceof Error ? err.message : "Unknown error occurred";
+        }
     }
 
     onMount(() => {
@@ -17,4 +27,8 @@
     });
 </script>
 
-<h1>OIDC callback page (no content)</h1>
+{#if error }
+    <h1>OIDC callback</h1>
+    <p class="text-sm text-red-600">Error: {error}</p>
+    <p><a href="/">Return to front page</a></p>
+{/if}

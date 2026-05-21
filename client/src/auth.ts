@@ -150,7 +150,7 @@ class AuthClient {
     async OIDCAuthorize(): Promise<OIDCAuthorizationResponse> {
         const response = await fetchApi(`${this.baseUrl}/oidc/authorize`, {
             skipAuthRetry: true,
-        })
+        });
 
         if (!response.ok) {
             throw new Error('OIDC authorize failed');
@@ -158,8 +158,8 @@ class AuthClient {
 
         return response.json();
     }
-    
-    async OIDCAuthenticate(code: string, state: string): Promise<Response> {
+
+    async OIDCAuthenticate(code: string, state: string): Promise<UserResponse> {
         const response = await fetchApi(`${this.baseUrl}/oidc/authenticate`, {
             method: 'POST',
             skipAuthRetry: true,

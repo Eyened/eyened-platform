@@ -53,6 +53,20 @@ export class UserManager {
         }
     }
 
+    async OIDCLogin(code: string, state: string) {
+        this.user = await authClient.OIDCAuthenticate(code, state);
+        this.starredTagIds = this.user.starred_tags ?? [];
+
+        // TODO: Get the 'next' url from state
+        const nextUrl = '';
+
+        if (nextUrl) {
+            await goto(decodeURIComponent(nextUrl));
+        } else {
+            await goto('/');
+        }
+    }
+
     async logout() {
         await authClient.logout();
         this.user = {
