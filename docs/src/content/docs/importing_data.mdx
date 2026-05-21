@@ -1,446 +1,54 @@
 ---
 title: Importing data
-description: Import data into the eyened platform
+description: Import ophthalmic images into the eyened platform
 ---
 
-The Eyened platform provides multiple ways to import ophthalmic images into the database. Choose the method that best fits your needs and technical expertise.
+Images are stored under a **storage backend** and registered in the database as `Project → Patient → Study → Series → ImageInstance → ImageStorage`. Each import supplies one flat record per image (`ImportRow`).
 
-## Importing via API (basic)
+| Method | Best for |
+|--------|----------|
+| [REST API](#rest-api) | Integrations, one-off uploads, scripts using HTTP |
+| [ORM importer](/eyened-platform/orm/importer) | Bulk imports, CSV, plan → review → apply, metadata patches |
 
-This method is the simplest way to import individual images using the REST API. It's ideal for smaller imports or when building integrations with other systems.
+Field names and types for patient, study, series, and image metadata are listed in [Import metadata fields](/eyened-platform/import_metadata_fields).
 
-The Eyened database follows a hierarchical structure where images are categorized into projects, patients, studies, and series (top to bottom). When importing an image, you specify identifiers for each level in a flat `data` object. The API will either use existing database objects or create new ones based on the `options` you provide.
+## REST API
 
-:::note
-For a complete example of using the import API with real images, check out our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb).
-:::
-
-:::note
-For detailed information about metadata fields (patient, study, series, image), see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
-:::
-
-### Single image import
-
-The API provides an endpoint for importing individual images and their associated metadata:
-
-```
-POST /api/import/image
-```
-
-This endpoint accepts a JSON payload with a flat `data` object:
+`POST /api/import/image` accepts a JSON body with `data` (one `ImportRow`) and `options`:
 
 ```json
 {
   "data": {
-    "project_name": "Project Name",
+    "project_name": "my-project",
     "patient_identifier": "Patient_1",
-    "sex": "M",
-    "birth_date": "1990-01-15",
     "study_date": "2023-05-15",
-    "study_description": "Baseline visit",
-    "series_id": "series123",
-    "series_number": 1,
-    "series_instance_uid": "1.2.3.4.5",
-    "image": "path/to/image.jpg",
+    "storage_backend_key": "local",
+    "object_key": "path/to/image.jpg",
     "modality": "ColorFundus",
-    "laterality": "R",
-    "attributes": {}
+    "laterality": "R"
   },
   "options": {
-    "create_patients": false,
-    "create_studies": false,
-    "create_series": true,
-    "create_project": false,
     "include_stack_trace": false
   }
 }
 ```
 
-**Required fields in `data`:**
+**File location:** set `storage_backend_key` and `object_key` (path within that backend). The server resolves files via configured storage mounts (`EYENED_STORAGE_MOUNTS`), not a single global `IMAGES_BASEPATH` field on the payload.
 
-- `project_name` (str) — Name of the project
-- `image` (str) — Path to the image file, relative to `IMAGES_BASEPATH`
-- `modality` (str) — Image modality (for example `"ColorFundus"`, `"OCT"`)
+**Hierarchy:** provide lookup fields (`project_name`, `patient_identifier`, `study_date`, `series_instance_uid`, …) or primary keys (`project_id`, `patient_id`, …). Missing parents are created when the row supplies enough keys to identify them; existing rows are matched and reused.
 
-**Optional hierarchy fields:** `patient_identifier`, `sex`, `birth_date`, `study_date`, `study_description`, `series_id`, `series_number`, `series_instance_uid`. Additional image metadata fields (for example `laterality`, `width`, `height`, `resolution_horizontal`) are documented in [Metadata Fields](/eyened-platform/import_metadata_fields).
+**Typical required fields:** `project_name`, `storage_backend_key`, `object_key`, and `modality` (needed by the viewer). Device defaults (`manufacturer`, `manufacturer_model_name`, …) may be required unless your deployment fills them server-side — see the [ORM importer](/eyened-platform/orm/importer) `defaults` example.
 
-**`attributes`** — Key-value pairs stored as image attributes (flexible schema).
+**Options:** only `include_stack_trace` (default `false`) — when `true`, failed imports return a stack trace in the response.
 
-**Options:**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `create_patients` | false | Create patient if not found |
-| `create_studies` | false | Create study if not found |
-| `create_series` | true | Create series if not found |
-| `create_project` | false | Create project if not found |
-| `include_stack_trace` | false | Include stack trace in error responses |
+Authenticate first (session cookie), then call the endpoint. Example workflow: [import_api.ipynb](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb) (uses `ImageImporter` from `eyened_orm.importer.image_importer`).
 
 :::caution
-The image path must be relative to `IMAGES_BASEPATH` as configured in your [Eyened platform setup](/eyened-platform/getting_started). Ensure files are located within that folder.
+`ImageImporter` still sends legacy `create_*` flags in `options`, but the API ignores them. Creation is driven by the row content and the shared ORM planner.
 :::
 
-## Importing via ORM (advanced)
+## ORM importer
 
-For bulk imports, patching existing metadata, and repeatable “plan → review → apply” workflows, use the renewed ORM importer based on **flat rows** (`ImportRow`) and an **import run** (`ImportRun`).
+For batch work, use `plan_image_import` → review (`run.display_summary()`) → `run.apply()` → `session.commit()`. Optional JSON export supports audit and undo.
 
-The workflow is:
-
-- Build `ImportRow` objects (or load them from CSV)
-- `plan_image_import(session, rows, ...)` → returns an `ImportRun` (image rows; merges defaults / inference then plans)
-- Review with `run.display_summary()` / `run.full_summary()`
-- Apply with `run.apply()` and `session.commit()`
-- Optionally write/read JSON for audit + undo (`run.write_json(...)` / `ImportRun.read_json(...)`)
-
-See **[ORM Importer](/eyened-platform/orm/importer)** for the up-to-date guide and examples.
-
----
-title: Importing data
-description: Import data into the eyened platform
----
-
-The Eyened platform provides multiple ways to import ophthalmic images into the database. Choose the method that best fits your needs and technical expertise.
-
-## Importing via API (basic)
-
-This method is the simplest way to import individual images using the REST API. It's ideal for smaller imports or when building integrations with other systems.
-
-The Eyened database follows a hierarchical structure where images are categorized into projects, patients, studies, and series (top to bottom). When importing an image, you specify identifiers for each level in a flat `data` object. The API will either use existing database objects or create new ones based on the `options` you provide.
-
-:::note
-For a complete example of using the import API with real images, check out our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb).
-:::
-
-:::note
-For detailed information about metadata fields (patient, study, series, image), see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
-:::
-
-### Single image import
-
-The API provides an endpoint for importing individual images and their associated metadata:
-
-```
-POST /api/import/image
-```
-
-This endpoint accepts a JSON payload with a flat `data` object:
-
-```json
-{
-  "data": {
-    "project_name": "Project Name",
-    "patient_identifier": "Patient_1",
-    "sex": "M",
-    "birth_date": "1990-01-15",
-    "study_date": "2023-05-15",
-    "study_description": "Baseline visit",
-    "series_id": "series123",
-    "series_number": 1,
-    "series_instance_uid": "1.2.3.4.5",
-    "image": "path/to/image.jpg",
-    "modality": "ColorFundus",
-    "laterality": "R",
-    "attributes": {}
-  },
-  "options": {
-    "create_patients": false,
-    "create_studies": false,
-    "create_series": true,
-    "create_project": false,
-    "include_stack_trace": false
-  }
-}
-```
-
-**Required fields in `data`:**
-
-- `project_name` (str) — Name of the project
-- `image` (str) — Path to the image file, relative to `IMAGES_BASEPATH`
-- `modality` (str) — Image modality (for example `"ColorFundus"`, `"OCT"`)
-
-**Optional hierarchy fields:** `patient_identifier`, `sex`, `birth_date`, `study_date`, `study_description`, `series_id`, `series_number`, `series_instance_uid`. Additional image metadata fields (for example `laterality`, `width`, `height`, `resolution_horizontal`) are documented in [Metadata Fields](/eyened-platform/import_metadata_fields).
-
-**`attributes`** — Key-value pairs stored as image attributes (flexible schema).
-
-**Options:**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `create_patients` | false | Create patient if not found |
-| `create_studies` | false | Create study if not found |
-| `create_series` | true | Create series if not found |
-| `create_project` | false | Create project if not found |
-| `include_stack_trace` | false | Include stack trace in error responses |
-
-:::caution
-The image path must be relative to `IMAGES_BASEPATH` as configured in your [Eyened platform setup](/eyened-platform/getting_started). Ensure files are located within that folder.
-:::
-
-## Importing via ORM (advanced)
-
-For bulk imports, patching existing metadata, and repeatable “plan → review → apply” workflows, use the renewed ORM importer based on **flat rows** (`ImportRow`) and an **import run** (`ImportRun`).
-
-The workflow is:
-
-- Build `ImportRow` objects (or load them from CSV)
-- `plan_image_import(session, rows, ...)` → returns an `ImportRun` (image rows; merges defaults / inference then plans)
-- Review with `run.display_summary()` / `run.full_summary()`
-- Apply with `run.apply()` and `session.commit()`
-- Optionally write/read JSON for audit + undo (`run.write_json(...)` / `ImportRun.read_json(...)`)
-
-See **[ORM Importer](/eyened-platform/orm/importer)** for the up-to-date guide and examples.
-
----
-title: Importing data
-description: Import data into the eyened platform
----
-
-The eyened platform provides multiple ways to import ophthalmic images into the database. Choose the method that best fits your needs and technical expertise.
-
-## Importing via API (basic)
-
-This method is the simplest way to import individual images using the REST API. It's ideal for smaller imports or when building integrations with other systems.
-
-The Eyened database follows a hierarchical structure where images are categorized into projects, patients, studies, and series, from top to bottom. When importing an image, you specify identifiers for each level in a flat `data` object. The API will either use existing database objects or create new ones based on the `options` you provide.
-
-:::note
-For a complete example of using the import API with real images, check out our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb).
-:::
-
-:::note
-For detailed information about metadata fields (patient, study, series, image), see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
-:::
-
-### Single image import
-
-The API provides an endpoint for importing individual images and their associated metadata:
-
-```
-POST /api/import/image
-```
-
-This endpoint accepts a JSON payload with a flat `data` object (no nested `props`):
-
-```json
-{
-  "data": {
-    "project_name": "Project Name",
-    "patient_identifier": "Patient_1",
-    "sex": "M",
-    "birth_date": "1990-01-15",
-    "study_date": "2023-05-15",
-    "study_description": "Baseline visit",
-    "series_id": "series123",
-    "series_number": 1,
-    "series_instance_uid": "1.2.3.4.5",
-    "image": "path/to/image.jpg",
-    "modality": "ColorFundus",
-    "laterality": "R",
-    "attributes": {}
-  },
-  "options": {
-    "create_patients": false,
-    "create_studies": false,
-    "create_series": true,
-    "create_project": false,
-    "include_stack_trace": false
-  }
-}
-```
-
-**Required fields in `data`:**
-
-- `project_name` (str) — Name of the project
-- `image` (str) — Path to the image file, relative to `IMAGES_BASEPATH`
-- `modality` (str) — Image modality (for example `"ColorFundus"`, `"OCT"`)
-
-**Optional hierarchy fields:** `patient_identifier`, `sex`, `birth_date`, `study_date`, `study_description`, `series_id`, `series_number`, `series_instance_uid`. Additional image metadata fields (for example `laterality`, `width`, `height`, `resolution_horizontal`) are documented in [Metadata Fields](/eyened-platform/import_metadata_fields).
-
-**`attributes`** — Key-value pairs stored as image attributes (flexible schema).
-
-**Options:**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `create_patients` | false | Create patient if not found |
-| `create_studies` | false | Create study if not found |
-| `create_series` | true | Create series if not found |
-| `create_project` | false | Create project if not found |
-| `include_stack_trace` | false | Include stack trace in error responses |
-
-:::caution
-The image path must be relative to `IMAGES_BASEPATH` as configured in your [Eyened platform setup](/eyened-platform/getting_started). Ensure files are located within that folder.
-:::
-
-## Importing via ORM (advanced)
-
-For bulk imports, patching existing metadata, and repeatable “plan → review → apply” workflows, use the renewed ORM importer based on **flat rows** (`ImportRow`) and an **import run** (`ImportRun`).
-
-The workflow is:
-
-- Build `ImportRow` objects (or load them from CSV)
-- `plan_image_import(session, rows, ...)` → returns an `ImportRun` (image rows; merges defaults / inference then plans)
-- Review with `run.display_summary()` / `run.full_summary()`
-- Apply with `run.apply()` and `session.commit()`
-- Optionally write/read JSON for audit + undo (`run.write_json(...)` / `ImportRun.read_json(...)`)
-
-See **[ORM Importer](/eyened-platform/orm/importer)** for the up-to-date guide and examples.
-
----
-title: Importing data
-description: Import data into the eyened platform
----
-
-The eyened platform provides multiple ways to import ophthalmic images into the database. Choose the method that best fits your needs and technical expertise.
-
-## Importing via API (basic) 🔌
-
-This method is the simplest way to import individual images using the REST API. It's ideal for smaller imports or when building integrations with other systems.
-
-The Eyened database follows a hierarchical structure where images are categorized into projects, patients, studies, and series, from top to bottom. When importing an image, you specify identifiers for each level in a flat `data` object. The API will either use existing database objects or create new ones based on the `options` you provide.
-
-:::note
-For a complete example of using the import API with real images, check out our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb).
-:::
-
-:::note
-For detailed information about metadata fields (patient, study, series, image), see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
-:::
-
-### Single Image Import
-
-The API provides an endpoint for importing individual images and their associated metadata:
-
-```
-POST /api/import/image
-```
-
-This endpoint accepts a JSON payload with a flat `data` object (no nested `props`):
-
-```json
-{
-  "data": {
-    "project_name": "Project Name",
-    "patient_identifier": "Patient_1",
-    "sex": "M",
-    "birth_date": "1990-01-15",
-    "study_date": "2023-05-15",
-    "study_description": "Baseline visit",
-    "series_id": "series123",
-    "series_number": 1,
-    "series_instance_uid": "1.2.3.4.5",
-    "image": "path/to/image.jpg",
-    "modality": "ColorFundus",
-    "laterality": "R",
-    "attributes": {}
-  },
-  "options": {
-    "create_patients": false,
-    "create_studies": false,
-    "create_series": true,
-    "create_project": false,
-    "include_stack_trace": false
-  }
-}
-```
-
-**Required fields in `data`:**
-- `project_name` (str) — Name of the project
-- `image` (str) — Path to the image file, relative to `IMAGES_BASEPATH`
-- `modality` (str) — Image modality (e.g. `"ColorFundus"`, `"OCT"`)
-
-**Optional hierarchy fields:** `patient_identifier`, `sex`, `birth_date`, `study_date`, `study_description`, `series_id`, `series_number`, `series_instance_uid`. Additional image metadata fields (e.g. `laterality`, `width`, `height`, `resolution_horizontal`) are documented in [Metadata Fields](/eyened-platform/import_metadata_fields).
-
-**`attributes`** — Key-value pairs stored as image attributes (flexible schema).
-
-**Options:**
-| Option | Default | Description |
-|--------|---------|-------------|
-| `create_patients` | false | Create patient if not found |
-| `create_studies` | false | Create study if not found |
-| `create_series` | true | Create series if not found |
-| `create_project` | false | Create project if not found |
-| `include_stack_trace` | false | Include stack trace in error responses |
-
-:::caution
-The image path must be relative to `IMAGES_BASEPATH` as configured in your [Eyened platform setup](/eyened-platform/getting_started). Ensure files are located within that folder.
-:::
-
-
-{/* 
-## Importing via ORM (advanced) 📊
-
-The `Importer` class in the eyened platform provides a structured way to import ophthalmic images directly using the Python ORM. This approach is more powerful and flexible, allowing batch imports of multiple patients, studies, and images in a single operation.
-
-:::note
-For a hands-on introduction to using the ORM importer, make sure to check our [example notebook](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_python.ipynb).
-:::
-
-:::note
-For detailed information about entity fields that can be included in the `props` dictionaries, see the [Metadata Fields documentation](/eyened-platform/import_metadata_fields).
-:::
-
-### Data Structure
-
-The importer expects an input structured as nested lists of dictionaries with the following format:
-
-```python
-[
-    { # patient object
-        "project_name": "Project Name",        # Required: name of the project
-        "patient_identifier": str,             # Optional patient identifier in the system
-        "props": {},                           # Optional key-value properties for patient
-        "studies": [
-            { # study object
-                "study_date": datetime.date,   # Optional study date
-                "props": {},                   # Optional key-value properties for study
-                "series": [
-                    { # series object
-                        "series_id": str,      # Optional series identifier
-                        "props": {},           # Optional key-value properties for series
-                        "images": [
-                            { # image object
-                                # Image-specific properties
-                                "path": str,   # Path to image file
-                                "props": {},   # Additional properties / image metadatada
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
-]
-```
-
-This structure specifies a hierarchy of Project → Patient → Study → Series → ImageInstance that will be translated to database objects:
-
-- Project is the name of the dataset or research study. It may match an existing project in the database, in which case it will be expanded.
-- Patient represents a unique data subject within a project. `patient_identifier` should be unique within the project. It may match an existing patient identifier within the project, in which case the new images will be assigned to this patient.
-- Study represents a *visit* of the patient to the clinic during which the corresponding set of images was acquired. It is identified by a `study_date` that is unique for the patient. It may match an existing `study_date` for this patient, in which case the new images will be added.
-- Series represents a grouping of images within the study. May be used to group images from the same capture device. It is identified by a numeric ID `series_id` which may also match an existing database id. 
-- ImageInstance represents an image and associated metadata. No ID is used as the importer will always create new image objects.
-
-:::note
-The Modality metadata field is currently required by the viewer.
-:::
-
-By default, the importer will try to find objects in the database with existing identifiers (Patient -> `patient_identifier`; Study -> `study_date`; Series -> `series_id`) following the hierarchy. If the identifiers match existing database objects, the new images will be assigned to those objects. If a provided identifier does not match database objects, the importer will produce an error. However, the importer can be configured to create new objects using the `create_patients`, `create_studies` and `create_series` flags. When these flags are set, the importer will try to create the corresponding objects if they do not exist. If the identifiers are not provided, the importer will create new objects with generic IDs.
-
-### Importer Options
-
-When initializing the `Importer` class, you can provide the following options:
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `session` | SQLAlchemy session | Required | Database session to use for the import |
-| `project_name` | str | Required | Name of the project to import data into |
-| `create_patients` | bool | False | If True, create patients when they don't exist |
-| `create_studies` | bool | False | If True, create studies when they don't exist |
-| `create_series` | bool | True | If True, create series when they don't exist |
-| `run_ai_models` | bool | False | If True, run AI models on the images after import |
-| `generate_thumbnails` | bool | True | If True, generate thumbnails for the images after import |
-| `env` | str | "test" | Environment to use for configuration (e.g., "test", "production") |
-
-*/}
-
+Full guide: **[ORM Importer](/eyened-platform/orm/importer)**.
