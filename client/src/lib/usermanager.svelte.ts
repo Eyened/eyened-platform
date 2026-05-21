@@ -58,7 +58,9 @@ export class UserManager {
         this.starredTagIds = this.user.starred_tags ?? [];
 
         // TODO: Get the 'next' url from state
-        const nextUrl = '';
+        const state_decoded = JSON.parse(decodeURIComponent(state));
+        console.log("Decoded JSON", state_decoded);
+        const nextUrl = state_decoded.next.toString();
 
         if (nextUrl) {
             await goto(decodeURIComponent(nextUrl));

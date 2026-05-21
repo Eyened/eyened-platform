@@ -148,8 +148,14 @@ class AuthClient {
     }
 
     async OIDCAuthorize(): Promise<OIDCAuthorizationResponse> {
+        let nextUrl = new URLSearchParams(window.location.search).get('redirect');
+        let queryParams = new URLSearchParams();
+        if (nextUrl) {
+            queryParams.append('next', nextUrl);
+        }
         const response = await fetchApi(`${this.baseUrl}/oidc/authorize`, {
             skipAuthRetry: true,
+            query: queryParams,
         });
 
         if (!response.ok) {
