@@ -18,6 +18,7 @@ from rq.exceptions import NoSuchJobError
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 from ..utils.tasks import (
+    layer_segmentation_job_timeout,
     run_cfi_amd_for_image_ids,
     run_cfi_model_for_image_ids,
     run_layer_segmentation_for_image_ids,
@@ -171,12 +172,21 @@ class RunCfiAmdRequest(RunImageIdsJobRequest):
     n_workers: int = 12
 
 
-def _queue_rq_job(queue_name: str, func, *args, ok_message: str) -> TaskResponse:
+def _queue_rq_job(
+    queue_name: str,
+    func,
+    *args,
+    ok_message: str,
+    job_timeout: int | None = None,
+) -> TaskResponse:
     from ..main import get_rq_queue
 
     try:
         task_id = str(uuid.uuid4())
-        get_rq_queue(queue_name).enqueue(func, *args, job_id=task_id)
+        enqueue_kwargs: dict = {"job_id": task_id}
+        if job_timeout is not None:
+            enqueue_kwargs["job_timeout"] = job_timeout
+        get_rq_queue(queue_name).enqueue(func, *args, **enqueue_kwargs)
         return TaskResponse(success=True, message=ok_message, task_id=task_id)
     except Exception as e:
         return TaskResponse(success=False, message=f"Failed to queue {queue_name}", error=str(e))
@@ -241,12 +251,17 @@ async def enqueue_run_layer_segmentation(
     body: RunImageIdsJobRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    job_timeout = layer_segmentation_job_timeout(len(body.image_ids))
     return _queue_rq_job(
         "layer-segmentation",
         run_layer_segmentation_for_image_ids,
         body.image_ids,
         body.overwrite,
-        ok_message="Layer segmentation task queued successfully",
+        ok_message=(
+            f"Layer segmentation task queued successfully "
+            f"(job_timeout={job_timeout}s for {len(body.image_ids)} image(s))"
+        ),
+        job_timeout=job_timeout,
     )
 
 

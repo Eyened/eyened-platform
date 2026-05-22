@@ -73,14 +73,43 @@ def run_cfi_amd_for_image_ids(
     return True
 
 
+# RQ default is 180s; large OCT batches need much longer (per-image wall time).
+LAYER_SEGMENTATION_SECONDS_PER_IMAGE = 600
+LAYER_SEGMENTATION_MIN_JOB_TIMEOUT = 600
+LAYER_SEGMENTATION_MAX_JOB_TIMEOUT = 86400
+
+
+def layer_segmentation_job_timeout(image_count: int) -> int:
+    """RQ ``job_timeout`` for a batch of OCT layer-segmentation instances."""
+    n = max(1, image_count)
+    return min(
+        LAYER_SEGMENTATION_MAX_JOB_TIMEOUT,
+        max(
+            LAYER_SEGMENTATION_MIN_JOB_TIMEOUT,
+            n * LAYER_SEGMENTATION_SECONDS_PER_IMAGE,
+        ),
+    )
+
+
 def run_layer_segmentation_for_image_ids(
     image_ids: list[int],
     overwrite: bool = False,
 ):
     """Run the OCT layer segmentation processor (``layer-segmentation`` queue)."""
+    from rq import get_current_job
+
     from eyened_orm import Database
     from eyened_orm.commands.model_processing import _get_device
     from eyened_orm.inference.layer_segmentation import run_for_image_ids
+
+    job = get_current_job()
+    if job is not None:
+        timeout = getattr(job, "timeout", None)
+        print(
+            f"[layer-segmentation] RQ job {job.id}: timeout={timeout}s, "
+            f"images={len(image_ids)}",
+            flush=True,
+        )
 
     database = Database()
     device = _get_device(None)

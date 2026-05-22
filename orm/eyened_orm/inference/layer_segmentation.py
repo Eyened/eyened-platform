@@ -186,6 +186,7 @@ class LayerSegmentation:
     def _prep_volume(
         self, volume: np.ndarray, *, image_instance_id: int = 0
     ) -> LayerPreppedVolume:
+        t0 = time.perf_counter()
         if volume.ndim == 2:
             slices = [volume]
         elif volume.ndim == 3:
@@ -201,8 +202,14 @@ class LayerSegmentation:
         input_dir, output_dir = work_dir / "nnunet_in", work_dir / "nnunet_out"
         input_dir.mkdir(parents=True)
         output_dir.mkdir(parents=True)
+        t_png = time.perf_counter()
         for i, slc in enumerate(slices):
             Image.fromarray(slc).save(input_dir / f"scan_{i:05d}_0000.png")
+        _log(
+            f"prep: wrote {depth} input PNGs in {time.perf_counter() - t_png:.1f}s "
+            f"(total prep {time.perf_counter() - t0:.1f}s)",
+            minimal=True,
+        )
 
         return LayerPreppedVolume(
             image_instance_id=image_instance_id,
@@ -230,6 +237,7 @@ class LayerSegmentation:
     @staticmethod
     def masks_to_array(prep: LayerPreppedVolume) -> np.ndarray:
         """Stack per-scan nnU-Net PNGs into ``(D, H, W)`` uint8 class maps."""
+        t0 = time.perf_counter()
         layers = np.zeros((prep.depth, prep.height, prep.width), dtype=np.uint8)
         for i in range(prep.depth):
             path = prep.output_dir / f"scan_{i:05d}.png"
@@ -239,6 +247,11 @@ class LayerSegmentation:
             if mask.ndim == 3:
                 mask = mask[..., 0]
             layers[i] = mask.astype(np.uint8)
+        _log(
+            f"stacked {prep.depth} mask PNGs -> {layers.shape} "
+            f"in {time.perf_counter() - t0:.1f}s",
+            minimal=True,
+        )
         return layers
 
     def predict_volume(self, volume: np.ndarray) -> np.ndarray:
@@ -255,6 +268,13 @@ class LayerSegmentation:
             prep.cleanup()
 
     def _save_to_db(self, prep: LayerPreppedVolume, layers: np.ndarray) -> None:
+        if layers.shape != (prep.depth, prep.height, prep.width):
+            raise ValueError(
+                f"Expected layers shape {(prep.depth, prep.height, prep.width)}, "
+                f"got {layers.shape}"
+            )
+
+        t0 = time.perf_counter()
         seg = ModelSegmentation.get_or_create(
             self.session,
             match_by={
@@ -266,21 +286,34 @@ class LayerSegmentation:
                 "Height": prep.height,
                 "Width": prep.width,
                 "SparseAxis": 0,
-                "ScanIndices": [],
+                "ScanIndices": list(range(prep.depth)),
                 "DataType": self.datatype,
                 "DataRepresentation": self.data_representation,
                 "Threshold": None,
             },
         )
+        _log(
+            f"save: get_or_create ModelSegmentation in {time.perf_counter() - t0:.1f}s",
+            minimal=True,
+        )
         try:
-            for scan_idx in range(prep.depth):
-                seg.write_data(
-                    layers[scan_idx], axis=seg.SparseAxis, slice_index=scan_idx
-                )
+            t_write = time.perf_counter()
+            seg.write_data(layers)
+            _log(
+                f"save: zarr write {layers.shape} in {time.perf_counter() - t_write:.1f}s",
+                minimal=True,
+            )
         finally:
+            t_flush = time.perf_counter()
             self.session.flush()
             self.session.expunge(seg)
+            _log(f"save: flush in {time.perf_counter() - t_flush:.1f}s", minimal=True)
+        t_commit = time.perf_counter()
         self.session.commit()
+        _log(
+            f"save: commit + total {time.perf_counter() - t0:.1f}s",
+            minimal=True,
+        )
 
     def filter_image_ids(self, image_ids: Iterable[int]) -> Set[int]:
         image_ids_set = set(image_ids)
@@ -299,27 +332,52 @@ class LayerSegmentation:
 
     def run(self, image_ids: Iterable[int]) -> None:
         """Run preprocess → nnU-Net → save for each image."""
+        t_model = time.perf_counter()
         self._ensure_predictor()
+        _log(f"model ready in {time.perf_counter() - t_model:.1f}s", minimal=True)
+
+        failed: list[int] = []
         for instance in tqdm(
             ImageInstance.by_ids(self.session, set(image_ids)),
             desc="Layer segmentation",
         ):
+            image_id = instance.ImageInstanceID
             prep: LayerPreppedVolume | None = None
+            t_image = time.perf_counter()
             try:
+                t_load = time.perf_counter()
+                volume = instance.pixel_array
+                _log(
+                    f"image {image_id}: pixel_array {volume.shape} "
+                    f"in {time.perf_counter() - t_load:.1f}s",
+                    minimal=True,
+                )
+
                 prep = self._prep_volume(
-                    instance.pixel_array,
-                    image_instance_id=instance.ImageInstanceID,
+                    volume,
+                    image_instance_id=image_id,
                 )
                 self._run_nnunet(prep)
-                self._save_to_db(prep, self.masks_to_array(prep))
+                layers = self.masks_to_array(prep)
+                self._save_to_db(prep, layers)
+                _log(
+                    f"image {image_id}: done in {time.perf_counter() - t_image:.1f}s",
+                    minimal=True,
+                )
             except Exception as e:
+                failed.append(image_id)
                 print(
-                    f"Layer segmentation failed for image "
-                    f"{instance.ImageInstanceID}: {e}"
+                    f"Layer segmentation failed for image {image_id}: {e}",
+                    flush=True,
                 )
             finally:
                 if prep is not None:
                     prep.cleanup()
+
+        if failed:
+            raise RuntimeError(
+                f"Layer segmentation failed for {len(failed)} image(s): {failed}"
+            )
 
 
 def run_for_image_ids(

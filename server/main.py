@@ -114,7 +114,13 @@ from rq import Queue
 redis_conn = get_redis_connection()
 queue = Queue("default", connection=redis_conn)
 
+# Fallback when ``enqueue(..., job_timeout=...)`` is omitted (RQ default is 180s).
+_QUEUE_DEFAULT_TIMEOUTS: dict[str, int] = {
+    "layer-segmentation": 600,
+}
+
 
 def get_rq_queue(name: str) -> Queue:
     """Named RQ queue (e.g. ``cfi-roi`` for CFI ROI jobs)."""
-    return Queue(name, connection=redis_conn)
+    default_timeout = _QUEUE_DEFAULT_TIMEOUTS.get(name)
+    return Queue(name, connection=redis_conn, default_timeout=default_timeout)

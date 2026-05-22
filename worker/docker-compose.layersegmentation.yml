@@ -19,7 +19,7 @@ services:
     build:
       context: ..
       dockerfile: worker/Dockerfile.layersegmentation
-    env_file: .env.dev
+    env_file: .env
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       EYENED_RQ_WORKER_QUEUES: layer-segmentation
