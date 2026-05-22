@@ -601,11 +601,21 @@ class DTOConverter:
         )
 
     @staticmethod
-    def task_to_get(task: "TaskORM") -> TaskGET:
+    def task_to_get(
+        task: "TaskORM",
+        *,
+        num_tasks: int | None = None,
+        num_tasks_ready: int | None = None,
+    ) -> TaskGET:
         """Convert Task ORM object to TaskGET."""
-        subs = getattr(task, "SubTasks", []) or []
-        num_tasks = len(subs)
-        num_tasks_ready = sum(1 for st in subs if st.TaskState == SubTaskState.Ready)
+        if num_tasks is None or num_tasks_ready is None:
+            subs = getattr(task, "SubTasks", []) or []
+            if num_tasks is None:
+                num_tasks = len(subs)
+            if num_tasks_ready is None:
+                num_tasks_ready = sum(
+                    1 for st in subs if st.TaskState == SubTaskState.Ready
+                )
 
         return TaskGET(
             id=task.TaskID,
