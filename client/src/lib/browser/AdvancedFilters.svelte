@@ -157,7 +157,13 @@
 		fieldType: string | string[],
 	): ConditionValue {
 		if (Array.isArray(fieldType)) {
-			return Array.isArray(value) ? value : [];
+			if (Array.isArray(value)) {
+				return value.map(String);
+			}
+			if (value == null || value === "") {
+				return [];
+			}
+			return [String(value)];
 		}
 
 		if (fieldType === "int") {

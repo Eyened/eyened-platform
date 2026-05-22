@@ -158,7 +158,13 @@ export class BrowserContext {
     // Coerce value based on field type
     private coerceValue(value: any, fieldType: string | string[]): Condition['value'] {
         if (Array.isArray(fieldType)) {
-            return Array.isArray(value) ? value : [];
+            if (Array.isArray(value)) {
+                return value.map(String);
+            }
+            if (value == null || value === '') {
+                return [];
+            }
+            return [String(value)];
         }
 
         switch (fieldType) {

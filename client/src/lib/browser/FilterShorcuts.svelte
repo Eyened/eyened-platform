@@ -10,18 +10,40 @@
 	// bindable single basic condition - this is the root state
 	let { condition = $bindable<Condition | null>(null) } = $props();
 
-	// Factory to generate getter/setter objects for condition variable equality
+	function fieldUsesInOperator(variable: string) {
+		return Array.isArray(
+			browserContext.activeSignature.find((s) => s.name === variable)
+				?.values,
+		);
+	}
+
+	// Factory to generate getter/setter objects for a single basic filter field
 	function conditionValueAccessor(variable: string) {
 		return {
 			get value() {
-				return condition?.variable === variable
-					? String(condition.value ?? "")
-					: "";
+				if (condition?.variable !== variable) return "";
+				const v = condition.value;
+				if (Array.isArray(v)) return v[0] ?? "";
+				return String(v ?? "");
 			},
 			set value(val: string) {
-				condition = val
-					? { variable, operator: "==", value: val }
-					: null;
+				if (!val) {
+					condition = null;
+					return;
+				}
+				condition = fieldUsesInOperator(variable)
+					? {
+							type: "default",
+							variable,
+							operator: "IN",
+							value: [val],
+						}
+					: {
+							type: "default",
+							variable,
+							operator: "==",
+							value: val,
+						};
 			},
 		};
 	}
