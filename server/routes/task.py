@@ -1,7 +1,7 @@
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Dict, Tuple
 import bisect
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, case
 from sqlalchemy.orm import Session, selectinload
 from eyened_orm import (
     Task,
@@ -23,6 +23,39 @@ from ..dtos.dto_converter import DTOConverter
 
 router = APIRouter()
 
+
+def _task_query_options():
+    """Load task metadata without eager-loading every SubTask row."""
+    return (
+        selectinload(Task.Creator),
+        selectinload(Task.TaskDefinition),
+    )
+
+
+def _subtask_counts_by_task_id(
+    db: Session, task_ids: List[int]
+) -> Dict[int, Tuple[int, int]]:
+    """Return ``{task_id: (num_tasks, num_tasks_ready)}`` via SQL aggregates."""
+    if not task_ids:
+        return {}
+    rows = db.execute(
+        select(
+            SubTask.TaskID,
+            func.count().label("num_tasks"),
+            func.coalesce(
+                func.sum(
+                    case((SubTask.TaskState == SubTaskState.Ready, 1), else_=0)
+                ),
+                0,
+            ).label("num_tasks_ready"),
+        )
+        .where(SubTask.TaskID.in_(task_ids))
+        .group_by(SubTask.TaskID)
+    ).all()
+    counts = {int(task_id): (int(n), int(r)) for task_id, n, r in rows}
+    return {tid: counts.get(tid, (0, 0)) for tid in task_ids}
+
+
 @router.post("/task", response_model=TaskGET)
 async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     task = Task(
@@ -36,7 +69,7 @@ async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user:
     # Reload with relationships
     task = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
+        .options(*_task_query_options())
         .where(Task.TaskID == task.TaskID)
     ).scalars().first()
     
@@ -57,8 +90,7 @@ async def create_task(dto: TaskPUT, db: Session = Depends(get_db), current_user:
             },
         )
     
-    return DTOConverter.task_to_get(task)
-
+    return DTOConverter.task_to_get(task, num_tasks=0, num_tasks_ready=0)
 
 
 @router.get("/task", response_model=List[TaskGET])
@@ -68,11 +100,17 @@ async def list_tasks(
 ):
     """List all tasks (no pagination)."""
     rows = db.execute(
-        select(Task)
-        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
-        .order_by(Task.TaskID)
+        select(Task).options(*_task_query_options()).order_by(Task.TaskID)
     ).scalars().all()
-    return [DTOConverter.task_to_get(t) for t in rows]
+    counts = _subtask_counts_by_task_id(db, [t.TaskID for t in rows])
+    return [
+        DTOConverter.task_to_get(
+            t,
+            num_tasks=counts[t.TaskID][0],
+            num_tasks_ready=counts[t.TaskID][1],
+        )
+        for t in rows
+    ]
 
 
 
@@ -81,12 +119,15 @@ async def list_tasks(
 async def get_task(task_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     task = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
+        .options(*_task_query_options())
         .where(Task.TaskID == task_id)
     ).scalars().first()
     if not task:
         raise HTTPException(404, "Task not found")
-    return DTOConverter.task_to_get(task)
+    num_tasks, num_tasks_ready = _subtask_counts_by_task_id(db, [task_id])[task_id]
+    return DTOConverter.task_to_get(
+        task, num_tasks=num_tasks, num_tasks_ready=num_tasks_ready
+    )
 
 
 
@@ -115,12 +156,12 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
 
     db.commit(); db.refresh(task)
     
-    # Reload with SubTasks for consistency
     task = db.execute(
         select(Task)
-        .options(selectinload(Task.SubTasks), selectinload(Task.Creator), selectinload(Task.TaskDefinition))
+        .options(*_task_query_options())
         .where(Task.TaskID == task_id)
     ).scalars().first()
+    num_tasks, num_tasks_ready = _subtask_counts_by_task_id(db, [task_id])[task_id]
     
     # Log task update
     logger = get_db_logger()
@@ -134,7 +175,9 @@ async def patch_task(task_id: int, dto: TaskPATCH, db: Session = Depends(get_db)
             changes=changes if changes else None,
         )
     
-    return DTOConverter.task_to_get(task)
+    return DTOConverter.task_to_get(
+        task, num_tasks=num_tasks, num_tasks_ready=num_tasks_ready
+    )
 
 @router.delete("/task/{task_id}", status_code=204)
 async def delete_task(task_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
