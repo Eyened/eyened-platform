@@ -3,13 +3,14 @@ import json
 import logging
 import secrets
 from json import JSONDecodeError
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import quote, unquote, urlencode
 
 import httpxyz
 import jwt
 from datetime import datetime, timedelta, timezone
 from hashlib import pbkdf2_hmac
+from jwt.algorithms import RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.utils.db_users import create_user, verify_password, hash_password
@@ -599,6 +600,61 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
         nonce=nonce_hash,
     )
 
+
+async def get_oidc_public_key(id_token: str) -> str:
+    """Retrieve the correct key for a given OIDC ID token."""
+    headers = jwt.get_unverified_header(id_token)
+    kid = headers["kid"]
+    async with httpxyz.AsyncClient() as client:
+        jwks_url = await settings.oidc.get_jwks_url()
+        response = await client.get(jwks_url)
+
+    if not response.is_success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OIDC public key retrieval failed")
+
+    jwks = response.json()
+    for key in jwks["keys"]:
+        if key["kid"] == kid:
+            return RSAAlgorithm.from_jwk(key)
+
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OIDC public key not found")
+
+
+async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
+    """
+    Validate a JWT ID token.
+
+    Args:
+        id_token (str): The ID token to validate.
+        nonce_hash (str): The nonce hash belonging to the nonce in the ID token.
+    """
+    public_key = await get_oidc_public_key(id_token)
+
+    try:
+        # TODO: validate the issuer (`iss`) and, for MS, the tenant (`tid`) claims.
+        #   Maybe make this flexible through configuration.
+        claims = jwt.decode(
+            jwt=id_token,
+            key=public_key,
+            algorithms=["RS256"],
+            audience=settings.oidc.client_id,
+        )
+    except jwt.InvalidTokenError as err:
+        logging.warning(f"Error while decoding ID Token: {err}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid ID token")
+
+    # Validate nonce
+    nonce = claims.get("nonce")
+    if not nonce:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (claims)")
+    if not nonce_hash:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (cookie)")
+    if not validate_secure_token(nonce, nonce_hash, settings.secret_key_value):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
+
+    return claims
+
+
 def check_oidc_login(id_claims: dict[str, str], session: Session):
     """
     Find or create the creator matching the OIDC claims.
@@ -669,38 +725,20 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
                 "client_secret": settings.oidc.client_secret.get_secret_value(),
             }
         )
-    if not token_response.is_success:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token request"
-        )
+        if not token_response.is_success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token request"
+            )
     token_data = token_response.json()
 
     # Validate the ID token
     id_token = token_data.get("id_token")
+    nonce_hash = oidc_nonce
     if not id_token:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing ID token")
-    try:
-        # TODO: use the JWKS endpoint to validate the token signature.
-        # TODO: validate the issuer (`iss`) and, for MS, the tenant (`tid`) claims.
-        #   Maybe make this flexible through configuration.
-        claims = jwt.decode(
-            jwt=id_token,
-            audience=settings.oidc.client_id,  # This is what MS Entra advises
-            options={"verify_signature": False, "verify_aud": True, "verify_exp": True, "verify_iat": True, "verify_nbf": True},
-        )
-    except jwt.InvalidTokenError as err:
-        logging.warning(f"Error while decoding ID Token: {err}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid ID token")
-
-    # Validate nonce
-    nonce = claims.get("nonce")
-    nonce_hash = oidc_nonce
-    if not nonce:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (claims)")
     if not nonce_hash:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (cookie)")
-    if not validate_secure_token(nonce, nonce_hash, settings.secret_key_value):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
+    claims = await validate_id_token(id_token, oidc_nonce)
 
     # Check claims with Creator database
     creator = check_oidc_login(claims, session)

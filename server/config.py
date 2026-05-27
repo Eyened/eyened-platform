@@ -75,10 +75,6 @@ class OIDCSettings(BaseSettings):
     provider_name: str = "OpenID Connect"
     create_new_accounts: bool = False
 
-    @property
-    def client_secret_value(self) -> str:
-        return str(self.client_secret.get_secret_value())
-
     @lru_cache
     async def _get_config_data(self):
         """Get OIDC configuration data from connect URL and validate it"""
@@ -93,7 +89,7 @@ class OIDCSettings(BaseSettings):
         except JSONDecodeError:
             raise ValueError("OIDC connect URL returned unparsable JSON data")
 
-        for key in ["authorization_endpoint", "token_endpoint"]:
+        for key in ["authorization_endpoint", "token_endpoint", "jwks_uri"]:
             if key not in config:
                 raise ValueError(f"OIDC connect URL response is missing required key '{key}'")
 
@@ -106,6 +102,10 @@ class OIDCSettings(BaseSettings):
     async def get_token_url(self) -> str:
         config = await self._get_config_data()
         return config["token_endpoint"]
+
+    async def get_jwks_url(self) -> str:
+        config = await self._get_config_data()
+        return config["jwks_uri"]
 
 @pretty_settings
 class Settings(BaseSettings):

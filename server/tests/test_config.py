@@ -18,7 +18,7 @@ def test_oidc_settings_from_env(monkeypatch):
 
     settings = Settings()
     assert settings.oidc.client_id == "client_id"
-    assert settings.oidc.client_secret_value == "client_secret"
+    assert settings.oidc.client_secret.get_secret_value() == "client_secret"
     assert settings.auth_oidc_enabled is True
 
 
