@@ -1,7 +1,8 @@
+import hashlib
 import json
 import logging
-import random
 import secrets
+from json import JSONDecodeError
 from typing import Annotated
 from urllib.parse import quote, unquote, urlencode
 
@@ -81,7 +82,7 @@ class AuthOptionsResponse(BaseModel):
 
 class OIDCAuthorizationResponse(BaseModel):
     url: str
-    csrf: int
+    csrf: str
 
 
 class OIDCAuthenticationRequest(BaseModel):
@@ -520,16 +521,40 @@ async def get_auth_options():
         oidc_provider_name=settings.oidc.provider_name,
     )
 
+def generate_secure_token(secret_key: str) -> tuple[str, str]:
+    """
+    Generate a secure token suitable for CSRF-like use.
+
+    Two corresponding values are created: a random token and a hashed token, which includes the application's secret key.
+
+    Returns:
+        A tuple containing the token, and the hashed token.
+    """
+    token = secrets.token_hex(64)
+    hash_data = f"{token}{secret_key}".encode("utf-8")
+    hashed_token = hashlib.sha256(hash_data).hexdigest()
+    return token, hashed_token
+
+def validate_secure_token(token: str, hashed: str, secret_key: str) -> bool:
+    """Validate a secure token against a corresponding hash."""
+    hash_data = f"{token}{secret_key}".encode("utf-8")
+    hashed_token = hashlib.sha256(hash_data).hexdigest()
+    return secrets.compare_digest(hashed, hashed_token)
 
 @router.get("/auth/oidc/authorize")
 async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Query(alias="next")] = "") -> OIDCAuthorizationResponse:
-    """The authorization URL at the OIDC provider for authentication."""
-    # The csrf_token value in state is used to safeguard the auth roundtrip against CSRF attacks
-    # TODO: use a more random CSRF token
-    csrf_token = random.randint(1, 1_000_000)
+    """
+    The authorization URL at the OIDC provider for authentication.
+
+    The authorization includes a CSRF token. The CSRF token hash is included in the 'state' parameter along the OIDC
+    authorization path, while the original token is returned to the client for safekeeping (as a cookie).
+    The client is supposed to provide the token (cookie) again when calling the authenticate endpoint, where it
+    will be validated.
+    """
+    token, token_hash = generate_secure_token(settings.secret_key_value)
     state = quote(json.dumps({
         "next": next_,
-        "csrf": csrf_token,
+        "csrf": token_hash,
     }))
 
     url = await settings.oidc.get_authorize_url()
@@ -545,7 +570,7 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
     authorization_url = f"{url}?{urlencode(params)}"
     response.set_cookie(
         key="oidc_csrf_token",
-        value=str(csrf_token),
+        value=token,
         httponly=True,
         max_age=60*15,
         secure=False,
@@ -554,7 +579,7 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
     )
     return OIDCAuthorizationResponse(
         url=authorization_url,
-        csrf=csrf_token,
+        csrf=token,
     )
 
 def check_oidc_login(id_claims: dict[str, str], session: Session):
@@ -598,17 +623,21 @@ def check_oidc_login(id_claims: dict[str, str], session: Session):
 @router.post("/auth/oidc/authenticate")
 async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), session: Session = Depends(get_db)):
     """Handle OIDC authentication using the code from the authorization URL."""
-    # Check state value
-    state = auth.state.strip()
+    # Unpack state
     try:
-        state = json.loads(unquote(state))
-        state_csrf = state['csrf']
-    except KeyError:
+        state = json.loads(unquote(auth.state.strip()))
+    except JSONDecodeError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
-    if not oidc_csrf_token:
+
+    # Check CSRF in state
+    csrf_token = oidc_csrf_token
+    csrf_hash = state.get("csrf")
+    if not csrf_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing csrf token (cookie)")
-    if int(state_csrf) != int(oidc_csrf_token):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid csrf token")
+    if not csrf_hash:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing csrf token (state)")
+    if not validate_secure_token(csrf_token, csrf_hash, settings.secret_key_value):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSRF token validation failed")
 
     # Use code to authenticate at the provider
     token_url = await settings.oidc.get_token_url()
