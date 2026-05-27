@@ -83,6 +83,7 @@ class AuthOptionsResponse(BaseModel):
 class OIDCAuthorizationResponse(BaseModel):
     url: str
     csrf: str
+    nonce: str
 
 
 class OIDCAuthenticationRequest(BaseModel):
@@ -550,27 +551,42 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
     authorization path, while the original token is returned to the client for safekeeping (as a cookie).
     The client is supposed to provide the token (cookie) again when calling the authenticate endpoint, where it
     will be validated.
+
+    A similar flow is set for the 'nonce', which is returned from the OIDC authentication response in the ID token,
+    which is also validated.
     """
-    token, token_hash = generate_secure_token(settings.secret_key_value)
+    csrf_token, csrf_token_hash = generate_secure_token(settings.secret_key_value)
     state = quote(json.dumps({
         "next": next_,
-        "csrf": token_hash,
+        "csrf": csrf_token_hash,
     }))
 
     url = await settings.oidc.get_authorize_url()
-    # TODO: Add nonce parameter?
+    nonce, nonce_hash = generate_secure_token(settings.secret_key_value)
     params = {
         "state": state,
         "response_type": "code",
         "client_id": settings.oidc.client_id,
         "redirect_uri": settings.oidc.redirect_url,
         "scope": "openid profile email",
+        "nonce": nonce,
     }
 
     authorization_url = f"{url}?{urlencode(params)}"
+    # OIDC authentication is always interactive and requires a browser, so cookies should be enough,
+    # but we include the cookie values in the response anyway.
     response.set_cookie(
         key="oidc_csrf_token",
-        value=token,
+        value=csrf_token,
+        httponly=True,
+        max_age=60*15,
+        secure=False,
+        samesite="strict",
+        path="/",
+    )
+    response.set_cookie(
+        key="oidc_nonce",
+        value=nonce_hash,
         httponly=True,
         max_age=60*15,
         secure=False,
@@ -579,7 +595,8 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
     )
     return OIDCAuthorizationResponse(
         url=authorization_url,
-        csrf=token,
+        csrf=csrf_token,
+        nonce=nonce_hash,
     )
 
 def check_oidc_login(id_claims: dict[str, str], session: Session):
@@ -621,7 +638,7 @@ def check_oidc_login(id_claims: dict[str, str], session: Session):
     return creator
 
 @router.post("/auth/oidc/authenticate")
-async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), session: Session = Depends(get_db)):
+async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), oidc_nonce: str = Cookie(None), session: Session = Depends(get_db)):
     """Handle OIDC authentication using the code from the authorization URL."""
     # Unpack state
     try:
@@ -659,8 +676,10 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
     token_data = token_response.json()
 
     # Validate the ID token
+    id_token = token_data.get("id_token")
+    if not id_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing ID token")
     try:
-        id_token = token_data["id_token"]
         # TODO: use the JWKS endpoint to validate the token signature.
         # TODO: validate the issuer (`iss`) and, for MS, the tenant (`tid`) claims.
         #   Maybe make this flexible through configuration.
@@ -669,9 +688,19 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
             audience=settings.oidc.client_id,  # This is what MS Entra advises
             options={"verify_signature": False, "verify_aud": True, "verify_exp": True, "verify_iat": True, "verify_nbf": True},
         )
-    except (KeyError, jwt.InvalidTokenError) as err:
+    except jwt.InvalidTokenError as err:
         logging.warning(f"Error while decoding ID Token: {err}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid ID token")
+
+    # Validate nonce
+    nonce = claims.get("nonce")
+    nonce_hash = oidc_nonce
+    if not nonce:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (claims)")
+    if not nonce_hash:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (cookie)")
+    if not validate_secure_token(nonce, nonce_hash, settings.secret_key_value):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
 
     # Check claims with Creator database
     creator = check_oidc_login(claims, session)
@@ -700,5 +729,6 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         path="/",
     )
     response.delete_cookie(key="oidc_csrf_token")
+    response.delete_cookie(key="oidc_nonce")
 
     return creator_to_response(creator, session)
