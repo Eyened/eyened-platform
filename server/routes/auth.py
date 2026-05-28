@@ -631,8 +631,6 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
     public_key = await get_oidc_public_key(id_token)
 
     try:
-        # TODO: validate the issuer (`iss`) and, for MS, the tenant (`tid`) claims.
-        #   Maybe make this flexible through configuration.
         claims = jwt.decode(
             jwt=id_token,
             key=public_key,
@@ -641,7 +639,7 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
         )
     except jwt.InvalidTokenError as err:
         logging.warning(f"Error while decoding ID Token: {err}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid ID token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ID token")
 
     # Validate nonce
     nonce = claims.get("nonce")
@@ -650,7 +648,18 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
     if not nonce_hash:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (cookie)")
     if not validate_secure_token(nonce, nonce_hash, settings.secret_key_value):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nonce validation failed")
+
+    # Validate additional claims
+    validations = settings.oidc.additional_token_validations.split(",")
+    for validation in validations:
+        claim_name, claim_value = validation.split("=", 1)
+        if claim_name not in claims:
+            logging.warning(f"Additional validation claim '{claim_name}' not found in ID token")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed (claim: {claim_name}")
+        elif claims[claim_name] != claim_value:
+            logging.warning(f"Additional validation claim '{claim_name}' not equal to '{claim_value}': {claims[claim_name]}")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed (claim: {claim_name}")
 
     return claims
 

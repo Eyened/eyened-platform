@@ -74,6 +74,7 @@ class OIDCSettings(BaseSettings):
     redirect_url: str = ""
     provider_name: str = "OpenID Connect"
     create_new_accounts: bool = False
+    additional_token_validations: str = ""
 
     @lru_cache
     async def _get_config_data(self):
