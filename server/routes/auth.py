@@ -13,7 +13,7 @@ from hashlib import pbkdf2_hmac
 from jwt.algorithms import RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
-from eyened_orm.utils.db_users import create_user, verify_password, hash_password
+from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
 
@@ -693,12 +693,10 @@ def check_oidc_login(id_claims: dict[str, str], session: Session):
         if not settings.oidc.create_new_accounts:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OIDC account not authorized")
 
-        # Create new account from ID claims
+        # Create new account from ID token claims
         username = id_claims["preferred_username"]
         identifier = f"oidc:sub:{id_claims['sub']}"
-        # TODO: how to handle password? Preferably set an unusable one or leave it out, so password auth doesn't work
-        random_password: str = secrets.token_hex(64)
-        creator = create_user(session, username=username, password=random_password, employee_identifier=identifier)
+        creator = create_user(session, username=username, password=None, employee_identifier=identifier)
 
     return creator
 

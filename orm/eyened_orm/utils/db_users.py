@@ -2,7 +2,7 @@ from eyened_orm import Creator
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2", "unix_disabled"], deprecated="auto")
 
 def hash_password(password: str) -> str:
     """Hash a password using Argon2."""
@@ -14,15 +14,23 @@ def verify_password(password: str, stored_hash: str) -> bool:
     return pwd_context.verify(password, stored_hash)
 
 
+def disable_password(stored_hash: str|None) -> str:
+    """Generated a valid password hash that disables password login."""
+    return pwd_context.disable(stored_hash)
+
 def create_user(
     session: Session,
     username: str,
-    password: str,
+    password: str | None,
     is_human: bool = True,
     description: str | None = None,
     employee_identifier: str | None = None,
 ) -> Creator:
-    """Create a new user with the given credentials."""
+    """
+    Create a new user with the given credentials.
+
+    If the password is None, a disabled password is generated.
+    """
     # Check if username already exists
     existing_user = (
         session.query(Creator).where(Creator.CreatorName == username).first()
@@ -31,9 +39,10 @@ def create_user(
         raise ValueError("Username already exists")
 
     # Create new user
+    password_hash = hash_password(password) if password else disable_password(None)
     new_user = Creator(
         CreatorName=username,
-        PasswordHash=hash_password(password),
+        PasswordHash=password_hash,
         IsHuman=is_human,
         Description=description,
         EmployeeIdentifier=employee_identifier,
