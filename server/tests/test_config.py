@@ -4,6 +4,7 @@ from server.config import OIDCSettings, Settings
 
 OPENID_CONFIG = {
     "authorization_endpoint": "https://example.com/api/authorize",
+    "jwks_uri": "https://example.com/api/jwks",
     "token_endpoint": "https://example.com/api/token",
     "userinfo_endpoint": "https://example.com/api/userinfo",
     "issuer": "https://example.com/api",
@@ -26,34 +27,35 @@ def test_oidc_settings_from_env(monkeypatch):
 async def test_oidc_settings_valid(httpx_mock):
     httpx_mock.add_response(json=OPENID_CONFIG)
 
-    oidc_settings = OIDCSettings(client_id="client_id", client_secret="client_secret", connect_url="https://example.com/api/.well-known/openid-configuration")
-    assert await oidc_settings.get_authorize_url() == "https://example.com/api/authorize"
+    oidc_settings = OIDCSettings(client_id="client_id", client_secret="client_secret", metadata_url="https://example.com/api/.well-known/openid-configuration")
+    assert await oidc_settings.get_authorization_endpoint() == "https://example.com/api/authorize"
 
 
 @pytest.mark.asyncio
 async def test_oidc_connect_url_returns_invalid_status(httpx_mock):
     httpx_mock.add_response(status_code=401)
 
-    oidc_settings = OIDCSettings(connect_url="https://example.com/api/.well-known/openid-configuration")
+    oidc_settings = OIDCSettings(metadata_url="https://example.com/api/.well-known/openid-configuration")
     with pytest.raises(ValueError, match="HTTP status code returned: 401"):
-        await oidc_settings.get_authorize_url()
+        await oidc_settings.get_authorization_endpoint()
 
 
 @pytest.mark.asyncio
 async def test_oidc_connect_url_returns_invalid_data(httpx_mock):
     httpx_mock.add_response(text="Text response indicating this is not JSON data")
 
-    oidc_settings = OIDCSettings(connect_url="https://example.com/api/.well-known/openid-configuration")
-    with pytest.raises(ValueError, match="OIDC connect URL returned unparsable JSON data"):
-        await oidc_settings.get_authorize_url()
+    oidc_settings = OIDCSettings(metadata_url="https://example.com/api/.well-known/openid-configuration")
+    with pytest.raises(ValueError, match="OIDC metadata URL returned unparsable JSON data"):
+        await oidc_settings.get_authorization_endpoint()
 
 
 @pytest.mark.asyncio
-async def test_oidc_missing_authorize_url(httpx_mock):
+@pytest.mark.parametrize("metadata_key", ["authorization_endpoint", "jwks_uri", "token_endpoint"])
+async def test_oidc_missing_required_metadata(httpx_mock, metadata_key):
     response_data = OPENID_CONFIG.copy()
-    del response_data["authorization_endpoint"]
+    del response_data[metadata_key]
     httpx_mock.add_response(json=response_data)
 
-    oidc_settings = OIDCSettings(connect_url="https://example.com/api/.well-known/openid-configuration")
-    with pytest.raises(ValueError, match="OIDC connect URL response is missing required key 'authorization_endpoint'"):
-        await oidc_settings.get_authorize_url()
+    oidc_settings = OIDCSettings(metadata_url="https://example.com/api/.well-known/openid-configuration")
+    with pytest.raises(ValueError, match=f"OIDC metadata URL response is missing required key '{metadata_key}'"):
+        await oidc_settings._get_metadata()

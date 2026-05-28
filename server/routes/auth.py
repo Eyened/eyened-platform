@@ -515,7 +515,7 @@ async def logout(response: Response):
 @router.get("/auth/options")
 async def get_auth_options():
     """Options and settings for authentication."""
-    oidc_auth_enabled = settings.auth_oidc_enabled and await settings.oidc.get_authorize_url() is not None
+    oidc_auth_enabled = settings.auth_oidc_enabled and await settings.oidc.get_authorization_endpoint() is not None
 
     return AuthOptionsResponse(
         password_enabled=settings.auth_password_enabled,
@@ -562,7 +562,7 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
         "csrf": csrf_token_hash,
     }))
 
-    url = await settings.oidc.get_authorize_url()
+    url = await settings.oidc.get_authorization_endpoint()
     nonce, nonce_hash = generate_secure_token(settings.secret_key_value)
     params = {
         "state": state,
@@ -606,7 +606,7 @@ async def get_oidc_public_key(id_token: str) -> str:
     headers = jwt.get_unverified_header(id_token)
     kid = headers["kid"]
     async with httpxyz.AsyncClient() as client:
-        jwks_url = await settings.oidc.get_jwks_url()
+        jwks_url = await settings.oidc.get_jwks_uri()
         response = await client.get(jwks_url)
 
     if not response.is_success:
@@ -722,7 +722,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSRF token validation failed")
 
     # Use code to authenticate at the provider
-    token_url = await settings.oidc.get_token_url()
+    token_url = await settings.oidc.get_token_endpoint()
     async with httpxyz.AsyncClient() as client:
         token_response = await client.post(
             token_url,

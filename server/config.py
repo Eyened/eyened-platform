@@ -68,45 +68,55 @@ class RqSettings(BaseSettings):
 @pretty_settings
 class OIDCSettings(BaseSettings):
     model_config = SettingsConfigDict(frozen=True, extra="forbid", env_prefix="EYENED_OIDC_")
-    client_id: str = ""
-    client_secret: SecretStr = ""
-    connect_url: str = ""
-    redirect_url: str = ""
-    provider_name: str = "OpenID Connect"
-    create_new_accounts: bool = False
-    additional_token_validations: str = ""
+
+    client_id: str = Field(default="", description="The OIDC client ID")
+    client_secret: SecretStr = Field(default="", description="The OIDC client secret")
+    metadata_url: str = Field(default="", description="The full URL to the OIDC Provider metadata document, usually "
+                                                      "found at `<issuer URL>/.well-known/openid-configuration`")
+    redirect_url: str = Field(default="", description="The full URL to the redirect page in the EyeNED viewer where "
+                                                      "the user is sent after authentication, should be "
+                                                      "`https://<eyened URL>/oidc-callback`")
+    provider_name: str = Field(default="OpenID Connect", description="The OIDC provider's name, or organisational name "
+                                                                     "for the authentication flow")
+    create_new_accounts: bool = Field(default=False, description="Whether or not to create new accounts for unknown "
+                                                                 "users that authenticated through OIDC.")
+    additional_token_validations: str = Field(default="", description="A key-value list of static token claims that "
+                                                                      "must be available in received ID tokens, for "
+                                                                      "example `iss=12345,tid=67890`. Keys and values "
+                                                                      "are separated by `=`, key-value pairs by `,`.")
 
     @lru_cache
-    async def _get_config_data(self):
-        """Get OIDC configuration data from connect URL and validate it"""
+    async def _get_metadata(self):
+        """Get OIDC metadata from URL and validate it"""
         async with httpxyz.AsyncClient() as client:
-            response = await client.get(self.connect_url)
+            response = await client.get(self.metadata_url)
 
         if response.status_code != httpxyz.codes.OK:
-            raise ValueError(f"OIDC connect URL '{self.connect_url}' seems to be invalid, HTTP status code returned: {response.status_code}")
+            raise ValueError(f"OIDC metadata URL '{self.metadata_url}' seems to be invalid, HTTP status code returned: {response.status_code}")
 
         try:
-            config = response.json()
+            metadata = response.json()
         except JSONDecodeError:
-            raise ValueError("OIDC connect URL returned unparsable JSON data")
+            raise ValueError("OIDC metadata URL returned unparsable JSON data")
 
         for key in ["authorization_endpoint", "token_endpoint", "jwks_uri"]:
-            if key not in config:
-                raise ValueError(f"OIDC connect URL response is missing required key '{key}'")
+            if key not in metadata:
+                raise ValueError(f"OIDC metadata URL response is missing required key '{key}'")
 
-        return config
+        return metadata
 
-    async def get_authorize_url(self) -> str:
-        config = await self._get_config_data()
-        return config["authorization_endpoint"]
+    async def get_authorization_endpoint(self) -> str:
+        metadata = await self._get_metadata()
+        return metadata["authorization_endpoint"]
 
-    async def get_token_url(self) -> str:
-        config = await self._get_config_data()
-        return config["token_endpoint"]
+    async def get_token_endpoint(self) -> str:
+        metadata = await self._get_metadata()
+        return metadata["token_endpoint"]
 
-    async def get_jwks_url(self) -> str:
-        config = await self._get_config_data()
-        return config["jwks_uri"]
+    async def get_jwks_uri(self) -> str:
+        metadata = await self._get_metadata()
+        return metadata["jwks_uri"]
+
 
 @pretty_settings
 class Settings(BaseSettings):
