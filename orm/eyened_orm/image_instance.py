@@ -28,7 +28,7 @@ from .base import Base
 from .types import OptionalEnum
 
 if TYPE_CHECKING:
-    from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series
+    from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series, Tag
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 BASE36_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -751,6 +751,23 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         images = cls.by_ids(session, image_ids)
         return pd.DataFrame([im.to_dict() for im in images.values()])
 
+    def tag(
+        self,
+        creator: "Creator",
+        tag: "Tag",
+        comment: Optional[str] = None,
+    ) -> "ImageInstanceTagLink":
+        """Create an image-tag link from existing creator and tag objects."""
+        from eyened_orm.tag import ImageInstanceTagLink
+
+        link = ImageInstanceTagLink(
+            Tag=tag,
+            ImageInstance=self,
+            Creator=creator,
+            Comment=comment,
+        )
+        return link
+
     def make_tag(
         self,
         tag_name: str,
@@ -795,13 +812,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         # Get or create link
         link = ImageInstanceTagLink.by_pk(session, (tag.TagID, self.ImageInstanceID))
         if link is None:
-            link = ImageInstanceTagLink(
-                TagID=tag.TagID,
-                ImageInstanceID=self.ImageInstanceID,
-                CreatorID=creator.CreatorID,
-                Comment=comment,
-            )
-            session.add(link)
+            link = self.tag(creator=creator, tag=tag, comment=comment)
             session.flush()
         elif comment is not None:
             link.Comment = comment

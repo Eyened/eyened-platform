@@ -33,6 +33,7 @@ setup(
         "pylibjpeg-libjpeg==2.*",
         "GPUtil==1.*",
         "requests==2.*",
+        "python-dotenv",
         "pydantic-settings==2.7.1",
         "python-dotenv==1.*",
         "retinalysis-fundusprep>=0.5.4",

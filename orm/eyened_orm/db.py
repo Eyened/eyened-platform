@@ -1,9 +1,11 @@
 from contextlib import contextmanager
+from os import PathLike
 from typing import Generator
 
-from eyened_orm.config import DatabaseSettings, load_database_settings
-from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from eyened_orm.config import DatabaseSettings, load_database_settings
 
 
 def create_connection_string(settings: DatabaseSettings) -> str:
@@ -36,9 +38,14 @@ class Database:
 
     def __init__(
         self,
-        database_settings: DatabaseSettings | None = None,
+        database_settings: DatabaseSettings | str | PathLike[str] | None = None,
     ):
-        self.database_settings = database_settings or load_database_settings()
+        if database_settings is None:
+            self.database_settings = load_database_settings()
+        elif isinstance(database_settings, DatabaseSettings):
+            self.database_settings = database_settings
+        else:
+            self.database_settings = load_database_settings(database_settings)
 
         self.engine = create_engine(
             create_connection_string(self.database_settings), pool_pre_ping=True
