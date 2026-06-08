@@ -21,6 +21,7 @@ export default defineConfig({
                 { slug: 'import_metadata_fields' },
                 { slug: 'platform_design' },
                 { slug: 'guides/development_setup' },
+                { slug: 'guides/authentication' },
                 {
                     label: 'Eyened ORM',
                     // Autogenerate a group of links for the 'orm' directory.
