@@ -10,7 +10,7 @@ import httpxyz
 import jwt
 from datetime import datetime, timedelta, timezone
 from hashlib import pbkdf2_hmac
-from jwt.algorithms import RSAAlgorithm
+from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
@@ -24,7 +24,7 @@ from ..config import settings
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 
-# Password hashing configuration
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -532,6 +532,7 @@ def generate_secure_token(secret_key: str) -> tuple[str, str]:
     Returns:
         A tuple containing the token, and the hashed token.
     """
+    # Optional: make the length of a secure token configurable
     token = secrets.token_hex(64)
     hash_data = f"{token}{secret_key}".encode("utf-8")
     hashed_token = hashlib.sha256(hash_data).hexdigest()
@@ -564,23 +565,26 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
 
     url = await settings.oidc.get_authorization_endpoint()
     nonce, nonce_hash = generate_secure_token(settings.secret_key_value)
+    # Optional: make the scope configurable
     params = {
-        "state": state,
         "response_type": "code",
+        "response_mode": "query",
+        "scope": "openid profile email",
+        "state": state,
         "client_id": settings.oidc.client_id,
         "redirect_uri": settings.oidc.redirect_url,
-        "scope": "openid profile email",
         "nonce": nonce,
     }
 
     authorization_url = f"{url}?{urlencode(params)}"
     # OIDC authentication is always interactive and requires a browser, so cookies should be enough,
-    # but we include the cookie values in the response anyway.
+    # but we include the csrf and nonce values in the response anyway.
+    cookie_age = 60 * 15 # 15 minutes
     response.set_cookie(
         key="oidc_csrf_token",
         value=csrf_token,
         httponly=True,
-        max_age=60*15,
+        max_age=cookie_age,
         secure=False,
         samesite="strict",
         path="/",
@@ -589,7 +593,7 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
         key="oidc_nonce",
         value=nonce_hash,
         httponly=True,
-        max_age=60*15,
+        max_age=cookie_age,
         secure=False,
         samesite="strict",
         path="/",
@@ -601,8 +605,8 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
     )
 
 
-async def get_oidc_public_key(id_token: str) -> str:
-    """Retrieve the correct key for a given OIDC ID token."""
+async def get_oidc_public_key(id_token: str) -> AllowedRSAKeys:
+    """Retrieve the correct public key for a given OIDC ID token."""
     headers = jwt.get_unverified_header(id_token)
     kid = headers["kid"]
     async with httpxyz.AsyncClient() as client:
@@ -610,14 +614,16 @@ async def get_oidc_public_key(id_token: str) -> str:
         response = await client.get(jwks_url)
 
     if not response.is_success:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OIDC public key retrieval failed")
+        logger.error(f"OIDC public key retrieval failed, endpoint returned status code {response.status_code}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Public key request failed")
 
     jwks = response.json()
     for key in jwks["keys"]:
         if key["kid"] == kid:
             return RSAAlgorithm.from_jwk(key)
 
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OIDC public key not found")
+    logger.error("OIDC public key not found in JWKS endpoint")
+    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="OIDC public key not found")
 
 
 async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
@@ -627,6 +633,8 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
     Args:
         id_token (str): The ID token to validate.
         nonce_hash (str): The nonce hash belonging to the nonce in the ID token.
+    Returns:
+        The dictionary of JWT claims from the validated ID token.
     """
     public_key = await get_oidc_public_key(id_token)
 
@@ -638,33 +646,37 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
             audience=settings.oidc.client_id,
         )
     except jwt.InvalidTokenError as err:
-        logging.warning(f"Error while decoding ID Token: {err}")
+        logger.warning(f"Error while decoding ID Token: {err}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ID token")
 
     # Validate nonce
     nonce = claims.get("nonce")
     if not nonce:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (claims)")
+        logger.warning("Nonce not found in ID token")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
     if not nonce_hash:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (cookie)")
+        logger.warning("Nonce hash not found in cookie")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
     if not validate_secure_token(nonce, nonce_hash, settings.secret_key_value):
+        logger.warning("Nonce validation failed")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nonce validation failed")
 
     # Validate additional claims
     validations = settings.oidc.additional_token_validations.split(",")
     for validation in validations:
-        claim_name, claim_value = validation.split("=", 1)
+        claim_name, expected_claim_value = validation.split("=", 1)
+        claim_value = claims.get(claim_name)
         if claim_name not in claims:
-            logging.warning(f"Additional validation claim '{claim_name}' not found in ID token")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed (claim: {claim_name}")
-        elif claims[claim_name] != claim_value:
-            logging.warning(f"Additional validation claim '{claim_name}' not equal to '{claim_value}': {claims[claim_name]}")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed (claim: {claim_name}")
+            logger.error(f" OIDC additional validation claim '{claim_name}' not found in ID token")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
+        elif claim_value != expected_claim_value:
+            logger.error(f"OIDC additional validation claim '{claim_name}' value mismatch, {expected_claim_value=} {claim_value=}")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
 
     return claims
 
 
-def check_oidc_login(id_claims: dict[str, str], session: Session):
+def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
     """
     Find or create the creator matching the OIDC claims.
 
@@ -673,50 +685,66 @@ def check_oidc_login(id_claims: dict[str, str], session: Session):
         session (Session): database session
     """
     creator = None
-    for claim_name in ["sub", "email", "preferred_username"]:
+    # Optional: make the list of additional claims configurable
+    additional_claims_to_check = ["email", "preferred_username"]
+    for claim_name in ["sub"] + additional_claims_to_check:
         if claim_name in id_claims:
             claim_value = id_claims[claim_name]
             lookup_key = f"oidc:{claim_name}:{claim_value}"
             creator = session.query(Creator).where(Creator.EmployeeIdentifier == lookup_key).first()
             if creator:
+                logger.debug(f"Found creator {creator.CreatorName} matching '{lookup_key}'")
                 break
 
     if creator:
         if not creator.EmployeeIdentifier.startswith("oidc:sub:"):
-            # Update the identifier to use the 'sub' claim
+            # The use of identification claims other than the 'Subject' claim is in general insecure, as claims
+            # such as the email address or firstname-lastname combinations might change in the future,
+            # or might be writable by end users.
+            # To make sure that the authentication stays consistent and secure we update the identifier in the
+            # Eyened backend after a successful authentication if it isn't a 'Subject' claim.
             identifier = f"oidc:sub:{id_claims['sub']}"
+            logger.info(f"Replacing temporary OIDC authentication claim '{creator.EmployeeIdentifier}' with {identifier}")
             creator.EmployeeIdentifier = identifier
             session.add(creator)
             session.commit()
 
     else:
-        if not settings.oidc.create_new_accounts:
+        # No existing account was found
+        if settings.oidc.create_new_accounts:
+            # Create new account from ID token claims
+            # Optional: make the claim that is used to fill the username configurable
+            username = id_claims["preferred_username"]
+            identifier = f"oidc:sub:{id_claims['sub']}"
+            creator = create_user(session, username=username, password=None, employee_identifier=identifier)
+            logger.info(f"Created new account '{username}' for OIDC authenticated session, {identifier=}")
+        else:
+            logger.warning(f"Denied access to authenticated OIDC session, no existing account found and not creating a new one. Received claims: {id_claims}")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OIDC account not authorized")
-
-        # Create new account from ID token claims
-        username = id_claims["preferred_username"]
-        identifier = f"oidc:sub:{id_claims['sub']}"
-        creator = create_user(session, username=username, password=None, employee_identifier=identifier)
 
     return creator
 
 @router.post("/auth/oidc/authenticate")
-async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), oidc_nonce: str = Cookie(None), session: Session = Depends(get_db)):
+async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), oidc_nonce: str = Cookie(None), session: Session = Depends(get_db)) -> UserResponse:
     """Handle OIDC authentication using the code from the authorization URL."""
     # Unpack state
     try:
         state = json.loads(unquote(auth.state.strip()))
-    except JSONDecodeError:
+    except JSONDecodeError as err:
+        logger.warning(f"Error parsing OIDC authentication state: {err}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
 
     # Check CSRF in state
     csrf_token = oidc_csrf_token
     csrf_hash = state.get("csrf")
     if not csrf_token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing csrf token (cookie)")
+        logger.warning(f"No OIDC CSRF token found in cookie")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSRF token validation failed")
     if not csrf_hash:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing csrf token (state)")
+        logger.warning(f"No OIDC CSRF token hash found in authentication state")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSRF token validation failed")
     if not validate_secure_token(csrf_token, csrf_hash, settings.secret_key_value):
+        logger.warning(f"OIDC CSRF token validation failed")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSRF token validation failed")
 
     # Use code to authenticate at the provider
@@ -733,8 +761,9 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
             }
         )
         if not token_response.is_success:
+            logger.error(f"OIDC token retrieval failed, OIDC token endpoint responded with status {token_response.status_code}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token request"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token request failed"
             )
     token_data = token_response.json()
 
@@ -742,13 +771,19 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
     id_token = token_data.get("id_token")
     nonce_hash = oidc_nonce
     if not id_token:
+        logger.error(f"OIDC token response did not contain an ID token")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing ID token")
     if not nonce_hash:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing nonce (cookie)")
+        logger.warning(f"No OIDC nonce found in cookie")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
     claims = await validate_id_token(id_token, oidc_nonce)
 
     # Check claims with Creator database
     creator = check_oidc_login(claims, session)
+    logger.info(f"OIDC authenticated session for {creator.CreatorName}")
+
+    response.delete_cookie(key="oidc_csrf_token")
+    response.delete_cookie(key="oidc_nonce")
 
     access_token = create_access_token(
         creator.CreatorID, creator.CreatorName, creator.Role
@@ -773,7 +808,5 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         samesite="strict",
         path="/",
     )
-    response.delete_cookie(key="oidc_csrf_token")
-    response.delete_cookie(key="oidc_nonce")
 
     return creator_to_response(creator, session)

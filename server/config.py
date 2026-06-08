@@ -75,7 +75,7 @@ class OIDCSettings(BaseSettings):
                                                       "found at `<issuer URL>/.well-known/openid-configuration`")
     redirect_url: str = Field(default="", description="The full URL to the redirect page in the EyeNED viewer where "
                                                       "the user is sent after authentication, should be "
-                                                      "`https://<eyened URL>/oidc-callback`")
+                                                      "`https://<eyened URL>/users/oidc-callback`")
     provider_name: str = Field(default="OpenID Connect", description="The OIDC provider's name, or organisational name "
                                                                      "for the authentication flow")
     create_new_accounts: bool = Field(default=False, description="Whether or not to create new accounts for unknown "

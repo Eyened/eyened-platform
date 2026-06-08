@@ -83,12 +83,14 @@ async def lifespan(app: FastAPI):
     if settings.public_auth_disabled:
         print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
 
-    # # before startup
+    # before startup
     logging.basicConfig()
     if settings.debug:
         logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+        logging.getLogger("server").setLevel(logging.DEBUG)
     else:
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+        logging.getLogger("server").setLevel(logging.INFO)
 
     # Initialize database modification logger
     init_db_logger(settings)
