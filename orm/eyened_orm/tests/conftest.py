@@ -1,4 +1,4 @@
-"""Pytest fixtures for importer unit tests."""
+"""Pytest fixtures for ORM unit tests."""
 
 from eyened_orm.utils.sqlite_testdb import SessionLocal, engine, session
 

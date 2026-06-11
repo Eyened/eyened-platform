@@ -627,40 +627,93 @@ class Feature(Base):
 
     @classmethod
     def from_list(
-        cls, session, feature_name: str, sub_features: List[str] | None = None
+        cls,
+        session,
+        feature_name: str,
+        sub_features: List[str] | None = None,
+        *,
+        verbose: bool = False,
     ) -> "Feature":
         """
-        Create a feature hierarchy from a list of feature names.
-        If a feature does not exist, it will be created.
-        If a feature already exists, it will be appended to the parent.
+        Get or create a feature hierarchy from a list of sub-feature names.
+
+        Idempotent: repeated calls with the same arguments leave the database
+        in the same state. Existing parent features are reused; sub-feature
+        links are added, removed, or reordered to match ``sub_features``.
         """
-        feature = cls(FeatureName=feature_name)
-        session.add(feature)
-        session.flush()
+        def log(message: str) -> None:
+            if verbose:
+                print(message)
+
+        feature = cls.by_name(session, feature_name)
+        if feature is None:
+            feature = cls(FeatureName=feature_name) 
+            session.add(feature)
+            session.flush()
+            log(f"Created feature: {feature_name}")
+        else:
+            log(f"Found existing feature: {feature_name}")  
 
         if sub_features is None:
             return feature
 
-        if isinstance(sub_features, list):
-            # first create the sub-features that don't exist
-            for sub_feature in sub_features:
-                if Feature.by_name(session, sub_feature) is None:
-                    session.add(Feature(FeatureName=sub_feature))
-            session.flush()
+        if not isinstance(sub_features, list):
+            raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
 
-            # then create the feature associations
-            for i, sub_feature in enumerate(sub_features):
+        for sub_feature in sub_features:
+            if cls.by_name(session, sub_feature) is None:
+                session.add(cls(FeatureName=sub_feature))
+                session.flush()
+                log(f"Created sub-feature: {sub_feature}")
+
+        session.flush()
+
+        # index -> (child_id, child_name)
+        target_links: Dict[int, tuple[int, str]] = {}
+        for i, sub_feature in enumerate(sub_features):
+            child = cls.by_name(session, sub_feature)
+            target_links[i + 1] = (child.FeatureID, sub_feature)
+
+        current_links = {
+            (assoc.FeatureIndex, assoc.ChildFeatureID): assoc
+            for assoc in feature.FeatureAssociations
+        }
+        target_keys = {
+            (index, child_id) for index, (child_id, _) in target_links.items()
+        }
+
+        if set(current_links.keys()) == target_keys:
+            log(f"Feature '{feature_name}' sub-features already match; no changes")
+            return feature
+
+        for key, assoc in list(current_links.items()):
+            if key not in target_keys:
+                session.delete(assoc)
+                log(
+                    f"Removed link: {feature_name}[{assoc.FeatureIndex}]"
+                    f" -> {assoc.Child.FeatureName}"
+                )
+
+        session.flush()
+        session.expire(feature, ["FeatureAssociations"])
+
+        current_keys = {
+            (assoc.FeatureIndex, assoc.ChildFeatureID)
+            for assoc in feature.FeatureAssociations
+        }
+        for index, (child_id, child_name) in target_links.items():
+            key = (index, child_id)
+            if key not in current_keys:
                 feature.FeatureAssociations.append(
                     FeatureFeatureLink(
                         ParentFeatureID=feature.FeatureID,
-                        ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
-                        FeatureIndex=i + 1,
+                        ChildFeatureID=child_id,
+                        FeatureIndex=index,
                     )
                 )
-        else:
-            raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
-        session.flush()
+                log(f"Added link: {feature_name}[{index}] -> {child_name}")
 
+        session.flush()
         return feature
 
     @property

@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-from sqlalchemy import create_engine
+import pytest
+from sqlalchemy import create_engine, event
 from sqlalchemy.dialects.mysql import JSON as MySQLJSON
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.ext.compiler import compiles
@@ -15,12 +16,9 @@ from sqlalchemy.sql.sqltypes import BLOB, JSON
 def _add_repo_orm_to_syspath() -> None:
     """
     Make `import eyened_orm` work when running from a git checkout without installation.
-
-    This matches the unit test setup in `orm/tests/conftest.py`.
     """
 
-    repo_root = Path(__file__).resolve().parents[2]
-    orm_root = repo_root / "orm"
+    orm_root = Path(__file__).resolve().parents[2]
     if str(orm_root) not in sys.path:
         sys.path.insert(0, str(orm_root))
 
@@ -61,6 +59,13 @@ def create_sqlite_memory_engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    @event.listens_for(engine, "connect")
+    def _sqlite_set_pragma(dbapi_connection, _connection_record):  # noqa: ANN001
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(engine)
     return engine
 
@@ -75,4 +80,21 @@ def create_sqlite_memory_sessionmaker(*, expire_on_commit: bool = False):
         expire_on_commit=expire_on_commit,
         class_=Session,
     )
+
+
+@pytest.fixture(scope="function")
+def engine():
+    """In-memory SQLite engine shared by all sessions in a test."""
+    return create_sqlite_memory_engine()
+
+
+@pytest.fixture(scope="function")
+def SessionLocal(engine):
+    return sessionmaker(bind=engine, future=True, expire_on_commit=False, class_=Session)
+
+
+@pytest.fixture(scope="function")
+def session(SessionLocal):
+    with SessionLocal() as s:
+        yield s
 
