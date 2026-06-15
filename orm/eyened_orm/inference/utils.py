@@ -20,6 +20,12 @@ def normalize(im, ce=None):
     return im_norm
 
 
+def load_image_rgb(image_path) -> np.ndarray:
+    """Load a fundus image as a uint8 RGB array. Supports DICOM and raster formats."""
+    from rtnls_fundusprep.utils import open_image
+    return open_image(image_path)
+
+
 def preprocess_image(image_path, resize=512, apply_ce=False):
     from rtnls_fundusprep.mask_extraction import get_cfi_bounds
     from rtnls_inference.utils import load_image

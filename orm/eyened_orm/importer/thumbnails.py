@@ -16,45 +16,44 @@ from eyened_orm.importer.preparation.thumbnail_util import (
 )
 
 
-def get_thumbnail(im: ImageInstance):
+def pixel_array_to_2d(im: ImageInstance) -> np.ndarray:
+    """Extract a displayable 2D numpy array from an image instance.
 
+    For OCT volumes this produces either a middle B-scan or an enface projection.
+    """
     pixel_array = im.pixel_array
     shape = pixel_array.shape
     if len(shape) == 3:
         if shape[2] <= 4:  # grayscale, RGB or RGBA
             return pixel_array.squeeze()
-        else:  # OCT
-            n_scans, _, _ = pixel_array.shape
-            if n_scans == 1:
-                # single B-scan
-                return pixel_array.squeeze()
-            elif n_scans < 10:
-                # few B-scans (take the middle one)
-                return pixel_array[n_scans // 2]
-            else:
-                # many B-scans (create enface projection)
-                np_im = pixel_array.mean(axis=1)
-                try:
-                    np_im = np_im - np.min(np_im)
-                    np_im = np_im / np.max(np_im)
-                    np_im = (np_im * 255).astype(np.uint8)
-                except ValueError:
-                    pass
+        # OCT volume: shape is (n_scans, H, W)
+        n_scans, _, _ = pixel_array.shape
+        if n_scans == 1:
+            return pixel_array.squeeze()
+        if n_scans < 10:
+            return pixel_array[n_scans // 2]
+        # many B-scans: enface projection
+        np_im = pixel_array.mean(axis=1)
+        try:
+            np_im = np_im - np.min(np_im)
+            np_im = np_im / np.max(np_im)
+            np_im = (np_im * 255).astype(np.uint8)
+        except ValueError:
+            pass
 
-                try:
-                    aspect_ratio = im.ResolutionHorizontal / im.ResolutionVertical
-                except (TypeError, ZeroDivisionError):
-                    aspect_ratio = 1
+        try:
+            aspect_ratio = im.ResolutionHorizontal / im.ResolutionVertical
+        except (TypeError, ZeroDivisionError):
+            aspect_ratio = 1
 
-                h, w = np_im.shape
-                if aspect_ratio > 1:
-                    target_shape = (int(w * aspect_ratio), h)
-                else:
-                    target_shape = (w, int(h / aspect_ratio))
+        h, w = np_im.shape
+        if aspect_ratio > 1:
+            target_shape = (int(w * aspect_ratio), h)
+        else:
+            target_shape = (w, int(h / aspect_ratio))
+        return cv2.resize(np_im, target_shape, interpolation=cv2.INTER_LINEAR)
 
-                return cv2.resize(np_im, target_shape, interpolation=cv2.INTER_LINEAR)
-    else:
-        return pixel_array
+    return pixel_array
 
 
 def get_thumbnail_identifier(im: ImageInstance) -> str:
@@ -63,17 +62,24 @@ def get_thumbnail_identifier(im: ImageInstance) -> str:
 
 
 def generate_thumbnail_base_image(im: ImageInstance, *, max_size: int) -> Image.Image:
-    """
-    Generate a base PIL image from which thumbnails are derived.
+    """Generate a base PIL image from which thumbnails are derived.
+
+    For color fundus images the image is cropped to the CFI bounds.
+    If bounds are unavailable a warning is printed and the full image is used.
     """
     if im.Modality == Modality.ColorFundus:
         bounds = im.bounds_with_image
-        if bounds is None:
-            raise ValueError("Bounds are not available for color fundus images")
-        _, bounds_cropped = bounds.crop(max_size)
-        np_im = bounds_cropped.image
+        if bounds is not None:
+            _, bounds_cropped = bounds.crop(max_size)
+            np_im = bounds_cropped.image
+        else:
+            print(
+                f"Warning: CFI bounds not available for image {im.ImageInstanceID}, "
+                "using full image for thumbnail"
+            )
+            np_im = pixel_array_to_2d(im)
     else:
-        np_im = get_thumbnail(im)
+        np_im = pixel_array_to_2d(im)
     return Image.fromarray(np_im)
 
 
