@@ -11,17 +11,18 @@
 	import ChevronLeft from "@lucide/svelte/icons/chevron-left";
 	import ChevronRight from "@lucide/svelte/icons/chevron-right";
 	import BrowserOverlay from "./BrowserOverlay.svelte";
+	import HelpOverlay from "./HelpOverlay.svelte";
 	import Task from "./icons/Task.svelte";
 
 	const viewerWindowContext = getContext<ViewerWindowContext>(
 		"viewerWindowContext",
 	);
 	const taskContext = getContext<TaskContext>("taskContext");
-	let selectedPanel: "task" | "browser" | null = $state(null);
+	let selectedPanel: "task" | "browser" | "help" | null = $state(null);
 
 	const navigation = new TaskNavigation(taskContext);
 
-	function selectPanel(panel: "task" | "browser" | null) {
+	function selectPanel(panel: "task" | "browser" | "help" | null) {
 		if (selectedPanel == panel) {
 			selectedPanel = null;
 		} else {
@@ -73,6 +74,9 @@
 			{#if selectedPanel == "browser"}
 				<BrowserOverlay {viewerWindowContext} />
 			{/if}
+			{#if selectedPanel == "help"}
+				<HelpOverlay />
+			{/if}
 		</div>
 	</div>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -95,6 +99,7 @@
 			</div>
 			<div class="icon" onclick={() => selectPanel("task")}><Task /></div>
 		{/if}
+		<div class="icon" onclick={() => selectPanel("help")}>?</div>
 		<div class="icon" onclick={() => selectPanel("browser")}>+</div>
 	</div>
 {/if}
