@@ -10,14 +10,6 @@ from eyened_orm.commands.model_processing import (
     CFI_ATTRIBUTE_MODEL_SLUGS,
     CFI_SEGMENTATION_MODEL_SLUGS,
     OCT_SEGMENTATION_MODEL_SLUGS,
-    _get_device,
-    run_cfi_attribute_pipeline,
-)
-from eyened_orm.inference.cfi_amd_segmentation import (
-    run_for_image_ids as run_cfi_amd_for_image_ids,
-)
-from eyened_orm.inference.layer_segmentation import (
-    run_for_image_ids as run_layer_segmentation_for_image_ids,
 )
 from eyened_orm.api_client import get_api_client
 from eyened_orm.image_instance import ImageInstance, Modality
@@ -42,6 +34,47 @@ class ProcessMode(StrEnum):
     SKIP = "skip"
     ENQUEUE = "enqueue"  # API / worker
     LOCAL = "local"  # same functions as RQ, same process
+
+
+def _local_cfi_attribute(
+    session: Session,
+    image_ids: list[int],
+    model_slug: str,
+    *,
+    device: str | None,
+) -> None:
+    from eyened_orm.commands.model_processing import _get_device, run_cfi_attribute_pipeline
+
+    run_cfi_attribute_pipeline(
+        session,
+        image_ids,
+        model_slug,
+        device=_get_device(device),
+    )
+
+
+def _local_cfi_amd(
+    session: Session,
+    image_ids: list[int],
+    *,
+    device: str | None,
+) -> None:
+    from eyened_orm.commands.model_processing import _get_device
+    from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
+
+    run_for_image_ids(session, image_ids, device=_get_device(device))
+
+
+def _local_layer_segmentation(
+    session: Session,
+    image_ids: list[int],
+    *,
+    device: str | None,
+) -> None:
+    from eyened_orm.commands.model_processing import _get_device
+    from eyened_orm.inference.layer_segmentation import run_for_image_ids
+
+    run_for_image_ids(session, image_ids, device=_get_device(device))
 
 
 class PostImport:
@@ -98,7 +131,6 @@ class PostImport:
             for image in self.images
             if image.Modality == Modality.OCT
         ]
-        torch_device = _get_device(device)
 
         self._run_step(
             "thumbnails",
@@ -127,8 +159,8 @@ class PostImport:
                 enqueue=lambda s=slug: self.client.enqueue_run_cfi_models(
                     image_ids=cfi_image_ids, model=s
                 ),
-                local=lambda s=slug: run_cfi_attribute_pipeline(
-                    session, cfi_image_ids, s, device=torch_device
+                local=lambda s=slug: _local_cfi_attribute(
+                    session, cfi_image_ids, s, device=device
                 ),
             )
 
@@ -138,9 +170,7 @@ class PostImport:
             cfi_image_ids,
             session=session,
             enqueue=lambda: self.client.enqueue_run_cfi_amd(image_ids=cfi_image_ids),
-            local=lambda: run_cfi_amd_for_image_ids(
-                session, cfi_image_ids, device=torch_device
-            ),
+            local=lambda: _local_cfi_amd(session, cfi_image_ids, device=device),
         )
 
         self._run_step(
@@ -151,7 +181,7 @@ class PostImport:
             enqueue=lambda: self.client.enqueue_run_layer_segmentation(
                 image_ids=oct_image_ids
             ),
-            local=lambda: run_layer_segmentation_for_image_ids(
-                session, oct_image_ids, device=torch_device
+            local=lambda: _local_layer_segmentation(
+                session, oct_image_ids, device=device
             ),
         )
