@@ -7,15 +7,17 @@ from enum import Enum
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from sqlalchemy.orm import Session
 
 from eyened_orm.base import Base
 
-from eyened_orm.image_instance import ImageInstance
 from eyened_orm.utils.table_printer import format_table_html
+
+if TYPE_CHECKING:
+    from eyened_orm.image_instance import ImageInstance
 
 
 def _serialize(value: Any) -> Any:
@@ -233,6 +235,8 @@ class ImportRun:
 
         Use after ``apply()`` so primary keys are flushed.
         """
+        from eyened_orm.image_instance import ImageInstance
+
         return [
             change.entity
             for change in self.changes

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -17,16 +18,13 @@ from PIL import Image, ImageOps
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
-from eyened_orm import Database, ImageInstance, Modality
 from eyened_orm.data_access import load_storage_root
+
+if TYPE_CHECKING:
+    from eyened_orm import Database, ImageInstance, Modality
 
 THUMBNAIL_SIZES: tuple[int, ...] = (144, 540)
 THUMBNAIL_COMMIT_INTERVAL = 100
-
-
-def thumbnails_folder() -> Path:
-    """Absolute path to the thumbnails storage root."""
-    return load_storage_root() / "thumbnails"
 
 
 def allocate_thumbnail_path(project_id: int) -> str:
@@ -36,7 +34,13 @@ def allocate_thumbnail_path(project_id: int) -> str:
 
 
 def thumbnail_filename(thumbnail_path: str, size: int) -> str:
+    """File name under ``{EYENED_STORAGE_ROOT}/thumbnails/`` (includes size suffix)."""
     return f"{thumbnail_path}_{size}.jpg"
+
+
+def thumbnails_folder() -> Path:
+    """Absolute path to the thumbnails storage root."""
+    return load_storage_root() / "thumbnails"
 
 
 def pixel_array_to_2d(
@@ -91,6 +95,8 @@ def build_base_pil_image(im: ImageInstance, *, max_size: int) -> Image.Image:
     For color fundus images the image is cropped to the CFI bounds.
     If bounds are unavailable a warning is printed and the full image is used.
     """
+    from eyened_orm import Modality
+
     res_h = im.ResolutionHorizontal
     res_v = im.ResolutionVertical
     if im.Modality == Modality.ColorFundus:
@@ -136,7 +142,6 @@ def persist_thumbnail_images(
     thumbnails: dict[int, Image.Image],
     thumbnails_folder: Path,
 ) -> dict[int, Path]:
-    # layout matches ``ImageInstance.get_thumbnail_filename``
     written: dict[int, Path] = {}
     for size, thumb in thumbnails.items():
         path = thumbnails_folder / thumbnail_filename(thumbnail_path, size)
@@ -161,6 +166,8 @@ def save_thumbnails(
 def get_missing_thumbnail_images(
     session: Session, include_failed: bool
 ) -> list[ImageInstance]:
+    from eyened_orm import ImageInstance
+
     # NULL: never generated; "" : previous generation failed
     where = ImageInstance.ThumbnailPath == None
     if include_failed:
@@ -171,6 +178,8 @@ def get_missing_thumbnail_images(
 
 
 def _needs_cfi_roi(im: ImageInstance) -> bool:
+    from eyened_orm import Modality
+
     if im.Modality != Modality.ColorFundus:
         return False
     roi = im.roi
@@ -229,6 +238,8 @@ def run_update_thumbnails_for_image_ids(
     sizes: tuple[int, ...],
     print_errors: bool,
 ) -> None:
+    from eyened_orm import ImageInstance
+
     ids = set(image_ids)
     images = ImageInstance.by_ids(session, ids)
     if len(images) != len(ids):

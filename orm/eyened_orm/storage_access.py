@@ -64,5 +64,9 @@ def resolve_image_data_ref(
 def resolve_thumbnail_ref(image_instance, *, size: int = 144) -> StorageRef:
     if not image_instance.ThumbnailPath:
         raise ValueError("Image thumbnail path is missing")
-    # thumbnail filename resolved under storage root by data access layer
-    return StorageRef("thumbnails", f"{image_instance.ThumbnailPath}_{size}.jpg")
+    from eyened_orm.importer.thumbnails import thumbnail_filename
+
+    return StorageRef(
+        "thumbnails",
+        thumbnail_filename(image_instance.ThumbnailPath, size),
+    )

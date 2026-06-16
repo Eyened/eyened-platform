@@ -470,7 +470,11 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return storage.ObjectKey if storage and storage.ObjectKey else ""
 
     def get_thumbnail_filename(self, size: int) -> str:
-        return f"{self.ThumbnailPath}_{size}.jpg"
+        if not self.ThumbnailPath:
+            raise ValueError("Image thumbnail path is missing")
+        from eyened_orm.importer.thumbnails import thumbnail_filename
+
+        return thumbnail_filename(self.ThumbnailPath, size)
 
     def get_thumbnail(self, size):
         adapter = get_data_access_adapter()
