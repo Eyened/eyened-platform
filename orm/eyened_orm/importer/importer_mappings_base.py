@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
+from eyened_orm import Creator, Feature
 from eyened_orm.base import Base
 from eyened_orm.project import Contact
 
@@ -88,5 +89,28 @@ CONTACT = Entity(
         "Email": "contact_email",
         "Institute": "contact_institute",
         "Orcid": "contact_orcid",
+    },
+)
+
+CREATOR = Entity(
+    model=Creator,
+    pk_column="CreatorID",
+    pk_row_field="creator_id",
+    lookups=(lookup(key("CreatorName")),),
+    fields={
+        "CreatorName": "creator_name",
+        "EmployeeIdentifier": "creator_employee_identifier",
+        "IsHuman": "creator_is_human",
+        "Description": "creator_description",
+    },
+)
+
+FEATURE = Entity(
+    model=Feature,
+    pk_column="FeatureID",
+    pk_row_field="feature_id",
+    lookups=(lookup(key("FeatureName")),),
+    fields={
+        "FeatureName": "feature_name",
     },
 )

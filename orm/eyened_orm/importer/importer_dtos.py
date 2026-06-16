@@ -263,6 +263,32 @@ class ImportRow(InstancePOST):
         return self
 
 
+class ImportSegmentationRow(BaseModel):
+    """Flat row for ``SEGMENTATION_ENTITY_SPECS`` (stage 2; image must already exist)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    image_instance_id: int
+    creator_name: str
+    feature_name: str
+    creator_is_human: bool = True
+    depth: int
+    height: int
+    width: int
+    sparse_axis: int = 0
+    data_representation: DataRepresentation
+    data_type: Datatype
+    segmentation_id: Optional[int] = None
+    creator_id: Optional[int] = None
+    feature_id: Optional[int] = None
+    threshold: Optional[float] = None
+    image_projection_matrix: Optional[List[List[float]]] = None
+    scan_indices: Optional[List[int]] = None
+    reference_segmentation_id: Optional[int] = None
+    inactive: Optional[bool] = None
+    subtask_id: Optional[int] = None
+
+
 class ImportTaskRow(ContactImportFields, BaseModel):
     """
     One flat record for the **task** importer graph (``TASK_ENTITY_SPECS``).

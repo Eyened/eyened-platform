@@ -179,26 +179,6 @@ def parse_import_update(d: dict[str, Any], session: Session) -> ImportUpdate:
         raise ValueError(f"Unknown import update type: {d['type']}")
 
 
-def color_fundus_image_ids_from_import_run(import_run: ImportRun) -> list[int]:
-    """Collect ``ImageInstanceID``s for ColorFundus images created in this run.
-
-    Only considers ``ImportCreate`` changes whose entity is an ``ImageInstance``.
-    Use after ``apply()`` (and typically after IDs are flushed) so PKs are set.
-    """
-    from eyened_orm import ImageInstance
-    from eyened_orm.image_instance import Modality
-
-    ids: list[int] = []
-    for change in import_run.changes:
-        if not isinstance(change, ImportCreate):
-            continue
-        if not isinstance(change.entity, ImageInstance):
-            continue
-        if change.entity.Modality == Modality.ColorFundus:
-            ids.append(change.entity.ImageInstanceID)
-    return ids
-
-
 class ImportRun:
     def __init__(
         self,
@@ -249,11 +229,28 @@ class ImportRun:
             raise
 
     def get_new_images(self) -> list[ImageInstance]:
+        """``ImageInstance`` objects created in this run (``ImportCreate`` changes only).
+
+        Use after ``apply()`` so primary keys are flushed.
+        """
         return [
             change.entity
             for change in self.changes
             if isinstance(change, ImportCreate)
             and isinstance(change.entity, ImageInstance)
+        ]
+
+    def color_fundus_image_ids(self) -> list[int]:
+        """``ImageInstanceID``s for ColorFundus images created in this run.
+
+        Use after ``apply()`` (and typically after IDs are flushed) so PKs are set.
+        """
+        from eyened_orm.image_instance import Modality
+
+        return [
+            im.ImageInstanceID
+            for im in self.get_new_images()
+            if im.Modality == Modality.ColorFundus
         ]
 
     def add_update(self, entity: Base, updates: dict[str, Update]):
@@ -301,6 +298,48 @@ class ImportRun:
         with path.open("r", encoding="utf-8") as f:
             return cls.from_dict(session, json.load(f))
 
+    def _entity_summary_rows(self) -> list[tuple[str, int, int, int]]:
+        per = defaultdict(lambda: {"Update": 0, "Create": 0})
+        for ch in self.changes:
+            name = ch.entity.__class__.__name__
+            per[name]["Create" if ch.name == "CREATE" else "Update"] += 1
+        rows = sorted(
+            per.items(), key=lambda kv: kv[1]["Update"] + kv[1]["Create"], reverse=True
+        )
+        return [
+            (entity, c["Update"], c["Create"], c["Update"] + c["Create"])
+            for entity, c in rows
+        ]
+
+    @staticmethod
+    def _format_summary_table(headers: list[str], rows: list[tuple]) -> str:
+        str_rows = [[str(cell) for cell in row] for row in rows]
+        widths = [len(header) for header in headers]
+        for row in str_rows:
+            for i, cell in enumerate(row):
+                widths[i] = max(widths[i], len(cell))
+
+        def format_row(cells: list[str]) -> str:
+            return "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(cells))
+
+        lines = [
+            format_row(headers),
+            format_row(["-" * width for width in widths]),
+        ]
+        lines.extend(format_row(row) for row in str_rows)
+        return "\n".join(lines)
+
+    def summary(self) -> str:
+        lines = [
+            f"Import run: {self.import_run_id}",
+            f"Status: {self.status}",
+            f"Total changes: {len(self.changes)}",
+            "",
+        ]
+        headers = ["Entity", "Update", "Create", "Total"]
+        lines.append(self._format_summary_table(headers, self._entity_summary_rows()))
+        return "\n".join(lines)
+
     def full_summary(self) -> str:
         lines = [
             f"Import run {self.import_run_id}",
@@ -311,22 +350,14 @@ class ImportRun:
             lines.append(f"{i}. {change.summary()}")
         return "\n".join(lines)
 
-    def display_summary(self) -> None:
-        per = defaultdict(lambda: {"Update": 0, "Create": 0})
-        for ch in self.changes:
-            name = ch.entity.__class__.__name__
-            per[name]["Create" if ch.name == "CREATE" else "Update"] += 1
-        rows = sorted(
-            per.items(), key=lambda kv: kv[1]["Update"] + kv[1]["Create"], reverse=True
-        )
+    def display_summary(self, console: bool = False) -> None:
+        if console:
+            print(self.summary())
+            return
+
         entity_data = [
-            (
-                entity,
-                c["Update"] or "",
-                c["Create"] or "",
-                (c["Update"] + c["Create"]) or "",
-            )
-            for entity, c in rows
+            (entity, update or "", create or "", total or "")
+            for entity, update, create, total in self._entity_summary_rows()
         ]
 
         from IPython.display import display, HTML

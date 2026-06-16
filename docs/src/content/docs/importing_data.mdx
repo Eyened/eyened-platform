@@ -48,3 +48,11 @@ Authenticate first (session cookie), then call the endpoint. Example workflow: [
 For batch work, use `plan_image_import` → review (`run.display_summary()`) → `run.apply()` → `session.commit()`. Optional JSON export supports audit and undo.
 
 Full guide: **[ORM Importer](/eyened-platform/orm/importer)**.
+
+## Thumbnails
+
+Import endpoints do **not** generate thumbnails. After images are in the database, generate them via the [Thumbnails](/eyened-platform/thumbnails) guide:
+
+- **`eorm update-thumbnails`** — repair all missing thumbnails from the shell
+- **`PostImport`** — run after `run.apply()` for newly imported instances (local or enqueue)
+- **`POST /api/import/update_thumbnails`** — queue a background job (requires an RQ worker on the `default` queue)

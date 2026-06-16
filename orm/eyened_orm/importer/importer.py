@@ -334,11 +334,11 @@ class Builder:
         return result
 
     def get_updates(
-        self, entity: Entity, row: Any, obj: Base
+        self, entity: Entity, row: Any, obj: Base, *, creating: bool = False
     ) -> dict[str, Update]:
         updates = {}
         for orm_field, row_field in entity.fields.items():
-            if orm_field in entity.non_mutable:
+            if orm_field in entity.non_mutable and not creating:
                 continue
             new_value = getattr(row, row_field, None)
             if new_value is None:
@@ -411,7 +411,7 @@ class Builder:
                     created_by_key[key] = obj
                     created = True
                 self.cache.seed(entity, row, obj)
-            field_updates = self.get_updates(entity, row, obj)
+            field_updates = self.get_updates(entity, row, obj, creating=created)
             updates.update(field_updates)
             if created:
                 import_run.add_create(obj, updates)

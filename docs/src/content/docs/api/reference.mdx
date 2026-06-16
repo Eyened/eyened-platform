@@ -108,13 +108,55 @@ Remove a tag from an image instance.
 
 Import a single image into the platform. See [Importing Data](/eyened-platform/importing_data) for detailed documentation.
 
+### POST /api/import/update_thumbnails
+
+Queue a background job to generate thumbnails for all images with missing (or optionally failed) `ThumbnailPath`. Returns a `task_id` for status polling.
+
+**Query parameters:** `failed` (bool), `print_errors` (bool)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Thumbnail update task queued successfully",
+  "task_id": "<uuid>",
+  "task_ids": null,
+  "error": null
+}
+```
+
+See [Thumbnails](/eyened-platform/thumbnails) for worker setup and status checks.
+
+### POST /api/import/update_thumbnails_for_image_ids
+
+Queue thumbnail generation for a specific list of `ImageInstanceID`s.
+
+**Request body:** `{ "image_ids": [int, ...], "print_errors": bool }`
+
+**Response:** same `TaskResponse` as above.
+
+### GET /api/import/status/\{task_id\}
+
+Poll RQ job status for any import-queue task (thumbnails, CFI models, etc.).
+
+**Response:**
+
+```json
+{
+  "task_id": "<uuid>",
+  "status": "queued | started | finished | failed | ...",
+  "result": true
+}
+```
+
+Returns `{ "error": "job not found" }` if the ID is unknown.
+
+Full workflow: [Thumbnails — API](/eyened-platform/thumbnails#api).
+
 ### POST /api/import/run_inference
 
 Queue a background task to run AI model inference on images.
-
-### POST /api/import/update_thumbnails
-
-Queue a background task to update thumbnails for all images.
 
 ## Segmentations
 

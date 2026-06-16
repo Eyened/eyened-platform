@@ -18,6 +18,7 @@ export default defineConfig({
                 { slug: 'about' },
                 { slug: 'getting_started' },
                 { slug: 'importing_data' },
+                { slug: 'thumbnails' },
                 { slug: 'import_metadata_fields' },
                 { slug: 'platform_design' },
                 { slug: 'guides/development_setup' },

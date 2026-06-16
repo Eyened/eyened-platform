@@ -45,11 +45,9 @@ eorm create-user [OPTIONS]
 
 ### update-thumbnails
 
-Updates thumbnails for images in the database. Use this after thumbnail-generation logic changes or to fill in missing thumbnails.
+Updates thumbnails for images in the database. Equivalent to `POST /api/import/update_thumbnails` but runs in-process (no worker).
 
-```bash
-eorm update-thumbnails [OPTIONS]
-```
+See **[Thumbnails](/eyened-platform/thumbnails#cli)** for options and behavior.
 
 ### run-models
 

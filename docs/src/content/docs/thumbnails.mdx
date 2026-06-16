@@ -1,0 +1,181 @@
+---
+title: Thumbnails
+description: Generate and update image thumbnails (CLI, importer, API, worker)
+---
+
+Thumbnails are JPEG files under `{EYENED_STORAGE_ROOT}/thumbnails/`. The database column `ImageInstance.ThumbnailPath` stores a **relative path prefix** (no extension); files are written as `{ThumbnailPath}_144.jpg` and `{ThumbnailPath}_540.jpg`.
+
+| `ThumbnailPath` | Meaning |
+|-----------------|--------|
+| `NULL` | Never generated — eligible for thumbnail jobs |
+| `""` (empty) | Generation ran and failed |
+| any other string | Success — prefix under the thumbnails root |
+
+Generation (see [`thumbnails.py`](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/thumbnails.py)) runs **CFI ROI** on ColorFundus images when no usable `CFI_ROI` attribute exists, crops to bounds when available (full image otherwise), then writes **letterboxed** square thumbnails.
+
+All paths below call the same ORM core: `update_thumbnails` → `save_thumbnails`.
+
+## CLI
+
+Scan the database for images missing thumbnails and generate them in-process:
+
+```bash
+eorm update-thumbnails --env prod
+eorm update-thumbnails --failed --print-errors --env prod
+```
+
+- Default: `ThumbnailPath IS NULL`
+- `--failed`: also retry images with `ThumbnailPath == ""`
+- `--print-errors`: log per-image errors to stdout
+
+Requires ORM env (database + `EYENED_STORAGE_ROOT` / mounts) on the machine where you run the command.
+
+## Importer (after import)
+
+Import via [Importing data](/eyened-platform/importing_data) or the [ORM importer](/eyened-platform/orm/importer) does **not** generate thumbnails during `prepare_rows`. Run them after commit with `PostImport`:
+
+```python
+from eyened_orm.importer import PostImport, ProcessMode, plan_image_import
+
+run = plan_image_import(session, rows, defaults=defaults)
+run.apply()
+session.commit()
+
+PostImport(
+    run.get_new_images(),
+    processing={
+        "thumbnails": ProcessMode.LOCAL,    # in-process
+        # "thumbnails": ProcessMode.ENQUEUE,  # queue on API worker (see below)
+    },
+    print_errors=True,
+).run(session)
+```
+
+`ProcessMode.LOCAL` calls `run_update_thumbnails_for_image_ids` directly. `ProcessMode.ENQUEUE` uses the API client (`POST /api/import/update_thumbnails_for_image_ids`) and needs a running worker.
+
+## API
+
+Thumbnail jobs are **asynchronous**: the API enqueues work on Redis (RQ) and returns immediately. A worker must consume the **`default`** queue (see [Worker](#worker)).
+
+### POST `/api/import/update_thumbnails`
+
+Equivalent to `eorm update-thumbnails`. Scans the DB for images that need thumbnails.
+
+**Query parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `failed` | `false` | Include images with empty `ThumbnailPath` |
+| `print_errors` | `false` | Log per-image errors on the worker |
+
+**Example:**
+
+```bash
+curl -X POST "$API_URL/api/import/update_thumbnails?failed=false&print_errors=true" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response** (`TaskResponse`):
+
+```json
+{
+  "success": true,
+  "message": "Thumbnail update task queued successfully",
+  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "task_ids": null,
+  "error": null
+}
+```
+
+On queue failure, `success` is `false`, `task_id` is null, and `error` contains the message.
+
+Save `task_id` to poll [job status](#job-status).
+
+### POST `/api/import/update_thumbnails_for_image_ids`
+
+Generate thumbnails for specific `ImageInstanceID`s (used by `PostImport` enqueue mode and after bulk import).
+
+**Request body:**
+
+```json
+{
+  "image_ids": [395, 396],
+  "print_errors": false
+}
+```
+
+**Response:** same `TaskResponse` shape as above (`message` refers to the by-ID job).
+
+### Job status
+
+**GET `/api/import/status/{task_id}`**
+
+Poll until the worker finishes. Uses the `task_id` from the enqueue response.
+
+**Example:**
+
+```bash
+curl "$API_URL/api/import/status/a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+
+```json
+{
+  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "finished",
+  "result": true
+}
+```
+
+`status` is an RQ job status, e.g. `queued`, `started`, `finished`, `failed`, `deferred`, `canceled`. When `status` is `finished`, `result` is the worker return value (`true` on success). On failure, check worker logs (especially with `print_errors=true`) and whether `ThumbnailPath` was set to `""`.
+
+Unknown or expired jobs:
+
+```json
+{ "error": "job not found" }
+```
+
+**Python (API client):**
+
+```python
+from eyened_orm.api_client import get_api_client
+
+client = get_api_client()
+resp = client.enqueue_update_thumbnails(failed=False, print_errors=True)
+task_id = resp["task_id"]
+
+status = client.get("/api/import/status/" + task_id).json()
+```
+
+## Worker
+
+The API only **enqueues** jobs. Execution happens in an RQ worker that shares:
+
+- **Redis** with the API (`EYENED_REDIS_*`) — same broker for enqueue and consume
+- **Database** credentials (`EYENED_DATABASE_*`) — ORM reads/writes `ThumbnailPath`
+- **Storage** — `EYENED_STORAGE_ROOT` and `EYENED_STORAGE_MOUNTS` so workers can read source images and write thumbnails
+
+Thumbnail jobs are placed on the **`default`** queue. The worker must listen to it:
+
+```bash
+# worker/.env
+EYENED_RQ_WORKER_QUEUES=default,cfi-roi,...   # must include default for thumbnails
+
+# from repo root
+PYTHONPATH=. python -m server.rq_worker
+```
+
+Docker example: [`worker/docker-compose.inference.yml`](https://github.com/Eyened/eyened-platform/blob/main/worker/docker-compose.inference.yml) and [`worker/.env.example`](https://github.com/Eyened/eyened-platform/blob/main/worker/.env.example).
+
+If you split workers (e.g. slim ROI-only container), ensure **at least one** worker lists `default` and has storage access — otherwise thumbnail jobs stay queued forever.
+
+Worker entrypoint: `run_thumbnail_update_job` / `run_thumbnail_update_for_image_ids_job` in [`server/utils/tasks.py`](https://github.com/Eyened/eyened-platform/blob/main/server/utils/tasks.py) → `run_update_thumbnails_*_job` in the ORM.
+
+## Related
+
+- [Importing data](/eyened-platform/importing_data) — register images first
+- [ORM Importer](/eyened-platform/orm/importer) — bulk import + `PostImport`
+- [API Reference — Import](/eyened-platform/api/reference#import) — endpoint index
+- [ImageInstance entity](/eyened-platform/orm/entities) — `ThumbnailPath` semantics

@@ -10,7 +10,6 @@ from .dicom_meta import dicom_header_patches_from_bytes
 from .hashes import md5_hex, sha256_bytes
 from .image_meta import raster_image_header_patches_from_bytes
 from .storage_io import try_read_storage_object_bytes
-from .thumbnail_util import allocate_thumbnail_path, save_thumbnails_from_bytes
 
 
 def _merge_missing(state: dict[str, Any], patch: dict[str, Any]) -> None:
@@ -36,7 +35,6 @@ class PreparationOptions:
     read_dicom_header: bool = False
     compute_storage_hash: bool = False
     compute_storage_checksum: bool = False
-    generate_thumbnails: bool = False
     raw_loader: Optional[Callable[[ImportRow], bytes | None]] = None
 
 
@@ -46,7 +44,6 @@ def _needs_raw_bytes(opts: PreparationOptions) -> bool:
         or opts.read_image_header
         or opts.compute_storage_hash
         or opts.compute_storage_checksum
-        or opts.generate_thumbnails
     )
 
 
@@ -63,10 +60,10 @@ def prepare_rows(
     rows: Sequence[ImportRow],
     *,
     infer_image_format: bool = True,
-    defaults: Optional[dict[str, Any]] = None,  
+    defaults: Optional[dict[str, Any]] = None,
     options: Optional[PreparationOptions] = None,
 ) -> list[ImportRow]:
-    """ 
+    """
     Enrich ``ImportRow`` instances in-memory before ``plan_import``.
 
     If ``options`` is given, it fully defines behavior (``infer_image_format`` /
@@ -74,8 +71,7 @@ def prepare_rows(
     ``PreparationOptions`` instance for backward compatibility.
 
     Optional steps read bytes via ``EYENED_STORAGE_MOUNTS`` (``storage_backend_key`` +
-    ``object_key``), or via ``PreparationOptions.raw_loader`` (e.g. post-import
-    enrichment using :func:`enrichment.raw_loader_from_image_instance`).
+    ``object_key``), or via ``PreparationOptions.raw_loader``.
     """
     if options is None:
         opts = PreparationOptions(
@@ -106,11 +102,7 @@ def prepare_rows(
         if opts.read_dicom_header and raw and fmt == "dicom":
             _merge_missing(state, dicom_header_patches_from_bytes(raw))
 
-        if (
-            opts.read_image_header
-            and raw
-            and fmt in {"image/png", "image/jpeg"}
-        ):
+        if opts.read_image_header and raw and fmt in {"image/png", "image/jpeg"}:
             _merge_missing(state, raster_image_header_patches_from_bytes(raw))
 
         if opts.compute_storage_hash and raw:
@@ -124,18 +116,6 @@ def prepare_rows(
             if state.get("image_storage_checksum") is None:
                 patch_c["image_storage_checksum"] = md5_hex(raw)
             _merge_missing(state, patch_c)
-
-        if opts.generate_thumbnails and raw and fmt is not None:
-            if state.get("thumbnail_path") is None:
-                pid = state.get("project_id")
-                if pid is not None and fmt in {"dicom", "image/png", "image/jpeg"}:
-                    tid = allocate_thumbnail_path(int(pid))
-                    save_thumbnails_from_bytes(
-                        raw,
-                        image_storage_format=fmt,
-                        thumbnail_path=tid,
-                    )
-                    _merge_missing(state, {"thumbnail_path": tid})
 
         prepared.append(ImportRow.model_validate(state))
 

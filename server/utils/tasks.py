@@ -3,9 +3,12 @@
 
 def run_thumbnail_update_job(failed: bool = False, print_errors: bool = False):
     """Same as ``eorm update-thumbnails`` (optional ``--failed`` / ``--print-errors``)."""
+    from eyened_orm import Database
     from eyened_orm.importer.thumbnails import run_update_thumbnails_job
 
-    run_update_thumbnails_job(failed=failed, print_errors=print_errors)
+    run_update_thumbnails_job(
+        Database(), include_failed=failed, print_errors=print_errors
+    )
     return True
 
 
@@ -14,9 +17,12 @@ def run_thumbnail_update_for_image_ids_job(
     print_errors: bool = False,
 ):
     """Generate thumbnails only for the given ``ImageInstanceID``s."""
+    from eyened_orm import Database
     from eyened_orm.importer.thumbnails import run_update_thumbnails_for_image_ids_job
 
-    run_update_thumbnails_for_image_ids_job(image_ids, print_errors=print_errors)
+    run_update_thumbnails_for_image_ids_job(
+        Database(), image_ids, print_errors=print_errors
+    )
     return True
 
 

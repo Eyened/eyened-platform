@@ -12,27 +12,13 @@ lookup is ``(SubTaskID, ImageInstanceID)`` with the image id read from the row.
 from __future__ import annotations
 
 from eyened_orm import (
-    Creator,
     SubTask,
     SubTaskImageLink,
     Task,
     TaskDefinition,
 )
 
-from .importer_mappings_base import CONTACT, Entity, key, lookup, opt, req
-
-CREATOR = Entity(
-    model=Creator,
-    pk_column="CreatorID",
-    pk_row_field="creator_id",
-    lookups=(lookup(key("CreatorName")),),
-    fields={
-        "CreatorName": "creator_name",
-        "EmployeeIdentifier": "creator_employee_identifier",
-        "IsHuman": "creator_is_human",
-        "Description": "creator_description",
-    },
-)
+from .importer_mappings_base import CONTACT, CREATOR, Entity, key, lookup, opt, req
 
 TASK_DEFINITION = Entity(
     model=TaskDefinition,

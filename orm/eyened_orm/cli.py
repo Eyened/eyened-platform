@@ -128,7 +128,7 @@ def update_thumbnails(failed, print_errors):
 
     database = get_database()
     run_update_thumbnails_job(
-        database, failed=failed, print_errors=print_errors
+        database, include_failed=failed, print_errors=print_errors
     )
 
 
