@@ -9,7 +9,7 @@ This document provides an overview of all main database entities in the Eyened O
 
 ## Image Hierarchy
 
-The core data model follows a hierarchical structure: **Project → Patient → Study → Series → ImageInstance**. 
+The core data model follows a hierarchical structure: **Project → Patient → Study → Series → ImageInstance → ImageStorage**.
 
 ```python
 from eyened_orm import Project, Patient, Study, Series, ImageInstance
@@ -27,7 +27,7 @@ for patient in project.Patients:
             print(f"    Series: {series.SeriesInstanceUid}")
             
             for image in series.ImageInstances:
-                print(f"      Image: {image.DatasetIdentifier}")
+                print(f"      Image: {image.PublicID}")
 ```
 
 ### Project
@@ -79,35 +79,38 @@ An `ImageInstance` represents a single image or volume:
 - `Modality`: Type of image (ColorFundus, OCT, OCTA, etc.)
 - `Laterality`: Left (L) or Right (R) eye
 - `ETDRSField`: ETDRS field position (F1-F7)
-- `ThumbnailPath`: Path identifier for image thumbnails (see below)
-- Relationships to `DeviceInstance`, `SourceInfo`, `ModalityTable`, and `Scan`
+- `ThumbnailPath`: Thumbnail path prefix (see below)
+- Relationships to `DeviceInstance`, `SourceInfo`, `ModalityTable`, `Scan`, and `ImageStorage`
 
-The location of the image is resolved by 
-- storage_backend_id (the storage_backend, currently the filesystem via nginx)
-- object_prefix 
-- object_key
-object_prefix and object_key together form the path to the image.
+**File location:** each image has one or more `ImageStorage` rows; the primary row (`IsPrimary`) points to a `StorageBackend` (nginx `Key`) and an `ObjectKey` (path within that backend). Local ORM/worker access resolves paths via `EYENED_STORAGE_MOUNTS`; the API serves files with `GET /api/images/{public_id}/data`.
 
-:::note
-We do not currently support images consisting of multiple files. When there's a need for this, we should update the concept of DatasetIdentifier.
-:::
+`DatasetIdentifier` on `ImageInstance` is deprecated — use `ImageStorage` instead.
 
 #### ThumbnailPath
 
-The `ThumbnailPath` column stores the thumbnail path identifier and generation state:
+The `ThumbnailPath` column stores the thumbnail path prefix and generation state:
 
-- **NULL**: The image has no thumbnail and thumbnail generation must be run
-- **Empty string (`""`)**: Thumbnail generation was attempted but failed
-- **Path string**: A relative path identifier within the `THUMBNAILS_PATH` directory
+- **NULL**: No thumbnail yet — run a thumbnail job (CLI, API, or `PostImport`)
+- **Empty string (`""`)**: Generation was attempted but failed
+- **Path prefix**: Success — relative path under `{EYENED_STORAGE_ROOT}/thumbnails/` (no file extension)
 
-The thumbnail generator creates multiple sizes (e.g., 144px, 540px). To get the full path for a specific size, append `_{size}.jpg` to the `ThumbnailPath`. For example, if `ThumbnailPath` is `"1/abc123"`, the 144px thumbnail will be at `<THUMBNAILS_PATH>/1/abc123_144.jpg`.
+The generator writes **144px** and **540px** square JPEGs as `{ThumbnailPath}_144.jpg` and `{ThumbnailPath}_540.jpg`. New prefixes are allocated as `{project_id}/{bucket}/{uuid}` (for example `42/a1/f3e2d1c0b4a5…`).
 
-You can access thumbnails programmatically using the `get_thumbnail_path(size)` method:
+On disk (local storage):
+
+```
+{EYENED_STORAGE_ROOT}/thumbnails/{ThumbnailPath}_144.jpg
+```
+
+Programmatic access:
 
 ```python
 image = ImageInstance.by_id(session, image_id)
-thumbnail_144 = image.get_thumbnail_path(144)  # Returns Path object
+filename = image.get_thumbnail_filename(144)  # e.g. "42/a1/uuid_144.jpg"
+pil_image = image.get_thumbnail(144)  # loads bytes via the data access adapter
 ```
+
+See **[Thumbnails](/eyened-platform/thumbnails)** for generation (CLI, importer, API, worker).
 
 ### Related Entities
 

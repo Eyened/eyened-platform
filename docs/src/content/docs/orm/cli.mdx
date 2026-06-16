@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-{/* Claude query: In cli.mdx, document the command line utilities in cli.py. Include a section for each utility and explain what they do. ie. that full will create a full copy of the production database for development reasons and update thumbnails will update all thumbnails in the database. Do not include the specific options for each command as these might change, but do indicate that they can be checked with --help */}
+{/* Document each eorm command at a high level; options may change — use --help. */}
 
 # Eyened ORM CLI
 
@@ -45,7 +45,7 @@ eorm create-user [OPTIONS]
 
 ### update-thumbnails
 
-Updates thumbnails for images in the database. Equivalent to `POST /api/import/update_thumbnails` but runs in-process (no worker).
+Generates thumbnails for images with missing (or optionally failed) `ThumbnailPath`. Equivalent to `POST /api/import/update_thumbnails` but runs in-process (no worker).
 
 See **[Thumbnails](/eyened-platform/thumbnails#cli)** for options and behavior.
 

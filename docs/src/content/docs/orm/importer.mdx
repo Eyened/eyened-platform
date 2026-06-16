@@ -16,7 +16,7 @@ At a high level:
 - Review the planned changes (`run.display_summary()` / `run.full_summary()`)
 - Apply the changes (`run.apply()`), then `session.commit()`
 - Optionally write the run to JSON for audit/undo (`run.write_json(...)`)
-- After commit, generate thumbnails with [PostImport](/eyened-platform/thumbnails#importer-after-import) (not part of `prepare_rows`)
+- After commit, generate thumbnails with [PostImport](/eyened-platform/thumbnails#importer-after-import) (import does not generate them automatically)
 
 ::::note
 Planning may mutate ORM objects in-memory; nothing is persisted until you call `run.apply()` and commit the session.

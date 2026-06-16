@@ -32,7 +32,7 @@ Requires ORM env (database + `EYENED_STORAGE_ROOT` / mounts) on the machine wher
 
 ## Importer (after import)
 
-Import via [Importing data](/eyened-platform/importing_data) or the [ORM importer](/eyened-platform/orm/importer) does **not** generate thumbnails during `prepare_rows`. Run them after commit with `PostImport`:
+Import via [Importing data](/eyened-platform/importing_data) or the [ORM importer](/eyened-platform/orm/importer) does **not** generate thumbnails automatically. Run them after commit with `PostImport`:
 
 ```python
 from eyened_orm.importer import PostImport, ProcessMode, plan_image_import

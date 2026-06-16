@@ -29,6 +29,15 @@ The following sections describe all available configuration options:
 | EYENED_API_USERNAME | Yes | - | API login username |
 | EYENED_API_PASSWORD | Yes | - | API login password |
 
+### Storage Settings
+
+Used by the ORM, workers, and thumbnail generation when reading/writing files locally.
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| EYENED_STORAGE_ROOT | No | `/storage` | Root directory for thumbnails (`thumbnails/`) and segmentations (`segmentations.zarr`) |
+| EYENED_STORAGE_MOUNTS | No | `{}` | JSON object mapping storage backend keys to local filesystem paths (for image `ObjectKey` resolution) |
+
 ## Creating Environment Files
 
 The most common way to configure the ORM is through `.env` files. Create an environment file (for example `.env.dev`) with the following structure:
@@ -46,6 +55,10 @@ EYENED_DATABASE_RAISE_ON_WARNINGS=true
 EYENED_API_URL=http://localhost:3000
 EYENED_API_USERNAME=myuser
 EYENED_API_PASSWORD=mypassword
+
+# Storage (local file access — thumbnails, segmentations, import preparation)
+EYENED_STORAGE_ROOT=/storage
+EYENED_STORAGE_MOUNTS='{"local":"/path/to/images"}'
 ```
 
 You can maintain multiple environment files for different environments (for example `.env.dev`, `.env.prod`, `.env.test`).

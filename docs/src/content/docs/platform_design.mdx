@@ -17,23 +17,23 @@ The Eyened platform consists of several interconnected services that work togeth
 
 ### API Server
 - FastAPI backend for data management and business logic
-- Task queue system (Huey/Redis) for managing long-running operations (inference, thumbnail generation)
+- Task queue system (RQ/Redis) for long-running operations (inference, thumbnail generation)
 
 ### Data Management
 - **MySQL** (8.0.27) for structured data storage
 - **Adminer** for database management (accessible on port 8080)
-- **Storage:**
-  - Original images (mounted at `IMAGES_BASEPATH`)
-  - Generated thumbnails (zarr-compatible storage)
-  - Segmentations (zarr format at `SEGMENTATIONS_ZARR_STORE`)
+- **Storage** (under `EYENED_STORAGE_ROOT`, default `/storage`):
+  - Original images via `EYENED_STORAGE_MOUNTS` (nginx-backed storage backends)
+  - Thumbnails as JPEG files in `thumbnails/`
+  - Segmentations in `segmentations.zarr`
 
 ### Fileserver
 - Nginx-based service for serving images and thumbnails
 - Exposes the platform on the configured `PORT`
 
 ### Worker
-- Background task processor (Huey)
-- Handles image processing, segmentation storage, and thumbnail generation
+- RQ worker (`python -m server.rq_worker`) consuming Redis job queues
+- Handles model inference, segmentation storage, and thumbnail generation
 
 ### Development Tools
 - [Import API](/eyened-platform/importing_data) for loading images and metadata via REST

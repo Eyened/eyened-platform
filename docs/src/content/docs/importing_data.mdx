@@ -41,7 +41,7 @@ Field names and types for patient, study, series, and image metadata are listed 
 
 **Options:** only `include_stack_trace` (default `false`) — when `true`, failed imports return a stack trace in the response.
 
-Authenticate first (session cookie), then call the endpoint. Example workflow: [import_api.ipynb](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb) (uses `ImageImporter` from `eyened_orm.importer.image_importer`).
+Authenticate first (session login or `Authorization: Bearer` token), then call the endpoint. Example workflow: [import_api.ipynb](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb) (uses `ImageImporter` from `eyened_orm.importer.image_importer`).
 
 ## ORM importer
 

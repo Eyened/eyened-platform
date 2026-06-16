@@ -3,21 +3,21 @@ title: API Reference
 description: Complete reference for all Eyened Platform API endpoints
 ---
 
-This document provides a comprehensive reference for all API endpoints in the Eyened Platform. All endpoints require authentication unless otherwise noted.
+This document lists API routes mounted under `/api`. All routes require authentication unless noted otherwise.
+
+**Authentication:** web clients use session cookies after `POST /api/auth/login`; API clients use `Authorization: Bearer <token>` from `POST /api/auth/token` or login with `"api_client": true`.
+
+**Image identifiers:** most user-facing routes use **`PublicID`** (12-character string). `GET /api/instances/{instance_id}` uses the numeric **`ImageInstanceID`**. Some routes accept either public ID or numeric ID as a fallback.
+
+**Health check (no auth):** `GET /health` — outside `/api`.
 
 ## Authentication
 
-All API endpoints (except login/register) require authentication via JWT tokens. Include the token in the `Authorization` header:
-
-```
-Authorization: Bearer <token>
-```
-
 ### POST /api/auth/login
 
-Authenticate a user and receive JWT tokens.
+Login with username and password.
 
-**Request Body:**
+**Request body:**
 ```json
 {
   "username": "string",
@@ -26,177 +26,210 @@ Authenticate a user and receive JWT tokens.
 }
 ```
 
-**Response:** User information and JWT tokens (either in cookies for web clients or response body for API clients).
+- `api_client: false` (default) — sets JWT cookies; returns user info.
+- `api_client: true` — returns `access_token`, `refresh_token`, and user info in the JSON body (no cookies).
 
 ### POST /api/auth/token
 
-Get an access token for API clients.
+Get a Bearer access token for API clients (no refresh token in response).
 
-**Request Body:**
-```json
-{
-  "username": "string",
-  "password": "string"
-}
-```
-
-**Response:** Access token and user information.
+**Request body:** `{ "username": "string", "password": "string" }`
 
 ### GET /api/auth/me
 
-Get current authenticated user information.
+Current authenticated user (id, username, role, starred tags).
 
 ### POST /api/auth/change-password
 
-Change the current user's password.
-
-**Request Body:**
-```json
-{
-  "old_password": "string",
-  "new_password": "string"
-}
-```
+**Request body:** `{ "old_password": "string", "new_password": "string" }`
 
 ### POST /api/auth/register
 
-Register a new user (may require admin privileges).
+Register a new user (may require admin privileges depending on deployment).
 
 ### POST /api/auth/refresh
 
-Refresh an access token using a refresh token.
+Refresh the access-token cookie using the **refresh-token cookie** (web clients only; no request body).
 
 ### POST /api/auth/logout
 
-Log out the current user.
+Clear JWT cookies.
 
-## Image Instances
+---
+
+## Image instances
 
 ### GET /api/instances/\{instance_id\}
 
-Get a single image instance by ID.
+Get one image by numeric **`ImageInstanceID`**.
 
-**Query Parameters:**
-- `with_segmentations` (bool): Include segmentation data
-- `with_form_annotations` (bool): Include form annotations
-- `with_model_segmentations` (bool): Include model-generated segmentations
-- `with_tag_metadata` (bool): Include tag metadata
+**Query parameters:** `with_segmentations`, `with_form_annotations`, `with_model_segmentations`, `with_tag_metadata` (all bool, default `false`).
+
+### GET /api/images/\{image_id\}
+
+Get one image by **`PublicID`** (preferred). If `image_id` is all digits, falls back to numeric `ImageInstanceID`.
+
+Same query parameters as `GET /api/instances/{instance_id}`.
+
+### GET /api/images/\{image_id\}/data
+
+Image file via nginx `X-Accel-Redirect`.
+
+**Query parameters:** `index` (int, volume slice), `meta` (bool, sidecar metadata for some formats).
+
+### GET /api/images/\{image_id\}/thumbnail
+
+Thumbnail via nginx redirect.
+
+**Query parameters:** `size` (int, default `144`) — `144` or `540`.
 
 ### GET /api/instances/images/\{dataset_identifier:path\}
 
-Get the image file for a given dataset identifier.
+**Legacy.** Serve image by deprecated `DatasetIdentifier` path (`/files/…` redirect).
 
 ### GET /api/instances/thumbnails/\{thumbnail_identifier:path\}
 
-Get a thumbnail image for a given thumbnail identifier.
+**Legacy.** Serve thumbnail by path under `thumbnails/` (typically `{ThumbnailPath}_{size}.jpg`). Prefer `GET /api/images/{image_id}/thumbnail`.
 
 ### POST /api/instances/\{instance_id\}/tags
 
-Add a tag to an image instance.
+Attach a tag to an image. **`instance_id` is the image `PublicID`**.
+
+**Request body:** `{ "tag_id": int, "comment": "string" | null }`
 
 ### PATCH /api/instances/\{instance_id\}/tags/\{tag_id\}
 
-Update a tag on an image instance.
+Update tag comment on an image (`PublicID`).
+
+**Request body:** `{ "comment": "string" | null }`
 
 ### DELETE /api/instances/\{instance_id\}/tags/\{tag_id\}
 
-Remove a tag from an image instance.
+Remove tag from an image (`PublicID`).
+
+---
+
+## Patients
+
+### GET /api/patients/\{patient_id\}
+
+Patient detail with project context.
+
+**Query parameters:** `include_attributes` (bool, default `true`) — include patient-level attribute values.
+
+---
 
 ## Import
 
+See also [Importing data](/eyened-platform/importing_data) and [Thumbnails](/eyened-platform/thumbnails).
+
 ### POST /api/import/image
 
-Import a single image into the platform. See [Importing Data](/eyened-platform/importing_data) for detailed documentation.
+Import a single flat `ImportRow`.
+
+**Request body:** `{ "data": { …ImportRow… }, "options": { "include_stack_trace": false } }`
 
 ### POST /api/import/update_thumbnails
 
-Queue a background job to generate thumbnails for all images with missing (or optionally failed) `ThumbnailPath`. Returns a `task_id` for status polling.
+Queue thumbnail generation for all images with missing (or optionally failed) `ThumbnailPath`.
 
 **Query parameters:** `failed` (bool), `print_errors` (bool)
 
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "Thumbnail update task queued successfully",
-  "task_id": "<uuid>",
-  "task_ids": null,
-  "error": null
-}
-```
-
-See [Thumbnails](/eyened-platform/thumbnails) for worker setup and status checks.
+**Response:** `TaskResponse` — `{ "success", "message", "task_id", "task_ids", "error" }`
 
 ### POST /api/import/update_thumbnails_for_image_ids
 
-Queue thumbnail generation for a specific list of `ImageInstanceID`s.
-
-**Request body:** `{ "image_ids": [int, ...], "print_errors": bool }`
-
-**Response:** same `TaskResponse` as above.
+**Request body:** `{ "image_ids": [int, …], "print_errors": bool }`
 
 ### GET /api/import/status/\{task_id\}
 
-Poll RQ job status for any import-queue task (thumbnails, CFI models, etc.).
+Poll RQ job status. **No authentication required.**
 
-**Response:**
+**Response:** `{ "task_id", "status", "result" }` or `{ "error": "job not found" }`
 
+### POST /api/import/run_cfi_models
+
+Queue CFI attribute models (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`).
+
+**Request body:**
 ```json
 {
-  "task_id": "<uuid>",
-  "status": "queued | started | finished | failed | ...",
-  "result": true
+  "image_ids": [1, 2],
+  "model": "cfi-roi",
+  "overwrite": false,
+  "commit_interval": 100,
+  "batch_size": 8,
+  "n_workers": 16
 }
 ```
 
-Returns `{ "error": "job not found" }` if the ID is unknown.
+Omit `model` to queue one job per attribute model. **Response:** `task_id` (first job) and `task_ids` (all jobs).
 
-Full workflow: [Thumbnails — API](/eyened-platform/thumbnails#api).
+### POST /api/import/run_cfi_amd
 
-### POST /api/import/run_inference
+Queue CFI AMD segmentation (`cfi-amd` queue).
 
-Queue a background task to run AI model inference on images.
+**Request body:** `{ "image_ids": [int, …], "overwrite": bool, "batch_size": 8, "n_workers": 12 }`
+
+### POST /api/import/run_layer_segmentation
+
+Queue OCT layer segmentation (`layer-segmentation` queue).
+
+**Request body:** `{ "image_ids": [int, …], "overwrite": bool }`
+
+---
 
 ## Segmentations
 
 ### POST /api/segmentations
 
-Create a new segmentation.
+Create a segmentation. **`image_id` is the image `PublicID`.**
 
-**Request Body:** Segmentation data including image_id, feature_id, creator_id, and segmentation metadata.
+**Request body:** dimensions, `data_type`, `data_representation`, `feature_id`, optional `subtask_id`, etc.
 
 ### GET /api/segmentations/\{segmentation_id\}
 
-Get a segmentation by ID.
-
-### DELETE /api/segmentations/\{segmentation_id\}
-
-Delete a segmentation.
-
-### PUT /api/segmentations/\{segmentation_id\}/data
-
-Upload segmentation data (zarr format).
-
-### GET /api/segmentations/\{segmentation_id\}/data
-
-Download segmentation data.
+Get segmentation metadata.
 
 ### PATCH /api/segmentations/\{segmentation_id\}
 
-Update segmentation metadata.
+Update metadata (`feature_id`, `threshold`, `reference_segmentation_id`, …).
+
+### DELETE /api/segmentations/\{segmentation_id\}
+
+Delete segmentation.
+
+### PUT /api/segmentations/\{segmentation_id\}/data
+
+Upload segmentation voxel data.
+
+**Body:** `Content-Type: application/octet-stream` — NumPy array bytes (`np.save` format).
+
+**Query parameters:** `axis`, `scan_nr` (optional slice indexing).
+
+### GET /api/segmentations/\{segmentation_id\}/data
+
+Download segmentation data as **gzip-compressed NumPy** (`application/octet-stream`).
+
+**Query parameters:** `axis`, `scan_nr`
 
 ### POST /api/segmentations/\{segmentation_id\}/tags
 
-Add a tag to a segmentation.
+Add tag to segmentation.
 
 ### DELETE /api/segmentations/\{segmentation_id\}/tags/\{tag_id\}
 
-Remove a tag from a segmentation.
+Remove tag from segmentation.
 
 ### GET /api/model-segmentations/\{model_segmentation_id\}/data
 
-Get model-generated segmentation data.
+Download model segmentation data (gzip NumPy). Query: `axis`, `scan_nr`.
+
+### PUT /api/model-segmentations/\{model_segmentation_id\}/data
+
+Upload model segmentation data (`application/octet-stream` NumPy). Query: `axis`, `scan_nr`.
+
+---
 
 ## Features
 
@@ -204,207 +237,155 @@ Get model-generated segmentation data.
 
 List all features.
 
-**Query Parameters:**
-- `with_counts` (bool): Include usage counts for each feature
+**Query parameters:** `with_counts` (bool) — include segmentation usage counts.
 
 ### POST /api/features
 
-Create a new feature with optional subfeatures.
-
-**Request Body:**
-```json
-{
-  "name": "string",
-  "subfeature_ids": [1, 2, 3]
-}
-```
+**Request body:** `{ "name": "string", "subfeature_ids": [1, 2] | null }`
 
 ### GET /api/features/\{feature_id\}
 
-Get a feature by ID.
-
 ### PATCH /api/features/\{feature_id\}
-
-Update a feature (name and/or subfeatures).
 
 ### DELETE /api/features/\{feature_id\}
 
-Delete a feature (with safety checks).
+See [Features API](/eyened-platform/api/features) for details.
 
-See [Features API](/eyened-platform/api/features) for detailed documentation.
+---
 
 ## Tags
 
 ### GET /api/tags
 
-List all tags.
-
-**Query Parameters:**
-- `tag_type` (optional): Filter by tag type (Study, ImageInstance, Segmentation, FormAnnotation)
+List all tags (no filters).
 
 ### POST /api/tags
 
-Create a new tag.
+**Request body:** `{ "name": "string", "tag_type": "ImageInstance", "description": "string" }`
 
-**Request Body:**
-```json
-{
-  "name": "string",
-  "tag_type": "ImageInstance",
-  "description": "string"
-}
-```
+`tag_type`: `Study`, `ImageInstance`, `Segmentation`, `FormAnnotation`, …
 
 ### PATCH /api/tags/\{tag_id\}
 
-Update a tag.
-
 ### DELETE /api/tags/\{tag_id\}
-
-Delete a tag.
 
 ### POST /api/tags/\{tag_id\}/star
 
-Star/favorite a tag for the current user.
+Star tag for current user.
 
 ### DELETE /api/tags/\{tag_id\}/star
 
-Unstar a tag for the current user.
+Unstar tag.
+
+---
 
 ## Tasks
 
 ### GET /api/task
 
-List all tasks.
+List all tasks (no pagination).
 
 ### POST /api/task
 
-Create a new task.
-
-**Request Body:**
-```json
-{
-  "name": "string",
-  "description": "string",
-  "contact_id": 1,
-  "task_definition_id": 1
-}
-```
+**Request body:** `{ "name", "description", "contact_id", "task_definition_id" }`
 
 ### GET /api/task/\{task_id\}
 
-Get a task by ID with subtasks.
+Get task with subtask counts.
 
 ### PATCH /api/task/\{task_id\}
 
-Update a task.
+Partial update (`name`, `description`, `contact_id`, `task_definition_id`, `task_state`).
 
 ### DELETE /api/task/\{task_id\}
 
-Delete a task.
-
 ### GET /api/task/\{task_id\}/subtasks
 
-Get all subtasks for a task.
+List subtasks with optional pagination and images.
 
-### GET /api/task/\{task_id\}/subtasks-with-images
+**Query parameters:** `with_images` (bool), `limit` (default `200`), `page` (default `0`), `subtask_status` (filter by state).
 
-Get all subtasks with their associated images.
+### GET /api/task/\{task_id\}/subtask/\{subtask_index\}
+
+Get one subtask by **0-based index** within the task (ordered by `SubTaskID`).
+
+**Query parameters:** `with_images` (bool), `with_next` (bool) — include the next subtask in the response.
+
+---
 
 ## Subtasks
 
 ### GET /api/subtasks/\{subtask_id\}
 
-Get a subtask by ID.
+Get subtask by ID.
 
-**Query Parameters:**
-- `with_images` (bool): Include associated images
+**Query parameters:** `with_images` (bool)
 
 ### PATCH /api/subtasks/\{subtask_id\}
 
-Update a subtask (state, creator, etc.).
+**Request body:** `{ "comments": "string" | null, "task_state": "string" | null }`
 
 ### DELETE /api/subtasks/\{subtask_id\}
 
-Delete a subtask.
-
 ### POST /api/subtasks/\{subtask_id\}/images
 
-Add images to a subtask.
+Add one image to a subtask.
 
-**Request Body:**
-```json
-{
-  "image_ids": [1, 2, 3]
-}
-```
+**Request body:** `{ "instance_id": "<PublicID>" }`
 
 ### DELETE /api/subtasks/\{subtask_id\}/images/\{instance_id\}
 
-Remove an image from a subtask.
+Remove image from subtask. **`instance_id` is the image `PublicID`.**
 
-## Form Annotations
+---
+
+## Form annotations
 
 ### GET /api/form-annotations
 
-List form annotations.
-
-**Query Parameters:**
-- `patient_id` (int, optional): Filter by patient
-- `study_id` (int, optional): Filter by study
-- `image_instance_id` (int, optional): Filter by image
-- `form_schema_id` (int, optional): Filter by schema
-- `creator_id` (int, optional): Filter by creator
+**Query parameters:** `patient_id`, `study_id`, `image_id` (`PublicID`), `form_schema_id`, `sub_task_id` (all optional filters).
 
 ### POST /api/form-annotations
 
-Create a new form annotation.
-
-**Request Body:**
+**Request body:**
 ```json
 {
   "form_schema_id": 1,
   "patient_id": 1,
   "study_id": 1,
-  "image_instance_id": 1,
+  "image_id": "abc123public",
   "laterality": "R",
-  "form_data": {}
+  "sub_task_id": 1,
+  "form_data": {},
+  "form_annotation_reference_id": null
 }
 ```
 
-### GET /api/form-annotations/\{annotation_id\}
+`image_id` is **`PublicID`**, not numeric ID.
 
-Get a form annotation by ID.
+### GET /api/form-annotations/\{annotation_id\}
 
 ### PATCH /api/form-annotations/\{annotation_id\}
 
-Update a form annotation.
-
 ### DELETE /api/form-annotations/\{annotation_id\}
-
-Delete a form annotation.
 
 ### GET /api/form-annotations/\{form_annotation_id\}/value
 
-Get the form data value for a form annotation.
+Form data JSON.
 
 ### PUT /api/form-annotations/\{form_annotation_id\}/value
 
-Update the form data value for a form annotation.
+Replace form data (204 on success).
 
 ### POST /api/form-annotations/\{annotation_id\}/tags
 
-Add a tag to a form annotation.
+### PATCH /api/form-annotations/\{annotation_id\}/tags/\{tag_id\}
 
 ### DELETE /api/form-annotations/\{annotation_id\}/tags/\{tag_id\}
 
-Remove a tag from a form annotation.
+---
 
-### PATCH /api/form-annotations/\{annotation_id\}/tags/\{tag_id\}
-
-Update a tag on a form annotation.
-
-## Form Schemas
+## Form schemas
 
 ### GET /api/form-schemas
 
@@ -412,47 +393,42 @@ List all form schemas.
 
 ### GET /api/form-schemas/\{form_schema_id\}
 
-Get a form schema by ID.
+---
 
 ## Studies
 
 ### POST /api/studies/\{study_id\}/tags
 
-Add a tag to a study.
+### PATCH /api/studies/\{study_id\}/tags/\{tag_id\}
 
 ### DELETE /api/studies/\{study_id\}/tags/\{tag_id\}
 
-Remove a tag from a study.
-
-### PATCH /api/studies/\{study_id\}/tags/\{tag_id\}
-
-Update a tag on a study.
+---
 
 ## Devices
 
 ### GET /api/devices
 
-List all device models.
+List device models (manufacturer + model name).
+
+---
 
 ## Search
 
 ### POST /api/instances/search
 
-Search for image instances with complex filters.
+Search image instances. **Request body:** `conditions`, `order_by`, `order`, `limit`, `page`.
 
-**Request Body:** Search criteria including filters, sorting, pagination.
+**Response:** instances, `result_ids` (public IDs), pagination fields.
 
 ### POST /api/studies/search
 
-Search for studies with complex filters.
-
-**Request Body:** Search criteria including filters, sorting, pagination.
+Search studies; includes related instances in the response.
 
 ### GET /api/instances/search/signature
 
-Get the search signature (available fields) for instance searches.
+Available filter/sort fields for instance search.
 
 ### GET /api/studies/search/signature
 
-Get the search signature (available fields) for study searches.
-
+Available filter/sort fields for study search.

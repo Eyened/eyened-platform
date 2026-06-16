@@ -5,100 +5,150 @@ description: Flat ImportRow fields for API and ORM image imports
 
 Imports use one **flat** record per image ([`ImportRow`](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/importer_dtos.py)), with **snake_case** keys. The same fields apply to `POST /api/import/image` (`data`) and to `eyened_orm.importer.ImportRow` in Python.
 
-See [Importing data](/eyened-platform/importing_data) for workflows. Match existing rows with lookup fields (names, dates, UIDs) or attach with `*_id` primary keys.
+See [Importing data](/eyened-platform/importing_data) for workflows.
+
+## How entities are resolved
+
+Each row is walked through the importer graph (`Project → Patient → Study → Series → ImageInstance → ImageStorage`, plus device and storage backend). For every entity you can:
+
+1. **Attach by primary key** — set `*_id` to an existing row (wins over lookups).
+2. **Match or create by lookup** — natural keys in the table below; missing parents are created when the row supplies enough parent context.
+3. **Group anonymously (batch-local)** — `*_anonymous_identity` integers merge rows in the **same import batch** when UIDs are absent.
+
+**Typical minimum for a new image** (plus device fields or [importer defaults](/eyened-platform/orm/importer#basic-import-new-images)):
+
+| Need | Fields |
+|------|--------|
+| Project | `project_name` or `project_id` |
+| Patient | `patient_identifier` or `patient_id` |
+| Study | `study_date` or `study_id` |
+| Series | `series_instance_uid`, `series_id`, or `series_anonymous_identity` |
+| Device | `manufacturer` + `manufacturer_model_name` + `device_description`, or `device_model_id` / `device_id` |
+| Image file | `storage_backend_key` + `object_key` |
+| Image metadata | `modality` (required for the viewer) |
+
+**Patch an existing image** — provide `image_instance_id`, `public_id`, or `sop_instance_uid` plus only the fields you want to change.
+
+### Lookup keys per entity
+
+| Entity | Primary key field | Lookup keys (match or create) | Notes |
+|--------|-------------------|-------------------------------|-------|
+| **Project** | `project_id` | `project_name` | |
+| **Patient** | `patient_id` | `project` + `patient_identifier` | Scoped to project |
+| **Study** | `study_id` | `patient` + `study_date` | One study per patient per date |
+| **Series** | `series_id` | `series_instance_uid` | Or `series_anonymous_identity` within the study |
+| **DeviceModel** | `device_model_id` | `manufacturer` + `manufacturer_model_name` | |
+| **DeviceInstance** | `device_id` | `device_model` + `device_description` | |
+| **Scan** | `scan_id` | `scan_mode` | Optional on image |
+| **ModalityTable** | `modality_id` | `modality_tag` | Optional; distinct from `modality` enum |
+| **ImageInstance** | `image_instance_id` | `sop_instance_uid` or `public_id` | Or `image_anonymous_identity` within the series |
+| **StorageBackend** | `storage_backend_id` | `storage_backend_key` | |
+| **ImageStorage** | `image_storage_id` | `storage_backend` + `object_key` | Unique `(backend, object_key)` |
+
+**Role column** in the tables below:
+
+| Role | Meaning |
+|------|---------|
+| **PK** | Primary key — attach to an existing row |
+| **Lookup** | Part of a natural key (see table above) |
+| **Property** | Metadata to set or update; not used for matching |
+| **Group** | Batch-local identity for anonymous create/reuse |
+
+---
 
 ## Project
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `project_id` | int | Existing project primary key |
-| `project_name` | str | Project name (lookup / create) |
-| `project_description` | str | Project description |
-| `project_doi` | str | DOI |
-| `project_contact_id` | int | Contact FK |
-| `project_external` | str | `"Y"` or `"N"` |
+| Field | Type | Role | Description |
+|-------|------|------|-------------|
+| `project_id` | int | PK | Existing project |
+| `project_name` | str | Lookup | Project name; created if missing |
+| `project_description` | str | Property | Free-text description |
+| `project_doi` | str | Property | Publication DOI |
+| `project_contact_id` | int | Property | FK to `Contact` |
+| `project_external` | str | Property | `"Y"` or `"N"` — external vs internal project |
 
 ## Patient
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `patient_id` | int | Existing patient primary key |
-| `patient_identifier` | str | Identifier unique within the project |
-| `birth_date` | date | Date of birth |
-| `sex` | str | `"M"` or `"F"` |
+| Field | Type | Role | Description |
+|-------|------|------|-------------|
+| `patient_id` | int | PK | Existing patient |
+| `patient_identifier` | str | Lookup | Identifier unique **within the project** (with project context) |
+| `birth_date` | date | Property | Date of birth |
+| `sex` | str | Property | `"M"` or `"F"` |
 
 ## Study
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `study_id` | int | Existing study primary key |
-| `study_date` | date | Visit date (lookup with patient) |
-| `study_description` | str | Study description |
-| `study_round` | int | Study round |
+| Field | Type | Role | Description |
+|-------|------|------|-------------|
+| `study_id` | int | PK | Existing study |
+| `study_date` | date | Lookup | Visit date; with patient, identifies the study |
+| `study_description` | str | Property | Study description |
+| `study_round` | int | Property | Study round number |
 
 ## Series
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `series_id` | int | Existing series primary key |
-| `series_instance_uid` | str | DICOM SeriesInstanceUID (lookup) |
-| `series_number` | int | Series number |
-| `study_instance_uid` | str | DICOM StudyInstanceUID (stored on Series) |
-| `series_anonymous_identity` | int | Batch-local key to group rows into the same new series when no UID is available |
+| Field | Type | Role | Description |
+|-------|------|------|-------------|
+| `series_id` | int | PK | Existing series |
+| `series_instance_uid` | str | Lookup | DICOM `SeriesInstanceUID` |
+| `series_number` | int | Property | DICOM series number |
+| `study_instance_uid` | str | Property | DICOM `StudyInstanceUID` (stored on `Series`) |
+| `series_anonymous_identity` | int | Group | Batch-local key: rows with the same value **and** the same study share one new series when no UID is given |
 
 ## Device
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `device_model_id` | int | Existing device model primary key |
-| `manufacturer` | str | Device manufacturer (lookup with model name) |
-| `manufacturer_model_name` | str | Device model name |
-| `device_description` | str | Device description |
-| `device_serial_number` | str | Device serial number |
-| `device_id` | int | Device instance FK |
+| Field | Type | Role | Description |
+|-------|------|------|-------------|
+| `device_model_id` | int | PK | Existing device model |
+| `manufacturer` | str | Lookup | Manufacturer name (with `manufacturer_model_name`) |
+| `manufacturer_model_name` | str | Lookup | Model name (with `manufacturer`) |
+| `device_id` | int | PK | Existing device **instance** |
+| `device_description` | str | Lookup | Device instance description (with device model); distinguishes instances of the same model |
+| `device_serial_number` | str | Property | Serial number |
 
 ## Image instance
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `image_instance_id` | int | Existing image primary key (patch mode) |
-| `modality` | str | **Required for new images.** e.g. `ColorFundus`, `OCT`, `OCTA` |
-| `laterality` | str | `"L"` or `"R"` |
-| `public_id` | str | Public identifier |
-| `sop_instance_uid` | str | DICOM SOP instance UID (lookup) |
-| `height` | int | Rows (pixels) |
-| `width` | int | Columns (pixels) |
-| `depth` | int | Frame count (e.g. OCT B-scans) |
-| `sop_class_uid` | str | DICOM SOP class |
-| `photometric_interpretation` | str | e.g. RGB, MONOCHROME |
-| `samples_per_pixel` | int | Color components per pixel |
-| `dicom_modality` | str | Equipment type: `OP`, `OPT`, `SC` |
-| `etdrs_field` | str | ETDRS field `F1`–`F7` |
-| `anatomic_region` | int | Body part examined |
-| `angiography` | str | Angiography indicator |
-| `acquisition_date_time` | datetime | Acquisition timestamp |
-| `pupil_dilated` | str | Whether pupil was dilated |
-| `horizontal_field_of_view` | float | Field of view (mm) |
-| `resolution_axial` | float | Axial resolution (mm) |
-| `resolution_horizontal` | float | Horizontal resolution (mm) |
-| `resolution_vertical` | float | Vertical resolution (mm) |
-| `scan_mode` | str | Scan mode (Scan entity lookup) |
-| `modality_tag` | str | Modality table tag (distinct from `modality` enum) |
-| `thumbnail_path` | str | Thumbnail path under storage root |
-| `image_anonymous_identity` | int | Batch-local key to group rows into the same new instance when no SOP UID is available |
+| Field | Type | Role | Description |
+|-------|------|------|-------------|
+| `image_instance_id` | int | PK | Existing image (patch mode) |
+| `public_id` | str | Lookup | **Public API identifier** — 12-character string used in URLs such as `/api/images/{public_id}/data` and `/api/images/{public_id}/thumbnail`, and in many instance routes. Auto-generated on create if omitted. Use as lookup to patch metadata on an existing image. **Cannot be changed** after creation. |
+| `sop_instance_uid` | str | Lookup | DICOM SOP instance UID |
+| `image_anonymous_identity` | int | Group | Batch-local key: rows with the same value **and** the same series share one new instance when no UID/`public_id` is given; distinct `object_key` values can add multiple `ImageStorage` rows to that instance |
+| `modality` | str | Property | **Required for new images** in practice. Image type: `ColorFundus`, `OCT`, `OCTA`, … — drives viewer behaviour and processing |
+| `laterality` | str | Property | `"L"` or `"R"` |
+| `height` | int | Property | Rows in pixels (`Rows_y`) |
+| `width` | int | Property | Columns in pixels (`Columns_x`) |
+| `depth` | int | Property | Frame count (`NrOfFrames`), e.g. OCT B-scans |
+| `sop_class_uid` | str | Property | DICOM SOP class UID |
+| `photometric_interpretation` | str | Property | e.g. `RGB`, `MONOCHROME2` |
+| `samples_per_pixel` | int | Property | Color components per pixel |
+| `dicom_modality` | str | Property | DICOM equipment modality: `OP`, `OPT`, `SC`, … |
+| `etdrs_field` | str | Property | ETDRS field `F1`–`F7` |
+| `anatomic_region` | int | Property | Body part examined |
+| `angiography` | str | Property | Angiography indicator |
+| `acquisition_date_time` | datetime | Property | Acquisition timestamp |
+| `pupil_dilated` | str | Property | Whether pupil was dilated |
+| `horizontal_field_of_view` | float | Property | Field of view (mm) |
+| `resolution_axial` | float | Property | Axial resolution (mm) |
+| `resolution_horizontal` | float | Property | Horizontal resolution (mm) |
+| `resolution_vertical` | float | Property | Vertical resolution (mm) |
+| `scan_mode` | str | Lookup | Scan mode (`Scan.ScanMode`); creates/links optional `Scan` row |
+| `modality_tag` | str | Lookup | Tag for optional `ModalityTable` row — **not** the same as `modality` enum |
+| `thumbnail_path` | str | Property | `ThumbnailPath` prefix under `{EYENED_STORAGE_ROOT}/thumbnails/`. Usually leave unset; generate via [Thumbnails](/eyened-platform/thumbnails) |
+| `inactive` | bool | Property | Soft-delete flag |
 
 ## Storage
 
-Files are referenced by backend + path within that backend (resolved via `EYENED_STORAGE_MOUNTS` on the server).
+Files are referenced by storage backend + path within that backend (resolved via `EYENED_STORAGE_MOUNTS` on the server/worker).
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `storage_backend_id` | int | Existing storage backend primary key |
-| `storage_backend_key` | str | Backend key (lookup / create) |
-| `storage_backend_kind` | str | Backend kind when creating |
-| `image_storage_id` | int | Existing storage row primary key |
-| `object_key` | str | **Required for new images.** Path within the storage backend |
-| `image_storage_format` | str | MIME or format string (often inferred from `object_key`) |
-| `image_storage_is_primary` | bool | Primary storage flag |
-| `image_storage_hash` | bytes | SHA-256 digest (32 bytes) |
-| `image_storage_checksum` | str | Checksum string (e.g. MD5 hex) |
+| Field | Type | Role | Description |
+|-------|------|------|-------------|
+| `storage_backend_id` | int | PK | Existing storage backend |
+| `storage_backend_key` | str | Lookup | Backend key (nginx location / mount name); created with `storage_backend_kind` if missing |
+| `storage_backend_kind` | str | Property | Backend kind when **creating** a new backend |
+| `image_storage_id` | int | PK | Existing `ImageStorage` row |
+| `object_key` | str | Lookup | **Required for new images.** Path to the file within the backend (unique per backend) |
+| `image_storage_format` | str | Property | MIME or format string (`image/png`, `dicom`, …); often inferred from `object_key` during [preparation](/eyened-platform/orm/importer) |
+| `image_storage_is_primary` | bool | Property | Whether this row is the primary storage location for the instance |
+| `image_storage_hash` | bytes | Property | SHA-256 digest (32 bytes) |
+| `image_storage_checksum` | str | Property | Checksum string (e.g. MD5 hex) |
