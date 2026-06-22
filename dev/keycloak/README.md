@@ -5,13 +5,11 @@ from the base dev stack — use it only when you want to exercise OIDC locally.
 
 ## Start
 
-From the `dev` folder:
+From the `dev` folder, layer the Keycloak override on top of the base stack:
 
 ```bash
-./keycloak/up.sh up -d
+docker compose -f docker-compose.yml -f keycloak/docker-compose.keycloak.yml up -d
 ```
-
-(equivalent to `docker compose -f docker-compose.yml -f keycloak/docker-compose.keycloak.yml up -d`)
 
 Then in `.env`:
 
