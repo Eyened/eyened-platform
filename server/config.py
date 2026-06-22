@@ -1,6 +1,7 @@
 import logging
+from dataclasses import dataclass
 from datetime import date
-from anyio.functools import lru_cache
+from functools import lru_cache
 from json import JSONDecodeError
 from pathlib import Path
 
@@ -85,37 +86,50 @@ class OIDCSettings(BaseSettings):
                                                                       "example `iss=12345,tid=67890`. Keys and values "
                                                                       "are separated by `=`, key-value pairs by `,`.")
 
-    @lru_cache
-    async def _get_metadata(self):
-        """Get OIDC metadata from URL and validate it"""
-        async with httpxyz.AsyncClient() as client:
-            response = await client.get(self.metadata_url)
 
-        if response.status_code != httpxyz.codes.OK:
-            raise ValueError(f"OIDC metadata URL '{self.metadata_url}' seems to be invalid, HTTP status code returned: {response.status_code}")
+@dataclass(frozen=True)
+class OIDCMetadata:
+    authorization_endpoint: str
+    token_endpoint: str
+    jwks_uri: str
 
-        try:
-            metadata = response.json()
-        except JSONDecodeError:
-            raise ValueError("OIDC metadata URL returned unparsable JSON data")
 
-        for key in ["authorization_endpoint", "token_endpoint", "jwks_uri"]:
-            if key not in metadata:
-                raise ValueError(f"OIDC metadata URL response is missing required key '{key}'")
+@lru_cache
+def get_oidc_metadata(metadata_url: str) -> OIDCMetadata:
+    """Fetch OIDC provider metadata and validate its required endpoints."""
+    return validate_oidc_metadata(_fetch_oidc_metadata(metadata_url))
 
-        return metadata
 
-    async def get_authorization_endpoint(self) -> str:
-        metadata = await self._get_metadata()
-        return metadata["authorization_endpoint"]
+def _fetch_oidc_metadata(metadata_url: str) -> dict:
+    """Fetch OIDC provider metadata from the provider's well-known URL."""
+    with httpxyz.Client() as client:
+        response = client.get(metadata_url)
 
-    async def get_token_endpoint(self) -> str:
-        metadata = await self._get_metadata()
-        return metadata["token_endpoint"]
+    if response.status_code != httpxyz.codes.OK:
+        raise ValueError(
+            f"OIDC metadata URL '{metadata_url}' seems to be invalid, "
+            f"HTTP status code returned: {response.status_code}"
+        )
 
-    async def get_jwks_uri(self) -> str:
-        metadata = await self._get_metadata()
-        return metadata["jwks_uri"]
+    try:
+        metadata = response.json()
+    except JSONDecodeError:
+        raise ValueError("OIDC metadata URL returned unparsable JSON data")
+
+    return metadata
+
+
+def validate_oidc_metadata(metadata: dict) -> OIDCMetadata:
+    """Validate the OIDC metadata fields used by the authentication flow."""
+    for key in ["authorization_endpoint", "token_endpoint", "jwks_uri"]:
+        if key not in metadata:
+            raise ValueError(f"OIDC metadata URL response is missing required key '{key}'")
+
+    return OIDCMetadata(
+        authorization_endpoint=metadata["authorization_endpoint"],
+        token_endpoint=metadata["token_endpoint"],
+        jwks_uri=metadata["jwks_uri"],
+    )
 
 
 @pretty_settings

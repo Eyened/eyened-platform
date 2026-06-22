@@ -1,6 +1,7 @@
 import pytest
 
-from server.config import OIDCSettings, Settings
+import server.config as config
+from server.config import OIDCSettings, Settings, get_oidc_metadata, validate_oidc_metadata
 
 OPENID_CONFIG = {
     "authorization_endpoint": "https://example.com/api/authorize",
@@ -10,6 +11,47 @@ OPENID_CONFIG = {
     "issuer": "https://example.com/api",
 }
 """Mock OpenID Connect configuration data as returned from a configuration URL"""
+
+METADATA_URL = "https://example.com/api/.well-known/openid-configuration"
+
+
+class FakeResponse:
+    def __init__(self, *, status_code=200, json_data=None, json_error=None):
+        self.status_code = status_code
+        self._json_data = json_data
+        self._json_error = json_error
+
+    def json(self):
+        if self._json_error is not None:
+            raise self._json_error
+        return self._json_data
+
+
+@pytest.fixture(autouse=True)
+def clear_oidc_metadata_cache():
+    get_oidc_metadata.cache_clear()
+    yield
+    get_oidc_metadata.cache_clear()
+
+
+@pytest.fixture
+def fake_oidc_metadata_client(monkeypatch):
+    class FakeClient:
+        requested_urls: list[str] = []
+        response = FakeResponse(json_data=OPENID_CONFIG)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def get(self, url: str):
+            self.requested_urls.append(url)
+            return self.response
+
+    monkeypatch.setattr(config.httpxyz, "Client", FakeClient)
+    return FakeClient
 
 
 def test_oidc_settings_from_env(monkeypatch):
@@ -23,39 +65,38 @@ def test_oidc_settings_from_env(monkeypatch):
     assert settings.auth_oidc_enabled is True
 
 
-@pytest.mark.asyncio
-async def test_oidc_settings_valid(httpx_mock):
-    httpx_mock.add_response(json=OPENID_CONFIG)
+def test_oidc_metadata_is_cached_by_url(fake_oidc_metadata_client):
+    metadata = get_oidc_metadata(METADATA_URL)
+    assert metadata.authorization_endpoint == "https://example.com/api/authorize"
+    assert get_oidc_metadata(METADATA_URL).token_endpoint == "https://example.com/api/token"
+    assert fake_oidc_metadata_client.requested_urls == [METADATA_URL]
 
-    oidc_settings = OIDCSettings(client_id="client_id", client_secret="client_secret", metadata_url="https://example.com/api/.well-known/openid-configuration")
-    assert await oidc_settings.get_authorization_endpoint() == "https://example.com/api/authorize"
 
+def test_oidc_metadata_url_returns_invalid_status(fake_oidc_metadata_client):
+    fake_oidc_metadata_client.response = FakeResponse(status_code=401)
 
-@pytest.mark.asyncio
-async def test_oidc_connect_url_returns_invalid_status(httpx_mock):
-    httpx_mock.add_response(status_code=401)
-
-    oidc_settings = OIDCSettings(metadata_url="https://example.com/api/.well-known/openid-configuration")
     with pytest.raises(ValueError, match="HTTP status code returned: 401"):
-        await oidc_settings.get_authorization_endpoint()
+        get_oidc_metadata(METADATA_URL)
 
 
-@pytest.mark.asyncio
-async def test_oidc_connect_url_returns_invalid_data(httpx_mock):
-    httpx_mock.add_response(text="Text response indicating this is not JSON data")
+def test_oidc_metadata_url_returns_invalid_data(fake_oidc_metadata_client):
+    fake_oidc_metadata_client.response = FakeResponse(json_error=config.JSONDecodeError("invalid json", "", 0))
 
-    oidc_settings = OIDCSettings(metadata_url="https://example.com/api/.well-known/openid-configuration")
     with pytest.raises(ValueError, match="OIDC metadata URL returned unparsable JSON data"):
-        await oidc_settings.get_authorization_endpoint()
+        get_oidc_metadata(METADATA_URL)
 
 
-@pytest.mark.asyncio
+def test_valid_oidc_metadata_is_returned_unchanged():
+    metadata = validate_oidc_metadata(OPENID_CONFIG)
+    assert metadata.authorization_endpoint == "https://example.com/api/authorize"
+    assert metadata.token_endpoint == "https://example.com/api/token"
+    assert metadata.jwks_uri == "https://example.com/api/jwks"
+
+
 @pytest.mark.parametrize("metadata_key", ["authorization_endpoint", "jwks_uri", "token_endpoint"])
-async def test_oidc_missing_required_metadata(httpx_mock, metadata_key):
+def test_oidc_missing_required_metadata(metadata_key):
     response_data = OPENID_CONFIG.copy()
     del response_data[metadata_key]
-    httpx_mock.add_response(json=response_data)
 
-    oidc_settings = OIDCSettings(metadata_url="https://example.com/api/.well-known/openid-configuration")
     with pytest.raises(ValueError, match=f"OIDC metadata URL response is missing required key '{metadata_key}'"):
-        await oidc_settings._get_metadata()
+        validate_oidc_metadata(response_data)

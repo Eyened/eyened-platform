@@ -20,13 +20,17 @@ from fastapi.params import Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..config import settings
+from ..config import get_oidc_metadata, settings
 from ..db import get_db
 from ..utils.db_logging import get_db_logger
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _oidc_metadata():
+    return get_oidc_metadata(settings.oidc.metadata_url)
 
 
 # Pydantic models
@@ -513,12 +517,12 @@ async def logout(response: Response):
 
 
 @router.get("/auth/options")
-async def get_auth_options():
+def get_auth_options():
     """Options and settings for authentication."""
     oidc_auth_enabled = False
     if settings.auth_oidc_enabled:
         try:
-            oidc_auth_enabled = await settings.oidc.get_authorization_endpoint() is not None
+            oidc_auth_enabled = _oidc_metadata().authorization_endpoint is not None
         except Exception:
             logger.warning("OIDC metadata unavailable", exc_info=True)
 
@@ -550,7 +554,7 @@ def validate_secure_token(token: str, hashed: str, secret_key: str) -> bool:
     return secrets.compare_digest(hashed, hashed_token)
 
 @router.get("/auth/oidc/authorize")
-async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Query(alias="next")] = "") -> OIDCAuthorizationResponse:
+def get_oidc_authorization_url(response: Response, next_: Annotated[str, Query(alias="next")] = "") -> OIDCAuthorizationResponse:
     """
     The authorization URL at the OIDC provider for authentication.
 
@@ -568,7 +572,7 @@ async def get_oidc_authorization_url(response: Response, next_: Annotated[str, Q
         "csrf": csrf_token_hash,
     }))
 
-    url = await settings.oidc.get_authorization_endpoint()
+    url = _oidc_metadata().authorization_endpoint
     nonce, nonce_hash = generate_secure_token(settings.secret_key_value)
     # Optional: make the scope configurable
     params = {
@@ -615,7 +619,7 @@ async def get_oidc_public_key(id_token: str) -> AllowedRSAKeys:
     headers = jwt.get_unverified_header(id_token)
     kid = headers["kid"]
     async with httpxyz.AsyncClient() as client:
-        jwks_url = await settings.oidc.get_jwks_uri()
+        jwks_url = _oidc_metadata().jwks_uri
         response = await client.get(jwks_url)
 
     if not response.is_success:
@@ -763,7 +767,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSRF token validation failed")
 
     # Use code to authenticate at the provider
-    token_url = await settings.oidc.get_token_endpoint()
+    token_url = _oidc_metadata().token_endpoint
     async with httpxyz.AsyncClient() as client:
         token_response = await client.post(
             token_url,
