@@ -83,6 +83,12 @@ export class ApiError extends Error {
 	}
 }
 
+/** Build an ApiError from a FastAPI error response (always `{ detail: string }`). */
+export async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+	const { detail }: { detail: string } = await response.json();
+	return new ApiError(response.status, detail);
+}
+
 export function isUnauthorizedStatus(status: number): boolean {
 	return status === 401 || status === 403;
 }

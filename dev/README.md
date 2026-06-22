@@ -17,6 +17,7 @@
 - Copy `sample.env` to `.env` and fill out the required values.
 
 ## 2. Start Docker Services
+- The database is a separate stack and is not part of this compose file. Start it first (see [../database/README.md](../database/README.md)); the server reaches it via `host.docker.internal` using the `EYENED_DATABASE_*` values in `.env`.
 - [Optional] You may want to update the name in docker-compose.yml
 - Run:
   ```bash
@@ -24,11 +25,14 @@
   ```
   This will start:
   - nginx fileserver that takes care of the routing (api, frontend and files)
-  - start a database service
-  - start an adminer service (for accessing the database through a browser)
-  Notes:
-  - `fileserver` uses `network_mode: host`, so `DEV_NGINX_PORT` is opened directly on the host.
-  - Database root password is hard-coded to `test` in `dev/docker-compose.yml` (match `EYENED_DATABASE_PASSWORD`).
+  - redis
+  - the server and client
+
+### OIDC login (optional)
+
+The base stack runs without OIDC. To test the OIDC login flow, either point the
+`EYENED_OIDC_*` values in `.env` at a real provider, or spin up the bundled local
+Keycloak — see [keycloak/README.md](./keycloak/README.md).
 
 ## 3. Populate the Database [Optional]
 To copy over data (for example from a production environment), run this:

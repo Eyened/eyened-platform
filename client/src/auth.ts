@@ -1,5 +1,4 @@
-import { fetchApi } from '$lib/api/client';
-import { redirect } from "@sveltejs/kit";
+import { apiErrorFromResponse, fetchApi } from '$lib/api/client';
 
 export interface UserResponse {
     id: number;
@@ -176,11 +175,11 @@ class AuthClient {
             })
         });
         if (!response.ok) {
-            throw new Error("OIDC authenticate failed");
+            throw await apiErrorFromResponse(response);
         }
 
         return response.json();
     }
 }
 
-export const authClient = new AuthClient(); 
+export const authClient = new AuthClient();

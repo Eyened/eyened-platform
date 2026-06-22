@@ -515,7 +515,12 @@ async def logout(response: Response):
 @router.get("/auth/options")
 async def get_auth_options():
     """Options and settings for authentication."""
-    oidc_auth_enabled = settings.auth_oidc_enabled and await settings.oidc.get_authorization_endpoint() is not None
+    oidc_auth_enabled = False
+    if settings.auth_oidc_enabled:
+        try:
+            oidc_auth_enabled = await settings.oidc.get_authorization_endpoint() is not None
+        except Exception:
+            logger.warning("OIDC metadata unavailable", exc_info=True)
 
     return AuthOptionsResponse(
         password_enabled=settings.auth_password_enabled,
@@ -662,7 +667,7 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nonce validation failed")
 
     # Validate additional claims
-    validations = settings.oidc.additional_token_validations.split(",")
+    validations = [v for v in settings.oidc.additional_token_validations.split(",") if v.strip()]
     for validation in validations:
         claim_name, expected_claim_value = validation.split("=", 1)
         claim_value = claims.get(claim_name)
@@ -712,11 +717,21 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
     else:
         # No existing account was found
         if settings.oidc.create_new_accounts:
-            # Create new account from ID token claims
-            # Optional: make the claim that is used to fill the username configurable
-            username = id_claims["preferred_username"]
+            username = id_claims.get("preferred_username")
+            if not username:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="OIDC token is missing the required preferred_username claim",
+                )
             identifier = f"oidc:sub:{id_claims['sub']}"
-            creator = create_user(session, username=username, password=None, employee_identifier=identifier)
+            try:
+                creator = create_user(session, username=username, password=None, employee_identifier=identifier)
+            except ValueError as err:
+                # create_user only rejects an already-taken username
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="An account with this username already exists but is not linked to your OIDC login. Ask an administrator to link your account.",
+                ) from err
             logger.info(f"Created new account '{username}' for OIDC authenticated session, {identifier=}")
         else:
             logger.warning(f"Denied access to authenticated OIDC session, no existing account found and not creating a new one. Received claims: {id_claims}")
