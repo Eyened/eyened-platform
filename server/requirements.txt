@@ -4,7 +4,6 @@ gunicorn==23.0.0
 numpy==2.0.0
 pandas>=1.5.3
 pydantic-settings==2.7.1
-zarr>=2.18.0
 python-multipart==0.0.20
 passlib==1.7.4
 pyjwt>=2.8.0

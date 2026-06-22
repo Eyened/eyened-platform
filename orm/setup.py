@@ -41,6 +41,7 @@ setup(
         "pyyaml==6.*",
         "google_crc32c==1.8.0",
         "simpleitk==2.*",
+        "zarr>=2.18.0",
     ],
     python_requires=">=3.10",
 )
