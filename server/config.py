@@ -1,6 +1,11 @@
 import logging
+from dataclasses import dataclass
 from datetime import date
+from functools import lru_cache
+from json import JSONDecodeError
 from pathlib import Path
+
+import httpxyz
 from eyened_orm.utils.pretty_settings import pretty_settings
 from pydantic import Field, SecretStr
 from pydantic_settings import SettingsConfigDict, BaseSettings
@@ -62,12 +67,80 @@ class RqSettings(BaseSettings):
 
 
 @pretty_settings
+class OIDCSettings(BaseSettings):
+    model_config = SettingsConfigDict(frozen=True, extra="forbid", env_prefix="EYENED_OIDC_")
+
+    client_id: str = Field(default="", description="The OIDC client ID")
+    client_secret: SecretStr = Field(default="", description="The OIDC client secret")
+    metadata_url: str = Field(default="", description="The full URL to the OIDC Provider metadata document, usually "
+                                                      "found at `<issuer URL>/.well-known/openid-configuration`")
+    redirect_url: str = Field(default="", description="The full URL to the redirect page in the EyeNED viewer where "
+                                                      "the user is sent after authentication, should be "
+                                                      "`https://<eyened URL>/users/oidc-callback`")
+    provider_name: str = Field(default="OpenID Connect", description="The OIDC provider's name, or organisational name "
+                                                                     "for the authentication flow")
+    create_new_accounts: bool = Field(default=False, description="Whether or not to create new accounts for unknown "
+                                                                 "users that authenticated through OIDC.")
+    additional_token_validations: str = Field(default="", description="A key-value list of static token claims that "
+                                                                      "must be available in received ID tokens, for "
+                                                                      "example `iss=12345,tid=67890`. Keys and values "
+                                                                      "are separated by `=`, key-value pairs by `,`.")
+
+
+@dataclass(frozen=True)
+class OIDCMetadata:
+    authorization_endpoint: str
+    token_endpoint: str
+    jwks_uri: str
+
+
+@lru_cache
+def get_oidc_metadata(metadata_url: str) -> OIDCMetadata:
+    """Fetch OIDC provider metadata and validate its required endpoints."""
+    return validate_oidc_metadata(_fetch_oidc_metadata(metadata_url))
+
+
+def _fetch_oidc_metadata(metadata_url: str) -> dict:
+    """Fetch OIDC provider metadata from the provider's well-known URL."""
+    with httpxyz.Client() as client:
+        response = client.get(metadata_url)
+
+    if response.status_code != httpxyz.codes.OK:
+        raise ValueError(
+            f"OIDC metadata URL '{metadata_url}' seems to be invalid, "
+            f"HTTP status code returned: {response.status_code}"
+        )
+
+    try:
+        metadata = response.json()
+    except JSONDecodeError:
+        raise ValueError("OIDC metadata URL returned unparsable JSON data")
+
+    return metadata
+
+
+def validate_oidc_metadata(metadata: dict) -> OIDCMetadata:
+    """Validate the OIDC metadata fields used by the authentication flow."""
+    for key in ["authorization_endpoint", "token_endpoint", "jwks_uri"]:
+        if key not in metadata:
+            raise ValueError(f"OIDC metadata URL response is missing required key '{key}'")
+
+    return OIDCMetadata(
+        authorization_endpoint=metadata["authorization_endpoint"],
+        token_endpoint=metadata["token_endpoint"],
+        jwks_uri=metadata["jwks_uri"],
+    )
+
+
+@pretty_settings
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         frozen=True, extra="forbid", env_prefix="EYENED_API_"
     )
     debug: bool = False
     public_auth_disabled: bool = False
+    auth_password_enabled: bool = True
+    auth_oidc_enabled: bool = False
     secret_key: SecretStr = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -81,6 +154,7 @@ class Settings(BaseSettings):
     redis: RedisSettings = Field(default_factory=RedisSettings)
     rq: RqSettings = Field(default_factory=RqSettings)
     db_log: DbLogSettings = Field(default_factory=DbLogSettings)
+    oidc: OIDCSettings = Field(default_factory=OIDCSettings)
 
     zarr_store: str = "/storage/segmentations.zarr"
 

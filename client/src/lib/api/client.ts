@@ -9,7 +9,7 @@ function redirectToLogin() {
 	// Only redirect if not already on login page
 	if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/users/login')) {
 		const currentUrl = encodeURIComponent(window.location.href);
-		window.location.href = `/users/login?redirect=${currentUrl}`;
+		window.location.href = `/users/login?next=${currentUrl}`;
 	}
 }
 
@@ -81,6 +81,12 @@ export class ApiError extends Error {
 		this.name = 'ApiError';
 		this.status = status;
 	}
+}
+
+/** Build an ApiError from a FastAPI error response (always `{ detail: string }`). */
+export async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+	const { detail }: { detail: string } = await response.json();
+	return new ApiError(response.status, detail);
 }
 
 export function isUnauthorizedStatus(status: number): boolean {

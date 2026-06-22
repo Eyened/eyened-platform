@@ -1,4 +1,4 @@
-import { fetchApi } from '$lib/api/client';
+import { apiErrorFromResponse, fetchApi } from '$lib/api/client';
 
 export interface UserResponse {
     id: number;
@@ -16,6 +16,17 @@ interface UserLogin {
 interface ChangePasswordRequest {
     old_password: string;
     new_password: string;
+}
+
+interface AuthOptionsResponse {
+    password_enabled: boolean;
+    oidc_enabled: boolean;
+    oidc_provider_name: string;
+}
+
+interface OIDCAuthorizationResponse {
+    url: string;
+    random: number;
 }
 
 class AuthClient {
@@ -122,6 +133,53 @@ class AuthClient {
 
         return response.json();
     }
+
+    async options(): Promise<AuthOptionsResponse> {
+        const response = await fetchApi(`${this.baseUrl}/options`, {
+            skipAuthRetry: true,
+        });
+
+        if (!response.ok) {
+            throw new Error('Could not fetch authentication options');
+        }
+
+        return response.json();
+    }
+
+    async OIDCAuthorize(): Promise<OIDCAuthorizationResponse> {
+        let nextUrl = new URLSearchParams(window.location.search).get('next');
+        let queryParams = new URLSearchParams();
+        if (nextUrl) {
+            queryParams.append('next', nextUrl);
+        }
+        const response = await fetchApi(`${this.baseUrl}/oidc/authorize`, {
+            skipAuthRetry: true,
+            query: queryParams,
+        });
+
+        if (!response.ok) {
+            throw new Error('OIDC authorize failed');
+        }
+
+        return response.json();
+    }
+
+    async OIDCAuthenticate(code: string, state: string): Promise<UserResponse> {
+        const response = await fetchApi(`${this.baseUrl}/oidc/authenticate`, {
+            method: 'POST',
+            skipAuthRetry: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: code,
+                state: state,
+            })
+        });
+        if (!response.ok) {
+            throw await apiErrorFromResponse(response);
+        }
+
+        return response.json();
+    }
 }
 
-export const authClient = new AuthClient(); 
+export const authClient = new AuthClient();

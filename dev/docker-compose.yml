@@ -37,6 +37,8 @@ services:
     build:
       context: ..
       dockerfile: dev/Dockerfile.server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       EYENED_REDIS_HOST: redis
       EYENED_REDIS_PORT: "6379"
@@ -47,8 +49,6 @@ services:
       # current solution for zarr storage is to mount it to the server container
       #- <filestorage_mount>:<filestorage_mount>:ro
     depends_on:
-      database:
-        condition: service_healthy
       redis:
         condition: service_healthy
 

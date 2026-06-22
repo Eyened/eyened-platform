@@ -1,0 +1,148 @@
+---
+title: Authentication
+description: How to configure authentication backends in Eyened
+---
+
+To access the Eyened platform, users need to authenticate. See below for options on how to manage them.
+
+## Standalone / database backend
+
+By default, accounts are managed in the MySQL database holding all Eyened data. The database table `creator` holds usernames, password hashes and a few other fields describing users. Non-human accounts like AI models generating output are also managed in this table. To create a new user, use the ORM command `eorm create-user`. More advanced user management is done by accessing the `creator` table in the database using SQL.
+
+## OpenID Connect (OIDC)
+
+It's also possible to integrate with an existing authentication backend in an organization using [OpenID Connect](https://openid.net/developers/discover-openid-and-openid-connect/) (or "OIDC" for short). This allows you to use the single sign-on flow that users within your organization are already used to. Users won't have to remember a separate password for the Eyened platform. Upon sign-in, the browser of the user is redirected to the authorization page at the OpenID Connect provider, and then redirected back to the Eyened platform.
+
+To set this up, a few steps need to be taken care of.
+
+### OIDC application registration
+
+At the party that manages the central authentication system, you need to request an App registration for OpenID Connect authentication. The application uses the "auth code flow for web applications" and requires the return of an "ID Token" from the token endpoint. The specific values that you'll need to provide depend on the system in use, but in general you'll only need to provide a "Redirect URL" sometimes also named "Callback URL". See the [`EYENED_OIDC_REDIRECT_URL`](#EYENED_OIDC_REDIRECT_URL) configuration option for details on the correct value for this URL.
+
+You'll receive some configuration values from your provider, that need to be set up in the Eyened application.
+
+### OIDC Setup
+
+To configure OIDC authentication in Eyened, you need to set up at least the `Client ID`, `Client Secret`, `Metadata URL`, `Redirect URL`. You also need to enable OIDC authentication (`EYENED_API_AUTH_OIDC_ENABLED=true`).
+
+After configuration, you can test if it works. Errors will be visible in the logs of the Eyened server. Also, the response from the authentication endpoint that is called from the callback in the frontend can be helpful. Use your browser dev tools for that.
+
+:::tip
+Try to do the initial setup in your local development environment. Ask the provider to configure the redirect URL `http://localhost:8000/users/oidc-callback` for you.
+:::
+
+### OIDC Configuration
+
+The OIDC backend is configured in the same way as the ORM, through env variables. See the [ORM documentation](/eyened-platform/orm/configuration) on how to provide these.
+
+This is a list of all available configuration options. Further down, more details are available.
+
+| Option                                   | Description                              |
+|------------------------------------------|------------------------------------------|
+| EYENED_OIDC_CLIENT_ID                    | Application Client ID                    |
+| EYENED_OIDC_CLIENT_SECRET                | Application Client Secret                |
+| EYENED_OIDC_METADATA_URL                 | Application Metadata URL                 |
+| EYENED_OIDC_REDIRECT_URL                 | Redirect URL in the Eyened platform      |
+| EYENED_OIDC_PROVIDER_NAME                | Friendly name of the OIDC provider       |
+| EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS | Additional token validations             |
+| EYENED_OIDC_CREATE_NEW_ACCOUNTS          | Enable creation of new accounts for OIDC |
+| EYENED_API_AUTH_OIDC_ENABLED             | Enable OIDC authentication               |
+| EYENED_API_AUTH_PASSWORD_ENABLED         | Enable password authentication           |
+
+#### `EYENED_OIDC_CLIENT_ID`, `EYENED_OIDC_CLIENT_SECRET`, `EYENED_OIDC_METADATA_URL`
+
+- Required: yes
+- Default values: -
+
+You should have received the Application `Client ID` (usually a string of random characters and numbers), `Client Secret` (another string of random characters and numbers) and `Metadata URL` (an URL) in response to your request for an App registration. The `Metadata URL` should end with `/.well-known/openid-configuration`, and should be publicly accessible.
+
+If you only received an "Issuer URL" or similar, the correct URL usually is `https://[Issuer URL]/.well-known/openid-configuration`. Check the documentation of the authentication provider, or ask the issuing party for assistance.
+
+#### `EYENED_OIDC_REDIRECT_URL`
+
+- Required: yes
+- Default value: -
+
+This is the `Redirect URL` that you supplied during App registration. This is the URL where the OIDC provider redirects the browser after authentication. The correct value for the URL is `https://eyened.example.org/users/oidc-callback`, where you need to replace `eyened.example.org` with the actual domain where the Eyened platform for your organization is running. You can visit this URL yourself in your deployed Eyened application, it will display a simple error message.
+
+#### `EYENED_OIDC_PROVIDER_NAME`
+
+- Required: no
+- Default value: `OpenID Connect`
+
+At the Eyened login screen, access to the OIDC authentication will be visible through a button with the text *Login with \[...\]*. Set this configuration option to the name of your login system to replace the default value with the name that your users know, e.g. "SURFconext" or "ACME Single Sign-on".
+
+#### `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS`
+
+- Required: no
+- Default value: -
+
+You can use this configuration option to list additional token claims that need to be validated in `ID tokens`. By default, only the "Audience" claim and various timing claims are checked. OpenID officially requires to also validate the Issuer claim (`iss`), and specific providers might advise to validate claims specific to their implementation. E.g. [MS Entra advises](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation) to also check the "Tenant" claim (`tid`).
+
+Example: the configuration value `iss=12345,foo=bar` will validate the "Issuer" claim (`iss`) to be `12345`, and the made-up `foo` claim to have value `bar`. Separate key and value from each other using an equals sign (`=`), multiple key-value sets are separated by a comma (`,`).
+
+It's recommended to configure this option to at least validate the "Issuer" claim (`iss`) You should have received the correct value for this claim with your app registration.
+
+#### `EYENED_OIDC_CREATE_NEW_ACCOUNTS`
+
+- Required: no
+- Default value: `false`
+
+Whether to create new accounts for users that have authenticated successfully using OIDC, but are unknown to the Eyened application. Read [OIDC Access control](#oidc-access-control) below for details.
+
+#### `EYENED_API_AUTH_OIDC_ENABLED`
+
+- Required: no
+- Default value: `false`
+
+When configuring authentication options, this option enables OIDC authentication. It will display the "Login with OpenID Connect" button on the login screen.
+
+#### `EYENED_API_AUTH_PASSWORD_ENABLED`
+
+- Required: no
+- Default value: `true`
+
+When configuring authentication options, this option controls password authentication. When enabled, the username + password dialog is shown in the login screen.
+
+After enabling OIDC authentication, you probably want to disable the default password authentication, which you can do by setting this option to `false`. In the rare case that you want to keep multiple authentication options available at the same time, just set both options to `true`.
+
+
+### OIDC Access control
+
+To manage who actually has access to the Eyened platform using OIDC, there are two possible approaches: either you control access inside the Eyened application itself, or at the OIDC provider. This is controlled using the `EYENED_OIDC_CREATE_NEW_ACCOUNTS` configuration key.
+
+#### Inside the Eyened application
+
+This is the default operation mode, when `EYENED_OIDC_CREATE_NEW_ACCOUNTS=false`.
+
+If you decide to keep access control in the Eyened application itself, only users who have an existing account in the Eyened platform (in the `creator` table) are allowed to log in. When adding a new account, you need to link the account to identities received from OIDC. To do this, you'll need to provide a claim available in received ID tokens. For security reasons, the "Subject" claim should be used in the long term, but this claim usually holds some random identifier that you cannot predict up front.
+
+To resolve this, you can use a different claim as a temporary replacement. E.g. if the ID token contains the users' email address in the claim `email`, you need to set the value of the `creator.EmployeeIdentifier` to `oidc:email:John.Doe@example.com`. After the first successful authentication, the value will be replaced with the "Subject" claim (using prefix `oidc:sub:`).
+
+:::note
+Only the `email` or the `preferred_username` claims are currently supported as a temporary claim.
+:::
+
+:::caution
+The claim value (e.g. the email address in the example) is checked case-sensitive.
+:::
+
+:::tip
+If you're migrating from password authentication to OIDC, the easiest way is to update the `creator.EmployeeIdentifier` field in all existing accounts with a claim value as described above. Now users will be able to sign in using both techniques. When you're sure that users can sign in using OIDC and end up with the same account, disable password authentication.
+:::
+
+#### At the OIDC provider
+
+This mode is activated when you set `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true`.
+
+If you handle access control at the OIDC provider, the provider usually allows a way to control which persons are authorized to access the application. Maybe you're connected to your organizations' Active Directory, and you can control access using Groups in AD. This totally depends on the provider, and your organization. Optionally consult your IT department for possibilities.
+
+When enabled, the Eyened platform will accept all authenticated sessions from OIDC. For new accounts, an entry in the `creator` table will be added and linked to their OIDC identity (by recording the "Subject" claim in the `creator.EmployeeIdentifier` field). When creating a new account, the other fields populated in the `creator` table are `CreatorName` (value taken from ID token claim `preferred_username`) and `PasswordHash` (set to an unusable password, so the user cannot log in using password authentication).
+
+:::tip
+Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authentication. Feel free to adjust the name in `creator.CreatorName` to whatever is convenient for displaying in the Eyened frontend. Values in the `creator` table are only touched during account creation.
+:::
+
+## General note on authentication
+
+There is no easy way to lock existing accounts out of the Eyened application. This is due to the fact that, once authenticated, the token that allows access to the application, can be refreshed indefinitely within the refresh token lifetime (default: 7 days). Only a new authentication will check the password (for password authentication) or force OIDC authentication again. To force re-authentication, you will need to set a new secret key (See `EYENED_API_SECRET_KEY`), or change the `CreatorName` value for an account.

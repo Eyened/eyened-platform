@@ -15,7 +15,7 @@ export class UserManager {
 
 
     async init(pathname: string) {
-        if (pathname.startsWith('/users/login')) {
+        if (pathname.startsWith('/users/login') || pathname.startsWith('/users/oidc-callback')) {
             return;
         }
 
@@ -25,7 +25,7 @@ export class UserManager {
             // Only redirect if we're not already on the login page
             if (!page.url.pathname.startsWith('/users/login')) {
                 console.log('redirecting to', encodeURIComponent(window.location.href));
-                await goto('/users/login?redirect=' + encodeURIComponent(window.location.href));
+                await goto('/users/login?next=' + encodeURIComponent(window.location.href));
             }
             return;
         }
@@ -41,13 +41,29 @@ export class UserManager {
         this.starredTagIds = this.user.starred_tags ?? [];
         // await this.setCreator(resp.id);
 
-        // Get the redirect URL from the query parameters
+        // Get the 'next' URL from the query parameters
         const params = new URLSearchParams(window.location.search);
-        const redirectUrl = params.get('redirect');
+        const nextUrl = params.get('next');
 
-        // If there's a redirect URL, go there, otherwise go to the root
-        if (redirectUrl) {
-            await goto(decodeURIComponent(redirectUrl));
+        // If there's a 'next' URL, go there, otherwise go to the root
+        if (nextUrl) {
+            await goto(decodeURIComponent(nextUrl));
+        } else {
+            await goto('/');
+        }
+    }
+
+    async OIDCLogin(code: string, state: string) {
+        this.user = await authClient.OIDCAuthenticate(code, state);
+        this.starredTagIds = this.user.starred_tags ?? [];
+
+        // Get the 'next' URL from state
+        const state_decoded = JSON.parse(decodeURIComponent(state));
+        const nextUrl = state_decoded.next.toString();
+
+        // If there's a 'next' URL, go there, otherwise go to the root
+        if (nextUrl) {
+            await goto(decodeURIComponent(nextUrl));
         } else {
             await goto('/');
         }
