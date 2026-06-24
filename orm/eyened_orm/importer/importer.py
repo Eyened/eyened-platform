@@ -9,6 +9,7 @@ from eyened_orm.base import Base
 
 from .import_run import ImportRun, Update
 from .importer_dtos import ImportRow
+from .importer_errors import missing_parent_error
 from .importer_mappings_base import Entity, Lookup, LookupPart
 from .importer_mappings_image import ENTITY_SPECS
 from .preparation import PreparationOptions, prepare_rows
@@ -212,7 +213,12 @@ class Cache:
             implied_obj = getattr(obj, imp.attribute, None)
             if implied_obj is None:
                 if imp.required:
-                    raise RuntimeError(f"missing parent {imp.parent.name} for row")
+                    raise missing_parent_error(
+                        self,
+                        entity=entity,
+                        parent=imp.parent,
+                        row=row,
+                    )
                 continue
             self.seed(imp.parent, row, implied_obj)
 
@@ -325,8 +331,11 @@ class Builder:
             parent = self.cache.get(imp.parent, row)
             if parent is None:
                 if imp.required:
-                    raise RuntimeError(
-                        f"Missing parent {imp.parent.name} for {entity.name}"
+                    raise missing_parent_error(
+                        self.cache,
+                        entity=entity,
+                        parent=imp.parent,
+                        row=row,
                     )
                 continue
             result[imp.attribute] = Update(old_value=None, new_value=parent)

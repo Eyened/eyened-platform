@@ -32,7 +32,7 @@ def test_missing_project_identification_rejected(session):
         )
     ]
 
-    with pytest.raises(RuntimeError, match="Missing parent"):
+    with pytest.raises(RuntimeError, match=r"provide row field\(s\)"):
         plan_image_import(session, rows)
 
 
