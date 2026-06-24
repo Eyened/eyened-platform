@@ -1989,6 +1989,11 @@ export interface components {
              * @default false
              */
             nullable: boolean;
+            /**
+             * Multi
+             * @default false
+             */
+            multi: boolean;
         };
         /** StudyGET */
         StudyGET: {

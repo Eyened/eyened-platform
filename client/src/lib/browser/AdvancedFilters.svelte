@@ -113,6 +113,8 @@
 		} else {
 			if (sig.values === "string") {
 				ops.push("==");
+				// Free-text fields flagged as multi also support IN (multiple values).
+				if ((sig as any).multi) ops.push("IN");
 			} else if (
 				sig.values === "int" ||
 				sig.values === "float" ||
@@ -173,6 +175,14 @@
 			return typeof value === "string" ? parseFloat(value) || 0 : value;
 		}
 		return value;
+	}
+
+	// Parse a comma-separated free-text input into a list of values (for IN).
+	function parseMultiValue(raw: string): string[] {
+		return raw
+			.split(",")
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0);
 	}
 
 	// Condition update helpers - normalize via browserContext before setting
@@ -342,6 +352,18 @@
 							values={(condition.value as string[]) ?? []}
 							onselect={(values) => updateConditionAt(i, { value: values })}
 						/>
+					{:else if condition.operator === "IN"}
+						<Input
+							type="text"
+							value={Array.isArray(condition.value)
+								? (condition.value as string[]).join(", ")
+								: String(condition.value ?? "")}
+							placeholder="Comma-separated values..."
+							onchange={(e: Event) =>
+								updateConditionAt(i, {
+									value: parseMultiValue((e.target as HTMLInputElement).value),
+								})}
+						/>
 					{:else if sig?.values === "date"}
 						<DatePicker
 							value={String(condition.value ?? "")}
@@ -438,6 +460,17 @@
 								options={getValueOptions(draftRow.field)}
 								values={(draftRow.value as string[]) ?? []}
 								onselect={(values) => updateDraftValue(values)}
+							/>
+						{:else if draftRow.operator === "IN"}
+							<Input
+								value={Array.isArray(draftRow.value)
+									? (draftRow.value as string[]).join(", ")
+									: String(draftRow.value ?? "")}
+								placeholder="Comma-separated values..."
+								onchange={(e: Event) =>
+									updateDraftValue(
+										parseMultiValue((e.target as HTMLInputElement).value),
+									)}
 							/>
 						{:else if sig?.values === "date"}
 							<DatePicker

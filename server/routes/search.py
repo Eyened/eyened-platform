@@ -658,6 +658,9 @@ class SignatureField(BaseModel):
     model: Optional[str] = None
     feature: Optional[str] = None  # NEW: feature name for segmentation-based attributes
     nullable: bool = False
+    # Free-text field that additionally supports matching several values at once
+    # (rendered as an IN / multi-value editor on the client).
+    multi: bool = False
 
 
 class DefaultCondition(BaseModel):
@@ -1175,7 +1178,7 @@ async def instances_signature(
         SignatureField(name="Image DBID", values="int"),
         SignatureField(name="Color Fundus Quality", values="float", nullable=True),
         SignatureField(name="Study Date", values="date"),
-        SignatureField(name="Patient Identifier", values="string"),
+        SignatureField(name="Patient Identifier", values="string", multi=True),
         SignatureField(name="Patient Birthdate", values="date", nullable=True),
     ])
 
@@ -1248,7 +1251,7 @@ async def studies_signature(
     )
     items.append(SignatureField(name="Study Round", values="int", nullable=True))
     items.append(SignatureField(name="Study Instance UID", values="string"))
-    items.append(SignatureField(name="Patient Identifier", values="string"))
+    items.append(SignatureField(name="Patient Identifier", values="string", multi=True))
     items.append(SignatureField(name="Patient Birthdate", values="date", nullable=True))
 
     return items

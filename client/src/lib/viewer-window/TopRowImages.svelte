@@ -62,17 +62,22 @@
 			}
 		}}
 	>
-		<div class="header">
-			<Button variant="outline" size="sm" onclick={() => selectPanel(null)}>
-				Close
-			</Button>
-		</div>
-		<div>
+		{#if selectedPanel !== "browser"}
+			<div class="header">
+				<Button variant="outline" size="sm" onclick={() => selectPanel(null)}>
+					Close
+				</Button>
+			</div>
+		{/if}
+		<div class="panel-body">
 			{#if selectedPanel == "task"}
 				<TaskOverlay {taskContext} />
 			{/if}
 			{#if selectedPanel == "browser"}
-				<BrowserOverlay {viewerWindowContext} />
+				<BrowserOverlay
+					{viewerWindowContext}
+					onClose={() => selectPanel(null)}
+				/>
 			{/if}
 			{#if selectedPanel == "help"}
 				<HelpOverlay />
@@ -144,7 +149,8 @@
 		backdrop-filter: blur(10px);
 		display: flex;
 		flex-direction: column;
-		overflow-y: auto;
+		/* The body scrolls, not the whole panel, so the header stays put */
+		overflow: hidden;
 		/* Force light theme for all child components */
 		color: #1a1a1a !important;
 	}
@@ -152,9 +158,17 @@
 		display: none !important;
 	}
 	div#panel .header {
+		flex: 0 0 auto;
 		display: flex;
 		justify-content: right;
 		padding: 0.2em;
+	}
+	div#panel .panel-body {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow-y: auto;
 	}
 	div#images {
 		flex: 1;

@@ -168,6 +168,17 @@ export function ingestTasks(tasksData: TaskGET[]) {
 
 export function ingestSubTasks(subtasksData: SubTaskWithImagesGET[]) {
 	for (const subtask of subtasksData) {
-		subtasks.set(subtask.id, subtask);
+		const existing = subtasks.get(subtask.id);
+		if (existing) {
+			// Merge so partial payloads (e.g. the image add/remove and comment
+			// endpoints) don't wipe fields they don't return, such as `index`.
+			const merged = { ...existing, ...subtask };
+			if (subtask.index == null && existing.index != null) {
+				merged.index = existing.index;
+			}
+			subtasks.set(subtask.id, merged);
+		} else {
+			subtasks.set(subtask.id, subtask);
+		}
 	}
 }

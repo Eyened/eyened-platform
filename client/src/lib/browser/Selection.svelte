@@ -9,13 +9,18 @@
 
     const browserContext = getContext<BrowserContext>("browserContext");
 
+    // 'bottom' (default) floats fixed at the bottom of the viewport (landing page).
+    // 'top' sticks to the top of the scroll container (embedded overlay usage),
+    // staying visible while taking up flow space so it never overlaps content.
+    let { placement = "bottom" }: { placement?: "top" | "bottom" } = $props();
+
     const intersectionTagIds = $derived((() => {
         const selected = browserContext.selectedInstances;
         if (selected.length === 0) return new Set<number>();
 
-        let ids = new Set<number>((selected[0].tags ?? []).map((t) => t.id));
+        let ids = new Set<number>((selected[0].tags ?? []).map((t: TagMeta) => t.id));
         for (let i = 1; i < selected.length; i++) {
-            const current = new Set<number>((selected[i].tags ?? []).map((t) => t.id));
+            const current = new Set<number>((selected[i].tags ?? []).map((t: TagMeta) => t.id));
             ids = new Set([...ids].filter((id) => current.has(id)));
             if (ids.size === 0) break;
         }
@@ -26,7 +31,7 @@
         const selected = browserContext.selectedInstances;
         if (selected.length === 0) return [];
         const ids = intersectionTagIds;
-        return (selected[0].tags ?? []).filter((t) => ids.has(t.id));
+        return (selected[0].tags ?? []).filter((t: TagMeta) => ids.has(t.id));
     })());
 
     function clear() {
@@ -39,7 +44,7 @@
 
     async function bulkTagSelection(tagId: number, comment?: string) {
         for (const inst of browserContext.selectedInstances) {
-            const isAlreadyTagged = inst.tags?.some((t) => t.id === tagId);
+            const isAlreadyTagged = inst.tags?.some((t: TagMeta) => t.id === tagId);
             if (!isAlreadyTagged) {
                 await tagInstance(inst, tagId, comment);
             }
@@ -48,14 +53,18 @@
 
     async function bulkUntagSelection(tagId: number) {
         for (const inst of browserContext.selectedInstances) {
-            if (inst.tags?.some((t) => t.id === tagId)) {
+            if (inst.tags?.some((t: TagMeta) => t.id === tagId)) {
                 await untagInstance(inst, tagId);
             }
         }
     }
 </script>
 
-<div class="fixed bottom-0 left-0 right-0 w-full z-50 bg-black/90">
+<div
+    class="left-0 right-0 w-full z-50 bg-black/90 {placement === 'top'
+        ? 'sticky top-0'
+        : 'fixed bottom-0'}"
+>
     <div class="flex gap-4 items-start p-2">
         <div class="button-container flex flex-col gap-1">
             <div>

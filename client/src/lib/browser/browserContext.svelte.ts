@@ -37,6 +37,10 @@ export class BrowserContext {
     loading: boolean = $state(false);
     filterMode: FilterMode = $state('basic');
 
+    // When false, searches/pagination will not push state to the URL.
+    // Used when the browser is embedded as a widget (e.g. overlays).
+    urlSync: boolean = $state(true);
+
     page: number = $state(0);
     limit: number = $state(10);
     count: number = $state(0);
@@ -130,6 +134,9 @@ export class BrowserContext {
             switch (sig.values) {
                 case 'string':
                     ops.push('==');
+                    // Free-text fields flagged as multi (e.g. Patient Identifier)
+                    // additionally support matching several values at once.
+                    if ((sig as any).multi) ops.push('IN');
                     break;
                 case 'int':
                 case 'float':
@@ -192,6 +199,11 @@ export class BrowserContext {
         let value = condition.value;
         if (operator !== 'IS NULL') {
             value = this.coerceValue(condition.value, sig.values);
+            // IN always operates on a list of values, even for free-text fields
+            // whose signature type is a scalar (e.g. Patient Identifier).
+            if (operator === 'IN' && !Array.isArray(value)) {
+                value = value == null || value === '' ? [] : [String(value)];
+            }
         }
 
         if ((condition as any).type === 'attribute') {
@@ -291,6 +303,25 @@ export class BrowserContext {
         return this.runSearch();
     }
 
+    // Seed state for an embedded/widget usage (no URL involved).
+    // Normalizes the conditions against the loaded signature and stores them
+    // in the active filter slot so a subsequent search() picks them up.
+    applyInitialConditions(
+        conds: Condition[],
+        opts: { queryMode?: QueryMode; displayMode?: DisplayMode; filterMode?: FilterMode } = {}
+    ) {
+        if (opts.queryMode) this.queryMode = opts.queryMode;
+        if (opts.displayMode) this.displayMode = opts.displayMode;
+        this.filterMode = opts.filterMode ?? 'advanced';
+
+        const normalized = this.normalizeConditions(conds ?? []);
+        if (this.filterMode === 'advanced') {
+            this.advancedConditions = normalized;
+        } else {
+            this.basicCondition = normalized[0] ?? null;
+        }
+    }
+
     // Method to load conditions from external source (like URL)
     loadConditions(conds: Condition[]) {
         // Preserve legacy callers; default these into advanced
@@ -332,7 +363,11 @@ export class BrowserContext {
         }
 
         this.loading = true;
-        this.selectedIds = [];
+        // When embedded as a widget (no URL sync), the selection represents the
+        // set the user is building up across multiple searches, so keep it.
+        if (this.urlSync) {
+            this.selectedIds = [];
+        }
 
         try {
             const res = await this.executeSearch(query);
@@ -344,6 +379,7 @@ export class BrowserContext {
     }
 
     private updateURL(query: Condition[]) {
+        if (!this.urlSync) return;
         const params = new URLSearchParams();
         params.set('page', this.page.toString());
         params.set('limit', this.limit.toString());

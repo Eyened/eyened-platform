@@ -1,78 +1,61 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
-	import BrowserContent from "$lib/browser/BrowserContent.svelte";
-	import { BrowserContext } from "$lib/browser/browserContext.svelte";
-	import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
+	import Browser from "$lib/browser/Browser.svelte";
+	import {
+		BrowserContext,
+		type Condition,
+	} from "$lib/browser/browserContext.svelte";
+	import { Button } from "$lib/components/ui/button";
 	import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
 	import { instances } from "$lib/data/stores.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-	import { getContext, onDestroy, setContext } from "svelte";
+	import { getContext, onDestroy } from "svelte";
 	import type { ImageGET } from "../../types/openapi_types";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
 	interface Props {
 		viewerWindowContext: ViewerWindowContext;
+		onClose?: () => void;
 	}
-	let { viewerWindowContext }: Props = $props();
+	let { viewerWindowContext, onClose }: Props = $props();
 
-    const browserContext = new BrowserContext();
-    setContext("browserContext", browserContext);
+	// The overlay owns the context so it can read the selection back out on close.
+	const browserContext = new BrowserContext();
+	browserContext.urlSync = false;
+	browserContext.limit = 100;
 
 	const initialInstanceIds = viewerWindowContext.instanceIds.slice();
 
-	
 	const taskContext = getContext<TaskContext>("taskContext");
 	const subTask = taskContext?.subTask;
 
 	// whether to update the image links in the database
 	let updateImageLinks = $state(false);
 
-	async function performPatientIdentifierSearch() {
-		// Extract unique patient identifiers from selected instances
+	// Default query: all images for the patients in the current selection.
+	const initialConditions: Condition[] = (() => {
 		const patientIdentifiers = new Set<string>();
-
-		// Get instances from the data stores using the instance IDs
 		for (const instanceId of initialInstanceIds) {
-			const instance = instances.get(instanceId) as ImageGET;
-			if (instance) {
-				if (instance.patient?.identifier) {
-					patientIdentifiers.add(instance.patient.identifier);
-				}
-			} else {
+			const instance = instances.get(instanceId) as ImageGET | undefined;
+			if (instance?.patient?.identifier) {
+				patientIdentifiers.add(instance.patient.identifier);
+			} else if (!instance) {
 				console.error("Instance not found", instanceId);
 			}
 		}
+		if (patientIdentifiers.size === 0) return [];
+		return [
+			{
+				type: "default",
+				variable: "Patient Identifier",
+				operator: "IN",
+				value: Array.from(patientIdentifiers),
+			} as Condition,
+		];
+	})();
 
-		// If we found patient identifiers, search for all instances from those patients
-		if (patientIdentifiers.size > 0) {
-			const patientIdsArray = Array.from(patientIdentifiers);
-			const conditions = [
-				{
-					type: "default" as const,
-					variable: "Patient Identifier" as const,
-					operator: "IN" as const,
-					value: patientIdsArray,
-				},
-			];
-
-			// Set up browser context for search
-			browserContext.queryMode = "studies";
-			browserContext.displayMode = "study";
-			browserContext.limit = 100; // Show more results for patient search
-			browserContext.page = 0;
-
-			// Perform the search
-			await browserContext.fetch(conditions, false);
-
-			// Set the initial selection after search completes
-			browserContext.selectedIds = [...initialInstanceIds];
-		}
-	}
-
-	const searching = performPatientIdentifierSearch();
-
-	function updateSubTaskImageLinks(currentInstanceIds: string[]) {
+	async function updateSubTaskImageLinks(currentInstanceIds: string[]) {
 		const newInstanceIds = currentInstanceIds.filter(
 			(id) => !initialInstanceIds.includes(id),
 		);
@@ -80,11 +63,17 @@
 			(id) => !currentInstanceIds.includes(id),
 		);
 
-		return Promise.all([
-			...newInstanceIds.map((id) => addSubTaskImage(subTask!.id, id)),
-			...removedInstanceIds.map((id) => removeSubTaskImage(subTask!.id, id)),
-		]);
+		// Run sequentially: each endpoint returns a full snapshot of the
+		// subtask's images, so parallel requests would ingest out-of-order
+		// (stale) snapshots and also race on the next ImageIndex.
+		for (const id of removedInstanceIds) {
+			await removeSubTaskImage(subTask!.id, id);
+		}
+		for (const id of newInstanceIds) {
+			await addSubTaskImage(subTask!.id, id);
+		}
 	}
+
 	function close() {
 		const currentInstanceIds = [...browserContext.selectedIds];
 		if (subTask) {
@@ -102,86 +91,80 @@
 	onDestroy(close);
 </script>
 
-<div id="browser-overlay">
-	<div class="button-container">
+<div id="browser-overlay" class="browser-light-surface">
+	<div class="header">
+		<span class="title">Browse images</span>
 		{#if subTask}
-			<label for="updateImageLinks">Update task image links</label>
-			<input
-				id="updateImageLinks"
-				type="checkbox"
-				bind:checked={updateImageLinks}
-			/>
+			<label class="task-option" for="updateImageLinks">
+				Update task image links
+				<input
+					id="updateImageLinks"
+					type="checkbox"
+					bind:checked={updateImageLinks}
+				/>
+			</label>
 		{/if}
+		<div class="actions">
+			<Button variant="outline" size="sm" onclick={() => onClose?.()}>
+				Close
+			</Button>
+		</div>
 	</div>
-	<div id="selection">
-		{#each browserContext.selectedInstances as instance (instance.id)}
-			<InstanceComponent {instance} />
-		{/each}
-	</div>
-	<div id="content">
-		{#await searching}
-			<div class="loading-message">Searching for patient images...</div>
-		{:then}
-			<BrowserContent mode="overlay" />
-		{/await}
+	<div class="body">
+		<Browser
+			context={browserContext}
+			mode="overlay"
+			syncUrl={false}
+			{initialConditions}
+			initialSelectedIds={initialInstanceIds}
+		/>
 	</div>
 </div>
 
 <style>
-	div#content {
-		flex: 1;
+	div#browser-overlay {
+		/* Render as a centered popup card rather than filling the panel */
 		display: flex;
 		flex-direction: column;
-		padding: 1em;
-		overflow-y: auto;
+		width: min(95vw, 100%);
+		height: min(95vh, 100%);
+		margin: auto;
+		background-color: var(--background);
+		border-radius: 12px;
+		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+		overflow: hidden;
 	}
-	div#selection {
+	div#browser-overlay .header {
+		flex: 0 0 auto;
 		display: flex;
-		background-color: black;
-	}
-	.button-container {
-		display: flex;
-		justify-content: center;
-		padding: 20px;
-	}
-	label {
-		align-self: center;
-	}
-
-	.loading-message {
-		display: flex;
-		justify-content: center;
 		align-items: center;
-		height: 200px;
-		font-size: 18px;
-		color: #666;
-		background-color: rgba(255, 255, 255, 0.9);
-		border-radius: 8px;
-		margin: 20px;
+		gap: 1em;
+		padding: 0.5em 1em;
+		border-bottom: 1px solid var(--border);
 	}
-
-	/* Override dark theme for all child components */
-	div#browser-overlay :global(*) {
-		color: #1a1a1a !important;
+	div#browser-overlay .header .title {
+		font-weight: bold;
 	}
-
-	div#browser-overlay :global(.bg-gray-200) {
-		background-color: #f3f4f6 !important;
+	div#browser-overlay .header .task-option {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		margin-left: auto;
+		font-size: 0.875rem;
+		cursor: pointer;
 	}
-
-	div#browser-overlay :global(.border-gray-300) {
-		border-color: #d1d5db !important;
+	div#browser-overlay .header .actions {
+		flex: 0 0 auto;
+		margin-left: auto;
 	}
-
-	div#browser-overlay :global(.text-white) {
-		color: #1a1a1a !important;
+	div#browser-overlay .header .task-option + .actions {
+		margin-left: 0;
 	}
-
-	div#browser-overlay :global(.bg-gray-800) {
-		background-color: #f9fafb !important;
-	}
-
-	div#browser-overlay :global(.bg-gray-900) {
-		background-color: #ffffff !important;
+	div#browser-overlay .body {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow-y: auto;
 	}
 </style>
