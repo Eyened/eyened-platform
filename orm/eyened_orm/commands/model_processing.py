@@ -110,8 +110,14 @@ def run_cfi_attribute_pipeline(
     "-p",
     "--path",
     type=str,
-    required=True,
+    default=None,
     help="Path to file containing image IDs (one per line)",
+)
+@click.option(
+    "--project",
+    type=int,
+    default=None,
+    help="Run on all ColorFundus images in this project ID",
 )
 @click.option(
     "-d",
@@ -146,8 +152,11 @@ def run_cfi_attribute_pipeline(
     default=100,
     help="Commit interval for processing",
 )
-def run_models(model, path, device, batch_size, n_workers, overwrite, commit_interval):
+def run_models(model, path, project, device, batch_size, n_workers, overwrite, commit_interval):
     """Run attribute inference models on a set of image IDs.
+
+    Provide image IDs via --path (one per line) or --project <id> to target all
+    ColorFundus images in a project.
 
     Supported models:
     - cfi-roi: CFI ROI detection (no device/batch-size needed)
@@ -155,15 +164,30 @@ def run_models(model, path, device, batch_size, n_workers, overwrite, commit_int
     - cfi-odfd: Optic Disc to Fovea Distance estimation
     - cfi-quality: Image quality assessment
     """
+    if path is None and project is None:
+        raise click.UsageError("Provide either --path or --project")
+    if path is not None and project is not None:
+        raise click.UsageError("--path and --project are mutually exclusive")
+
     database = get_database()
-
-    # Load image IDs
-    image_ids = _load_image_ids(path)
-    print(f"Loaded {len(image_ids)} image IDs from {path}")
-
     device_obj = _get_device(device)
 
     with database.get_session() as session:
+        if path is not None:
+            image_ids = _load_image_ids(path)
+            print(f"Loaded {len(image_ids)} image IDs from {path}")
+        else:
+            from eyened_orm import ImageInstance, Modality
+            from eyened_orm.project import Project
+
+            images = ImageInstance.where(
+                session,
+                (Project.ProjectID == project)
+                & (ImageInstance.Modality == Modality.ColorFundus),
+            )
+            image_ids = {im.ImageInstanceID for im in images}
+            print(f"Found {len(image_ids)} ColorFundus images in project {project}")
+
         for slug in [model] if model is not None else CFI_ATTRIBUTE_MODEL_SLUGS:
             run_cfi_attribute_pipeline(
                 session,
@@ -327,9 +351,9 @@ def run_registration(patient, project, replace, skip):
         )
 
         if patient:
-            patients = Patient.by_column(session, PatientIdentifier=patient)
+            patients = Patient.by_columns(session, PatientIdentifier=patient)
         elif project:
-            patients = Patient.by_column(session, ProjectID=project)
+            patients = Patient.by_columns(session, ProjectID=project)
         else:
             raise ValueError("No patient or project provided")
         for patient in patients:

@@ -16,6 +16,7 @@ export default defineConfig({
             social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/eyened/eyened-platform' }],
             sidebar: [
                 { slug: 'about' },
+                { slug: 'release_notes' },
                 { slug: 'getting_started' },
                 { slug: 'importing_data' },
                 { slug: 'thumbnails' },
