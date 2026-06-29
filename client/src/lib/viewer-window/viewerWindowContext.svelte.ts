@@ -69,13 +69,18 @@ export class ViewerWindowContext {
 
     async setInstanceIDs(ids: string[]) {
         // ensure metadata of all instances is loaded
-        const missingIds = ids.filter((id) => !instances.get(id));
-        if (missingIds.length) {
-            await Promise.all(missingIds.map((id) => fetchInstance(id, {
-                with_segmentations: true,
-                with_form_annotations: true,
-                with_model_segmentations: true
-            })));
+        const fetchOptions = {
+            with_segmentations: true,
+            with_form_annotations: true,
+            with_model_segmentations: true,
+        };
+        const idsNeedingFetch = ids.filter((id) => {
+            const inst = instances.get(id);
+            // Search-ingested instances lack embedded segmentations / form annotations
+            return !inst || !('segmentations' in inst);
+        });
+        if (idsNeedingFetch.length) {
+            await Promise.all(idsNeedingFetch.map((id) => fetchInstance(id, fetchOptions)));
             // Data is automatically ingested into global stores by fetchInstance
         }
 
