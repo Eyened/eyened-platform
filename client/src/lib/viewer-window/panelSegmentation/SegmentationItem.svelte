@@ -278,7 +278,6 @@
 
 	div.content.empty-non-editable {
 		opacity: 0.6;
-		pointer-events: none;
 	}
 
 	div.content.empty-editable:not(.active) {
