@@ -16,6 +16,7 @@
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
 	import { formSchemas } from "$lib/data/stores.svelte";
+	import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
 	import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 	import {
 		Close,
@@ -94,13 +95,13 @@
 	let minimize = $state(viewerWindowContext.mainPanels.length > 1);
 
 	const etdrsSchema = formSchemas.find(
-		(schema) => schema.name === "ETDRS-grid coordinates",
+		(schema) => schema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID,
 	)!;
 	if (!etdrsSchema) {
 		console.warn("ETDRS schema not found");
 	}
 	const registrationSchema = formSchemas.find(
-		(schema) => schema.name === "Pointset registration",
+		(schema) => schema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
 	)!;
 
 	const panels: {

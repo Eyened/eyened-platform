@@ -16,6 +16,7 @@ The following commands are available:
 - run-etdrs-model: Run ETDRS model processing on segmentations.
 - run-cfi-amd: Run CFI AMD segmentation models.
 - run-registration: Pairwise CFI/AF/IR registration per patient; scope with --patient or --project.
+- seed-form-schemas: Insert builtin viewer FormSchema rows (ETDRS grid, registration).
 - validate-forms: Validate form annotations and schemas in the database.
 - zarr-tree: Display the structure of the zarr store, showing groups and array shapes.
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
@@ -70,7 +71,13 @@ _register_model_commands()
 
 @eorm.command()
 @click.option("--recreate", is_flag=True, default=False, help="Drop and create the database before creating the models")
-def initialize_database(recreate: bool):
+@click.option(
+    "--seed-form-schemas",
+    is_flag=True,
+    default=False,
+    help="Also insert builtin viewer FormSchema rows after creating tables",
+)
+def initialize_database(recreate: bool, seed_form_schemas: bool):
     """Initialize an empty database and create ORM tables."""
     from eyened_orm.base import Base
 
@@ -85,6 +92,38 @@ def initialize_database(recreate: bool):
 
     print("Creating tables...")
     Base.metadata.create_all(database.engine)
+
+    if seed_form_schemas:
+        _run_seed_form_schemas(database, update=False)
+
+
+def _run_seed_form_schemas(database, update: bool) -> None:
+    from .form_schemas import seed_form_schemas
+
+    with database.get_session() as session:
+        result = seed_form_schemas(session, update=update)
+
+    if result.created:
+        print(f"Created: {', '.join(result.created)}")
+    if result.updated:
+        print(f"Updated: {', '.join(result.updated)}")
+    if result.skipped:
+        print(f"Skipped (already present): {', '.join(result.skipped)}")
+    if not result.created and not result.updated and not result.skipped:
+        print("No builtin form schemas configured.")
+
+
+@eorm.command("seed-form-schemas")
+@click.option(
+    "--update",
+    is_flag=True,
+    default=False,
+    help="Update Schema JSON and EntityType for existing builtin schemas",
+)
+def seed_form_schemas_cmd(update: bool):
+    """Insert builtin viewer FormSchema rows (ETDRS grid, registration schemas)."""
+    database = get_database()
+    _run_seed_form_schemas(database, update=update)
 
 
 @eorm.command()

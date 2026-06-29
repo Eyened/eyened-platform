@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "description": "Registration sets linking image pairs with composite, projective, or parabolic transforms.",
+  "items": {
+    "type": "object",
+    "properties": {
+      "image1": { "type": "string" },
+      "image2": { "type": "string" },
+      "transform": { "type": "object" }
+    },
+    "required": ["image1", "image2", "transform"]
+  }
+}

@@ -7,6 +7,7 @@
     } from "$lib/registration/pointsetRegistration";
     import type { Registration } from "$lib/registration/registration";
     import { getRegistrationSets, type RegistrationSet } from "$lib/registration/registrationItem";
+    import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
 
     interface Props {
         registration: Registration;
@@ -21,13 +22,13 @@
 
     const updateFromFormAnnotation = (value: any) => {
         if (value && formSchema) {
-            if (formSchema.name === "Pointset registration") {
+            if (formSchema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION) {
                 const items = getPointsetRegistrations(value);
                 registration.importRegistrationItems(items);
-            } else if (formSchema.name === "Affine registration") {
+            } else if (formSchema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.AFFINE_REGISTRATION) {
                 const items = getAffineTransforms(value);
                 registration.importRegistrationItems(items);
-            } else if (formSchema.name === "RegistrationSet") {
+            } else if (formSchema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.REGISTRATION_SET) {
                 const items = getRegistrationSets(value);
                 registration.importRegistrationItems(items);
             }

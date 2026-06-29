@@ -46,6 +46,7 @@ docker compose exec -it server bash
 Initialize database
 ```bash
 eorm initialize-database
+eorm seed-form-schemas
 ```
 
 Create a user (for log in to front-end and/or use with api-client)

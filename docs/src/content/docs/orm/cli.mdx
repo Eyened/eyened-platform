@@ -35,6 +35,18 @@ Creates the database and tables if they do not already exist.
 eorm initialize-database [OPTIONS]
 ```
 
+Use `--seed-form-schemas` to also insert builtin viewer FormSchema rows in the same step.
+
+### seed-form-schemas
+
+Inserts builtin viewer FormSchema rows required by the ETDRS grid and registration panels. Idempotent: existing schemas are skipped unless `--update` is passed.
+
+```bash
+eorm seed-form-schemas [--update]
+```
+
+See **[Form Schemas](/eyened-platform/orm/form_schemas)** for the list of seeded schemas and how to add clinical forms.
+
 ### create-user
 
 Creates a database user with login credentials and metadata.
