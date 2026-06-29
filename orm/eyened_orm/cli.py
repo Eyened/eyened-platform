@@ -86,6 +86,18 @@ def initialize_database(recreate: bool):
     print("Creating tables...")
     Base.metadata.create_all(database.engine)
 
+    from eyened_orm.utils.alembic_utils import (
+        get_current_alembic_revision,
+        stamp_alembic_head,
+    )
+
+    current = get_current_alembic_revision(database.engine)
+    head = stamp_alembic_head(database.engine)
+    if current == head:
+        print(f"Alembic already at head ({head}).")
+    else:
+        print(f"Stamped Alembic at head ({head}).")
+
 
 @eorm.command()
 @click.option("--username", type=str, prompt=True)
