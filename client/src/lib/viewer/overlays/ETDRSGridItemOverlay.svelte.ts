@@ -54,7 +54,11 @@ export class ETDRSGridItemOverlay implements Overlay {
 
         const f = this.annotation.form_data?.fovea;
         const d = this.annotation.form_data?.disc_edge;
-        const srcId = String(this.annotation.image_id);
+        let srcId = String(this.annotation.image_id);
+        // ETDRS landmarks are 2D enface coords; avoid OCTToProj remapping index → y
+        if (image.image_id.endsWith('_proj') && !srcId.endsWith('_proj')) {
+            srcId = `${srcId}_proj`;
+        }
 
         if (!f || !d) return;
 
