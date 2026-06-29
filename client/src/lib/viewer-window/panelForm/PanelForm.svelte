@@ -43,7 +43,10 @@
 
     const taskConfig = taskContext?.task.task_definition.config;
     if (taskConfig?.form_schema_name) {
-        selectedSchema = formSchemasByName.get(taskConfig.form_schema_name);
+        const schema = formSchemasByName.get(taskConfig.form_schema_name);
+        if (schema && !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name)) {
+            selectedSchema = schema;
+        }
     }
     if (taskConfig?.form_image_scope) {
         filters.push(
@@ -60,9 +63,10 @@
         [...formSchemas.values()].filter((schema) => !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name))
     );
 
-    const formShortcutSchema = $derived(
-        formShortcut ? formSchemasByName.get(formShortcut) : undefined
-    );
+    const formShortcutSchema = $derived.by(() => {
+        if (!formShortcut || HIDE_FROM_FORM_PANEL_NAMES.has(formShortcut)) return undefined;
+        return formSchemasByName.get(formShortcut);
+    });
 
     async function addFormWithSchema(schema: FormSchemaGET | undefined) {
         if (!schema) return;

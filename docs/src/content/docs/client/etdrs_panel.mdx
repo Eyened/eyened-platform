@@ -122,16 +122,3 @@ The ETDRS panel reads AI keypoints for preview only. Saving manual coordinates c
 ### Relationship to ETDRS area summaries
 
 The ORM command `eorm run-etdrs-model` computes ETDRS subfield areas from segmentations and keypoint/attribute data — not directly from FormAnnotation coordinates unless those values are also present in attributes or `CFKeypoints`. See **[CLI: run-etdrs-model](/eyened-platform/orm/cli#run-etdrs-model)**.
-
-## Tasks
-
-For workflow tasks that require ETDRS placement, configure the task definition's `TaskConfig`:
-
-```json
-{
-  "form_schema_name": "ETDRS-grid coordinates",
-  "form_image_scope": true
-}
-```
-
-This pre-selects the ETDRS schema in the Form panel and restricts listed annotations to the current image. See **[Form Schemas — TaskConfig](/eyened-platform/orm/form_schemas#taskconfig-for-grading-tasks)**.
