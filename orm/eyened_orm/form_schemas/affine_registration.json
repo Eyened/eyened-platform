@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "description": "Affine transforms between image pairs.",
+  "items": {
+    "type": "object",
+    "properties": {
+      "image0": { "type": "number" },
+      "image1": { "type": "number" },
+      "transform": {
+        "type": "array",
+        "items": { "type": "number" },
+        "minItems": 6,
+        "maxItems": 6
+      }
+    },
+    "required": ["image0", "image1", "transform"]
+  }
+}

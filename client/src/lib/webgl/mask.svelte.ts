@@ -293,6 +293,41 @@ export class ProbabilityMask extends AbstractDataMask {
         super(image, segmentation);
     }
 
+    computePixelArea(threshold: number): number {
+        const data = this.textureData.data;
+        const dataType = this.segmentation.data_type;
+        let count = 0;
+        if (dataType === 'R32F') {
+            for (let i = 0; i < data.length; i++) {
+                if ((data as Float32Array)[i] > threshold) {
+                    count++;
+                }
+            }
+        } else {
+            const t = 255 * threshold;
+            for (let i = 0; i < data.length; i++) {
+                if ((data as Uint8Array)[i] > t) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private afterUpdate(threshold: number) {
+        this.pixelArea = this.computePixelArea(threshold);
+    }
+
+    importData(data: DrawingArray): void {
+        super.importData(data);
+        this.afterUpdate(this.segmentation.threshold ?? 0.5);
+    }
+
+    clear(): void {
+        super.clear();
+        this.afterUpdate(this.segmentation.threshold ?? 0.5);
+    }
+
     drawEnhance(settings: {
         radiusX: number,
         radiusY: number,
@@ -313,6 +348,7 @@ export class ProbabilityMask extends AbstractDataMask {
         }
         this.u_hard = false;
         this.textureData.passShader(this.image.webgl.shaders.drawEnhance, uniforms);
+        this.afterUpdate(this.segmentation.threshold ?? 0.5);
     }
 
     draw(drawing: ImageType, paintSettings: PaintSettings): void {
@@ -328,6 +364,7 @@ export class ProbabilityMask extends AbstractDataMask {
             u_questionable: paintSettings.questionable
         };
         this.textureData.passShader(this.image.webgl.shaders.drawHard, uniforms);
+        this.afterUpdate(this.segmentation.threshold ?? 0.5);
     }
 
     render(renderTarget: RenderTarget, uniforms: any): void {

@@ -16,6 +16,7 @@
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
 	import { formSchemas } from "$lib/data/stores.svelte";
+	import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
 	import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 	import {
 		Close,
@@ -30,6 +31,13 @@
 	import PanelInfo from "./panelInfo/panelInfo.svelte";
 	import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
 	import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
+	import EtdrsPanelHelp from "./panelHelp/EtdrsPanelHelp.svelte";
+	import FormPanelHelp from "./panelHelp/FormPanelHelp.svelte";
+	import InfoPanelHelp from "./panelHelp/InfoPanelHelp.svelte";
+	import MeasurePanelHelp from "./panelHelp/MeasurePanelHelp.svelte";
+	import RegistrationPanelHelp from "./panelHelp/RegistrationPanelHelp.svelte";
+	import RenderingPanelHelp from "./panelHelp/RenderingPanelHelp.svelte";
+	import SegmentationPanelHelp from "./panelHelp/SegmentationPanelHelp.svelte";
 	interface Props {
 		image: AbstractImage;
 	}
@@ -94,26 +102,28 @@
 	let minimize = $state(viewerWindowContext.mainPanels.length > 1);
 
 	const etdrsSchema = formSchemas.find(
-		(schema) => schema.name === "ETDRS-grid coordinates",
+		(schema) => schema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID,
 	)!;
 	if (!etdrsSchema) {
 		console.warn("ETDRS schema not found");
 	}
 	const registrationSchema = formSchemas.find(
-		(schema) => schema.name === "Pointset registration",
+		(schema) => schema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
 	)!;
 
 	const panels: {
 		name: PanelName;
-		component: Component;
+		component: Component<any>;
 		Icon: Component;
-		props?: any;
+		Help?: Component;
+		props?: Record<string, unknown>;
 	}[] = [
-		{ name: "Info", component: PanelInfo, Icon: Info },
+		{ name: "Info", component: PanelInfo, Icon: Info, Help: InfoPanelHelp },
 		{
 			name: "Rendering",
 			component: PanelRendering,
 			Icon: Rendering,
+			Help: RenderingPanelHelp,
 		},
 	];
 
@@ -122,6 +132,7 @@
 			name: "ETDRS",
 			component: PanelETDRS,
 			Icon: ETDRS,
+			Help: EtdrsPanelHelp,
 			props: { etdrsSchema, active: false },
 		});
 	}
@@ -131,6 +142,7 @@
 			name: "Registration",
 			component: PanelRegistration,
 			Icon: Registration,
+			Help: RegistrationPanelHelp,
 			props: { registrationSchema, active: false },
 		});
 	}
@@ -140,13 +152,15 @@
 			name: "Measure",
 			component: PanelMeasure,
 			Icon: Measure,
+			Help: MeasurePanelHelp,
 			props: { active: false },
 		},
-		{ name: "Form", component: PanelForm, Icon: Form },
+		{ name: "Form", component: PanelForm, Icon: Form, Help: FormPanelHelp },
 		{
 			name: "Segmentation",
 			component: PanelSegmentation,
 			Icon: Draw,
+			Help: SegmentationPanelHelp,
 		},
 	);
 </script>
@@ -180,8 +194,8 @@
 		</header>
 
 		<nav id="panels" class="panels" class:minimize>
-			{#each panels as { name, component: Component, Icon, props = { } }}
-				<PanelHeader text={name} panelName={name} {Icon} />
+			{#each panels as { name, component: Component, Icon, Help, props = { } }}
+				<PanelHeader text={name} panelName={name} {Icon} {Help} />
 				<section
 					class="panel {activePanels.has(name) ? 'expanded' : 'collapsed'}"
 				>

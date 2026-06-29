@@ -5,6 +5,7 @@
 	import { ViewerWindowContext } from '../viewerWindowContext.svelte';
 	import MeasureAreas from './MeasureAreas.svelte';
 	import { formAnnotations, formSchemasByName } from '$lib/data';
+	import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from '$lib/config/builtinFormSchemas';
 	import Line from './Line.svelte';
 	import SetResolutionEtdrs from './SetResolutionETDRS.svelte';
 	
@@ -31,7 +32,7 @@
 	// filter any annotation that can be linked to this image using the registration
 	const { registration } = getContext<ViewerWindowContext>('viewerWindowContext');
 
-	const etdrsSchema = formSchemasByName.get('ETDRS-grid coordinates')!;
+	const etdrsSchema = formSchemasByName.get(BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID)!;
 
 	const filtered = $derived(
 		formAnnotations.filter(formAnnotation => {

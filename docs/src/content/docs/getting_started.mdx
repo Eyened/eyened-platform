@@ -91,6 +91,7 @@ With this setup you will be able to:
 
     ```bash
     eorm initialize-database
+    eorm seed-form-schemas
     ```
 
     This creates tables from the ORM and stamps the current Alembic revision. You will be prompted to confirm the target database.
@@ -98,6 +99,8 @@ With this setup you will be able to:
     ```bash
     eorm create-user
     ```
+
+    The `seed-form-schemas` command inserts builtin viewer FormSchemas (ETDRS grid, registration). See **[Form Schemas](/eyened-platform/orm/form_schemas)** and the **[ETDRS Panel](/eyened-platform/client/etdrs_panel)** docs.
 
     New users can also be added through the user interface.
 

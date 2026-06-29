@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "description": "Per-image point sets for pairwise registration. Keys are image IDs; values are arrays of {x, y} landmarks.",
+  "additionalProperties": {
+    "type": "array",
+    "items": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          },
+          "required": ["x", "y"]
+        },
+        { "type": "null" }
+      ]
+    }
+  }
+}

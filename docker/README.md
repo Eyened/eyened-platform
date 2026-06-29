@@ -34,6 +34,7 @@ Initialize database (creates tables and stamps the current Alembic revision):
 
 ```bash
 eorm initialize-database
+eorm seed-form-schemas
 ```
 
 Create a user (for log in to front-end and/or use with api-client):
