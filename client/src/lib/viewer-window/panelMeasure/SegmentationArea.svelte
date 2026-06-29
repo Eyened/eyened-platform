@@ -4,9 +4,9 @@
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { BinaryMask, ProbabilityMask } from "$lib/webgl/mask.svelte";
     import { getContext } from "svelte";
-    import type { SegmentationGET } from "../../../types/openapi_types";
+    import type { Segmentation } from "../panelSegmentation/segmentationContext.svelte";
     export interface Props {
-        segmentation: SegmentationGET;
+        segmentation: Segmentation;
         measureTool: MeasureTool;
     }
     let { segmentation, measureTool }: Props = $props();
@@ -14,19 +14,35 @@
     const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
     const { segmentationContext } = mainViewerContext;
 
-    let area = $derived.by(() => {
+    let area = $state<number | undefined>(undefined);
+
+    $effect(() => {
+        const index = viewerContext.index;
+        const resX = measureTool.imageResX;
+        const resY = measureTool.imageResY;
+
         const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
-        const mask = segmentationItem?.getMask(viewerContext.index);
-        if (mask instanceof BinaryMask || mask instanceof ProbabilityMask) {
-            if (mask.pixelArea == undefined) return undefined;
-            const areamm2 =
-                (mask.pixelArea *
-                    measureTool.imageResX *
-                    measureTool.imageResY) /
-                1e6;
-            return areamm2;
+        const mask = segmentationItem.getMask(index);
+        if (!mask) {
+            area = undefined;
+            return;
         }
-        return 0;
+
+        if (mask instanceof BinaryMask) {
+            const pixelArea = mask.pixelArea;
+            area = (pixelArea * resX * resY) / 1e6;
+            return;
+        }
+
+        if (mask instanceof ProbabilityMask) {
+            // pixelArea tracks data changes; threshold is applied at read time
+            mask.pixelArea;
+            const pixelArea = mask.computePixelArea(segmentationItem.threshold);
+            area = (pixelArea * resX * resY) / 1e6;
+            return;
+        }
+
+        area = 0;
     });
 </script>
 
