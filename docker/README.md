@@ -2,31 +2,19 @@
 
 Production stack: `server` (API), `client` (UI), `fileserver` (nginx reverse proxy + file serving).
 
-Prerequisit: you need access to a mysql database. Check the database folder for setting up a new database server
+Prerequisite: a MySQL database. See the [database](../database/) folder to start one locally.
 
 ### 1) Configure before first run
 
-Edit `docker-compose.yaml`:
-- `server.volumes`: replace `</path/to/segmentations.zarr>` with a writable host path.
-- `fileserver.volumes`: replace `</path/to/thumbnails>` with your thumbnails path.
-- `fileserver.volumes`: replace/add dataset mounts (for example `</mnt/data_source_1>`).
+Copy `.env.example` to `.env` and set database credentials, Redis password, and `PORT`.
+
+Set `EYENED_STORAGE_ROOT` to a writable host directory (default `/storage`). Compose mounts this path into the server; thumbnails are served from `{EYENED_STORAGE_ROOT}/thumbnails`.
 
 Edit `nginx.conf`:
 - Add one `location /<StorageBackend.Key>/ { ... }` block per mounted dataset path.
 - Keep `alias` paths matching the container mount paths from `docker-compose.yaml`.
 
-Create or update `.env`:
-```env
-PORT=<port to expose the app>
-EYENED_API_SECRET_KEY=<a random string>
-EYENED_DATABASE_USER=<db-user>
-EYENED_DATABASE_PASSWORD=<db-password>
-EYENED_DATABASE_HOST=<db-host, use host.docker.internal for localhost>
-EYENED_DATABASE_PORT=<db-port>
-
-# optional use a custom database name (default eyened_database) 
-EYENED_DATABASE_DATABASE=eyened_database
-```
+Add read-only dataset mounts under `fileserver.volumes` in `docker-compose.yaml` when needed.
 
 ### 2) Build and start the platform
 
@@ -38,18 +26,19 @@ docker compose up -d --build
 
 Run once after services are up:
 
-Enter terminal inside the server container:
 ```bash
 docker compose exec -it server bash
 ```
 
-Initialize database
+Initialize database (creates tables and stamps the current Alembic revision):
+
 ```bash
 eorm initialize-database
 eorm seed-form-schemas
 ```
 
-Create a user (for log in to front-end and/or use with api-client)
+Create a user (for log in to front-end and/or use with api-client):
+
 ```bash
 eorm create-user
 ```

@@ -93,6 +93,18 @@ def initialize_database(recreate: bool, seed_form_schemas: bool):
     print("Creating tables...")
     Base.metadata.create_all(database.engine)
 
+    from eyened_orm.utils.alembic_utils import (
+        get_current_alembic_revision,
+        stamp_alembic_head,
+    )
+
+    current = get_current_alembic_revision(database.engine)
+    head = stamp_alembic_head(database.engine)
+    if current == head:
+        print(f"Alembic already at head ({head}).")
+    else:
+        print(f"Stamped Alembic at head ({head}).")
+
     if seed_form_schemas:
         _run_seed_form_schemas(database, update=False)
 

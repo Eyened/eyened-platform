@@ -38,50 +38,53 @@ With this setup you will be able to:
     cd eyened-platform/docker
     ```
 
-3. You will need to configure a sql database. 
-    If you already have one: just set the correct environment variables.
-    Alternatively, set the ports and volume mounts in `docker-compose-database.yaml`
-    and start a new mysql server with this command:
+3. Configure a MySQL database.
+    If you already have one, set the `EYENED_DATABASE_*` variables in `docker/.env` (see step 4).
+    To start a new MySQL server from the repository:
+
     ```bash
-    docker compose up -f docker-compose-database.yaml -d
+    cd ../database
+    cp .env.example .env   # set MYSQL_* and EYENED_DATABASE_* passwords
+    docker compose up -d
+    cd ../docker
     ```
 
-4. Create a `.env` file with the following variables:
+4. Create `docker/.env` from the example and adjust values:
+
+    ```bash
+    cp .env.example .env
+    ```
 
     | Variable | Description |
     | --- | --- |
     | PORT | Port the app will be served on |
     | EYENED_API_SECRET_KEY | A random string |
-    | EYENED_DATABASE_HOST | Hostname of the database |
+    | EYENED_DATABASE_HOST | Database hostname (`host.docker.internal` for a host-run MySQL container) |
     | EYENED_DATABASE_PORT | Port to access the database |
     | EYENED_DATABASE_USER | Username for database access |
     | EYENED_DATABASE_PASSWORD | Password for database access |
+    | EYENED_DATABASE_DATABASE | Database name (default `eyened_database`) |
+    | EYENED_REDIS_PASSWORD | Password for the Redis service |
+    | EYENED_STORAGE_ROOT | Writable host path for thumbnails and segmentations (default `/storage`) |
 
-5. Configure storage
-    The server needs access to a writable directory mounted under /storage/
-    Update the docker-compose.yaml to specify the volume mount in the `server` service.
-    ```bash
-        volumes:
-        # Access to the storage directory 
-        # The application will use /storage/segmentations.zarr for segmentations
-        # And /storage/thumbnails for thumbnails
-        - </path/to/storage>:/storage/
-    ```
+5. Configure storage.
+    Ensure `EYENED_STORAGE_ROOT` points to a writable host directory. The server uses `{EYENED_STORAGE_ROOT}/segmentations.zarr` and `{EYENED_STORAGE_ROOT}/thumbnails`.
 
-6. Configure the fileserver
+6. Configure the fileserver (optional for image datasets).
     Routing of files is handled by nginx.
-    Update nginx.conf by adding locations for every folder where images are stored.
+    Update `nginx.conf` by adding locations for every folder where images are stored.
     Each `location` can later be referenced in the database as a `StorageKey`.
-    Make sure the alias for each location is mounted in the docker service.
+    Add matching read-only mounts under `fileserver.volumes` in `docker-compose.yaml`.
 
-7. Start the platform:
+7. Build and start the platform:
 
     ```bash
-    USERID=$(id -u) GROUPID=$(id -g) docker compose up -d
+    docker compose up -d --build
     ```
 
-8. Initialize the application
-    If this is the first time setting up the platform, you will need to initialize the database.
+8. Initialize the application.
+    On first setup, initialize the database and create a login user:
+
     ```bash
     docker compose exec -it server bash
     ```
@@ -91,19 +94,19 @@ With this setup you will be able to:
     eorm seed-form-schemas
     ```
 
+    This creates tables from the ORM and stamps the current Alembic revision. You will be prompted to confirm the target database.
+
     ```bash
     eorm create-user
     ```
-    New users can be added through the user interface.
 
     The `seed-form-schemas` command inserts builtin viewer FormSchemas (ETDRS grid, registration). See **[Form Schemas](/eyened-platform/orm/form_schemas)** and the **[ETDRS Panel](/eyened-platform/client/etdrs_panel)** docs.
 
+    New users can also be added through the user interface.
 
 :::note
-**For development there is a slightly different setup procedure
+For local development, see [Development Setup](/eyened-platform/guides/development_setup).
 :::
-
-
 
 ## Accessing the Platform
 
@@ -113,7 +116,7 @@ To manage the platform:
 
 - To view logs: `docker compose logs -f`
 - To stop the platform: `docker compose down`
-- To start the platform: `USERID=$(id -u) GROUPID=$(id -g) docker compose up -d`
+- To start the platform: `docker compose up -d`
 
 :::caution
 Make sure to set up regular back ups for both the MySQL database and storage folders.
