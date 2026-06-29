@@ -29,7 +29,7 @@ eorm [COMMAND] --help
 
 ### initialize-database
 
-Creates the database and tables if they do not already exist.
+Creates tables from the ORM on an empty database and stamps the current Alembic revision so later `alembic upgrade head` runs apply only new migrations. Prompts for confirmation of the target database.
 
 ```bash
 eorm initialize-database [OPTIONS]

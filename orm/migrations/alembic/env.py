@@ -51,6 +51,7 @@ no_prompt_cmds = {
     "show",
     "check",
     "list_templates",
+    "stamp",
 }
 if cmd not in no_prompt_cmds:
     confirm_target = (
