@@ -4,3 +4,4 @@
 **/*.pyc
 **/*.my.ipynb
 .cursor/
+build/
