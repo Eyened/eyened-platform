@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 from typing import Any
 
 import numpy as np
-from eyened_orm import ImageInstance, AttributeValue
+from eyened_orm import AttributeValue, ImageInstance
 from rtnls_registration import Registration
 from rtnls_registration.transformation import (
     CompositeTransform,
@@ -38,19 +38,90 @@ def transform_from_dict(d: dict[str, Any]) -> Transform:
     raise ValueError(f"Unknown transform type: {ttype!r}")
 
 
-def get_processed_edges(attribute_value: AttributeValue):
-    transforms = attribute_value.ValueJSON or []
-    if transforms:
-        processed = {(e["image1"], e["image2"]) for e in transforms}
-    else:
-        processed = set()
+def registration_image_key(image: ImageInstance) -> str:
+    """Public image identifier stored in registration JSON (matches viewer ``image_id``)."""
+    return image.PublicID
 
-    # Build adjacency list from the processed edges (bidirectional)
+
+def collect_legacy_instance_ids(transforms: list[dict[str, Any]]) -> set[int]:
+    ids: set[int] = set()
+    for edge in transforms:
+        for key in ("image1", "image2"):
+            val = edge.get(key)
+            if isinstance(val, int):
+                ids.add(val)
+            elif isinstance(val, str) and val.isdigit():
+                ids.add(int(val))
+    return ids
+
+
+def build_id_to_public(session, instance_ids: set[int]) -> dict[int, str]:
+    if not instance_ids:
+        return {}
+    images = ImageInstance.by_columns(session, ImageInstanceID=instance_ids)
+    return {im.ImageInstanceID: im.PublicID for im in images}
+
+
+def normalize_registration_key(
+    key: str | int, id_to_public: dict[int, str]
+) -> str:
+    if isinstance(key, str) and not key.isdigit():
+        return key
+    int_id = int(key)
+    return id_to_public.get(int_id, str(int_id))
+
+
+def normalize_registration_transforms(
+    transforms: list[dict[str, Any]], id_to_public: dict[int, str]
+) -> list[dict[str, Any]]:
+    return [
+        {
+            **edge,
+            "image1": normalize_registration_key(edge["image1"], id_to_public),
+            "image2": normalize_registration_key(edge["image2"], id_to_public),
+        }
+        for edge in transforms
+    ]
+
+
+def graph_from_transforms(
+    transforms: list[dict[str, Any]], id_to_public: dict[int, str] | None = None
+):
+    id_to_public = id_to_public or {}
     graph = defaultdict(set)
-    for img1, img2 in processed:
+    for edge in transforms:
+        img1 = normalize_registration_key(edge["image1"], id_to_public)
+        img2 = normalize_registration_key(edge["image2"], id_to_public)
         graph[img1].add(img2)
         graph[img2].add(img1)
     return graph
+
+
+def get_processed_edges(
+    attribute_value: AttributeValue, id_to_public: dict[int, str] | None = None
+):
+    id_to_public = id_to_public or {}
+    transforms = attribute_value.ValueJSON or []
+    return graph_from_transforms(transforms, id_to_public)
+
+
+def collect_registration_seed_transforms(
+    session, patient, attribute_id: int, *, replace: bool
+) -> list[dict[str, Any]]:
+    """All stored registration edges for this patient/attribute (any model version)."""
+    if replace:
+        return []
+
+    attribute_values = AttributeValue.by_columns(
+        session,
+        PatientID=patient.PatientID,
+        AttributeID=attribute_id,
+    )
+    seed: list[dict[str, Any]] = []
+    for av in attribute_values:
+        if av.ValueJSON:
+            seed.extend(av.ValueJSON)
+    return seed
 
 
 def are_connected(image_id1, image_id2, graph):
@@ -60,7 +131,6 @@ def are_connected(image_id1, image_id2, graph):
     if image_id1 == image_id2:
         return True
 
-    # BFS to check connectivity
     if image_id1 not in graph or image_id2 not in graph:
         return False
 
@@ -88,19 +158,16 @@ def get_etdrs_field(image):
             return "F2"
 
     if image.CFKeypoints and image.CFROI:
-        # derive field from location of fovea relative to center of the image
         fx, _ = image.CFKeypoints["fovea_xy"]
         cx, _ = image.CFROI["center"]
         r = image.CFROI["radius"]
         d = abs(cx - fx) / r
-        # F2 if fovea is closer to center than 0.5 of the radius, F1 otherwise
         return "F2" if d < 0.5 else "F1"
 
     if image.Modality and image.Modality.name in (
         "InfraredReflectance",
         "Autofluorescence",
     ):
-        # assume that these are F2
         return "F2"
 
     return None
@@ -117,56 +184,59 @@ def sort_images(images):
 
 def get_pixel_array(image):
     if image.NrOfFrames and image.NrOfFrames > 1:
-        # Note: using only the first frame for registration
         return image.pixel_array[0]
     else:
         return image.pixel_array
 
 
-def run_registration(image_set, graph, form_data):
-    # Skip if image set is empty
+def run_registration(image_set, graph, new_transforms):
     if not image_set:
         return None, None
 
-    # best quality image as reference
     reference = max(image_set, key=lambda i: i.CFQuality if i.CFQuality else 0)
+    ref_key = registration_image_key(reference)
 
     registrator = Registration()
     registrator.set_reference(get_pixel_array(reference))
 
     for i in image_set:
-        if are_connected(reference.ImageInstanceID, i.ImageInstanceID, graph):
+        i_key = registration_image_key(i)
+        if are_connected(ref_key, i_key, graph):
             continue
 
         registrator.set_target(get_pixel_array(i))
         try:
             print(
-                f"Running registration for {reference.ImageInstanceID} -> {i.ImageInstanceID}"
+                f"Running registration for {ref_key} -> {i_key} "
             )
             transform = registrator.run()
-            graph[reference.ImageInstanceID].add(i.ImageInstanceID)
-            graph[i.ImageInstanceID].add(reference.ImageInstanceID)
-            form_data.append(
+            graph[ref_key].add(i_key)
+            graph[i_key].add(ref_key)
+            new_transforms.append(
                 {
-                    "image1": reference.ImageInstanceID,
-                    "image2": i.ImageInstanceID,
+                    "image1": ref_key,
+                    "image2": i_key,
                     "transform": transform.to_dict(),
                 }
             )
         except Exception as e:
             print(
-                f"Error running registration for {reference.ImageInstanceID}, {i.ImageInstanceID}: {e}"
+                f"Error running registration for {ref_key}, {i_key}: {e}"
             )
 
     return registrator, reference
 
 
-def run_registration_patient(patient, attribute_value: AttributeValue, skip_ids=None):
+def run_registration_patient(
+    patient,
+    seed_transforms: list[dict[str, Any]],
+    skip_ids=None,
+    session=None,
+):
     print(
         f"Running registration for patient {patient.PatientID} {patient.PatientIdentifier}"
     )
 
-    # Build the where clause to filter by modality and exclude skipped images
     modality_filter = ImageInstance.Modality.in_(
         ["ColorFundus", "InfraredReflectance", "Autofluorescence"]
     )
@@ -180,62 +250,72 @@ def run_registration_patient(patient, attribute_value: AttributeValue, skip_ids=
 
     enface_images = patient.get_images(where=where_clause)
     print(f"Found {len(enface_images)} enface images")
-    graph = get_processed_edges(attribute_value)
-    print(f"Found {len(graph)} processed pairs")
 
-    all_transforms = list(attribute_value.ValueJSON or [])
+    id_to_public = {
+        im.ImageInstanceID: im.PublicID for im in enface_images
+    }
+    if session is not None:
+        legacy_ids = collect_legacy_instance_ids(seed_transforms)
+        id_to_public.update(build_id_to_public(session, legacy_ids))
+
+    seed_normalized = normalize_registration_transforms(seed_transforms, id_to_public)
+    graph = graph_from_transforms(seed_normalized, id_to_public)
+    print(f"Found {len(graph)} processed pairs in seed graph")
+
+    new_transforms: list[dict[str, Any]] = []
     for eye in "RL":
 
         eye_images = [
             i for i in enface_images if i.Laterality and i.Laterality.name == eye
         ]
 
-        # split images into F1 and F2
         sorted_images = sort_images(eye_images)
 
         register_f1 = None
         register_f2 = None
         if sorted_images["F1"]:
-            print(f"Running registration for F1 images")
+            print("Running registration for F1 images")
             register_f1, reference_f1 = run_registration(
-                sorted_images["F1"], graph, all_transforms
+                sorted_images["F1"], graph, new_transforms
             )
 
         if sorted_images["F2"]:
-            print(f"Running registration for F2 images")
+            print("Running registration for F2 images")
             register_f2, reference_f2 = run_registration(
-                sorted_images["F2"], graph, all_transforms
+                sorted_images["F2"], graph, new_transforms
             )
 
         if (
             register_f1
             and register_f2
-            and not are_connected(
-                reference_f1.ImageInstanceID, reference_f2.ImageInstanceID, graph
-            )
+            and reference_f1 is not None
+            and reference_f2 is not None
         ):
-            # register the two reference images
-            registration = Registration()
-            registration.set_reference(get_pixel_array(reference_f1))
-            registration.set_target(get_pixel_array(reference_f2))
+            ref_f1 = registration_image_key(reference_f1)
+            ref_f2 = registration_image_key(reference_f2)
+            if not are_connected(ref_f1, ref_f2, graph):
+                registration = Registration()
+                registration.set_reference(get_pixel_array(reference_f1))
+                registration.set_target(get_pixel_array(reference_f2))
 
-            try:
-                transform = registration.run()
-                graph[reference_f1.ImageInstanceID].add(reference_f2.ImageInstanceID)
-                graph[reference_f2.ImageInstanceID].add(reference_f1.ImageInstanceID)
-                all_transforms.append(
-                    {
-                        "image1": reference_f1.ImageInstanceID,
-                        "image2": reference_f2.ImageInstanceID,
-                        "transform": transform.to_dict(),
-                    }
-                )
-            except Exception as e:
-                print(
-                    f"Error running reference-to-reference registration for {reference_f1.ImageInstanceID}, {reference_f2.ImageInstanceID}: {e}"
-                )
+                try:
+                    transform = registration.run()
+                    graph[ref_f1].add(ref_f2)
+                    graph[ref_f2].add(ref_f1)
+                    new_transforms.append(
+                        {
+                            "image1": ref_f1,
+                            "image2": ref_f2,
+                            "transform": transform.to_dict(),
+                        }
+                    )
+                except Exception as e:
+                    print(
+                        f"Error running reference-to-reference registration "
+                        f"for {ref_f1}, {ref_f2}: {e}"
+                    )
 
-    return all_transforms
+    return normalize_registration_transforms(new_transforms, id_to_public)
 
 
 def run_patient(session, patient, definition, model, replace, skip_ids=None):
@@ -250,8 +330,22 @@ def run_patient(session, patient, definition, model, replace, skip_ids=None):
     if replace:
         attribute_value.ValueJSON = []
 
-    all_transforms = run_registration_patient(patient, attribute_value, skip_ids)
-    attribute_value.ValueJSON = all_transforms
+    seed_transforms = collect_registration_seed_transforms(
+        session,
+        patient,
+        definition.AttributeID,
+        replace=replace,
+    )
+    new_transforms = run_registration_patient(
+        patient, seed_transforms, skip_ids, session=session
+    )
+
+    if replace:
+        attribute_value.ValueJSON = new_transforms
+    else:
+        existing = list(attribute_value.ValueJSON or [])
+        existing.extend(new_transforms)
+        attribute_value.ValueJSON = existing
 
     session.add(attribute_value)
     session.commit()

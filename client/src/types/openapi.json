@@ -305,6 +305,123 @@
         }
       }
     },
+    "/auth/options": {
+      "get": {
+        "summary": "Get Auth Options",
+        "description": "Options and settings for authentication.",
+        "operationId": "get_auth_options_auth_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oidc/authorize": {
+      "get": {
+        "summary": "Get Oidc Authorization Url",
+        "description": "The authorization URL at the OIDC provider for authentication.\n\nThe authorization includes a CSRF token. The CSRF token hash is included in the 'state' parameter along the OIDC\nauthorization path, while the original token is returned to the client for safekeeping (as a cookie).\nThe client is supposed to provide the token (cookie) again when calling the authenticate endpoint, where it\nwill be validated.\n\nA similar flow is set for the 'nonce', which is returned from the OIDC authentication response in the ID token,\nwhich is also validated.",
+        "operationId": "get_oidc_authorization_url_auth_oidc_authorize_get",
+        "parameters": [
+          {
+            "name": "next",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Next"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OIDCAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oidc/authenticate": {
+      "post": {
+        "summary": "Oidc Authenticate",
+        "description": "Handle OIDC authentication using the code from the authorization URL.",
+        "operationId": "oidc_authenticate_auth_oidc_authenticate_post",
+        "parameters": [
+          {
+            "name": "oidc_csrf_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Oidc Csrf Token"
+            }
+          },
+          {
+            "name": "oidc_nonce",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Oidc Nonce"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OIDCAuthenticationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/instances/{instance_id}": {
       "get": {
         "summary": "Get Instance",
@@ -7648,6 +7765,47 @@
         ],
         "title": "ModelSegmentationGET"
       },
+      "OIDCAuthenticationRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "OIDCAuthenticationRequest"
+      },
+      "OIDCAuthorizationResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "csrf": {
+            "type": "string",
+            "title": "Csrf"
+          },
+          "nonce": {
+            "type": "string",
+            "title": "Nonce"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "csrf",
+          "nonce"
+        ],
+        "title": "OIDCAuthorizationResponse"
+      },
       "ObjectTagPATCH": {
         "properties": {
           "comment": {
@@ -7689,6 +7847,29 @@
         ],
         "title": "ObjectTagPOST"
       },
+      "PatientAttributeValueGET": {
+        "properties": {
+          "value": {
+            "title": "Value"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "PatientAttributeValueGET",
+        "description": "One attribute value produced by a model (or manual entry when model is null)."
+      },
       "PatientDetailGET": {
         "properties": {
           "id": {
@@ -7724,7 +7905,12 @@
             "$ref": "#/components/schemas/ProjectMeta"
           },
           "attrs": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/PatientAttributeValueGET"
+              },
+              "type": "array"
+            },
             "type": "object",
             "title": "Attrs"
           }
