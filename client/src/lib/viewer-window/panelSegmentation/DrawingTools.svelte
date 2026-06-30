@@ -83,6 +83,10 @@
 	});
 
 	const drawingExecutor = {
+		undo,
+		redo,
+		canUndo: () => checkHistory("canUndo"),
+		canRedo: () => checkHistory("canRedo"),
 		getCtx: () => {
 			const item = segmentationContext.segmentationItem;
 			if (!item) {

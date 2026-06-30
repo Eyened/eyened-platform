@@ -14,6 +14,10 @@ export type DrawingMode = 'erase' | 'paint';
 export interface DrawingExecutor {
     getCtx(): CanvasRenderingContext2D;
     draw(ctx: CanvasRenderingContext2D, mode: 'paint' | 'erase'): Promise<void>;
+    undo(): void;
+    redo(): void;
+    canUndo(): boolean;
+    canRedo(): boolean;
 }
 
 
@@ -94,8 +98,22 @@ export abstract class SegmentationTool implements Overlay {
     }
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        const { event: { repeat, key }, viewerContext } = e;
+        const { event: { repeat, key, ctrlKey, shiftKey }, viewerContext } = e;
         if (repeat) return;
+
+        if (ctrlKey) {
+            const k = key.toLowerCase();
+            if (k === 'z' && !shiftKey && this.drawingExecutor.canUndo()) {
+                this.drawingExecutor.undo();
+                e.event.preventDefault();
+                return;
+            }
+            if (k === 'y' && this.drawingExecutor.canRedo()) {
+                this.drawingExecutor.redo();
+                e.event.preventDefault();
+                return;
+            }
+        }
 
         const k = key.toUpperCase();
         if (k == paintKey) this.drawingState = 'paint';
