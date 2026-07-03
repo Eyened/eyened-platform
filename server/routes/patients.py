@@ -20,8 +20,12 @@ async def get_patient(
     opts = [selectinload(Patient.Project)]
     if include_attributes:
         opts.append(
+            selectinload(Patient.AttributeValues)
+            .selectinload(AttributeValue.AttributeDefinition)
+        )
+        opts.append(
             selectinload(Patient.AttributeValues).selectinload(
-                AttributeValue.AttributeDefinition
+                AttributeValue.ProducingModel
             )
         )
 

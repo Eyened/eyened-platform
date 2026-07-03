@@ -37,7 +37,7 @@ setup(
         "pydantic-settings==2.7.1",
         "python-dotenv==1.*",
         "retinalysis-fundusprep>=0.5.4",
-        "retinalysis-registration>=0.1.4",
+        "retinalysis-registration>=0.1.6",
         "pyyaml==6.*",
         "google_crc32c==1.8.0",
         "simpleitk==2.*",

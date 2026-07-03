@@ -25,20 +25,22 @@
             if (formSchema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION) {
                 const items = getPointsetRegistrations(value);
                 registration.importRegistrationItems(items);
+                registration.recomputePathsNow();
             } else if (formSchema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.AFFINE_REGISTRATION) {
                 const items = getAffineTransforms(value);
                 registration.importRegistrationItems(items);
+                registration.recomputePathsNow();
             } else if (formSchema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.REGISTRATION_SET) {
                 const items = getRegistrationSets(value);
                 registration.importRegistrationItems(items);
+                registration.recomputePathsNow();
             }
         }
     };
 
     const updateFromPatientAttrs = (value: RegistrationSet[] | undefined) => {
         if (value?.length) {
-            const items = getRegistrationSets(value);
-            registration.importRegistrationItems(items);
+            registration.importPatientRegistrationSets(value);
         }
     };
     $effect(() => updateFromFormAnnotation(formAnnotation?.form_data));

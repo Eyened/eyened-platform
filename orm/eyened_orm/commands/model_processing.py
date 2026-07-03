@@ -7,12 +7,14 @@ import click
 from eyened_orm.inference.etdrs_summary import run_etdrs_model
 
 from .shared import get_database
-
-
-def _load_image_ids(path: str) -> set[int]:
-    """Load image IDs from a file (one ID per line)."""
-    with open(path, "r") as f:
-        return {int(line.strip()) for line in f.readlines() if line.strip()}
+from .targets import (
+    image_target_options,
+    patient_target_options,
+    resolve_exclude_ids,
+    resolve_image_target,
+    resolve_patient_target,
+    target_spec_from_cli,
+)
 
 
 def _get_device(device: str | None):
@@ -106,19 +108,7 @@ def run_cfi_attribute_pipeline(
     required=False,
     help="Model to run (if not specified, runs all models)",
 )
-@click.option(
-    "-p",
-    "--path",
-    type=str,
-    default=None,
-    help="Path to file containing image IDs (one per line)",
-)
-@click.option(
-    "--project",
-    type=int,
-    default=None,
-    help="Run on all ColorFundus images in this project ID",
-)
+@image_target_options()
 @click.option(
     "-d",
     "--device",
@@ -152,11 +142,25 @@ def run_cfi_attribute_pipeline(
     default=100,
     help="Commit interval for processing",
 )
-def run_models(model, path, project, device, batch_size, n_workers, overwrite, commit_interval):
-    """Run attribute inference models on a set of image IDs.
+def run_models(
+    model,
+    path,
+    image_ids,
+    project,
+    patient,
+    exclude,
+    modality,
+    include_inactive,
+    device,
+    batch_size,
+    n_workers,
+    overwrite,
+    commit_interval,
+):
+    """Run attribute inference models on a set of images.
 
-    Provide image IDs via --path (one per line) or --project <id> to target all
-    ColorFundus images in a project.
+    Target images via --path, --image-ids, --project, and/or --patient.
+    ColorFundus is the default modality when using --project without --modality.
 
     Supported models:
     - cfi-roi: CFI ROI detection (no device/batch-size needed)
@@ -164,34 +168,27 @@ def run_models(model, path, project, device, batch_size, n_workers, overwrite, c
     - cfi-odfd: Optic Disc to Fovea Distance estimation
     - cfi-quality: Image quality assessment
     """
-    if path is None and project is None:
-        raise click.UsageError("Provide either --path or --project")
-    if path is not None and project is not None:
-        raise click.UsageError("--path and --project are mutually exclusive")
+    spec = target_spec_from_cli(
+        path=path,
+        image_ids=image_ids,
+        project=project,
+        patient=patient,
+        exclude=exclude,
+        modality=modality or ("ColorFundus" if project and not patient else None),
+        include_inactive=include_inactive,
+    )
 
     database = get_database()
     device_obj = _get_device(device)
 
     with database.get_session() as session:
-        if path is not None:
-            image_ids = _load_image_ids(path)
-            print(f"Loaded {len(image_ids)} image IDs from {path}")
-        else:
-            from eyened_orm import ImageInstance, Modality
-            from eyened_orm.project import Project
-
-            images = ImageInstance.where(
-                session,
-                (Project.ProjectID == project)
-                & (ImageInstance.Modality == Modality.ColorFundus),
-            )
-            image_ids = {im.ImageInstanceID for im in images}
-            print(f"Found {len(image_ids)} ColorFundus images in project {project}")
+        target = resolve_image_target(session, spec)
+        print(f"Target: {target.summary}")
 
         for slug in [model] if model is not None else CFI_ATTRIBUTE_MODEL_SLUGS:
             run_cfi_attribute_pipeline(
                 session,
-                image_ids,
+                target.image_ids,
                 slug,
                 device=device_obj,
                 batch_size=batch_size,
@@ -209,13 +206,7 @@ def run_models(model, path, project, device, batch_size, n_workers, overwrite, c
     required=False,
     help="Segmentation model to run (if not specified, runs all models)",
 )
-@click.option(
-    "-p",
-    "--path",
-    type=str,
-    required=True,
-    help="Path to file containing image IDs (one per line)",
-)
+@image_target_options()
 @click.option(
     "-d",
     "--device",
@@ -243,22 +234,43 @@ def run_models(model, path, project, device, batch_size, n_workers, overwrite, c
     default=True,
     help="Skip existing segmentations (filters out complete images)",
 )
-def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
-    """Run segmentation inference models on a set of image IDs.
+def run_segmentation(
+    model,
+    path,
+    image_ids,
+    project,
+    patient,
+    exclude,
+    modality,
+    include_inactive,
+    device,
+    batch_size,
+    n_workers,
+    skip_existing,
+):
+    """Run segmentation inference models on a set of images.
 
     Supported models:
     - cfi-amd: CFI AMD segmentation (drusen, RPD, hyperpigmentation, RPE degeneration)
     - layer-segmentation: OCT retinal layer segmentation (nnU-Net)
     """
+    spec = target_spec_from_cli(
+        path=path,
+        image_ids=image_ids,
+        project=project,
+        patient=patient,
+        exclude=exclude,
+        modality=modality,
+        include_inactive=include_inactive,
+    )
+
     database = get_database()
-
-    # Load image IDs
-    image_ids = _load_image_ids(path)
-    print(f"Loaded {len(image_ids)} image IDs from {path}")
-
     device_obj = _get_device(device)
 
     with database.get_session() as session:
+        target = resolve_image_target(session, spec)
+        print(f"Target: {target.summary}")
+
         slugs = [model] if model is not None else SEGMENTATION_MODEL_SLUGS
         for slug in slugs:
             if slug == "cfi-amd":
@@ -267,7 +279,7 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
                 print(f"Running {slug}")
                 run_for_image_ids(
                     session,
-                    image_ids,
+                    target.image_ids,
                     device=device_obj,
                     batch_size=batch_size,
                     n_workers=n_workers,
@@ -279,23 +291,16 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
                 print(f"Running {slug}")
                 run_for_image_ids(
                     session,
-                    image_ids,
+                    target.image_ids,
                     device=device_obj,
                     overwrite=not skip_existing,
                 )
             else:
                 raise ValueError(f"Unknown segmentation model: {slug!r}")
 
+
 @click.command(name="run-registration")
-@click.option(
-    "--patient",
-    type=str,
-    required=False,
-    help="Patient identifier to run registration for",
-)
-@click.option(
-    "--project", type=int, required=False, help="Project ID to run registration for"
-)
+@patient_target_options()
 @click.option(
     "--replace",
     is_flag=True,
@@ -303,37 +308,34 @@ def run_segmentation(model, path, device, batch_size, n_workers, skip_existing):
     default=False,
     help="Replace existing registration",
 )
-@click.option(
-    "--skip",
-    type=str,
-    required=False,
-    help=(
-        "Comma-separated list of ImageInstanceIDs to skip during registration "
-        "(e.g. --skip 1811325,1811324,1811323)"
-    ),
-)
-def run_registration(patient, project, replace, skip):
+def run_registration(path, image_ids, project, patient, exclude, replace):
     """Run pairwise enface registration for patients or projects.
 
     Stores transforms in a patient-level Registration attribute (JSON).
-    Requires --patient or --project. See --help for --replace and --skip.
+    Scope with --patient, --project, or --path/--image-ids. See --help for
+    --replace and --skip.
     """
-    from eyened_orm import Patient, AttributeDefinition, AttributesModel
+    from eyened_orm import AttributeDefinition, AttributesModel
     from eyened_orm.utils.registration import run_patient
     import rtnls_registration
 
-    # Parse skip list from comma-separated string
-    skip_ids = None
-    if skip:
-        try:
-            skip_ids = [int(id.strip()) for id in skip.split(",") if id.strip()]
-            print(f"Skipping {len(skip_ids)} imageInstanceIDs: {skip_ids}")
-        except ValueError as e:
-            print(f"Error parsing skip list: {e}. Expected comma-separated integers.")
-            return
+    spec = target_spec_from_cli(
+        path=path,
+        image_ids=image_ids,
+        project=project,
+        patient=patient,
+        exclude=exclude,
+    )
 
     database = get_database()
     with database.get_session() as session:
+        skip_ids = resolve_exclude_ids(session, exclude)
+        if skip_ids:
+            print(f"Skipping {len(skip_ids)} image(s): {skip_ids}")
+
+        target = resolve_patient_target(session, spec)
+        print(f"Target: {target.summary}")
+
         definition = AttributeDefinition.get_or_create(
             session,
             match_by={"AttributeName": "Registration"},
@@ -350,14 +352,8 @@ def run_registration(patient, project, replace, skip):
             },
         )
 
-        if patient:
-            patients = Patient.by_columns(session, PatientIdentifier=patient)
-        elif project:
-            patients = Patient.by_columns(session, ProjectID=project)
-        else:
-            raise ValueError("No patient or project provided")
-        for patient in patients:
-            run_patient(session, patient, definition, model, replace, skip_ids)
+        for pat in target.patients:
+            run_patient(session, pat, definition, model, replace, skip_ids)
 
 
 model_commands = [

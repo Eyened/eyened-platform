@@ -13,8 +13,8 @@ from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
 from .dtos_instances import (
     DeviceMeta,
     ImageGET,
+    PatientAttributeValueGET,
     PatientDetailGET,
-    PatientGET,
     PatientMeta,
     ProjectGET,
     ProjectMeta,
@@ -86,28 +86,44 @@ class DTOConverter:
         )
 
     @staticmethod
-    def patient_to_get(patient: "Patient") -> PatientGET:
-        """Convert Patient ORM object to PatientGET."""
-        return PatientGET(
-            id=patient.PatientID,
-            identifier=patient.PatientIdentifier or "",
-            birth_date=patient.BirthDate,
-            sex=patient.Sex,
+    def _registration_attr_to_public_ids(sess: Optional["Session"], value) -> list:
+        """Convert legacy ImageInstanceID keys in Registration JSON to PublicID."""
+        if not isinstance(value, list):
+            return value
+        from eyened_orm.utils.registration import (
+            build_id_to_public,
+            collect_legacy_instance_ids,
+            normalize_registration_transforms,
         )
+
+        legacy_ids = collect_legacy_instance_ids(value)
+        id_to_public = build_id_to_public(sess, legacy_ids) if sess else {}
+        return normalize_registration_transforms(value, id_to_public)
 
     @staticmethod
     def patient_to_detail_get(
         patient: "Patient", include_attributes: bool = True
     ) -> PatientDetailGET:
         """Convert Patient ORM object to PatientDetailGET."""
-        attrs = {}
+        sess = object_session(patient)
+        attrs: dict[str, list[PatientAttributeValueGET]] = {}
         if include_attributes:
             for av in getattr(patient, "AttributeValues", []) or []:
                 attr_def = getattr(av, "AttributeDefinition", None)
                 if not attr_def:
                     continue
                 try:
-                    attrs[attr_def.AttributeName] = av.value
+                    value = av.value
+                    if attr_def.AttributeName == "Registration":
+                        value = DTOConverter._registration_attr_to_public_ids(
+                            sess, value
+                        )
+                    model_meta = None
+                    producing_model = getattr(av, "ProducingModel", None)
+                    if producing_model is not None:
+                        model_meta = DTOConverter.model_to_meta(producing_model)
+                    entry = PatientAttributeValueGET(value=value, model=model_meta)
+                    attrs.setdefault(attr_def.AttributeName, []).append(entry)
                 except Exception:
                     continue
 
@@ -145,7 +161,7 @@ class DTOConverter:
             id=study.Patient.Project.ProjectID,
             name=study.Patient.Project.ProjectName,
         )
-        patient_meta = PatientMeta(
+        patient = PatientMeta(
             id=study.Patient.PatientID,
             identifier=study.Patient.PatientIdentifier or "",
             birth_date=study.Patient.BirthDate,
@@ -159,7 +175,7 @@ class DTOConverter:
             round=study.StudyRound,
             age=study.age_years,
             project=project_meta,
-            patient=patient_meta,
+            patient=patient,
             tags=[],
         )
 
@@ -229,7 +245,7 @@ class DTOConverter:
             id=image_instance.Series.Study.Patient.Project.ProjectID,
             name=image_instance.Series.Study.Patient.Project.ProjectName,
         )
-        patient_meta = PatientMeta(
+        patient = PatientMeta(
             id=image_instance.Series.Study.Patient.PatientID,
             identifier=image_instance.Series.Study.Patient.PatientIdentifier,
             birth_date=image_instance.Series.Study.Patient.BirthDate,
@@ -272,7 +288,7 @@ class DTOConverter:
             date_modified=image_instance.DateModified,
             date_preprocessed=image_instance.DatePreprocessed,
             project=project_meta,
-            patient=patient_meta,
+            patient=patient,
             study=study_meta,
             series=series_meta,
             device=device_meta,

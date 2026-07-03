@@ -13,6 +13,7 @@ Keeps track of the main panels and the top row of images.
 	import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
 	import { formAnnotations, instances, patients } from "$lib/data";
 	import type { RegistrationSet } from "$lib/registration/registrationItem";
+	import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
 
 	interface Props {
 		viewerWindowContext: ViewerWindowContext;
@@ -47,10 +48,7 @@ Keeps track of the main panels and the top row of images.
 		// TODO: check if patient can be fetched with promise directly?
 		for (const patientId of patientIds) {
 			const patient = patients.get(patientId);
-			
-			if (patient?.attrs?.Registration) {
-				result.push(...(patient.attrs.Registration as RegistrationSet[]));
-			}
+			result.push(...collectPatientRegistrationSets(patient?.attrs));
 		}
 		return result;
 	});

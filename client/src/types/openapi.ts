@@ -144,6 +144,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auth Options
+         * @description Options and settings for authentication.
+         */
+        get: operations["get_auth_options_auth_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Oidc Authorization Url
+         * @description The authorization URL at the OIDC provider for authentication.
+         *
+         *     The authorization includes a CSRF token. The CSRF token hash is included in the 'state' parameter along the OIDC
+         *     authorization path, while the original token is returned to the client for safekeeping (as a cookie).
+         *     The client is supposed to provide the token (cookie) again when calling the authenticate endpoint, where it
+         *     will be validated.
+         *
+         *     A similar flow is set for the 'nonce', which is returned from the OIDC authentication response in the ID token,
+         *     which is also validated.
+         */
+        get: operations["get_oidc_authorization_url_auth_oidc_authorize_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/authenticate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Oidc Authenticate
+         * @description Handle OIDC authentication using the code from the authorization URL.
+         */
+        post: operations["oidc_authenticate_auth_oidc_authenticate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instances/{instance_id}": {
         parameters: {
             query?: never;
@@ -1729,6 +1797,22 @@ export interface components {
             /** Date Modified */
             date_modified?: string | null;
         };
+        /** OIDCAuthenticationRequest */
+        OIDCAuthenticationRequest: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** OIDCAuthorizationResponse */
+        OIDCAuthorizationResponse: {
+            /** Url */
+            url: string;
+            /** Csrf */
+            csrf: string;
+            /** Nonce */
+            nonce: string;
+        };
         /** ObjectTagPATCH */
         ObjectTagPATCH: {
             /** Comment */
@@ -1740,6 +1824,15 @@ export interface components {
             tag_id: number;
             /** Comment */
             comment?: string | null;
+        };
+        /**
+         * PatientAttributeValueGET
+         * @description One attribute value produced by a model (or manual entry when model is null).
+         */
+        PatientAttributeValueGET: {
+            /** Value */
+            value: unknown;
+            model?: components["schemas"]["ModelMeta"] | null;
         };
         /** PatientDetailGET */
         PatientDetailGET: {
@@ -1753,7 +1846,7 @@ export interface components {
             project: components["schemas"]["ProjectMeta"];
             /** Attrs */
             attrs?: {
-                [key: string]: unknown;
+                [key: string]: components["schemas"]["PatientAttributeValueGET"][];
             };
         };
         /** PatientMeta */
@@ -2714,6 +2807,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_auth_options_auth_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_oidc_authorization_url_auth_oidc_authorize_get: {
+        parameters: {
+            query?: {
+                next?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OIDCAuthorizationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oidc_authenticate_auth_oidc_authenticate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                oidc_csrf_token?: string;
+                oidc_nonce?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OIDCAuthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
