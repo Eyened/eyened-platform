@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class TargetSpec:
     """Facade-agnostic scope input. CLI maps flags here; API can map JSON later."""
 
-    image_ids: list[int] | None = None
+    image_ids: list[str] | None = None
     image_ids_file: str | None = None
     project: str | None = None
     patient: str | None = None
@@ -55,20 +55,6 @@ def _parse_comma_tokens(value: str | None) -> list[str]:
     return [token.strip() for token in value.split(",") if token.strip()]
 
 
-def _parse_inline_image_ids(value: str | None) -> list[int]:
-    tokens = _parse_comma_tokens(value)
-    ids: list[int] = []
-    for token in tokens:
-        try:
-            ids.append(int(token))
-        except ValueError as exc:
-            raise click.UsageError(
-                f"Invalid --image-ids entry {token!r}: expected integer "
-                f"(use --path for PublicID lists)"
-            ) from exc
-    return ids
-
-
 def target_spec_from_cli(
     *,
     path: str | None = None,
@@ -81,7 +67,7 @@ def target_spec_from_cli(
 ) -> TargetSpec:
     project_str = str(project) if project is not None else None
     return TargetSpec(
-        image_ids=_parse_inline_image_ids(image_ids) or None,
+        image_ids=_parse_comma_tokens(image_ids) or None,
         image_ids_file=path,
         project=project_str,
         patient=patient,
@@ -185,8 +171,11 @@ def resolve_image_target(session: Session, spec: TargetSpec) -> ImageTarget:
         summary_parts.append(f"{len(from_file)} from {spec.image_ids_file}")
 
     if spec.image_ids:
-        image_ids |= set(spec.image_ids)
-        summary_parts.append(f"{len(spec.image_ids)} from --image-ids")
+        from_inline = {
+            resolve_identifier(session, token) for token in spec.image_ids
+        }
+        image_ids |= from_inline
+        summary_parts.append(f"{len(from_inline)} from --image-ids")
 
     if not image_ids:
         if spec.patient:
@@ -323,7 +312,7 @@ def image_target_options(*, require_one: bool = True) -> Callable:
             "--image-ids",
             type=str,
             default=None,
-            help="Comma-separated ImageInstanceIDs (for small lists)",
+            help="Comma-separated ImageInstanceIDs or PublicIDs (for small lists)",
         )(f)
         f = click.option(
             "-p",
@@ -379,7 +368,7 @@ def patient_target_options(*, require_one: bool = True) -> Callable:
             "--image-ids",
             type=str,
             default=None,
-            help="Comma-separated ImageInstanceIDs; derive patients from these images",
+            help="Comma-separated ImageInstanceIDs or PublicIDs; derive patients from these images",
         )(f)
         f = click.option(
             "-p",
@@ -388,7 +377,7 @@ def patient_target_options(*, require_one: bool = True) -> Callable:
             "path",
             type=click.Path(exists=True, dir_okay=False),
             default=None,
-            help="File with image IDs; derive patients from these images",
+            help="File with ImageInstanceIDs or PublicIDs; derive patients from these images",
         )(f)
         f = click.option(
             "--project",

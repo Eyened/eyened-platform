@@ -55,12 +55,19 @@ def _import_images(session, *, project_name: str = "target-proj", count: int = 2
 
 def test_target_spec_from_cli_inline_ids():
     spec = target_spec_from_cli(image_ids="1,2,3")
-    assert spec.image_ids == [1, 2, 3]
+    assert spec.image_ids == ["1", "2", "3"]
 
 
-def test_target_spec_from_cli_rejects_non_int_inline_ids():
-    with pytest.raises(click.UsageError, match="Invalid --image-ids"):
-        target_spec_from_cli(image_ids="abc")
+def test_resolve_image_target_inline_ids_and_public_ids(session):
+    _proj, images = _import_images(session)
+    spec = TargetSpec(
+        image_ids=[
+            str(images[0].ImageInstanceID),
+            images[1].PublicID,
+        ]
+    )
+    target = resolve_image_target(session, spec)
+    assert target.image_ids == {images[0].ImageInstanceID, images[1].ImageInstanceID}
 
 
 def test_resolve_project_by_name_and_id(session):
