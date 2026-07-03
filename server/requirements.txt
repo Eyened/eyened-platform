@@ -7,7 +7,7 @@ pandas>=1.5.3
 pydantic-settings==2.7.1
 python-multipart==0.0.20
 passlib==1.7.4
-pyjwt>=2.8.0
+pyjwt>=2.12.0
 rq>=2.7.0
 redis>=7.4.0
 cryptography>=44.0.2

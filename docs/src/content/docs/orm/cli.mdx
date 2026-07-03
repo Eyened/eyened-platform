@@ -59,11 +59,13 @@ eorm create-user [OPTIONS]
 
 Generates thumbnails for images with missing (or optionally failed) `ThumbnailPath`. Equivalent to `POST /api/import/update_thumbnails` but runs in-process (no worker).
 
+With no target flags, scans the whole database. Scope a subset with `--path`, `--image-ids`, `--project`, or `--patient` (same targeting options as inference commands).
+
 See **[Thumbnails](/eyened-platform/thumbnails#cli)** for options and behavior.
 
 ### run-models
 
-Runs attribute inference models on a provided set of image IDs.
+Runs attribute inference models on a scoped set of images.
 
 ```bash
 eorm run-models [OPTIONS]
@@ -71,7 +73,7 @@ eorm run-models [OPTIONS]
 
 ### run-segmentation
 
-Runs segmentation inference models on a provided set of image IDs.
+Runs segmentation inference models on a scoped set of images.
 
 ```bash
 eorm run-segmentation [OPTIONS]
@@ -84,6 +86,31 @@ Runs ETDRS summary processing using model segmentations and related model output
 ```bash
 eorm run-etdrs-model [OPTIONS]
 ```
+
+## Targeting
+
+Image- and patient-scoped commands share the same targeting flags. Provide **at least one** of:
+
+| Flag | Description |
+|------|-------------|
+| `-p` / `--path` / `--image-ids-file` | File with one `ImageInstanceID` or `PublicID` per line (`#` comments ok) |
+| `--image-ids` | Comma-separated `ImageInstanceID` or `PublicID` values (small lists) |
+| `--project` | Project ID or project name |
+| `--patient` | Patient identifier; combine with `--project` when the identifier exists in multiple projects |
+| `--exclude` / `--skip` | Comma-separated IDs or PublicIDs to exclude (image commands) or skip (registration) |
+| `--modality` | Filter by modality when expanding `--project` or `--patient` |
+
+Examples:
+
+```bash
+eorm run-models --project "AMD-Study" --modality ColorFundus
+eorm run-segmentation --path ids.txt
+eorm run-registration --project "AMD-Study" --patient amd001
+eorm run-registration --project 1 --skip abc12def,1811325
+eorm update-thumbnails --project "AMD-Study"
+```
+
+When no target flags are given, `update-thumbnails` and `update-hashes` scan the whole database (previous behavior).
 
 ### run-registration
 

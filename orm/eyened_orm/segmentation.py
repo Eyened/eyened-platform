@@ -736,7 +736,6 @@ class Model(Base):
     _name_column: ClassVar[str] = "ModelName"
 
     __table_args__ = (
-        UniqueConstraint("ModelName", name="ModelName"),
         UniqueConstraint("ModelName", "Version"),
     )
     __mapper_args__ = {"polymorphic_on": "ModelType"}

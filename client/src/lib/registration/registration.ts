@@ -3,6 +3,7 @@ import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { photoLocatorsToRegistrationItems, type PhotoLocator } from "./photoLocators";
 import { OCTToProj, ProjToOCT } from "./projectionRegistration";
 import type { mappingFunction, RegistrationItem } from "./registrationItem";
+import { getRegistrationSets, type RegistrationSet } from "./registrationItem";
 
 export type Pointer = {
     image_id: string,
@@ -133,6 +134,13 @@ export class Registration {
         }
         this.pathsDirty = true;
         this.scheduleRecompute();
+    }
+
+    /** Import all patient-level registration pairs and recompute paths for transitive linking. */
+    importPatientRegistrationSets(sets: Iterable<RegistrationSet>) {
+        const items = getRegistrationSets([...sets]);
+        this.importRegistrationItems(items);
+        this.recomputePathsNow();
     }
 
     getLinkedImgIds(source: string): Set<string> {

@@ -5,6 +5,7 @@ from .utils.testdb import drop_create_db, load_db
 from tqdm import tqdm
 
 from .commands.shared import get_database
+from .commands.targets import image_target_options, has_target_spec, resolve_image_target, target_spec_from_cli
 from .utils.env import load_env_file
 
 """
@@ -170,17 +171,55 @@ def create_user(username: str, password: str, is_human: bool, description: str |
 
 
 @eorm.command()
+@image_target_options(require_one=False)
 @click.option("--failed", is_flag=True, default=False)
 @click.option("--print-errors", is_flag=True, default=False)
-def update_thumbnails(failed, print_errors):
-    """Update thumbnails for all images in the database."""
+def update_thumbnails(
+    path,
+    image_ids,
+    project,
+    patient,
+    exclude,
+    modality,
+    include_inactive,
+    failed,
+    print_errors,
+):
+    """Update thumbnails for images in the database.
 
-    from eyened_orm.importer.thumbnails import run_update_thumbnails_job
+    With no target flags, scans the whole database for missing thumbnails.
+    With --path, --image-ids, --project, or --patient, updates only that scope.
+    """
+
+    from eyened_orm.importer.thumbnails import (
+        run_update_thumbnails_for_image_ids_job,
+        run_update_thumbnails_job,
+    )
 
     database = get_database()
-    run_update_thumbnails_job(
-        database, include_failed=failed, print_errors=print_errors
+    spec = target_spec_from_cli(
+        path=path,
+        image_ids=image_ids,
+        project=project,
+        patient=patient,
+        exclude=exclude,
+        modality=modality,
+        include_inactive=include_inactive,
     )
+
+    if has_target_spec(spec):
+        with database.get_session() as session:
+            target = resolve_image_target(session, spec)
+            print(f"Target: {target.summary}")
+            run_update_thumbnails_for_image_ids_job(
+                database,
+                sorted(target.image_ids),
+                print_errors=print_errors,
+            )
+    else:
+        run_update_thumbnails_job(
+            database, include_failed=failed, print_errors=print_errors
+        )
 
 
 @eorm.command()
@@ -207,16 +246,18 @@ def zarr_tree():
     """Display the structure of the zarr store, showing groups and array shapes."""
     import zarr
 
-    settings = load_orm_settings()
+    from eyened_orm.segmentation_storage import get_zarr_storage_manager
 
-    # Open the zarr store
+    manager = get_zarr_storage_manager()
+    store_path = manager.store_path
+
     try:
-        root = zarr.open_group(store=settings.segmentations_zarr_store, mode="r")
+        root = zarr.open_group(store=store_path, mode="r")
     except Exception as e:
-        print(f"Error opening zarr store at {settings.segmentations_zarr_store}: {e}")
+        print(f"Error opening zarr store at {store_path}: {e}")
         return
 
-    print(f"Zarr store: {settings.segmentations_zarr_store}")
+    print(f"Zarr store: {store_path}")
     print("=" * 50)
 
     # Iterate through groups
@@ -260,18 +301,18 @@ def defragment_zarr(new_store_path):
     """
     from pathlib import Path
 
-    from orm.eyened_orm.utils.zarr.manager import ZarrStorageManager
+    from eyened_orm.segmentation_storage import get_zarr_storage_manager
+    from eyened_orm.utils.zarr.manager import ZarrStorageManager
 
-    settings = load_orm_settings()
+    manager = get_zarr_storage_manager()
+    store_path = manager.store_path
 
-    # Create new store path if it doesn't exist
     new_store_path = Path(new_store_path)
     new_store_path.mkdir(parents=True, exist_ok=True)
 
-    # Create annotation zarr storage manager for existing store
-    old_manager = ZarrStorageManager(settings.segmentations_zarr_store)
+    old_manager = ZarrStorageManager(store_path)
 
-    print(f"Defragmenting zarr store from: {settings.segmentations_zarr_store}")
+    print(f"Defragmenting zarr store from: {store_path}")
     print(f"Creating new zarr store at: {new_store_path}")
     print("=" * 50)
 
@@ -292,29 +333,51 @@ def defragment_zarr(new_store_path):
 
 
 @eorm.command()
+@image_target_options(require_one=False)
 @click.option(
     "--print-errors",
     is_flag=True,
     default=False,
     help="Print errors for failed hash calculations",
 )
-def update_hashes(print_errors):
-    """Update FileChecksum and DataHash for all ImageInstances in the database where they are NULL.
+def update_hashes(
+    path,
+    image_ids,
+    project,
+    patient,
+    exclude,
+    modality,
+    include_inactive,
+    print_errors,
+):
+    """Update FileChecksum and DataHash for ImageInstances where they are NULL.
 
-    This command will iterate over all ImageInstances in the database with FileChecksum == None
-    or DataHash == None and populate them with the outputs of im.calc_file_checksum() and
-    im.calc_data_hash() respectively.
+    With no target flags, scans the whole database. With target flags, limits scope.
     """
     from eyened_orm import ImageInstance
     from sqlalchemy import select
 
     database = get_database()
+    spec = target_spec_from_cli(
+        path=path,
+        image_ids=image_ids,
+        project=project,
+        patient=patient,
+        exclude=exclude,
+        modality=modality,
+        include_inactive=include_inactive,
+    )
 
     with database.get_session() as session:
-        # Get all image instances with missing hashes
         query = select(ImageInstance).filter(
             (ImageInstance.FileChecksum == None) | (ImageInstance.DataHash == None)
         )
+        if has_target_spec(spec):
+            target = resolve_image_target(session, spec)
+            print(f"Target: {target.summary}")
+            query = query.filter(
+                ImageInstance.ImageInstanceID.in_(target.image_ids)
+            )
 
         images = session.execute(query).scalars().all()
         total = len(images)
