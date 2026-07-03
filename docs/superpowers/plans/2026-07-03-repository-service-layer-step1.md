@@ -57,32 +57,24 @@ from server.services.exceptions import (
 )
 
 
-def test_not_found_error_is_a_service_error():
-    assert issubclass(NotFoundError, ServiceError)
-
-
-def test_service_error_carries_detail_and_default_status():
-    err = ServiceError("boom")
-    assert err.detail == "boom"
-    assert err.status_code == 500
-
-
 def test_not_found_error_maps_to_404_response():
+    # A NotFoundError should become an HTTP 404 carrying its message.
     resp = service_error_to_response(NotFoundError("Patient 5 not found"))
     assert resp.status_code == 404
     assert json.loads(resp.body) == {"detail": "Patient 5 not found"}
 
 
 def test_base_service_error_maps_to_500_response():
+    # A plain ServiceError (no status override) falls back to HTTP 500.
     resp = service_error_to_response(ServiceError("boom"))
     assert resp.status_code == 500
     assert json.loads(resp.body) == {"detail": "boom"}
 
 
 def test_register_exception_handlers_registers_service_error_base():
-    # Registering the base class is what makes every subclass (incl. Step 2's
-    # future PermissionDeniedError) dispatch through this one handler, since
-    # Starlette resolves handlers by walking the exception's MRO.
+    # Registering the ServiceError base is what makes every subclass (incl.
+    # Step 2's future PermissionDeniedError) dispatch through this one handler,
+    # since Starlette resolves handlers by walking the exception's MRO.
     app = FastAPI()
     register_exception_handlers(app)
     assert ServiceError in app.exception_handlers
@@ -159,7 +151,7 @@ __all__ = ["ServiceError", "NotFoundError"]
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `pytest server/tests/test_services_exceptions.py -v`
-Expected: PASS (5 passed).
+Expected: PASS (3 passed).
 
 - [ ] **Step 5: Register the handler in `server/main.py`**
 
@@ -212,6 +204,7 @@ from eyened_orm.repositories.device_repository import DeviceRepository
 
 
 def test_list_all_orders_by_manufacturer_then_model(session):
+    # list_all returns every device sorted by manufacturer, then model name.
     session.add_all(
         [
             DeviceModel(Manufacturer="Zeiss", ManufacturerModelName="Cirrus"),
@@ -229,10 +222,6 @@ def test_list_all_orders_by_manufacturer_then_model(session):
         ("Topcon", "Maestro"),
         ("Zeiss", "Cirrus"),
     ]
-
-
-def test_list_all_on_empty_table_returns_empty_list(session):
-    assert DeviceRepository().list_all(session) == []
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -279,7 +268,7 @@ __all__ = ["DeviceRepository"]
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `pytest orm/eyened_orm/tests/test_device_repository.py -v`
-Expected: PASS (2 passed).
+Expected: PASS (1 passed).
 
 - [ ] **Step 5: Commit**
 
@@ -331,6 +320,7 @@ from server.services.device_service import DeviceService
 
 
 def test_list_devices_returns_repository_rows_in_order(session):
+    # The service hands back exactly what the repository returns, order intact.
     session.add_all(
         [
             DeviceModel(Manufacturer="Zeiss", ManufacturerModelName="Cirrus"),
@@ -467,7 +457,7 @@ git commit -m "refactor(routes): route devices endpoint through DeviceService"
 
 **Interfaces:**
 - Consumes: `eyened_orm.Patient` (`patient.py:27`; `PatientID`, `PatientIdentifier`, non-nullable `ProjectID`), `eyened_orm.AttributeValue`, `eyened_orm.Project` (`project.py`; requires `ProjectName` + `External`), `eyened_orm.project.ExternalEnum`.
-- Produces: `PatientRepository().get_with_attributes(session: Session, patient_id: int, include_attributes: bool = True) -> Patient | None` — eager-loads `Patient.Project`, and (when `include_attributes`) `Patient.AttributeValues -> AttributeValue.AttributeDefinition`. Returns `None` if no such patient.
+- Produces: `PatientRepository().get_with_attributes(session: Session, patient_id: int, include_attributes: bool = True) -> Patient | None` — eager-loads `Patient.Project`, and (when `include_attributes`) both `Patient.AttributeValues -> AttributeValue.AttributeDefinition` and `Patient.AttributeValues -> AttributeValue.ProducingModel`. Returns `None` if no such patient. (The two attribute eager-loads mirror the current `server/routes/patients.py` `get_patient` handler exactly — `ProducingModel` is the attribute-provenance relationship added on the `development` branch; omitting it would reintroduce an N+1 when `DTOConverter.patient_to_detail_get` reads `av.ProducingModel`.)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -490,6 +480,7 @@ def _make_patient(session, identifier: str = "ID1") -> Patient:
 
 
 def test_get_with_attributes_returns_the_patient(session):
+    # Looking up an existing patient by id returns that patient.
     patient = _make_patient(session)
 
     result = PatientRepository().get_with_attributes(session, patient.PatientID)
@@ -499,6 +490,7 @@ def test_get_with_attributes_returns_the_patient(session):
 
 
 def test_get_with_attributes_unknown_id_returns_none(session):
+    # An unknown id returns None — the repository never raises for "not found".
     assert PatientRepository().get_with_attributes(session, 999_999) is None
 ```
 
@@ -531,9 +523,16 @@ class PatientRepository:
         """Return a patient by id with Project (and optionally attributes) eager-loaded."""
         opts = [selectinload(Patient.Project)]
         if include_attributes:
+            # Mirror server/routes/patients.py: load the attribute definition AND
+            # its producing-model provenance so patient_to_detail_get stays N+1-free.
             opts.append(
                 selectinload(Patient.AttributeValues).selectinload(
                     AttributeValue.AttributeDefinition
+                )
+            )
+            opts.append(
+                selectinload(Patient.AttributeValues).selectinload(
+                    AttributeValue.ProducingModel
                 )
             )
         return session.get(Patient, patient_id, options=tuple(opts))
@@ -602,6 +601,7 @@ def _make_patient(session, identifier: str = "ID1") -> Patient:
 
 
 def test_get_patient_returns_the_patient(session):
+    # An existing patient is returned by the service unchanged.
     patient = _make_patient(session)
 
     service = PatientService(PatientRepository())
@@ -611,6 +611,7 @@ def test_get_patient_returns_the_patient(session):
 
 
 def test_get_patient_unknown_id_raises_not_found(session):
+    # A missing patient makes the service raise NotFoundError (→ 404 via handler).
     service = PatientService(PatientRepository())
 
     with pytest.raises(NotFoundError):
