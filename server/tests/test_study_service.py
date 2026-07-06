@@ -132,8 +132,11 @@ def test_tag_study_logs_insert_when_logger_present(session):
     _service(logger).tag_study(session, study.StudyID, tag.TagID, "hi", _actor())
 
     assert len(logger.inserts) == 1
-    assert logger.inserts[0]["user"] == "alice"
-    assert logger.inserts[0]["entity"] == "StudyTagLink"
+    ins = logger.inserts[0]
+    assert ins["user"] == "alice"
+    assert ins["entity"] == "StudyTagLink"
+    assert ins["endpoint"] == f"POST /api/studies/{study.StudyID}/tags"
+    assert ins["fields"] == {"tag_id": tag.TagID, "study_id": study.StudyID, "comment": "hi"}
 
 
 def test_untag_study_removes_the_link(session):
@@ -193,3 +196,48 @@ def test_patch_study_tag_wrong_tag_type_raises_bad_request(session):
 
     with pytest.raises(BadRequestError):
         _service().patch_study_tag(session, study.StudyID, tag.TagID, "x", _actor())
+
+
+def test_patch_study_tag_logs_update_when_logger_present(session):
+    """Patching an existing link emits one update audit record with the comment diff."""
+    study = _make_study(session)
+    creator = _make_creator(session)
+    tag = _make_tag(session, creator.CreatorID)
+    logger = FakeAuditLogger()
+    service = _service(logger)
+    service.tag_study(session, study.StudyID, tag.TagID, "old", _actor())
+
+    service.patch_study_tag(session, study.StudyID, tag.TagID, "new", _actor())
+
+    assert len(logger.updates) == 1
+    upd = logger.updates[0]
+    assert upd["user"] == "alice"
+    assert upd["entity"] == "StudyTagLink"
+    assert upd["endpoint"] == f"PATCH /api/studies/{study.StudyID}/tags/{tag.TagID}"
+    assert upd["fields"] == {"tag_id": tag.TagID, "study_id": study.StudyID}
+    assert upd["changes"] == {"comment": "old -> new"}
+
+
+def test_untag_study_logs_delete_when_logger_present(session):
+    """Untagging emits one delete audit record carrying the removed link's data."""
+    study = _make_study(session)
+    creator = _make_creator(session)
+    tag = _make_tag(session, creator.CreatorID)
+    logger = FakeAuditLogger()
+    service = _service(logger)
+    service.tag_study(session, study.StudyID, tag.TagID, "bye", _actor())
+
+    service.untag_study(session, study.StudyID, tag.TagID, _actor())
+
+    assert len(logger.deletes) == 1
+    dele = logger.deletes[0]
+    assert dele["user"] == "alice"
+    assert dele["entity"] == "StudyTagLink"
+    assert dele["endpoint"] == f"DELETE /api/studies/{study.StudyID}/tags/{tag.TagID}"
+    assert dele["fields"] == {"tag_id": tag.TagID, "study_id": study.StudyID}
+    assert dele["deleted_data"] == {
+        "tag_id": tag.TagID,
+        "study_id": study.StudyID,
+        "comment": "bye",
+        "creator_id": 1,
+    }
