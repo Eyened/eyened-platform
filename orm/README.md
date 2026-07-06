@@ -55,7 +55,7 @@ alembic -x env_file=/path/to/.env upgrade head
 
 ## Test a migration
 
-1. Prepare a test database (see `docs/src/content/docs/orm/development_and_migrations.mdx`).
+1. Prepare a test database (see `docs/src/content/docs/orm/development.mdx`).
 2. Apply migration:
 
    ```bash
