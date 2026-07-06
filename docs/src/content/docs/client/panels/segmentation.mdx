@@ -1,0 +1,55 @@
+---
+title: Segmentation panel
+description: Draw and edit 2D and OCT segmentations
+sidebar:
+  order: 8
+---
+
+The **Segmentation** panel is the primary annotation workspace: draw, edit, import, and review segmentations on the current image plane.
+
+## Using the panel
+
+### Segmentation list
+
+- Click a segmentation name to select it for editing (active item has a cyan border).
+- Hover a list item to briefly highlight its overlay on the image.
+- Use the **show/hide** icon to toggle an individual segmentation; **right-click** the icon to show only that one.
+- Expand a creator group (▼/►) to show or hide all segmentations from that user. AI model outputs appear in a separate **AI** group.
+- Empty segmentations on the current slice appear dimmed; you can still select them to start drawing.
+
+### Creating segmentations
+
+- Search for a feature name at the bottom to quickly create a **Questionable** segmentation covering the full image.
+- Click **Advanced…** for placement, type, and feature options.
+- New segmentations activate automatically so you can start drawing immediately.
+
+### Drawing and editing
+
+- **Brush** and **polygon** tools; region tools for OCT volumes
+- **MultiClass** / **MultiLabel** features with per-class opacity
+- **Reference segmentations** and conditional masks
+- **Feature pipette** — pick a class from existing pixels
+- **B-scan links** — scroll linked OCT B-scans together
+- **Ctrl-Z** — undo recent drawing strokes
+
+Use the opacity slider at the top to blend overlays with the underlying image. For binary segmentations you can change overlay color per item.
+
+### Import and duplicate
+
+Import existing segmentations from other images or duplicate the current segmentation to another instance where supported.
+
+:::note
+The in-app help (`SegmentationPanelHelp`) is the most complete reference today. Expand this doc with full keyboard shortcuts and tool descriptions.
+:::
+
+## Implementation & analysis
+
+Segmentation masks are stored as **zarr** arrays on the configured storage backend, linked to `Segmentation` or `ModelSegmentation` ORM rows.
+
+- **Data model:** [Segmentations](/eyened-platform/orm/data_model/segmentations)
+- **API:** [Segmentations](/eyened-platform/api/segmentations) — CRUD, zarr upload/download
+- **Features:** [Features API](/eyened-platform/api/features) — feature hierarchy and composite features
+
+The viewer syncs edits to the server incrementally. For batch model output, use inference commands — see **[Inference](/eyened-platform/orm/inference)**.
+
+Related: **[Measure panel](/eyened-platform/client/panels/measure)** for area readouts.

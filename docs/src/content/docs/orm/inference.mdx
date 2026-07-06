@@ -1,0 +1,54 @@
+---
+title: Model inference
+description: Running AI models via eorm — attributes, segmentations, registration
+sidebar:
+  order: 6
+---
+
+The ORM runs inference through `eorm` commands that write results to the database (`AttributeValue`, `ModelSegmentation`, or patient-level registration JSON). All image-scoped commands share the same **[targeting flags](/eyened-platform/orm/cli#targeting)**.
+
+## Attribute models (`run-models`)
+
+Runs **AttributesModel** pipelines — CFI ROI, keypoints, quality scores, etc. Each model:
+- Registers as a `Model` row (`ModelName` + `Version`)
+- Writes typed values to `AttributeValue`
+- Skips images that already have output (use `--overwrite` to reprocess)
+
+```bash
+eorm run-models --project "My Study" --modality ColorFundus
+eorm run-models --path ids.txt
+```
+
+Implementation uses optional preprocess → batch → postprocess stages; see `orm/eyened_orm/commands/` in the repository for extending with custom models.
+
+## Segmentation models (`run-segmentation`)
+
+Runs **SegmentationModel** inference into `ModelSegmentation` zarr arrays.
+
+```bash
+eorm run-segmentation --project "My Study"
+```
+
+## Registration (`run-registration`)
+
+Pairwise enface registration via `eorm run-registration`. Writes transforms to patient **Registration** attributes (not FormAnnotations). See **[Registration](/eyened-platform/orm/registration#batch-inference)** for storage, PublicID rules, and how the viewer merges model output with manual sets.
+
+## ETDRS summary (`run-etdrs-model`)
+
+Computes ETDRS subfield areas from segmentations and keypoint/attribute data — not directly from manual FormAnnotation coordinates unless also present in attributes.
+
+```bash
+eorm run-etdrs-model --project "My Study"
+```
+
+See also **[ETDRS Panel](/eyened-platform/client/panels/etdrs)** and **[CLI](/eyened-platform/orm/cli)**.
+
+## Workers and queues
+
+Async API endpoints enqueue the same jobs on Redis. A worker with `EYENED_RQ_WORKER_QUEUES` including the relevant queue must be running — see **[Thumbnails](/eyened-platform/thumbnails#worker)** for worker setup pattern.
+
+## Related data model docs
+
+- [Registration](/eyened-platform/orm/registration) — enface alignment storage and viewer graph
+- [Attributes](/eyened-platform/orm/data_model/attributes) — `AttributeValue` storage
+- [Segmentations](/eyened-platform/orm/data_model/segmentations) — `ModelSegmentation`, zarr

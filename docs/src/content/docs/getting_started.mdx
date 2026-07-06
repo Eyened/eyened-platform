@@ -73,7 +73,7 @@ With this setup you will be able to:
 6. Configure the fileserver (optional for image datasets).
     Routing of files is handled by nginx.
     Update `nginx.conf` by adding locations for every folder where images are stored.
-    Each `location` can later be referenced in the database as a `StorageKey`.
+    Each `location` path must match a `StorageBackend.Key` value used at import time (`storage_backend_key` in import rows).
     Add matching read-only mounts under `fileserver.volumes` in `docker-compose.yaml`.
 
 7. Build and start the platform:
@@ -100,7 +100,7 @@ With this setup you will be able to:
     eorm create-user
     ```
 
-    The `seed-form-schemas` command inserts builtin viewer FormSchemas (ETDRS grid, registration). See **[Form Schemas](/eyened-platform/orm/form_schemas)** and the **[ETDRS Panel](/eyened-platform/client/etdrs_panel)** docs.
+    The `seed-form-schemas` command inserts builtin viewer FormSchemas (ETDRS grid, registration). See **[Form schemas](/eyened-platform/orm/form_schemas)**, **[Registration](/eyened-platform/orm/registration)**, and the **[ETDRS panel](/eyened-platform/client/panels/etdrs)**.
 
     New users can also be added through the user interface.
 

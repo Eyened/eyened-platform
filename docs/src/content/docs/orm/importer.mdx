@@ -23,25 +23,7 @@ Planning may mutate ORM objects in-memory; nothing is persisted until you call `
 `run.apply()` writes to the database but does not commit.
 ::::
 
-## Setup
-
-Install the ORM:
-
-```bash
-cd orm
-pip install -e .
-```
-
-Connect to your database (see [ORM Configuration](/eyened-platform/orm/configuration)):
-
-```python
-from dotenv import load_dotenv
-from eyened_orm import Database
-
-load_dotenv("path/to/your.env")
-db = Database()
-session = db.create_session()
-```
+Requires an ORM session configured as in **[ORM setup](/eyened-platform/orm/getting_started)**.
 
 ## Basic import (new images)
 

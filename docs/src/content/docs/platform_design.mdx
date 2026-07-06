@@ -3,41 +3,67 @@ title: Platform Design
 description: Software services and architecture
 ---
 
-The Eyened platform consists of several interconnected services that work together to provide a complete ophthalmic image management and annotation solution.
+EyeNED is a web platform for browsing, annotating, and managing ophthalmic images. A typical deployment runs several Docker services behind a single nginx entry point; MySQL holds metadata and relationships, while image files live on mounted storage.
 
 ## Architecture Overview
 
 ![Platform Architecture](../../assets/eyened_platform.png)
 
-## Core Services
+**Request flow:** the browser talks to **fileserver** (nginx) on `PORT` (set in `docker/.env`, default `80`). Nginx proxies `/` to the **client** (viewer UI) and `/api/` to the **server** (FastAPI). Image bytes and thumbnails are served via nginx internal redirects — the API validates access, then tells nginx which file to send.
 
-### Client
-- Web-based viewer built with Svelte and WebGL2
-- Browser-based rendering of images and annotations
+## Runtime services
 
-### API Server
-- FastAPI backend for data management and business logic
-- Task queue system (RQ/Redis) for long-running operations (inference, thumbnail generation)
+These run from `docker/docker-compose.yaml`:
 
-### Data Management
-- **MySQL** (8.0.27) for structured data storage
-- **Adminer** for database management (accessible on port 8080)
-- **Storage** (under `EYENED_STORAGE_ROOT`, default `/storage`):
-  - Original images via `EYENED_STORAGE_MOUNTS` (nginx-backed storage backends)
-  - Thumbnails as JPEG files in `thumbnails/`
-  - Segmentations in `segmentations.zarr`
+| Service | Role |
+|---------|------|
+| **Fileserver** | nginx reverse proxy; single entry point for UI, API, thumbnails, and image datasets |
+| **Client** | SvelteKit viewer with WebGL2 rendering for images and segmentations |
+| **Server** | FastAPI backend — authentication, database access, business logic; enqueues long jobs to Redis |
+| **Redis** | Job broker for async work (`EYENED_REDIS_HOST`, `EYENED_REDIS_PORT`, `EYENED_REDIS_PASSWORD`) |
 
-### Fileserver
-- Nginx-based service for serving images and thumbnails
-- Exposes the platform on the configured `PORT`
+The server also needs `EYENED_API_SECRET_KEY` and the `EYENED_DATABASE_*` variables (see below).
 
-### Worker
-- RQ worker (`python -m server.rq_worker`) consuming Redis job queues
-- Handles model inference, segmentation storage, and thumbnail generation
+**Worker** is deployed separately (`python -m server.rq_worker` or a worker Docker compose file). It uses the same `EYENED_REDIS_*`, `EYENED_DATABASE_*`, and storage env as the server. Set `EYENED_RQ_WORKER_QUEUES` to the queues it should consume (include `default` for thumbnail jobs). Without a worker, synchronous CLI paths still work; async API endpoints will queue jobs that never run.
 
-### Development Tools
-- [Import API](/eyened-platform/importing_data) for loading images and metadata via REST
-- Python ORM (`eyened_orm`) for database access, batch imports, and metadata patching (see [ORM Importer](/eyened-platform/orm/importer))
-- `ImageImporter` utility for API-based imports from Python
+## Database
 
-For detailed setup instructions, see the [Getting Started](/eyened-platform/getting_started) guide.
+MySQL stores all structured data: projects, patients, studies, images, annotations, tasks, users, and storage references. It is **not** bundled in the main compose stack — run the `database/` stack from the repository (`MYSQL_*` vars in `database/.env`) or point the app at an existing server via:
+
+- `EYENED_DATABASE_HOST`
+- `EYENED_DATABASE_PORT`
+- `EYENED_DATABASE_USER`
+- `EYENED_DATABASE_PASSWORD`
+- `EYENED_DATABASE_DATABASE`
+
+Optional **Adminer** in the database stack is exposed on `EYENED_ADMINER_PORT` (default `8080`).
+
+See [Getting Started](/eyened-platform/getting_started) for setup.
+
+## Storage
+
+Two distinct layers:
+
+**Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Configure a matching nginx `location /{key}/` and read-only mount on the fileserver for each backend. The server and worker resolve local paths via the JSON env var `EYENED_STORAGE_MOUNTS` (e.g. `'{"local":"/path/to/images"}'`); the API serves files through nginx with `GET /api/images/{public_id}/data`.
+
+**Platform storage** — writable data under `EYENED_STORAGE_ROOT` (default `/storage`):
+
+| Path | Contents |
+|------|----------|
+| `thumbnails/` | JPEG previews (`_144.jpg`, `_540.jpg`); served by nginx at `/thumbnails/` |
+| `segmentations.zarr` | Zarr store for user-drawn and model segmentations |
+
+The server container mounts `EYENED_STORAGE_ROOT` read-write; the fileserver mounts `{EYENED_STORAGE_ROOT}/thumbnails` read-only.
+
+## Loading data
+
+Images must be on a storage backend **before** import — neither the ORM nor the API uploads files. The primary path is the [ORM importer](/eyened-platform/orm/importer) (Python/CLI, batch CSV, plan → review → apply). A [REST API](/eyened-platform/importing_data#rest-api-alternative) is available for integrations that cannot run the ORM directly.
+
+After import, generate thumbnails separately — see [Thumbnails](/eyened-platform/thumbnails).
+
+## Further reading
+
+- [Getting Started](/eyened-platform/getting_started) — deploy the stack
+- [Importing data](/eyened-platform/importing_data) — register images and metadata
+- [Authentication](/eyened-platform/guides/authentication) — password login and optional OIDC
+- [ORM Configuration](/eyened-platform/orm/configuration) — environment variables

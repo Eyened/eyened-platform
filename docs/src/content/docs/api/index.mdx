@@ -1,0 +1,45 @@
+---
+title: API overview
+description: Eyened REST API — authentication, identifiers, and endpoint groups
+sidebar:
+  order: 1
+---
+
+The FastAPI server exposes JSON endpoints under **`/api`**. Almost all routes require authentication.
+
+## Authentication
+
+| Client type | How to authenticate |
+|-------------|---------------------|
+| **Web viewer** | Session cookies after `POST /api/auth/login` |
+| **Scripts / integrations** | `Authorization: Bearer <token>` from `POST /api/auth/token` or login with `"api_client": true` |
+
+Details: **[Authentication](/eyened-platform/api/authentication)**. Platform setup: **[Guides — Authentication](/eyened-platform/guides/authentication)**.
+
+**Health check (no auth):** `GET /health` — outside `/api`.
+
+## Identifiers
+
+| ID type | Used for |
+|---------|----------|
+| **`PublicID`** (12-char string) | Preferred in user-facing routes — images, tags, subtask image links |
+| **`ImageInstanceID`** (integer) | `GET /api/instances/{id}`; some routes accept numeric strings as fallback |
+
+## Endpoint groups
+
+| Topic | Description |
+|-------|-------------|
+| [Authentication](/eyened-platform/api/authentication) | Login, tokens, password, logout |
+| [Images & patients](/eyened-platform/api/images) | Image metadata, file/thumbnail serving, patient detail |
+| [Import](/eyened-platform/api/import) | Register images, queue thumbnails and inference jobs |
+| [Segmentations](/eyened-platform/api/segmentations) | Create, read, update segmentation data |
+| [Features](/eyened-platform/api/features) | Segmentation feature hierarchy |
+| [Forms](/eyened-platform/api/forms) | Form annotations and schemas |
+| [Tasks](/eyened-platform/api/tasks) | Tasks, subtasks, workflow |
+| [Tags](/eyened-platform/api/tags) | Tags on studies, images, segmentations, forms |
+| [Search](/eyened-platform/api/search) | Filter and sort instances and studies |
+| [Devices](/eyened-platform/api/devices) | Device model lookup |
+
+Compact index of every path: **[Full endpoint index](/eyened-platform/api/reference)**.
+
+OpenAPI schema (generated from the server): `client/src/types/openapi.json` in the repository.

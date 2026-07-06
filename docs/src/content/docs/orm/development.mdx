@@ -1,9 +1,11 @@
 ---
-title: Development guide
-description: Conventions and database migration setup for Eyened ORM
+title: ORM development
+description: ORM conventions and Alembic migrations for contributors
+sidebar:
+  order: 9
 ---
 
-This document is meant for developers of the Eyened database and ORM. It explains how to develop changes and how to create and test database migrations.
+This page is for **contributors** changing the Eyened database schema or ORM code — not for routine deployment or data loading.
 
 ## ORM Conventions
 
@@ -45,7 +47,7 @@ We use Alembic for managing database migrations. This section explains our proce
 
 ### Development Repository
 
-Make sure `eyened_orm` is installed (see [Getting Started](/eyened-platform/orm/getting_started)). Alembic is installed with `eyened_orm`. Make sure the `alembic` command is available in the terminal.
+Make sure `eyened_orm` is installed (see [ORM overview](/eyened-platform/orm/getting_started)). Alembic is installed with `eyened_orm`. Make sure the `alembic` command is available in the terminal.
 
 To set up a testing environment, check the README here: https://github.com/Eyened/eyened-platform/tree/main/orm/migrations
 

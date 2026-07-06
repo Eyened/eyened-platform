@@ -1,0 +1,43 @@
+---
+title: Registration panel
+description: Point-set registration between enface images
+sidebar:
+  order: 5
+---
+
+The **Registration** panel manages pairwise alignment between enface images from the **same patient and same laterality** (one eye). Color fundus, autofluorescence, infrared, and other enface modalities on that eye can be linked. Registered views share cursor position across linked images.
+
+## Using the panel
+
+### When it appears
+
+The panel is available for **2D enface** images. If it is missing, your deployment may not have registration form schemas configured.
+
+Only images from the **same patient and same eye** can be linked. Open linked images side by side and activate the same registration item in each window.
+
+### Workflow
+
+1. Open a 2D enface image in the viewer.
+2. Expand the **Registration** panel.
+3. Click **Create new** to start a registration set, or select an existing one from the list (the active item is highlighted).
+4. Place matching landmark points on each image — at least **three pairs** before a transform is computed reliably.
+5. Repeat for additional image pairs as needed.
+
+It is recommended to open each image in a separate viewer window and activate the same registration item in each.
+
+### Editing points
+
+- **Left click** on empty space — add a point
+- **Left click** on a point, then drag — move it
+- **Right click** on a point — remove it
+- **Shift + click** — pan or zoom without editing
+
+Pick clearly identifiable structures (vessel crossings, bifurcations) that appear in both images. After placing a point, press **0–9** to zoom to registration points 1–9 for fine adjustment.
+
+:::note
+This page is a stub — expand with linked scrolling behavior and multi-image layout tips from `PanelRegistration.svelte`.
+:::
+
+## Implementation & analysis
+
+Manual work creates **`Pointset registration`** FormAnnotations. Storage paths, PublicID rules, builtin schemas, batch inference, and client loader details: **[Registration](/eyened-platform/orm/registration)**.

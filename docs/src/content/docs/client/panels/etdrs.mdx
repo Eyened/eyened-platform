@@ -1,0 +1,81 @@
+---
+title: ETDRS panel
+description: Place and review ETDRS grids on 2D enface images
+sidebar:
+  order: 4
+---
+
+The **ETDRS** panel lets you place, review, and persist ETDRS grid coordinates on 2D enface images (for example color fundus). The grid is centered on the fovea and scaled using the fovea-to-optic-disc distance.
+
+## Using the panel
+
+### When it appears
+
+The ETDRS panel is available when the current image is **2D enface** (not a volume or OCT stack). If the panel is missing, your deployment may not have the ETDRS form schema configured — contact your administrator.
+
+### Automatic vs manual grids
+
+| Source | Editable | Saved to database |
+|--------|----------|-------------------|
+| **Automatic** — AI-detected landmarks | No (read-only overlay) | Already stored on the image |
+| **Manual** — your annotation | Yes (edit tool) | Yes, when you save |
+
+When AI keypoints are present, the panel shows an **Automatic** row. Toggle it to preview the grid. To persist your own coordinates, click **Create new**, then use the edit tool.
+
+### Workflow
+
+1. Open a 2D enface image in the viewer.
+2. Expand the **ETDRS** panel.
+3. Optionally toggle **Automatic** to preview AI-detected landmarks.
+4. Click **Create new** for a manual annotation (the edit tool activates automatically).
+5. **Left click** in the image to set the **fovea**; **right click** to set the **optic disc edge**.
+6. Use **show/hide** on an annotation to display or hide the grid overlay.
+
+Hold **Shift** while clicking to pan or zoom without placing landmarks when the edit tool is active.
+
+The grid overlay and edit tool can stay active after you collapse the ETDRS panel — deactivate the tool when you are done editing.
+
+Annotations from registered linked images may appear when registration connects them to the current view.
+
+### Grid geometry
+
+Three concentric circles represent **1 mm** (central), **3 mm** (inner), and **6 mm** (outer) ETDRS subfields. Scale uses the fovea–disc distance; the **ETDRS radius fraction** (default **0.85**) treats that fraction of the distance as 3 mm.
+
+### Keyboard shortcuts
+
+| Keys | Action |
+|------|--------|
+| `C` | Cycle central subfield circles (C0, C1, C2) |
+| `I` | Cycle inner subfield circles (I1, I2) |
+| `O` | Cycle outer subfield circles (O1, O2) |
+
+### Measure panel
+
+The **[Measure](/eyened-platform/client/panels/measure)** panel can derive µm/pixel from ETDRS coordinates. Use the same radius fraction as in this panel.
+
+## Implementation & analysis
+
+### Prerequisites (deployment)
+
+The builtin FormSchema **`ETDRS-grid coordinates`** must exist in the database:
+
+```bash
+eorm seed-form-schemas
+```
+
+See **[Form schemas](/eyened-platform/orm/form_schemas)** for seeding and updates.
+
+### Storage
+
+| Source | Location | JSON shape |
+|--------|----------|------------|
+| Manual grid | `FormAnnotation.FormData` | `{ "fovea": {x,y}, "disc_edge": {x,y} }` |
+| AI keypoints | `ImageInstance.CFKeypoints` | `fovea_xy`, `disc_edge_xy` tuples |
+
+Manual annotations use FormSchema **`ETDRS-grid coordinates`** (`EntityType.ImageInstance`). Coordinates are full-resolution pixel positions. Persisted via **[API — Forms](/eyened-platform/api/forms)**.
+
+AI keypoints are written by `eorm run-models` or CFI import pipelines — preview only in this panel.
+
+### Downstream analysis
+
+ETDRS **area summaries** (segmentation counts per subfield) are computed by `eorm run-etdrs-model` using segmentations and attributes — see **[Inference](/eyened-platform/orm/inference)**.

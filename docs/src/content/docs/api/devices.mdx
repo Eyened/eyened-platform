@@ -1,0 +1,18 @@
+---
+title: Devices
+description: Imaging device model lookup
+sidebar:
+  order: 11
+---
+
+### GET /api/devices
+
+List device models (`manufacturer` + `manufacturer_model_name` pairs).
+
+Used when displaying or editing device metadata in the viewer and when resolving import defaults.
+
+**Data model:** device fields on **[Images & storage](/eyened-platform/orm/data_model/images)** (DeviceModel, DeviceInstance).
+
+**Import:** device columns in **[Import metadata fields](/eyened-platform/import_metadata_fields)**.
+
+Further device-management endpoints may be added in future releases.

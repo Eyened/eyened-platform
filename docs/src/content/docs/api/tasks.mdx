@@ -1,0 +1,64 @@
+---
+title: Tasks
+description: Task and subtask workflow endpoints
+sidebar:
+  order: 8
+---
+
+## Tasks
+
+### GET /api/task
+
+List all tasks (no pagination).
+
+### POST /api/task
+
+**Request body:** `{ "name", "description", "contact_id", "task_definition_id" }`
+
+### GET /api/task/\{task_id\}
+
+Get task with subtask counts.
+
+### PATCH /api/task/\{task_id\}
+
+Partial update (`name`, `description`, `contact_id`, `task_definition_id`, `task_state`).
+
+### DELETE /api/task/\{task_id\}
+
+### GET /api/task/\{task_id\}/subtasks
+
+List subtasks with optional pagination and images.
+
+**Query parameters:** `with_images` (bool), `limit` (default `200`), `page` (default `0`), `subtask_status`.
+
+### GET /api/task/\{task_id\}/subtask/\{subtask_index\}
+
+Get one subtask by **0-based index** within the task.
+
+**Query parameters:** `with_images` (bool), `with_next` (bool).
+
+## Subtasks
+
+### GET /api/subtasks/\{subtask_id\}
+
+**Query parameters:** `with_images` (bool)
+
+### PATCH /api/subtasks/\{subtask_id\}
+
+**Request body:** `{ "comments": "string" | null, "task_state": "string" | null }`
+
+### DELETE /api/subtasks/\{subtask_id\}
+
+### POST /api/subtasks/\{subtask_id\}/images
+
+**Request body:** `{ "instance_id": "<PublicID>" }`
+
+### DELETE /api/subtasks/\{subtask_id\}/images/\{instance_id\}
+
+**`instance_id` is the image `PublicID`.**
+
+---
+
+**Data model:** **[Tasks](/eyened-platform/orm/data_model/tasks)**.
+
+**Task import:** **[ORM Importer](/eyened-platform/orm/importer)**.

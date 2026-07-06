@@ -3,18 +3,43 @@ title: Importing data
 description: Import ophthalmic images into the eyened platform
 ---
 
-Images are stored under a **storage backend** and registered in the database as `Project → Patient → Study → Series → ImageInstance → ImageStorage`. Each import supplies one flat record per image (`ImportRow`).
+Before images appear in the viewer, they must be **registered in the database** and linked to a file on a **storage backend** (local disk, S3, etc.). Importing creates this link and attaches metadata — patient, study, series, modality, laterality, and so on.
 
-| Method | Best for |
-|--------|----------|
-| [REST API](#rest-api) | Integrations, one-off uploads, scripts using HTTP |
-| [ORM importer](/eyened-platform/orm/importer) | Bulk imports, CSV, plan → review → apply, metadata patches |
+Each import supplies one flat record per image (`ImportRow`). The platform builds the hierarchy:
 
-Field names and types for patient, study, series, and image metadata are listed in [Import metadata fields](/eyened-platform/import_metadata_fields).
+`Project → Patient → Study → Series → ImageInstance → ImageStorage`
 
-## REST API
+Existing records are matched and reused, so you can attach new images to existing patients, studies, or series.
 
-`POST /api/import/image` accepts a JSON body with `data` (one `ImportRow`) and `options`:
+Field names and types are listed in [Import metadata fields](/eyened-platform/import_metadata_fields).
+
+## ORM importer
+
+The **ORM importer** is the primary way to load data. Use it from Python or the `eorm` CLI for bulk imports, CSV files, and metadata patches.
+
+Typical workflow:
+
+1. Build `ImportRow` objects (or load from CSV)
+2. `plan_image_import(session, rows, ...)` — preview what will be created or matched
+3. `run.display_summary()` — review the plan
+4. `run.apply()` then `session.commit()` — write to the database
+5. Optionally export the run to JSON for audit or undo
+
+Each row points to an image file via `storage_backend_key` and `object_key`. The file must already exist on that backend — import registers the path in the database; it does not copy or upload image bytes. Place files on the backend first (e.g. rsync to a local mount, or upload to S3 separately), then run the import.
+
+Full guide: **[ORM Importer](/eyened-platform/orm/importer)** (requires **[ORM setup](/eyened-platform/orm/getting_started)**).
+
+## Thumbnails
+
+Import does **not** generate thumbnails. After images are registered, generate them separately — see [Thumbnails](/eyened-platform/thumbnails):
+
+- **`eorm update-thumbnails`** — backfill missing thumbnails from the shell
+- **`PostImport`** — run after `run.apply()` for newly imported instances
+- **`POST /api/import/update_thumbnails`** — queue a background job (requires an RQ worker on the `default` queue)
+
+## REST API (alternative)
+
+For integrations that cannot run the ORM directly, `POST /api/import/image` accepts the same `ImportRow` fields over HTTP:
 
 ```json
 {
@@ -33,26 +58,8 @@ Field names and types for patient, study, series, and image metadata are listed 
 }
 ```
 
-**File location:** set `storage_backend_key` and `object_key` (path within that backend). 
+The API has the same limitation as the ORM importer: **it registers an existing file, it does not upload one.** The image must already be on the storage backend and reachable at `object_key`. There is no multipart upload endpoint — if you need to get files onto the backend, do that separately (filesystem copy, S3 upload, etc.) and then call the API to register them.
 
-**Hierarchy:** provide lookup fields (`project_name`, `patient_identifier`, `study_date`, `series_instance_uid`, …) or primary keys (`project_id`, `patient_id`, …). Missing parents are created when the row supplies enough keys to identify them; existing rows are matched and reused.
+Authenticate first (session login or `Authorization: Bearer` token). Example notebook: [import_api.ipynb](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb).
 
-**Typical required fields:** `project_name`, `storage_backend_key`, `object_key`, and `modality` (needed by the viewer). Device defaults (`manufacturer`, `manufacturer_model_name`, …) may be required unless your deployment fills them server-side — see the [ORM importer](/eyened-platform/orm/importer) `defaults` example.
-
-**Options:** only `include_stack_trace` (default `false`) — when `true`, failed imports return a stack trace in the response.
-
-Authenticate first (session login or `Authorization: Bearer` token), then call the endpoint. Example workflow: [import_api.ipynb](https://github.com/Eyened/eyened-platform/blob/main/notebooks/import_api.ipynb) (uses `ImageImporter` from `eyened_orm.importer.image_importer`).
-
-## ORM importer
-
-For batch work, use `plan_image_import` → review (`run.display_summary()`) → `run.apply()` → `session.commit()`. Optional JSON export supports audit and undo.
-
-Full guide: **[ORM Importer](/eyened-platform/orm/importer)**.
-
-## Thumbnails
-
-Import endpoints do **not** generate thumbnails. After images are in the database, generate them via the [Thumbnails](/eyened-platform/thumbnails) guide:
-
-- **`eorm update-thumbnails`** — repair all missing thumbnails from the shell
-- **`PostImport`** — run after `run.apply()` for newly imported instances (local or enqueue)
-- **`POST /api/import/update_thumbnails`** — queue a background job (requires an RQ worker on the `default` queue)
+For batch work, plan/review workflows, CSV, and undo, prefer the [ORM importer](/eyened-platform/orm/importer).

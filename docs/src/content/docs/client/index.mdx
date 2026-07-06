@@ -1,0 +1,41 @@
+---
+title: Viewer overview
+description: EyeNED image viewer and sidebar panels
+sidebar:
+  order: 1
+---
+
+The **viewer** opens when you select an image from the browser or a grading task. Each image window has a main canvas (WebGL) and a **sidebar** of collapsible panels for metadata, rendering, annotation, and measurement.
+
+Click a panel header to expand or collapse it. The **?** icon on each header opens in-panel help.
+
+## Panel reference
+
+Panels appear in the order listed below. Some are **conditional**:
+
+| Panel | When available |
+|-------|----------------|
+| [Info](/eyened-platform/client/panels/info) | Always |
+| [Rendering](/eyened-platform/client/panels/rendering) | Always |
+| [ETDRS](/eyened-platform/client/panels/etdrs) | 2D enface images |
+| [Registration](/eyened-platform/client/panels/registration) | 2D enface images |
+| [Measure](/eyened-platform/client/panels/measure) | Always |
+| [Form](/eyened-platform/client/panels/form) | Always (schemas vary by deployment) |
+| [Segmentation](/eyened-platform/client/panels/segmentation) | Always |
+
+## How panel docs are organized
+
+Each panel page is split into two parts when relevant:
+
+1. **Using the panel** — for graders and clinicians: what the panel does, when it appears, step-by-step workflow, and keyboard shortcuts.
+2. **Implementation & analysis** — for developers and data engineers: database storage, FormSchemas, API routes, CLI commands, and downstream analysis pipelines.
+
+Pure display panels (for example Rendering) may only have a user section.
+
+## Related documentation
+
+- **[Getting started](/eyened-platform/getting_started)** — deploy the platform
+- **[Form schemas](/eyened-platform/orm/form_schemas)** — seeding builtin viewer schemas
+- **[Registration](/eyened-platform/orm/registration)** — enface alignment, storage, and schemas
+- **[API — Forms](/eyened-platform/api/forms)** — persist form annotations
+- **[API — Segmentations](/eyened-platform/api/segmentations)** — segmentation CRUD

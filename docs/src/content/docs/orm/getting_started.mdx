@@ -1,150 +1,101 @@
 ---
-title: Getting started with Eyened ORM
-description: Learn how to work with database objects in Python code or Jupyter notebooks
+title: ORM setup & overview
+description: Install, configure, and connect the Eyened ORM
 sidebar:
   order: 1
 ---
 
-The Eyened ORM (Object-Relational Mapping) is a Python library that provides direct access to the Eyened database through a high-level, object-oriented interface. Built on SQLAlchemy 2.0, it allows you to interact with database entities as Python objects, making it easy to query, update, and manage data programmatically.
+The Eyened ORM is a Python library (SQLAlchemy 2.0) for direct database access — queries, bulk updates, imports, and model inference. **Start here** before using the [importer](/eyened-platform/orm/importer), [CLI](/eyened-platform/orm/cli), or notebooks.
 
-## When to Use the ORM
+## When to use the ORM vs the API
 
-The Eyened ORM provides direct, low-level access to database objects, which gives you maximum flexibility and control. However, for many common operations, the [Eyened API](/eyened-platform/api/features) may provide a more convenient interface with a higher level of abstraction.
-
-**Use the ORM when you need to:**
-- Perform bulk operations on large datasets
-- Access fields or relationships not exposed through the API
-- Write complex queries requiring SQLAlchemy's full capabilities
-- Build custom data processing pipelines or automated workflows
-- Import/export data or work directly with database entities in Python scripts or Jupyter notebooks
-
-**Consider using the API instead when:**
-- You need standard CRUD operations
-- You want built-in validation and business logic
-- You're building web applications or integrations
+| Use the ORM | Use the [API](/eyened-platform/api) |
+|-------------|-------------------------------------|
+| Bulk operations and custom pipelines | Standard CRUD from applications |
+| Import, dumps, inference CLI | Built-in validation and HTTP integration |
+| Fields or relationships not exposed by the API | Web-facing integrations |
 
 :::note
-Use of the ORM is considered advanced as it provides broader functionality and more direct interaction with database objects. Make sure you understand the database schema and relationships before making changes that could affect data integrity.
+The ORM gives broad, low-level access. Skim the [data model](/eyened-platform/orm/data_model) before changing production data.
 :::
 
-## Setup
+## Install
 
-To install the ORM locally as a Python package:
-
-```
-git clone https://github.com/Eyened/eyened-platform.git 
+```bash
+git clone https://github.com/Eyened/eyened-platform.git
 cd eyened-platform/orm
 pip install -e .
 ```
 
-## Connecting to the database
+Verify the CLI:
 
-To connect the ORM to a database, use the `Database` class. You can initialize it from environment variables, configuration files, or dictionaries. See [ORM Configuration](/eyened-platform/orm/configuration) for detailed setup instructions and all available configuration options.
-
-## Working with database objects
-
-Once connected, you can import and use database objects from the ORM. The Eyened database follows a hierarchical structure: **Project → Patient → Study → Series → ImageInstance**.
-
-### Basic usage
-
-Start by importing the entity classes you need:
-
-```python
-from eyened_orm import Project, Patient, Study, Series, ImageInstance
+```bash
+eorm --help
 ```
 
-### Finding objects
+## Configure environment
 
-Use helper methods to find objects by common identifiers:
+The ORM reads **`EYENED_DATABASE_*`** variables (and optionally **`EYENED_STORAGE_*`**, **`EYENED_API_*`**) from the environment or a `.env` file.
 
-```python
-# Find a project by name
-project = Project.by_name(session, 'My Project Name')
+Minimum for database access:
 
-# Find a patient by identifier
-patient = Patient.by_identifier(session, project_id, 'Patient_001')
+```bash
+EYENED_DATABASE_HOST=localhost
+EYENED_DATABASE_PORT=3306
+EYENED_DATABASE_USER=eyened
+EYENED_DATABASE_PASSWORD=...
+EYENED_DATABASE_DATABASE=eyened_database
 ```
 
-### Navigating relationships
+For local file access (thumbnails, segmentations, import preparation):
 
-Access related objects through relationship properties:
-
-```python
-# Navigate from project down the hierarchy
-project = Project.by_name(session, 'My Project Name')
-
-for patient in project.Patients:
-    print(f"Patient ID: {patient.PatientID}, Identifier: {patient.PatientIdentifier}")
-    
-    for study in patient.Studies:
-        print(f"  Study date: {study.StudyDate}")
-        
-        for series in study.Series:
-            print(f"    Series ID: {series.SeriesID}")
-            
-            for image in series.ImageInstances:
-                print(f"      Image path: {image.path}")
+```bash
+EYENED_STORAGE_ROOT=/storage
+EYENED_STORAGE_MOUNTS='{"local":"/path/to/images"}'
 ```
 
-### Querying with SQLAlchemy
+Full variable list: **[Configuration](/eyened-platform/orm/configuration)**.
 
-For more complex queries, use SQLAlchemy 2.0's query API:
+Point the CLI at a specific env file:
+
+```bash
+eorm -e /path/to/.env create-user
+```
+
+## Connect from Python
+
+```python
+from dotenv import load_dotenv
+from eyened_orm import Database
+
+load_dotenv("/path/to/.env")  # optional if vars are already in the environment
+db = Database()
+
+with db.get_session() as session:
+    # queries, imports, etc.
+    ...
+```
+
+Prefer `get_session()` for automatic cleanup; use `create_session()` only when you manage the lifecycle yourself.
+
+## Quick query example
 
 ```python
 from sqlalchemy import select
+from eyened_orm import Project, Patient
 
-# Query patients matching a pattern
+project = Project.by_name(session, "My Project")
 patients = session.scalars(
-    select(Patient).where(Patient.PatientIdentifier.like("Patient_%"))
-).all()
-
-# Query with joins and filters
-from sqlalchemy import and_
-
-studies = session.scalars(
-    select(Study)
-    .join(Patient)
-    .where(and_(
-        Patient.PatientIdentifier == "Patient_001",
-        Study.StudyDate >= "2024-01-01"
-    ))
+    select(Patient).where(Patient.ProjectID == project.ProjectID)
 ).all()
 ```
 
-### Attribute naming
+ORM properties support SQL column names (`PatientIdentifier`) and snake_case (`patient_identifier`).
 
-The properties on each ORM object match the database column names (in capitalized camel case), but they're also exposed in Python style (snake_case):
+## Next steps
 
-```python
-# Both styles work
-patient_id = patient.PatientID  # Database style
-patient_id = patient.patient_id  # Python style
-
-identifier = patient.PatientIdentifier  # Database style
-identifier = patient.patient_identifier  # Python style
-
-study_date = study.StudyDate  # Database style
-study_date = study.study_date  # Python style
-```
-
-:::tip
-For detailed information about all available entities, their properties, and relationships, see the [Database Entities](/eyened-platform/orm/entities) documentation.
-:::
-
-For more information on using SQLAlchemy queries, see the [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/).
-
-## Next Steps
-
-Now that you're set up and familiar with the basics, explore these resources to learn more:
-
-- **[ORM Importer](/eyened-platform/orm/importer)**: Import and patch data using `ImportRow` + `ImportRun` (plan/review/apply, CSV support, audit/undo).
-
-- **[ORM Configuration](/eyened-platform/orm/configuration)**: Learn about all available configuration options, including database settings, file paths, and other global settings.
-
-- **[Database Entities](/eyened-platform/orm/entities)**: Get detailed information about all database entities, their relationships, and how to work with them, including segmentations, form annotations, attributes, tasks, and more.
-
-- **[Command Line Utilities](/eyened-platform/orm/cli)**: Database dumps, thumbnail repair, model execution, and other maintenance tasks.
-
-- **[Development and Migrations](/eyened-platform/orm/development_and_migrations)**: Learn about database migrations, schema changes, and development workflows.
-
-- **[Utilities](/eyened-platform/orm/utils)**: Explore utility functions and helpers available in the ORM.
+1. **[Configuration](/eyened-platform/orm/configuration)** — all env vars and `DatabaseSettings`
+2. **[Data model](/eyened-platform/orm/data_model)** — entities and relationships
+3. **[Importing data](/eyened-platform/importing_data)** → **[ORM Importer](/eyened-platform/orm/importer)**
+4. **[CLI](/eyened-platform/orm/cli)** · **[Inference](/eyened-platform/orm/inference)**
+5. **[ORM development](/eyened-platform/orm/development)** — schema changes (contributors)

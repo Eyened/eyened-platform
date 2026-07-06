@@ -1,0 +1,64 @@
+---
+title: Forms
+description: Form annotations and form schemas
+sidebar:
+  order: 7
+---
+
+## Form annotations
+
+### GET /api/form-annotations
+
+**Query parameters:** `patient_id`, `study_id`, `image_id` (`PublicID`), `form_schema_id`, `sub_task_id` (all optional filters).
+
+### POST /api/form-annotations
+
+**Request body:**
+```json
+{
+  "form_schema_id": 1,
+  "patient_id": 1,
+  "study_id": 1,
+  "image_id": "abc123public",
+  "laterality": "R",
+  "sub_task_id": 1,
+  "form_data": {},
+  "form_annotation_reference_id": null
+}
+```
+
+`image_id` is **`PublicID`**, not numeric ID.
+
+### GET /api/form-annotations/\{annotation_id\}
+
+### PATCH /api/form-annotations/\{annotation_id\}
+
+### DELETE /api/form-annotations/\{annotation_id\}
+
+### GET /api/form-annotations/\{form_annotation_id\}/value
+
+Form data JSON.
+
+### PUT /api/form-annotations/\{form_annotation_id\}/value
+
+Replace form data (204 on success).
+
+### POST /api/form-annotations/\{annotation_id\}/tags
+
+### PATCH /api/form-annotations/\{annotation_id\}/tags/\{tag_id\}
+
+### DELETE /api/form-annotations/\{annotation_id\}/tags/\{tag_id\}
+
+## Form schemas
+
+### GET /api/form-schemas
+
+List all form schemas.
+
+### GET /api/form-schemas/\{form_schema_id\}
+
+---
+
+**ORM:** **[Form schemas](/eyened-platform/orm/form_schemas)** · **[Form annotations](/eyened-platform/orm/data_model/form_annotations)**.
+
+**Viewer:** **[Form panel](/eyened-platform/client/panels/form)** · **[ETDRS panel](/eyened-platform/client/panels/etdrs)**.

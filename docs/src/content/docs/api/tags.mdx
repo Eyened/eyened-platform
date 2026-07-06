@@ -1,0 +1,42 @@
+---
+title: Tags
+description: Tags and starring
+sidebar:
+  order: 9
+---
+
+## Tags
+
+### GET /api/tags
+
+List all tags (no filters).
+
+### POST /api/tags
+
+**Request body:** `{ "name": "string", "tag_type": "ImageInstance", "description": "string" }`
+
+`tag_type`: `Study`, `ImageInstance`, `Segmentation`, `FormAnnotation`, …
+
+### PATCH /api/tags/\{tag_id\}
+
+### DELETE /api/tags/\{tag_id\}
+
+### POST /api/tags/\{tag_id\}/star
+
+Star tag for current user.
+
+### DELETE /api/tags/\{tag_id\}/star
+
+Unstar tag.
+
+## Study tags
+
+### POST /api/studies/\{study_id\}/tags
+
+### PATCH /api/studies/\{study_id\}/tags/\{tag_id\}
+
+### DELETE /api/studies/\{study_id\}/tags/\{tag_id\}
+
+Image and segmentation tag routes live under **[Images](/eyened-platform/api/images)** and **[Segmentations](/eyened-platform/api/segmentations)**.
+
+**Data model:** **[Tagging](/eyened-platform/orm/data_model/tagging)**.

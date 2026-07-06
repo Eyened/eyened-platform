@@ -2,7 +2,7 @@
 title: Form Schemas
 description: Builtin viewer FormSchemas, seeding, and how form data is stored
 sidebar:
-  order: 4
+  order: 7
 ---
 
 Form annotations store structured JSON attached to patients, studies, or images. Each annotation references a **FormSchema** that defines the JSON Schema for validation and (for clinical forms) the fields shown in the Form panel.
@@ -11,27 +11,24 @@ Form annotations store structured JSON attached to patients, studies, or images.
 
 | Entity | Role |
 |--------|------|
-| `FormSchema` | Defines `SchemaName`, JSON Schema (`Schema`), and `EntityType` (Patient, Study, StudyEye, ImageInstance, …) |
+| `FormSchema` | Defines `SchemaName`, JSON Schema (`Schema`), and `EntityType` (Patient, Study, StudyEye, Eye, ImageInstance, …) |
 | `FormAnnotation` | Stores `FormData` JSON for one entity instance, linked to a schema and creator |
 
-See **[Database Entities — Form Annotations](/eyened-platform/orm/entities#form-annotations)** for the full ORM model.
+See **[Form annotations](/eyened-platform/orm/data_model/form_annotations)** for the ORM model.
 
 Clinical grading forms (AMD, glaucoma, naevi, etc.) are **site-specific** and are inserted per deployment. Viewer infrastructure schemas are **builtin** and shipped with the platform.
 
 ## Builtin viewer schemas
 
-These schemas are required for ETDRS grid and registration panels. They are defined in version-controlled JSON under `orm/eyened_orm/form_schemas/` and listed in `registry.py`.
+These schemas are required for ETDRS and registration panels. They are defined in version-controlled JSON under `orm/eyened_orm/form_schemas/` and listed in `registry.py`.
+
+They are **hidden from the generic Form panel** in the viewer and managed through dedicated panels (ETDRS, Registration).
 
 | Schema name | Entity type | Purpose |
 |-------------|-------------|---------|
 | `ETDRS-grid coordinates` | ImageInstance | Manual ETDRS grid placement (`fovea`, `disc_edge`) |
-| `Pointset registration` | ImageInstance | Point-set registration between images |
-| `Affine registration` | ImageInstance | Stored affine transforms between image pairs |
-| `RegistrationSet` | ImageInstance | Composite registration transforms |
 
-These schemas are **hidden from the generic Form panel** in the viewer. They are managed through dedicated panels (ETDRS, Registration) or loaded into the registration system.
-
-The client uses the same schema names in `client/src/lib/config/builtinFormSchemas.ts` — keep this file in sync with `registry.py` when adding or renaming builtin schemas.
+Registration schemas (`Pointset registration`, `Affine registration`, `RegistrationSet`) are also seeded here — semantics, JSON shapes, and viewer behaviour are documented in **[Registration](/eyened-platform/orm/registration)**.
 
 ## Seeding builtin schemas
 
@@ -85,7 +82,7 @@ flowchart LR
 | AI keypoints | `ImageInstance.CFKeypoints` | `{ "fovea_xy": [x,y], "disc_edge_xy": [x,y], … }` | `eorm run-models` / CFI import |
 | Manual ETDRS grid | `FormAnnotation.FormData` | `{ "fovea": {x,y}, "disc_edge": {x,y} }` | ETDRS edit tool → `PUT /form-annotations/{id}/value` |
 
-Both use **full-resolution image pixel coordinates**. See **[ETDRS Grid Panel](/eyened-platform/client/etdrs_panel)** for the viewer workflow.
+Both use **full-resolution image pixel coordinates**. See **[ETDRS Grid Panel](/eyened-platform/client/panels/etdrs)** for the viewer workflow.
 
 ## Adding a clinical FormSchema
 
@@ -146,4 +143,4 @@ Form schemas are read-only via the API:
 - `GET /api/form-schemas` — list all schemas
 - `GET /api/form-schemas/{id}` — single schema
 
-Form annotations are created and updated via `/api/form-annotations`. See **[API Reference](/eyened-platform/api/reference)**.
+Form annotations are created and updated via `/api/form-annotations`. See **[API — Import](/eyened-platform/api/import)**

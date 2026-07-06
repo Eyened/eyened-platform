@@ -1,0 +1,107 @@
+---
+title: Segmentations
+description: Segmentation data layout, features, and zarr storage
+sidebar:
+  order: 3
+---
+
+Pixel-level annotations on an `ImageInstance`. Mask data is stored in a shared **zarr** array; each row (`Segmentation` or `ModelSegmentation`) holds metadata describing how to interpret its slice of that array.
+
+```python
+from eyened_orm import Segmentation
+
+image = ImageInstance.by_id(session, image_id)
+for seg in image.Segmentations:
+    data = seg.read_data()  # numpy array shaped (Depth, Height, Width)
+```
+
+## Shape and storage
+
+Every segmentation has a fixed 3D shape **`(Depth, Height, Width)`** — axes 0, 1, and 2 respectively. A **2D** mask is represented with a singleton axis (for example `Depth=1`). Data is always read and written in `(D, H, W)` order.
+
+| Column | Meaning |
+|--------|---------|
+| `ZarrArrayIndex` | Index of this mask inside the shared zarr group for its `DataRepresentation` |
+| `Depth`, `Height`, `Width` | Immutable after creation |
+| `Inactive` | Soft delete (`Segmentation` only) |
+
+Pixel bytes live under `{EYENED_STORAGE_ROOT}/segmentations.zarr`, grouped by `DataRepresentation`. Access through the ORM with `read_data()` / `write_data()`, or via the API (`GET /api/segmentations/{id}/data`, `GET /api/model-segmentations/{id}/data`). Maintenance: `eorm zarr-tree`, `eorm defragment-zarr`.
+
+## DataRepresentation
+
+`DataRepresentation` defines **how pixel values encode meaning**:
+
+| Value | Meaning |
+|-------|---------|
+| `Binary` | `0` = background, `>0` = foreground |
+| `DualBitMask` | Two bits per pixel in one byte: bit 0 = drawn, bit 1 = questionable/uncertain |
+| `Probability` | Per-pixel soft mask; binarize with `Threshold` (see `binary_mask` property) |
+| `MultiLabel` | Integer bitmask — each bit is a child feature (`FeatureIndex` → bit position); labels can overlap |
+| `MultiClass` | Integer class ID per pixel — `0` = background, `n` → child with `FeatureIndex = n - 1` |
+
+`MultiLabel` and `MultiClass` require a composite **`Feature`** with child features linked through **`FeatureFeatureLink`** (`ParentFeatureID`, `ChildFeatureID`, `FeatureIndex`).
+
+## Datatype
+
+`DataType` is the **storage dtype** of each voxel in zarr:
+
+| Value | NumPy dtype | Typical use |
+|-------|-------------|-------------|
+| `R8` | `uint8` | Binary masks interpreted as `[0, 1]` |
+| `R8UI` | `uint8` | 8-bit integer labels or packed bits |
+| `R16UI` | `uint16` | Wider label maps |
+| `R32UI` | `uint32` | Large MultiLabel bitmasks |
+| `R32F` | `float32` | Probability maps |
+
+Use `Segmentation.infer_data_type(array)` when importing from numpy.
+
+For **`Probability`** masks, `Threshold` controls binarization: fraction of full scale for integer types (`R8`/`R8UI`), absolute value for `R32F`.
+
+## Sparse segmentations (OCT and volumes)
+
+For volumes where only some slices carry data (typical OCT B-scans):
+
+| Column | Meaning |
+|--------|---------|
+| `SparseAxis` | Axis along which data is sparse (`0` = depth, `1` = height, `2` = width) |
+| `ScanIndices` | List of slice indices along `SparseAxis` that contain data; `None` = dense (all slices valid) |
+| `ImageProjectionMatrix` | Optional 3×3 matrix projecting segmentation coordinates into image space; if `None`, shape must match the image |
+
+Read or write a single slice with `read_data(axis=…, slice_index=…)`. Use `remove_slice()` to clear one sparse slice and update `ScanIndices`.
+
+## Reference segmentations
+
+A **`Segmentation`** may set `ReferenceSegmentationID` to another `Segmentation` on the same image. The reference mask constrains where the dependent segmentation may be drawn (conditional / region-limited annotation). Shape and sparse layout must match the reference.
+
+## Features
+
+A **`Feature`** names what is segmented (for example `"Drusen"`, `"Retinal Layers"`). Composite features group sub-features for MultiClass and MultiLabel maps:
+
+```python
+from eyened_orm import Feature
+
+Feature.from_list(session, "Retinal Layers", sub_features=["ILM", "RNFL", "GCL"])
+```
+
+Each child gets a `FeatureIndex` used when encoding or decoding pixel values. See the ORM source and tests for bit-mask and class-value lookup patterns with `read_data()`.
+
+## Segmentation vs ModelSegmentation
+
+Both classes inherit the same abstract **`SegmentationBase`** — identical shape, `DataRepresentation`, `DataType`, sparse-axis fields, and zarr I/O. The only difference is **provenance** (who or what produced the mask):
+
+| | **`Segmentation`** | **`ModelSegmentation`** |
+|---|-------------------|-------------------------|
+| **Intended use** | Human grader or AI-assisted manual work in the viewer | Automated model inference (`eorm run-segmentation`, layer jobs, import pipelines) |
+| **Linked to** | `Creator` + `Feature` | `Model` (`SegmentationModel` → `Feature`) |
+| **Workflow extras** | Optional `SubTaskID`, tags, `ReferenceSegmentationID`, `Inactive` | `DateInserted` only; shown under the AI group in the viewer |
+
+Choose **`Segmentation`** when a person (or the viewer on their behalf) creates or edits the mask. Choose **`ModelSegmentation`** when a registered **`SegmentationModel`** writes output programmatically — the data layout is the same, so viewer tools, measure panel, and `read_data()` work on both.
+
+### Model registry
+
+AI models are registered as **`Model`** rows (`ModelName` + `Version`):
+
+- **`SegmentationModel`** — produces `ModelSegmentation` for a `Feature`
+- **`AttributesModel`** — produces `AttributeValue` rows (see **[Attributes](/eyened-platform/orm/data_model/attributes)**)
+
+Run inference via `eorm run-models`, `eorm run-segmentation`, etc. See **[Inference](/eyened-platform/orm/inference)** and **[CLI](/eyened-platform/orm/cli)**.

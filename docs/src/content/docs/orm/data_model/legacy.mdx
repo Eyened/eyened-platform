@@ -1,0 +1,22 @@
+---
+title: Legacy annotations
+description: Deprecated Annotation system
+sidebar:
+  order: 8
+---
+
+:::note
+The `Annotation` system is replaced by **Segmentation** for new data. These tables remain for backward compatibility only.
+:::
+
+## Annotation
+
+Legacy annotation linked to `Patient`, `Study`, `Series`, and optionally `ImageInstance`. Has `Feature`, `Creator`, `AnnotationType`, optional `AnnotationReferenceID`, and `Inactive` flag.
+
+## AnnotationData
+
+Per-scan or volume data: `ValueBlob` / `ValueInt` / `ValueFloat`, `MediaType`, `DatasetIdentifier`.
+
+## AnnotationType
+
+Defines interpretation (`AnnotationTypeName`, `Interpretation`) for legacy rows.

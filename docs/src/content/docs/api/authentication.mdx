@@ -1,0 +1,52 @@
+---
+title: Authentication
+description: Login, tokens, and session endpoints
+sidebar:
+  order: 2
+---
+
+All routes in this section are under `/api/auth`.
+
+### POST /api/auth/login
+
+Login with username and password.
+
+**Request body:**
+```json
+{
+  "username": "string",
+  "password": "string",
+  "api_client": false
+}
+```
+
+- `api_client: false` (default) — sets JWT cookies; returns user info.
+- `api_client: true` — returns `access_token`, `refresh_token`, and user info in the JSON body (no cookies).
+
+### POST /api/auth/token
+
+Bearer access token for API clients (no refresh token in response).
+
+**Request body:** `{ "username": "string", "password": "string" }`
+
+### GET /api/auth/me
+
+Current authenticated user (id, username, role, starred tags).
+
+### POST /api/auth/change-password
+
+**Request body:** `{ "old_password": "string", "new_password": "string" }`
+
+### POST /api/auth/register
+
+Register a new user (may require admin privileges depending on deployment).
+
+### POST /api/auth/refresh
+
+Refresh the access-token cookie using the **refresh-token cookie** (web clients only; no request body).
+
+### POST /api/auth/logout
+
+Clear JWT cookies.
+
+See also **[Guides — Authentication](/eyened-platform/guides/authentication)** for OIDC and deployment configuration.

@@ -7,7 +7,7 @@ To access the Eyened platform, users need to authenticate. See below for options
 
 ## Standalone / database backend
 
-By default, accounts are managed in the MySQL database holding all Eyened data. The database table `creator` holds usernames, password hashes and a few other fields describing users. Non-human accounts like AI models generating output are also managed in this table. To create a new user, use the ORM command `eorm create-user`. More advanced user management is done by accessing the `creator` table in the database using SQL.
+By default, accounts are managed in the MySQL database holding all Eyened data. The database table `creator` holds usernames, password hashes and a few other fields describing users. To create a new user, use the ORM command `eorm create-user`. More advanced user management is done by accessing the `Creator` table in the database using SQL.
 
 ## OpenID Connect (OIDC)
 

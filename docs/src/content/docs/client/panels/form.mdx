@@ -1,0 +1,41 @@
+---
+title: Form panel
+description: Clinical and custom grading forms
+sidebar:
+  order: 7
+---
+
+The **Form** panel lists grading forms attached to the current patient, study, or image. Each form is driven by a **FormSchema** that defines the fields shown and validates your input on save.
+
+## Using the panel
+
+### Intended use
+
+Use this panel for **clinical grading** (AMD, glaucoma, naevi, etc.) and other site-specific questionnaires. Builtin viewer infrastructure (ETDRS grid, registration) is managed in dedicated panels, not here.
+
+### Workflow
+
+1. Expand the **Form** panel.
+2. Select a form schema from the dropdown (only schemas matching the current context are listed).
+3. Create a new form annotation or open an existing one.
+4. Fill in the fields; changes are saved automatically or on submit, depending on the schema.
+
+When you open the viewer from a **grading task**, new annotations are linked to the active subtask.
+
+:::note
+This page is a stub — document schema selection, laterality, and validation errors from `PanelForm.svelte` and `FormPanelHelp.svelte`.
+:::
+
+## Implementation & analysis
+
+### Deployment-specific schemas
+
+Clinical forms are **inserted per site** — they are not part of the default platform seed. Each `FormSchema` row defines a JSON Schema (Draft 7) and an `EntityType` (Patient, Study, StudyEye, ImageInstance, …).
+
+Configure which form a task uses via **`TaskDefinition.TaskConfig`** (`form_schema_name`, optional `form_image_scope`). See **[Form schemas](/eyened-platform/orm/form_schemas)**.
+
+### Storage and API
+
+- **Data model:** [Form annotations](/eyened-platform/orm/data_model/form_annotations)
+- **API:** [Forms](/eyened-platform/api/forms) — create, update, and list `FormAnnotation` rows
+- **Validation:** `eorm validate-forms` checks schemas and existing annotation data

@@ -1,184 +1,98 @@
 ---
-title: Command line utilities
-description: Learn how to use the command line utilities available in the ORM
+title: CLI reference
+description: eorm command-line utilities
 sidebar:
-  order: 3
+  order: 5
 ---
 
-{/* Document each eorm command at a high level; options may change — use --help. */}
-
-# Eyened ORM CLI
-
-The Eyened ORM includes command line utilities for database setup, maintenance, model inference, and validation. Commands are available through the `eorm` CLI.
+The `eorm` CLI covers database setup, maintenance, and inference entry points. Use `eorm --help` and `eorm COMMAND --help` for current flags.
 
 :::note
-Use the global help to list all commands:
-
-```bash
-eorm --help
-```
-
-Use command help to inspect current options:
-
-```bash
-eorm [COMMAND] --help
-```
+**Inference commands** (`run-models`, `run-segmentation`, `run-registration`, …) are summarized in **[Inference](/eyened-platform/orm/inference)**. **Thumbnails**: **[Thumbnails](/eyened-platform/thumbnails)**.
 :::
 
-## Available Commands
+## Database setup
 
 ### initialize-database
 
-Creates tables from the ORM on an empty database and stamps the current Alembic revision so later `alembic upgrade head` runs apply only new migrations. Prompts for confirmation of the target database.
+Creates tables on an empty database and stamps the current Alembic revision.
 
 ```bash
-eorm initialize-database [OPTIONS]
+eorm initialize-database [--seed-form-schemas] [--recreate]
 ```
-
-Use `--seed-form-schemas` to also insert builtin viewer FormSchema rows in the same step.
 
 ### seed-form-schemas
 
-Inserts builtin viewer FormSchema rows required by the ETDRS grid and registration panels. Idempotent: existing schemas are skipped unless `--update` is passed.
+Inserts builtin viewer FormSchemas (ETDRS, registration). See **[Form schemas](/eyened-platform/orm/form_schemas)**; registration semantics: **[Registration](/eyened-platform/orm/registration)**.
 
 ```bash
 eorm seed-form-schemas [--update]
 ```
 
-See **[Form Schemas](/eyened-platform/orm/form_schemas)** for the list of seeded schemas and how to add clinical forms.
-
 ### create-user
 
-Creates a database user with login credentials and metadata.
+Interactive user creation for viewer/API login.
 
 ```bash
-eorm create-user [OPTIONS]
+eorm create-user
 ```
 
-### update-thumbnails
+## Inference (summary)
 
-Generates thumbnails for images with missing (or optionally failed) `ThumbnailPath`. Equivalent to `POST /api/import/update_thumbnails` but runs in-process (no worker).
+| Command | Purpose |
+|---------|---------|
+| `run-models` | Attribute inference |
+| `run-segmentation` | Segmentation model inference |
+| `run-registration` | Enface image registration — see **[Registration](/eyened-platform/orm/registration)** |
+| `run-etdrs-model` | ETDRS subfield areas |
 
-With no target flags, scans the whole database. Scope a subset with `--path`, `--image-ids`, `--project`, or `--patient` (same targeting options as inference commands).
-
-See **[Thumbnails](/eyened-platform/thumbnails#cli)** for options and behavior.
-
-### run-models
-
-Runs attribute inference models on a scoped set of images.
-
-```bash
-eorm run-models [OPTIONS]
-```
-
-### run-segmentation
-
-Runs segmentation inference models on a scoped set of images.
-
-```bash
-eorm run-segmentation [OPTIONS]
-```
-
-### run-etdrs-model
-
-Runs ETDRS summary processing using model segmentations and related model outputs.
-
-```bash
-eorm run-etdrs-model [OPTIONS]
-```
+Details: **[Inference](/eyened-platform/orm/inference)**.
 
 ## Targeting
 
-Image- and patient-scoped commands share the same targeting flags. Provide **at least one** of:
+Image- and patient-scoped commands share targeting flags. Provide **at least one** of:
 
 | Flag | Description |
 |------|-------------|
-| `-p` / `--path` / `--image-ids-file` | File with one `ImageInstanceID` or `PublicID` per line (`#` comments ok) |
-| `--image-ids` | Comma-separated `ImageInstanceID` or `PublicID` values (small lists) |
-| `--project` | Project ID or project name |
-| `--patient` | Patient identifier; combine with `--project` when the identifier exists in multiple projects |
-| `--exclude` / `--skip` | Comma-separated IDs or PublicIDs to exclude (image commands) or skip (registration) |
-| `--modality` | Filter by modality when expanding `--project` or `--patient` |
-
-Examples:
+| `-p` / `--path` | File with one `ImageInstanceID` or `PublicID` per line |
+| `--image-ids` | Comma-separated IDs or PublicIDs |
+| `--project` | Project ID or name |
+| `--patient` | Patient identifier (with `--project` if ambiguous) |
+| `--exclude` / `--skip` | IDs or PublicIDs to exclude |
+| `--modality` | Filter when expanding `--project` or `--patient` |
 
 ```bash
 eorm run-models --project "AMD-Study" --modality ColorFundus
-eorm run-segmentation --path ids.txt
-eorm run-registration --project "AMD-Study" --patient amd001
-eorm run-registration --project 1 --skip abc12def,1811325
-eorm update-thumbnails --project "AMD-Study"
+eorm update-thumbnails --path ids.txt
 ```
 
-When no target flags are given, `update-thumbnails` and `update-hashes` scan the whole database (previous behavior).
+`update-thumbnails` and `update-hashes` scan the whole database when no target flags are given.
 
-### run-registration
+## Maintenance
 
-Runs pairwise registration for enface images (color fundus, autofluorescence, and infrared reflectance) using the `retinalysis-registration` model. For each patient, transforms are stored in a patient-level **Registration** attribute as JSON: a list of `{image1, image2, transform}` records.
+### update-thumbnails
 
-You must scope the run with either `--patient` (patient identifier) or `--project` (project ID). Without `--replace`, existing transforms are kept and only missing pairs are computed. With `--replace`, stored transforms are cleared first. Use `--skip` to exclude specific image instance IDs (comma-separated).
-
-Requires the optional `rtnls_registration` package and ORM database configuration (see [ORM Configuration](/eyened-platform/orm/configuration)).
-
-```bash
-eorm run-registration --patient PATIENT_IDENTIFIER
-eorm run-registration --project 1
-eorm -e /path/to/.env run-registration --project 1 --replace
-eorm run-registration --patient PATIENT_IDENTIFIER --skip 1811325,1811324
-```
-
-See `eorm run-registration --help` for all options.
-
-### validate-forms
-
-Validates form annotations and schemas stored in the database.
-
-```bash
-eorm validate-forms [OPTIONS]
-```
-
-### zarr-tree
-
-Prints the structure of the configured zarr store, including groups and arrays.
-
-```bash
-eorm zarr-tree [OPTIONS]
-```
-
-### defragment-zarr
-
-Copies segmentations to a new zarr store with sequential indices to reduce fragmentation.
-
-```bash
-eorm defragment-zarr [OPTIONS]
-```
+Backfill missing `ThumbnailPath` values. See **[Thumbnails — CLI](/eyened-platform/thumbnails#cli)**.
 
 ### update-hashes
 
-Updates missing `FileChecksum` and `DataHash` values for image instances.
+Fill missing `FileChecksum` and `DataHash` on image instances.
+
+### validate-forms
+
+Validate `FormAnnotation` JSON against schemas.
+
+### zarr-tree / defragment-zarr
+
+Inspect or compact `{EYENED_STORAGE_ROOT}/segmentations.zarr`.
+
+## Database dumps
+
+### load-dump / save-dump
+
+Load or create SQL dumps. **`load-dump` is destructive** — drops and recreates the target database.
 
 ```bash
-eorm update-hashes [OPTIONS]
+eorm save-dump -p /path/to/dump_dir
+eorm load-dump -p /path/to/dump.sql
 ```
-
-### load-dump
-
-Loads a SQL dump into the target database after dropping and recreating it.
-
-```bash
-eorm load-dump [OPTIONS]
-```
-
-:::caution
-`load-dump` is destructive and replaces all existing data in the configured database.
-:::
-
-### save-dump
-
-Creates a dated SQL dump of the configured database.
-
-```bash
-eorm save-dump [OPTIONS]
-```
-
-

@@ -7,6 +7,15 @@ Imports use one **flat** record per image ([`ImportRow`](https://github.com/Eyen
 
 See [Importing data](/eyened-platform/importing_data) for workflows.
 
+<style>{`
+.import-metadata-fields table th:first-child,
+.import-metadata-fields table td:first-child {
+	white-space: nowrap;
+}
+`}</style>
+
+<div class="import-metadata-fields">
+
 ## How entities are resolved
 
 Each row is walked through the importer graph (`Project → Patient → Study → Series → ImageInstance → ImageStorage`, plus device and storage backend). For every entity you can:
@@ -152,3 +161,5 @@ Files are referenced by storage backend + path within that backend (resolved via
 | `image_storage_is_primary` | bool | Property | Whether this row is the primary storage location for the instance |
 | `image_storage_hash` | bytes | Property | SHA-256 digest (32 bytes) |
 | `image_storage_checksum` | str | Property | Checksum string (e.g. MD5 hex) |
+
+</div>

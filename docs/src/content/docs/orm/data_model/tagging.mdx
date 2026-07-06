@@ -1,0 +1,29 @@
+---
+title: Tagging
+description: Tags and tag links on studies, images, and annotations
+sidebar:
+  order: 7
+---
+
+Labels for filtering and organization.
+
+## Tag
+
+`TagName` (unique per `TagType`), `TagDescription`, and creating `Creator`. Types include Study, ImageInstance, Segmentation, FormAnnotation, etc. Creators can star tags via `CreatorTagLink`.
+
+## Tag links
+
+Junction tables attach tags to entities with optional `Comment` and `DateInserted`:
+
+- `StudyTagLink`, `ImageInstanceTagLink`, `SegmentationTagLink`, `FormAnnotationTagLink`
+- Legacy: `AnnotationTagLink`
+
+```python
+from eyened_orm import ImageInstance
+
+image = ImageInstance.by_id(session, image_id)
+for link in image.ImageInstanceTagLinks:
+    print(link.Tag.TagName, link.Comment)
+```
+
+API routes use image `PublicID` for instance tags — see **[API — Tags](/eyened-platform/api/tags)** · **[API — Images](/eyened-platform/api/images)**

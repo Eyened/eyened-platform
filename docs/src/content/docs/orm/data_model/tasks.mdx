@@ -1,0 +1,34 @@
+---
+title: Tasks
+description: Task, SubTask, and grading workflows
+sidebar:
+  order: 6
+---
+
+Organizes annotation work into assignable units.
+
+## Task
+
+Work assignment with `TaskDefinition`, assigned `Creator`, `Contact`, and `TaskState` (NotStarted, Busy, Finished, Aborted, Archived). Contains multiple `SubTask`s.
+
+```python
+from eyened_orm import Task
+
+task = Task.create_from_imagesets(
+    session,
+    taskdef_name="AMD Grading",
+    task_name="Q1 2024 AMD Review",
+    imagesets=[[1, 2, 3], [4, 5, 6]],
+    creator_name="Dr. Smith",
+)
+```
+
+## SubTask
+
+Unit of work within a task: assigned annotator, state (NotStarted, Busy, Ready), linked `ImageInstance`s via `SubTaskImageLink`, optional `Comments`, and produced `Segmentations` / `FormAnnotations`.
+
+## TaskDefinition
+
+`TaskDefinitionName` and `TaskConfig` JSON — e.g. `form_schema_name` and `form_image_scope` for grading. See **[Form schemas — TaskConfig](/eyened-platform/orm/form_schemas#taskconfig-for-grading-tasks)**.
+
+Tasks can also be created via the ORM importer — see **[ORM Importer](/eyened-platform/orm/importer)**.
