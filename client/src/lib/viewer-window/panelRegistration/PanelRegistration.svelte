@@ -35,11 +35,16 @@
 				if (formAnnotation.form_schema_id !== registrationSchema.id)
 					return false;
 				if (formAnnotation.patient_id !== instance.patient.id) return false;
-				// Check laterality - look up full instance if needed
-				const formInstance = formAnnotation.image_id
-					? instances.get(formAnnotation.image_id)
-					: null;
-				if (formInstance && formInstance.laterality !== instance.laterality) {
+				const formLaterality =
+					formAnnotation.laterality ??
+					(formAnnotation.image_id
+						? instances.get(formAnnotation.image_id)?.laterality
+						: undefined);
+				if (
+					formLaterality &&
+					instance.laterality &&
+					formLaterality !== instance.laterality
+				) {
 					return false;
 				}
 				return true;

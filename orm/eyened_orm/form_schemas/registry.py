@@ -22,17 +22,17 @@ BUILTIN_FORM_SCHEMAS: tuple[BuiltinFormSchema, ...] = (
     ),
     BuiltinFormSchema(
         "Pointset registration",
-        EntityType.ImageInstance,
+        EntityType.Eye,
         "pointset_registration.json",
     ),
     BuiltinFormSchema(
         "Affine registration",
-        EntityType.ImageInstance,
+        EntityType.Eye,
         "affine_registration.json",
     ),
     BuiltinFormSchema(
         "RegistrationSet",
-        EntityType.ImageInstance,
+        EntityType.Eye,
         "registration_set.json",
     ),
 )
