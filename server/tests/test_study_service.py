@@ -164,6 +164,9 @@ def test_untag_study_no_link_is_idempotent(session):
     # No link exists; deleting is a no-op, not an error.
     _service().untag_study(session, study.StudyID, 999_999, _actor())
 
+    # The no-op leaves no link behind (and did not raise).
+    assert StudyRepository().get_link(session, 999_999, study.StudyID) is None
+
 
 def test_patch_study_tag_updates_comment(session):
     """Patching an existing link overwrites its comment with the new value."""
