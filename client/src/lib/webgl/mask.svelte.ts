@@ -95,15 +95,20 @@ export class BinaryMask extends Mask {
     }
 
     protected _drawMask(mask: BitMaskTexture, drawing: ImageType, paintSettings: PaintSettings): void {
-        const uniforms = {
-            u_drawing: imageToTexture(this.webgl.gl, drawing),
-            u_paint: paintSettings.paint,
-            u_mode: true // multi-label logic is used for binary masks
-        };
+        const drawingTexture = imageToTexture(this.webgl.gl, drawing);
         if (paintSettings.dilateErode) {
-            mask.passShader(this.shaders.erodeDilate, uniforms);
+            mask.passShader(this.shaders.erodeDilate, {
+                u_drawing: drawingTexture,
+                u_dilate: paintSettings.paint,
+                u_is_multi_label: true, // binary masks store foreground as a single bit
+                u_active_feature: mask.bitmask,
+            });
         } else {
-            mask.passShader(this.shaders.draw, uniforms);
+            mask.passShader(this.shaders.draw, {
+                u_drawing: drawingTexture,
+                u_paint: paintSettings.paint,
+                u_mode: true, // multi-label logic is used for binary masks
+            });
         }
         this.afterUpdate();
     }
@@ -391,18 +396,25 @@ abstract class BaseMultiMask extends AbstractDataMask {
             console.warn("MultiLabelSegmentation: no active indices");
             return;
         }
-        const bitmask = this.getBitmask(paintSettings.activeIndices);
-        const uniforms = {
-            u_current: this.textureData.texture,
-            u_drawing: imageToTexture(this.image.webgl.gl, drawing),
-            u_paint: paintSettings.paint,
-            u_bitmask: bitmask,
-            u_mode: this.segmentation.data_representation == 'MultiLabel'
-        };
+        const activeFeature = this.getBitmask(paintSettings.activeIndices);
+        const isMultiLabel = this.segmentation.data_representation == 'MultiLabel';
+        const drawingTexture = imageToTexture(this.image.webgl.gl, drawing);
         if (paintSettings.dilateErode) {
-            //TODO: implement erodeDilate for multi-label segmentation
+            this.textureData.passShader(this.image.webgl.shaders.erodeDilate, {
+                u_current: this.textureData.texture,
+                u_drawing: drawingTexture,
+                u_dilate: paintSettings.paint,
+                u_is_multi_label: isMultiLabel,
+                u_active_feature: activeFeature,
+            });
         } else {
-            this.textureData.passShader(this.image.webgl.shaders.draw, uniforms);
+            this.textureData.passShader(this.image.webgl.shaders.draw, {
+                u_current: this.textureData.texture,
+                u_drawing: drawingTexture,
+                u_paint: paintSettings.paint,
+                u_bitmask: activeFeature,
+                u_mode: isMultiLabel,
+            });
         }
     }
 
