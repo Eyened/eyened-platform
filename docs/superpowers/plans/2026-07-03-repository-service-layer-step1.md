@@ -22,6 +22,70 @@ Copied verbatim from `docs/superpowers/specs/2026-07-03-repository-service-layer
 - **Do not touch:** CLI/worker code (`orm/eyened_orm/commands/`), `search.py`, `auth.py`, or `Base`'s existing generic classmethods.
 - **Repository tests** go in `orm/eyened_orm/tests/`; **Service tests** go in `server/tests/`. Both are already covered by `testpaths = ["server", "orm"]` in `pyproject.toml`.
 
+> **Interpreter note:** there is no `python`/`pytest` on `PATH` in this environment; the project virtualenv lives at `dev/.venv`. Every command below therefore uses `dev/.venv/bin/python` and `dev/.venv/bin/pytest`. Activate the venv if you prefer bare `python`/`pytest`.
+
+---
+
+### Task 0: Test-runner setup (prerequisite)
+
+The plan's `pytest` steps require pytest, which is **not installed** in `dev/.venv` and not declared runnably. This task makes the suite runnable locally. The broader CI/CD design (GitHub Actions on PR into `main`/`development`, cloud-lift) is parked in `docs/superpowers/specs/2026-07-06-pr-test-ci-design.md` and ships as its own separate PR — **only the local test-runner enablement is done here.**
+
+**Files:**
+- Modify: `server/test-requirements.txt`
+- Modify: `pyproject.toml`
+
+**Interfaces:**
+- Consumes: existing `orm/setup.py` (editable orm install), `server/requirements.txt`.
+- Produces: a runnable `dev/.venv/bin/pytest` that discovers `server` + `orm` testpaths.
+
+- [ ] **Step 1: Make test deps reproducible**
+
+Replace the contents of `server/test-requirements.txt` with:
+
+```
+-r requirements.txt
+pytest==8.*
+```
+
+(Chains the server runtime deps and pins pytest, so one `pip install -r server/test-requirements.txt` installs everything reproducibly.)
+
+- [ ] **Step 2: Fix the pytest config section**
+
+In `pyproject.toml` the pytest table is under the wrong header (`[tool.pytest]`), so `pythonpath`/`testpaths` are silently ignored, and `minversion = "9.0"` is unsatisfiable (pytest is 8.x). Replace the whole table with:
+
+```toml
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = [
+    "server",
+    "orm",
+]
+```
+
+(Renames `[tool.pytest]` → `[tool.pytest.ini_options]` and drops `minversion`. Now `pythonpath = ["."]` puts the repo root on `sys.path` so `import server.*` resolves at collection, and bare `dev/.venv/bin/pytest` auto-discovers both `server` and `orm`.)
+
+- [ ] **Step 3: Install into the dev venv**
+
+Run:
+```bash
+dev/.venv/bin/python -m pip install -e ./orm
+dev/.venv/bin/python -m pip install -r server/test-requirements.txt
+```
+
+(`eyened_orm` must be importable at collection time and supplies SQLAlchemy et al. via its `setup.py`; the editable install provides both. It is already present in `dev/.venv`, but the command is idempotent and documents the fresh-clone requirement.)
+
+- [ ] **Step 4: Establish the baseline — existing suite green**
+
+Run: `dev/.venv/bin/pytest -q`
+Expected: the pre-existing suite collects and passes (no new tests yet). **If anything is already red, stop and surface it before adding new tests — do not build on a red baseline.**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add server/test-requirements.txt pyproject.toml
+git commit -m "test: make pytest runnable (pin deps, fix pytest config section)"
+```
+
 ---
 
 ### Task 1: Domain exception hierarchy + central handler registration
@@ -84,7 +148,7 @@ def test_register_exception_handlers_registers_service_error_base():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest server/tests/test_services_exceptions.py -v`
+Run: `dev/.venv/bin/pytest server/tests/test_services_exceptions.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'server.services'`.
 
 - [ ] **Step 3: Write the exceptions module**
@@ -150,7 +214,7 @@ __all__ = ["ServiceError", "NotFoundError"]
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pytest server/tests/test_services_exceptions.py -v`
+Run: `dev/.venv/bin/pytest server/tests/test_services_exceptions.py -v`
 Expected: PASS (3 passed).
 
 - [ ] **Step 5: Register the handler in `server/main.py`**
@@ -171,7 +235,7 @@ register_exception_handlers(app_api)
 
 - [ ] **Step 6: Verify the app still imports cleanly**
 
-Run: `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password python -c "import server.main; print('ok')"`
+Run: `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password dev/.venv/bin/python -c "import server.main; print('ok')"`
 Expected: prints `ok` with no traceback. (The dummy DB env vars mirror `server/tests/conftest.py`'s `pytest_configure`; `Database()` builds an engine lazily and does not connect at import.)
 
 - [ ] **Step 7: Commit**
@@ -226,7 +290,7 @@ def test_list_all_orders_by_manufacturer_then_model(session):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest orm/eyened_orm/tests/test_device_repository.py -v`
+Run: `dev/.venv/bin/pytest orm/eyened_orm/tests/test_device_repository.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'eyened_orm.repositories'`.
 
 - [ ] **Step 3: Write the repository**
@@ -267,7 +331,7 @@ __all__ = ["DeviceRepository"]
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pytest orm/eyened_orm/tests/test_device_repository.py -v`
+Run: `dev/.venv/bin/pytest orm/eyened_orm/tests/test_device_repository.py -v`
 Expected: PASS (1 passed).
 
 - [ ] **Step 5: Commit**
@@ -337,7 +401,7 @@ def test_list_devices_returns_repository_rows_in_order(session):
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `pytest server/tests/test_device_service.py -v`
+Run: `dev/.venv/bin/pytest server/tests/test_device_service.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'server.services.device_service'`.
 
 - [ ] **Step 4: Write the service**
@@ -380,7 +444,7 @@ __all__ = ["ServiceError", "NotFoundError", "DeviceService"]
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `pytest server/tests/test_device_service.py -v`
+Run: `dev/.venv/bin/pytest server/tests/test_device_service.py -v`
 Expected: PASS (1 passed).
 
 - [ ] **Step 6: Commit**
@@ -431,12 +495,12 @@ async def list_devices(
 
 - [ ] **Step 2: Verify the router imports and exposes the route**
 
-Run: `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password python -c "from server.routes import devices; print(sorted((r.path, tuple(sorted(r.methods))) for r in devices.router.routes))"`
+Run: `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password dev/.venv/bin/python -c "from server.routes import devices; print(sorted((r.path, tuple(sorted(r.methods))) for r in devices.router.routes))"`
 Expected: prints `[('/devices', ('GET', 'HEAD'))]` (or similar) with no traceback.
 
 - [ ] **Step 3: Run the full test suite to confirm no regressions**
 
-Run: `pytest -q`
+Run: `dev/.venv/bin/pytest -q`
 Expected: all tests pass (including the Task 1–3 tests); no import/collection errors.
 
 - [ ] **Step 4: Commit**
@@ -496,7 +560,7 @@ def test_get_with_attributes_unknown_id_returns_none(session):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest orm/eyened_orm/tests/test_patient_repository.py -v`
+Run: `dev/.venv/bin/pytest orm/eyened_orm/tests/test_patient_repository.py -v`
 Expected: FAIL — `ImportError: cannot import name 'PatientRepository'`.
 
 - [ ] **Step 3: Write the repository**
@@ -549,7 +613,7 @@ __all__ = ["DeviceRepository", "PatientRepository"]
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pytest orm/eyened_orm/tests/test_patient_repository.py -v`
+Run: `dev/.venv/bin/pytest orm/eyened_orm/tests/test_patient_repository.py -v`
 Expected: PASS (2 passed).
 
 - [ ] **Step 5: Commit**
@@ -620,7 +684,7 @@ def test_get_patient_unknown_id_raises_not_found(session):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest server/tests/test_patient_service.py -v`
+Run: `dev/.venv/bin/pytest server/tests/test_patient_service.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'server.services.patient_service'`.
 
 - [ ] **Step 3: Write the service**
@@ -680,7 +744,7 @@ __all__ = ["ServiceError", "NotFoundError", "DeviceService", "PatientService"]
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pytest server/tests/test_patient_service.py -v`
+Run: `dev/.venv/bin/pytest server/tests/test_patient_service.py -v`
 Expected: PASS (2 passed).
 
 - [ ] **Step 5: Commit**
@@ -734,12 +798,12 @@ async def get_patient(
 
 - [ ] **Step 2: Verify the router imports and exposes the route**
 
-Run: `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password python -c "from server.routes import patients; print(sorted(r.path for r in patients.router.routes))"`
+Run: `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password dev/.venv/bin/python -c "from server.routes import patients; print(sorted(r.path for r in patients.router.routes))"`
 Expected: prints `['/patients/{patient_id}']` with no traceback.
 
 - [ ] **Step 3: Run the full test suite to confirm no regressions**
 
-Run: `pytest -q`
+Run: `dev/.venv/bin/pytest -q`
 Expected: all tests pass; no import/collection errors.
 
 - [ ] **Step 4: Commit**
@@ -755,8 +819,8 @@ git commit -m "refactor(routes): route patient endpoint through PatientService"
 
 After all tasks, confirm the whole vertical slice:
 
-1. **Full suite green:** `pytest -q` — all new Repository/Service/exception tests plus the pre-existing suite pass.
-2. **App boots:** `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password python -c "import server.main; print('ok')"` prints `ok`.
+1. **Full suite green:** `dev/.venv/bin/pytest -q` — all new Repository/Service/exception tests plus the pre-existing suite pass.
+2. **App boots:** `EYENED_DATABASE_USER=test_user EYENED_DATABASE_PASSWORD=test_password dev/.venv/bin/python -c "import server.main; print('ok')"` prints `ok`.
 3. **Manual smoke (optional, needs a real dev DB + running server):** start the API and hit `GET /api/devices` (expect a JSON list) and `GET /api/patients/999999` (expect HTTP 404 with body `{"detail": "Patient 999999 not found"}` — proving `NotFoundError` → central handler → 404). This 404 message text is the observable signal that the new exception path is live rather than the old inline `HTTPException`.
 
 ## Out of scope / follow-up plans
