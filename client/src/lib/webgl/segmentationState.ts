@@ -8,6 +8,8 @@ import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
 import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
+import { segmentationPlaneSize } from "./segmentationProjection";
+import { writable, type Writable } from "svelte/store";
 
 type MaskConstructor = new (image: AbstractImage, segmentation: SegmentationGET) => Mask;
 export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'MultiClass' | 'MultiLabel', MaskConstructor> = {
@@ -19,6 +21,8 @@ export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'Mu
 }
 
 // manages the segmentation state (history, mask) for a single scan
+export type SyncState = "synced" | "saving" | "error";
+
 export class SegmentationState {
 
     protected history: DrawingHistory<string>;
@@ -26,6 +30,9 @@ export class SegmentationState {
 
     private isDrawing = Promise.resolve();
     private hasInitialCheckpoint = false;
+    private updateTimeout: ReturnType<typeof setTimeout> | null = null;
+    private pendingUpdateResolve: (() => void) | null = null;
+    public readonly syncState: Writable<SyncState> = writable<SyncState>("synced");
 
     constructor(
         readonly image: AbstractImage,
@@ -34,7 +41,8 @@ export class SegmentationState {
         initialData?: DrawingArray,
     ) {
         this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
-        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, image.width, image.height));
+        const plane = segmentationPlaneSize(segmentation, image);
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, plane.width, plane.height));
         if (initialData) {
             this.mask.importData(initialData);
         } else {
@@ -127,14 +135,57 @@ export class SegmentationState {
     }
 
     updateServer() {
-        const data = this.mask.exportData();
-        const buffer = encodeNpy(data, [this.image.height, this.image.width]);
-        const sparse_axis = this.segmentation.sparse_axis ?? undefined;
-        const scan_nr = this.image.image_id.endsWith('proj') ? undefined : this.scanNr;
-        return updateSegmentationData(this.segmentation.id, buffer, { sparse_axis, scan_nr });
+        // Clear existing timeout if one exists (debounce: cancel previous pending update)
+        if (this.updateTimeout) {
+            clearTimeout(this.updateTimeout);
+        }
+        
+        // Resolve immediately for optimistic UI updates (don't block drawing)
+        // The actual server call will be debounced and happen in the background
+        const resolveImmediately = this.pendingUpdateResolve;
+        if (resolveImmediately) {
+            resolveImmediately();
+        }
+        
+        // Set sync state to "saving" when update is triggered
+        this.syncState.set("saving");
+        
+        // Debounce: wait 2 seconds after last update before sending to server
+        // The last call wins - it will export the current mask state, so no data is lost
+        this.updateTimeout = setTimeout(async () => {
+            try {
+                const data = this.mask.exportData();
+                const { planeHeight, planeWidth } = this.mask;
+                const buffer = encodeNpy(data, [planeHeight, planeWidth]);
+                const sparse_axis = this.segmentation.sparse_axis ?? undefined;
+                const scan_nr = this.image.image_id.endsWith('proj') ? undefined : this.scanNr;
+                await updateSegmentationData(this.segmentation.id, buffer, { sparse_axis, scan_nr });
+                this.syncState.set("synced");
+            } catch (error) {
+                this.syncState.set("error");
+                console.error("Failed to update segmentation data:", error);
+            } finally {
+                this.updateTimeout = null;
+            }
+        }, 2000);
+        
+        // Return a Promise that resolves immediately for optimistic updates
+        return new Promise<void>((resolve) => {
+            this.pendingUpdateResolve = resolve;
+            // Resolve immediately so checkpoint() doesn't block
+            resolve();
+        });
     }
 
     dispose() {
+        // Clear any pending update timeout
+        // Note: We could optionally send the pending update immediately here,
+        // but cancelling is safer to avoid race conditions during disposal
+        if (this.updateTimeout) {
+            clearTimeout(this.updateTimeout);
+            this.updateTimeout = null;
+        }
+        // pendingUpdateResolve is not needed here since Promises resolve immediately
         this.mask.dispose();
         this.history.clear();
     }

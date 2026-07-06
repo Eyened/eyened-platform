@@ -1,0 +1,30 @@
+---
+title: Info panel
+description: Image and study metadata in the viewer sidebar
+sidebar:
+  order: 2
+---
+
+The **Info** panel shows metadata for the image open in the current viewer window. Use it to confirm you are grading the correct eye and visit before drawing annotations.
+
+## Using the panel
+
+### What it shows
+
+- Patient, study, and series identifiers
+- Device manufacturer and model
+- Modality, laterality, dimensions, and acquisition fields
+- Optional extra columns configured for your deployment
+
+Expand the panel in the sidebar to read fields while keeping the main image in view. No edits are made from this panel — it is read-only.
+
+:::note
+This page is a stub — expand with screenshots and field definitions as needed.
+:::
+
+## Implementation & analysis
+
+Metadata comes from the `ImageInstance` row and its related patient, study, series, and device records.
+
+- **Data model:** [Images & storage](/eyened-platform/orm/data_model/images)
+- **API:** [Images & patients](/eyened-platform/api/images)

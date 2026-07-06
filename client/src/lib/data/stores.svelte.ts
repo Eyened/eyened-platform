@@ -1,7 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type {
-	InstanceGET,
-	InstanceMeta,
+	ImageGET,
 	StudyGET,
 	TagGET,
 	FeatureGET,
@@ -10,7 +9,8 @@ import type {
 	ModelSegmentationGET,
 	FormAnnotationGET,
 	TaskGET,
-	SubTaskWithImagesGET
+	SubTaskWithImagesGET,
+    PatientDetailGET
 } from '../../types/openapi_types';
 
 // ReactiveMap extends SvelteMap with array-like iteration methods
@@ -83,8 +83,7 @@ class ReactiveMap<K, V> extends SvelteMap<K, V> {
 }
 
 // Simple stores - just maps of plain data by ID
-export const instances = new ReactiveMap<number, InstanceGET>();
-export const instanceMetas = new ReactiveMap<number, InstanceMeta>();  // Lightweight references
+export const instances = new ReactiveMap<string, ImageGET>();
 export const studies = new ReactiveMap<number, StudyGET>();
 export const tags = new ReactiveMap<number, TagGET>();
 export const features = new ReactiveMap<number, FeatureGET>();
@@ -94,6 +93,7 @@ export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>(
 export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>();
 export const tasks = new ReactiveMap<number, TaskGET>();
 export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>();
+export const patients = new ReactiveMap<number, PatientDetailGET>();
 
 // Secondary indexes for common lookups
 export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>();
@@ -101,27 +101,21 @@ export const featuresByName = new ReactiveMap<string, FeatureGET>();
 export const tagsByName = new ReactiveMap<string, TagGET>();
 
 // Ingest functions handle embedded data extraction
+export function ingestPatients(patientsData: PatientDetailGET[]) {
+	for (const patient of patientsData) {
+		patients.set(patient.id, patient);
+	}
+}
+
 export function ingestStudies(studiesData: StudyGET[]) {
 	for (const study of studiesData) {
 		studies.set(study.id, study);
 	}
 }
 
-export function ingestInstances(instancesData: InstanceGET[]) {
+export function ingestInstances(instancesData: ImageGET[]) {
 	for (const inst of instancesData) {
-		// Only ingest full InstanceGET objects (from /instances/search or /instances/{id})
-		// If you have InstanceMeta, use ingestInstanceMetas() instead
-		if (!('sop_instance_uid' in inst) || !('rows' in inst)) {
-			console.error('ingestInstances() expects InstanceGET, got InstanceMeta. Use ingestInstanceMetas() instead:', inst);
-			continue;
-		}
 		instances.set(inst.id, inst);
-	}
-}
-
-export function ingestInstanceMetas(metasData: InstanceMeta[]) {
-	for (const meta of metasData) {
-		instanceMetas.set(meta.id, meta);
 	}
 }
 
@@ -174,6 +168,17 @@ export function ingestTasks(tasksData: TaskGET[]) {
 
 export function ingestSubTasks(subtasksData: SubTaskWithImagesGET[]) {
 	for (const subtask of subtasksData) {
-		subtasks.set(subtask.id, subtask);
+		const existing = subtasks.get(subtask.id);
+		if (existing) {
+			// Merge so partial payloads (e.g. the image add/remove and comment
+			// endpoints) don't wipe fields they don't return, such as `index`.
+			const merged = { ...existing, ...subtask };
+			if (subtask.index == null && existing.index != null) {
+				merged.index = existing.index;
+			}
+			subtasks.set(subtask.id, merged);
+		} else {
+			subtasks.set(subtask.id, subtask);
+		}
 	}
 }

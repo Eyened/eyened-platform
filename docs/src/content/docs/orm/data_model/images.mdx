@@ -1,0 +1,111 @@
+---
+title: Images & storage
+description: Project hierarchy, ImageInstance, and file storage
+sidebar:
+  order: 2
+---
+
+The core data model follows: **Project → Patient → Study → Series → ImageInstance → ImageStorage**.
+
+```python
+from eyened_orm import Project, Patient, Study, Series, ImageInstance
+
+project = Project.by_name(session, 'My Project')
+
+for patient in project.Patients:
+    for study in patient.Studies:
+        for series in study.Series:
+            for image in series.ImageInstances:
+                print(image.PublicID)
+```
+
+## Project
+
+A `Project` groups related patients and images:
+- Unique `ProjectName`
+- Optional `Contact`, `DOI`, and `External` flag
+
+## Patient
+
+Belongs to a `Project`. `PatientIdentifier` is unique within the project. Optional `BirthDate` and `Sex`.
+
+## Study
+
+One examination visit for a patient. Key fields: `StudyDate`, `StudyInstanceUid`, `StudyDescription`, `StudyRound`.
+
+:::note
+EyeNED treats `(StudyDate, PatientID)` as unique — effectively a **visit** rather than strict DICOM study semantics.
+:::
+
+## Series
+
+Groups related images: `SeriesInstanceUid`, `SeriesNumber`, and linked `ImageInstances`.
+
+## ImageInstance
+
+A single image or volume. Important fields:
+- `PublicID` — 12-character ID used in API URLs
+- `SOPInstanceUid`, dimensions, resolution, `Modality`, `Laterality`, `ETDRSField`
+- `ThumbnailPath` — see **[Thumbnails](/eyened-platform/thumbnails)**
+- Links to `DeviceInstance`, `ImageStorages`, and optional reference tables
+
+`DatasetIdentifier` on `ImageInstance` is deprecated — use `ImageStorage`.
+
+```python
+from eyened_orm import ImageInstance
+
+image = ImageInstance.by_id(session, image_id)
+print(image.PublicID, image.path)  # resolves via primary ImageStorage
+```
+
+## ImageStorage
+
+An `ImageStorage` row registers **where the pixel data lives** for an `ImageInstance`. Import and the API do not upload files — they record a `StorageBackend` + `ObjectKey` pair that must already exist on disk (or object storage mounted into the container).
+
+Each instance has one or more `ImageStorage` rows in the `ImageStorages` relationship. Exactly one should be marked **`IsPrimary`**; the ORM uses that row for `ImageInstance.path`, `object_key`, and `read_image_data()`.
+
+### StorageBackend
+
+Backends are shared lookup rows — one per nginx mount or future object-store configuration:
+
+| Column | Meaning |
+|--------|---------|
+| `Key` | Identifier used at import (`storage_backend_key`) and in nginx `location /{key}/` |
+| `Kind` | Backend type — currently `local` (fileserver); S3 planned |
+| `Config` | Reserved for future backend-specific settings |
+
+### ImageStorage columns
+
+| Column | Meaning |
+|--------|---------|
+| `ObjectKey` | Path to the file **within** the backend (unique per `StorageBackendID`) |
+| `Format` | How to read the bytes — `dicom`, `image/png`, `image/jpeg`, `png_series`, `binary`, … |
+| `IsPrimary` | Whether this row is the default storage location for the instance |
+| `Hash` / `Checksum` | Optional integrity fields (SHA-256 digest or checksum string) |
+
+**Multiple files per instance:** import rows with the same `image_anonymous_identity` (and series) but different `object_key` values attach several `ImageStorage` rows to one `ImageInstance` — for example enface + OCT derived from the same source. See **[Import metadata fields](/eyened-platform/import_metadata_fields#storage)**.
+
+### Resolving and reading files
+
+Local paths are resolved at runtime via `EYENED_STORAGE_MOUNTS` (JSON map from backend `Key` to host path). The data-access adapter combines mount + `ObjectKey`:
+
+```python
+image = ImageInstance.by_id(session, image_id)
+path = image.path                    # Path on the machine running the ORM
+storage = image.primary_storage      # ImageStorage with IsPrimary=True
+backend = image.storage_backend      # StorageBackend row
+```
+
+The viewer and API fetch bytes through nginx: `GET /api/images/{public_id}/data` (see **[Platform design](/eyened-platform/platform_design)** for the fileserver flow).
+
+### Import fields
+
+When importing, set at minimum `object_key` and `storage_backend_key` (plus image metadata). Full field list: **[Import metadata fields — Storage](/eyened-platform/import_metadata_fields#storage)**.
+
+
+## Related entities
+
+- **Contact** — researcher or institution on a project
+- **DeviceModel** / **DeviceInstance** — imaging equipment
+- **SourceInfo** — upstream database or system
+- **ModalityTable**, **Scan** — optional reference data for volumes

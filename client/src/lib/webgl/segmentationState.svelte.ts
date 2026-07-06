@@ -1,0 +1,324 @@
+import { getSegmentationData, getModelSegmentationData, updateSegmentationData } from "$lib/data/helpers";
+import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
+import type { ModelSegmentationGET, SegmentationGET, SegmentationDataRepresentation } from "../../types/openapi_types";
+// SimpleDataRepresentation is a subset of SegmentationDataRepresentation
+export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
+import type { AbstractImage } from "./abstractImage";
+import { DrawingHistory } from "./drawingHistory.svelte";
+import { Base64Serializer } from "./imageEncoder";
+import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
+import { convert } from "./segmentationConverter";
+import type { SegmentationItem } from "./segmentationItem.svelte";
+import { segmentationPlaneSize } from "./segmentationProjection";
+
+function isNavigationTimeFetchFailure(error: unknown): boolean {
+    return error instanceof TypeError && error.message === 'Failed to fetch';
+}
+
+type MaskConstructor = new (image: AbstractImage, segmentation: SegmentationGET) => Mask;
+export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'MultiClass' | 'MultiLabel', MaskConstructor> = {
+    'Binary': BinaryMask,
+    'DualBitMask': QuestionableMask,
+    'Probability': ProbabilityMask,
+    'MultiClass': MultiClassMask,
+    'MultiLabel': MultiLabelMask,
+}
+
+/** Flush pending segmentation PUTs when the tab is hidden or unloaded (best-effort). */
+const segmentationSaveFlushCallbacks = new Set<() => void>();
+/** Return true if closing the tab may lose unsaved segmentation data (debounced or in-flight save). */
+const segmentationUnloadWarnCheckers = new Set<() => boolean>();
+let segmentationSaveLifecycleInstalled = false;
+
+function installSegmentationSaveLifecycle() {
+    if (typeof window === 'undefined' || segmentationSaveLifecycleInstalled) return;
+    segmentationSaveLifecycleInstalled = true;
+    const flushAll = () => {
+        for (const cb of segmentationSaveFlushCallbacks) {
+            try {
+                cb();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    };
+    window.addEventListener('pagehide', flushAll);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') flushAll();
+    });
+    // Warn before closing (browser shows a generic "Leave site?" dialog).
+    // Do not fetch here: the browser tears down in-flight requests during beforeunload, which
+    // causes Failed to fetch, stuck "pending" in devtools, and a false error state. Saves run
+    // from pagehide / visibilitychange instead, or after the user chooses Stay and sync finishes.
+    window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
+        let shouldWarn = false;
+        for (const check of segmentationUnloadWarnCheckers) {
+            try {
+                if (check()) {
+                    shouldWarn = true;
+                    break;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        if (shouldWarn) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+}
+
+function registerSegmentationSaveFlush(cb: () => void) {
+    segmentationSaveFlushCallbacks.add(cb);
+    installSegmentationSaveLifecycle();
+}
+
+function unregisterSegmentationSaveFlush(cb: () => void) {
+    segmentationSaveFlushCallbacks.delete(cb);
+}
+
+function registerSegmentationUnloadWarn(check: () => boolean) {
+    segmentationUnloadWarnCheckers.add(check);
+    installSegmentationSaveLifecycle();
+}
+
+function unregisterSegmentationUnloadWarn(check: () => boolean) {
+    segmentationUnloadWarnCheckers.delete(check);
+}
+
+// manages the segmentation state (history, mask) for a single scan
+export type SyncState = "synced" | "saving" | "error";
+
+export class SegmentationState {
+
+    protected history: DrawingHistory<string>;
+    public readonly mask: Mask;
+
+    private isDrawing = Promise.resolve();
+    private hasInitialCheckpoint = false;
+    private updateTimeout: ReturnType<typeof setTimeout> | null = null;
+    private pendingUpdateResolve: (() => void) | null = null;
+    private readonly flushOnHide = () => {
+        this.flushPendingServerUpdate();
+    };
+    private readonly checkUnsavedForUnload = () => this.hasUnsavedServerData();
+    public syncState = $state<SyncState>("synced");
+    public isEmptyForSlice = $state(false);
+
+    constructor(
+        readonly image: AbstractImage,
+        readonly segmentation: SegmentationGET | ModelSegmentationGET,
+        readonly scanNr: number,
+        initialData?: DrawingArray,
+        readonly segmentationItem?: SegmentationItem,
+    ) {
+        this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
+        const plane = segmentationPlaneSize(segmentation, image);
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, plane.width, plane.height));
+        if (initialData) {
+            this.mask.importData(initialData);
+        } else {
+            this.isDrawing = this.initialize();
+        }
+        if (typeof window !== 'undefined') {
+            registerSegmentationSaveFlush(this.flushOnHide);
+            registerSegmentationUnloadWarn(this.checkUnsavedForUnload);
+        }
+    }
+
+    private ensureInitialCheckpoint() {
+        if (!this.hasInitialCheckpoint) {
+            this.history.checkpoint(this.mask.exportData());
+            this.hasInitialCheckpoint = true;
+        }
+    }
+
+    private async initialize() {
+        // Load a single slice from the server
+        const sparse_axis = this.segmentation.sparse_axis ?? undefined;
+        const scan_nr = this.scanNr;
+
+        let npyArray: NPYArray | null;
+        if (this.segmentation.annotation_type == 'model_segmentation') {
+            npyArray = await getModelSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
+        } else {
+            npyArray = await getSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
+        }
+        if (npyArray == null) {
+            this.isEmptyForSlice = true;
+            return;
+        }
+        this.mask.importData(npyArray.data as DrawingArray);
+        this.segmentationItem?.addSavedScanIndex(scan_nr);
+    }
+
+    async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
+        await this.isDrawing; // wait for previous drawing to finish
+        this.ensureInitialCheckpoint();
+        this.mask.draw(drawing, settings);
+        this.isDrawing = this.checkpoint();
+    }
+
+    async importOther(other: Mask) {
+        await this.isDrawing; // wait for previous drawing to finish
+        this.ensureInitialCheckpoint();
+
+        const data = other.exportData();
+
+        const thisType = this.segmentation.data_representation as SegmentationDataRepresentation;
+        const otherType = other.segmentation.data_representation as SegmentationDataRepresentation;
+        const threshold = (255 * (other.segmentation.threshold ?? 0.5));
+
+        function isSimpleRepresentation(t: SegmentationDataRepresentation): t is SimpleDataRepresentation {
+            return t === 'Binary' || t === 'DualBitMask' || t === 'Probability';
+        }
+
+        if (isSimpleRepresentation(thisType) && isSimpleRepresentation(otherType)) {
+            const dataConverted = convert(data, otherType, thisType, threshold);
+            this.mask.importData(dataConverted);
+        } else if (thisType === otherType) {
+            this.mask.importData(data);
+        } else {
+            console.warn("SegmentationState.importOther: conversion not supported", otherType, "->", thisType);
+        }
+
+        this.isDrawing = this.checkpoint();
+    }
+
+    async checkpoint() {
+        const data = this.mask.exportData();
+        await this.updateServer();
+        this.history.checkpoint(data);
+    }
+
+    get canUndo() {
+        return this.history.canUndo;
+    }
+
+    get canRedo() {
+        return this.history.canRedo;
+    }
+
+    async undo() {
+        const data = await this.history.undo();
+        if (data) {
+            this.mask.importData(data);
+            await this.updateServer();
+        }
+    }
+
+    async redo() {
+        const data = await this.history.redo();
+        if (data) {
+            this.mask.importData(data);
+            await this.updateServer();
+        }
+    }
+
+    updateServer() {
+        // Clear existing timeout if one exists (debounce: cancel previous pending update)
+        if (this.updateTimeout) {
+            clearTimeout(this.updateTimeout);
+        }
+
+        // Resolve immediately for optimistic UI updates (don't block drawing)
+        // The actual server call will be debounced and happen in the background
+        const resolveImmediately = this.pendingUpdateResolve;
+        if (resolveImmediately) {
+            resolveImmediately();
+        }
+
+        // Set sync state to "saving" when update is triggered
+        this.syncState = "saving";
+
+        // Debounce: wait 2 seconds after last update before sending to server.
+        // If this tick was superseded by a newer timer, skip (the newer tick will save).
+        const tid = setTimeout(() => {
+            if (this.updateTimeout !== tid) return;
+            this.updateTimeout = null;
+            void this.performSave();
+        }, 2000);
+        this.updateTimeout = tid;
+
+        // Return a Promise that resolves immediately for optimistic updates
+        return new Promise<void>((resolve) => {
+            this.pendingUpdateResolve = resolve;
+            // Resolve immediately so checkpoint() doesn't block
+            resolve();
+        });
+    }
+
+    private async performSave(options?: { keepalive?: boolean }) {
+        try {
+            const data = this.mask.exportData();
+            const { planeHeight, planeWidth } = this.mask;
+            const expectedLen = planeHeight * planeWidth;
+            if (data.length !== expectedLen && data.length !== expectedLen * 4) {
+                console.error(
+                    "Segmentation save: data length mismatch",
+                    { got: data.length, expected: expectedLen, planeWidth, planeHeight },
+                );
+            }
+            const buffer = encodeNpy(data, [planeHeight, planeWidth]);
+            const sparse_axis = this.segmentation.sparse_axis ?? undefined;
+            let scan_nr: number | undefined = this.scanNr;
+            if (this.image.image_id.endsWith('proj')) {
+                scan_nr = undefined;
+            }
+            if (scan_nr !== undefined) {
+                this.segmentationItem?.addSavedScanIndex(scan_nr);
+            }
+            const resp = await updateSegmentationData(this.segmentation.id, buffer, {
+                sparse_axis,
+                scan_nr,
+                keepalive: options?.keepalive,
+            });
+            await resp.json();
+
+
+            this.syncState = "synced";
+        } catch (error) {
+            // keepalive runs around navigation; the browser often aborts these with TypeError:
+            // Failed to fetch — that is not a real server failure, avoid flipping to error UI.
+            if (
+                options?.keepalive &&
+                (isNavigationTimeFetchFailure(error) ||
+                    (error instanceof DOMException && error.name === 'AbortError'))
+            ) {
+                return;
+            }
+            this.syncState = "error";
+            console.error("Failed to update segmentation data:", error);
+        }
+    }
+
+    /** True if a server sync is still pending (debounced timer, in-flight request, or error). */
+    private hasUnsavedServerData(): boolean {
+        return this.updateTimeout !== null || this.syncState !== "synced";
+    }
+
+    /**
+     * Encode and send the current mask without waiting for the debounce timer.
+     * Uses keepalive so the browser is more likely to complete the request on unload.
+     */
+    private flushPendingServerUpdate() {
+        const shouldSave = this.hasUnsavedServerData();
+        if (this.updateTimeout) {
+            clearTimeout(this.updateTimeout);
+            this.updateTimeout = null;
+        }
+        if (!shouldSave) return;
+        void this.performSave({ keepalive: true });
+    }
+
+    dispose() {
+        if (typeof window !== 'undefined') {
+            unregisterSegmentationSaveFlush(this.flushOnHide);
+            unregisterSegmentationUnloadWarn(this.checkUnsavedForUnload);
+        }
+        this.flushPendingServerUpdate();
+        this.mask.dispose();
+        this.history.clear();
+    }
+}

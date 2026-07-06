@@ -4,7 +4,7 @@
 	import { instances } from "$lib/data/stores.svelte";
 
 	interface Props {
-		instanceId: number;
+		instanceId: string;
 	}
 	let { instanceId }: Props = $props();
 

@@ -1,0 +1,28 @@
+---
+title: Search
+description: Search instances and studies
+sidebar:
+  order: 10
+---
+
+### POST /api/instances/search
+
+Search image instances.
+
+**Request body:** `conditions`, `order_by`, `order`, `limit`, `page`.
+
+**Response:** instances, `result_ids` (public IDs), pagination fields.
+
+### POST /api/studies/search
+
+Search studies; includes related instances in the response.
+
+### GET /api/instances/search/signature
+
+Available filter/sort fields for instance search.
+
+### GET /api/studies/search/signature
+
+Available filter/sort fields for study search.
+
+The browser and task UI use these endpoints for filtering. Detailed condition syntax is defined in the server search module — see `server/routes/search.py` and OpenAPI types in the repository.

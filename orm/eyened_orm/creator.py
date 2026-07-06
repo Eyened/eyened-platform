@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, ClassVar, List, Optional
+from typing import TYPE_CHECKING, ClassVar, List, Optional, Set
 
 from sqlalchemy import BINARY, ForeignKey, String, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -43,4 +43,4 @@ class Creator(Base):
     Tags: Mapped[List["Tag"]] = relationship("eyened_orm.tag.Tag", back_populates="Creator")
     Tasks: Mapped[List["Task"]] = relationship("eyened_orm.task.Task", back_populates="Creator")
     # Tags that this creator starred
-    StarredTags: Mapped[List["CreatorTagLink"]] = relationship("eyened_orm.tag.CreatorTagLink", back_populates="Creator", viewonly=True, lazy="selectin")
+    StarredTags: Mapped[Set["CreatorTagLink"]] = relationship("eyened_orm.tag.CreatorTagLink", back_populates="Creator", viewonly=True, lazy="selectin")

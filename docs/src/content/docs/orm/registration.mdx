@@ -1,0 +1,99 @@
+---
+title: Enface registration
+description: Eye-scoped image alignment — storage, schemas, inference, and viewer
+sidebar:
+  order: 7
+---
+
+**Registration** links enface images from the same **patient and eye** (color fundus, autofluorescence, infrared, etc.) so the viewer can compute transforms and share cursor position across linked views.
+
+Registration is not a separate database table. It uses **`FormAnnotation`** (manual / editable), patient **`AttributeValue`** (model output), and a shared client-side **registration graph**.
+
+The viewer loads **both** into one graph. Prefer **FormAnnotations** for grader-owned or editable sets; **AttributeValues** for versioned model output. See **[Form annotations](/eyened-platform/orm/data_model/form_annotations)** and **[Attributes](/eyened-platform/orm/data_model/attributes)** for the underlying entities.
+
+
+## Builtin FormSchemas
+
+Three registration schemas are seeded with `eorm seed-form-schemas` (see **[Form schemas](/eyened-platform/orm/form_schemas)**). All use **`EntityType.Eye`**: set `PatientID` and `Laterality` on the annotation row.
+
+| Schema | `FormData` shape | Typical source |
+|--------|------------------|----------------|
+| `Pointset registration` | `{ "<PublicID>": [{x,y}, …], … }` | Registration panel |
+| `Affine registration` | `[{ image0, image1, transform }, …]` | Import / tools |
+| `RegistrationSet` | `[{ image1, image2, transform }, …]` | Import / composite pipelines |
+
+These schemas are hidden from the generic Form panel.
+
+## JSON formats and client interpretation
+
+Each schema becomes a set of **directed edges** between image `PublicID`s in the client `Registration` object. The viewer composes transforms along shortest paths so cursor position can propagate across linked images.
+
+### `Pointset registration`
+
+**JSON:** an object whose keys are image **`PublicID`s**. Each value is an array of landmark points `{x, y}` in full-resolution image pixels. Points at the **same index** in two arrays are treated as a correspondence pair; entries may be `null` where a landmark is not yet placed.
+
+```json
+{
+  "a1b2c3d4e5f6": [{ "x": 1024, "y": 768 }, { "x": 512, "y": 640 }],
+  "f6e5d4c3b2a1": [{ "x": 1010, "y": 770 }, null]
+}
+```
+
+**Client:** For every pair of keys, the client fits a 2D affine matrix from matching non-null point pairs (at least 3 corresponding points are needed). The Registration panel **creates and edits** this JSON via the registration tool (`PUT /form-annotations/{id}/value`).
+
+### `Affine registration`
+
+**JSON:** an array of precomputed pairwise affines:
+
+```json
+[
+  {
+    "image0": "a1b2c3d4e5f6",
+    "image1": "f6e5d4c3b2a1",
+    "transform": [a, b, c, d, e, f]
+  }
+]
+```
+
+Each `transform` is six numbers forming a 2×3 affine matrix (maps source → target). Image keys should be **`PublicID` strings**; the bundled JSON Schema still allows numbers for legacy data — the client stringifies them when building the graph.
+
+**Client:** `getAffineTransforms` wraps each row as an `AffineRegistration` edge. Used when affines are produced offline or imported rather than derived from point sets.
+
+### `RegistrationSet`
+
+**JSON:** an array of edges with typed transforms — the same shape written by **`eorm run-registration`** to patient **`Registration`** attributes:
+
+```json
+[
+  {
+    "image1": "a1b2c3d4e5f6",
+    "image2": "f6e5d4c3b2a1",
+    "transform": {
+      "type": "ProjectiveTransform",
+      "Matrix": [/* 9 numbers, 3×3 */]
+    }
+  }
+]
+```
+
+Supported `transform.type` values in the client: **`ProjectiveTransform`** (3×3 projective / homography), **`CompositeTransform`** (nested list), **`ParabolicTransform`** / **`Polynomial2DTransform`** (parabolic warps from coefficient arrays `dx`, `dy`).
+
+**Client:** `getRegistrationSets` dispatches on `transform.type` and builds `RegistrationItem`s with pixel mappings and GLSL shaders for rendering. Loaded from **`RegistrationSet`** FormAnnotations and from patient **`Registration`** attribute arrays (`collectPatientRegistrationSets` in `ViewerWindow`).
+
+:::caution[Important — use PublicID]
+Registration JSON (in **`FormAnnotation.FormData`** or patient **`AttributeValue`** for the `Registration` attribute) references images by **`PublicID`** — the 12-character API identifier (`ImageInstance.PublicID`), not the numeric `ImageInstanceID`. The viewer uses the same string as `ImageGET.id` when reading and writing point-set keys.
+:::
+
+## Batch inference
+
+Pairwise enface registration via `retinalysis-registration` writes `{image1, image2, transform}` lists to patient **Registration** attributes.
+
+
+
+```bash
+eorm run-registration --project 1 --patient PAT001
+```
+
+Requires `--project` or `--patient`. Use `--replace` to clear existing transforms; `--skip` to exclude PublicIDs. Each package version creates its own `Model` row; the viewer merges graphs across versions.
+
+Requires optional `rtnls_registration` package — see `eorm run-registration --help`. Targeting flags: **[CLI](/eyened-platform/orm/cli#targeting)**.

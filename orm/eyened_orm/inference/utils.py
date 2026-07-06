@@ -1,8 +1,41 @@
+import os
 from datetime import datetime
 
 from eyened_orm import ImageInstance
 from sqlalchemy import update
 from tqdm import tqdm
+
+import numpy as np
+
+
+def normalize(im, ce=None):
+    mean = 0.485, 0.456, 0.406
+    std = 0.229, 0.224, 0.225
+    assert im.dtype == np.uint8
+
+    im_norm = (im / 255.0 - mean) / std
+    if ce is not None:
+        ce_norm = (ce / 255.0 - mean) / std
+        return np.concatenate([im_norm, ce_norm], axis=2)
+    return im_norm
+
+
+def load_image_rgb(image_path) -> np.ndarray:
+    """Load a fundus image as a uint8 RGB array. Supports DICOM and raster formats."""
+    from rtnls_fundusprep.utils import open_image
+    return open_image(image_path)
+
+
+def preprocess_image(image_path, resize=512, apply_ce=False):
+    from rtnls_fundusprep.mask_extraction import get_cfi_bounds
+    from rtnls_inference.utils import load_image
+
+    image = load_image(image_path)
+    bounds = get_cfi_bounds(image)
+    T, bounds_cropped = bounds.crop(resize)
+    im = bounds_cropped.image
+    ce = bounds_cropped.contrast_enhanced_5 if apply_ce else None
+    return T, normalize(im, ce)
 
 
 def transform_kps(colname):
@@ -22,6 +55,7 @@ def transform_kps(colname):
 def logits_to_continuous_score(logits, temperature=3.0):
     import torch
     import torch.nn.functional as F
+
     logits = torch.tensor(logits, dtype=torch.float32) / temperature
     probs = F.softmax(logits, dim=-1)
     num_classes = len(logits)
@@ -87,17 +121,75 @@ def clear_unsuccessfull(session, df, commit=True):
         session.commit()
 
 
+def inference_verbose() -> bool:
+    return os.environ.get("EYENED_INFERENCE_VERBOSE", "0") == "1"
+
+
+def ensure_nnunet_env() -> None:
+    """nnU-Net v2 expects ``nnUNet_*`` env vars (not only ``NNUNET_RESULTS``)."""
+    results = os.environ.get("NNUNET_RESULTS", "/nnUNet_results")
+    for key in ("nnUNet_results", "nnUNet_raw", "nnUNet_preprocessed"):
+        os.environ.setdefault(key, results)
+
 
 def auto_device():
     import GPUtil
     import torch
-    # Attempt to select a free GPU
+
+    if not torch.cuda.is_available():
+        return torch.device("cpu")
     try:
-        deviceID = GPUtil.getFirstAvailable(order="memory")[
-            0
-        ]  # Get the GPU with the most free memory
-        device = f"cuda:{deviceID}"
-    except RuntimeError:
-        device = "cpu"
-    device = torch.device(device if torch.cuda.is_available() else "cpu")
-    return device
+        device_id = GPUtil.getFirstAvailable(order="memory")[0]
+        return torch.device(f"cuda:{device_id}")
+    except Exception:
+        # GPUtil often fails in Docker; still use the visible GPU.
+        return torch.device("cuda:0")
+
+
+def assert_cuda_kernel_compatible(device) -> None:
+    """Fail fast when PyTorch in this environment cannot run on the visible GPU."""
+    import torch
+
+    if device.type != "cuda" or not torch.cuda.is_available():
+        return
+    cap = torch.cuda.get_device_capability(device)
+    name = torch.cuda.get_device_name(device)
+    ver = torch.__version__
+    if cap[0] >= 12 and "+cu118" in ver:
+        raise RuntimeError(
+            f"PyTorch {ver} does not support {name} (sm_{cap[0]}{cap[1]}). "
+            "Rebuild the worker image:\n"
+            "  cd worker && docker compose -f docker-compose.layersegmentation.yml build"
+        )
+    try:
+        torch.zeros(1, device=device).add_(1)
+        torch.cuda.synchronize(device)
+    except RuntimeError as exc:
+        if "no kernel image" in str(exc).lower():
+            raise RuntimeError(
+                f"PyTorch {ver} cannot execute CUDA kernels on {name} (sm_{cap[0]}{cap[1]}). "
+                "Rebuild the worker image:\n"
+                "  cd worker && docker compose -f docker-compose.layersegmentation.yml build"
+            ) from exc
+        raise
+
+
+def quiet_console():
+    """Suppress stdout/stderr from noisy libraries unless ``EYENED_INFERENCE_VERBOSE=1``."""
+    import contextlib
+    import sys
+
+    if inference_verbose():
+        return contextlib.nullcontext()
+
+    @contextlib.contextmanager
+    def _suppress():
+        with open(os.devnull, "w") as devnull:
+            old_out, old_err = sys.stdout, sys.stderr
+            sys.stdout, sys.stderr = devnull, devnull
+            try:
+                yield
+            finally:
+                sys.stdout, sys.stderr = old_out, old_err
+
+    return _suppress()

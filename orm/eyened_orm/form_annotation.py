@@ -1,14 +1,15 @@
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 from enum import Enum
 from pandas import DataFrame, json_normalize
-from sqlalchemy import Column, DateTime, ForeignKey, String, func, Enum as SAEnum
+from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func, Enum as SAEnum
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
 from .image_instance import Laterality
+from .types import OptionalEnum
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -35,13 +36,34 @@ class FormSchema(Base):
     FormSchemaID: Mapped[int] = mapped_column(primary_key=True)
     SchemaName: Mapped[str] = mapped_column(String(255), unique=True)
     Schema: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
-    EntityType: Mapped[Optional[EntityType]] = mapped_column(SAEnum(EntityType), default=None)
+    EntityType: Mapped[Optional[EntityType]] = mapped_column(OptionalEnum(EntityType), default=None)
 
     FormAnnotations: Mapped[List["FormAnnotation"]] = relationship("eyened_orm.form_annotation.FormAnnotation", back_populates="FormSchema")
 
 
 class FormAnnotation(Base):
     __tablename__ = "FormAnnotation"
+    __table_args__ = (
+        Index(
+            "ix_FormAnnotation_FormSchema_Inactive_Creator",
+            "FormSchemaID",
+            "Inactive",
+            "CreatorID",
+        ),
+        Index(
+            "ix_FormAnnotation_Patient_Study_Inactive",
+            "PatientID",
+            "StudyID",
+            "Inactive",
+        ),
+        Index(
+            "ix_FormAnnotation_Image_Laterality_Inactive",
+            "ImageInstanceID",
+            "Laterality",
+            "Inactive",
+        ),
+        Index("ix_FormAnnotation_SubTask_Inactive", "SubTaskID", "Inactive"),
+    )
 
     FormAnnotationID: Mapped[int] = mapped_column(primary_key=True)
 
@@ -49,7 +71,7 @@ class FormAnnotation(Base):
     PatientID: Mapped[int] = mapped_column(ForeignKey("Patient.PatientID"))
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
     ImageInstanceID: Mapped[Optional[int]] = mapped_column(ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"))
-    Laterality: Mapped[Optional[Laterality]] = mapped_column(SAEnum(Laterality))
+    Laterality: Mapped[Optional[Laterality]] = mapped_column(OptionalEnum(Laterality))
     
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     SubTaskID: Mapped[Optional[int]] = mapped_column(ForeignKey("SubTask.SubTaskID", ondelete="SET NULL"))
@@ -66,7 +88,7 @@ class FormAnnotation(Base):
     ImageInstance: Mapped["ImageInstance"] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="FormAnnotations")
     Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="FormAnnotations")
     SubTask: Mapped["SubTask"] = relationship("eyened_orm.task.SubTask", back_populates="FormAnnotations")
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship("eyened_orm.tag.FormAnnotationTagLink", back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
+    FormAnnotationTagLinks: Mapped[Set["FormAnnotationTagLink"]] = relationship("eyened_orm.tag.FormAnnotationTagLink", back_populates="FormAnnotation", passive_deletes=True, lazy="selectin")
 
     def make_tag(
         self,
@@ -171,7 +193,9 @@ class FormAnnotation(Base):
             "Creator": self.Creator.CreatorName,
             "Created": self.DateInserted,
             "PatientIdentifier": self.Patient.PatientIdentifier,
-            "ImageInstance": self.ImageInstanceID,
+            "ImageInstance": self.ImageInstance.PublicID if self.ImageInstance else None,
+            "StudyDate": self.Study.StudyDate if self.Study else None,
+            "ProjectName": self.Patient.Project.ProjectName,
             "Laterality": (
                 str(self.Laterality.name)
                 if self.Laterality

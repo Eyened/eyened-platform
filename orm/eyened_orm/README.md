@@ -212,8 +212,8 @@ The central hierarchy of the ORM follows the DICOM-inspired structure common in 
 
 **Key Methods**:
 - `Project.by_name(session, name)`: Find project by name
-- `Project.make_dataframe(session)`: Get dataframe of all images in project
-- `Project.get_patient_by_identifier(session, identifier)`: Find patient within project
+- `Project.make_dataframe()`: Get dataframe of all images in project
+- `Project.get_patient_by_identifier(identifier)`: Find patient within project
 
 #### Patient ([patient.py](patient.py))
 
@@ -510,7 +510,7 @@ By default segmentation.shape == image.shape. That is:
 - Segmentation.Depth == ImageInstance.NrOfFrames or 1 
 - Segmentation.Height == ImageInstance.Rows_y
 - Segmentation.Width == ImageInstance.Columns_x
-However, if ImageProjectionMatrix is provided, two dimensions may differ. SparseAxis must indicate the dimension that is not modified (0=Depth, 1=Height, 2=Width)
+However, if ImageProjectionMatrix is provided, two dimensions may differ and SparseAxis must indicate the dimension that is not modified (0=Depth, 1=Height, 2=Width). If only a SparseAxis is provided, the dimension in that axis can differ.
 
 SliceIndices is used to indicate which slices along SparseAxis have valid data (e.g. when annotating a subset of B-scans in an OCT volume).
 
@@ -664,12 +664,12 @@ session.commit()
   - `AttributeDataType` enum: String, Float, Int, JSON
   - Relationships: `AttributeValues` (1→N), `ProducingModels` (N→M, via AttributesModelOutput)
 
-- **`AttributeValue`**: Stores a computed attribute value for an entity
+- **`AttributeValue`**: Stores a computed or manual attribute value for an entity
   - Primary key: `AttributeValueID`
   - Unique constraints: separate constraints for each entity type (ImageInstance, Segmentation, ModelSegmentation) with AttributeID and ModelID
   - Check constraint: exactly one of ImageInstanceID, SegmentationID, or ModelSegmentationID must be non-null
   - Can attach to: `ImageInstance` (optional), `Segmentation` (optional), `ModelSegmentation` (optional)
-  - Relationships: `AttributeDefinition` (N→1, required), `ProducingModel` (N→1, required), `ImageInstance` (N→1, optional, CASCADE), `Segmentation` (N→1, optional, CASCADE), `ModelSegmentation` (N→1, optional, CASCADE), `InputValues` (provenance tracking, N→M), `UsedByValues` (provenance tracking, N→M)
+  - Relationships: `AttributeDefinition` (N→1, required), `ProducingModel` (N→1, optional), `ImageInstance` (N→1, optional, CASCADE), `Segmentation` (N→1, optional, CASCADE), `ModelSegmentation` (N→1, optional, CASCADE), `InputValues` (provenance tracking, N→M), `UsedByValues` (provenance tracking, N→M)
   - Stores value as: `ValueFloat`, `ValueInt`, `ValueText`, or `ValueJSON` depending on attribute type
 
 - **`AttributesModel`**: Model that produces attribute values (polymorphic)

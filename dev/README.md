@@ -3,10 +3,21 @@
 **Prerequisites:** npm, python .venv with required packages, docker, docker compose  
 **Working dir:** `dev` (cd dev)
 
-## 1. Configure Environment Variables
+## 0. Install Dependencies (first time only)
+- Python deps:
+  ```bash
+  python -m pip install -r ../server/requirements.txt
+  ```
+- Client deps:
+  ```bash
+  (cd ../client && npm install)
+  ```
+
+## 1. Configure Settings and Secrets
 - Copy `sample.env` to `.env` and fill out the required values.
 
 ## 2. Start Docker Services
+- The database is a separate stack and is not part of this compose file. Start it first (see [../database/README.md](../database/README.md)); the server reaches it via `host.docker.internal` using the `EYENED_DATABASE_*` values in `.env`.
 - [Optional] You may want to update the name in docker-compose.yml
 - Run:
   ```bash
@@ -14,42 +25,24 @@
   ```
   This will start:
   - nginx fileserver that takes care of the routing (api, frontend and files)
-  - start a database service
-  - start an adminer service (for accessing the database through a browser)
+  - redis
+  - the server and client
+
+### OIDC login (optional)
+
+The base stack runs without OIDC. To test the OIDC login flow, either point the
+`EYENED_OIDC_*` values in `.env` at a real provider, or spin up the bundled local
+Keycloak — see [keycloak/README.md](./keycloak/README.md).
 
 ## 3. Populate the Database [Optional]
-To copy over some data (for example from a production environment), run this:
+To copy over data (for example from a production environment), run this:
 ```bash
-eorm database-mirror-test -c transfer-config.yml
+eorm load-dump -p path_to_dump
 ```
-
-where `transfer-config.yml` has the following structure:
-```yaml
-source:
-  host: 
-  port: 
-  user: 
-  password: 
-  database: eyened_database
-
-target:
-  host: 
-  port: 
-  user: root
-  password: 
-  database: eyened_database
-
-copy_objects:
-  - table: Patient
-    clause:
-      PatientIdentifier: '1'
-  - table: Patient
-    clause:
-      PatientIdentifier: '2'
+A dump can be created like this:
+```bash
+eorm save-dump -p path_to_dump
 ```
-**Note:** 
-- You can fill out the list of object to copy (`copy_objects`). Linked objects from other tables (via foreign keys) are also automatically included.
-- The `source` is the source database (e.g. production), `target` is the development database (use `port=DATABASE_PORT` from the `.env`).
 
 ### Apply Pending Migrations (if needed)
 Working from `orm/migrations`:
@@ -59,20 +52,11 @@ cd ../orm/migrations
 
 Assuming the migration you want to run is found in `orm/migrations/alembic/versions`:
 
-1. Set the connection string in `orm/migrations/alembic.ini` by running:
-   ```bash
-   python set_connection_string.py ../../dev/.env
-   ```
-
-2. Double check if the connection string is correct:
-   ```bash
-   cat alembic.ini | grep url
-   ```
-
-3. Run the migration:
-   ```bash
-   alembic upgrade head
-   ```
+Run the migration:
+```bash
+alembic -x env_file=../../dev/.env upgrade head
+```
+You will be prompted to confirm the target database before the migration runs.
 
 ## 4. Start the Development Server & Client
 Working from `dev` 
@@ -92,5 +76,20 @@ cd ../../dev
   ```bash
   ./start_client_dev.sh
   ```
-  This will start the client in development mode, using vite hot-reload 
+  This will start the client in development mode, using vite hot-reload.
 
+## Run unit tests
+
+First time only: install testing dependencies
+
+```shell
+pip install -r ../server/test-requirements.txt
+```
+
+Then run `pytest` from the root folder:
+
+```shell
+pytest
+# or, when in ./dev:
+pytest ..
+```

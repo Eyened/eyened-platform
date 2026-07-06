@@ -1,78 +1,127 @@
+from __future__ import annotations
+
 from collections import defaultdict, deque
-from pathlib import Path
+from typing import Any
 
-from eyened_orm import Creator, FormAnnotation, FormSchema, ImageInstance
+import numpy as np
+from eyened_orm import AttributeValue, ImageInstance
 from rtnls_registration import Registration
+from rtnls_registration.transformation import (
+    CompositeTransform,
+    Polynomial2DTransform,
+    ProjectiveTransform,
+    Transform,
+)
+from sklearn.linear_model import LinearRegression
 
 
-def get_or_create_schema(session, schema_name):
-    schema = FormSchema.by_name(session, schema_name)
-    if schema is None:
-        import json
+def transform_from_dict(d: dict[str, Any]) -> Transform:
+    """Reconstruct an rtnls_registration transform from JSON (e.g. ``AttributeValue.ValueJSON`` edge)."""
+    ttype = d["type"]
+    if ttype == "CompositeTransform":
+        return CompositeTransform([transform_from_dict(t) for t in d["transforms"]])
+    if ttype == "ProjectiveTransform":
+        return ProjectiveTransform(np.array(d["Matrix"], dtype=float).reshape(3, 3))
+    if ttype == "Polynomial2DTransform":
 
-        current_dir = Path(__file__).parent
-        schema_path = current_dir / "registration_schema.json"
+        def _model_from_coefs(coefs: list[float]) -> LinearRegression:
+            model = LinearRegression()
+            model.intercept_ = coefs[0]
+            model.coef_ = np.array(coefs[1:], dtype=float)
+            return model
 
-        with open(schema_path, "r") as f:
-            schema_dict = json.load(f)
-
-        schema = FormSchema(SchemaName=schema_name, Schema=schema_dict)
-        print(f"Created schema for registration set using name '{schema_name}'")
-        session.add(schema)
-        session.commit()
-    return schema
-
-
-def get_or_create_creator(session, creator_name):
-    creator = Creator.by_name(session, creator_name)
-    if creator is None:
-        creator = Creator(CreatorName=creator_name, IsHuman=True)
-        session.add(creator)
-        session.commit()
-        print(f"Created creator for registration set using name '{creator_name}'")
-    return creator
+        return Polynomial2DTransform(
+            _model_from_coefs(d["dx"]),
+            _model_from_coefs(d["dy"]),
+            degree=d["degree"],
+        )
+    raise ValueError(f"Unknown transform type: {ttype!r}")
 
 
-def get_or_create_FormAnnotation(session, patient, schema, creator):
-    """
-    Get or create a form annotation for a patient.
-    """
-    formAnnotation = FormAnnotation.where(
-        session,
-        (FormAnnotation.FormSchemaID == schema.FormSchemaID)
-        & (FormAnnotation.CreatorID == creator.CreatorID)
-        & (FormAnnotation.PatientID == patient.PatientID),
-    )
-    if formAnnotation:
-        if len(formAnnotation) > 1:
-            print(
-                f"Found multiple form annotations for patient {patient.PatientID}, using the first one ({formAnnotation[0].FormAnnotationID})"
-            )
-        return formAnnotation[0]
-
-    formAnnotation = FormAnnotation()
-    formAnnotation.Creator = creator
-    formAnnotation.FormSchema = schema
-    formAnnotation.Patient = patient
-    formAnnotation.FormData = []
-
-    session.add(formAnnotation)
-    session.commit()
-    return formAnnotation
+def registration_image_key(image: ImageInstance) -> str:
+    """Public image identifier stored in registration JSON (matches viewer ``image_id``)."""
+    return image.PublicID
 
 
-def get_processed_edges(formAnnotation):
-    if formAnnotation.FormData:
-        processed = {(e["image1"], e["image2"]) for e in formAnnotation.FormData}
-    else:
-        processed = set()
+def collect_legacy_instance_ids(transforms: list[dict[str, Any]]) -> set[int]:
+    ids: set[int] = set()
+    for edge in transforms:
+        for key in ("image1", "image2"):
+            val = edge.get(key)
+            if isinstance(val, int):
+                ids.add(val)
+            elif isinstance(val, str) and val.isdigit():
+                ids.add(int(val))
+    return ids
 
-    # Build adjacency list from the processed edges (bidirectional)
+
+def build_id_to_public(session, instance_ids: set[int]) -> dict[int, str]:
+    if not instance_ids:
+        return {}
+    images = ImageInstance.by_columns(session, ImageInstanceID=instance_ids)
+    return {im.ImageInstanceID: im.PublicID for im in images}
+
+
+def normalize_registration_key(
+    key: str | int, id_to_public: dict[int, str]
+) -> str:
+    if isinstance(key, str) and not key.isdigit():
+        return key
+    int_id = int(key)
+    return id_to_public.get(int_id, str(int_id))
+
+
+def normalize_registration_transforms(
+    transforms: list[dict[str, Any]], id_to_public: dict[int, str]
+) -> list[dict[str, Any]]:
+    return [
+        {
+            **edge,
+            "image1": normalize_registration_key(edge["image1"], id_to_public),
+            "image2": normalize_registration_key(edge["image2"], id_to_public),
+        }
+        for edge in transforms
+    ]
+
+
+def graph_from_transforms(
+    transforms: list[dict[str, Any]], id_to_public: dict[int, str] | None = None
+):
+    id_to_public = id_to_public or {}
     graph = defaultdict(set)
-    for img1, img2 in processed:
+    for edge in transforms:
+        img1 = normalize_registration_key(edge["image1"], id_to_public)
+        img2 = normalize_registration_key(edge["image2"], id_to_public)
         graph[img1].add(img2)
         graph[img2].add(img1)
     return graph
+
+
+def get_processed_edges(
+    attribute_value: AttributeValue, id_to_public: dict[int, str] | None = None
+):
+    id_to_public = id_to_public or {}
+    transforms = attribute_value.ValueJSON or []
+    return graph_from_transforms(transforms, id_to_public)
+
+
+def collect_registration_seed_transforms(
+    session, patient, attribute_id: int, *, replace: bool
+) -> list[dict[str, Any]]:
+    """All stored registration edges for this patient/attribute (any model version)."""
+    if replace:
+        return []
+
+    attribute_values = AttributeValue.by_columns(
+        session,
+        PatientID=patient.PatientID,
+        AttributeID=attribute_id,
+    )
+    seed: list[dict[str, Any]] = []
+    for av in attribute_values:
+        if av.ValueJSON:
+            seed.extend(av.ValueJSON)
+    return seed
 
 
 def are_connected(image_id1, image_id2, graph):
@@ -82,7 +131,6 @@ def are_connected(image_id1, image_id2, graph):
     if image_id1 == image_id2:
         return True
 
-    # BFS to check connectivity
     if image_id1 not in graph or image_id2 not in graph:
         return False
 
@@ -110,19 +158,16 @@ def get_etdrs_field(image):
             return "F2"
 
     if image.CFKeypoints and image.CFROI:
-        # derive field from location of fovea relative to center of the image
         fx, _ = image.CFKeypoints["fovea_xy"]
         cx, _ = image.CFROI["center"]
         r = image.CFROI["radius"]
         d = abs(cx - fx) / r
-        # F2 if fovea is closer to center than 0.5 of the radius, F1 otherwise
         return "F2" if d < 0.5 else "F1"
 
     if image.Modality and image.Modality.name in (
         "InfraredReflectance",
         "Autofluorescence",
     ):
-        # assume that these are F2
         return "F2"
 
     return None
@@ -138,133 +183,169 @@ def sort_images(images):
 
 
 def get_pixel_array(image):
-    if image.NrOfFrames > 1:
-        # Note: using only the first frame for registration
+    if image.NrOfFrames and image.NrOfFrames > 1:
         return image.pixel_array[0]
     else:
         return image.pixel_array
 
 
-def run_registration(image_set, graph, form_data):
-    # Skip if image set is empty
+def run_registration(image_set, graph, new_transforms):
     if not image_set:
         return None, None
 
-    # best quality image as reference
     reference = max(image_set, key=lambda i: i.CFQuality if i.CFQuality else 0)
+    ref_key = registration_image_key(reference)
 
     registrator = Registration()
     registrator.set_reference(get_pixel_array(reference))
 
     for i in image_set:
-        if are_connected(reference.ImageInstanceID, i.ImageInstanceID, graph):
+        i_key = registration_image_key(i)
+        if are_connected(ref_key, i_key, graph):
             continue
 
         registrator.set_target(get_pixel_array(i))
         try:
             print(
-                f"Running registration for {reference.ImageInstanceID} -> {i.ImageInstanceID}"
+                f"Running registration for {ref_key} -> {i_key} "
             )
             transform = registrator.run()
-            graph[reference.ImageInstanceID].add(i.ImageInstanceID)
-            graph[i.ImageInstanceID].add(reference.ImageInstanceID)
-            form_data.append(
+            graph[ref_key].add(i_key)
+            graph[i_key].add(ref_key)
+            new_transforms.append(
                 {
-                    "image1": reference.ImageInstanceID,
-                    "image2": i.ImageInstanceID,
+                    "image1": ref_key,
+                    "image2": i_key,
                     "transform": transform.to_dict(),
                 }
             )
         except Exception as e:
             print(
-                f"Error running registration for {reference.ImageInstanceID}, {i.ImageInstanceID}: {e}"
+                f"Error running registration for {ref_key}, {i_key}: {e}"
             )
 
     return registrator, reference
 
 
-def run_registration_patient(patient, formAnnotation):
+def run_registration_patient(
+    patient,
+    seed_transforms: list[dict[str, Any]],
+    skip_ids=None,
+    session=None,
+):
     print(
         f"Running registration for patient {patient.PatientID} {patient.PatientIdentifier}"
     )
-    enface_images = patient.get_images(
-        where=ImageInstance.Modality.in_(
-            ["ColorFundus", "InfraredReflectance", "Autofluorescence"]
-        )
-    )
-    print(f"Found {len(enface_images)} enface images")
-    graph = get_processed_edges(formAnnotation)
-    print(f"Found {len(graph)} processed pairs")
 
-    all_transforms = [*formAnnotation.FormData] if formAnnotation.FormData else []
+    modality_filter = ImageInstance.Modality.in_(
+        ["ColorFundus", "InfraredReflectance", "Autofluorescence"]
+    )
+
+    if skip_ids:
+        skip_filter = ~ImageInstance.ImageInstanceID.in_(skip_ids)
+        where_clause = modality_filter & skip_filter
+        print(f"Skipping {len(skip_ids)} imageInstanceIDs: {skip_ids}")
+    else:
+        where_clause = modality_filter
+
+    enface_images = patient.get_images(where=where_clause)
+    print(f"Found {len(enface_images)} enface images")
+
+    id_to_public = {
+        im.ImageInstanceID: im.PublicID for im in enface_images
+    }
+    if session is not None:
+        legacy_ids = collect_legacy_instance_ids(seed_transforms)
+        id_to_public.update(build_id_to_public(session, legacy_ids))
+
+    seed_normalized = normalize_registration_transforms(seed_transforms, id_to_public)
+    graph = graph_from_transforms(seed_normalized, id_to_public)
+    print(f"Found {len(graph)} processed pairs in seed graph")
+
+    new_transforms: list[dict[str, Any]] = []
     for eye in "RL":
 
-        eye_images = [i for i in enface_images if i.Laterality.name == eye]
+        eye_images = [
+            i for i in enface_images if i.Laterality and i.Laterality.name == eye
+        ]
 
-        # split images into F1 and F2
         sorted_images = sort_images(eye_images)
 
         register_f1 = None
         register_f2 = None
         if sorted_images["F1"]:
-            print(f"Running registration for F1 images")
+            print("Running registration for F1 images")
             register_f1, reference_f1 = run_registration(
-                sorted_images["F1"], graph, all_transforms
+                sorted_images["F1"], graph, new_transforms
             )
 
         if sorted_images["F2"]:
-            print(f"Running registration for F2 images")
+            print("Running registration for F2 images")
             register_f2, reference_f2 = run_registration(
-                sorted_images["F2"], graph, all_transforms
+                sorted_images["F2"], graph, new_transforms
             )
-
 
         if (
             register_f1
             and register_f2
-            and not are_connected(
-                reference_f1.ImageInstanceID, reference_f2.ImageInstanceID, graph
-            )
+            and reference_f1 is not None
+            and reference_f2 is not None
         ):
-            # register the two reference images
-            registration = Registration()
-            registration.M0 = register_f1.M0
-            registration.kp0_005 = register_f1.kp0_005
-            registration.des0_005 = register_f1.des0_005
-            registration.kp0_01 = register_f1.kp0_01
-            registration.des0_01 = register_f1.des0_01
+            ref_f1 = registration_image_key(reference_f1)
+            ref_f2 = registration_image_key(reference_f2)
+            if not are_connected(ref_f1, ref_f2, graph):
+                registration = Registration()
+                registration.set_reference(get_pixel_array(reference_f1))
+                registration.set_target(get_pixel_array(reference_f2))
 
-            registration.M1 = register_f2.M0
-            registration.kp1_005 = register_f2.kp0_005
-            registration.des1_005 = register_f2.des0_005
-            registration.kp1_01 = register_f2.kp0_01
-            registration.des1_01 = register_f2.des0_01
-            try:
-                transform = registration.run()
-                graph[reference_f1.ImageInstanceID].add(reference_f2.ImageInstanceID)
-                graph[reference_f2.ImageInstanceID].add(reference_f1.ImageInstanceID)
-                all_transforms.append(
-                    {
-                        "image1": reference_f1.ImageInstanceID,
-                        "image2": reference_f2.ImageInstanceID,
-                        "transform": transform.to_dict(),
-                    }
-                )
-            except Exception as e:
-                print(
-                    f"Error running reference-to-reference registration for {reference_f1.ImageInstanceID}, {reference_f2.ImageInstanceID}: {e}"
-                )
+                try:
+                    transform = registration.run()
+                    graph[ref_f1].add(ref_f2)
+                    graph[ref_f2].add(ref_f1)
+                    new_transforms.append(
+                        {
+                            "image1": ref_f1,
+                            "image2": ref_f2,
+                            "transform": transform.to_dict(),
+                        }
+                    )
+                except Exception as e:
+                    print(
+                        f"Error running reference-to-reference registration "
+                        f"for {ref_f1}, {ref_f2}: {e}"
+                    )
 
-    return all_transforms
+    return normalize_registration_transforms(new_transforms, id_to_public)
 
 
-def run_patient(session, patient, schema, creator, replace):
-    formAnnotation = get_or_create_FormAnnotation(session, patient, schema, creator)
+def run_patient(session, patient, definition, model, replace, skip_ids=None):
+    attribute_value = AttributeValue.get_or_create(
+        session,
+        match_by={
+            "AttributeID": definition.AttributeID,
+            "ModelID": model.ModelID,
+            "PatientID": patient.PatientID,
+        },
+    )
     if replace:
-        formAnnotation.FormData = []
+        attribute_value.ValueJSON = []
 
-    all_transforms = run_registration_patient(patient, formAnnotation)
-    formAnnotation.FormData = all_transforms
+    seed_transforms = collect_registration_seed_transforms(
+        session,
+        patient,
+        definition.AttributeID,
+        replace=replace,
+    )
+    new_transforms = run_registration_patient(
+        patient, seed_transforms, skip_ids, session=session
+    )
 
-    session.add(formAnnotation)
+    if replace:
+        attribute_value.ValueJSON = new_transforms
+    else:
+        existing = list(attribute_value.ValueJSON or [])
+        existing.extend(new_transforms)
+        attribute_value.ValueJSON = existing
+
+    session.add(attribute_value)
     session.commit()

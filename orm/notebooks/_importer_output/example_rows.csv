@@ -1,0 +1,3 @@
+project_name,storage_backend_key,object_key,patient_identifier,study_date,modality,laterality,modality_tag,scan_mode
+csv-proj,csv-backend,csv-0.png,patient-csv,2026-01-10,ColorFundus,L,csv_vendor_tag,
+csv-proj,csv-backend,csv-1.png,patient-csv,2026-01-10,ColorFundus,R,csv_vendor_tag,RadialStack

@@ -1,100 +1,174 @@
-import hashlib
-import hmac
+"""Thumbnail generation for :class:`~eyened_orm.ImageInstance` records.
+
+Shared by:
+- :class:`~eyened_orm.importer.postimport.PostImport` (after import)
+- ``eorm update-thumbnails`` (CLI bulk repair)
+- API RQ workers (``run_update_thumbnails_*_job``)
+"""
+
+from __future__ import annotations
+
+import uuid
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
-from PIL import Image
-from sqlalchemy import func, select
+from PIL import Image, ImageOps
+from sqlalchemy.orm import Session
 from tqdm import tqdm
 
-from eyened_orm import ImageInstance, Modality
+from eyened_orm.data_access import load_storage_root
+
+if TYPE_CHECKING:
+    from eyened_orm import Database, ImageInstance, Modality
+
+THUMBNAIL_SIZES: tuple[int, ...] = (144, 540)
+THUMBNAIL_COMMIT_INTERVAL = 100
 
 
-def get_thumbnail(im: ImageInstance):
-    pixel_array = im.pixel_array
+def allocate_thumbnail_path(project_id: int) -> str:
+    """Random path prefix under the thumbnails root: ``{project_id}/{bucket}/{uuid}``."""
+    u = uuid.uuid4().hex
+    return f"{project_id}/{u[:2]}/{u}"
+
+
+def thumbnail_filename(thumbnail_path: str, size: int) -> str:
+    """File name under ``{EYENED_STORAGE_ROOT}/thumbnails/`` (includes size suffix)."""
+    return f"{thumbnail_path}_{size}.jpg"
+
+
+def thumbnails_folder() -> Path:
+    """Absolute path to the thumbnails storage root."""
+    return load_storage_root() / "thumbnails"
+
+
+def pixel_array_to_2d(
+    pixel_array: np.ndarray,
+    *,
+    resolution_horizontal: float | None,
+    resolution_vertical: float | None,
+) -> np.ndarray:
+    """Reduce a volume or multi-channel array to a displayable 2D slice.
+
+    For OCT volumes this produces either a middle B-scan or an enface projection.
+    """
     shape = pixel_array.shape
     if len(shape) == 3:
         if shape[2] <= 4:  # grayscale, RGB or RGBA
             return pixel_array.squeeze()
-        else:  # OCT 
-            n_scans, _, _ = pixel_array.shape
-            if n_scans == 1:
-                # single B-scan
-                return pixel_array.squeeze()
-            elif n_scans < 10:
-                # few B-scans (take the middle one)
-                return pixel_array[n_scans // 2]
-            else:
-                # many B-scans (create enface projection)
-                np_im = pixel_array.mean(axis=1)
-                try:
-                    np_im = np_im - np.min(np_im)
-                    np_im = np_im / np.max(np_im)
-                    np_im = (np_im * 255).astype(np.uint8)
-                except ValueError:
-                    pass
-                    
-                try:
-                    aspect_ratio = im.ResolutionHorizontal / im.ResolutionVertical
-                except (TypeError, ZeroDivisionError):
-                    aspect_ratio = 1
-                    
-                h, w = np_im.shape
-                if aspect_ratio > 1:
-                    target_shape = (int(w * aspect_ratio), h)
-                else:
-                    target_shape = (w, int(h / aspect_ratio))
-
-                return cv2.resize(np_im, target_shape, interpolation=cv2.INTER_LINEAR)
-    else:
-        return pixel_array
-
-
-def generate_thumbnail_name(db_id, secret_key):
-    # default to the db_id if no secret key is provided
-    if secret_key is None:
-        return str(db_id)
-    # otherwise generate a hash of the db_id and the secret key for obfuscation
-    hash_bytes = hmac.new(
-        secret_key.encode(), str(db_id).encode(), hashlib.sha256
-    ).hexdigest()
-    return hash_bytes
-
-
-def get_thumbnail_identifier(im: ImageInstance) -> str:
-    """Generate a unique identifier for the thumbnail."""
-    secret_key = im.config.secret_key
-    project_id = str(im.Patient.Project.ProjectID)
-    thumbnail_name = generate_thumbnail_name(im.ImageInstanceID, secret_key)[:24]
-    return f"{project_id}/{thumbnail_name}"
-
-
-def save_thumbnails(im: ImageInstance, sizes=[144, 540]):
-
-    if im.Modality == Modality.ColorFundus:
-        _, bounds_cropped = im.bounds.crop(max(sizes))
-        np_im = bounds_cropped.image
-    else:
-        np_im = get_thumbnail(im)
-    pil_im = Image.fromarray(np_im)
-
-    # Save thumbnails for each size    
-    
-    for size in sizes:
-        thumb = pil_im.copy()
-        thumb.thumbnail((size, size))
-        thumb_path = im.get_thumbnail_path(size)
-        thumb_path.parent.mkdir(parents=True, exist_ok=True)
-        thumb.save(
-            thumb_path,
-            format="JPEG",
-            optimize=True,
-            quality=75,
-            progressive=True,
+        # OCT volume: shape is (n_scans, H, W)
+        n_scans, _, _ = shape
+        if n_scans == 1:
+            return pixel_array.squeeze()
+        if n_scans < 10:
+            # few B-scans (take the middle one)
+            return pixel_array[n_scans // 2]
+        # many B-scans: enface projection
+        np_im = pixel_array.mean(axis=1)
+        try:
+            np_im = np_im - np.min(np_im)
+            np_im = np_im / np.max(np_im)
+            np_im = (np_im * 255).astype(np.uint8)
+        except ValueError:
+            pass
+        try:
+            aspect_ratio = (
+                float(resolution_horizontal) / float(resolution_vertical)
+                if resolution_horizontal is not None
+                and resolution_vertical not in (None, 0)
+                else 1.0
+            )
+        except (TypeError, ZeroDivisionError):
+            aspect_ratio = 1.0
+        h, w = np_im.shape
+        target_shape = (
+            (int(w * aspect_ratio), h) if aspect_ratio > 1 else (w, int(h / aspect_ratio))
         )
+        return cv2.resize(np_im, target_shape, interpolation=cv2.INTER_LINEAR)
+    return pixel_array
 
 
-def get_missing_thumbnail_images(session, include_failed=False):
+def build_base_pil_image(im: ImageInstance, *, max_size: int) -> Image.Image:
+    """Build the source PIL image from which thumbnails are derived.
+
+    For color fundus images the image is cropped to the CFI bounds.
+    If bounds are unavailable a warning is printed and the full image is used.
+    """
+    from eyened_orm import Modality
+
+    res_h = im.ResolutionHorizontal
+    res_v = im.ResolutionVertical
+    if im.Modality == Modality.ColorFundus:
+        bounds = im.bounds_with_image
+        if bounds is not None:
+            _, bounds_cropped = bounds.crop(max_size)
+            np_im = bounds_cropped.image
+        else:
+            print(
+                f"Warning: CFI bounds not available for image {im.ImageInstanceID}, "
+                "using full image for thumbnail"
+            )
+            np_im = pixel_array_to_2d(
+                im.pixel_array,
+                resolution_horizontal=res_h,
+                resolution_vertical=res_v,
+            )
+    else:
+        np_im = pixel_array_to_2d(
+            im.pixel_array,
+            resolution_horizontal=res_h,
+            resolution_vertical=res_v,
+        )
+    return Image.fromarray(np_im)
+
+
+def render_square_thumbnails(
+    pil_im: Image.Image, sizes: tuple[int, ...]
+) -> dict[int, Image.Image]:
+    """Letterbox to square thumbnails keyed by size."""
+    bands = pil_im.getbands()
+    # border filled with zeros (per channel)
+    pad_color = 0 if len(bands) == 1 else (0,) * len(bands)
+    resample = Image.Resampling.LANCZOS
+    return {
+        size: ImageOps.pad(pil_im, (size, size), method=resample, color=pad_color)
+        for size in sizes
+    }
+
+
+def persist_thumbnail_images(
+    thumbnail_path: str,
+    thumbnails: dict[int, Image.Image],
+    thumbnails_folder: Path,
+) -> dict[int, Path]:
+    written: dict[int, Path] = {}
+    for size, thumb in thumbnails.items():
+        path = thumbnails_folder / thumbnail_filename(thumbnail_path, size)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        thumb.save(path, format="JPEG", optimize=True, quality=75, progressive=True)
+        written[size] = path
+    return written
+
+
+def save_thumbnails(
+    im: ImageInstance,
+    *,
+    thumbnail_path: str,
+    thumbnails_folder: Path,
+    sizes: tuple[int, ...],
+) -> dict[int, Path]:
+    pil_im = build_base_pil_image(im, max_size=max(sizes))
+    thumbs = render_square_thumbnails(pil_im, sizes)
+    return persist_thumbnail_images(thumbnail_path, thumbs, thumbnails_folder)
+
+
+def get_missing_thumbnail_images(
+    session: Session, include_failed: bool
+) -> list[ImageInstance]:
+    from eyened_orm import ImageInstance
+
+    # NULL: never generated; "" : previous generation failed
     where = ImageInstance.ThumbnailPath == None
     if include_failed:
         where = where | (ImageInstance.ThumbnailPath == "")
@@ -103,28 +177,125 @@ def get_missing_thumbnail_images(session, include_failed=False):
     return images
 
 
+def _needs_cfi_roi(im: ImageInstance) -> bool:
+    from eyened_orm import Modality
+
+    if im.Modality != Modality.ColorFundus:
+        return False
+    roi = im.roi
+    if roi is None:
+        return True
+    return roi.get("success") is False
+
+
+def ensure_cfi_roi_for_thumbnails(session: Session, images: list[ImageInstance]) -> None:
+    """Run CFI ROI on ColorFundus images missing a usable ``CFI_ROI`` attribute."""
+    from eyened_orm.commands.model_processing import run_cfi_attribute_pipeline
+
+    image_ids = [im.ImageInstanceID for im in images if _needs_cfi_roi(im)]
+    if not image_ids:
+        return
+    # overwrite=True so previously failed ROI detections are retried
+    run_cfi_attribute_pipeline(session, image_ids, "cfi-roi", overwrite=True)
+
+
 def update_thumbnails(
-    session,
-    images,
-    print_errors=False,
-    N=100,
-):
+    session: Session,
+    images: list[ImageInstance],
+    *,
+    thumbnails_folder: Path,
+    sizes: tuple[int, ...],
+    print_errors: bool,
+) -> None:
+    ensure_cfi_roi_for_thumbnails(session, images)
     for i, image in enumerate(tqdm(images)):
         try:
-            if image.path.suffix == ".json":
-                image.ThumbnailPath = None
-                # print(f"Skipping {image.ImageInstanceID} because it is a JSON file")
-            else:
-                image.ThumbnailPath = get_thumbnail_identifier(image)
-                save_thumbnails(image)
+            thumbnail_path = allocate_thumbnail_path(image.Patient.Project.ProjectID)
+            image.ThumbnailPath = thumbnail_path
+            save_thumbnails(
+                image,
+                thumbnail_path=thumbnail_path,
+                thumbnails_folder=thumbnails_folder,
+                sizes=sizes,
+            )
         except Exception as e:
-            image.ThumbnailPath = ""
+            image.ThumbnailPath = ""  # mark failed (see ImageInstance.ThumbnailPath)
             if print_errors:
                 print(
                     f"Error generating thumbnail for image {image.ImageInstanceID}: {e}"
                 )
-
         session.add(image)
-        if (i + 1) % N == 0:
+        if (i + 1) % THUMBNAIL_COMMIT_INTERVAL == 0:
             session.commit()
     session.commit()
+
+
+def run_update_thumbnails_for_image_ids(
+    session: Session,
+    image_ids: list[int],
+    *,
+    thumbnails_folder: Path,
+    sizes: tuple[int, ...],
+    print_errors: bool,
+) -> None:
+    from eyened_orm import ImageInstance
+
+    ids = set(image_ids)
+    images = ImageInstance.by_ids(session, ids)
+    if len(images) != len(ids):
+        found = {im.ImageInstanceID for im in images}
+        missing = ids - found
+        print(
+            f"Thumbnail job: skipping {len(missing)} unknown ImageInstanceID(s): "
+            f"{sorted(missing)[:20]}{'...' if len(missing) > 20 else ''}"
+        )
+    if not images:
+        print("No images to process")
+        return
+    update_thumbnails(
+        session,
+        images,
+        thumbnails_folder=thumbnails_folder,
+        sizes=sizes,
+        print_errors=print_errors,
+    )
+
+
+def run_update_thumbnails_job(
+    database: Database,
+    *,
+    include_failed: bool,
+    print_errors: bool,
+) -> None:
+    """Find images missing thumbnails, generate and persist them.
+
+    Used by the ``eorm update-thumbnails`` CLI and the API RQ worker.
+    """
+    folder = thumbnails_folder()
+    with database.get_session() as session:
+        images = get_missing_thumbnail_images(session, include_failed)
+        update_thumbnails(
+            session,
+            images,
+            thumbnails_folder=folder,
+            sizes=THUMBNAIL_SIZES,
+            print_errors=print_errors,
+        )
+
+
+def run_update_thumbnails_for_image_ids_job(
+    database: Database,
+    image_ids: list[int],
+    *,
+    print_errors: bool,
+) -> None:
+    """Generate thumbnails for the given instance IDs (regardless of prior ``ThumbnailPath``)."""
+    folder = thumbnails_folder()
+    with database.get_session() as session:
+        run_update_thumbnails_for_image_ids(
+            session,
+            image_ids,
+            thumbnails_folder=folder,
+            sizes=THUMBNAIL_SIZES,
+            print_errors=print_errors,
+        )

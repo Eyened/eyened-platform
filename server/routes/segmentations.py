@@ -29,6 +29,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
+from ..utils.db_logging import get_db_logger
+from eyened_orm.segmentation_storage import read_segmentation_data, write_segmentation_data
 from .auth import CurrentUser, get_current_user
 from ..dtos.dtos_main import SegmentationGET, SegmentationPOST, SegmentationPATCH
 from ..dtos.dto_converter import DTOConverter
@@ -43,6 +45,17 @@ dtypes = {
     Datatype.R32UI: np.uint32,
     Datatype.R32F: np.float32,
 }
+
+
+def _resolve_image_instance_id(db: Session, image_id: str) -> int:
+    item = (
+        db.query(ImageInstance)
+        .filter(ImageInstance.PublicID == image_id)
+        .first()
+    )
+    if item:
+        return item.ImageInstanceID
+    raise HTTPException(status_code=404, detail="ImageInstance not found")
 
 
 async def load_array(np_array: Optional[UploadFile]) -> Optional[np.ndarray]:
@@ -90,9 +103,10 @@ async def create_segmentation(
 ):
     # create a new segmentation
     dto = SegmentationPOST.model_validate_json(metadata)
+    image_instance_id = _resolve_image_instance_id(db, dto.image_id)
 
     segmentation = Segmentation(
-        ImageInstanceID=dto.image_instance_id,
+        ImageInstanceID=image_instance_id,
         FeatureID=dto.feature_id,
         CreatorID=current_user.id,
         SubTaskID=dto.subtask_id,
@@ -163,12 +177,36 @@ async def create_segmentation(
     db.flush()
 
     try:
-        segmentation.write_data(data)
+        write_segmentation_data(segmentation, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     db.commit()
     db.refresh(segmentation)
+    
+    # Log segmentation creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint="POST /api/segmentations",
+            entity="Segmentation",
+            entity_id=segmentation.SegmentationID,
+            fields={
+                "image_instance_id": segmentation.ImageInstanceID,
+                "feature_id": segmentation.FeatureID,
+                "subtask_id": segmentation.SubTaskID,
+                "creator_id": segmentation.CreatorID,
+                "data_type": str(segmentation.DataType),
+                "data_representation": str(segmentation.DataRepresentation),
+                "shape": segmentation.shape,
+                "sparse_axis": segmentation.SparseAxis,
+                "threshold": segmentation.Threshold,
+                "reference_segmentation_id": segmentation.ReferenceSegmentationID,
+            },
+        )
+    
     return DTOConverter.segmentation_to_get(segmentation)
 
 
@@ -203,9 +241,36 @@ async def delete_segmentation(
     if segmentation is None:
         raise HTTPException(status_code=404, detail="Segmentation not found")
 
+    # Save segmentation data for logging before soft delete
+    deleted_data = {
+        "image_instance_id": segmentation.ImageInstanceID,
+        "feature_id": segmentation.FeatureID,
+        "subtask_id": segmentation.SubTaskID,
+        "creator_id": segmentation.CreatorID,
+        "data_type": str(segmentation.DataType),
+        "data_representation": str(segmentation.DataRepresentation),
+        "shape": segmentation.shape,
+        "sparse_axis": segmentation.SparseAxis,
+        "threshold": segmentation.Threshold,
+        "reference_segmentation_id": segmentation.ReferenceSegmentationID,
+    }
+    
     # db.delete(segmentation)
     segmentation.Inactive = True
     db.commit()
+    
+    # Log segmentation deletion (soft delete)
+    logger = get_db_logger()
+    if logger:
+        logger.log_delete(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"DELETE /api/segmentations/{segmentation_id}",
+            entity="Segmentation",
+            entity_id=segmentation_id,
+            deleted_data=deleted_data,
+        )
+    
     return Response(status_code=204)
 
 
@@ -232,7 +297,7 @@ async def update_segmentation_data(
     np_image = np.load(io.BytesIO(data))
 
     try:
-        segmentation.write_data(np_image, axis=axis, slice_index=scan_nr)
+        write_segmentation_data(segmentation, np_image, axis=axis, slice_index=scan_nr)
     except IndexError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ValueError as e:
@@ -245,6 +310,19 @@ async def update_segmentation_data(
 
     # return the updated segmentation
     db.refresh(segmentation)
+    
+    # Log segmentation data update (simple one-line format for high-frequency operations)
+    logger = get_db_logger()
+    if logger:
+        logger.log_simple(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PUT /api/segmentations/{segmentation_id}/data",
+            operation="UPDATE",
+            entity="Segmentation",
+            entity_id=segmentation_id,
+        )
+    
     return segmentation
 
 
@@ -261,7 +339,7 @@ async def get_segmentation_data(
         raise HTTPException(status_code=404, detail="Segmentation data not found")
 
     try:
-        arr = segmentation.read_data(axis=axis, slice_index=scan_nr)
+        arr = read_segmentation_data(segmentation, axis=axis, slice_index=scan_nr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -298,11 +376,32 @@ async def patch_segmentation(
         segmentation.ReferenceSegmentationID = dto.reference_segmentation_id
     if dto.feature_id is not None:
         segmentation.FeatureID = dto.feature_id
+    changes = {}
+    if dto.reference_segmentation_id is not None:
+        changes["reference_segmentation_id"] = f"{segmentation.ReferenceSegmentationID} -> {dto.reference_segmentation_id}"
+        segmentation.ReferenceSegmentationID = dto.reference_segmentation_id
+    if dto.feature_id is not None:
+        changes["feature_id"] = f"{segmentation.FeatureID} -> {dto.feature_id}"
+        segmentation.FeatureID = dto.feature_id
     if dto.threshold is not None:
+        changes["threshold"] = f"{segmentation.Threshold} -> {dto.threshold}"
         segmentation.Threshold = dto.threshold
 
     db.commit()
     db.refresh(segmentation)
+    
+    # Log segmentation update
+    logger = get_db_logger()
+    if logger:
+        logger.log_update(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PATCH /api/segmentations/{segmentation_id}",
+            entity="Segmentation",
+            entity_id=segmentation_id,
+            changes=changes if changes else None,
+        )
+    
     return DTOConverter.segmentation_to_get(segmentation)
 
 
@@ -373,6 +472,20 @@ async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Sessio
         link = SegmentationTagLink(TagID=tag.TagID, SegmentationID=segmentation_id, CreatorID=current_user.id)
         db.add(link); db.commit(); db.refresh(link)
         link.Tag = tag
+        
+        # Log tag link creation
+        logger = get_db_logger()
+        if logger:
+            logger.log_insert(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"POST /api/segmentations/{segmentation_id}/tags",
+                entity="SegmentationTagLink",
+                fields={
+                    "tag_id": tag.TagID,
+                    "segmentation_id": segmentation_id,
+                },
+            )
 
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -384,7 +497,27 @@ async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = De
         raise HTTPException(404, "Segmentation not found")
     link = db.get(SegmentationTagLink, {"TagID": tag_id, "SegmentationID": segmentation_id})
     if link:
+        # Save link data for logging before deletion
+        deleted_data = {
+            "tag_id": tag_id,
+            "segmentation_id": segmentation_id,
+            "creator_id": link.CreatorID,
+        }
+        
         db.delete(link); db.commit()
+        
+        # Log tag link deletion
+        logger = get_db_logger()
+        if logger:
+            logger.log_delete(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"DELETE /api/segmentations/{segmentation_id}/tags/{tag_id}",
+                entity="SegmentationTagLink",
+                fields={"tag_id": tag_id, "segmentation_id": segmentation_id},
+                deleted_data=deleted_data,
+            )
+    
     return Response(status_code=204)
 
 
@@ -401,7 +534,7 @@ async def get_model_segmentation_data(
         raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
 
     try:
-        arr = model_segmentation.read_data(axis=axis, slice_index=scan_nr)
+        arr = read_segmentation_data(model_segmentation, axis=axis, slice_index=scan_nr)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -419,3 +552,43 @@ async def get_model_segmentation_data(
         "Content-Length": str(len(gz)),
     }
     return Response(content=gz, media_type="application/octet-stream", headers=headers)
+
+
+@router.put("/model-segmentations/{model_segmentation_id}/data")
+async def update_model_segmentation_data(
+    model_segmentation_id: int,
+    request: Request,
+    axis: Optional[int] = None,
+    scan_nr: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    model_segmentation = ModelSegmentation.by_id(db, model_segmentation_id)
+    if model_segmentation is None:
+        raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
+
+    content_type = request.headers.get("Content-Type", "").lower()
+    if content_type != "application/octet-stream":
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported media type: {content_type}"
+        )
+
+    data = await request.body()
+    np_image = np.load(io.BytesIO(data))
+
+    try:
+        write_segmentation_data(
+            model_segmentation,
+            np_image,
+            axis=axis,
+            slice_index=scan_nr,
+        )
+    except IndexError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    db.add(model_segmentation)
+    db.commit()
+    db.refresh(model_segmentation)
+    return model_segmentation

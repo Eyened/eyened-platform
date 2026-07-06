@@ -1,0 +1,64 @@
+---
+title: Images & patients
+description: Image instances, file serving, and patient endpoints
+sidebar:
+  order: 3
+---
+
+## Image instances
+
+### GET /api/instances/\{instance_id\}
+
+Get one image by numeric **`ImageInstanceID`**.
+
+**Query parameters:** `with_segmentations`, `with_form_annotations`, `with_model_segmentations`, `with_tag_metadata` (all bool, default `false`).
+
+### GET /api/images/\{image_id\}
+
+Get one image by **`PublicID`** (preferred). If `image_id` is all digits, falls back to numeric `ImageInstanceID`.
+
+Same query parameters as `GET /api/instances/{instance_id}`.
+
+### GET /api/images/\{image_id\}/data
+
+Image file via nginx `X-Accel-Redirect`.
+
+**Query parameters:** `index` (int, volume slice), `meta` (bool, sidecar metadata for some formats).
+
+### GET /api/images/\{image_id\}/thumbnail
+
+Thumbnail via nginx redirect.
+
+**Query parameters:** `size` (int, default `144`) — `144` or `540`.
+
+### GET /api/instances/images/\{dataset_identifier:path\}
+
+**Legacy.** Serve image by deprecated `DatasetIdentifier` path (`/files/…` redirect).
+
+### GET /api/instances/thumbnails/\{thumbnail_identifier:path\}
+
+**Legacy.** Serve thumbnail by path under `thumbnails/`. Prefer `GET /api/images/{image_id}/thumbnail`.
+
+### POST /api/instances/\{instance_id\}/tags
+
+Attach a tag to an image. **`instance_id` is the image `PublicID`**.
+
+**Request body:** `{ "tag_id": int, "comment": "string" | null }`
+
+### PATCH /api/instances/\{instance_id\}/tags/\{tag_id\}
+
+Update tag comment on an image (`PublicID`).
+
+### DELETE /api/instances/\{instance_id\}/tags/\{tag_id\}
+
+Remove tag from an image (`PublicID`).
+
+## Patients
+
+### GET /api/patients/\{patient_id\}
+
+Patient detail with project context.
+
+**Query parameters:** `include_attributes` (bool, default `true`) — patient-level attribute values (e.g. registration graphs) as lists with model provenance.
+
+Related data model: **[Attributes](/eyened-platform/orm/data_model/attributes)**.

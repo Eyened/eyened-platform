@@ -1,155 +1,98 @@
 ---
-title: Command line utilities
-description: Learn how to use the command line utilities available in the ORM
+title: CLI reference
+description: eorm command-line utilities
 sidebar:
-  order: 3
+  order: 5
 ---
 
-{/* Claude query: In cli.mdx, document the command line utilities in cli.py. Include a section for each utility and explain what they do. ie. that full will create a full copy of the production database for development reasons and update thumbnails will update all thumbnails in the database. Do not include the specific options for each command as these might change, but do indicate that they can be checked with --help */}
-
-# Eyened ORM CLI
-
-The Eyened ORM provides several command line utilities to help with development, testing, and maintenance. These commands are available through the `eorm` CLI tool.
-
+The `eorm` CLI covers database setup, maintenance, and inference entry points. Use `eorm --help` and `eorm COMMAND --help` for current flags.
 
 :::note
-All commands support the `--help` option to display available command-specific options.
-
-```bash
-eorm [COMMAND] --help
-```
+**Inference commands** (`run-models`, `run-segmentation`, `run-registration`, …) are summarized in **[Inference](/eyened-platform/orm/inference)**. **Thumbnails**: **[Thumbnails](/eyened-platform/thumbnails)**.
 :::
 
+## Database setup
 
-## Available Commands
+### initialize-database
 
-
-### database-mirror-test
-
-Creates a test database for ORM testing, developing new features, or running alembic migrations. This command creates a database with the schema but only a subset of the data from the production database.
+Creates tables on an empty database and stamps the current Alembic revision.
 
 ```bash
-eorm database-mirror-test [OPTIONS]
+eorm initialize-database [--seed-form-schemas] [--recreate]
 ```
 
-### database-mirror-full
+### seed-form-schemas
 
-Creates a complete test database with all data from the production database. This is useful when you need a full copy of the database for development or testing purposes.
+Inserts builtin viewer FormSchemas (ETDRS, registration). See **[Form schemas](/eyened-platform/orm/form_schemas)**; registration semantics: **[Registration](/eyened-platform/orm/registration)**.
 
 ```bash
-eorm database-mirror-full [OPTIONS]
+eorm seed-form-schemas [--update]
 ```
+
+### create-user
+
+Interactive user creation for viewer/API login.
+
+```bash
+eorm create-user
+```
+
+## Inference (summary)
+
+| Command | Purpose |
+|---------|---------|
+| `run-models` | Attribute inference |
+| `run-segmentation` | Segmentation model inference |
+| `run-registration` | Enface image registration — see **[Registration](/eyened-platform/orm/registration)** |
+| `run-etdrs-model` | ETDRS subfield areas |
+
+Details: **[Inference](/eyened-platform/orm/inference)**.
+
+## Targeting
+
+Image- and patient-scoped commands share targeting flags. Provide **at least one** of:
+
+| Flag | Description |
+|------|-------------|
+| `-p` / `--path` | File with one `ImageInstanceID` or `PublicID` per line |
+| `--image-ids` | Comma-separated IDs or PublicIDs |
+| `--project` | Project ID or name |
+| `--patient` | Patient identifier (with `--project` if ambiguous) |
+| `--exclude` / `--skip` | IDs or PublicIDs to exclude |
+| `--modality` | Filter when expanding `--project` or `--patient` |
+
+```bash
+eorm run-models --project "AMD-Study" --modality ColorFundus
+eorm update-thumbnails --path ids.txt
+```
+
+`update-thumbnails` and `update-hashes` scan the whole database when no target flags are given.
+
+## Maintenance
 
 ### update-thumbnails
 
-Updates thumbnails for all images in the database. This is useful when the thumbnail generation logic has changed or when thumbnails are missing.
-
-```bash
-eorm update-thumbnails [OPTIONS]
-```
-
-**Options:**
-- `-e, --env PATH`: Path to `.env` file for environment configuration (see [Configuration](/eyened-platform/orm/configuration))
-- `--failed`: Include images with failed thumbnails (empty `ThumbnailPath`) in addition to images with no thumbnails (NULL `ThumbnailPath`)
-
-**Usage:**
-
-By default, the command processes images where `ThumbnailPath` is NULL:
-
-```bash
-eorm update-thumbnails --env production.env
-```
-
-To also regenerate thumbnails for images where generation previously failed:
-
-```bash
-eorm update-thumbnails --failed --env production.env
-```
-
-**Updating thumbnail generation code:**
-
-If you need to modify the thumbnail generation logic (e.g., to support new image types or change generation behavior):
-
-1. Update the thumbnail generation code in [`orm/eyened_orm/importer/thumbnails.py`](https://github.com/Eyened/eyened-platform/blob/main/orm/eyened_orm/importer/thumbnails.py)
-2. Test your changes using the [test notebook](https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/test_thumbnail_generator.ipynb)
-3. For images that need regeneration, set their `ThumbnailPath` to NULL in the database
-4. Run the update command with the `--failed` flag to regenerate all thumbnails:
-
-```bash
-eorm update-thumbnails --failed --env production.env
-```
-
-### run-models
-
-Runs inference models on the database. This command processes images with the configured AI models.
-
-```bash
-eorm run-models [OPTIONS]
-```
-
-### validate-forms
-
-Validates form annotations and schemas in the database. This helps ensure that all form data is correctly structured and follows the defined schemas.
-
-```bash
-eorm validate-forms [OPTIONS]
-```
-
-### zarr-tree
-
-Displays the structure of the zarr store, showing groups and array shapes. This is useful for understanding the organization of segmentation data stored in zarr format.
-
-```bash
-eorm zarr-tree [OPTIONS]
-```
-
-### defragment-zarr
-
-Defragments the zarr store by copying all segmentations to a new store with sequential indices. This command creates a new zarr store and copies all existing segmentations to it, assigning new sequential ZarrArrayIndex values to eliminate gaps and improve storage efficiency.
-
-```bash
-eorm defragment-zarr [OPTIONS]
-```
+Backfill missing `ThumbnailPath` values. See **[Thumbnails — CLI](/eyened-platform/thumbnails#cli)**.
 
 ### update-hashes
 
-Updates FileChecksum and DataHash for all ImageInstances in the database where they are NULL. This maintains data integrity by ensuring all images have proper hash values.
+Fill missing `FileChecksum` and `DataHash` on image instances.
+
+### validate-forms
+
+Validate `FormAnnotation` JSON against schemas.
+
+### zarr-tree / defragment-zarr
+
+Inspect or compact `{EYENED_STORAGE_ROOT}/segmentations.zarr`.
+
+## Database dumps
+
+### load-dump / save-dump
+
+Load or create SQL dumps. **`load-dump` is destructive** — drops and recreates the target database.
 
 ```bash
-eorm update-hashes [OPTIONS]
+eorm save-dump -p /path/to/dump_dir
+eorm load-dump -p /path/to/dump.sql
 ```
-
-### run-registration
-
-Runs registration processing for images in the database. This command processes images to perform registration operations, which can be filtered by patient identifier, project ID, form schema, or creator.
-
-```bash
-eorm run-registration [OPTIONS]
-```
-
-**Options:**
-- `-e, --env PATH`: Path to `.env` file for environment configuration (see [Configuration](/eyened-platform/orm/configuration))
-- `--patient PATIENT`: Patient identifier to run registration for (optional)
-- `--project PROJECT_ID`: Project ID to run registration for (optional)
-- `--schema SCHEMA_NAME`: SchemaName to run registration for (default: "RegistrationSet")
-- `--creator CREATOR_NAME`: CreatorName to run registration for (default: "registration model")
-- `--replace`: Replace existing registration if it already exists
-
-**Usage:**
-
-To run registration for a specific patient:
-```bash
-eorm run-registration --env production.env --patient Patient_001
-```
-
-To run registration for all patients in a project:
-```bash
-eorm run-registration --env production.env --project 1
-```
-
-To run registration with custom schema and creator:
-```bash
-eorm run-registration --env production.env --schema "CustomRegistration" --creator "My Registration Model"
-```
-
-

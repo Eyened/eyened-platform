@@ -12,10 +12,10 @@ from typing import Any, Dict, List, Optional
 
 from eyened_orm.image_instance import ETDRSField, Laterality, Modality, ModalityType
 from eyened_orm.patient import SexEnum as Sex
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from .dtos_aux import TagMeta
-from .dtos_main import FormAnnotationGET, ModelSegmentationGET, SegmentationGET
+from .dtos_main import FormAnnotationGET, ModelMeta, ModelSegmentationGET, SegmentationGET
 
 # Type aliases matching TypeScript types
 AnatomicRegion = str  # Based on database field
@@ -31,22 +31,50 @@ class ProjectGET(BaseModel):
     description: Optional[str] = None
 
 
-class PatientGET(BaseModel):
+class RegistrationSet(BaseModel):
+    """Pairwise registration edge between two images (PublicID keys)."""
+
+    image1: str = Field(description="Public image ID of the source image")
+    image2: str = Field(description="Public image ID of the target image")
+    transform: Dict[str, Any] = Field(description="rtnls_registration transform JSON")
+
+
+class PatientAttributeValueGET(BaseModel):
+    """One attribute value produced by a model (or manual entry when model is null)."""
+
+    value: Any
+    model: Optional[ModelMeta] = None
+
+
+class PatientDetailGET(BaseModel):
     id: int
     identifier: str
     birth_date: Optional[date] = None
     sex: Optional[Sex] = None
+    project: "ProjectMeta"
+    attrs: Dict[str, List[PatientAttributeValueGET]] = Field(default_factory=dict)
+
+    @field_serializer("birth_date")
+    def serialize_birth_date(self, value: Optional[date]) -> Optional[str]:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat() if value is not None else None
 
 
 class StudyGET(BaseModel):
     id: int
     description: Optional[str] = None
-    date: datetime
+    date: date
+    round: Optional[int] = None
     age: Optional[float] = None  # patient age in years
     project: "ProjectMeta"
     patient: "PatientMeta"
     series: Optional[List["SeriesGET"]] = None
     tags: List[TagMeta]
+
+    @field_serializer('date')
+    def serialize_date(self, value: date) -> str:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat()
 
 
 class SeriesGET(BaseModel):
@@ -54,7 +82,7 @@ class SeriesGET(BaseModel):
     laterality: Optional[Laterality] = None
     series_number: Optional[int] = None
     series_instance_uid: str
-    instance_ids: List[int] = Field(default_factory=list)
+    instance_ids: List[str] = Field(default_factory=list)
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -69,11 +97,22 @@ class PatientMeta(BaseModel):
     id: int
     identifier: str
     birth_date: Optional[date] = None
+    sex: Optional[Sex] = None
+
+    @field_serializer('birth_date')
+    def serialize_birth_date(self, value: Optional[date]) -> Optional[str]:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat() if value is not None else None
 
 
 class StudyMeta(BaseModel):
     id: int
-    date: datetime
+    date: date
+
+    @field_serializer('date')
+    def serialize_date(self, value: date) -> str:
+        """Serialize date as YYYY-MM-DD string."""
+        return value.isoformat()
 
 
 class SeriesMeta(BaseModel):
@@ -90,15 +129,16 @@ class ScanMeta(BaseModel):
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# ========================= INSTANCES =========================
+# ========================= IMAGES ============================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-class InstanceBase(BaseModel):
-    """Instance frontend object"""
+
+
+class ImageBase(BaseModel):
+    """Image metadata exposed via public id."""
 
     sop_instance_uid: str
-    dataset_identifier: str
-    thumbnail_identifier: str
-    thumbnail_path: str
+    data_format: str
+    data_source_id: Optional[str] = None
     modality: Optional[Modality] = None
     dicom_modality: Optional[ModalityType] = None
     etdrs_field: Optional[ETDRSField] = None
@@ -119,20 +159,8 @@ class InstanceBase(BaseModel):
     date_preprocessed: Optional[datetime] = None
 
 
-class InstanceMeta(BaseModel):
-    id: int
-    thumbnail_path: str
-    modality: Optional[Modality] = None
-    dicom_modality: Optional[ModalityType] = None
-    etdrs_field: Optional[ETDRSField] = None
-    laterality: Optional[Laterality] = None
-    anatomic_region: AnatomicRegion
-    device: DeviceMeta
-    tags: List[TagMeta]
-
-
-class InstanceGET(InstanceBase):
-    id: int
+class ImageGET(ImageBase):
+    id: str
     project: ProjectMeta
     patient: PatientMeta
     study: StudyMeta
@@ -145,9 +173,7 @@ class InstanceGET(InstanceBase):
     model_segmentations: Optional[List[ModelSegmentationGET]] = None
     form_annotations: Optional[List[FormAnnotationGET]] = None
 
-    date_inserted: datetime
-    date_modified: Optional[datetime] = None
-    date_preprocessed: Optional[datetime] = None
-
     # Nested attributes by model name then attribute name
-    attributes: Dict[str, Dict[str, Any]]
+    model_attrs: Dict[str, Dict[str, Any]]
+    # Attributes without a model
+    attrs: Dict[str, Any]

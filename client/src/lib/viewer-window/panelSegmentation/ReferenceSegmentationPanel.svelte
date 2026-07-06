@@ -8,11 +8,10 @@
 	import type { SegmentationGET } from "../../../types/openapi_types";
 	import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons";
 	import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
-	import type { Segmentation } from "./segmentationContext.svelte";
 
 	interface Props {
 		segmentationItem: SegmentationItem;
-		segmentation: Segmentation;
+		segmentation: SegmentationGET;
 		image: AbstractImage;
 		isEditable: boolean;
 	}
@@ -28,22 +27,18 @@
 				segmentation,
 				image,
 				resolve: async (other: SegmentationGET) => {
-					if (segmentation.annotation_type === "grader_segmentation") {
-						await updateSegmentation(segmentation.id, {
-							reference_segmentation_id: other.id,
-						});
-					}
+					await updateSegmentation(segmentation.id, {
+						reference_segmentation_id: other.id,
+					});
 				},
 			},
 		};
 	}
 
 	async function removeReference() {
-		if (segmentation.annotation_type === "grader_segmentation") {
-			await updateSegmentation(segmentation.id, {
-				reference_segmentation_id: null,
-			});
-		}
+		await updateSegmentation(segmentation.id, {
+			reference_segmentation_id: null,
+		});
 	}
 
 	function toggleApplyMask() {

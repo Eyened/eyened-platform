@@ -10,22 +10,22 @@ class ETDRS_masks:
     # [SNTI] = superior/nasal/temporal/inferior
     # [IO] = inner/outer
 
-    subfields_9 = 'CSF', 'SIM', 'NIM', 'TIM', 'IIM', 'SOM', 'NOM', 'TOM', 'IOM'
-    rings_3 = 'center', 'inner', 'outer'
-    quadrants = 'superior_grid', 'nasal_grid', 'inferior_grid', 'temporal_grid'
-    all_fields = (*subfields_9, *rings_3, *quadrants, 'grid', 'total')
+    subfields_9 = "CSF", "SIM", "NIM", "TIM", "IIM", "SOM", "NOM", "TOM", "IOM"
+    rings_3 = "center", "inner", "outer"
+    quadrants = "superior_grid", "nasal_grid", "inferior_grid", "temporal_grid"
+    all_fields = (*subfields_9, *rings_3, *quadrants, "grid", "total")
 
     def __init__(self, h, w, fovea_x, fovea_y, resolution, laterality):
-        '''
+        """
         h: height of the image
         w: width of the image
         fovea_x: x coordinate of the fovea
         fovea_y: y coordinate of the fovea
-        resolution: resolution of the image in mm/pix 
+        resolution: resolution of the image in mm/pix
             or: (resolution_x, resolution_y)
 
         laterality: laterality of the eye, 'R' or 'L'
-        '''
+        """
         self.h = h
         self.w = w
         self.fovea_x = fovea_x
@@ -51,39 +51,52 @@ class ETDRS_masks:
     def calculate_count(self, binary_image):
         return self._calculate_count(measure.label(binary_image))
 
+    def calculate_mean(self, float_image, mask=None):
+        if mask is not None:
+            float_image = float_image[mask]
+        else:
+            float_image = float_image.flatten()
+        return float(float_image.sum() / float_image.size)
+
     def _calculate_count(self, labeled_image):
         return int(np.max(labeled_image))
 
     def calculate_largest_area(self, labeled_image):
         regions = measure.regionprops(labeled_image)
-        return max((r.area for r in regions), default=0) * self.pixel_area
+        return float(max((r.area for r in regions), default=0) * self.pixel_area)
 
-    def get_summary(self, binary_image, fields, include_area=True, include_count=True, include_largest=True):
-        if binary_image is None:
-            result = {}
-            for field in fields:
-                result[f'{field}_area'] = 0.0
-                result[f'{field}_count'] = 0
-                result[f'{field}_largest'] = 0.0
-            return result
-            
-        masked_images = {
-            field: getattr(self, field) & binary_image
-            for field in fields
-        }
+    def get_summary_mean(self, float_image, fields, mask=None):
+        result = {}
+        for field in fields:
+            result[f"{field}_mean"] = self.calculate_mean(
+                float_image, mask=getattr(self, field)
+            )
+        return result
+
+    def get_summary(
+        self,
+        binary_image,
+        fields,
+        include_area=True,
+        include_count=True,
+        include_largest=True,
+        skip_zero=True,
+    ):
+        masked_images = {field: getattr(self, field) & binary_image for field in fields}
         result = {}
         for field, masked_image in masked_images.items():
             if include_area:
-                result[f'{field}_area'] = self.calculate_area(masked_image)
+                result[f"{field}_area"] = self.calculate_area(masked_image)
             if include_largest or include_count:
                 labeled_image = measure.label(masked_image)
                 if include_count:
-                    result[f'{field}_count'] = self._calculate_count(
-                        labeled_image)
+                    result[f"{field}_count"] = self._calculate_count(labeled_image)
                 if include_largest:
-                    result[f'{field}_largest'] = self.calculate_largest_area(
-                        labeled_image)
-
+                    result[f"{field}_largest"] = self.calculate_largest_area(
+                        labeled_image
+                    )
+        if skip_zero:
+            result = {k: v for k, v in result.items() if v}
         return result
 
     @cached_property
@@ -96,7 +109,9 @@ class ETDRS_masks:
 
     @cached_property
     def theta(self):
-        return np.arctan2(self.dy * self.resolution_y, self.dx * self.resolution_x) / (2 * np.pi)
+        return np.arctan2(self.dy * self.resolution_y, self.dx * self.resolution_x) / (
+            2 * np.pi
+        )
 
     @cached_property
     def distance_to_fovea(self):
@@ -128,27 +143,27 @@ class ETDRS_masks:
     # quadrants
     @cached_property
     def inferior(self):
-        return (1/8 < self.theta) & (self.theta <= 3/8)
+        return (1 / 8 < self.theta) & (self.theta <= 3 / 8)
 
     @cached_property
     def left(self):
-        return (3/8 < self.theta) | (self.theta <= -3/8)
+        return (3 / 8 < self.theta) | (self.theta <= -3 / 8)
 
     @cached_property
     def superior(self):
-        return (- 3/8 < self.theta) & (self.theta <= -1/8)
+        return (-3 / 8 < self.theta) & (self.theta <= -1 / 8)
 
     @cached_property
     def right(self):
-        return (-1/8 < self.theta) & (self.theta <= 1/8)
+        return (-1 / 8 < self.theta) & (self.theta <= 1 / 8)
 
     @cached_property
     def nasal(self):
-        return self.right if self.laterality == 'R' else self.left
+        return self.right if self.laterality == "R" else self.left
 
     @cached_property
     def temporal(self):
-        return self.left if self.laterality == 'R' else self.right
+        return self.left if self.laterality == "R" else self.right
 
     # quadrants grid
     @cached_property
@@ -204,26 +219,48 @@ class ETDRS_masks:
     def IOM(self):
         return self.inferior & self.outer
 
-    def create_svg(self, text_dict=None, crop=True, color='black'):
+    def plot(self, ax, color="white", alpha=0.5):
+        from matplotlib import pyplot as plt
+
+        fx = self.fovea_x
+        fy = self.fovea_y
+        res = self.resolution_x
+        for r in (0.5, 1.5, 3):
+            ax.add_artist(
+                plt.Circle((fx, fy), r / res, color=color, fill=False, alpha=alpha)
+            )
+        for th in range(45, 360, 90):
+            dx = np.cos(np.radians(th))
+            dy = np.sin(np.radians(th))
+            ax.add_artist(
+                plt.Line2D(
+                    (fx + 0.5 * dx / res, fx + 3 * dx / res),
+                    (fy + 0.5 * dy / res, fy + 3 * dy / res),
+                    color=color,
+                    alpha=alpha,
+                )
+            )
+
+    def create_svg(self, text_dict=None, crop=True, color="black"):
         id_ = f"id_{uuid.uuid4().hex}"
 
         if text_dict is None:
-            text_dict = {k: '' for k in ETDRS_masks.subfields_9}
+            text_dict = {k: "" for k in ETDRS_masks.subfields_9}
 
-        if self.laterality == 'R':
+        if self.laterality == "R":
             # nasal right, temporal left
-            translate = str.maketrans({'N': 'R', 'T': 'L'})
+            translate = str.maketrans({"N": "R", "T": "L"})
         else:
             # nasal left, temporal right
-            translate = str.maketrans({'T': 'R', 'N': 'L'})
+            translate = str.maketrans({"T": "R", "N": "L"})
         text_query = {k.translate(translate): v for k, v in text_dict.items()}
 
         def svg_element(element, **kwargs):
-            attr = ' '.join(f'{k}="{v}"' for k, v in kwargs.items())
-            return f'<{element} {attr}/>'
+            attr = " ".join(f'{k}="{v}"' for k, v in kwargs.items())
+            return f"<{element} {attr}/>"
 
         if crop:
-            viewbox = '-3 -3 6 6'
+            viewbox = "-3 -3 6 6"
             width = 240
             height = 240
         else:
@@ -231,7 +268,7 @@ class ETDRS_masks:
             fy = self.fovea_y * self.resolution_y
             w = self.w * self.resolution_x
             h = self.h * self.resolution_y
-            viewbox = f'{-fx} {-fy} {w} {h}'
+            viewbox = f"{-fx} {-fy} {w} {h}"
             width = self.w
             height = self.h
 
@@ -239,19 +276,18 @@ class ETDRS_masks:
             return f'<text x="{x}" y="{y}">{text}</text>'
 
         text_coordinates = [
-            (0, 0, text_query.get('CSF', 'CSF')),
-            (0, 1, text_query.get('IIM', 'IIM')),
-            (0, -1, text_query.get('SIM', 'SIM')),
-            (-1, 0, text_query.get('LIM', 'LIM')),
-            (1, 0, text_query.get('RIM', 'RIM')),
-            (0, 2.25, text_query.get('IOM', 'IOM')),
-            (0, -2.25, text_query.get('SOM', 'SOM')),
-            (-2.25, 0, text_query.get('LOM', 'LOM')),
-            (2.25, 0, text_query.get('ROM', 'ROM'))
+            (0, 0, text_query.get("CSF", "CSF")),
+            (0, 1, text_query.get("IIM", "IIM")),
+            (0, -1, text_query.get("SIM", "SIM")),
+            (-1, 0, text_query.get("LIM", "LIM")),
+            (1, 0, text_query.get("RIM", "RIM")),
+            (0, 2.25, text_query.get("IOM", "IOM")),
+            (0, -2.25, text_query.get("SOM", "SOM")),
+            (-2.25, 0, text_query.get("LOM", "LOM")),
+            (2.25, 0, text_query.get("ROM", "ROM")),
         ]
 
-        svg_texts = "\n".join(svg_text(x, y, text)
-                              for (x, y, text) in text_coordinates)
+        svg_texts = "\n".join(svg_text(x, y, text) for (x, y, text) in text_coordinates)
 
         d_inner = np.sqrt((0.5**2) / 2)
         d_outer = np.sqrt((3**2) / 2)

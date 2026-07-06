@@ -10,11 +10,13 @@ This file contains DTOs that represent:
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
-from eyened_orm.segmentation import DataRepresentation, Datatype
-from eyened_orm.image_instance import Laterality
 from eyened_orm.form_annotation import EntityType
-from .dtos_aux import CreatorMeta, TagMeta
+from eyened_orm.image_instance import Laterality
+from eyened_orm.segmentation import DataRepresentation, Datatype
 from pydantic import BaseModel
+
+from .dtos_aux import CreatorMeta, TagMeta
+
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= FEATURES =========================
@@ -34,6 +36,7 @@ class FeaturePUT(FeatureBase):
 
 class FeaturePATCH(BaseModel):
     """Partial update for Feature with optional fields."""
+
     name: Optional[str] = None
     subfeature_ids: Optional[List[int]] = None
 
@@ -45,12 +48,14 @@ class FeatureGET(FeatureBase):
     date_inserted: datetime
     segmentation_count: Optional[int] = None
 
+
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ========================= SEGMENTATIONS =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-class SegmentationBase(BaseModel):
-    image_instance_id: int
+
+class SegmentationCommonBase(BaseModel):
+    image_id: str
     depth: int
     height: int
     width: int
@@ -59,28 +64,30 @@ class SegmentationBase(BaseModel):
     image_projection_matrix: Optional[List[List[float]]] = None
     scan_indices: Optional[List[int]] = None
     threshold: Optional[float] = None
-    reference_segmentation_id: Optional[int] = None
 
     data_type: Datatype
     data_representation: DataRepresentation
 
-class SegmentationPUT(SegmentationBase):
-    pass
+
+class SegmentationBase(SegmentationCommonBase):
+    reference_segmentation_id: Optional[int] = None
+
 
 class SegmentationPOST(SegmentationBase):
-    
     feature_id: int
     subtask_id: Optional[int] = None
+
 
 class SegmentationPATCH(BaseModel):
     reference_segmentation_id: Optional[int] = None
     feature_id: Optional[int] = None
     threshold: Optional[float] = None
 
+
 class SegmentationGET(SegmentationBase):
     id: int
-    annotation_type: Literal['grader_segmentation']
-   
+    annotation_type: Literal["grader_segmentation"]
+
     feature: FeatureGET
     creator: CreatorMeta
     tags: List[TagMeta]
@@ -93,15 +100,17 @@ class SegmentationGET(SegmentationBase):
 # ========================= MODEL SEGMENTATIONS =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
 class ModelMeta(BaseModel):
     id: int
     name: str
     version: str
 
-class ModelSegmentationGET(SegmentationBase):
+
+class ModelSegmentationGET(SegmentationCommonBase):
     id: int
-    annotation_type: Literal['model_segmentation']
-   
+    annotation_type: Literal["model_segmentation"]
+
     creator: ModelMeta
     feature: FeatureGET
     tags: List[TagMeta]
@@ -135,7 +144,7 @@ class FormAnnotationBase(BaseModel):
     form_schema_id: int
     patient_id: int
     study_id: Optional[int] = None
-    image_instance_id: Optional[int] = None
+    image_id: Optional[str] = None
     laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
     form_data: Optional[Any] = None
@@ -148,9 +157,9 @@ class FormAnnotationPUT(FormAnnotationBase):
 
 class FormAnnotationGET(FormAnnotationBase):
     id: int
-    annotation_type: Literal['grader_form']
+    annotation_type: Literal["grader_form"]
 
-    object_type: Literal['patient', 'study', 'image_instance']
+    object_type: Literal["patient", "study", "image_instance"]
     tags: List[TagMeta]
     creator: CreatorMeta
 
@@ -160,10 +169,11 @@ class FormAnnotationGET(FormAnnotationBase):
 
 class FormAnnotationPATCH(BaseModel):
     """Partial update for FormAnnotation with optional fields."""
+
     form_schema_id: Optional[int] = None
     patient_id: Optional[int] = None
     study_id: Optional[int] = None
-    image_instance_id: Optional[int] = None
+    image_id: Optional[str] = None
     laterality: Optional[Laterality] = None
     sub_task_id: Optional[int] = None
     form_data: Optional[Any] = None
@@ -174,10 +184,8 @@ class FormAnnotationPATCH(BaseModel):
 # ========================= DEVICE MODELS =========================
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
 class DeviceModelGET(BaseModel):
     id: int
     manufacturer: str
     model: str
-
-
-

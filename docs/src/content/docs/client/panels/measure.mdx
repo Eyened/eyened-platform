@@ -1,0 +1,30 @@
+---
+title: Measure panel
+description: Areas, lines, and resolution from ETDRS grids
+sidebar:
+  order: 6
+---
+
+The **Measure** panel reports quantitative measurements on the current image — segmentation areas, ETDRS-based resolution, and related readouts.
+
+## Using the panel
+
+### Typical uses
+
+- **Segmentation areas** — sum pixel or voxel counts for selected segmentations (including probability masks)
+- **ETDRS resolution** — estimate µm/pixel from an ETDRS annotation and radius fraction (pairs with the **[ETDRS panel](/eyened-platform/client/panels/etdrs)**)
+- **Line measurements** — distance tools where enabled for the modality
+
+Select the measure mode and source annotation or segmentation from the panel controls. Readouts update when you change the active segmentation or ETDRS grid settings.
+
+:::note
+This page is a stub — document each measure mode from `PanelMeasure.svelte` and `MeasurePanelHelp.svelte`.
+:::
+
+## Implementation & analysis
+
+Measurements are computed **client-side** from segmentation zarr data and form annotations already loaded in the viewer. No separate API call is made for area or resolution readouts.
+
+For persisted quantitative outputs at scale (for example ETDRS subfield areas), use **`eorm run-etdrs-model`** — see **[Inference](/eyened-platform/orm/inference)**.
+
+Related panels: **[Segmentation](/eyened-platform/client/panels/segmentation)** · **[ETDRS](/eyened-platform/client/panels/etdrs)**.

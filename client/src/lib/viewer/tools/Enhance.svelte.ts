@@ -16,7 +16,7 @@ export class EnhanceTool extends BrushTool {
         drawingExecutor: DrawingExecutor,
         viewerContext: ViewerContext,
         segmentationContext: SegmentationContext,
-        private readonly globalContext: GlobalContext
+        private readonly globalContext: GlobalContext,
     ) {
         super(drawingExecutor, viewerContext, segmentationContext);
     }
@@ -40,13 +40,14 @@ export class EnhanceTool extends BrushTool {
 
         this.drawInterval = setInterval(() => {
             if (this.lastPosition) {
+                const { rx, ry } = this.imageBrushRadiiToSegmentation(this.lastPosition);
                 const settings = {
-                    brushRadius: this.brushRadius,
+                    radiusX: rx,
+                    radiusY: ry,
                     hardness: this.hardness,
                     pressure: this.pressure,
                     erase: this.mode === 'erase',
                     point: this.lastPosition,
-                    aspectRatio: this.viewerContext.aspectRatio
                 };
                 mask.drawEnhance(settings)
             }
@@ -55,6 +56,7 @@ export class EnhanceTool extends BrushTool {
     }
 
     endDraw() {
+        this.segmentationContext.isDrawing = false;
         const segmentationItem = this.segmentationContext.segmentationItem;
         if (!segmentationItem) {
             console.warn("No segmentation item");

@@ -22,6 +22,7 @@
 	import {
 		Tooltip,
 		TooltipContent,
+		TooltipProvider,
 		TooltipTrigger,
 	} from "$lib/components/ui/tooltip";
 	import { createTag } from "$lib/data/helpers";
@@ -132,6 +133,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<TooltipProvider>
 <div
 	class="tagging-component border border-gray-300 rounded-md bg-gray-100 p-2 text-lg"
 	onclick={(e) => e.stopPropagation()}
@@ -176,7 +178,7 @@
 				Add tag...
 			</Button>
 		</PopoverTrigger>
-		<PopoverContent class="w-40" portalProps={{ disabled: true }}>
+		<PopoverContent class="w-80" portalProps={{ disabled: true }}>
 			<Command bind:value onkeydown={handleCommandKeydown}>
 				<CommandInput bind:value={textValue} placeholder="Search tags..." />
 				<CommandList>
@@ -237,6 +239,7 @@
 		{/if}
 	</div>
 </div>
+</TooltipProvider>
 
 <style>
 	.tags-list {

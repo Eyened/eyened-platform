@@ -1,0 +1,56 @@
+---
+title: Segmentations
+description: Segmentation and model-segmentation endpoints
+sidebar:
+  order: 5
+---
+
+### POST /api/segmentations
+
+Create a segmentation. **`image_id` is the image `PublicID`.**
+
+**Request body:** dimensions, `data_type`, `data_representation`, `feature_id`, optional `subtask_id`, etc.
+
+### GET /api/segmentations/\{segmentation_id\}
+
+Get segmentation metadata.
+
+### PATCH /api/segmentations/\{segmentation_id\}
+
+Update metadata (`feature_id`, `threshold`, `reference_segmentation_id`, …).
+
+### DELETE /api/segmentations/\{segmentation_id\}
+
+Delete segmentation.
+
+### PUT /api/segmentations/\{segmentation_id\}/data
+
+Upload segmentation voxel data.
+
+**Body:** `Content-Type: application/octet-stream` — NumPy array bytes (`np.save` format).
+
+**Query parameters:** `axis`, `scan_nr` (optional slice indexing).
+
+### GET /api/segmentations/\{segmentation_id\}/data
+
+Download segmentation data as **gzip-compressed NumPy** (`application/octet-stream`).
+
+### POST /api/segmentations/\{segmentation_id\}/tags
+
+### DELETE /api/segmentations/\{segmentation_id\}/tags/\{tag_id\}
+
+### GET /api/model-segmentations/\{model_segmentation_id\}/data
+
+Download model segmentation data (gzip NumPy). Query: `axis`, `scan_nr`.
+
+### PUT /api/model-segmentations/\{model_segmentation_id\}/data
+
+Upload model segmentation data. Query: `axis`, `scan_nr`.
+
+---
+
+**Features** (what is being segmented): **[Features API](/eyened-platform/api/features)**.
+
+**Viewer:** **[Segmentation panel](/eyened-platform/client/panels/segmentation)**.
+
+**Data model:** **[Segmentations](/eyened-platform/orm/data_model/segmentations)**.

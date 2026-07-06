@@ -1,5 +1,5 @@
 import type { RenderMode } from "$lib/viewer/viewer-utils";
-import type { InstanceGET } from "../../types/openapi_types";
+import type { ImageGET } from "../../types/openapi_types";
 import { AbstractImage } from "./abstractImage";
 import { TextureData } from "./texture";
 import type { Dimensions } from "./types";
@@ -20,7 +20,7 @@ export class Image2D extends AbstractImage {
     standardizedHistogram!: TextureData;
 
     constructor(
-        instance: InstanceGET,
+        instance: ImageGET,
         webgl: WebGL,
         image_id: string,
         readonly textureData: TextureData,
@@ -45,7 +45,7 @@ export class Image2D extends AbstractImage {
         this.standardizedHistogram = hist;
     }
 
-    static fromBitmap(instance: InstanceGET, webgl: WebGL, image_id: string, bitmap: ImageBitmap, dimensions: Dimensions, meta: any) {
+    static fromBitmap(instance: ImageGET, webgl: WebGL, image_id: string, bitmap: ImageBitmap, dimensions: Dimensions, meta: any) {
         const texture = initTexture(webgl.gl, bitmap);
         const result = new Image2D(instance, webgl, image_id, texture, dimensions, meta);
         result.initialize();
@@ -62,7 +62,7 @@ export class Image2D extends AbstractImage {
      * @param meta 
      * @returns 
      */
-    static fromPixelData(instance: InstanceGET, webgl: WebGL, image_id: string, pixelData: Uint8Array, dimensions: Dimensions, meta: any) {
+    static fromPixelData(instance: ImageGET, webgl: WebGL, image_id: string, pixelData: Uint8Array, dimensions: Dimensions, meta: any) {
         const texture = new TextureData(webgl.gl, dimensions.width, dimensions.height, 'RGBA');
 
         let data;

@@ -1,18 +1,16 @@
 <script lang="ts">
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { getThumbUrl } from "$lib/data-loading/utils";
-	import type { GlobalContext } from "$lib/data/globalContext.svelte";
+
 	import { getContext } from "svelte";
-	import type { InstanceGET, InstanceMeta } from "../../types/openapi_types";
+	import type { ImageGET } from "../../types/openapi_types";
 	import type { BrowserContext } from "./browserContext.svelte";
 	import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
 
 	const browserContext = getContext<BrowserContext>("browserContext");
-	const globalContext = getContext<GlobalContext>("globalContext");
-	const { user: creator } = globalContext;
 
 	interface Props {
-		instance: InstanceGET | InstanceMeta;
+		instance: ImageGET;
 		showSegmentationInfo?: boolean;
 	}
 
@@ -36,6 +34,34 @@
 	function toggleSelect() {
 		browserContext.toggleInstance(instance);
 	}
+	const name_map = {
+		AdaptiveOptics: "AO",
+		ColorFundus: "CFI",
+		ColorFundusStereo: "CF Stereo",
+		RedFreeFundus: "Red Free",
+		ExternalEye: "External",
+		LensPhotograph: "Lens",
+		Ophthalmoscope: "OS",
+		Autofluorescence: "AF",
+		FluoresceinAngiography: "FA",
+		ICGA: "ICGA",
+		InfraredReflectance: "IR",
+		BlueReflectance: "BR",
+		GreenReflectance: "GR",
+		OCT: "OCT",
+		OCTA: "OCTA",
+	};
+
+	let name = "";
+	if (instance.modality && name_map[instance.modality]) {
+		name += name_map[instance.modality];
+	}
+	if (instance.etdrs_field) {
+		name += ` ${instance.etdrs_field}`;
+	}
+	if (instance.modality == "OCT") {
+		name += ` [${instance.nr_of_frames}]`;
+	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -52,26 +78,33 @@
 			popupOpen = true;
 		}}
 	>
-		<div>
-			{instance.id}
+		<div class="text-xs">
+			{name}
 		</div>
 	</div>
 	<div
 		class="tile flex flex-col flex-1 items-center justify-center"
-		onclick={toggleSelect}
+		onpointerdown={toggleSelect}
 	>
-		{#if image_url}
-			<div class="thumbnail-container" style="width: {size}; height: {size};">
-				<img src={image_url} alt="Thumbnail" loading="lazy" class="thumbnail" />
-			</div>
-			<!-- {#if instance.dicom_modality == "OPT"}
+		<div class="thumbnail-container" style="width: {size}; height: {size};">
+			{#if image_url}
+				<img
+					src={image_url}
+					alt="Thumbnail"
+					loading="lazy"
+					class="thumbnail"
+					draggable="false"
+				/>
+			{/if}
+		</div>
+		<!-- {#if instance.dicom_modality == "OPT"}
                     <div class="oct-info text-[10px] text-white/70">
                         [{instance.anatomic_region}] ({instance.nr_of_frames} x {instance.columns})
                     </div>
                 {/if}
             </div> -->
 
-			<!-- {#if showSegmentationInfo && $segmentations.length}
+		<!-- {#if showSegmentationInfo && $segmentations.length}
                 <ul>
                     {#each Object.entries($creatorCounts) as [c, count]}
                         <li class:has-own-segmentations={creator.name == c}>
@@ -80,7 +113,6 @@
                     {/each}
                 </ul>
             {/if} -->
-		{/if}
 	</div>
 
 	<Dialog.Root bind:open={popupOpen}>

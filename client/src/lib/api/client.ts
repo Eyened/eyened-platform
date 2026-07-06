@@ -9,7 +9,7 @@ function redirectToLogin() {
 	// Only redirect if not already on login page
 	if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/users/login')) {
 		const currentUrl = encodeURIComponent(window.location.href);
-		window.location.href = `/users/login?redirect=${currentUrl}`;
+		window.location.href = `/users/login?next=${currentUrl}`;
 	}
 }
 
@@ -73,7 +73,40 @@ async function handleTokenRefresh(): Promise<void> {
 	}
 }
 
-// Custom fetch wrapper that handles 401 responses by refreshing tokens
+export class ApiError extends Error {
+	readonly status: number;
+
+	constructor(status: number, message: string) {
+		super(message);
+		this.name = 'ApiError';
+		this.status = status;
+	}
+}
+
+/** Build an ApiError from a FastAPI error response (always `{ detail: string }`). */
+export async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+	const { detail }: { detail: string } = await response.json();
+	return new ApiError(response.status, detail);
+}
+
+export function isUnauthorizedStatus(status: number): boolean {
+	return status === 401 || status === 403;
+}
+
+/** Retry an API operation once after refreshing tokens (covers edge cases after HTTP-level retry). */
+export async function withAuthRetry<T>(operation: () => Promise<T>): Promise<T> {
+	try {
+		return await operation();
+	} catch (error) {
+		if (!(error instanceof ApiError) || !isUnauthorizedStatus(error.status)) {
+			throw error;
+		}
+		await handleTokenRefresh();
+		return await operation();
+	}
+}
+
+// Custom fetch wrapper that handles 401/403 responses by refreshing tokens
 async function fetchWithAuthRetry(
 	input: RequestInfo | URL,
 	init?: RequestInit
@@ -96,8 +129,8 @@ async function fetchWithAuthRetry(
 	// Make the initial request
 	let response = await fetch(input, requestInit);
 
-	// If we get a 401, try to refresh token and retry once
-	if (response.status === 401 && !isRefreshEndpoint) {
+	// If we get a 401/403, try to refresh token and retry once
+	if (isUnauthorizedStatus(response.status) && !isRefreshEndpoint) {
 		try {
 			// Attempt to refresh the token
 			await handleTokenRefresh();
@@ -107,7 +140,7 @@ async function fetchWithAuthRetry(
 			
 			// If retry still returns 401, the refresh didn't help or token is invalid
 			// This shouldn't happen if refresh succeeded, but handle it gracefully
-			if (response.status === 401) {
+			if (isUnauthorizedStatus(response.status)) {
 				// Authentication failed even after refresh - redirect to login
 				redirectToLogin();
 			}
@@ -196,5 +229,14 @@ export async function fetchApi(
 		return fetchWithCredentials(url, init);
 	}
 
-	return fetchWithAuthRetry(url, init);
+	return withAuthRetry(async () => {
+		const response = await fetchWithAuthRetry(url, init);
+		if (isUnauthorizedStatus(response.status)) {
+			throw new ApiError(
+				response.status,
+				`Request failed: ${response.status}`,
+			);
+		}
+		return response;
+	});
 }

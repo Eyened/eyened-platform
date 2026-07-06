@@ -1,11 +1,11 @@
 import type { Position } from "$lib/types";
-import type { InstanceGET } from "../../types/openapi_types";
+import type { ImageGET } from "../../types/openapi_types";
 import type { RegistrationItem } from "./registrationItem";
 
 export class OCTToProj implements RegistrationItem {
     public readonly source: string;
     public readonly target: string;
-    constructor(public readonly instance: InstanceGET) {
+    constructor(public readonly instance: ImageGET) {
         this.source = `${instance.id}`;
         this.target = `${instance.id}_proj`;
     }
@@ -28,7 +28,7 @@ export class OCTToProj implements RegistrationItem {
 export class ProjToOCT implements RegistrationItem {
     public readonly source: string;
     public readonly target: string;
-    constructor(public readonly instance: InstanceGET) {
+    constructor(public readonly instance: ImageGET) {
         this.source = `${instance.id}_proj`;
         this.target = `${instance.id}`;
     }

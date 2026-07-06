@@ -1,11 +1,12 @@
 <script lang="ts">
-    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation, getInstanceByDataSetIdentifier, instances } from "$lib/data";
+    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation, instances } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET, FormSchemaGET } from "../../../types/openapi_types";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+    import { HIDE_FROM_FORM_PANEL_NAMES } from "$lib/config/builtinFormSchemas";
     import FormItem from "./FormItem.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -19,16 +20,13 @@
 
     const taskContext = getContext<TaskContext>("taskContext");
 
-    //TODO: this should be part of the config?
-    const form_schema_ids_to_exclude = new Set([
-        2, 6, 8, 9
-    ]);
-    
-    
     let selectedSchema: FormSchemaGET | undefined = $state();
 
     const filters = [
-        (annotation: FormAnnotationGET) => !form_schema_ids_to_exclude.has(annotation.form_schema_id),    
+        (annotation: FormAnnotationGET) => {
+            const schema = formSchemas.get(annotation.form_schema_id);
+            return !schema || !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name);
+        },
         (annotation: FormAnnotationGET) => annotation.patient_id === instance.patient.id, //same patient
         (annotation: FormAnnotationGET) => {
             const schema = formSchemas.get(annotation.form_schema_id);
@@ -38,36 +36,37 @@
             }
 
             //TODO: check for other entity types
-            return annotation.image_instance_id == instance.id;     
+            return annotation.image_id == instance.id;     
         }
         
     ];
-    
 
-    // TODO: refactor this, to be used as extension?
-    if (taskContext) {
-        const TaskDefinitionName = taskContext.task.task_definition.name;
-        if (TaskDefinitionName === "Naevi") {
-            selectedSchema = formSchemasByName.get("Naevi grading");
-        } else if (TaskDefinitionName === "ETDRS-grid placement") {
-            selectedSchema = formSchemasByName.get("ETDRS-grid coordinates");
-            filters.push(
-                (annotation: FormAnnotationGET) => annotation.image_instance_id == instance.id,
-            );
-        } else if (TaskDefinitionName === "Glaucoma grading") {
-            selectedSchema = formSchemasByName.get("Glaucoma grading");
+    const taskConfig = taskContext?.task.task_definition.config;
+    if (taskConfig?.form_schema_name) {
+        const schema = formSchemasByName.get(taskConfig.form_schema_name);
+        if (schema && !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name)) {
+            selectedSchema = schema;
         }
     }
-
+    if (taskConfig?.form_image_scope) {
+        filters.push(
+            (annotation: FormAnnotationGET) => annotation.image_id == instance.id,
+        );
+    }
 
     const forms = $derived(
         formAnnotations.filter((annotation) => filters.every((filter) => filter(annotation)))        
         .sort((a, b) => a.id - b.id)
     )
 
-    const formShortcutSchema = $derived(
-        formShortcut ? formSchemasByName.get(formShortcut) : undefined
+    const selectableSchemas = $derived(
+        [...formSchemas.values()].filter((schema) => !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name))
     );
+
+    const formShortcutSchema = $derived.by(() => {
+        if (!formShortcut || HIDE_FROM_FORM_PANEL_NAMES.has(formShortcut)) return undefined;
+        return formSchemasByName.get(formShortcut);
+    });
 
     async function addFormWithSchema(schema: FormSchemaGET | undefined) {
         if (!schema) return;
@@ -75,7 +74,7 @@
             form_schema_id: schema.id,
             patient_id: instance.patient.id,
             study_id: instance.study?.id ?? undefined,
-            image_instance_id: instance.id,
+            image_id: instance.id,
             laterality: instance.laterality ?? undefined,
             sub_task_id: taskContext?.subTask?.id,
             form_data: {},
@@ -88,9 +87,9 @@
 <div class="main">
     <div class="new-form">
         <div>
-            <select bind:value={selectedSchema}>
+            <select class="schema-select" bind:value={selectedSchema}>
                 <option value={undefined} disabled>-- select form type --</option>
-                {#each formSchemas.values() as schema}
+                {#each selectableSchemas as schema}
                     <option value={schema}>{schema.name}</option>
                 {/each}
             </select>
@@ -146,5 +145,18 @@
     button:not(:disabled):hover {
         cursor: pointer;
         background-color: rgba(255, 255, 255, 0.3);
+    }
+    select.schema-select {
+        /* Inherited sidebar text color breaks native <select> on Windows */
+        color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        padding: 0.2em;
+        color-scheme: dark;
+    }
+    select.schema-select option {
+        color: rgba(255, 255, 255, 0.9);
+        background-color: rgb(30, 30, 30);
     }
 </style>

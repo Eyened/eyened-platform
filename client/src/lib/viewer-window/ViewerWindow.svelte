@@ -11,7 +11,9 @@ Keeps track of the main panels and the top row of images.
 	import TopRowImages from "./TopRowImages.svelte";
 	import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 	import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
-	import { formAnnotations } from "$lib/data";
+	import { formAnnotations, instances, patients } from "$lib/data";
+	import type { RegistrationSet } from "$lib/registration/registrationItem";
+	import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
 
 	interface Props {
 		viewerWindowContext: ViewerWindowContext;
@@ -38,6 +40,18 @@ Keeps track of the main panels and the top row of images.
 
 	let main: HTMLDivElement | undefined = $state();
 	let isResizing = false;
+	let registrationSet: RegistrationSet[] = $derived.by(() => {
+		const result: RegistrationSet[] = [];
+		const patientIds = new Set<number>([
+			...instanceIds.map((id) => instances.get(id)?.patient.id),
+		]);
+		// TODO: check if patient can be fetched with promise directly?
+		for (const patientId of patientIds) {
+			const patient = patients.get(patientId);
+			result.push(...collectPatientRegistrationSets(patient?.attrs));
+		}
+		return result;
+	});
 
 	function startResize(event: PointerEvent) {
 		isResizing = true;
@@ -74,6 +88,8 @@ Keeps track of the main panels and the top row of images.
 {#each Array.from(formAnnotations.values()) as formAnnotation}
 	<RegistrationItemLoader {registration} {formAnnotation} />
 {/each}
+
+<RegistrationItemLoader {registration} {registrationSet} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div id="main" bind:this={main} class="dark">

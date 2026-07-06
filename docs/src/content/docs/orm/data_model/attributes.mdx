@@ -1,0 +1,40 @@
+---
+title: Attributes
+description: AttributeValue, AttributeDefinition, and model provenance
+sidebar:
+  order: 5
+---
+
+Structured metadata on images, segmentations, patients, or studies — from AI models or manual entry.
+This can be used to store any kind of metadata on any entity in the database.
+Typical use cases:
+- Patient-level attributes (e.g. **[registration](/eyened-platform/orm/registration)** graphs from `run-registration`, metadata not stored on `Patient` columns)
+- Image-level attributes (e.g. image quality, metadata not stored on `ImageInstance` columns)
+
+## AttributeDefinition
+
+`AttributeName` + `AttributeDataType` (String, Float, Int, JSON). 
+
+## AttributeValue
+
+One value on exactly one entity (`ImageInstance`, `Segmentation`, `ModelSegmentation`, `Patient`, or `Study`):
+- Optional `Laterality`
+- Typed storage: `ValueFloat`, `ValueInt`, `ValueText`, or `ValueJSON`
+- Linked to `AttributeDefinition` and producing `Model`
+- Provenance via `InputValues` / `UsedByValues`
+
+```python
+from eyened_orm import AttributeValue
+
+for attr_val in image.AttributeValues:
+    print(attr_val.AttributeDefinition.AttributeName, attr_val.ValueFloat)
+```
+
+
+## AttributesModel and ModelInput
+
+An **AttributesModel** declares required inputs (`ModelInput`) and output definitions, then writes `AttributeValue` rows. Run via **`eorm run-models`** — see **[Inference](/eyened-platform/orm/inference)**.
+
+## AttributeValueInput
+
+Links output values to input values for dependency tracking.

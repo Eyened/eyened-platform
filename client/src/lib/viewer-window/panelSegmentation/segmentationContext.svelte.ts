@@ -2,8 +2,9 @@
 import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { SvelteSet } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type { ImageBox } from "./segmentationRegion";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
 
 export type Segmentation = SegmentationGET | ModelSegmentationGET;
@@ -12,14 +13,17 @@ export type Segmentation = SegmentationGET | ModelSegmentationGET;
 export function getSegmentationKey(segmentation: Segmentation): string {
     return `${segmentation.annotation_type}_${segmentation.id}`;
 }
+function matchesAxis(segmentation: Segmentation, axis: number): boolean {
+    return segmentation.sparse_axis == null || segmentation.sparse_axis == undefined || segmentation.sparse_axis == axis;
+}
 export class SegmentationContext {
 
     public graderSegmentations: SegmentationGET[] = $derived(
-        segmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+        segmentations.filter((s) => s.image_id == this.instanceId && matchesAxis(s, this.axis))
     );
 
     public modelSegmentations: ModelSegmentationGET[] = $derived(
-        modelSegmentations.filter((s) => s.image_instance_id == this.instanceId && s.sparse_axis == this.axis)
+        modelSegmentations.filter((s) => s.image_id == this.instanceId && matchesAxis(s, this.axis))
     );
 
     public creatorVisible = new SvelteSet<number>();
@@ -39,15 +43,31 @@ export class SegmentationContext {
     public erodeDilateActive = $state(false);
     public questionableActive = $state(false);
     public brushRadius = $state(4);
+    /** Multi-class overlay opacity for the selected class vs other visible classes. */
+    public multiClassActiveAlpha = $state(1);
+    public multiClassInactiveAlpha = $state(0.2);
     public segmentationItem: SegmentationItem | undefined = $state(undefined);
-    public activeIndices: number | number[] = $state([]);
+    public scan_indices: number[] = $derived(this.segmentationItem?.savedScanIndices ?? []);
+    
+    // active mask indices for multi-label / multi-class segmentations
+    public activeIndices: number | number[] = $state([]); 
+    /** True while a segmentation stroke is in progress (pointer/keyboard). Used by multi-label overlay. */
+    public isDrawing = $state(false);
+
+    /** Drag-to-define region tool for new segmentations. */
+    public regionToolActive = $state(false);
+    public pendingRegionBox: ImageBox | undefined = $state(undefined);
+
+    /** Per-segmentation bitmask: bit (i-1) = 1 means subfeature i is shown in multi-class / multi-label shaders. */
+    private visibleFeatureMaskBySegmentationKey = new SvelteMap<string, number>();
 
     constructor(
-        public readonly instanceId: number,
+        public readonly instanceId: string,
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage,
-    ) { }
+    ) {
+    }
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         return this.image.getOrCreateSegmentationItem(segmentation);
@@ -93,14 +113,87 @@ export class SegmentationContext {
         this.shownSegmentations.add(key);
     }
 
-    toggleActive(segmentationItem: SegmentationItem) {
-        if (this.segmentationItem == segmentationItem) {
-            this.segmentationItem = undefined;
+    /**
+     * After creating a segmentation: activate it for drawing, show only it in the
+     * viewer, expand the current user's panel, and collapse/hide other graders + AI.
+     */
+    activateForDrawing(segmentation: Segmentation, creatorId: number) {
+        const item = this.getSegmentationItem(segmentation);
+        this.segmentationItem = item;
+        this.showOnlySegmentation(segmentation);
+
+        this.creatorVisible.clear();
+        this.creatorVisible.add(creatorId);
+
+        this.modelVisible = false;
+
+        const rep = segmentation.data_representation;
+        if (rep === "MultiClass" || rep === "MultiLabel") {
+            this.activeIndices = 1;
         } else {
-            this.segmentationItem = segmentationItem;
-            this.shownSegmentations.add(getSegmentationKey(segmentationItem.segmentation));
+            this.activeIndices = [];
+        }
+        this.questionableActive = false;
+        this.erodeDilateActive = false;
+    }
+
+    private activeSegmentationKey(): string | undefined {
+        return this.segmentationItem
+            ? getSegmentationKey(this.segmentationItem.segmentation)
+            : undefined;
+    }
+
+    isActiveSegmentation(segmentation: Segmentation): boolean {
+        return this.activeSegmentationKey() === getSegmentationKey(segmentation);
+    }
+
+    /** Select a segmentation for editing (pipette / panel); does not toggle off if already active. */
+    activateSegmentationItem(segmentationItem: SegmentationItem) {
+        const key = getSegmentationKey(segmentationItem.segmentation);
+        this.segmentationItem = segmentationItem;
+        this.shownSegmentations.add(key);
+
+        const rep = segmentationItem.segmentation.data_representation;
+        if (rep === 'MultiClass' || rep === 'MultiLabel') {
+            this.activeIndices = 1;
+        } else {
+            this.activeIndices = [];
+        }
+        this.questionableActive = false;
+        this.erodeDilateActive = false;
+    }
+
+    toggleActive(segmentationItem: SegmentationItem) {
+        const key = getSegmentationKey(segmentationItem.segmentation);
+        if (this.activeSegmentationKey() === key) {
+            this.segmentationItem = undefined;
+            this.activeIndices = [];
+            this.questionableActive = false;
+            this.erodeDilateActive = false;
+            return;
         }
 
+        this.activateSegmentationItem(segmentationItem);
+    }
+
+    private static readonly ALL_FEATURES_VISIBLE = 0xffffffff >>> 0;
+
+    getVisibleFeatureMask(segmentation: Segmentation): number {
+        const key = getSegmentationKey(segmentation);
+        const v = this.visibleFeatureMaskBySegmentationKey.get(key);
+        return v === undefined ? SegmentationContext.ALL_FEATURES_VISIBLE : v >>> 0;
+    }
+
+    isFeatureLayerVisible(segmentation: Segmentation, featureIndex: number): boolean {
+        const bit = (1 << (featureIndex - 1)) >>> 0;
+        return (this.getVisibleFeatureMask(segmentation) & bit) !== 0;
+    }
+
+    toggleFeatureLayerVisibility(segmentation: Segmentation, featureIndex: number): void {
+        const key = getSegmentationKey(segmentation);
+        const cur = this.getVisibleFeatureMask(segmentation) >>> 0;
+        const bit = (1 << (featureIndex - 1)) >>> 0;
+        this.visibleFeatureMaskBySegmentationKey.set(key, (cur ^ bit) >>> 0);
     }
 }
 

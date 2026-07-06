@@ -1,19 +1,30 @@
 import enum
 import re
+from collections.abc import Hashable, Iterable
 from typing import (
     Any,
     ClassVar,
     Dict,
+    Iterable,
     List,
     Optional,
     Type,
     TypeVar,
 )
 
-from eyened_orm.utils.zarr.manager import ZarrStorageManager
+from sqlalchemy import Column, Index, UniqueConstraint, false, select, tuple_
+from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute, Session, lazyload
+
+from eyened_orm.display_meta import EyeNedDeclarativeDisplayMeta
 from eyened_orm.utils.table_printer import TablePrinter
-from sqlalchemy import Column, Index, UniqueConstraint, select
-from sqlalchemy.orm import DeclarativeBase, Session
+
+
+def _many(x):
+    if x is None:
+        return ()
+    if isinstance(x, (list, tuple)):
+        return tuple(x)
+    return (x,)
 
 
 def _convert_property_name(name: str) -> str:
@@ -52,6 +63,7 @@ def _get_attribute_with_conversion(obj, name: str) -> Any:
 
 
 T = TypeVar("T", bound="Base")
+PK = TypeVar("PK", bound=Hashable)
 
 
 def ForeignKeyIndex(src_table: str, ref_table: str, column_name: str) -> Index:
@@ -64,7 +76,7 @@ def CompositeUniqueConstraint(name: str, *column_names: str) -> UniqueConstraint
     return UniqueConstraint(*column_names, name=name)
 
 
-class Base(DeclarativeBase):
+class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
     """SQLAlchemy Declarative base with common helpers and utilities."""
 
     _name_column: ClassVar[str | None] = None
@@ -79,36 +91,67 @@ class Base(DeclarativeBase):
             raise ValueError("Object not attached to a session")
         return session
 
-    @property
-    def config(self):
-        """Get config from the attached session."""
-        if not hasattr(self.session, "config"):
-            raise ValueError("Session not properly configured")
-        return self.session.config
-
-    @property
-    def storage_manager(self) -> ZarrStorageManager:
-        """Get storage manager from the attached session."""
-        if not hasattr(self.session, "storage_manager"):
-            raise ValueError("Session not properly configured")
-        return self.session.storage_manager
-
     def __getattr__(self, name: str) -> Any:
         """Resolve missing attributes by converting snake_case to CamelCase column names."""
         return _get_attribute_with_conversion(self, name)
 
     @classmethod
-    def by_name(cls, session: Session, name: str) -> Optional[T]:
+    def by_name(cls: type[T], session: Session, name: str, lazy: bool = False) -> Optional[T]:
         """Find an object by its name column value."""
         if cls._name_column is None:
             raise AttributeError(f"{cls.__name__} has no name column")
         kwargs = {cls._name_column: name}
-        return cls.by_column(session, **kwargs)
+        return cls.by_column(session, lazy=lazy, **kwargs)
 
     @classmethod
-    def fetch_all(cls: Type[T], session: Session) -> List[T]:
+    def fetch_all(
+        cls: Type[T],
+        session: Session,
+        limit: int | None = None,
+        offset: int | None = None,
+        lazy: bool = False,
+    ) -> List[T]:
         """Return all objects of the table."""
-        return session.scalars(select(cls)).all()
+        stmt = select(cls)
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        return session.scalars(stmt).all()
+
+    @classmethod
+    def query_column(
+        cls,
+        session: Session,
+        column: Column | InstrumentedAttribute | str,
+        distinct: bool = True,
+        where: Any = None,
+    ) -> List[Any]:
+        """
+        Query distinct values from a single column of this table, with optional filtering.
+
+        Args:
+            session: SQLAlchemy session.
+            column: Column attribute (e.g., cls.ColumnName) or column name string.
+            distinct: If True, return only distinct values (default: True).
+            where: Optional SQLAlchemy filter expression(s) to apply.
+
+        Returns:
+            List of column values.
+
+        Example:
+            >>> Creator.query_column(session, Creator.CreatorName)
+            ['Alice', 'Bob', 'Charlie']
+            >>> Project.query_column(session, 'ProjectName', distinct=False)
+            ['Project1', 'Project1', 'Project2', ...]
+            >>> Creator.query_column(session, Creator.CreatorName, where=(Creator.Inactive == False))
+            ['Alice', 'Bob']
+        """
+        if isinstance(column, str):
+            column = getattr(cls, column)
+        return cls.select(session, column, distinct=distinct, where=where)
 
     @classmethod
     def primary_keys(cls) -> List[Column]:
@@ -124,23 +167,132 @@ class Base(DeclarativeBase):
         return pks[0]
 
     @classmethod
-    def by_id(cls: type[T], session: Session, id: int) -> Optional[T]:
+    def by_id(
+        cls: type[T], session: Session, id: PK, lazy: bool = False
+    ) -> Optional[T]:
         """Get object by single-column primary key."""
         pk_col = cls.primary_key()
         stmt = select(cls).where(pk_col == id)
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
         return session.scalar(stmt)
 
     @classmethod
-    def by_ids(cls: Type[T], session: Session, ids: List[int]) -> List[T]:
+    def by_ids(
+        cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False
+    ) -> List[T]:
         """Fetch objects by single-column primary key."""
-        if not ids:
+        ids_set = set(ids)
+        if not ids_set:
             return []
         pk_col = cls.primary_key()
-        stmt = select(cls).where(pk_col.in_(set(ids)))
+        stmt = select(cls).where(pk_col.in_(ids_set))
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
         return session.scalars(stmt).all()
 
     @classmethod
-    def by_pk(cls: type[T], session: Session, pk: int | tuple) -> Optional[T]:
+    def by_ids_dict(
+        cls: Type[T], session: Session, ids: Iterable[PK], lazy: bool = False
+    ) -> Dict[PK, T]:
+        """Fetch objects by single-column primary key."""
+        ids_set = set(ids)
+        if not ids_set:
+            return {}
+        pk_col = cls.primary_key()
+        stmt = select(pk_col, cls).where(pk_col.in_(ids_set))
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
+        return {id: obj for id, obj in session.execute(stmt).all()}
+
+    @classmethod
+    def fetch_dict(
+        cls: Type[T],
+        session: Session,
+        *,
+        key_columns: str | tuple[str, ...] | None = None,
+        keys: Iterable[Any] | Iterable[tuple[Any, ...]],
+        lazy: bool = False,
+    ) -> Dict[Any, T]:
+        """
+        Fetch rows matching the provided keys and return a dict keyed by the requested column(s).
+
+        If `key_columns` is not provided (or is empty), falls back to this table's primary key
+        column(s).
+
+        - For a single key column, uses an IN query on that column.
+        - For multiple key columns, uses a tuple IN query: (c1, c2, ...) IN (...)
+
+        Raises:
+            ValueError: if duplicate keys are returned from the database.
+        """
+        if key_columns is None or (isinstance(key_columns, tuple) and not key_columns):
+            pks = cls.primary_keys()
+            if not pks:
+                raise ValueError(f"{cls.__name__}.fetch_dict() could not determine primary key")
+            cols: tuple[str, ...] = tuple(pk.name for pk in pks)
+        else:
+            cols = (key_columns,) if isinstance(key_columns, str) else key_columns
+            if not cols:
+                raise ValueError("key_columns must contain at least one column name")
+
+        if len(cols) == 1:
+            col_name = cols[0]
+            values_set = {v for v in keys if v is not None}  # type: ignore[arg-type]
+            if not values_set:
+                return {}
+
+            rows = cls.by_columns(session, lazy=lazy, **{col_name: values_set})
+            out: Dict[Any, T] = {}
+            for r in rows:
+                k = getattr(r, col_name)
+                if k in out:
+                    raise ValueError(
+                        f"Duplicate key for {cls.__name__}.fetch_dict(): {col_name}={k!r}"
+                    )
+                out[k] = r
+            return out
+
+        # Composite key
+        keys_set: set[tuple[Any, ...]] = set()
+        for k in keys:  # type: ignore[assignment]
+            if k is None:
+                continue
+            if not isinstance(k, tuple):
+                raise ValueError(
+                    f"{cls.__name__}.fetch_dict() expected tuple keys for key_columns={cols}"
+                )
+            if len(k) != len(cols):
+                raise ValueError(
+                    f"{cls.__name__}.fetch_dict() expected {len(cols)} values per key, got {len(k)}"
+                )
+            if any(v is None for v in k):
+                continue
+            keys_set.add(k)
+
+        if not keys_set:
+            return {}
+
+        col_attrs = tuple(getattr(cls, c) for c in cols)
+        stmt = select(cls).where(tuple_(*col_attrs).in_(keys_set))
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
+        rows = session.scalars(stmt).all()
+
+        out: Dict[Any, T] = {}
+        for r in rows:
+            k = tuple(getattr(r, c) for c in cols)
+            if k in out:
+                raise ValueError(
+                    f"Duplicate key for {cls.__name__}.fetch_dict(): {cols}={k!r}"
+                )
+            out[k] = r
+        return out
+
+    @classmethod
+    def by_pk(
+        cls: type[T], session: Session, pk: Any | tuple, lazy: bool = False
+    ) -> Optional[T]:
         """Generic lookup by primary key (supports single or composite keys via tuple)."""
         pks = cls.primary_keys()
 
@@ -155,7 +307,59 @@ class Base(DeclarativeBase):
 
         conditions = [col == val for col, val in zip(pks, pk)]
         stmt = select(cls).where(*conditions)
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
         return session.scalar(stmt)
+
+    @classmethod
+    def query(
+        cls,
+        session: Session,
+        *,
+        columns=(),
+        joins=(),
+        where=(),
+        order_by=(),
+        lazy: bool = False,
+        include_inactive: bool = False,
+        as_mappings: bool = False,
+    ):
+        """
+        Query objects from the table with optional joins, filtering, and ordering.
+
+        Args:
+            session: SQLAlchemy session.
+            columns: List of columns to select from the table.
+            joins: List of joins to apply to the query.
+            where: List of where conditions to apply to the query.
+            order_by: List of order by conditions to apply to the query.
+            lazy: If True, use lazy loading for the query (avoids expensive select_in joins).
+            include_inactive: If True, include inactive objects in the query.
+            as_mappings: If True, return the query as a list of dictionaries.
+
+        Returns:
+            List of objects.
+
+        """
+        cols = tuple(_many(columns))
+        stmt = select(*cols).select_from(cls) if cols else select(cls)
+        if lazy and not cols:  # lazyload("*") only meaningful for ORM entity loads
+            # this avoids expensive select_in joins
+            stmt = stmt.options(lazyload("*"))
+        for j in _many(joins):
+            stmt = stmt.join(j)
+        if not include_inactive and hasattr(cls, "Inactive"):
+            stmt = stmt.where(~cls.Inactive)
+        stmt = stmt.where(*_many(where))
+        stmt = stmt.order_by(*_many(order_by))
+        if not cols:
+            return session.scalars(stmt).all()
+        result = session.execute(stmt)
+        if as_mappings:
+            return result.mappings().all()  # list[RowMapping]
+        if len(cols) == 1:
+            return result.scalars().all()  # list[value]
+        return result.all()  # list[tuple]
 
     @classmethod
     def name_to_id(cls, session: Session) -> dict[str, int]:
@@ -166,23 +370,229 @@ class Base(DeclarativeBase):
         }
 
     @classmethod
-    def by_column(cls: type[T], session: Session, **kwargs) -> Optional[T]:
-        """Generic method to query by any column."""
-        conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
-        stmt = select(cls).where(*conditions)
-        return session.scalar(stmt)
+    def _build_conditions(cls, **filters):
+        """Build WHERE conditions from kwargs.
+
+        Automatically uses in_ operator for iterable values (list, tuple, set) but not strings.
+
+        Returns:
+            List of SQLAlchemy condition expressions.
+        """
+
+        conditions = []
+        for k, v in filters.items():
+            col = getattr(cls, k)
+            # Use in_ for iterables (but not strings)
+            if isinstance(v, Iterable) and not isinstance(v, str):
+                seq = tuple(v)
+                if len(seq) == 0:
+                    conditions.append(false())
+                else:
+                    conditions.append(col.in_(seq))
+            else:
+                conditions.append(col == v)
+        return conditions
 
     @classmethod
-    def by_columns(cls: type[T], session: Session, **kwargs) -> List[T]:
-        """Generic method to query by any columns."""
-        conditions = [getattr(cls, k) == v for k, v in kwargs.items()]
+    def _build_where_stmt(cls, lazy: bool = False, **kwargs):
+        """Build a select statement with where conditions from kwargs.
+
+        Automatically uses in_ operator for iterable values (list, tuple, set) but not strings.
+        """
+        conditions = cls._build_conditions(**kwargs)
         stmt = select(cls).where(*conditions)
-        return session.scalars(stmt).all()
+        if lazy:
+            stmt = stmt.options(lazyload("*"))
+        return stmt
+
+    @classmethod
+    def by_column(
+        cls: type[T], session: Session, lazy: bool = False, **kwargs
+    ) -> Optional[T]:
+        """Generic method to query by any column."""
+        return session.scalar(cls._build_where_stmt(lazy=lazy, **kwargs))
+
+    @classmethod
+    def by_columns(
+        cls: type[T], session: Session, lazy: bool = False, **kwargs
+    ) -> List[T]:
+        """
+        Generic method to query by any columns.
+
+        Automatically uses in_ operator when values are iterables (list, tuple, set) but not strings.
+
+        Example:
+            >>> AttributeValue.by_columns(session, ModelID=32, ImageInstanceID=selected_images)
+            # Uses: ModelID == 32 AND ImageInstanceID.in_(selected_images)
+        """
+        return session.scalars(cls._build_where_stmt(lazy=lazy, **kwargs)).all()
+
+    @classmethod
+    def select(
+        cls,
+        session: Session,
+        *columns: Column | InstrumentedAttribute | str,
+        distinct: bool = False,
+        where: Any = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        **filters,
+    ) -> List[Any] | List[tuple]:
+        """
+        Select specific columns from the table with optional filtering.
+
+        SQL-like interface for selecting column values. Automatically uses IN operator
+        for iterable values (list, tuple, set) but not strings.
+
+        Args:
+            session: SQLAlchemy session.
+            *columns: One or more column attributes (e.g., cls.ColumnName) or column name strings.
+                If one column: returns list[Any]
+                If multiple columns: returns list[tuple]
+            distinct: If True, return only distinct values (default: False).
+            where: Optional SQLAlchemy filter expression(s) to apply in addition to filters.
+            **filters: Column filters as kwargs. Automatically uses IN for iterables.
+
+        Returns:
+            list[Any] for single column, list[tuple] for multiple columns.
+
+        """
+        if not columns:
+            raise ValueError("At least one column must be specified")
+
+        # Convert string column names to column attributes
+        resolved_columns = [
+            getattr(cls, col) if isinstance(col, str) else col for col in columns
+        ]
+
+        stmt = select(*resolved_columns)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        if filters:
+            conditions = cls._build_conditions(**filters)
+            stmt = stmt.where(*conditions)
+
+        if where is not None:
+            stmt = stmt.where(where)
+
+        if distinct:
+            stmt = stmt.distinct()
+
+        if len(resolved_columns) == 1:
+            return session.scalars(stmt).all()
+        else:
+            return session.execute(stmt).all()
+
+    @classmethod
+    def get_or_create(
+        cls: type[T],
+        session: Session,
+        match_by: Dict[str, Any],
+        create_kwargs: Optional[Dict[str, Any]] = None,
+        must_match: Optional[Dict[str, Any]] = None,
+        update_values: Optional[Dict[str, Any]] = None,
+        verbose: bool = False,
+    ) -> T:
+        """
+        Get an existing instance matching the criteria, or create a new one if not found.
+        Optionally update the instance if found or set values when creating.
+
+        Args:
+            session: SQLAlchemy session.
+            match_by: Dict of field names to values to match on (for "get").
+            create_kwargs: Dict of values to use when creating (if not exist).
+                If None, uses match_by values.
+            must_match: Optional dict of fields that must match *if* found, else raises error.
+                Useful for type checking or ensuring consistency.
+            update_values: Optional dict of fields to update (if found) or set (if created).
+            verbose: If True, print log messages about found/created instances.
+
+        Returns:
+            The found or created instance.
+
+        Raises:
+            ValueError: If an existing instance is found but doesn't match must_match criteria.
+        """
+        # Try to find existing instance
+        instance = cls.by_column(session, **match_by)
+
+        display_name = cls.__name__
+        is_new = False
+        if instance:
+            # Optionally, check for required matches (e.g. data type)
+            if must_match:
+                errors = [
+                    f"{attr}: existing={actual}, requested={expect}"
+                    for attr, expect in must_match.items()
+                    if (actual := getattr(instance, attr)) != expect
+                ]
+                if errors:
+                    raise ValueError(
+                        f"{display_name} exists with different parameters: "
+                        + "; ".join(errors)
+                    )
+        else:
+            # Create new instance
+            instance = cls(**(match_by | (create_kwargs or {})))
+            session.add(instance)
+            is_new = True
+
+        # Apply updates if provided (works for both existing and new instances)
+        if update_values is not None:
+            for key, value in update_values.items():
+                setattr(instance, key, value)
+
+        session.flush([instance])
+
+        if verbose:
+            action = "Created" if is_new else "Found existing"
+            print(f"{action} {display_name}: {repr(instance)}")
+        return instance
+
+    @classmethod
+    def upsert(
+        cls: type[T],
+        session: Session,
+        match_by: Dict[str, Any],
+        update_values: Optional[Dict[str, Any]] = None,
+    ) -> T:
+        """
+        Update an existing instance matching the criteria, or create a new one if not found.
+
+        This is a convenience wrapper around get_or_create that always applies update_values.
+
+        Args:
+            session: SQLAlchemy session.
+            match_by: Dict of field names to values to match on (for finding existing record).
+            update_values: Dict of field names to values to update (if found) or set (if created).
+
+        Returns:
+            The updated or created instance.
+
+        """
+        return cls.get_or_create(session, match_by, update_values=update_values)
 
     @classmethod
     def columns(cls) -> List[Column]:
         """Return all columns of the table."""
         return cls.__table__.columns
+
+    @classmethod
+    def all_columns(cls) -> List[Column]:
+        """Return all columns including columns from parent classes in the inheritance hierarchy."""
+        columns = []
+        seen_names = set()
+        # Traverse MRO to collect columns from all Base subclasses
+        for base_cls in cls.__mro__:
+            if issubclass(base_cls, Base) and hasattr(base_cls, "__table__"):
+                for col in base_cls.__table__.columns:
+                    # Avoid duplicates (child classes may redefine parent columns)
+                    if col.name not in seen_names:
+                        columns.append(col)
+                        seen_names.add(col.name)
+        return columns
 
     @classmethod
     def local_columns(cls) -> List[Column]:
@@ -193,11 +603,20 @@ class Base(DeclarativeBase):
     def _base_joins(cls, statement):
         """Override this method to add custom joins to queries."""
         return statement
-    
+
     @classmethod
-    def where(cls: Type[T], session: Session, condition, include_inactive=False, **kwargs) -> List[T]:
+    def where(
+        cls: Type[T],
+        session: Session,
+        condition,
+        include_inactive=False,
+        lazy: bool = False,
+        **kwargs,
+    ) -> List[T]:
         """Query objects with a custom condition and optional joins."""
         statement = select(cls)
+        if lazy:
+            statement = statement.options(lazyload("*"))
 
         if not include_inactive and hasattr(cls, "Inactive"):
             statement = statement.where(~cls.Inactive)
@@ -213,11 +632,16 @@ class Base(DeclarativeBase):
             return val.value
         return val
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert the object to a dictionary, skipping columns marked private."""
+    def to_dict(self, include_parents: bool = False) -> Dict[str, Any]:
+        """Convert the object to a dictionary, skipping columns marked private.
+
+        Args:
+            include_parents: If True, include columns from parent classes in inheritance hierarchy.
+        """
+        columns = self.all_columns() if include_parents else self.columns()
         return {
             c.name: self.get_value(c)
-            for c in self.columns()
+            for c in columns
             if not (getattr(c, "info", None) or {}).get("private", False)
         }
 
@@ -227,13 +651,16 @@ class Base(DeclarativeBase):
 
     def __repr__(self) -> str:
         """String representation of the object."""
-        args = ", ".join([f"{c.name}={getattr(self, c.name)}" for c in self.columns()])
+        cols = self.all_columns()  # include parent-table columns (joined inheritance)
+        args = ", ".join([f"{c.name}={self.get_value(c)}" for c in cols])
         return f"{self.__class__.__name__}({args})"
 
     def _repr_html_(self) -> str:
-        """HTML representation for Jupyter notebook display in table format."""            
-        printer = TablePrinter(title=f'{self.__class__.__name__} {self.get_value(self.primary_key())}')
-        return printer.print_table(self.to_dict())
+        """HTML representation for Jupyter notebook display in table format."""
+        pk_values = tuple(self.get_value(pk) for pk in self.primary_keys())
+        pk_str = pk_values[0] if len(pk_values) == 1 else pk_values
+        printer = TablePrinter(title=f"{self.__class__.__name__} {pk_str}")
+        return printer.print_table(self.to_dict(include_parents=True))
 
     def __hash__(self):
         return id(self)

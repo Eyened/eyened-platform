@@ -1,18 +1,27 @@
-import { api } from '../api/client';
-import type { TagGET, FeatureGET, FormSchemaGET, InstanceGET, StudyGET, TaskGET, SubTaskWithImagesGET } from '../../types/openapi_types';
-import { 
-	ingestTags, 
-	ingestFeatures, 
+import type {
+	FeatureGET,
+	FormSchemaGET,
+	ImageGET,
+	PatientDetailGET,
+	StudyGET,
+	SubTaskWithImagesGET,
+	TagGET,
+	TaskGET
+} from '../../types/openapi_types';
+import { ApiError, api, isUnauthorizedStatus, withAuthRetry } from '../api/client';
+import {
+	formAnnotations,
+	ingestFeatures,
+	ingestFormAnnotations,
 	ingestFormSchemas,
 	ingestInstances,
-	ingestInstanceMetas,
-	ingestStudies,
-	ingestSegmentations,
 	ingestModelSegmentations,
-	ingestFormAnnotations,
-	ingestTasks,
+	ingestPatients,
+	ingestSegmentations,
+	ingestStudies,
 	ingestSubTasks,
-	formAnnotations,
+	ingestTags,
+	ingestTasks,
 	segmentations
 } from './stores.svelte';
 
@@ -25,10 +34,10 @@ import {
  * @returns The data from the response
  */
 function handleResponse<T>(res: { data?: T; error?: any; response: Response }, operation: string): T {
-	if (res.error) {
-		// If authentication error, redirect is already handled by fetchWithAuthRetry
-		// But we should still throw to prevent processing invalid data
-		throw new Error(`Failed to ${operation}: ${res.response.status}`);
+	if (res.error || isUnauthorizedStatus(res.response.status)) {
+		// Auth errors may surface as status only (fetch retried once at HTTP layer).
+		// withAuthRetry on callers can refresh and run the operation again.
+		throw new ApiError(res.response.status, `Failed to ${operation}: ${res.response.status}`);
 	}
 	return res.data as T;
 }
@@ -44,36 +53,73 @@ function getOperationName(path: string, method: string): string {
 	return `${verb} ${cleanPath}`;
 }
 
+export type ApiCallResult<T = unknown> = {
+	data?: T;
+	error?: unknown;
+	response: Response;
+};
+
 /**
- * Wrapped API GET method that automatically handles errors
+ * openapi-fetch call with HTTP-level and app-level auth retry.
  */
+export async function apiInvoke<T = unknown>(
+	call: () => Promise<ApiCallResult<T>>,
+	operation = 'request',
+): Promise<ApiCallResult<T>> {
+	return withAuthRetry(async () => {
+		const res = await call();
+		if (res.error || isUnauthorizedStatus(res.response.status)) {
+			throw new ApiError(
+				res.response.status,
+				`Failed to ${operation}: ${res.response.status}`,
+			);
+		}
+		return res;
+	});
+}
+
+/** Like apiInvoke but does not treat openapi `error` as failure (e.g. 204 No Content). */
+export async function apiInvokeAllowEmpty<T = unknown>(
+	call: () => Promise<ApiCallResult<T>>,
+): Promise<ApiCallResult<T>> {
+	return withAuthRetry(async () => {
+		const res = await call();
+		if (isUnauthorizedStatus(res.response.status)) {
+			throw new ApiError(
+				res.response.status,
+				`Request failed: ${res.response.status}`,
+			);
+		}
+		return res;
+	});
+}
+
 async function apiGet<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.GET(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'GET'));
+	return withAuthRetry(async () => {
+		const res = await api.GET(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'GET'));
+	});
 }
 
-/**
- * Wrapped API POST method that automatically handles errors
- */
 async function apiPost<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.POST(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'POST'));
+	return withAuthRetry(async () => {
+		const res = await api.POST(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'POST'));
+	});
 }
 
-/**
- * Wrapped API PATCH method that automatically handles errors
- */
 async function apiPatch<T = any>(path: string, options?: any): Promise<T> {
-	const res = await api.PATCH(path as any, options);
-	return handleResponse<T>(res, getOperationName(path, 'PATCH'));
+	return withAuthRetry(async () => {
+		const res = await api.PATCH(path as any, options);
+		return handleResponse<T>(res, getOperationName(path, 'PATCH'));
+	});
 }
 
-/**
- * Wrapped API DELETE method that automatically handles errors
- */
 async function apiDelete(path: string, options?: any): Promise<void> {
-	const res = await api.DELETE(path as any, options);
-	handleResponse(res, getOperationName(path, 'DELETE'));
+	return withAuthRetry(async () => {
+		const res = await api.DELETE(path as any, options);
+		handleResponse(res, getOperationName(path, 'DELETE'));
+	});
 }
 
 // ===== Fetch Functions =====
@@ -99,17 +145,22 @@ export async function fetchFormSchemas(): Promise<FormSchemaGET[]> {
 }
 
 export async function fetchInstance(
-	id: number, 
-	options?: {
+	id: string, 
+	options: {
 		with_segmentations?: boolean;
 		with_form_annotations?: boolean;
 		with_model_segmentations?: boolean;
 		with_tag_metadata?: boolean;
+	} = {
+		with_segmentations: true,
+		with_form_annotations: true,
+		with_model_segmentations: true,
+		with_tag_metadata: true
 	}
-): Promise<InstanceGET> {
-	const instance = await apiGet<InstanceGET>('/instances/{instance_id}' as any, {
+): Promise<ImageGET> {
+	const instance = await apiGet<ImageGET>('/images/{image_id}' as any, {
 		params: { 
-			path: { instance_id: id },
+			path: { image_id: id },
 			query: { 
 				with_tag_metadata: true,
 				...options
@@ -143,6 +194,20 @@ export async function fetchStudy(id: number): Promise<StudyGET> {
 	return study;
 }
 
+export async function fetchPatient(
+	id: number,
+	options: { include_attributes?: boolean } = { include_attributes: true }
+): Promise<PatientDetailGET> {
+	const patient = await apiGet<PatientDetailGET>('/patients/{patient_id}' as any, {
+		params: {
+			path: { patient_id: id },
+			query: { include_attributes: options.include_attributes ?? true }
+		} as any
+	});
+	ingestPatients([patient]);
+	return patient;
+}
+
 // ===== Search Functions =====
 
 export async function searchInstances(query: any): Promise<any> {
@@ -169,10 +234,8 @@ export async function searchStudies(query: any): Promise<any> {
 		ingestStudies(data.studies);
 	}
 	
-	// StudySearchResponse has instances: InstanceMeta[] (lightweight references)
-	// Ingest into separate instanceMetas store
 	if (data.instances) {
-		ingestInstanceMetas(data.instances);
+		ingestInstances(data.instances);
 	}
 	
 	return data;
@@ -193,19 +256,30 @@ export async function getStudiesSignature(): Promise<any[]> {
 export async function createSegmentation(item: any, np_array?: any): Promise<any> {
 	const formData = new FormData();
 	formData.append('metadata', JSON.stringify(item));
-	
+
 	if (np_array) {
 		formData.append('np_array', await np_array.toBlob(true), 'np_array.npy.gz');
 	}
-	
+
 	const data = await apiPost<any>('/segmentations' as any, {
-		body: formData
+		body: formData,
 	} as any);
-	
+
 	ingestSegmentations([data]);
-	
+
 	return data;
 }
+
+export type CreateSegmentationShape = {
+	depth: number;
+	height: number;
+	width: number;
+};
+
+export type CreateSegmentationOptions = {
+	shape?: CreateSegmentationShape;
+	image_projection_matrix?: number[][] | null;
+};
 
 export async function createSegmentationFrom(
 	image: any,  // AbstractImage type
@@ -214,28 +288,31 @@ export async function createSegmentationFrom(
 	data_type: any,
 	threshold?: number,
 	sparse_axis?: number,
-	subtask_id?: number
+	subtask_id?: number,
+	options?: CreateSegmentationOptions,
 ): Promise<any> {
 	const instance = image.instance;
 	const scan_indices = image.is3D ? [] : null;
-	let shape = {
+	let shape: CreateSegmentationShape = options?.shape ?? {
 		depth: image.depth,
 		height: image.height,
 		width: image.width,
 	};
-	
-	if (sparse_axis === 1) {
+
+	if (!options?.shape && sparse_axis === 1) {
 		// projection
-		shape.depth = image.height;
-		shape.height = 1;
-		shape.width = image.width;
+		shape = {
+			depth: image.height,
+			height: 1,
+			width: image.width,
+		};
 	}
 
 	const item = {
-		image_instance_id: instance.id,
+		image_id: instance.id,
 		...shape,
 		sparse_axis,
-		image_projection_matrix: null,
+		image_projection_matrix: options?.image_projection_matrix ?? null,
 		scan_indices,
 		data_representation,
 		data_type,
@@ -261,7 +338,7 @@ export async function fetchFormAnnotation(id: number): Promise<any> {
 export async function fetchFormAnnotations(filters?: {
 	patient_id?: number;
 	study_id?: number;
-	image_instance_id?: number;
+	image_id?: string;
 	form_schema_id?: number;
 	sub_task_id?: number;
 }): Promise<any[]> {
@@ -276,8 +353,8 @@ export async function createFormAnnotation(data: {
 	form_schema_id: number;
 	patient_id: number;
 	study_id?: number;
-	image_instance_id: number;
-	laterality?: 'L' | 'R';
+	image_id?: string;
+	laterality?: 'L' | 'R' | null;
 	sub_task_id?: number;
 	form_data: any;
 	form_annotation_reference_id?: number;

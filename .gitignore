@@ -1,4 +1,3 @@
-orm/eyened_orm/environments/*.env
 docker/.env
 *.env
 *.zip
@@ -17,6 +16,9 @@ client/src/lib/extensions.ts
 TODO.md
 orm/migrations/transfer-config.yml
 orm/migrations/transfer-config.*.yml
-database/
 segmentations.zarr/
 **/.ipynb_checkpoints/**
+.cursor/
+client/src/lib/extensions.ts
+venv
+trash

@@ -1,5 +1,5 @@
 import { Matrix } from "$lib/matrix";
-import type { InstanceGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import type { ImageGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 import { SvelteMap } from "svelte/reactivity";
@@ -16,11 +16,11 @@ export abstract class AbstractImage {
     public readonly resolution: { x: number, y: number, z: number };
     transform: Matrix = Matrix.identity;
     
-    // Cache segmentation items per segmentation ID
-    public readonly segmentationItems = new SvelteMap<number, SegmentationItem>();
+    // Cache segmentation items per annotation type + id (ids can overlap across types)
+    public readonly segmentationItems = new SvelteMap<string, SegmentationItem>();
     public readonly orientation: 'axial' | 'enface';
     constructor(
-        public readonly instance: InstanceGET,
+        public readonly instance: ImageGET,
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
@@ -94,15 +94,17 @@ export abstract class AbstractImage {
      * it is cleared before each use
      */
     _drawingContext: CanvasRenderingContext2D | null = null;
-    getDrawingCtx() {
+    getDrawingCtx(width: number = this.width, height: number = this.height) {
         if (!this._drawingContext) {
-            // create empty canvas used from drawing annotations
             const canvas = document.createElement('canvas');
-            canvas.width = this.width;
-            canvas.height = this.height;
             this._drawingContext = canvas.getContext('2d', { willReadFrequently: true })!;
         }
-        this._drawingContext.clearRect(0, 0, this.width, this.height);
+        const canvas = this._drawingContext.canvas;
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+        this._drawingContext.clearRect(0, 0, width, height);
         return this._drawingContext;
     }
 
@@ -124,16 +126,19 @@ export abstract class AbstractImage {
         return this._ioContext;
     }
 
+    private segmentationItemKey(segmentation: SegmentationGET | ModelSegmentationGET): string {
+        return `${segmentation.annotation_type}_${segmentation.id}`;
+    }
+
     getOrCreateSegmentationItem(segmentation: SegmentationGET | ModelSegmentationGET): SegmentationItem {
-        // Use id as key (unique per segmentation)
-        const cached = this.segmentationItems.get(segmentation.id);
+        const key = this.segmentationItemKey(segmentation);
+        const cached = this.segmentationItems.get(key);
         if (cached) {
             return cached;
         }
 
-        // Create new segmentation item
         const segmentationItem = new SegmentationItem(this, segmentation);
-        this.segmentationItems.set(segmentation.id, segmentationItem);
+        this.segmentationItems.set(key, segmentationItem);
         return segmentationItem;
     }
 

@@ -1,5 +1,5 @@
 import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Set
 
 from sqlalchemy import ForeignKey, Index, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -23,10 +23,11 @@ class Study(Base):
 
     __tablename__ = "Study"
     __table_args__ = (
-        Index("PatientIDStudyDate_UNIQUE", "StudyDate", "PatientID", unique=True),
-        Index("fk_Study_Patient1_idx", "PatientID"),
+        Index("PatientIDStudyDate_UNIQUE", "PatientID", "StudyDate", unique=True),
         Index("StudyDate_idx", "StudyDate"),
-        Index("StudyRound", "StudyRound"),
+        Index("fk_Study_Patient1_idx", "PatientID"),
+        Index("ix_Study_PatientID_StudyRound", "PatientID", "StudyRound"),
+        Index("ix_Study_StudyRound_StudyDate", "StudyRound", "StudyDate"),
     )
 
     StudyID: Mapped[int] = mapped_column(primary_key=True)
@@ -43,7 +44,10 @@ class Study(Base):
         "eyened_orm.patient.Patient", back_populates="Studies", lazy="selectin"
     )
     Series: Mapped[List["Series"]] = relationship(
-        "eyened_orm.series.Series", back_populates="Study", passive_deletes=True
+        "eyened_orm.series.Series",
+        back_populates="Study",
+        passive_deletes=True,
+        lazy="selectin",
     )
     Annotations: Mapped[List["Annotation"]] = relationship(
         "eyened_orm.annotation.Annotation", back_populates="Study"
@@ -54,7 +58,7 @@ class Study(Base):
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue", back_populates="Study"
     )
-    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
+    StudyTagLinks: Mapped[Set["StudyTagLink"]] = relationship(
         "eyened_orm.tag.StudyTagLink", back_populates="Study", lazy="selectin"
     )
 
@@ -73,6 +77,10 @@ class Study(Base):
         if self.StudyDate is None or self.Patient.BirthDate is None:
             return None
         return (self.StudyDate - self.Patient.BirthDate).days / 365.25
+
+    @property
+    def images(self) -> List["ImageInstance"]:
+        return self.get_images()
 
     def get_images(self, where=None, include_inactive=False) -> List["ImageInstance"]:
         from eyened_orm import ImageInstance, Series

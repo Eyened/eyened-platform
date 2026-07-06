@@ -1,0 +1,68 @@
+---
+title: Release notes
+description: EyeNED Platform v2026.07.0 release notes
+---
+
+## v2026.07.0
+
+This release focuses on making EyeNED easier to run in real environments and more pleasant for day-to-day annotation work. Version numbers now follow calendar versioning (`YYYY.MM.MICRO`).
+
+### Highlights
+
+- **Single sign-on support:** EyeNED can authenticate with OpenID Connect providers, including secure ID-token validation, nonce/CSRF checks, optional automatic account creation, and a local Keycloak setup for development.
+- **More useful viewer and task UI:** embeddable browser widget, global help panel, per-panel help overlays, browser overlay fixes, smoother task/search performance, pending-segmentation unload checks, and small layout improvements.
+- **EyeNED ORM:** the ORM can now load images and segmentations either through the API or a local file-storage adapter.
+- **Better segmentation workflows:** the viewer has a unified segmentation creation flow, region tools, feature pipette support, multiclass/multilabel opacity controls, B-scan link scrolling, probability-mask area calculation fixes, Ctrl-Z undo support.
+- **Safer, clearer imports:** the ORM importer now plans changes before applying them, supports CSV and JSON audit/undo workflows, handles idempotent re-runs, documents how patient/study/series/image rows are matched, and reports clearer errors when required parent records cannot be resolved.
+- **Unified `eorm` CLI targeting:** shared `--path`, `--project`, `--patient`, `--exclude`, and `--modality` flags across inference and maintenance commands. See [CLI](/eyened-platform/orm/cli).
+- **Deployment and developer setup updates:** database, Docker, Redis/RQ worker, Keycloak, and storage instructions have been refreshed. Database setup is extracted into a new `database/` subdirectory with a standalone stack, including tools for creating and loading database dumps.
+- **Database setup improvements:** `eorm initialize-database` creates tables and stamps the current Alembic revision so later `alembic upgrade head` runs apply only new migrations.
+- **Thumbnail generation is centralized:** imports no longer hide thumbnail work. Use `eorm update-thumbnails`, `PostImport`, or the async import API endpoints depending on where the work should run.
+- **ETDRS and form schemas:** builtin viewer FormSchemas (ETDRS grid, registration) can be seeded with `eorm seed-form-schemas`. See the [ETDRS Panel](/eyened-platform/client/panels/etdrs) and [Form Schemas](/eyened-platform/orm/form_schemas) docs.
+- **Registration model versioning:** each package version gets its own `Model` row; patient attributes preserve provenance per model version; viewer crosshair linking works across registration graph versions.
+
+### Bug fixes
+
+**Viewer and annotation**
+
+- Segmentations and registration graphs load correctly when adding images dynamically to the viewer (#104).
+- Browser overlay shows loaded images again.
+- Segmentation area measurement works correctly for probability masks.
+- Segmentations with a sparse axis render and measure correctly.
+- Composite features can be created from a list of existing features.
+- B-scan numbers update dynamically when scrolling linked OCT scans.
+- ETDRS overlay renders correctly on enface OCT images.
+- Subtask row index stays correct when filtering tasks (#69).
+- Task overlay state buttons update reactively.
+- Search fields pre-fill from URL parameters (#58).
+
+**Import and data**
+
+- Using random `Public ID`s for images instead of database primary keys.
+- DICOM RGB images load correctly during preprocessing.
+- DICOM parser handles edge cases more reliably.
+- Image importer API mismatches corrected.
+
+**Server and CLI**
+
+- Nullable enum columns no longer cause 500 errors (#63).
+- Concurrent API requests handled reliably (#61).
+- Slow signatures endpoint improved.
+- Worker Redis DNS resolution fixed.
+
+### Upgrade notes
+
+1. Run database migrations before starting the new server containers.
+2. On fresh deployments, run `eorm seed-form-schemas` after `eorm initialize-database` (or pass `--seed-form-schemas` to combine both steps).
+3. Review authentication settings before deployment. Password login remains enabled by default; OIDC is opt-in via `EYENED_API_AUTH_OIDC_ENABLED=true`.
+4. Ensure at least one RQ worker listens to the `default` queue if you use async thumbnail jobs.
+5. If you install `eyened_orm` directly, reinstall it after pulling this release so the ORM-owned dependencies, including `zarr`, are available.
+6. **Patient attributes API change:** `GET /patients/{id}` now returns each attribute as a list of `{ value, model }` entries so provenance per model version is preserved.
+
+### Documentation to read
+
+- [Authentication](/eyened-platform/guides/authentication) for OIDC setup and account linking.
+- [Importing data](/eyened-platform/importing_data) and [ORM Importer](/eyened-platform/orm/importer) for the new import flow.
+- [Thumbnails](/eyened-platform/thumbnails) for CLI, importer, API, and worker thumbnail generation.
+- [Getting Started](/eyened-platform/getting_started) for the updated Docker/database setup.
+- [ETDRS Panel](/eyened-platform/client/panels/etdrs) and [Form Schemas](/eyened-platform/orm/form_schemas) for grid placement and grading tasks.

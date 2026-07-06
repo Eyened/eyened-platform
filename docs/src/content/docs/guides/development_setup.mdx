@@ -3,42 +3,16 @@ title: Development Setup
 description: Set up your development environment for the Eyened platform
 ---
 
-This guide will help you set up your development environment for contributing to the Eyened platform.
+The `dev/` stack runs the viewer, API, nginx, and Redis in Docker with source mounted for hot reload. MySQL is a **separate** compose stack — start it first, then point the dev server at it via `EYENED_DATABASE_*` in `.env`.
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
-
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [Python](https://www.python.org/) (v3.8 or later)
 - [Docker](https://www.docker.com/) and Docker Compose
 - [Git](https://git-scm.com/)
 
-## Quick Start
+To run `eorm` or `pytest` on the host (outside containers), install the ORM — see **[ORM setup](/eyened-platform/orm/getting_started)**.
 
-To start the development environment:
-
-```bash
-cd dev
-docker-compose up -d
-```
-This starts the database and fileserver services.
-
-In separate terminals:
-```bash
-./start_client_dev.sh
-./start_server_dev.sh
-```
-
-Now you can make edits to the client or server code, the application should update automatically.
-
-:::tip
-Check the README in the `dev` folder for  more details.
-:::
-
-:::note
-If this is your first time running the development environment, you may need to:
-
+## First-time setup
 
 1. Clone the repository:
 
@@ -47,52 +21,113 @@ If this is your first time running the development environment, you may need to:
     cd eyened-platform
     ```
 
-2. Install server dependencies:
+2. Start MySQL (if you do not already have one):
+
     ```bash
-    cd ../server
-    python -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
+    cd database
+    cp .env.example .env   # set MYSQL_* and EYENED_DATABASE_* passwords
+    docker compose up -d
+    cd ../dev
     ```
 
-3. Create a `.env` file:
+3. Configure the dev environment:
+
     ```bash
     cp sample.env .env
     ```
 
-4. Install client dependencies:
+    Set at minimum:
+
+    | Variable | Purpose |
+    | --- | --- |
+    | `EYENED_API_SECRET_KEY` | Session signing key |
+    | `EYENED_REDIS_PASSWORD` | Redis auth (required by compose) |
+    | `EYENED_STORAGE_ROOT` | Writable path for `segmentations.zarr` (mounted into the server container) |
+    | `EYENED_DATABASE_HOST` | Database hostname (`host.docker.internal` when MySQL runs on the Docker host) |
+    | `EYENED_DATABASE_PORT` | Host port MySQL listens on (e.g. `3306`) |
+    | `EYENED_DATABASE_USER` | Database user |
+    | `EYENED_DATABASE_PASSWORD` | Database password |
+    | `EYENED_DATABASE_DATABASE` | Database name (default `eyened_database`) |
+    | `DEV_NGINX_PORT` | Port for the app in your browser (e.g. `8080`) |
+
+4. Configure nginx and storage mounts in `docker-compose.yml` and `nginx.conf`:
+    - Add read-only volume mounts on **fileserver** for thumbnail and image dataset paths.
+    - Add matching `location /{storage_backend_key}/` blocks in `nginx.conf` (see [Platform Design](/eyened-platform/platform_design#storage)).
+    - Mount `EYENED_STORAGE_ROOT` into the **server** container if segmentations should persist.
+
+5. Build and start:
+
     ```bash
-    cd ../client
-    npm install
+    docker compose up -d --build
     ```
 
-5. Make the start scripts executable:
+6. Initialize a fresh database (once):
+
     ```bash
-    chmod +x start_client_dev.sh start_server_dev.sh
+    docker compose exec server bash
+    eorm initialize-database
+    eorm seed-form-schemas
+    eorm create-user
     ```
 
-:::
+    Or run the same commands on the host with `dev/.env` loaded if `eyened_orm` is installed locally.
+
+## Daily use
+
+From `dev/`:
+
+```bash
+docker compose up -d        # start
+docker compose logs -f      # follow logs
+docker compose down         # stop
+```
+
+Open `http://<hostname>:<DEV_NGINX_PORT>/`. The **client** container runs Vite with hot reload; the **server** container runs uvicorn with `--reload` on mounted `server/` and `orm/` sources.
 
 :::caution
-The browser updates automatically when editing code, but sometimes the webgl context is outdated and you may need to refresh the page manually.
+WebGL state in the viewer can go stale after heavy client edits — refresh the page if overlays look wrong. Server reload usually picks up Python changes automatically; restart the server container if it does not.
 :::
 
-:::caution
-The FastAPI server doesn't always restart automatically after code edits. You may need to manually restart the server in some cases.
+## Optional: OIDC login
+
+The base stack uses password auth only. To test OpenID Connect locally, layer the Keycloak override — see `dev/keycloak/README.md`:
+
+```bash
+docker compose -f docker-compose.yml -f keycloak/docker-compose.keycloak.yml up -d
+```
+
+Set `DEV_PUBLIC_HOST`, `EYENED_API_AUTH_OIDC_ENABLED=true`, and the `EYENED_OIDC_*` vars in `.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
+
+## Optional: existing data
+
+Load a dump:
+
+```bash
+eorm load-dump -p /path/to/dump.sql
+```
+
+Apply pending migrations from `orm/migrations/`:
+
+```bash
+alembic -x env_file=../../dev/.env upgrade head
+```
+
+## Tests
+
+Install test dependencies once (`pip install -r server/test-requirements.txt`), then from the repo root:
+
+```bash
+pytest
+```
+
+## Contributing
+
+1. Branch from `development`: `git checkout -b feature/your-feature-name`
+2. Make and test changes locally
+3. Open a pull request against `development`
+
+Never commit secrets — keep them in `.env` only.
+
+:::tip
+More detail and edge cases: `dev/README.md` in the repository.
 :::
-
-## Development Workflow
-
-1. Create a new branch for your feature:
-    ```bash
-    git checkout -b feature/your-feature-name
-    ```
-
-2. Make your changes and test them locally
-
-3. Push to the public repository and create a pull request
-
-:::caution
-Never commit sensitive information like API keys or passwords to the repository. Use environment variables for all sensitive configuration.
-:::
-

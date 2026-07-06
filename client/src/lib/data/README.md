@@ -45,6 +45,7 @@ export const formSchemas = new ReactiveMap<number, FormSchemaGET>()
 export const segmentations = new ReactiveMap<number, SegmentationGET>()
 export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>()
 export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>()
+export const patients = new ReactiveMap<number, PatientDetailGET>()
 export const tasks = new ReactiveMap<number, TaskGET>()
 export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>()
 
@@ -443,8 +444,8 @@ if (instance.segmentations) {
   ingestSegmentations(instance.segmentations);
 }
 
-// Access from store
-const segs = segmentations.filter(s => s.image_instance_id === instance.id);
+// Access from store (segmentations use public image_id string, same as ImageGET.id)
+const segs = segmentations.filter(s => s.image_id === instance.id);
 ```
 
 ### SubTask With Images
@@ -462,6 +463,32 @@ if (subtask) {
 ```
 
 ### Form Annotation Data
+
+**`FormAnnotationGET` scope fields** (see OpenAPI `FormAnnotationGET`):
+
+- `patient_id: number` — internal patient key (not the display identifier)
+- `study_id?: number | null` — set for study- or image-scoped forms
+- `image_id?: string | null` — public image ID (same as `ImageGET.id`), not a numeric `image_instance_id`
+- `laterality?: 'L' | 'R' | null` — eye for study-level (`StudyEye`) forms
+- `object_type: 'patient' | 'study' | 'image_instance'` — which scope the annotation applies to
+
+**Look up display metadata from stores** (e.g. in popups that only receive `form`):
+
+```typescript
+const annotation = formAnnotations.get(123)!;
+
+const instance = annotation.image_id
+  ? instances.get(annotation.image_id)
+  : undefined;
+const patient = instance?.patient ?? patients.get(annotation.patient_id);
+const study =
+  instance?.study ??
+  (annotation.study_id != null ? studies.get(annotation.study_id) : undefined);
+
+console.log(patient?.identifier);  // human-readable patient ID
+console.log(study?.date);
+console.log(annotation.image_id);  // public image ID when image-scoped
+```
 
 **`form_data` may be stored separately and requires separate fetch:**
 
@@ -598,8 +625,23 @@ await getModelSegmentationData(id, { axis, scan_nr, sparse_axis });
 **Form annotation operations:**
 ```typescript
 await fetchFormAnnotation(id);
-await fetchFormAnnotations({ patient_id, study_id, image_instance_id, form_schema_id, sub_task_id });
-await createFormAnnotation({ form_schema_id, patient_id, study_id, image_instance_id, laterality, sub_task_id, form_data, form_annotation_reference_id });
+await fetchFormAnnotations({
+  patient_id,
+  study_id,
+  image_id,        // public image ID string (ImageGET.id)
+  form_schema_id,
+  sub_task_id,
+});
+await createFormAnnotation({
+  form_schema_id,
+  patient_id,
+  study_id,        // optional; required for study/image scope per schema
+  image_id,        // optional; public image ID when annotating an image
+  laterality,      // optional; 'L' | 'R' for StudyEye-style forms
+  sub_task_id,
+  form_data,
+  form_annotation_reference_id,
+});
 await deleteFormAnnotation(id);
 await getFormAnnotationValue(id);
 await setFormAnnotationValue(id, form_data);
@@ -762,6 +804,7 @@ def image_instance_to_get(
 - `FormAnnotationGET.form_data` may be `null` or `undefined`
 - Use `getFormAnnotationValue(id)` to fetch form data separately
 - Use `setFormAnnotationValue(id, data)` to update form data
+- Use `patient_id` / `study_id` / `image_id` on the DTO (not `image_instance_id`); resolve `patient.identifier` via `patients` or `instances.get(form.image_id)?.patient`
 
 ### Segmentation Data Requires Separate Fetch
 

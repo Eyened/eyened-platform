@@ -8,12 +8,15 @@ uniform usampler2D u_boundaries;
 
 
 uniform float u_alpha;
+uniform float u_multi_active_alpha;
+uniform float u_multi_inactive_alpha;
 uniform vec3[32] u_colors;
 uniform int u_highlighted_feature_index;
 uniform uint u_active_feature_mask;
+uniform uint u_visible_feature_mask;
 uniform vec3 u_image_size;
+uniform bool u_show_seg_bounds;
 
-uniform bool u_smooth;
 uniform usampler2D u_mask;
 uniform uint u_mask_bitmask;
 uniform bool u_has_mask;
@@ -29,26 +32,8 @@ float getAlphaQuestionable(float a,bool layer_annotation){
     return mix(.5f*brightness,.5f*(a+brightness),float(layer_annotation));
 }
 
-float bilinear(usampler2D binary_mask, uint bitmask, vec2 pos) {
-    ivec2 ipos = ivec2(pos);
-    bool t00 = (bitmask & texelFetch(binary_mask, ipos, 0).r) > 0u;
-    bool t10 = (bitmask & texelFetch(binary_mask, ipos + ivec2(1, 0), 0).r) > 0u;
-    bool t01 = (bitmask & texelFetch(binary_mask, ipos + ivec2(0, 1), 0).r) > 0u;
-    bool t11 = (bitmask & texelFetch(binary_mask, ipos + ivec2(1, 1), 0).r) > 0u;
-
-    vec2 f = fract(pos);
-    float u0 = mix(float(t00), float(t10), f.x);
-    float u1 = mix(float(t01), float(t11), f.x);
-    float u = mix(u0, u1, f.y);
-    return u;
-}
-
 bool getMask(usampler2D mask, uint bitmask, vec2 pos) {
-    if(u_smooth) {
-        return bilinear(mask, bitmask, pos) > 0.5f;
-    } else {
-        return (bitmask & texelFetch(mask, ivec2(pos), 0).r) > 0u;
-    }
+    return (bitmask & texelFetch(mask, ivec2(pos), 0).r) > 0u;
 }
 
 void main(){
@@ -58,22 +43,34 @@ void main(){
             discard;
         }
     }
+
+    if (isSegPlaneOutlineScreen()) {
+        color_out = segPlaneOutlineColor();
+        return;
+    }
     
-    uint annotation = texture(u_annotation,v_uv).r;
+    uint annotation = texelFetch(u_annotation, ivec2(p), 0).r;
     
     bool has_layer = annotation > 0u;
     
     if(has_layer){
-        // &31 = mod 32
-        vec3 color=u_colors[(annotation-1u)&31u];
-        // highlight layer if u_highlighted_feature_index is 0 (none specified) or if this is the highlighted layer
-        float show_highlight=float(u_highlighted_feature_index==int(annotation) || (u_active_feature_mask == annotation));
+        uint class_bit = 1u << ((annotation - 1u) & 31u);
+        if((u_visible_feature_mask & class_bit) == 0u) {
+            color_out = vec4(0.);
+        } else {
+            // &31 = mod 32
+            vec3 color=u_colors[(annotation-1u)&31u];
+            // highlight layer if u_highlighted_feature_index is 0 (none specified) or if this is the highlighted layer
+            float show_highlight=float(u_highlighted_feature_index==int(annotation) || (u_active_feature_mask == annotation));
 
-        // 0.3f is the default alpha value, u_alpha is the alpha value for the highlight
-        color_out=vec4(color,mix(.3f,u_alpha,show_highlight));
+            float layer_a = mix(u_multi_inactive_alpha, u_multi_active_alpha, show_highlight);
+            color_out = vec4(color, layer_a * u_alpha);
+        }
     }else{
         color_out=vec4(0.);
     }
+
+    applySegPlaneOutline(color_out);
     
     // 16 bit unsigned integer for boundary value in range 0-885
     // Red channel: top boundary

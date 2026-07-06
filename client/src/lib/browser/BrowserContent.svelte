@@ -42,7 +42,7 @@
 		{onPageChange}
 	>
 		{#each browserContext.orderedStudies as study (study.id)}
-			<StudyBlock study={study} {mode} />
+			<StudyBlock {study} {mode} />
 		{/each}
 	</PaginatedResults>
 {:else}

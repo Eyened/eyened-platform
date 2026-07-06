@@ -1,120 +1,67 @@
-version: "3.1"
-
 name: eyened-platform
 
 services:
 
-  database:
-    image: mysql:8.0.27
+  redis:
+    image: redis:7-alpine
+    env_file: .env
     environment:
-      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
-    volumes:
-      - ${DATABASE_PATH}:/var/lib/mysql 
+      REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
     ports:
-      - "${DATABASE_PORT}:3306"
+      - "${EYENED_REDIS_PUBLISH_PORT:-6379}:6379"
+    command: >
+      sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DATABASE_ROOT_PASSWORD}"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-    restart: always
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  api-server:
-    user: "${USERID:-1000}:${GROUPID:-1000}"
+  server:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.server
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-    depends_on:
-      database:
-        condition: service_healthy
+    env_file: .env
     environment:
-      - IMAGES_BASEPATH=/images
-      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
-      - THUMBNAILS_PATH=/storage/thumbnails
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - DATABASE_HOST=database
-      - DATABASE_ROOT_PASSWORD=${DATABASE_ROOT_PASSWORD}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_PORT=3306
-      - DATABASE_NAME=eyened_database
-      - ADMIN_USERNAME=${ADMIN_USERNAME}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY}
-    restart: always
-    volumes:
-      - ${IMAGES_BASEPATH}:/images
-      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
-      - ${THUMBNAILS_PATH}:/storage/thumbnails
-
-  redis:
-    user: "${USERID:-1000}:${GROUPID:-1000}"
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-    restart: always
-
-  worker:
-    user: "${USERID:-1000}:${GROUPID:-1000}"
-    build:
-      context: ../
-      dockerfile: ./docker/Dockerfile.worker
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - DATABASE_HOST=database
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_PORT=3306
-      - DATABASE_NAME=eyened_database
-      - ADMIN_USERNAME=${ADMIN_USERNAME}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - IMAGES_BASEPATH=/images
-      - SEGMENTATIONS_ZARR_STORE=/storage/segmentations.zarr
-      - THUMBNAILS_PATH=/storage/thumbnails
-      - SECRET_KEY=${SECRET_KEY}
+      EYENED_REDIS_HOST: redis
+      EYENED_REDIS_PORT: "6379"
+      EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       redis:
         condition: service_healthy
-      database:
-        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health?src=docker-compose', timeout=2).read()
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
     volumes:
-      - ${IMAGES_BASEPATH}:/images
-      - ${SEGMENTATIONS_ZARR_STORE}:/storage/segmentations.zarr
-      - ${THUMBNAILS_PATH}:/storage/thumbnails
-    restart: always
+      - ${EYENED_STORAGE_ROOT}:${EYENED_STORAGE_ROOT}
+
+  client:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile.client
 
   fileserver:
-    build:
-      context: .
-      dockerfile: Dockerfile.fileserver
+    env_file: .env
+    image: nginx:latest
+    ports:
+      - "${PORT:-80}:80"
     depends_on:
-      api-server:
+      server:
         condition: service_healthy
+      client:
+        condition: service_started
     volumes:
-      - ${IMAGES_BASEPATH}:/images
-      - ${THUMBNAILS_PATH}:/thumbnails
-    ports:
-      - ${PORT}:80
-    restart: always
-
-  adminer:
-    image: adminer:latest
-    restart: always
-    ports:
-      - "8080:8080"
-    depends_on:
-      database:
-        condition: service_healthy
-    environment:
-      - ADMINER_DEFAULT_SERVER=database
-
+      # nginx configuration
+      - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      # Thumbnail directory served by nginx
+      - ${EYENED_STORAGE_ROOT}/thumbnails:/storage/thumbnails:ro
+      # Add other read-only mounts for local datasets here

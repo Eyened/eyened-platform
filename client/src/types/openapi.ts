@@ -144,6 +144,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auth Options
+         * @description Options and settings for authentication.
+         */
+        get: operations["get_auth_options_auth_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Oidc Authorization Url
+         * @description The authorization URL at the OIDC provider for authentication.
+         *
+         *     The authorization includes a CSRF token. The CSRF token hash is included in the 'state' parameter along the OIDC
+         *     authorization path, while the original token is returned to the client for safekeeping (as a cookie).
+         *     The client is supposed to provide the token (cookie) again when calling the authenticate endpoint, where it
+         *     will be validated.
+         *
+         *     A similar flow is set for the 'nonce', which is returned from the OIDC authentication response in the ID token,
+         *     which is also validated.
+         */
+        get: operations["get_oidc_authorization_url_auth_oidc_authorize_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/authenticate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Oidc Authenticate
+         * @description Handle OIDC authentication using the code from the authorization URL.
+         */
+        post: operations["oidc_authenticate_auth_oidc_authenticate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instances/{instance_id}": {
         parameters: {
             query?: never;
@@ -153,6 +221,57 @@ export interface paths {
         };
         /** Get Instance */
         get: operations["get_instance_instances__instance_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Image */
+        get: operations["get_public_image_images__image_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{image_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Image Data */
+        get: operations["get_public_image_data_images__image_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{image_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Image Thumbnail */
+        get: operations["get_public_image_thumbnail_images__image_id__thumbnail_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -342,7 +461,8 @@ export interface paths {
         };
         /** Get Model Segmentation Data */
         get: operations["get_model_segmentation_data_model_segmentations__model_segmentation_id__data_get"];
-        put?: never;
+        /** Update Model Segmentation Data */
+        put: operations["update_model_segmentation_data_model_segmentations__model_segmentation_id__data_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -367,7 +487,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/import/run_inference": {
+    "/import/run_cfi_models": {
         parameters: {
             query?: never;
             header?: never;
@@ -376,8 +496,45 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run Inference */
-        post: operations["run_inference_import_run_inference_post"];
+        /**
+         * Enqueue Run Cfi Models
+         * @description Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...).
+         */
+        post: operations["enqueue_run_cfi_models_import_run_cfi_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/run_cfi_amd": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enqueue Run Cfi Amd */
+        post: operations["enqueue_run_cfi_amd_import_run_cfi_amd_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/run_layer_segmentation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enqueue Run Layer Segmentation */
+        post: operations["enqueue_run_layer_segmentation_import_run_layer_segmentation_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -393,8 +550,48 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Update Thumbnails */
-        post: operations["update_thumbnails_import_update_thumbnails_post"];
+        /**
+         * Post Import Update Thumbnails
+         * @description Queue a job that scans the DB for missing thumbnails (CLI-equivalent).
+         */
+        post: operations["post_import_update_thumbnails_import_update_thumbnails_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/update_thumbnails_for_image_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Import Update Thumbnails For Image Ids
+         * @description Queue thumbnail generation for the given ``image_ids`` only.
+         */
+        post: operations["post_import_update_thumbnails_for_image_ids_import_update_thumbnails_for_image_ids_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import/status/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_import_status__task_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -902,6 +1099,23 @@ export interface paths {
         patch: operations["patch_study_tag_studies__study_id__tags__tag_id__patch"];
         trace?: never;
     };
+    "/patients/{patient_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Patient */
+        get: operations["get_patient_patients__patient_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -909,7 +1123,7 @@ export interface components {
         /** AddImageRequest */
         AddImageRequest: {
             /** Instance Id */
-            instance_id: number;
+            instance_id: string;
         };
         /** AttributeCondition */
         AttributeCondition: {
@@ -919,14 +1133,14 @@ export interface components {
              */
             type: "attribute";
             /** Model */
-            model: string;
+            model?: string | null;
             /** Variable */
             variable: string;
             /**
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN" | "IS NULL";
             /** Value */
             value: number | string | string[] | null;
             /** Feature */
@@ -979,7 +1193,7 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN" | "IS NULL";
             /** Value */
             value: string | number | string[] | null;
         };
@@ -1009,6 +1223,11 @@ export interface components {
          * @enum {string}
          */
         EntityType: "Patient" | "Study" | "Eye" | "StudyEye" | "ImageInstance";
+        /**
+         * ExternalEnum
+         * @enum {string}
+         */
+        ExternalEnum: "Y" | "N" | "M";
         /** FeatureGET */
         FeatureGET: {
             /** Name */
@@ -1052,8 +1271,8 @@ export interface components {
             patient_id: number;
             /** Study Id */
             study_id?: number | null;
-            /** Image Instance Id */
-            image_instance_id?: number | null;
+            /** Image Id */
+            image_id?: string | null;
             laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
@@ -1095,8 +1314,8 @@ export interface components {
             patient_id?: number | null;
             /** Study Id */
             study_id?: number | null;
-            /** Image Instance Id */
-            image_instance_id?: number | null;
+            /** Image Id */
+            image_id?: string | null;
             laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
@@ -1113,8 +1332,8 @@ export interface components {
             patient_id: number;
             /** Study Id */
             study_id?: number | null;
-            /** Image Instance Id */
-            image_instance_id?: number | null;
+            /** Image Id */
+            image_id?: string | null;
             laterality?: components["schemas"]["Laterality"] | null;
             /** Sub Task Id */
             sub_task_id?: number | null;
@@ -1140,135 +1359,14 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /**
-         * ImageImportData
-         * @description Model for a single image import data
-         */
-        ImageImportData: {
-            /**
-             * Project Name
-             * @description Required project name
-             */
-            project_name: string;
-            /**
-             * Patient Identifier
-             * @description Patient identifier in the system
-             */
-            patient_identifier?: string | null;
-            /**
-             * Patient Props
-             * @description Optional key-value properties for new patient
-             * @default {}
-             */
-            patient_props: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Study Date
-             * @description Study date (can be a date object or ISO format string)
-             */
-            study_date?: string | null;
-            /**
-             * Study Props
-             * @description Optional key-value properties for new study
-             * @default {}
-             */
-            study_props: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Series Id
-             * @description Optional series identifier
-             */
-            series_id?: string | null;
-            /**
-             * Series Props
-             * @description Optional key-value properties for new series
-             * @default {}
-             */
-            series_props: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Image
-             * @description Path to the image file (required)
-             */
-            image: string;
-            /**
-             * Image Props
-             * @description Optional key-value properties for new image
-             * @default {}
-             */
-            image_props: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * ImportOptions
-         * @description Options for the import process
-         */
-        ImportOptions: {
-            /**
-             * Create Patients
-             * @description If True, create patients when they don't exist
-             * @default false
-             */
-            create_patients: boolean;
-            /**
-             * Create Studies
-             * @description If True, create studies when they don't exist
-             * @default false
-             */
-            create_studies: boolean;
-            /**
-             * Create Series
-             * @description If True, create series when they don't exist
-             * @default true
-             */
-            create_series: boolean;
-            /**
-             * Create Project
-             * @description If True, create project when it doesn't exist
-             * @default false
-             */
-            create_project: boolean;
-            /**
-             * Include Stack Trace
-             * @description If True, include stack trace in the error response
-             * @default false
-             */
-            include_stack_trace: boolean;
-        };
-        /** ImportRequest */
-        ImportRequest: {
-            data: components["schemas"]["ImageImportData"];
-            options: components["schemas"]["ImportOptions"];
-        };
-        /** ImportResponse */
-        ImportResponse: {
-            /** Success */
-            success: boolean;
-            /** Message */
-            message: string;
-            /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
-            /** Error */
-            error?: string | null;
-            /** Stack Trace */
-            stack_trace?: string | null;
-        };
-        /** InstanceGET */
-        InstanceGET: {
+        /** ImageGET */
+        ImageGET: {
             /** Sop Instance Uid */
             sop_instance_uid: string;
-            /** Dataset Identifier */
-            dataset_identifier: string;
-            /** Thumbnail Identifier */
-            thumbnail_identifier: string;
-            /** Thumbnail Path */
-            thumbnail_path: string;
+            /** Data Format */
+            data_format: string;
+            /** Data Source Id */
+            data_source_id?: string | null;
             modality?: components["schemas"]["Modality"] | null;
             dicom_modality?: components["schemas"]["ModalityType"] | null;
             etdrs_field?: components["schemas"]["ETDRSField"] | null;
@@ -1309,7 +1407,7 @@ export interface components {
             /** Date Preprocessed */
             date_preprocessed?: string | null;
             /** Id */
-            id: number;
+            id: string;
             project: components["schemas"]["ProjectMeta"];
             patient: components["schemas"]["PatientMeta"];
             study: components["schemas"]["StudyMeta"];
@@ -1324,28 +1422,317 @@ export interface components {
             model_segmentations?: components["schemas"]["ModelSegmentationGET"][] | null;
             /** Form Annotations */
             form_annotations?: components["schemas"]["FormAnnotationGET"][] | null;
-            /** Attributes */
-            attributes: {
+            /** Model Attrs */
+            model_attrs: {
                 [key: string]: {
                     [key: string]: unknown;
                 };
             };
+            /** Attrs */
+            attrs: {
+                [key: string]: unknown;
+            };
         };
-        /** InstanceMeta */
-        InstanceMeta: {
-            /** Id */
-            id: number;
-            /** Thumbnail Path */
-            thumbnail_path: string;
+        /**
+         * ImportOptions
+         * @description Options for the import process
+         */
+        ImportOptions: {
+            /**
+             * Include Stack Trace
+             * @description If True, include stack trace in the error response
+             * @default false
+             */
+            include_stack_trace: boolean;
+        };
+        /** ImportRequest */
+        ImportRequest: {
+            data: components["schemas"]["ImportRow"];
+            options: components["schemas"]["ImportOptions"];
+        };
+        /** ImportResponse */
+        ImportResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error?: string | null;
+            /** Stack Trace */
+            stack_trace?: string | null;
+        };
+        /**
+         * ImportRow
+         * @description One flat record per image: project → patient → study → series → instance → storage fields.
+         *     All fields are optional until consistency rules are enforced (see model validator).
+         */
+        ImportRow: {
+            /** Contact Id */
+            contact_id?: number | null;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Contact Institute */
+            contact_institute?: string | null;
+            /** Contact Orcid */
+            contact_orcid?: string | null;
+            /** Sop Instance Uid */
+            sop_instance_uid?: string | null;
             modality?: components["schemas"]["Modality"] | null;
             dicom_modality?: components["schemas"]["ModalityType"] | null;
             etdrs_field?: components["schemas"]["ETDRSField"] | null;
             laterality?: components["schemas"]["Laterality"] | null;
+            /**
+             * Height
+             * @description Rows_y
+             */
+            height?: number | null;
+            /**
+             * Width
+             * @description Columns_x
+             */
+            width?: number | null;
+            /**
+             * Depth
+             * @description NrOfFrames
+             */
+            depth?: number | null;
+            /** Resolution Horizontal */
+            resolution_horizontal?: number | null;
+            /** Resolution Vertical */
+            resolution_vertical?: number | null;
+            /** Resolution Axial */
+            resolution_axial?: number | null;
+            /** Old Path */
+            old_path?: string | null;
+            /** Device Id */
+            device_id?: number | null;
+            /** Device Serial Number */
+            device_serial_number?: string | null;
+            /**
+             * Device Description
+             * @description Description of the device
+             */
+            device_description?: string | null;
+            /**
+             * Manufacturer
+             * @description Manufacturer of the device
+             */
+            manufacturer?: string | null;
+            /**
+             * Manufacturer Model Name
+             * @description Model name of the device
+             */
+            manufacturer_model_name?: string | null;
+            /**
+             * Scan Mode
+             * @description Scan.ScanMode; used with SCAN importer entity for lookup/create
+             */
+            scan_mode?: string | null;
+            /**
+             * Modality Tag
+             * @description Modality.ModalityTag (lookup/create Modality table row); distinct from modality enum
+             */
+            modality_tag?: string | null;
+            /** Source Info Id */
+            source_info_id?: number | null;
             /** Anatomic Region */
-            anatomic_region: string;
-            device: components["schemas"]["DeviceMeta"];
-            /** Tags */
-            tags: components["schemas"]["TagMeta"][];
+            anatomic_region?: number | null;
+            /** Acquisition Date Time */
+            acquisition_date_time?: string | null;
+            /** Angiography */
+            angiography?: string | null;
+            /** Samples Per Pixel */
+            samples_per_pixel?: number | null;
+            /** Horizontal Field Of View */
+            horizontal_field_of_view?: number | null;
+            /** Sop Class Uid */
+            sop_class_uid?: string | null;
+            /** Photometric Interpretation */
+            photometric_interpretation?: string | null;
+            /** Pupil Dilated */
+            pupil_dilated?: string | null;
+            /** Fda Identifier */
+            fda_identifier?: string | null;
+            /**
+             * Dataset Identifier
+             * @description Maps to ImageInstance.DatasetIdentifier, deprecated and will be removed in a future release
+             */
+            dataset_identifier?: string | null;
+            /**
+             * Modality Id
+             * @description Modality.ModalityID (SCAN-like PK for Modality table importer entity)
+             */
+            modality_id?: number | null;
+            /**
+             * Scan Id
+             * @description Scan.ScanID when referencing an existing Scan row
+             */
+            scan_id?: number | null;
+            /**
+             * Slice Thickness
+             * @description SliceThickness
+             */
+            slice_thickness?: number | null;
+            /**
+             * Alt Dataset Identifier
+             * @description AltDatasetIdentifier; deprecated and will be removed in a future release
+             */
+            alt_dataset_identifier?: string | null;
+            /**
+             * Date Inserted
+             * @description DateInserted
+             */
+            date_inserted?: string | null;
+            /**
+             * Date Modified
+             * @description DateModified
+             */
+            date_modified?: string | null;
+            /**
+             * Date Preprocessed
+             * @description DatePreprocessed
+             */
+            date_preprocessed?: string | null;
+            /**
+             * Cf Roi
+             * @description CFROI JSON
+             */
+            cf_roi?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Cf Keypoints
+             * @description CFKeypoints JSON
+             */
+            cf_keypoints?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Cf Quality
+             * @description CFQuality
+             */
+            cf_quality?: number | null;
+            /** Project Id */
+            project_id?: number | null;
+            /**
+             * Project Name
+             * @description Name of the project
+             */
+            project_name?: string | null;
+            /** Project Description */
+            project_description?: string | null;
+            /** Project Doi */
+            project_doi?: string | null;
+            /** Project Contact Id */
+            project_contact_id?: number | null;
+            /** @description Whether the project is external */
+            project_external?: components["schemas"]["ExternalEnum"] | null;
+            /** Patient Id */
+            patient_id?: number | null;
+            /**
+             * Patient Identifier
+             * @description Patient identifier (unique within the project)
+             */
+            patient_identifier?: string | null;
+            sex?: components["schemas"]["SexEnum"] | null;
+            /**
+             * Birth Date
+             * @description Patient's date of birth
+             */
+            birth_date?: string | null;
+            /** Study Id */
+            study_id?: number | null;
+            /**
+             * Study Date
+             * @description Date when the study was performed
+             */
+            study_date?: string | null;
+            /** Study Description */
+            study_description?: string | null;
+            /** Study Round */
+            study_round?: number | null;
+            /** Series Id */
+            series_id?: number | null;
+            /**
+             * Series Instance Uid
+             * @description DICOM SeriesInstanceUID; stored on Series.SeriesInstanceUid
+             */
+            series_instance_uid?: string | null;
+            /**
+             * Series Anonymous Identity
+             * @description Batch-local grouping key for anonymous series creation
+             */
+            series_anonymous_identity?: number | null;
+            /** Series Number */
+            series_number?: number | null;
+            /**
+             * Study Instance Uid
+             * @description DICOM StudyInstanceUID; stored on Series.StudyInstanceUid
+             */
+            study_instance_uid?: string | null;
+            /** Device Model Id */
+            device_model_id?: number | null;
+            /** Image Instance Id */
+            image_instance_id?: number | null;
+            /** Public Id */
+            public_id?: string | null;
+            /** Inactive */
+            inactive?: boolean | null;
+            /**
+             * Image Anonymous Identity
+             * @description Batch-local grouping key for anonymous image instance creation
+             */
+            image_anonymous_identity?: number | null;
+            /** Storage Backend Id */
+            storage_backend_id?: number | null;
+            /**
+             * Storage Backend Key
+             * @description StorageBackend used for this image
+             */
+            storage_backend_key?: string | null;
+            /**
+             * Storage Backend Kind
+             * @description Kind of the storage backend
+             */
+            storage_backend_kind?: string | null;
+            /** Image Storage Id */
+            image_storage_id?: number | null;
+            /**
+             * Object Key
+             * @description Path to the image file within the storage backend
+             */
+            object_key?: string | null;
+            /**
+             * Image Storage Format
+             * @description If set, overrides inferred Format for ImageStorage
+             */
+            image_storage_format?: string | null;
+            /**
+             * Image Storage Is Primary
+             * @description If set, maps to ImageStorage.IsPrimary
+             */
+            image_storage_is_primary?: boolean | null;
+            /**
+             * Image Storage Hash
+             * @description SHA-256 digest (32 bytes); maps to ImageStorage.Hash
+             */
+            image_storage_hash?: string | null;
+            /**
+             * Image Storage Checksum
+             * @description Checksum string (e.g. MD5 hex); maps to ImageStorage.Checksum
+             */
+            image_storage_checksum?: string | null;
+            /**
+             * Thumbnail Path
+             * @description Thumbnail identifier under storage root; maps to ImageInstance.ThumbnailPath
+             */
+            thumbnail_path?: string | null;
         };
         /**
          * Laterality
@@ -1373,8 +1760,8 @@ export interface components {
         };
         /** ModelSegmentationGET */
         ModelSegmentationGET: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -1389,8 +1776,6 @@ export interface components {
             scan_indices?: number[] | null;
             /** Threshold */
             threshold?: number | null;
-            /** Reference Segmentation Id */
-            reference_segmentation_id?: number | null;
             data_type: components["schemas"]["Datatype"];
             data_representation: components["schemas"]["DataRepresentation"];
             /** Id */
@@ -1412,6 +1797,22 @@ export interface components {
             /** Date Modified */
             date_modified?: string | null;
         };
+        /** OIDCAuthenticationRequest */
+        OIDCAuthenticationRequest: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** OIDCAuthorizationResponse */
+        OIDCAuthorizationResponse: {
+            /** Url */
+            url: string;
+            /** Csrf */
+            csrf: string;
+            /** Nonce */
+            nonce: string;
+        };
         /** ObjectTagPATCH */
         ObjectTagPATCH: {
             /** Comment */
@@ -1424,6 +1825,30 @@ export interface components {
             /** Comment */
             comment?: string | null;
         };
+        /**
+         * PatientAttributeValueGET
+         * @description One attribute value produced by a model (or manual entry when model is null).
+         */
+        PatientAttributeValueGET: {
+            /** Value */
+            value: unknown;
+            model?: components["schemas"]["ModelMeta"] | null;
+        };
+        /** PatientDetailGET */
+        PatientDetailGET: {
+            /** Id */
+            id: number;
+            /** Identifier */
+            identifier: string;
+            /** Birth Date */
+            birth_date?: string | null;
+            sex?: components["schemas"]["SexEnum"] | null;
+            project: components["schemas"]["ProjectMeta"];
+            /** Attrs */
+            attrs?: {
+                [key: string]: components["schemas"]["PatientAttributeValueGET"][];
+            };
+        };
         /** PatientMeta */
         PatientMeta: {
             /** Id */
@@ -1432,6 +1857,7 @@ export interface components {
             identifier: string;
             /** Birth Date */
             birth_date?: string | null;
+            sex?: components["schemas"]["SexEnum"] | null;
         };
         /** ProjectMeta */
         ProjectMeta: {
@@ -1439,6 +1865,73 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+        };
+        /** RunCfiAmdRequest */
+        RunCfiAmdRequest: {
+            /** Image Ids */
+            image_ids: number[];
+            /**
+             * Overwrite
+             * @default false
+             */
+            overwrite: boolean;
+            /**
+             * Batch Size
+             * @default 8
+             */
+            batch_size: number;
+            /**
+             * N Workers
+             * @default 12
+             */
+            n_workers: number;
+        };
+        /**
+         * RunCfiModelsRequest
+         * @description Queue a model job for the given image instance IDs (CFI attributes or segmentation).
+         */
+        RunCfiModelsRequest: {
+            /**
+             * Image Ids
+             * @description ImageInstance IDs to process (e.g. ColorFundus IDs from a completed import).
+             */
+            image_ids: number[];
+            /**
+             * Model
+             * @description Single CFI attribute pipeline, or omit to run all attribute models.
+             */
+            model?: ("cfi-roi" | "cfi-keypoints" | "cfi-odfd" | "cfi-quality") | null;
+            /**
+             * Overwrite
+             * @description If true, re-run even when results already exist.
+             * @default false
+             */
+            overwrite: boolean;
+            /**
+             * Commit Interval
+             * @default 100
+             */
+            commit_interval: number;
+            /**
+             * Batch Size
+             * @default 8
+             */
+            batch_size: number;
+            /**
+             * N Workers
+             * @default 16
+             */
+            n_workers: number;
+        };
+        /** RunImageIdsJobRequest */
+        RunImageIdsJobRequest: {
+            /** Image Ids */
+            image_ids: number[];
+            /**
+             * Overwrite
+             * @default false
+             */
+            overwrite: boolean;
         };
         /** ScanMeta */
         ScanMeta: {
@@ -1479,7 +1972,7 @@ export interface components {
         /** SearchResponse */
         SearchResponse: {
             /** Instances */
-            instances: components["schemas"]["InstanceGET"][];
+            instances: components["schemas"]["ImageGET"][];
             /** Studies */
             studies: components["schemas"]["StudyGET"][];
             /** Limit */
@@ -1489,14 +1982,14 @@ export interface components {
             /** Count */
             count?: number | null;
             /** Result Ids */
-            result_ids: number[];
+            result_ids: string[];
             /** Has More */
             has_more: boolean;
         };
         /** SegmentationGET */
         SegmentationGET: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -1511,10 +2004,10 @@ export interface components {
             scan_indices?: number[] | null;
             /** Threshold */
             threshold?: number | null;
-            /** Reference Segmentation Id */
-            reference_segmentation_id?: number | null;
             data_type: components["schemas"]["Datatype"];
             data_representation: components["schemas"]["DataRepresentation"];
+            /** Reference Segmentation Id */
+            reference_segmentation_id?: number | null;
             /** Id */
             id: number;
             /**
@@ -1553,13 +2046,18 @@ export interface components {
             /** Series Instance Uid */
             series_instance_uid: string;
             /** Instance Ids */
-            instance_ids?: number[];
+            instance_ids?: string[];
         };
         /** SeriesMeta */
         SeriesMeta: {
             /** Id */
             id: number;
         };
+        /**
+         * SexEnum
+         * @enum {string}
+         */
+        SexEnum: "M" | "F";
         /**
          * SignatureField
          * @description Signature descriptor for a searchable field.
@@ -1579,6 +2077,16 @@ export interface components {
             model?: string | null;
             /** Feature */
             feature?: string | null;
+            /**
+             * Nullable
+             * @default false
+             */
+            nullable: boolean;
+            /**
+             * Multi
+             * @default false
+             */
+            multi: boolean;
         };
         /** StudyGET */
         StudyGET: {
@@ -1586,11 +2094,10 @@ export interface components {
             id: number;
             /** Description */
             description?: string | null;
-            /**
-             * Date
-             * Format: date-time
-             */
+            /** Date */
             date: string;
+            /** Round */
+            round?: number | null;
             /** Age */
             age?: number | null;
             project: components["schemas"]["ProjectMeta"];
@@ -1604,10 +2111,7 @@ export interface components {
         StudyMeta: {
             /** Id */
             id: number;
-            /**
-             * Date
-             * Format: date-time
-             */
+            /** Date */
             date: string;
         };
         /** StudySearchCondition */
@@ -1621,7 +2125,7 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN";
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "IN" | "IS NULL";
             /** Value */
             value: string | number | string[] | null;
         };
@@ -1661,7 +2165,7 @@ export interface components {
             /** Studies */
             studies: components["schemas"]["StudyGET"][];
             /** Instances */
-            instances: components["schemas"]["InstanceMeta"][];
+            instances: components["schemas"]["ImageGET"][];
             /** Limit */
             limit: number;
             /** Page */
@@ -1725,7 +2229,7 @@ export interface components {
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;
             /** Images */
-            images: components["schemas"]["InstanceGET"][];
+            images: components["schemas"]["ImageGET"][];
         };
         /**
          * SubTasksResponse
@@ -1882,6 +2386,8 @@ export interface components {
             message: string;
             /** Task Id */
             task_id?: string | null;
+            /** Task Ids */
+            task_ids?: string[] | null;
             /** Error */
             error?: string | null;
         };
@@ -1914,6 +2420,23 @@ export interface components {
             /** Expires In */
             expires_in: number;
             user: components["schemas"]["UserResponse"];
+        };
+        /**
+         * UpdateThumbnailsForImageIdsRequest
+         * @description Queue thumbnail generation for specific instances (same processing as bulk update).
+         */
+        UpdateThumbnailsForImageIdsRequest: {
+            /**
+             * Image Ids
+             * @description ImageInstance IDs to generate thumbnails for.
+             */
+            image_ids: number[];
+            /**
+             * Print Errors
+             * @description Log per-image errors to worker stdout.
+             * @default false
+             */
+            print_errors: boolean;
         };
         /** UserLogin */
         UserLogin: {
@@ -1952,8 +2475,8 @@ export interface components {
         };
         /** SegmentationPOST */
         SegmentationPOST: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -1980,13 +2503,13 @@ export interface components {
              * @default null
              */
             threshold: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
             /**
              * Reference Segmentation Id
              * @default null
              */
             reference_segmentation_id: number | null;
-            data_type: components["schemas"]["Datatype"];
-            data_representation: components["schemas"]["DataRepresentation"];
             /** Feature Id */
             feature_id: number;
             /**
@@ -2009,8 +2532,8 @@ export interface components {
         };
         /** SegmentationBase */
         SegmentationBase: {
-            /** Image Instance Id */
-            image_instance_id: number;
+            /** Image Id */
+            image_id: string;
             /** Depth */
             depth: number;
             /** Height */
@@ -2037,13 +2560,13 @@ export interface components {
              * @default null
              */
             threshold: number | null;
+            data_type: components["schemas"]["Datatype"];
+            data_representation: components["schemas"]["DataRepresentation"];
             /**
              * Reference Segmentation Id
              * @default null
              */
             reference_segmentation_id: number | null;
-            data_type: components["schemas"]["Datatype"];
-            data_representation: components["schemas"]["DataRepresentation"];
             $defs: {
                 /**
                  * DataRepresentation
@@ -2288,6 +2811,93 @@ export interface operations {
             };
         };
     };
+    get_auth_options_auth_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_oidc_authorization_url_auth_oidc_authorize_get: {
+        parameters: {
+            query?: {
+                next?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OIDCAuthorizationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oidc_authenticate_auth_oidc_authenticate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                oidc_csrf_token?: string;
+                oidc_nonce?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OIDCAuthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_instance_instances__instance_id__get: {
         parameters: {
             query?: {
@@ -2315,7 +2925,123 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InstanceGET"];
+                    "application/json": components["schemas"]["ImageGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_image_images__image_id__get: {
+        parameters: {
+            query?: {
+                with_segmentations?: boolean;
+                with_form_annotations?: boolean;
+                with_model_segmentations?: boolean;
+                with_tag_metadata?: boolean;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_image_data_images__image_id__data_get: {
+        parameters: {
+            query?: {
+                index?: number | null;
+                meta?: boolean;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_image_thumbnail_images__image_id__thumbnail_get: {
+        parameters: {
+            query?: {
+                size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2406,7 +3132,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: number;
+                instance_id: string;
             };
             cookie?: {
                 jwt_token?: string;
@@ -2446,7 +3172,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: number;
+                instance_id: string;
                 tag_id: number;
             };
             cookie?: {
@@ -2481,7 +3207,7 @@ export interface operations {
                 authorization?: string;
             };
             path: {
-                instance_id: number;
+                instance_id: string;
                 tag_id: number;
             };
             cookie?: {
@@ -2855,6 +3581,45 @@ export interface operations {
             };
         };
     };
+    update_model_segmentation_data_model_segmentations__model_segmentation_id__data_put: {
+        parameters: {
+            query?: {
+                axis?: number | null;
+                scan_nr?: number | null;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                model_segmentation_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     import_single_image_import_image_post: {
         parameters: {
             query?: never;
@@ -2893,9 +3658,128 @@ export interface operations {
             };
         };
     };
-    run_inference_import_run_inference_post: {
+    enqueue_run_cfi_models_import_run_cfi_models_post: {
         parameters: {
             query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCfiModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_run_cfi_amd_import_run_cfi_amd_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCfiAmdRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_run_layer_segmentation_import_run_layer_segmentation_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunImageIdsJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_import_update_thumbnails_import_update_thumbnails_post: {
+        parameters: {
+            query?: {
+                /** @description Include images with empty ThumbnailPath (failed previous run), like ``eorm update-thumbnails --failed``. */
+                failed?: boolean;
+                /** @description Print per-image errors on the worker, like ``eorm update-thumbnails --print-errors``. */
+                print_errors?: boolean;
+            };
             header?: {
                 authorization?: string;
             };
@@ -2927,7 +3811,7 @@ export interface operations {
             };
         };
     };
-    update_thumbnails_import_update_thumbnails_post: {
+    post_import_update_thumbnails_for_image_ids_import_update_thumbnails_for_image_ids_post: {
         parameters: {
             query?: never;
             header?: {
@@ -2939,7 +3823,11 @@ export interface operations {
                 refresh_token?: string;
             };
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateThumbnailsForImageIdsRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2948,6 +3836,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_import_status__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2966,7 +3885,7 @@ export interface operations {
             query?: {
                 patient_id?: number | null;
                 study_id?: number | null;
-                image_instance_id?: number | null;
+                image_id?: string | null;
                 form_schema_id?: number | null;
                 sub_task_id?: number | null;
             };
@@ -4370,7 +5289,7 @@ export interface operations {
             };
             path: {
                 subtaskid: number;
-                instance_id: number;
+                instance_id: string;
             };
             cookie?: {
                 jwt_token?: string;
@@ -4536,6 +5455,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TagMeta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_patient_patients__patient_id__get: {
+        parameters: {
+            query?: {
+                include_attributes?: boolean;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                patient_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientDetailGET"];
                 };
             };
             /** @description Validation Error */

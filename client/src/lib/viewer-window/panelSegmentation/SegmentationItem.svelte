@@ -15,7 +15,10 @@
 	import ImportPanel from "./ImportPanel.svelte";
 	import MultiFeatureSelector from "./MultiFeatureSelector.svelte";
 	import ReferenceSegmentationPanel from "./ReferenceSegmentationPanel.svelte";
-	import { getSegmentationKey, type Segmentation } from "./segmentationContext.svelte";
+	import {
+		getSegmentationKey,
+		type Segmentation,
+	} from "./segmentationContext.svelte";
 	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
 	const globalContext = getContext<GlobalContext>("globalContext");
@@ -35,16 +38,22 @@
 	const image = viewerContext.image;
 
 	const visible = $derived(
-		segmentationContext.shownSegmentations.has(getSegmentationKey(segmentation)),
+		segmentationContext.shownSegmentations.has(
+			getSegmentationKey(segmentation),
+		),
 	);
 
-	const segmentationItem =
-		segmentationContext.getSegmentationItem(segmentation);
+	// Must not run inside $derived: getOrCreateSegmentationItem mutates the image cache.
+	const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
 
 	const segmentationState = $derived(
 		segmentationItem.getSegmentationState(viewerContext.index),
 	);
+	const syncState = $derived(segmentationState?.syncState ?? null);
 	const isEditable = globalContext.canEdit(segmentation);
+	const isEmptyForCurrentSlice = $derived(
+		segmentationItem.isEmptyForSlice(viewerContext.index),
+	);
 	let collapsed = $state(true);
 
 	async function remove() {
@@ -53,8 +62,9 @@
 			if (segmentation.annotation_type === "grader_segmentation") {
 				await deleteSegmentation(segmentation.id);
 			}
-			if (segmentationContext.segmentationItem == segmentationItem) {
+			if (segmentationContext.isActiveSegmentation(segmentation)) {
 				segmentationContext.segmentationItem = undefined;
+				segmentationContext.activeIndices = [];
 			}
 		};
 
@@ -79,11 +89,12 @@
 
 	function toggleActive() {
 		segmentationContext.toggleActive(segmentationItem);
+		if (mainViewerContext.highlightedSegmentationItem === segmentationItem) {
+			mainViewerContext.highlightedSegmentationItem = undefined;
+		}
 	}
 
-	const active = $derived(
-		segmentationContext.segmentationItem == segmentationItem,
-	);
+	const isActive = $derived(segmentationContext.isActiveSegmentation(segmentation));
 
 	function pointerEnter() {
 		mainViewerContext.highlightedSegmentationItem = segmentationItem;
@@ -119,11 +130,16 @@
 
 <div
 	class="content"
+	role="group"
+	aria-label="{feature.name} segmentation [{segmentation.id}]"
 	class:loading={segmentationItem.loading}
-	class:active
+	class:active={isActive}
+	class:visible={visible}
+	class:empty-non-editable={!isEditable && isEmptyForCurrentSlice}
+	class:empty-editable={isEditable && isEmptyForCurrentSlice}
 	onpointerenter={pointerEnter}
 	onpointerleave={pointerLeave}
->
+>    
 	<div class="row">
 		<div>
 			{#if visible}
@@ -147,7 +163,7 @@
 			<FeatureColorPicker {segmentation} />
 		{/if}
 
-		<button type="button" class="expand" onclick={toggleActive}>
+		<button type="button" class="expand" class:active={isActive} onclick={toggleActive}>
 			<div class="feature-name">{feature.name}</div>
 			<div class="segmentationID">[{segmentation.id}]</div>
 			<div class="segmentationType">[{segmentationType}]</div>
@@ -159,13 +175,13 @@
 	</div>
 
 	{#if dataRepresentation == "Probability"}
-		{#if active}
+		{#if isActive}
 			<div class="row">
 				<ThresholdSlider {segmentation} {segmentationItem} />
 			</div>
 		{/if}
 	{/if}
-	{#if active && segmentation.annotation_type == "model_segmentation"}
+	{#if isActive && segmentation.annotation_type == "model_segmentation"}
 		<div class="row">
 			<button type="button" class="duplicate-button" onclick={applyDuplicateAI}>
 				Duplicate
@@ -174,19 +190,31 @@
 	{/if}
 
 	{#if dataRepresentation == "MultiLabel" || dataRepresentation == "MultiClass"}
-		<MultiFeatureSelector {segmentation} {active} />
+		<MultiFeatureSelector {segmentation} active={isActive} />
 	{/if}
 	{#if segmentationItem.loading}
 		<div class="row">
 			<div class="loading">Loading segmentation…</div>
 		</div>
 	{/if}
-	{#if active}
+	{#if isActive}
 		<button type="button" class="open" onclick={() => (collapsed = !collapsed)}>
-			{#if collapsed}
-				&#9654;
-			{:else}
-				&#9660;
+			<div class="handle">
+				{#if collapsed}
+					&#9654;
+				{:else}
+					&#9660;
+				{/if}
+			</div>
+			{#if segmentationState && syncState && isEditable}
+				<div
+					class="sync-indicator"
+					class:synced={syncState === "synced"}
+					class:saving={syncState === "saving"}
+					class:error={syncState === "error"}
+				>
+					<div class="traffic-light"></div>
+				</div>
 			{/if}
 		</button>
 
@@ -207,14 +235,16 @@
 					{/if}
 				</div>
 
-				<div class="row">
-					<ReferenceSegmentationPanel
-						{segmentation}
-						{image}
-						{isEditable}
-						{segmentationItem}
-					/>
-				</div>
+				{#if segmentation.annotation_type === "grader_segmentation"}
+					<div class="row">
+						<ReferenceSegmentationPanel
+							{segmentation}
+							{image}
+							{isEditable}
+							{segmentationItem}
+						/>
+					</div>
+				{/if}
 				{#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
 					<div class="row">
 						<CCPanel {segmentationItem} />
@@ -230,10 +260,31 @@
 		display: flex;
 	}
 	div.content {
+        font-size: small;
 		flex-direction: column;
+		border-left: 3px solid transparent;
+		border-radius: 2px;
+	}
+	div.content.visible:not(.active) {
+		border-left-color: rgba(100, 255, 255, 0.35);
+	}
+	div.content.active {
+		border-left-color: rgb(100, 255, 255);
+		background-color: rgba(100, 255, 255, 0.22);
 	}
 	div.content.loading {
 		opacity: 0.5;
+	}
+
+	div.content.empty-non-editable {
+		opacity: 0.6;
+	}
+
+	div.content.empty-editable:not(.active) {
+		background-color: rgba(100, 255, 255, 0.08);
+	}
+	div.content.empty-editable.active {
+		background-color: rgba(100, 255, 255, 0.22);
 	}
 
 	div.row {
@@ -257,14 +308,11 @@
 		flex: 1;
 		min-height: 2em;
 		border-radius: 2px;
-		transition: all 0.3s ease;
+		transition: background-color 0.15s ease;
 	}
-	div.active {
-		background-color: rgba(100, 255, 255, 0.3);
-	}
-	button.expand:hover {
-		background-color: rgba(100, 255, 255, 0.3);
-	}
+	button.expand:hover:not(.active) {
+		background-color: rgba(100, 255, 255, 0.12);
+	}	
 	div.feature-name {
 		flex: 1;
 		/* max-width: 12em; */
@@ -310,5 +358,37 @@
 	}
 	button.duplicate-button:hover {
 		background-color: rgba(255, 255, 255, 0.3);
+	}
+
+	div.sync-indicator {
+		margin-right: 0.5em;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	div.traffic-light {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background-color: gray;
+		transition: background-color 0.2s ease;
+	}
+
+	div.handle {
+		flex: 1;
+        padding-left: 0.5em;
+	}
+
+	div.sync-indicator.synced .traffic-light {
+		background-color: #22c55e; /* green */
+	}
+
+	div.sync-indicator.saving .traffic-light {
+		background-color: #f59e0b; /* orange */
+	}
+
+	div.sync-indicator.error .traffic-light {
+		background-color: #ef4444; /* red */
 	}
 </style>

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Set
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, String, func
+from sqlalchemy import ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from eyened_orm.base import Base, CompositeUniqueConstraint, ForeignKeyIndex
@@ -59,38 +59,38 @@ class Tag(Base):
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    CreatorTagLinks: Mapped[List["CreatorTagLink"]] = relationship(
+    CreatorTagLinks: Mapped[Set["CreatorTagLink"]] = relationship(
         "eyened_orm.tag.CreatorTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
 
-    StudyTagLinks: Mapped[List["StudyTagLink"]] = relationship(
+    StudyTagLinks: Mapped[Set["StudyTagLink"]] = relationship(
         "eyened_orm.tag.StudyTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    ImageInstanceTagLinks: Mapped[List["ImageInstanceTagLink"]] = relationship(
+    ImageInstanceTagLinks: Mapped[Set["ImageInstanceTagLink"]] = relationship(
         "eyened_orm.tag.ImageInstanceTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    AnnotationTagLinks: Mapped[List["AnnotationTagLink"]] = relationship(
+    AnnotationTagLinks: Mapped[Set["AnnotationTagLink"]] = relationship(
         "eyened_orm.tag.AnnotationTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+    SegmentationTagLinks: Mapped[Set["SegmentationTagLink"]] = relationship(
         "eyened_orm.tag.SegmentationTagLink",
         back_populates="Tag",
         passive_deletes=True,
         lazy="selectin",
     )
-    FormAnnotationTagLinks: Mapped[List["FormAnnotationTagLink"]] = relationship(
+    FormAnnotationTagLinks: Mapped[Set["FormAnnotationTagLink"]] = relationship(
         "eyened_orm.tag.FormAnnotationTagLink",
         back_populates="Tag",
         passive_deletes=True,
@@ -108,6 +108,7 @@ class StudyTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "Study", "StudyID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_StudyTag_Study_Tag", "StudyID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -137,6 +138,7 @@ class ImageInstanceTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "ImageInstance", "ImageInstanceID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_ImageInstanceTag_Image_Tag", "ImageInstanceID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -168,6 +170,7 @@ class AnnotationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "Annotation", "AnnotationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_AnnotationTag_Annotation_Tag", "AnnotationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -193,6 +196,7 @@ class SegmentationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "Segmentation", "SegmentationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index("ix_SegmentationTag_Segmentation_Tag", "SegmentationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
@@ -222,6 +226,11 @@ class FormAnnotationTagLink(Base):
         ForeignKeyIndex(__tablename__, "Tag", "TagID"),
         ForeignKeyIndex(__tablename__, "FormAnnotation", "FormAnnotationID"),
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        Index(
+            "ix_FormAnnotationTag_Form_Tag",
+            "FormAnnotationID",
+            "TagID",
+        ),
     )
     TagID: Mapped[int] = mapped_column(
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True

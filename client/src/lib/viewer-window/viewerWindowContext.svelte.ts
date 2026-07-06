@@ -1,5 +1,5 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { fetchInstance, fetchFormAnnotations } from "$lib/data/api";
+import { fetchInstance, fetchFormAnnotations, fetchPatient } from "$lib/data/api";
 import { instances } from "$lib/data/stores.svelte";
 import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
@@ -7,7 +7,7 @@ import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
-import type { InstanceGET } from "../../types/openapi_types";
+import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from './MainViewer.svelte';
 
 export type MainPanelType = {
@@ -17,13 +17,12 @@ export type MainPanelType = {
 
 export class ViewerWindowContext {
 
-    private imagesIndex = new Map<number, Promise<LoadedImages>>();
-    private byDatasetIdentifier = new Map<string, LoadedImages>();
+    private imagesIndex = new Map<string, Promise<LoadedImages>>();
     private bySOPInstanceUID = new Map<string, LoadedImages>();
 
     private viewers = new Set<ViewerContext>();
 
-    public instanceIds: number[] = $state([]);
+    public instanceIds: string[] = $state([]);
 
     public mainPanels: MainPanelType[] = $state([]);
 
@@ -40,7 +39,7 @@ export class ViewerWindowContext {
         public readonly webgl: WebGL,
         public readonly registration: Registration,
         public readonly creator: unknown,
-        instanceIDs: number[] = [],
+        instanceIDs: string[] = [],
     ) {
         this.imageLoader = new ImageLoader(webgl);
 
@@ -68,20 +67,25 @@ export class ViewerWindowContext {
         this.viewers.forEach((viewer) => viewer.repaint());
     }
 
-    async setInstanceIDs(ids: number[]) {
+    async setInstanceIDs(ids: string[]) {
         // ensure metadata of all instances is loaded
-        const missingIds = ids.filter((id) => !instances.get(id));
-        if (missingIds.length) {
-            await Promise.all(missingIds.map((id) => fetchInstance(id, {
-                with_segmentations: true,
-                with_form_annotations: true,
-                with_model_segmentations: true
-            })));
+        const fetchOptions = {
+            with_segmentations: true,
+            with_form_annotations: true,
+            with_model_segmentations: true,
+        };
+        const idsNeedingFetch = ids.filter((id) => {
+            const inst = instances.get(id);
+            // Search-ingested instances lack embedded segmentations / form annotations
+            return !inst || !('segmentations' in inst);
+        });
+        if (idsNeedingFetch.length) {
+            await Promise.all(idsNeedingFetch.map((id) => fetchInstance(id, fetchOptions)));
             // Data is automatically ingested into global stores by fetchInstance
         }
 
         this.instanceIds = ids;
-
+        
         // Fetch all form annotations for the involved patient(s)
         const patientIds = Array.from(new Set(
             ids
@@ -94,6 +98,9 @@ export class ViewerWindowContext {
                     .filter((pid) => !this.loadedPatientIds.has(pid))
                     .map(async (pid) => {
                         await fetchFormAnnotations({ patient_id: pid });
+                        await fetchPatient(pid, {
+                            include_attributes: true,
+                        });
                         this.loadedPatientIds.add(pid);
                     })
             );
@@ -113,7 +120,7 @@ export class ViewerWindowContext {
     destroy() {
         // Cancel animation frame
         cancelAnimationFrame(this.frame);
-        
+
         // Dispose all images and their resources
         for (const [image, viewer] of this.topViewers.entries()) {
             try {
@@ -122,12 +129,11 @@ export class ViewerWindowContext {
                 console.error(`Error disposing image ${image.image_id}:`, error);
             }
         }
-        
+
         // Clear all maps and sets
         this.topViewers.clear();
         this.viewers.clear();
         this.imagesIndex.clear();
-        this.byDatasetIdentifier.clear();
         this.bySOPInstanceUID.clear();
         this.photoLocators.clear();
         this.photoLocatorSets = [];
@@ -135,7 +141,7 @@ export class ViewerWindowContext {
         this.instanceIds = [];
     }
 
-    async loadImage(instance: InstanceGET): Promise<LoadedImages> {
+    async loadImage(instance: ImageGET): Promise<LoadedImages> {
         // Start loading if not already in progress
         if (!this.imagesIndex.has(instance.id)) {
             const loadPromise = this.imageLoader.load(instance).then(loadedImages => {
@@ -146,7 +152,6 @@ export class ViewerWindowContext {
                 }
 
                 // Set up indices
-                this.byDatasetIdentifier.set(instance.dataset_identifier, loadedImages);
                 this.bySOPInstanceUID.set(instance.sop_instance_uid, loadedImages);
 
                 // Create viewer contexts
@@ -201,7 +206,7 @@ export class ViewerWindowContext {
         this.mainPanels = this.mainPanels.filter((item) => item !== panel);
     }
 
-    getImages(instanceID: number): Promise<LoadedImages> {
+    getImages(instanceID: string): Promise<LoadedImages> {
         const instance = instances.get(instanceID);
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);

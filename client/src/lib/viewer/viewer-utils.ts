@@ -32,11 +32,27 @@ export type EventName =
     | 'keyup'
     | 'dblclick';
 
+export type ViewerModifiers = {
+    shift: boolean;
+    ctrl: boolean;
+    alt: boolean;
+    meta: boolean;
+};
+
+export type ViewerWheelData = {
+    deltaXPx: number;
+    deltaYPx: number;
+    primaryDeltaPx: number;
+    zoomIntent: boolean;
+};
+
 export interface ViewerEvent<T extends PointerEvent | KeyboardEvent | WheelEvent | MouseEvent> {
     event: T,
     viewerContext: ViewerContext,
     cursor: Position2D,
-    position: Position2D
+    position: Position2D,
+    modifiers: ViewerModifiers,
+    wheel?: ViewerWheelData
 };
 
 export interface ViewerEventListener {

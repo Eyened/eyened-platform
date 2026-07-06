@@ -21,11 +21,11 @@ export class ScrollOCT implements ViewerEventListener {
     }
 
     wheel(e: ViewerEvent<WheelEvent>) {
-        const { event, viewerContext } = e
+        const { viewerContext, wheel } = e
         const { image, lockScroll, index } = viewerContext
-        if (event.shiftKey) return;
+        if (wheel?.zoomIntent) return;
         if (lockScroll) return;
-        const delta = event.deltaY;
+        const delta = wheel?.primaryDeltaPx ?? 0;
 
         let i = index + Math.sign(delta);
         i = Math.max(0, Math.min(i, image.depth - 1));

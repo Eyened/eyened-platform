@@ -1,0 +1,35 @@
+---
+title: Data model overview
+description: Overview of Eyened database entities and how they relate
+sidebar:
+  order: 1
+---
+
+The Eyened database is accessed through SQLAlchemy ORM classes in `eyened_orm`. This section describes the main entities, their relationships, and typical usage patterns.
+
+## Core hierarchy
+
+Images and metadata follow a fixed chain:
+
+**Project → Patient → Study → Series → ImageInstance → ImageStorage**
+
+Import rows and the viewer both use this structure. See **[Images & storage](/eyened-platform/orm/data_model/images)** for details.
+
+## Annotation and workflow data
+
+| Area | Main entities | Doc |
+|------|---------------|-----|
+| Manual and model segmentations | `Segmentation`, `ModelSegmentation`, `Feature` | [Segmentations](/eyened-platform/orm/data_model/segmentations) |
+| Clinical and viewer forms | `FormSchema`, `FormAnnotation` | [Form annotations](/eyened-platform/orm/data_model/form_annotations) |
+| Enface image registration | `FormAnnotation`, `AttributeValue` | [Registration](/eyened-platform/orm/registration) |
+| Model outputs and metadata | `AttributeValue`, `AttributeDefinition`, `Model` | [Attributes](/eyened-platform/orm/data_model/attributes) |
+| Grading workflows | `Task`, `SubTask`, `TaskDefinition` | [Tasks](/eyened-platform/orm/data_model/tasks) |
+| Labels and favorites | `Tag`, `*TagLink` | [Tagging](/eyened-platform/orm/data_model/tagging) |
+
+## Legacy
+
+The older `Annotation` / `AnnotationData` tables remain for backward compatibility. New work should use `Segmentation`. See **[Legacy annotations](/eyened-platform/orm/data_model/legacy)**.
+
+## Naming conventions
+
+ORM properties mirror database column names (`PatientIdentifier`) and are also available in snake_case (`patient_identifier`). Classmethods starting with `by_` query existing rows; those starting with `from_` are alternative constructors.

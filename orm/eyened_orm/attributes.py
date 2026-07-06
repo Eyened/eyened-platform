@@ -1,16 +1,33 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Set
+
+import pandas as pd
+
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    cast,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from eyened_orm.segmentation import Model, ModelKind
-from sqlalchemy import JSON, CheckConstraint
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from eyened_orm.image_instance import ImageInstance
+from eyened_orm.study import Study
+from eyened_orm.patient import Patient
+from eyened_orm.project import Project
+from eyened_orm.series import Series
 
 from .base import Base
 from .image_instance import Laterality
+from .types import OptionalEnum
+from typing import Any
 
 
 class AttributeDataType(Enum):
@@ -22,6 +39,7 @@ class AttributeDataType(Enum):
 
 class AttributesModel(Model):
     __tablename__ = "AttributesModel"
+    _name_column = "ModelName"
 
     ModelID: Mapped[int] = mapped_column(
         ForeignKey("Model.ModelID", ondelete="CASCADE"), primary_key=True
@@ -33,7 +51,7 @@ class AttributesModel(Model):
         back_populates="Model",
         cascade="all, delete-orphan",
     )
-    OutputAttributes: Mapped[List["AttributeDefinition"]] = relationship(
+    OutputAttributes: Mapped[Set["AttributeDefinition"]] = relationship(
         "eyened_orm.attributes.AttributeDefinition",
         secondary="AttributesModelOutput",
         back_populates="ProducingModels",
@@ -44,12 +62,87 @@ class AttributesModel(Model):
 
     __mapper_args__ = {"polymorphic_identity": ModelKind.Attributes}
 
+    def export_to_csv(
+        self,
+        session: Session,
+        output_path: str,
+        attributes: List[AttributeDefinition],
+        project_names: List[str],
+    ):
+
+        attribute_values = (
+            session.query(
+                AttributeValue.ValueFloat,
+                AttributeValue.ValueInt,
+                AttributeValue.ValueText,
+                AttributeDefinition.AttributeName,
+                ImageInstance.ImageInstanceID,
+                cast(ImageInstance.Laterality, String),
+                cast(ImageInstance.ETDRSField, String),
+                Patient.PatientIdentifier,
+                Study.StudyDate,
+                Project.ProjectName,
+            )
+            .join(AttributeDefinition)
+            .filter(AttributeDefinition.AttributeName.in_(attributes))
+            .filter(AttributeDefinition.AttributeDataType != AttributeDataType.JSON)
+            .join(AttributesModel)
+            .filter(AttributesModel.ModelID == self.ModelID)
+            .join(
+                ImageInstance,
+                AttributeValue.ImageInstanceID == ImageInstance.ImageInstanceID,
+            )
+            .join(Series, ImageInstance.SeriesID == Series.SeriesID)
+            .join(Study, Series.StudyID == Study.StudyID)
+            .join(Patient, Study.PatientID == Patient.PatientID)
+            .join(Project, Patient.ProjectID == Project.ProjectID)
+            .filter(Project.ProjectName.in_(project_names))
+        )
+
+        results = attribute_values.all()
+        df = pd.DataFrame(
+            results,
+            columns=[
+                "ValueFloat",
+                "ValueInt",
+                "ValueJSON",
+                "AttributeName",
+                "ImageInstanceID",
+                "Laterality",
+                "PatientIdentifier",
+                "StudyDate",
+                "ProjectName",
+            ],
+        )
+
+        df_pivot = df.pivot(
+            index=[
+                "ImageInstanceID",
+                "PatientIdentifier",
+                "Laterality",
+                "ProjectName",
+                "StudyDate",
+            ],
+            columns="AttributeName",
+            values=["ValueFloat", "ValueInt", "ValueJSON"],
+        )
+        df_pivot.reset_index(inplace=True)
+        df_pivot.dropna(axis=1, how="all", inplace=True)
+        # Remove the top-level ('ValueFloat', ...), keep only 'AttributeName' in columns
+        df_pivot.columns = [
+            col[1] if isinstance(col, tuple) and col[1] else col[0]
+            for col in df_pivot.columns.values
+        ]
+        df_pivot.to_csv(output_path, index=False)
+
 
 class AttributeDefinition(Base):
     __tablename__ = "AttributeDefinition"
     __table_args__ = (
         UniqueConstraint("AttributeName", name="uq_AttributeDefinition_AttributeName"),
     )
+
+    _name_column = "AttributeName"
 
     AttributeID: Mapped[int] = mapped_column(primary_key=True)
     AttributeName: Mapped[str] = mapped_column(String(255))
@@ -61,13 +154,24 @@ class AttributeDefinition(Base):
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         back_populates="AttributeDefinition",
-        lazy="selectin",
+        lazy="noload",
     )
-    ProducingModels: Mapped[List["AttributesModel"]] = relationship(
+    ProducingModels: Mapped[Set["AttributesModel"]] = relationship(
         "eyened_orm.attributes.AttributesModel",
         secondary="AttributesModelOutput",
         back_populates="OutputAttributes",
     )
+
+    @staticmethod
+    def infer_attribute_data_type(value: Any) -> AttributeDataType:
+        if isinstance(value, float):
+            return AttributeDataType.Float
+        elif isinstance(value, int):
+            return AttributeDataType.Int
+        elif isinstance(value, (dict, list)):
+            return AttributeDataType.JSON
+        else:
+            return AttributeDataType.String
 
 
 class AttributeValue(Base):
@@ -111,6 +215,27 @@ class AttributeValue(Base):
         Index("fk_AttributeValue_Study1_idx", "StudyID"),
         Index("fk_AttributeValue_Attribute1_idx", "AttributeID"),
         Index("fk_AttributeValue_Model1_idx", "ModelID"),
+        Index(
+            "ix_AttributeValue_ImageInstance_Attribute",
+            "ImageInstanceID",
+            "AttributeID",
+        ),
+        Index(
+            "ix_AttributeValue_Segmentation_Attribute",
+            "SegmentationID",
+            "AttributeID",
+        ),
+        Index(
+            "ix_AttributeValue_ModelSegmentation_Attribute",
+            "ModelSegmentationID",
+            "AttributeID",
+        ),
+        Index(
+            "ix_AttributeValue_Patient_Attribute",
+            "PatientID",
+            "AttributeID",
+        ),
+        Index("ix_AttributeValue_Study_Attribute", "StudyID", "AttributeID"),
         CheckConstraint(
             "(ImageInstanceID IS NOT NULL AND SegmentationID IS NULL AND ModelSegmentationID IS NULL AND PatientID IS NULL AND StudyID IS NULL) OR "
             "(ImageInstanceID IS NULL AND SegmentationID IS NOT NULL AND ModelSegmentationID IS NULL AND PatientID IS NULL AND StudyID IS NULL) OR "
@@ -125,8 +250,8 @@ class AttributeValue(Base):
     AttributeID: Mapped[int] = mapped_column(
         ForeignKey("AttributeDefinition.AttributeID", ondelete="CASCADE")
     )
-    ModelID: Mapped[int] = mapped_column(
-        ForeignKey("Model.ModelID", ondelete="CASCADE")
+    ModelID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("Model.ModelID", ondelete="CASCADE"), nullable=True
     )
 
     # Entity FKs (exactly one must be non-null)
@@ -141,7 +266,7 @@ class AttributeValue(Base):
     )
     PatientID: Mapped[Optional[int]] = mapped_column(ForeignKey("Patient.PatientID"))
     StudyID: Mapped[Optional[int]] = mapped_column(ForeignKey("Study.StudyID"))
-    Laterality: Mapped[Optional[Laterality]] = mapped_column(SAEnum(Laterality))
+    Laterality: Mapped[Optional[Laterality]] = mapped_column(OptionalEnum(Laterality))
 
     ValueFloat: Mapped[Optional[float]]
     ValueInt: Mapped[Optional[int]]
@@ -152,32 +277,84 @@ class AttributeValue(Base):
     AttributeDefinition: Mapped["AttributeDefinition"] = relationship(
         "eyened_orm.attributes.AttributeDefinition", back_populates="AttributeValues"
     )
-    ProducingModel: Mapped["Model"] = relationship(
+    ProducingModel: Mapped[Optional["Model"]] = relationship(
         "eyened_orm.segmentation.Model", back_populates="ProducedAttributeValues"
     )
 
     # Entity relationships
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship("eyened_orm.image_instance.ImageInstance", back_populates="AttributeValues")  # type: ignore[name-defined]
-    Segmentation: Mapped[Optional["Segmentation"]] = relationship("eyened_orm.segmentation.Segmentation", back_populates="AttributeValues")  # type: ignore[name-defined]
-    ModelSegmentation: Mapped[Optional["ModelSegmentation"]] = relationship("eyened_orm.segmentation.ModelSegmentation", back_populates="AttributeValues")  # type: ignore[name-defined]
-    Patient: Mapped[Optional["Patient"]] = relationship("eyened_orm.patient.Patient", back_populates="AttributeValues")  # type: ignore[name-defined]
-    Study: Mapped[Optional["Study"]] = relationship("eyened_orm.study.Study", back_populates="AttributeValues")  # type: ignore[name-defined]
+    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+        "eyened_orm.image_instance.ImageInstance", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    Segmentation: Mapped[Optional["Segmentation"]] = relationship(
+        "eyened_orm.segmentation.Segmentation", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    ModelSegmentation: Mapped[Optional["ModelSegmentation"]] = relationship(
+        "eyened_orm.segmentation.ModelSegmentation", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    Patient: Mapped[Optional["Patient"]] = relationship(
+        "eyened_orm.patient.Patient", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
+    Study: Mapped[Optional["Study"]] = relationship(
+        "eyened_orm.study.Study", back_populates="AttributeValues"
+    )  # type: ignore[name-defined]
 
     # Provenance tracking
-    InputValues: Mapped[List["AttributeValue"]] = relationship(
+    InputValues: Mapped[Set["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         secondary="AttributeValueInput",
         primaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.OutputAttributeValueID",
         secondaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.InputAttributeValueID",
         back_populates="UsedByValues",
     )
-    UsedByValues: Mapped[List["AttributeValue"]] = relationship(
+    UsedByValues: Mapped[Set["AttributeValue"]] = relationship(
         "eyened_orm.attributes.AttributeValue",
         secondary="AttributeValueInput",
         primaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.InputAttributeValueID",
         secondaryjoin="AttributeValue.AttributeValueID == AttributeValueInput.OutputAttributeValueID",
         back_populates="InputValues",
     )
+
+    def _value_column_name(self) -> str:
+        if self.AttributeDefinition is None:
+            raise ValueError("AttributeDefinition must be set before accessing value.")
+
+        attr_type = self.AttributeDefinition.AttributeDataType
+        if attr_type == AttributeDataType.Float:
+            return "ValueFloat"
+        elif attr_type == AttributeDataType.Int:
+            return "ValueInt"
+        elif attr_type == AttributeDataType.String:
+            return "ValueText"
+        elif attr_type == AttributeDataType.JSON:
+            return "ValueJSON"
+        raise ValueError(f"Unsupported attribute data type: {attr_type}")
+
+    @staticmethod
+    def _coerce_value(column_name: str, raw_value: Any) -> Any:
+        if column_name == "ValueFloat":
+            return float(raw_value)
+        if column_name == "ValueInt":
+            return int(raw_value)
+        if column_name == "ValueText":
+            return str(raw_value)
+        return raw_value
+
+    def _clear_value_columns(self):
+        self.ValueFloat = None
+        self.ValueInt = None
+        self.ValueText = None
+        self.ValueJSON = None
+
+    @property
+    def value(self):
+        return getattr(self, self._value_column_name())
+
+    @value.setter
+    def value(self, raw_value: Any):
+        column_name = self._value_column_name()
+        coerced_value = self._coerce_value(column_name, raw_value)
+        self._clear_value_columns()
+        setattr(self, column_name, coerced_value)
 
 
 # Junction table for model output declarations

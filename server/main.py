@@ -1,15 +1,13 @@
 import logging
-import os
 import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, ORJSONResponse
+from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
-from server.config import settings
 from server.routes import (
     auth,
     import_api,
@@ -24,14 +22,12 @@ from server.routes import (
     search,
     devices,
     studies,
+    patients,
 )
-from server.utils.database_init import (
-    create_database,
-    init_admin,
-)
-from eyened_orm import Database
+from server.utils.db_logging import init_db_logger
+from server.config import get_redis_connection, settings
 
-app_api = FastAPI(title="Eyened API", default_response_class=ORJSONResponse)
+app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
 app_api.include_router(instances.router)
 app_api.include_router(segmentations.router)
@@ -45,6 +41,7 @@ app_api.include_router(task.router)
 app_api.include_router(subtask.router)
 app_api.include_router(devices.router)
 app_api.include_router(studies.router)
+app_api.include_router(patients.router)
 
 
 ### Exception handlers
@@ -55,9 +52,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors()},
     )
 
+
 @app_api.exception_handler(SQLAlchemyError)
 async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
-    if settings.environment == 'development':
+    if settings.debug:
         # print stack trace
         traceback.print_exc()
     return JSONResponse(
@@ -65,9 +63,10 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
         content={"detail": "A database error occurred."},
     )
 
+
 @app_api.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    if settings.environment == 'development':
+    if settings.debug:
         # print stack trace
         traceback.print_exc()
     return JSONResponse(
@@ -76,52 +75,33 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up with settings:")
     print(settings)
-    
+
     if settings.public_auth_disabled:
         print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
 
-    if settings.database_root_password:
-        try:
-            # create database tables and user if they don't exist
-            create_database()
-        except Exception as e:
-            raise RuntimeError(f"Error creating database: {e}") from e
-    else:
-        print("DATABASE_ROOT_PASSWORD is not set, skipping database creation")
-
-
-
-    # # before startup
+    # before startup
     logging.basicConfig()
-    if settings.environment == 'development':
-        logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    if settings.debug:
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+        logging.getLogger("server").setLevel(logging.DEBUG)
     else:
-        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
-    
-    
-    db = Database(settings)
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+        logging.getLogger("server").setLevel(logging.INFO)
 
-    
-
-    with db.get_session() as session:
-        init_admin(session)
-        
-
+    # Initialize database modification logger
+    init_db_logger(settings)
 
     yield
     # after shutdown
 
 
-
-
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(GZipMiddleware, minimum_size=1024 * 1024)
+app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
 
 app.mount("/api", app_api)
 
@@ -131,13 +111,18 @@ async def health_check():
     return {"status": "healthy"}
 
 
-@app.get("/{path:path}")  # Catch-all route for file serving
-async def catch_all(path: str):
-    file_path = os.path.join("/client/build", path)
+from rq import Queue
 
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)  # Serve existing file
-    return FileResponse(os.path.join("/client/build", "index.html"))
+redis_conn = get_redis_connection()
+queue = Queue("default", connection=redis_conn)
+
+# Fallback when ``enqueue(..., job_timeout=...)`` is omitted (RQ default is 180s).
+_QUEUE_DEFAULT_TIMEOUTS: dict[str, int] = {
+    "layer-segmentation": 600,
+}
 
 
-
+def get_rq_queue(name: str) -> Queue:
+    """Named RQ queue (e.g. ``cfi-roi`` for CFI ROI jobs)."""
+    default_timeout = _QUEUE_DEFAULT_TIMEOUTS.get(name)
+    return Queue(name, connection=redis_conn, default_timeout=default_timeout)

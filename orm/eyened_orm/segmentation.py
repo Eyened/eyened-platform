@@ -1,12 +1,14 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
-from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, func
+from eyened_orm.data_access import get_data_access_adapter
+from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
+from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
 
 if TYPE_CHECKING:
@@ -64,7 +66,7 @@ class Datatype(Enum):
     R32F = "R32F"  # 32-bit float
 
 
-class SegmentationBase(Base):
+class SegmentationBase(AttributeValueLookupMixin, Base):
     __abstract__ = True  # This makes the class abstract
 
     # index in the zarr array of the segmentation
@@ -99,9 +101,6 @@ class SegmentationBase(Base):
     DataType: Mapped[Datatype] = mapped_column(SAEnum(Datatype))
 
     Threshold: Mapped[Optional[float]]
-    ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("Segmentation.SegmentationID")
-    )
 
     @property
     def dtype(self) -> np.dtype:
@@ -153,37 +152,33 @@ class SegmentationBase(Base):
             return None
         return np.linalg.inv(np.array(self.ImageProjectionMatrix))
 
+    def _api_data_path(self) -> str:
+        seg_id = getattr(self, "SegmentationID", None)
+        if seg_id is not None:
+            return f"/api/segmentations/{seg_id}/data"
+
+        model_seg_id = getattr(self, "ModelSegmentationID", None)
+        if model_seg_id is not None:
+            return f"/api/model-segmentations/{model_seg_id}/data"
+
+        raise ValueError(
+            "Segmentation must be persisted before reading or writing data"
+        )
+
     def write_data(
         self,
         data: np.ndarray,
         axis: Optional[int] = None,
         slice_index: Optional[int] = None,
     ) -> int:
-        """Write annotation data to the zarr array and update the ZarrArrayIndex."""
+        """Write annotation data (D, H, W) through configured data access."""
 
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
-
-        zarr_index = self.storage_manager.write(
-            group_name=self.groupname,
-            data_dtype=self.dtype,
-            data_shape=self.shape,
-            data=data,
-            zarr_index=self.ZarrArrayIndex,
-            axis=axis,
-            slice_index=slice_index,
+        adapter = get_data_access_adapter()
+        return adapter.write_segmentation_data(
+            self, data, axis=axis, slice_index=slice_index
         )
-
-        # for sparse annotations, we need to update the ScanIndices list
-        if self.ScanIndices is not None and self.is_sparse and axis == self.SparseAxis:
-            if slice_index not in self.ScanIndices:
-                # copy necessary to ensure update is picked up by the ORM
-                scan_indices = self.ScanIndices.copy()
-                scan_indices.append(slice_index)
-                self.ScanIndices = scan_indices
-
-        self.ZarrArrayIndex = zarr_index
-        return zarr_index
 
     def write_empty(
         self, axis: Optional[int] = None, slice_index: Optional[int] = None
@@ -193,23 +188,112 @@ class SegmentationBase(Base):
             np.zeros(self.shape, dtype=self.dtype), axis, slice_index
         )
 
+    def remove_slice(self, session, slice_index: int) -> List[int]:
+
+        if slice_index < 0:
+            raise ValueError("slice_index must be >= 0")
+
+        if not self.is_sparse:
+            raise ValueError("remove_slice is only supported for sparse segmentations")
+
+        if self.SparseAxis not in (0, 1, 2):
+            raise ValueError(
+                f"Invalid SparseAxis={self.SparseAxis}; expected 0, 1 or 2"
+            )
+
+        if self.ScanIndices is None:
+            raise ValueError(
+                "Sparse segmentation has no ScanIndices; refusing to remove slice"
+            )
+
+        scan_indices = list(self.ScanIndices)
+        if slice_index not in scan_indices:
+            raise ValueError(
+                f"slice_index {slice_index} not present in ScanIndices={scan_indices}"
+            )
+
+        axis = self.SparseAxis
+
+        current_slice = self.read_data(axis=axis, slice_index=slice_index)
+        if current_slice is not None:
+            empty_slice = np.zeros_like(current_slice)
+            self.write_data(empty_slice, axis=axis, slice_index=slice_index)
+
+        self.ScanIndices = [idx for idx in scan_indices if idx != slice_index]
+
+        ## Always commit after removing the data to ensure databse consistency
+        session.commit()
+
+        return self.ScanIndices
+
     def read_data(
         self, axis: Optional[int] = None, slice_index: Optional[int] = None
-    ) -> np.ndarray:
-        if self.ZarrArrayIndex is None:
-            return None
-
+    ) -> Optional[np.ndarray]:
+        """Read segmentation data through configured data access."""
         if not self.ImageInstance:
             raise ValueError("Segmentation has no associated ImageInstance")
+        adapter = get_data_access_adapter()
+        return adapter.read_segmentation_data(self, axis=axis, slice_index=slice_index)
 
-        return self.storage_manager.read(
-            group_name=self.groupname,
-            data_dtype=self.dtype,
-            data_shape=self.shape,
-            zarr_index=self.ZarrArrayIndex,
-            axis=axis,
-            slice_index=slice_index,
-        )
+    @property
+    def binary_mask(self) -> np.ndarray | None:
+        """
+        Return a boolean segmentation mask.
+
+        Notes:
+        - Stored segmentation data is always shaped (Depth, Height, Width).
+        - For 2D segmentations (i.e. any singleton axis), we automatically drop
+          singleton axes and return the squeezed mask.
+        - For 3D segmentations, this returns the full 3D volume.
+        """
+        if (
+            self.DataRepresentation == DataRepresentation.MultiClass
+            or self.DataRepresentation == DataRepresentation.MultiLabel
+        ):
+            raise ValueError(
+                "MultiClass and MultiLabel data representations are not supported for binary masks"
+            )
+
+        data = self.read_data()
+        if data is None:
+            return None
+
+        if self.DataRepresentation == DataRepresentation.Binary:
+            mask = data > 0
+        elif self.DataRepresentation == DataRepresentation.DualBitMask:
+            mask = (data & 1) > 0
+        elif self.DataRepresentation == DataRepresentation.Probability:
+            threshold = self.Threshold or 0
+            if self.DataType in (Datatype.R8, Datatype.R8UI):
+                mask = data > 255 * threshold
+            elif self.DataType == Datatype.R32F:
+                mask = data > threshold
+            else:
+                raise ValueError(f"Unsupported data type: {self.DataType}")
+        else:
+            raise ValueError(
+                f"Unsupported data representation: {self.DataRepresentation}"
+            )
+
+        # Convenience: for "2D" segmentations (any singleton axis), return the squeezed mask.
+        # Examples:
+        #   (1, H, W) -> (H, W)
+        #   (D, 1, W) -> (D, W)
+        #   (D, H, 1) -> (D, H)
+        if mask.ndim == 3 and self.is_2d:
+            singleton_axes = tuple(i for i, s in enumerate(mask.shape) if s == 1)
+            assert len(singleton_axes) == 1, "Expected exactly one singleton axis"
+            if singleton_axes:
+                mask = np.squeeze(mask, axis=singleton_axes)
+
+        # If a reference segmentation is provided, that is interpreted as a conditional mask
+        # i.e. the final mask is the intersection of the current mask and the reference mask.
+        if hasattr(self, "ReferenceSegmentation") and self.ReferenceSegmentation:
+            reference_mask = self.ReferenceSegmentation.binary_mask
+            if reference_mask is not None:
+                mask = mask & reference_mask
+
+        return mask
 
     @property
     def shape_matches_image_shape(self):
@@ -220,9 +304,133 @@ class SegmentationBase(Base):
                 return False
         return True
 
+    def check_consistency(self):
+        """
+        Checks if the segmentation is consistent with the associated ImageInstance
+        and ReferenceSegmentation according to the rules.
+        """
+        # 1. Get ImageInstance
+        image = self.ImageInstance
+        if not image and self.ImageInstanceID:
+            session = object_session(self)
+            if session:
+                from eyened_orm.image_instance import ImageInstance
+
+                image = session.get(ImageInstance, self.ImageInstanceID)
+
+        if not image:
+            # If we can't find the image, we can't check (e.g. detached object without ID)
+            # For strict safety, raise error if ID is present but image not found.
+            if self.ImageInstanceID:
+                # This might happen if we are inserting a new Segmentation and a new ImageInstance together and flush hasn't happened for ImageInstance?
+                # But ImageInstanceID is required.
+                pass
+            return
+
+        # Image dimensions
+        # Note: ImageInstance.NrOfFrames can be None (implies 1)
+        img_d = image.NrOfFrames if image.NrOfFrames is not None else 1
+        img_h = image.Rows_y
+        img_w = image.Columns_x
+
+        # 2. Check Dimensions
+        if self.ImageProjectionMatrix is None:
+            # Strict match
+            if self.Depth != img_d and self.SparseAxis != 0:
+                raise ValueError(
+                    f"Depth mismatch: Segmentation {self.Depth} != Image {img_d}"
+                )
+            if self.Height != img_h and self.SparseAxis != 1:
+                raise ValueError(
+                    f"Height mismatch: Segmentation {self.Height} != Image {img_h}"
+                )
+            if self.Width != img_w and self.SparseAxis != 2:
+                raise ValueError(
+                    f"Width mismatch: Segmentation {self.Width} != Image {img_w}"
+                )
+        else:
+            # Sparse / Projected
+            if self.SparseAxis not in (0, 1, 2):
+                raise ValueError(
+                    "SparseAxis must be 0, 1, or 2 when ImageProjectionMatrix is provided"
+                )
+
+            # Check the sparse axis dimension
+            # The dimension along SparseAxis must be equal to image dimension OR 1
+            if self.SparseAxis == 0:
+                if self.Depth != img_d and self.Depth != 1:
+                    raise ValueError(
+                        f"Sparse Depth mismatch: {self.Depth} != {img_d} and != 1"
+                    )
+            elif self.SparseAxis == 1:
+                if self.Height != img_h and self.Height != 1:
+                    raise ValueError(
+                        f"Sparse Height mismatch: {self.Height} != {img_h} and != 1"
+                    )
+            elif self.SparseAxis == 2:
+                if self.Width != img_w and self.Width != 1:
+                    raise ValueError(
+                        f"Sparse Width mismatch: {self.Width} != {img_w} and != 1"
+                    )
+
+        # 3. Check ScanIndices
+        if self.ScanIndices is not None:
+            if self.SparseAxis is None:
+                raise ValueError("ScanIndices provided but SparseAxis is None")
+
+            limit = 0
+            if self.SparseAxis == 0:
+                limit = img_d
+            elif self.SparseAxis == 1:
+                limit = img_h
+            elif self.SparseAxis == 2:
+                limit = img_w
+
+            # indices must be < limit
+            for idx in self.ScanIndices:
+                if idx >= limit:
+                    raise ValueError(
+                        f"ScanIndex {idx} out of bounds for axis {self.SparseAxis} (limit {limit})"
+                    )
+
+        # 4. Check Reference Segmentation
+        if (
+            hasattr(self, "ReferenceSegmentationID")
+            and self.ReferenceSegmentationID is not None
+        ):
+            # We need to fetch the reference.
+            # Since SegmentationBase defines the ID but not the relationship in all subclasses,
+            # we might need to query safely.
+            # Assuming we are in a session
+            session = object_session(self)
+            if session:
+                # Use the class of the reference, which is Segmentation (manual)
+                from eyened_orm.segmentation import Segmentation as ManualSegmentation
+
+                ref = session.get(ManualSegmentation, self.ReferenceSegmentationID)
+                if ref:
+                    if (self.Depth, self.Height, self.Width) != (
+                        ref.Depth,
+                        ref.Height,
+                        ref.Width,
+                    ):
+                        raise ValueError(
+                            f"Dimensions mismatch with ReferenceSegmentation: {self.shape} != {ref.shape}"
+                        )
+
 
 class Segmentation(SegmentationBase):
     __tablename__ = "Segmentation"
+    __table_args__ = (
+        Index(
+            "ix_Segmentation_Image_Feature_Inactive",
+            "ImageInstanceID",
+            "FeatureID",
+            "Inactive",
+        ),
+        Index("ix_Segmentation_SubTask_Feature", "SubTaskID", "FeatureID"),
+        Index("ix_Segmentation_Feature_Inactive", "FeatureID", "Inactive"),
+    )
     SegmentationID: Mapped[int] = mapped_column(primary_key=True)
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
@@ -236,21 +444,27 @@ class Segmentation(SegmentationBase):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
     DateModified: Mapped[Optional[datetime]]
 
+    ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("Segmentation.SegmentationID")
+    )
+
     Inactive: Mapped[bool] = mapped_column(default=False)
 
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+    ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="Segmentations"
     )
     Creator: Mapped["Creator"] = relationship(
-        "eyened_orm.creator.Creator", back_populates="Segmentations"
+        "eyened_orm.creator.Creator", back_populates="Segmentations", lazy="selectin"
     )
     Feature: Mapped["Feature"] = relationship(
-        "eyened_orm.segmentation.Feature", back_populates="Segmentations"
+        "eyened_orm.segmentation.Feature",
+        back_populates="Segmentations",
+        lazy="selectin",
     )
-    SubTask: Mapped["SubTask"] = relationship(
+    SubTask: Mapped[Optional["SubTask"]] = relationship(
         "eyened_orm.task.SubTask", back_populates="Segmentations"
     )
-    SegmentationTagLinks: Mapped[List["SegmentationTagLink"]] = relationship(
+    SegmentationTagLinks: Mapped[Set["SegmentationTagLink"]] = relationship(
         "eyened_orm.tag.SegmentationTagLink",
         back_populates="Segmentation",
         lazy="selectin",
@@ -260,6 +474,31 @@ class Segmentation(SegmentationBase):
         back_populates="Segmentation",
         lazy="selectin",
     )
+
+    ReferenceSegmentation: Mapped[Optional["Segmentation"]] = relationship(
+        "Segmentation",
+        remote_side="Segmentation.SegmentationID",
+        back_populates="ReferenceSegmentations",
+        lazy="selectin",
+    )
+
+    ReferenceSegmentations: Mapped[list["Segmentation"]] = relationship(
+        "Segmentation",
+        back_populates="ReferenceSegmentation",
+        lazy="selectin",
+    )
+
+    @staticmethod
+    def infer_data_type(data: np.ndarray) -> Datatype:
+        if data.dtype == np.uint8:
+            return Datatype.R8UI  # or R8?
+        if data.dtype == np.uint16:
+            return Datatype.R16UI
+        if data.dtype == np.uint32:
+            return Datatype.R32UI
+        if data.dtype == np.float32:
+            return Datatype.R32F
+        return Datatype.R8
 
     def make_tag(
         self,
@@ -388,39 +627,93 @@ class Feature(Base):
 
     @classmethod
     def from_list(
-        cls, session, feature_name: str, sub_features: List[str] | None = None
+        cls,
+        session,
+        feature_name: str,
+        sub_features: List[str] | None = None,
+        *,
+        verbose: bool = False,
     ) -> "Feature":
         """
-        Create a feature hierarchy from a list of feature names.
-        If a feature does not exist, it will be created.
-        If a feature already exists, it will be appended to the parent.
+        Get or create a feature hierarchy from a list of sub-feature names.
+
+        Idempotent: repeated calls with the same arguments leave the database
+        in the same state. Existing parent features are reused; sub-feature
+        links are added, removed, or reordered to match ``sub_features``.
         """
-        feature = cls(FeatureName=feature_name)
-        session.add(feature)
-        session.flush()
+        def log(message: str) -> None:
+            if verbose:
+                print(message)
+
+        feature = cls.by_name(session, feature_name)
+        if feature is None:
+            feature = cls(FeatureName=feature_name) 
+            session.add(feature)
+            session.flush()
+            log(f"Created feature: {feature_name}")
+        else:
+            log(f"Found existing feature: {feature_name}")  
 
         if sub_features is None:
             return feature
 
-        if isinstance(sub_features, list):
-            # first create the sub-features that don't exist
-            for sub_feature in sub_features:
-                if Feature.by_name(session, sub_feature) is None:
-                    session.add(Feature(FeatureName=sub_feature))
-            session.flush()
+        if not isinstance(sub_features, list):
+            raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
 
-            # then create the feature associations
-            for i, sub_feature in enumerate(sub_features):
+        for sub_feature in sub_features:
+            if cls.by_name(session, sub_feature) is None:
+                session.add(cls(FeatureName=sub_feature))
+                session.flush()
+                log(f"Created sub-feature: {sub_feature}")
+
+        session.flush()
+
+        # index -> (child_id, child_name)
+        target_links: Dict[int, tuple[int, str]] = {}
+        for i, sub_feature in enumerate(sub_features):
+            child = cls.by_name(session, sub_feature)
+            target_links[i + 1] = (child.FeatureID, sub_feature)
+
+        current_links = {
+            (assoc.FeatureIndex, assoc.ChildFeatureID): assoc
+            for assoc in feature.FeatureAssociations
+        }
+        target_keys = {
+            (index, child_id) for index, (child_id, _) in target_links.items()
+        }
+
+        if set(current_links.keys()) == target_keys:
+            log(f"Feature '{feature_name}' sub-features already match; no changes")
+            return feature
+
+        for key, assoc in list(current_links.items()):
+            if key not in target_keys:
+                session.delete(assoc)
+                log(
+                    f"Removed link: {feature_name}[{assoc.FeatureIndex}]"
+                    f" -> {assoc.Child.FeatureName}"
+                )
+
+        session.flush()
+        session.expire(feature, ["FeatureAssociations"])
+
+        current_keys = {
+            (assoc.FeatureIndex, assoc.ChildFeatureID)
+            for assoc in feature.FeatureAssociations
+        }
+        for index, (child_id, child_name) in target_links.items():
+            key = (index, child_id)
+            if key not in current_keys:
                 feature.FeatureAssociations.append(
                     FeatureFeatureLink(
                         ParentFeatureID=feature.FeatureID,
-                        ChildFeatureID=Feature.by_name(session, sub_feature).FeatureID,
-                        FeatureIndex=i,
+                        ChildFeatureID=child_id,
+                        FeatureIndex=index,
                     )
                 )
-        else:
-            raise ValueError(f"Unsupported sub_features type: {type(sub_features)}")
+                log(f"Added link: {feature_name}[{index}] -> {child_name}")
 
+        session.flush()
         return feature
 
     @property
@@ -440,12 +733,15 @@ class Feature(Base):
 
 class Model(Base):
     __tablename__ = "Model"
+    _name_column: ClassVar[str] = "ModelName"
 
-    __table_args__ = (UniqueConstraint("ModelName", "Version"),)
+    __table_args__ = (
+        UniqueConstraint("ModelName", "Version"),
+    )
     __mapper_args__ = {"polymorphic_on": "ModelType"}
 
     ModelID: Mapped[int] = mapped_column(primary_key=True)
-    ModelName: Mapped[str] = mapped_column(String(255), unique=True)
+    ModelName: Mapped[str] = mapped_column(String(255))
     Version: Mapped[str] = mapped_column(String(255))
     ModelType: Mapped[ModelKind] = mapped_column(
         SAEnum(
@@ -484,6 +780,10 @@ class SegmentationModel(Model):
 
 class ModelSegmentation(SegmentationBase):
     __tablename__ = "ModelSegmentation"
+    __table_args__ = (
+        Index("ix_ModelSegmentation_Model_Image", "ModelID", "ImageInstanceID"),
+        Index("ix_ModelSegmentation_Image_Model", "ImageInstanceID", "ModelID"),
+    )
 
     ModelSegmentationID: Mapped[int] = mapped_column(primary_key=True)
     ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID"))
@@ -491,9 +791,11 @@ class ModelSegmentation(SegmentationBase):
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
     Model: Mapped["SegmentationModel"] = relationship(
-        "eyened_orm.segmentation.SegmentationModel", back_populates="Segmentations"
+        "eyened_orm.segmentation.SegmentationModel",
+        back_populates="Segmentations",
+        lazy="selectin",
     )
-    ImageInstance: Mapped[Optional["ImageInstance"]] = relationship(
+    ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance", back_populates="ModelSegmentations"
     )
     AttributeValues: Mapped[List["AttributeValue"]] = relationship(
@@ -514,3 +816,26 @@ class ModelSegmentation(SegmentationBase):
             if base_model is not None:
                 return f"model_{base_model.ModelName}_{base_model.Version}"
         return "model_name_unknown"
+
+
+# Event Listeners
+def validate_segmentation(mapper, connection, target):
+    target.check_consistency()
+
+
+def validate_immutable_dims(mapper, connection, target):
+    # Check if history shows changes to dims
+    from sqlalchemy.orm.attributes import get_history
+
+    for attr in ["Depth", "Height", "Width"]:
+        hist = get_history(target, attr)
+        if hist.has_changes():
+            raise ValueError(f"Cannot modify {attr} of a Segmentation once created.")
+    target.check_consistency()
+
+
+event.listen(Segmentation, "before_insert", validate_segmentation)
+event.listen(Segmentation, "before_update", validate_immutable_dims)
+
+event.listen(ModelSegmentation, "before_insert", validate_segmentation)
+event.listen(ModelSegmentation, "before_update", validate_immutable_dims)

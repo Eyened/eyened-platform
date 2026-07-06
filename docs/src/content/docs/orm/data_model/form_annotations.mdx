@@ -1,0 +1,103 @@
+---
+title: Form annotations
+description: FormSchema, FormAnnotation, and getting started with forms
+sidebar:
+  order: 4
+---
+
+**Form annotations** store structured JSON on a patient, study, image, or eye — clinical grading, ETDRS grids, and other site-specific fields. Each row references a **`FormSchema`** that defines validation and (for clinical forms) the fields shown in the viewer Form panel.
+
+For **enface image registration** (separate storage paths, PublicID rules, viewer graph), see **[Registration](/eyened-platform/orm/registration)**.
+
+## FormSchema
+
+A `FormSchema` is the **template** — it does not hold answers.
+
+| Column | Meaning |
+|--------|---------|
+| `SchemaName` | Unique name (for example `"AMD Grading"`, `"ETDRS-grid coordinates"`) |
+| `Schema` | JSON Schema (Draft 7) |
+| `EntityType` | Attachment level: `ImageInstance`, `Study`, `StudyEye`, `Eye`, `Patient`, … |
+
+Builtin viewer schemas (ETDRS, registration) are seeded with `eorm seed-form-schemas` and edited in dedicated panels, not the generic Form panel. Details: **[Form schemas](/eyened-platform/orm/form_schemas)**.
+
+## Getting started
+
+**1. Seed or create schemas**
+
+```bash
+eorm initialize-database --seed-form-schemas   # builtin viewer schemas
+eorm validate-forms                            # after any schema change
+```
+
+For clinical forms, insert a `FormSchema` before use (import, API, or Python):
+
+```python
+import json
+from eyened_orm import FormSchema, EntityType
+
+with db.get_session() as session:
+    session.add(FormSchema(
+        SchemaName="AMD Grading",
+        Schema=json.load(open("amd_grading.json")),
+        EntityType=EntityType.StudyEye,
+    ))
+    session.commit()
+```
+
+Pick `EntityType` to match scope: `ImageInstance` (per image), `Study` / `StudyEye` (visit), `Eye` (per eye — see **[Registration](/eyened-platform/orm/registration)**).
+
+:::note
+The JSON Schema drives the viewer Form panel: field types, required keys, and conditional show/hide. Clinical forms are **site-specific** and not included in the default seed.
+:::
+
+**2. Create and query annotations**
+
+A **`FormAnnotation`** is one filled-in instance — `FormData` JSON plus `PatientID`, optional `StudyID` / `ImageInstanceID`, `Laterality`, `CreatorID`, and optional `SubTaskID`.
+
+```python
+from eyened_orm import FormAnnotation
+
+annotations = FormAnnotation.by_schema_and_creator(
+    session, "AMD Grading", creator_name="Dr. Smith"
+)
+for fa in annotations:
+    print(fa.FormData)
+```
+
+In the viewer, annotations are created from the Form or ETDRS panels (and the Registration panel for registration schemas). Externally: **[API — Forms](/eyened-platform/api/forms)**.
+
+**3. Attach to grading tasks (optional)**
+
+Set `TaskDefinition.TaskConfig` with `form_schema_name` (and optional `form_image_scope`). The schema must already exist. See **[Tasks](/eyened-platform/orm/data_model/tasks)**.
+
+## FormAnnotation fields
+
+| Field | Meaning |
+|-------|---------|
+| `FormSchemaID` | Template |
+| `PatientID` | Always set |
+| `StudyID` / `ImageInstanceID` | Per `EntityType` |
+| `Laterality` | Required for `Eye` and `StudyEye` |
+| `FormData` | JSON payload |
+| `CreatorID` | Author |
+| `SubTaskID` | Active grading subtask, if any |
+| `FormAnnotationReferenceID` | Parent for duplicate / versioned copies |
+| `Inactive` | Soft delete |
+
+| `EntityType` | Keys typically set | Example |
+|--------------|----------------------|---------|
+| `ImageInstance` | `PatientID`, `ImageInstanceID` | ETDRS grid, per-image grading |
+| `Study` / `StudyEye` | `PatientID`, `StudyID`, optional `Laterality` | Visit-level forms |
+| `Eye` | `PatientID`, `Laterality` | Registration — see **[Registration](/eyened-platform/orm/registration)** |
+
+:::note
+**ETDRS:** AI landmarks live in `ImageInstance.CFKeypoints`; manual grids use `FormAnnotation.FormData` under schema **`ETDRS-grid coordinates`**. See **[ETDRS panel](/eyened-platform/client/panels/etdrs)**.
+:::
+
+## Related
+
+- **[Form schemas](/eyened-platform/orm/form_schemas)**
+- **[Registration](/eyened-platform/orm/registration)**
+- **[API — Forms](/eyened-platform/api/forms)**
+- **[Form panel](/eyened-platform/client/panels/form)**

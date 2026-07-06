@@ -1,0 +1,64 @@
+---
+title: Import
+description: Register images and queue background jobs
+sidebar:
+  order: 4
+---
+
+The API **registers** images that already exist on a storage backend — it does not upload file bytes. See **[Importing data](/eyened-platform/importing_data)**.
+
+### POST /api/import/image
+
+Import a single flat `ImportRow`.
+
+**Request body:** `{ "data": { …ImportRow… }, "options": { "include_stack_trace": false } }`
+
+Field reference: **[Import metadata fields](/eyened-platform/import_metadata_fields)**.
+
+### POST /api/import/update_thumbnails
+
+Queue thumbnail generation for all images with missing (or optionally failed) `ThumbnailPath`.
+
+**Query parameters:** `failed` (bool), `print_errors` (bool)
+
+**Response:** `TaskResponse` — `{ "success", "message", "task_id", "task_ids", "error" }`
+
+See **[Thumbnails](/eyened-platform/thumbnails)**.
+
+### POST /api/import/update_thumbnails_for_image_ids
+
+**Request body:** `{ "image_ids": [int, …], "print_errors": bool }`
+
+### GET /api/import/status/\{task_id\}
+
+Poll RQ job status. **No authentication required.**
+
+**Response:** `{ "task_id", "status", "result" }` or `{ "error": "job not found" }`
+
+### POST /api/import/run_cfi_models
+
+Queue CFI attribute models (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`).
+
+**Request body:**
+```json
+{
+  "image_ids": [1, 2],
+  "model": "cfi-roi",
+  "overwrite": false,
+  "commit_interval": 100,
+  "batch_size": 8,
+  "n_workers": 16
+}
+```
+
+Omit `model` to queue one job per attribute model.
+
+### POST /api/import/run_cfi_amd
+
+Queue CFI AMD segmentation (`cfi-amd` queue).
+
+### POST /api/import/run_layer_segmentation
+
+Queue OCT layer segmentation (`layer-segmentation` queue).
+
+CLI equivalents: **[Inference](/eyened-platform/orm/inference)**.

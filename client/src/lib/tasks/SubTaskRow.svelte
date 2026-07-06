@@ -1,11 +1,10 @@
 <script lang="ts">
+	import BrowserPicker from "$lib/browser/BrowserPicker.svelte";
+	import type { Condition } from "$lib/browser/browserContext.svelte";
 	import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
 	import { Button } from "$lib/components/ui/button";
-	import * as Input from "$lib/components/ui/input";
 	import * as Table from "$lib/components/ui/table";
-	import type {
-		SubTaskWithImagesGET,
-	} from "../../types/openapi_types";
+	import type { SubTaskWithImagesGET } from "../../types/openapi_types";
 	import { toast } from "svelte-sonner";
 	import {
 		addSubTaskImage,
@@ -16,29 +15,57 @@
 	type Props = {
 		subtask: SubTaskWithImagesGET;
 		taskId: number;
-		index: number;
-		start: number;
 	};
-	let { subtask, taskId, index, start }: Props = $props();
+	let { subtask, taskId }: Props = $props();
 
 	const row = $derived(subtask);
-	let newInstanceId = $state<string>("");
 
-	async function addImage() {
+	let showPicker = $state(false);
+
+	// Image ids currently linked to this subtask.
+	const currentImageIds = $derived(
+		((row as any).images ?? []).map((img: any) => String(img.id)),
+	);
+
+	// Default query: all images for the patients already linked to this subtask.
+	const pickerConditions = $derived.by((): Condition[] => {
+		const identifiers = new Set<string>();
+		for (const img of (row as any).images ?? []) {
+			if (img?.patient?.identifier) identifiers.add(img.patient.identifier);
+		}
+		if (identifiers.size === 0) return [];
+		return [
+			{
+				type: "default",
+				variable: "Patient Identifier",
+				operator: "IN",
+				value: Array.from(identifiers),
+			} as Condition,
+		];
+	});
+
+	async function confirmImages(selectedIds: string[]) {
+		const initial: string[] = currentImageIds;
+		const added = selectedIds.filter((id) => !initial.includes(id));
+		const removed = initial.filter((id) => !selectedIds.includes(id));
 		try {
-			const id = Number(newInstanceId);
-			if (!id) {
-				toast.error("Please enter a valid instance id");
-				return;
+			// Run sequentially: each endpoint returns a full snapshot of the
+			// subtask's images, so parallel requests would ingest out-of-order
+			// (stale) snapshots and also race on the next ImageIndex.
+			for (const id of removed) {
+				await removeSubTaskImage(row.id, id);
 			}
-			await addSubTaskImage(row.id, id);
-			newInstanceId = "";
+			for (const id of added) {
+				await addSubTaskImage(row.id, id);
+			}
 		} catch (e) {
 			toast.error(String(e));
+		} finally {
+			showPicker = false;
 		}
 	}
 
-	async function removeImage(instance_id: number) {
+	async function removeImage(instance_id: string) {
 		try {
 			await removeSubTaskImage(row.id, instance_id);
 		} catch (e) {
@@ -56,11 +83,13 @@
 </script>
 
 <Table.Row>
-	<Table.Cell>{row.id}</Table.Cell>
+	<Table.Cell>
+		<span class="text-xs">{row.id} [{row.index}]</span>
+	</Table.Cell>
 	<Table.Cell>{row.task_state ?? "-"}</Table.Cell>
 	<Table.Cell>
 		<Button
-			href={`/tasks/${taskId}/grade/${index + start}`}
+			href={`/tasks/${taskId}/grade/${row.index}`}
 			target="_blank"
 			class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
 		>
@@ -91,21 +120,11 @@
 				-
 			{/if}
 
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					addImage();
-				}}
-				class="flex items-center gap-2 mt-1 w-full"
-			>
-				<Input.Root
-					type="number"
-					bind:value={newInstanceId}
-					placeholder="Instance ID"
-					class="w-36"
-				/>
-				<Button type="submit">Add Image</Button>
-			</form>
+			<div class="mt-1 w-full">
+				<Button type="button" onclick={() => (showPicker = true)}>
+					Browse images
+				</Button>
+			</div>
 		</div>
 	</Table.Cell>
 	<Table.Cell>
@@ -120,6 +139,17 @@
 		></textarea>
 	</Table.Cell>
 </Table.Row>
+
+{#if showPicker}
+	<BrowserPicker
+		initialConditions={pickerConditions}
+		initialSelectedIds={currentImageIds}
+		onConfirm={confirmImages}
+		onCancel={() => (showPicker = false)}
+		confirmLabel="Save images"
+		title={`Select images for subtask [${row.index}]`}
+	/>
+{/if}
 
 <style>
 	.instances {

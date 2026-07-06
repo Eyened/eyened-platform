@@ -50,6 +50,7 @@ class Annotation(Base):
     )
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     FeatureID: Mapped[int] = mapped_column(ForeignKey("Feature.FeatureID"))
+    Feature: Mapped["Feature"] = relationship("eyened_orm.segmentation.Feature", lazy="selectin")
     AnnotationTypeID: Mapped[int] = mapped_column(
         ForeignKey("AnnotationType.AnnotationTypeID")
     )
@@ -67,9 +68,9 @@ class Annotation(Base):
         "eyened_orm.image_instance.ImageInstance",
         back_populates="Annotations"
     )
-    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Annotations")
+    Creator: Mapped["Creator"] = relationship("eyened_orm.creator.Creator", back_populates="Annotations", lazy="selectin")
 
-    AnnotationType: Mapped["AnnotationType"] = relationship("eyened_orm.annotation.AnnotationType", back_populates="Annotations")
+    AnnotationType: Mapped["AnnotationType"] = relationship("eyened_orm.annotation.AnnotationType", back_populates="Annotations", lazy="selectin")
     AnnotationReference: Mapped[Optional["Annotation"]] = relationship(
         "eyened_orm.annotation.Annotation",
         back_populates="ChildAnnotations", remote_side="Annotation.AnnotationID"
@@ -83,7 +84,7 @@ class Annotation(Base):
     # Actual data is stored in AnnotationData
     AnnotationData: Mapped[List["AnnotationData"]] = relationship(
         "eyened_orm.annotation.AnnotationData",
-        back_populates="Annotation", passive_deletes=True
+        back_populates="Annotation", passive_deletes=True, lazy="selectin"
     )
 
     def __repr__(self):

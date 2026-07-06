@@ -14,7 +14,7 @@ Used to create the viewerwindow context.
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     interface Props {
-        instanceIDs: number[];
+        instanceIDs: string[];
     }
     let { instanceIDs }: Props = $props();
 

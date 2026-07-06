@@ -305,6 +305,123 @@
         }
       }
     },
+    "/auth/options": {
+      "get": {
+        "summary": "Get Auth Options",
+        "description": "Options and settings for authentication.",
+        "operationId": "get_auth_options_auth_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oidc/authorize": {
+      "get": {
+        "summary": "Get Oidc Authorization Url",
+        "description": "The authorization URL at the OIDC provider for authentication.\n\nThe authorization includes a CSRF token. The CSRF token hash is included in the 'state' parameter along the OIDC\nauthorization path, while the original token is returned to the client for safekeeping (as a cookie).\nThe client is supposed to provide the token (cookie) again when calling the authenticate endpoint, where it\nwill be validated.\n\nA similar flow is set for the 'nonce', which is returned from the OIDC authentication response in the ID token,\nwhich is also validated.",
+        "operationId": "get_oidc_authorization_url_auth_oidc_authorize_get",
+        "parameters": [
+          {
+            "name": "next",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Next"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OIDCAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oidc/authenticate": {
+      "post": {
+        "summary": "Oidc Authenticate",
+        "description": "Handle OIDC authentication using the code from the authorization URL.",
+        "operationId": "oidc_authenticate_auth_oidc_authenticate_post",
+        "parameters": [
+          {
+            "name": "oidc_csrf_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Oidc Csrf Token"
+            }
+          },
+          {
+            "name": "oidc_nonce",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Oidc Nonce"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OIDCAuthenticationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/instances/{instance_id}": {
       "get": {
         "summary": "Get Instance",
@@ -393,8 +510,260 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InstanceGET"
+                  "$ref": "#/components/schemas/ImageGET"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}": {
+      "get": {
+        "summary": "Get Public Image",
+        "operationId": "get_public_image_images__image_id__get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "with_segmentations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Segmentations"
+            }
+          },
+          {
+            "name": "with_form_annotations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Form Annotations"
+            }
+          },
+          {
+            "name": "with_model_segmentations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Model Segmentations"
+            }
+          },
+          {
+            "name": "with_tag_metadata",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "With Tag Metadata"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageGET"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/data": {
+      "get": {
+        "summary": "Get Public Image Data",
+        "operationId": "get_public_image_data_images__image_id__data_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Index"
+            }
+          },
+          {
+            "name": "meta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Meta"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/thumbnail": {
+      "get": {
+        "summary": "Get Public Image Thumbnail",
+        "operationId": "get_public_image_thumbnail_images__image_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 144,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -532,7 +901,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -609,7 +978,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -693,7 +1062,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -1445,6 +1814,100 @@
             }
           }
         }
+      },
+      "put": {
+        "summary": "Update Model Segmentation Data",
+        "operationId": "update_model_segmentation_data_model_segmentations__model_segmentation_id__data_put",
+        "parameters": [
+          {
+            "name": "model_segmentation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Model Segmentation Id"
+            }
+          },
+          {
+            "name": "axis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Axis"
+            }
+          },
+          {
+            "name": "scan_nr",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scan Nr"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/import/image": {
@@ -1514,11 +1977,238 @@
         }
       }
     },
-    "/import/run_inference": {
+    "/import/run_cfi_models": {
       "post": {
-        "summary": "Run Inference",
-        "operationId": "run_inference_import_run_inference_post",
+        "summary": "Enqueue Run Cfi Models",
+        "description": "Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...).",
+        "operationId": "enqueue_run_cfi_models_import_run_cfi_models_post",
         "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCfiModelsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/run_cfi_amd": {
+      "post": {
+        "summary": "Enqueue Run Cfi Amd",
+        "operationId": "enqueue_run_cfi_amd_import_run_cfi_amd_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCfiAmdRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/run_layer_segmentation": {
+      "post": {
+        "summary": "Enqueue Run Layer Segmentation",
+        "operationId": "enqueue_run_layer_segmentation_import_run_layer_segmentation_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunImageIdsJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/update_thumbnails": {
+      "post": {
+        "summary": "Post Import Update Thumbnails",
+        "description": "Queue a job that scans the DB for missing thumbnails (CLI-equivalent).",
+        "operationId": "post_import_update_thumbnails_import_update_thumbnails_post",
+        "parameters": [
+          {
+            "name": "failed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include images with empty ThumbnailPath (failed previous run), like ``eorm update-thumbnails --failed``.",
+              "default": false,
+              "title": "Failed"
+            },
+            "description": "Include images with empty ThumbnailPath (failed previous run), like ``eorm update-thumbnails --failed``."
+          },
+          {
+            "name": "print_errors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Print per-image errors on the worker, like ``eorm update-thumbnails --print-errors``.",
+              "default": false,
+              "title": "Print Errors"
+            },
+            "description": "Print per-image errors on the worker, like ``eorm update-thumbnails --print-errors``."
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -1571,10 +2261,11 @@
         }
       }
     },
-    "/import/update_thumbnails": {
+    "/import/update_thumbnails_for_image_ids": {
       "post": {
-        "summary": "Update Thumbnails",
-        "operationId": "update_thumbnails_import_update_thumbnails_post",
+        "summary": "Post Import Update Thumbnails For Image Ids",
+        "description": "Queue thumbnail generation for the given ``image_ids`` only.",
+        "operationId": "post_import_update_thumbnails_for_image_ids_import_update_thumbnails_for_image_ids_post",
         "parameters": [
           {
             "name": "authorization",
@@ -1604,6 +2295,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThumbnailsForImageIdsRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1612,6 +2313,43 @@
                 "schema": {
                   "$ref": "#/components/schemas/TaskResponse"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/status/{task_id}": {
+      "get": {
+        "summary": "Get Status",
+        "operationId": "get_status_import_status__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -1731,19 +2469,19 @@
             }
           },
           {
-            "name": "image_instance_id",
+            "name": "image_id",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Image Instance Id"
+              "title": "Image Id"
             }
           },
           {
@@ -4335,7 +5073,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Instance Id"
             }
           },
@@ -4682,6 +5420,82 @@
           }
         }
       }
+    },
+    "/patients/{patient_id}": {
+      "get": {
+        "summary": "Get Patient",
+        "operationId": "get_patient_patients__patient_id__get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "include_attributes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Attributes"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientDetailGET"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4689,7 +5503,7 @@
       "AddImageRequest": {
         "properties": {
           "instance_id": {
-            "type": "integer",
+            "type": "string",
             "title": "Instance Id"
           }
         },
@@ -4707,7 +5521,14 @@
             "title": "Type"
           },
           "model": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Model"
           },
           "variable": {
@@ -4723,7 +5544,8 @@
               "<=",
               "==",
               "!=",
-              "IN"
+              "IN",
+              "IS NULL"
             ],
             "title": "Operator"
           },
@@ -4765,7 +5587,6 @@
         "type": "object",
         "required": [
           "type",
-          "model",
           "variable",
           "operator",
           "value"
@@ -4896,7 +5717,8 @@
               "<=",
               "==",
               "!=",
-              "IN"
+              "IN",
+              "IS NULL"
             ],
             "title": "Operator"
           },
@@ -5000,6 +5822,15 @@
           "ImageInstance"
         ],
         "title": "EntityType"
+      },
+      "ExternalEnum": {
+        "type": "string",
+        "enum": [
+          "Y",
+          "N",
+          "M"
+        ],
+        "title": "ExternalEnum"
       },
       "FeatureGET": {
         "properties": {
@@ -5132,16 +5963,16 @@
             ],
             "title": "Study Id"
           },
-          "image_instance_id": {
+          "image_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Image Instance Id"
+            "title": "Image Id"
           },
           "laterality": {
             "anyOf": [
@@ -5278,16 +6109,16 @@
             ],
             "title": "Study Id"
           },
-          "image_instance_id": {
+          "image_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Image Instance Id"
+            "title": "Image Id"
           },
           "laterality": {
             "anyOf": [
@@ -5356,16 +6187,16 @@
             ],
             "title": "Study Id"
           },
-          "image_instance_id": {
+          "image_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Image Instance Id"
+            "title": "Image Id"
           },
           "laterality": {
             "anyOf": [
@@ -5475,245 +6306,26 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ImageImportData": {
-        "properties": {
-          "project_name": {
-            "type": "string",
-            "title": "Project Name",
-            "description": "Required project name"
-          },
-          "patient_identifier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Identifier",
-            "description": "Patient identifier in the system"
-          },
-          "patient_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Props",
-            "description": "Optional key-value properties for new patient",
-            "default": {}
-          },
-          "study_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Study Date",
-            "description": "Study date (can be a date object or ISO format string)"
-          },
-          "study_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Study Props",
-            "description": "Optional key-value properties for new study",
-            "default": {}
-          },
-          "series_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Series Id",
-            "description": "Optional series identifier"
-          },
-          "series_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Series Props",
-            "description": "Optional key-value properties for new series",
-            "default": {}
-          },
-          "image": {
-            "type": "string",
-            "title": "Image",
-            "description": "Path to the image file (required)"
-          },
-          "image_props": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image Props",
-            "description": "Optional key-value properties for new image",
-            "default": {}
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_name",
-          "image"
-        ],
-        "title": "ImageImportData",
-        "description": "Model for a single image import data"
-      },
-      "ImportOptions": {
-        "properties": {
-          "create_patients": {
-            "type": "boolean",
-            "title": "Create Patients",
-            "description": "If True, create patients when they don't exist",
-            "default": false
-          },
-          "create_studies": {
-            "type": "boolean",
-            "title": "Create Studies",
-            "description": "If True, create studies when they don't exist",
-            "default": false
-          },
-          "create_series": {
-            "type": "boolean",
-            "title": "Create Series",
-            "description": "If True, create series when they don't exist",
-            "default": true
-          },
-          "create_project": {
-            "type": "boolean",
-            "title": "Create Project",
-            "description": "If True, create project when it doesn't exist",
-            "default": false
-          },
-          "include_stack_trace": {
-            "type": "boolean",
-            "title": "Include Stack Trace",
-            "description": "If True, include stack trace in the error response",
-            "default": false
-          }
-        },
-        "type": "object",
-        "title": "ImportOptions",
-        "description": "Options for the import process"
-      },
-      "ImportRequest": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ImageImportData"
-          },
-          "options": {
-            "$ref": "#/components/schemas/ImportOptions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "data",
-          "options"
-        ],
-        "title": "ImportRequest"
-      },
-      "ImportResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "stack_trace": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stack Trace"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "message"
-        ],
-        "title": "ImportResponse"
-      },
-      "InstanceGET": {
+      "ImageGET": {
         "properties": {
           "sop_instance_uid": {
             "type": "string",
             "title": "Sop Instance Uid"
           },
-          "dataset_identifier": {
+          "data_format": {
             "type": "string",
-            "title": "Dataset Identifier"
+            "title": "Data Format"
           },
-          "thumbnail_identifier": {
-            "type": "string",
-            "title": "Thumbnail Identifier"
-          },
-          "thumbnail_path": {
-            "type": "string",
-            "title": "Thumbnail Path"
+          "data_source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Source Id"
           },
           "modality": {
             "anyOf": [
@@ -5852,7 +6464,7 @@
             "title": "Date Preprocessed"
           },
           "id": {
-            "type": "integer",
+            "type": "string",
             "title": "Id"
           },
           "project": {
@@ -5922,21 +6534,24 @@
             ],
             "title": "Form Annotations"
           },
-          "attributes": {
+          "model_attrs": {
             "additionalProperties": {
               "additionalProperties": true,
               "type": "object"
             },
             "type": "object",
-            "title": "Attributes"
+            "title": "Model Attrs"
+          },
+          "attrs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attrs"
           }
         },
         "type": "object",
         "required": [
           "sop_instance_uid",
-          "dataset_identifier",
-          "thumbnail_identifier",
-          "thumbnail_path",
+          "data_format",
           "angio_graphy",
           "anatomic_region",
           "rows",
@@ -5954,19 +6569,159 @@
           "device",
           "scan",
           "tags",
-          "attributes"
+          "model_attrs",
+          "attrs"
         ],
-        "title": "InstanceGET"
+        "title": "ImageGET"
       },
-      "InstanceMeta": {
+      "ImportOptions": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
+          "include_stack_trace": {
+            "type": "boolean",
+            "title": "Include Stack Trace",
+            "description": "If True, include stack trace in the error response",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ImportOptions",
+        "description": "Options for the import process"
+      },
+      "ImportRequest": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ImportRow"
           },
-          "thumbnail_path": {
+          "options": {
+            "$ref": "#/components/schemas/ImportOptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "options"
+        ],
+        "title": "ImportRequest"
+      },
+      "ImportResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
             "type": "string",
-            "title": "Thumbnail Path"
+            "title": "Message"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "stack_trace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stack Trace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "ImportResponse"
+      },
+      "ImportRow": {
+        "properties": {
+          "contact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          },
+          "contact_institute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Institute"
+          },
+          "contact_orcid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Orcid"
+          },
+          "sop_instance_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sop Instance Uid"
           },
           "modality": {
             "anyOf": [
@@ -6008,30 +6763,812 @@
               }
             ]
           },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height",
+            "description": "Rows_y"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width",
+            "description": "Columns_x"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth",
+            "description": "NrOfFrames"
+          },
+          "resolution_horizontal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Horizontal"
+          },
+          "resolution_vertical": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Vertical"
+          },
+          "resolution_axial": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Axial"
+          },
+          "old_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Path"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "device_serial_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Serial Number"
+          },
+          "device_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Description",
+            "description": "Description of the device"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer",
+            "description": "Manufacturer of the device"
+          },
+          "manufacturer_model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer Model Name",
+            "description": "Model name of the device"
+          },
+          "scan_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Mode",
+            "description": "Scan.ScanMode; used with SCAN importer entity for lookup/create"
+          },
+          "modality_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modality Tag",
+            "description": "Modality.ModalityTag (lookup/create Modality table row); distinct from modality enum"
+          },
+          "source_info_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Info Id"
+          },
           "anatomic_region": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Anatomic Region"
           },
-          "device": {
-            "$ref": "#/components/schemas/DeviceMeta"
+          "acquisition_date_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquisition Date Time"
           },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagMeta"
-            },
-            "type": "array",
-            "title": "Tags"
+          "angiography": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Angiography"
+          },
+          "samples_per_pixel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Samples Per Pixel"
+          },
+          "horizontal_field_of_view": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizontal Field Of View"
+          },
+          "sop_class_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sop Class Uid"
+          },
+          "photometric_interpretation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photometric Interpretation"
+          },
+          "pupil_dilated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pupil Dilated"
+          },
+          "fda_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fda Identifier"
+          },
+          "dataset_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Identifier",
+            "description": "Maps to ImageInstance.DatasetIdentifier, deprecated and will be removed in a future release"
+          },
+          "modality_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modality Id",
+            "description": "Modality.ModalityID (SCAN-like PK for Modality table importer entity)"
+          },
+          "scan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Id",
+            "description": "Scan.ScanID when referencing an existing Scan row"
+          },
+          "slice_thickness": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slice Thickness",
+            "description": "SliceThickness"
+          },
+          "alt_dataset_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Dataset Identifier",
+            "description": "AltDatasetIdentifier; deprecated and will be removed in a future release"
+          },
+          "date_inserted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Inserted",
+            "description": "DateInserted"
+          },
+          "date_modified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Modified",
+            "description": "DateModified"
+          },
+          "date_preprocessed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Preprocessed",
+            "description": "DatePreprocessed"
+          },
+          "cf_roi": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cf Roi",
+            "description": "CFROI JSON"
+          },
+          "cf_keypoints": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cf Keypoints",
+            "description": "CFKeypoints JSON"
+          },
+          "cf_quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cf Quality",
+            "description": "CFQuality"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name",
+            "description": "Name of the project"
+          },
+          "project_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Description"
+          },
+          "project_doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Doi"
+          },
+          "project_contact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Contact Id"
+          },
+          "project_external": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the project is external"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "patient_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Identifier",
+            "description": "Patient identifier (unique within the project)"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SexEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date",
+            "description": "Patient's date of birth"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "study_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Date",
+            "description": "Date when the study was performed"
+          },
+          "study_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Description"
+          },
+          "study_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Round"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "series_instance_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Instance Uid",
+            "description": "DICOM SeriesInstanceUID; stored on Series.SeriesInstanceUid"
+          },
+          "series_anonymous_identity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Anonymous Identity",
+            "description": "Batch-local grouping key for anonymous series creation"
+          },
+          "series_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Number"
+          },
+          "study_instance_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Instance Uid",
+            "description": "DICOM StudyInstanceUID; stored on Series.StudyInstanceUid"
+          },
+          "device_model_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model Id"
+          },
+          "image_instance_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Instance Id"
+          },
+          "public_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Id"
+          },
+          "inactive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inactive"
+          },
+          "image_anonymous_identity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Anonymous Identity",
+            "description": "Batch-local grouping key for anonymous image instance creation"
+          },
+          "storage_backend_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend Id"
+          },
+          "storage_backend_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend Key",
+            "description": "StorageBackend used for this image"
+          },
+          "storage_backend_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend Kind",
+            "description": "Kind of the storage backend"
+          },
+          "image_storage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Id"
+          },
+          "object_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Key",
+            "description": "Path to the image file within the storage backend"
+          },
+          "image_storage_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Format",
+            "description": "If set, overrides inferred Format for ImageStorage"
+          },
+          "image_storage_is_primary": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Is Primary",
+            "description": "If set, maps to ImageStorage.IsPrimary"
+          },
+          "image_storage_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Hash",
+            "description": "SHA-256 digest (32 bytes); maps to ImageStorage.Hash"
+          },
+          "image_storage_checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Checksum",
+            "description": "Checksum string (e.g. MD5 hex); maps to ImageStorage.Checksum"
+          },
+          "thumbnail_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Path",
+            "description": "Thumbnail identifier under storage root; maps to ImageInstance.ThumbnailPath"
           }
         },
         "type": "object",
-        "required": [
-          "id",
-          "thumbnail_path",
-          "anatomic_region",
-          "device",
-          "tags"
-        ],
-        "title": "InstanceMeta"
+        "title": "ImportRow",
+        "description": "One flat record per image: project → patient → study → series → instance → storage fields.\nAll fields are optional until consistency rules are enforced (see model validator)."
       },
       "Laterality": {
         "type": "string",
@@ -6096,9 +7633,9 @@
       },
       "ModelSegmentationGET": {
         "properties": {
-          "image_instance_id": {
-            "type": "integer",
-            "title": "Image Instance Id"
+          "image_id": {
+            "type": "string",
+            "title": "Image Id"
           },
           "depth": {
             "type": "integer",
@@ -6165,17 +7702,6 @@
             ],
             "title": "Threshold"
           },
-          "reference_segmentation_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Segmentation Id"
-          },
           "data_type": {
             "$ref": "#/components/schemas/Datatype"
           },
@@ -6224,7 +7750,7 @@
         },
         "type": "object",
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",
@@ -6238,6 +7764,47 @@
           "date_inserted"
         ],
         "title": "ModelSegmentationGET"
+      },
+      "OIDCAuthenticationRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "OIDCAuthenticationRequest"
+      },
+      "OIDCAuthorizationResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "csrf": {
+            "type": "string",
+            "title": "Csrf"
+          },
+          "nonce": {
+            "type": "string",
+            "title": "Nonce"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "csrf",
+          "nonce"
+        ],
+        "title": "OIDCAuthorizationResponse"
       },
       "ObjectTagPATCH": {
         "properties": {
@@ -6280,6 +7847,82 @@
         ],
         "title": "ObjectTagPOST"
       },
+      "PatientAttributeValueGET": {
+        "properties": {
+          "value": {
+            "title": "Value"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "PatientAttributeValueGET",
+        "description": "One attribute value produced by a model (or manual entry when model is null)."
+      },
+      "PatientDetailGET": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "identifier": {
+            "type": "string",
+            "title": "Identifier"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SexEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectMeta"
+          },
+          "attrs": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/PatientAttributeValueGET"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Attrs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "identifier",
+          "project"
+        ],
+        "title": "PatientDetailGET"
+      },
       "PatientMeta": {
         "properties": {
           "id": {
@@ -6293,14 +7936,23 @@
           "birth_date": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "date"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Birth Date"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SexEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6327,6 +7979,118 @@
           "name"
         ],
         "title": "ProjectMeta"
+      },
+      "RunCfiAmdRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "default": false
+          },
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size",
+            "default": 8
+          },
+          "n_workers": {
+            "type": "integer",
+            "title": "N Workers",
+            "default": 12
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "RunCfiAmdRequest"
+      },
+      "RunCfiModelsRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids",
+            "description": "ImageInstance IDs to process (e.g. ColorFundus IDs from a completed import)."
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cfi-roi",
+                  "cfi-keypoints",
+                  "cfi-odfd",
+                  "cfi-quality"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Single CFI attribute pipeline, or omit to run all attribute models."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "description": "If true, re-run even when results already exist.",
+            "default": false
+          },
+          "commit_interval": {
+            "type": "integer",
+            "title": "Commit Interval",
+            "default": 100
+          },
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size",
+            "default": 8
+          },
+          "n_workers": {
+            "type": "integer",
+            "title": "N Workers",
+            "default": 16
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "RunCfiModelsRequest",
+        "description": "Queue a model job for the given image instance IDs (CFI attributes or segmentation)."
+      },
+      "RunImageIdsJobRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "RunImageIdsJobRequest"
       },
       "ScanMeta": {
         "properties": {
@@ -6409,7 +8173,7 @@
         "properties": {
           "instances": {
             "items": {
-              "$ref": "#/components/schemas/InstanceGET"
+              "$ref": "#/components/schemas/ImageGET"
             },
             "type": "array",
             "title": "Instances"
@@ -6442,7 +8206,7 @@
           },
           "result_ids": {
             "items": {
-              "type": "integer"
+              "type": "string"
             },
             "type": "array",
             "title": "Result Ids"
@@ -6465,9 +8229,9 @@
       },
       "SegmentationGET": {
         "properties": {
-          "image_instance_id": {
-            "type": "integer",
-            "title": "Image Instance Id"
+          "image_id": {
+            "type": "string",
+            "title": "Image Id"
           },
           "depth": {
             "type": "integer",
@@ -6534,6 +8298,12 @@
             ],
             "title": "Threshold"
           },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
           "reference_segmentation_id": {
             "anyOf": [
               {
@@ -6544,12 +8314,6 @@
               }
             ],
             "title": "Reference Segmentation Id"
-          },
-          "data_type": {
-            "$ref": "#/components/schemas/Datatype"
-          },
-          "data_representation": {
-            "$ref": "#/components/schemas/DataRepresentation"
           },
           "id": {
             "type": "integer",
@@ -6593,7 +8357,7 @@
         },
         "type": "object",
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",
@@ -6680,7 +8444,7 @@
           },
           "instance_ids": {
             "items": {
-              "type": "integer"
+              "type": "string"
             },
             "type": "array",
             "title": "Instance Ids"
@@ -6705,6 +8469,14 @@
           "id"
         ],
         "title": "SeriesMeta"
+      },
+      "SexEnum": {
+        "type": "string",
+        "enum": [
+          "M",
+          "F"
+        ],
+        "title": "SexEnum"
       },
       "SignatureField": {
         "properties": {
@@ -6756,6 +8528,16 @@
               }
             ],
             "title": "Feature"
+          },
+          "nullable": {
+            "type": "boolean",
+            "title": "Nullable",
+            "default": false
+          },
+          "multi": {
+            "type": "boolean",
+            "title": "Multi",
+            "default": false
           }
         },
         "type": "object",
@@ -6785,8 +8567,18 @@
           },
           "date": {
             "type": "string",
-            "format": "date-time",
             "title": "Date"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round"
           },
           "age": {
             "anyOf": [
@@ -6845,7 +8637,6 @@
           },
           "date": {
             "type": "string",
-            "format": "date-time",
             "title": "Date"
           }
         },
@@ -6884,7 +8675,8 @@
               "<=",
               "==",
               "!=",
-              "IN"
+              "IN",
+              "IS NULL"
             ],
             "title": "Operator"
           },
@@ -6985,7 +8777,7 @@
           },
           "instances": {
             "items": {
-              "$ref": "#/components/schemas/InstanceMeta"
+              "$ref": "#/components/schemas/ImageGET"
             },
             "type": "array",
             "title": "Instances"
@@ -7210,7 +9002,7 @@
           },
           "images": {
             "items": {
-              "$ref": "#/components/schemas/InstanceGET"
+              "$ref": "#/components/schemas/ImageGET"
             },
             "type": "array",
             "title": "Images"
@@ -7674,6 +9466,20 @@
             ],
             "title": "Task Id"
           },
+          "task_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Ids"
+          },
           "error": {
             "anyOf": [
               {
@@ -7753,6 +9559,31 @@
           "user"
         ],
         "title": "TokenResponse"
+      },
+      "UpdateThumbnailsForImageIdsRequest": {
+        "properties": {
+          "image_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Image Ids",
+            "description": "ImageInstance IDs to generate thumbnails for."
+          },
+          "print_errors": {
+            "type": "boolean",
+            "title": "Print Errors",
+            "description": "Log per-image errors to worker stdout.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_ids"
+        ],
+        "title": "UpdateThumbnailsForImageIdsRequest",
+        "description": "Queue thumbnail generation for specific instances (same processing as bulk update)."
       },
       "UserLogin": {
         "properties": {
@@ -7874,9 +9705,9 @@
           }
         },
         "properties": {
-          "image_instance_id": {
-            "title": "Image Instance Id",
-            "type": "integer"
+          "image_id": {
+            "title": "Image Id",
+            "type": "string"
           },
           "depth": {
             "title": "Depth",
@@ -7947,6 +9778,12 @@
             "default": null,
             "title": "Threshold"
           },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
           "reference_segmentation_id": {
             "anyOf": [
               {
@@ -7958,12 +9795,6 @@
             ],
             "default": null,
             "title": "Reference Segmentation Id"
-          },
-          "data_type": {
-            "$ref": "#/components/schemas/Datatype"
-          },
-          "data_representation": {
-            "$ref": "#/components/schemas/DataRepresentation"
           },
           "feature_id": {
             "title": "Feature Id",
@@ -7983,7 +9814,7 @@
           }
         },
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",
@@ -8020,9 +9851,9 @@
           }
         },
         "properties": {
-          "image_instance_id": {
-            "title": "Image Instance Id",
-            "type": "integer"
+          "image_id": {
+            "title": "Image Id",
+            "type": "string"
           },
           "depth": {
             "title": "Depth",
@@ -8093,6 +9924,12 @@
             "default": null,
             "title": "Threshold"
           },
+          "data_type": {
+            "$ref": "#/components/schemas/Datatype"
+          },
+          "data_representation": {
+            "$ref": "#/components/schemas/DataRepresentation"
+          },
           "reference_segmentation_id": {
             "anyOf": [
               {
@@ -8104,16 +9941,10 @@
             ],
             "default": null,
             "title": "Reference Segmentation Id"
-          },
-          "data_type": {
-            "$ref": "#/components/schemas/Datatype"
-          },
-          "data_representation": {
-            "$ref": "#/components/schemas/DataRepresentation"
           }
         },
         "required": [
-          "image_instance_id",
+          "image_id",
           "depth",
           "height",
           "width",

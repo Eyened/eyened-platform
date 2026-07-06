@@ -3,6 +3,7 @@ import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { photoLocatorsToRegistrationItems, type PhotoLocator } from "./photoLocators";
 import { OCTToProj, ProjToOCT } from "./projectionRegistration";
 import type { mappingFunction, RegistrationItem } from "./registrationItem";
+import { getRegistrationSets, type RegistrationSet } from "./registrationItem";
 
 export type Pointer = {
     image_id: string,
@@ -25,6 +26,10 @@ class Mapper<T> {
 
     sourceEntries(): Iterable<[string, Map<string, T>]> {
         return this.mappings.entries();
+    }
+
+    targets(source: string): Iterable<string> {
+        return this.mappings.get(source)?.keys() ?? [];
     }
 }
 
@@ -51,20 +56,13 @@ export class Registration {
         this.cache.set(source, position);
     }
 
-    getPosition(image_id: string): Position | undefined {
-        
-        if (this.cache.has(image_id)) {
-            return this.cache.get(image_id);
-        }
-        
-        const source = this.pointer.image_id;
-        const target = image_id;
-        let path = this.shortestPaths[source]?.[target];
+    private mapPositionAlongPath(source: string, target: string, startPosition: Position): Position | undefined {
+        const path = this.shortestPaths[source]?.[target];
         if (!path) {
             return;
         }
         let current = source;
-        let currentPosition: Position | undefined = this.pointer.position;
+        let currentPosition: Position | undefined = startPosition;
         for (let i = 1; i < path.length; i++) {
             const next = path[i];
             const func = this.mappings.get(current, next);
@@ -78,7 +76,21 @@ export class Registration {
             }
             current = next;
         }
-        this.cache.set(image_id, currentPosition);
+        return currentPosition;
+    }
+
+    getPosition(image_id: string): Position | undefined {
+        
+        if (this.cache.has(image_id)) {
+            return this.cache.get(image_id);
+        }
+        
+        const source = this.pointer.image_id;
+        const target = image_id;
+        const currentPosition = this.mapPositionAlongPath(source, target, this.pointer.position);
+        if (currentPosition !== undefined) {
+            this.cache.set(image_id, currentPosition);
+        }
         return currentPosition;
     }
 
@@ -96,7 +108,7 @@ export class Registration {
     // Expose an explicit synchronous recomputation when needed by callers
     public recomputePathsNow() {
         this.pathsDirty = false;
-        this.recomputeScheduled = false;
+        this.recomputeScheduled = false;        
         this.shortestPaths = allPairsShortestPaths(this.mappings);
     }
 
@@ -124,6 +136,13 @@ export class Registration {
         this.scheduleRecompute();
     }
 
+    /** Import all patient-level registration pairs and recompute paths for transitive linking. */
+    importPatientRegistrationSets(sets: Iterable<RegistrationSet>) {
+        const items = getRegistrationSets([...sets]);
+        this.importRegistrationItems(items);
+        this.recomputePathsNow();
+    }
+
     getLinkedImgIds(source: string): Set<string> {
         return new Set(Object.keys(this.shortestPaths[source] ?? {}));
     }
@@ -132,7 +151,7 @@ export class Registration {
         if (source == target) {
             return position;
         }
-        return this.mappings.get(source, target)?.(position);
+        return this.mapPositionAlongPath(source, target, position);
     }
 
 
@@ -142,70 +161,63 @@ export class Registration {
 }
 
 
-function allPairsShortestPaths(graph: Mapper<mappingFunction>): { [node: string]: { [node: string]: string[] } } {
-
-    const distances: { [node: string]: { [node: string]: number } } = {};
-    const predecessors: { [node: string]: { [node: string]: string } } = {};
-
-    const nodeSet = new Set<string>();
-    for (const [k, v] of graph.sourceEntries()) {
-        nodeSet.add(k);
-        for (const k of v.keys())
-            nodeSet.add(k);
-    }
-    const keys: string[] = [...nodeSet];
-
-    // Initialize the distances to Infinity for all pairs of nodes
-    for (const node1 of keys) {
-        distances[node1] = {};
-        predecessors[node1] = {};
-        for (const node2 of keys) {
-            distances[node1][node2] = Infinity;
-        }
-        distances[node1][node1] = 0;
-    }
-
-    // Set the distances for the edges in the graph
-    for (const [node1, neighbors] of graph.sourceEntries()) {
-        for (const node2 of neighbors.keys()) {
-            distances[node1][node2] = 1;
-            predecessors[node1][node2] = node1;
+function allPairsShortestPaths(
+    graph: Mapper<mappingFunction>,
+): { [node: string]: { [node: string]: string[] } } {
+    const allNodes = new Set<string>();
+    for (const [source, neighbors] of graph.sourceEntries()) {
+        allNodes.add(source);
+        for (const target of neighbors.keys()) {
+            allNodes.add(target);
         }
     }
+    const keys = [...allNodes];
+    const endpoints = keys;
 
-    // Compute the shortest path between every pair of nodes
-    for (const k of keys) {
-        for (const i of keys) {
-            for (const j of keys) {
-                if (distances[i][j] > distances[i][k] + distances[k][j]) {
-                    distances[i][j] = distances[i][k] + distances[k][j];
-                    predecessors[i][j] = predecessors[k][j];
-                }
+    const paths: { [node: string]: { [node: string]: string[] } } = {};
+
+    function reconstructPath(source: string, target: string, prev: Map<string, string | null>): string[] | null {
+        if (!prev.has(target)) {
+            return null;
+        }
+        const path: string[] = [];
+        let current: string | null = target;
+        while (current !== null) {
+            path.push(current);
+            if (current === source) {
+                break;
             }
+            current = prev.get(current) ?? null;
         }
-    }
-
-    function getPath(start: string, end: string) {
-        const path = [end];
-        let current = end;
-        while (current !== start) {
-            current = predecessors[start][current];
-            if (!current) {
-                return null;
-            }
-            path.unshift(current);
+        if (path[path.length - 1] !== source) {
+            return null;
         }
+        path.reverse();
         return path;
     }
 
-    // Construct the shortest path between every pair of nodes
-    const paths: { [node: string]: { [node: string]: string[] } } = {};
-    for (const node1 of keys) {
-        paths[node1] = {};
-        for (const node2 of keys) {
-            const path = getPath(node1, node2);
+    for (const source of endpoints) {
+        const prev = new Map<string, string | null>();
+        const queue: string[] = [source];
+        prev.set(source, null);
+
+        // BFS shortest paths in unweighted directed graph
+        for (let i = 0; i < queue.length; i++) {
+            const current = queue[i];
+            for (const next of graph.targets(current)) {
+                if (prev.has(next)) {
+                    continue;
+                }
+                prev.set(next, current);
+                queue.push(next);
+            }
+        }
+
+        paths[source] = {};
+        for (const target of endpoints) {
+            const path = reconstructPath(source, target, prev);
             if (path) {
-                paths[node1][node2] = path;
+                paths[source][target] = path;
             }
         }
     }

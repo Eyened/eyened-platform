@@ -17,24 +17,61 @@
 	import {
 		BrowserContext,
 		decodeConditions,
+		type Condition,
 		type QueryMode,
 	} from "./browserContext.svelte";
 	import FilterShorcuts from "./FilterShorcuts.svelte";
 
+	interface Props {
+		// Optionally reuse an externally owned context (e.g. to read the
+		// selection back out from an overlay wrapper).
+		context?: BrowserContext;
+		// Sync filter/pagination state to the page URL (landing page only).
+		syncUrl?: boolean;
+		// Layout/styling hint forwarded to BrowserContent.
+		mode?: "full" | "overlay";
+		// Seed conditions/selection when not driven by the URL.
+		initialConditions?: Condition[];
+		initialSelectedIds?: string[];
+	}
+	let {
+		context,
+		syncUrl = true,
+		mode = "full",
+		initialConditions,
+		initialSelectedIds,
+	}: Props = $props();
+
 	const globalContext = getContext<GlobalContext>("globalContext");
 	const { user } = globalContext;
-	
-	const browserContext: BrowserContext = new BrowserContext();
+
+	const browserContext: BrowserContext = context ?? new BrowserContext();
 	setContext("browserContext", browserContext);
 
 	let initializing = true;
 
 	onMount(async () => {
 		initializing = true;
-		initParamState();
+		browserContext.urlSync = syncUrl;
 		await browserContext.loadSignatures();
-		// After signatures are in state, optionally kick off a search if there are pre-existing conditions
-		await browserContext.search();
+
+		if (syncUrl) {
+			initParamState();
+			// After signatures are in state, optionally kick off a search if there are pre-existing conditions
+			await browserContext.search();
+		} else {
+			if (initialConditions?.length) {
+				browserContext.applyInitialConditions(initialConditions, {
+					queryMode: "studies",
+					displayMode: "study",
+					filterMode: "advanced",
+				});
+				await browserContext.search();
+			}
+			if (initialSelectedIds?.length) {
+				browserContext.selectedIds = [...initialSelectedIds];
+			}
+		}
 		initializing = false;
 	});
 
@@ -109,15 +146,18 @@
 {/if}
 
 <div id="container">
+	{#if mode === "overlay" && browserContext.selectedIds.length > 0}
+		<Selection placement="top" />
+	{/if}
 	<div id="main" class="flex flex-row w-full bg-gray-200 font-sm">
 		<div class="flex-5 flex-col min-w-0 p-4">
 			{#if browserContext.filterMode === "basic"}
 				<FilterShorcuts bind:condition={browserContext.basicCondition} />
-            {:else if browserContext.activeSignature.length}
-                <AdvancedFilters
-                    signature={browserContext.activeSignature}
-                    bind:conditions={browserContext.advancedConditions}
-                />
+			{:else if browserContext.activeSignature.length}
+				<AdvancedFilters
+					signature={browserContext.activeSignature}
+					bind:conditions={browserContext.advancedConditions}
+				/>
 			{/if}
 
 			<div class="">
@@ -217,9 +257,16 @@
 	</div>
 
 	<div id="content" class="p-4">
-		<BrowserContent />
+		<BrowserContent {mode} />
 	</div>
-	{#if browserContext.selectedIds.length > 0}
+	<footer></footer>
+	{#if mode !== "overlay" && browserContext.selectedIds.length > 0}
 		<Selection />
 	{/if}
 </div>
+
+<style>
+	footer {
+		height: 200px;
+	}
+</style>

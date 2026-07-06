@@ -40,8 +40,8 @@ export class ZoomPan implements ViewerEventListener {
      * Handles pointer move events for panning when shift is pressed
      */
     pointermove(e: ViewerEvent<PointerEvent>): void {
-        const { event, cursor } = e;
-        if (event.shiftKey && this.lastPosition) {
+        const { cursor, modifiers } = e;
+        if (modifiers.shift && this.lastPosition) {
             const { viewerContext } = e;
             viewerContext.pan(this.lastPosition, cursor);
             this.lastPosition = cursor;
@@ -52,19 +52,19 @@ export class ZoomPan implements ViewerEventListener {
      * Handles wheel events for zooming when shift is pressed
      */
     wheel(e: ViewerEvent<WheelEvent>): void {
-        const { viewerContext, event, cursor } = e;
+        const { viewerContext, event, cursor, wheel } = e;
 
-        if (!event.shiftKey) return;
+        if (!wheel?.zoomIntent) return;
 
-        const zoomFactor = this.calculateZoomFactor(event);
+        const zoomFactor = this.calculateZoomFactor(event, wheel.primaryDeltaPx);
         viewerContext.zoom(cursor.x, cursor.y, zoomFactor);
     }
 
     /**
      * Calculates the zoom factor based on wheel event details
      */
-    private calculateZoomFactor(event: WheelEvent): number {
-        let pixelDeltaY = this.normalizeWheelDelta(event);
+    private calculateZoomFactor(event: WheelEvent, pixelDeltaY?: number): number {
+        pixelDeltaY = pixelDeltaY ?? this.normalizeWheelDelta(event);
         const direction = -Math.sign(pixelDeltaY);
         const magnitude = 1 + Math.abs(pixelDeltaY) / 100;
         const f = direction * magnitude;

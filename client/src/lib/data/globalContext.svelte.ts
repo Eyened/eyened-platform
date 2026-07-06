@@ -1,7 +1,6 @@
 import { UserManager } from '$lib/usermanager.svelte';
 
 import type { FormAnnotationGET, ModelSegmentationGET, SearchCondition, SegmentationGET, StudySearchCondition } from '../../types/openapi_types';
-import { apiUrl, authEnabled, fsHost, thumbnailHost } from '../config';
 import { fetchFeatures, fetchFormSchemas, fetchTags } from './api';
 
 export type ComponentDef = {
@@ -24,18 +23,12 @@ export class GlobalContext {
 
     constructor() {
         this.userManager = new UserManager()
-        console.log(`Loaded GlobalContext`)
-        console.log(`apiUrl: ${apiUrl}`)
-        console.log(`fsHost: ${fsHost}`)
-        console.log(`thumbnailHost: ${thumbnailHost}`)
-        console.log(`authEnabled: ${authEnabled}`)
-        console.log(import.meta.env.PUBLIC_AUTH_DISABLED)
     }
 
     async init(pathname: string) {
         // user must be logged in before fetching any data
         await this.userManager.init(pathname);
-        
+
         // Only fetch data if user is logged in
         // If user is not logged in, userManager.init will redirect to login
         if (this.userManager.loggedIn) {
