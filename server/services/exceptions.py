@@ -28,6 +28,17 @@ class NotFoundError(ServiceError):
     status_code = 404
 
 
+class BadRequestError(ServiceError):
+    """A request violates a business precondition (maps to HTTP 400).
+
+    Distinct from ``pydantic.ValidationError`` (request-schema validation,
+    handled by FastAPI before the Service runs); this is a domain-rule
+    violation raised by the Service itself.
+    """
+
+    status_code = 400
+
+
 def service_error_to_response(exc: ServiceError) -> JSONResponse:
     """Map a ServiceError to the JSON error response shape used by the API."""
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

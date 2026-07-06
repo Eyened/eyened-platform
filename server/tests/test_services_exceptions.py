@@ -31,3 +31,12 @@ def test_register_exception_handlers_registers_service_error_base():
     app = FastAPI()
     register_exception_handlers(app)
     assert ServiceError in app.exception_handlers
+
+
+def test_bad_request_error_maps_to_400_response():
+    """BadRequestError maps to HTTP 400, carrying its detail message in the body."""
+    from server.services.exceptions import BadRequestError
+
+    resp = service_error_to_response(BadRequestError("Tag type must be Study"))
+    assert resp.status_code == 400
+    assert json.loads(resp.body) == {"detail": "Tag type must be Study"}
