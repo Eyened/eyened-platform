@@ -1,3 +1,4 @@
+from .acting_user import ActingUser
 from .device_service import DeviceService
 from .exceptions import BadRequestError, NotFoundError, ServiceError
 from .form_schema_service import FormSchemaService
@@ -7,6 +8,7 @@ __all__ = [
     "ServiceError",
     "NotFoundError",
     "BadRequestError",
+    "ActingUser",
     "DeviceService",
     "PatientService",
     "FormSchemaService",
