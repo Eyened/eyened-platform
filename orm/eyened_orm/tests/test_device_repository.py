@@ -3,7 +3,7 @@ from eyened_orm.repositories.device_repository import DeviceRepository
 
 
 def test_list_all_orders_by_manufacturer_then_model(session):
-    # list_all returns every device sorted by manufacturer, then model name.
+    """list_all returns every device sorted by manufacturer, then model name."""
     session.add_all(
         [
             DeviceModel(Manufacturer="Zeiss", ManufacturerModelName="Cirrus"),
