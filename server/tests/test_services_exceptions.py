@@ -40,3 +40,17 @@ def test_bad_request_error_maps_to_400_response():
     resp = service_error_to_response(BadRequestError("Tag type must be Study"))
     assert resp.status_code == 400
     assert json.loads(resp.body) == {"detail": "Tag type must be Study"}
+
+
+def test_conflict_error_maps_to_409_with_structured_detail():
+    """ConflictError maps to HTTP 409 and preserves a structured (dict) detail body."""
+    from server.services.exceptions import ConflictError
+
+    detail = {
+        "code": "FEATURE_HAS_SEGMENTATIONS",
+        "message": "Cannot delete feature 'X' because it has 3 linked segmentation(s).",
+        "segmentation_count": 3,
+    }
+    resp = service_error_to_response(ConflictError(detail))
+    assert resp.status_code == 409
+    assert json.loads(resp.body) == {"detail": detail}

@@ -17,7 +17,7 @@ class ServiceError(Exception):
 
     status_code: int = 500
 
-    def __init__(self, detail: str) -> None:
+    def __init__(self, detail: str | dict) -> None:
         self.detail = detail
         super().__init__(detail)
 
@@ -37,6 +37,17 @@ class BadRequestError(ServiceError):
     """
 
     status_code = 400
+
+
+class ConflictError(ServiceError):
+    """A request conflicts with the current state of a resource (maps to HTTP 409).
+
+    Its ``detail`` is a structured dict (``{"code", "message", ...}``) so the
+    client can branch on a stable ``code`` rather than parsing a message string.
+    The central handler serializes it into ``{"detail": <dict>}`` unchanged.
+    """
+
+    status_code = 409
 
 
 def service_error_to_response(exc: ServiceError) -> JSONResponse:
