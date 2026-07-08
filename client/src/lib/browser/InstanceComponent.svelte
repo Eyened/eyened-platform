@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { getThumbUrl } from "$lib/data-loading/utils";
+	import CopyIcon from "@lucide/svelte/icons/copy";
 
 	import { getContext } from "svelte";
 	import type { ImageGET } from "../../types/openapi_types";
@@ -17,15 +18,6 @@
 	let { instance, showSegmentationInfo = false }: Props = $props();
 	let size = $derived(browserContext.thumbnailSize);
 	let popupOpen = $state(false);
-
-	// const segmentations = instance.segmentations;
-	// const creatorCounts = segmentations.reduce(
-	//     (acc, seg) => {
-	//         acc[seg.creator.name] = (acc[seg.creator.name] || 0) + 1;
-	//         return acc;
-	//     },
-	//     {} as { [name: string]: number },
-	// );
 
 	const image_url = $derived(getThumbUrl(instance));
 
@@ -62,6 +54,18 @@
 	if (instance.modality == "OCT") {
 		name += ` [${instance.nr_of_frames}]`;
 	}
+
+	const publicId = $derived(instance.id);
+
+	function openInfoPanel() {
+		popupOpen = true;
+	}
+
+	function copyPublicId(event: MouseEvent) {
+		event.stopPropagation();
+		event.preventDefault();
+		void navigator.clipboard.writeText(publicId);
+	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -73,13 +77,22 @@
 	class:ring-emerald-400={selected}
 >
 	<div
-		class="title text-sm flex flex-col text-gray-500 cursor-pointer hover:text-black items-center"
-		onclick={() => {
-			popupOpen = true;
-		}}
+		class="title group text-sm text-gray-500 cursor-pointer hover:text-black"
+		onclick={openInfoPanel}
 	>
-		<div class="text-xs">
-			{name}
+		<div class="title-flip">
+			<div class="title-face title-face-default text-xs">{name}</div>
+			<div class="title-face title-face-hover text-xs">
+				<span class="public-id truncate">{publicId}</span>
+				<button
+					type="button"
+					class="copy-btn shrink-0"
+					aria-label="Copy public ID"
+					onclick={copyPublicId}
+				>
+					<CopyIcon class="size-3" />
+				</button>
+			</div>
 		</div>
 	</div>
 	<div
@@ -97,22 +110,6 @@
 				/>
 			{/if}
 		</div>
-		<!-- {#if instance.dicom_modality == "OPT"}
-                    <div class="oct-info text-[10px] text-white/70">
-                        [{instance.anatomic_region}] ({instance.nr_of_frames} x {instance.columns})
-                    </div>
-                {/if}
-            </div> -->
-
-		<!-- {#if showSegmentationInfo && $segmentations.length}
-                <ul>
-                    {#each Object.entries($creatorCounts) as [c, count]}
-                        <li class:has-own-segmentations={creator.name == c}>
-                            {count} x {c}
-                        </li>
-                    {/each}
-                </ul>
-            {/if} -->
 	</div>
 
 	<Dialog.Root bind:open={popupOpen}>
@@ -123,6 +120,68 @@
 </div>
 
 <style>
+	.title {
+		width: 100%;
+		min-height: 1.25rem;
+	}
+
+	.title-flip {
+		position: relative;
+		width: 100%;
+		min-height: 1.25rem;
+		transform-style: preserve-3d;
+		transition: transform 0.2s ease;
+	}
+
+	.group:hover .title-flip {
+		transform: rotateX(180deg);
+	}
+
+	.title-face {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		min-height: 1.25rem;
+		backface-visibility: hidden;
+	}
+
+	.title-face-hover {
+		position: absolute;
+		inset: 0;
+		gap: 0.15rem;
+		padding-inline: 0.1rem;
+		transform: rotateX(180deg);
+		pointer-events: none;
+	}
+
+	.group:hover .title-face-default {
+		pointer-events: none;
+	}
+
+	.group:hover .title-face-hover {
+		pointer-events: auto;
+	}
+
+	.public-id {
+		min-width: 0;
+	}
+
+	.copy-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.1rem;
+		border-radius: 0.15rem;
+		color: inherit;
+		opacity: 0.7;
+	}
+
+	.copy-btn:hover {
+		opacity: 1;
+		background-color: rgb(0 0 0 / 0.06);
+	}
+
 	.thumbnail-container {
 		display: flex;
 		align-items: center;
