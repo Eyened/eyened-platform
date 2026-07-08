@@ -42,9 +42,11 @@ Keeps track of the main panels and the top row of images.
 	let isResizing = false;
 	let registrationSet: RegistrationSet[] = $derived.by(() => {
 		const result: RegistrationSet[] = [];
-		const patientIds = new Set<number>([
-			...instanceIds.map((id) => instances.get(id)?.patient.id),
-		]);
+		const patientIds = new Set<number>(
+			viewerWindowContext.instanceIds
+				.map((id) => instances.get(id)?.patient.id)
+				.filter((pid): pid is number => typeof pid === "number"),
+		);
 		// TODO: check if patient can be fetched with promise directly?
 		for (const patientId of patientIds) {
 			const patient = patients.get(patientId);
