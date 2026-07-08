@@ -76,10 +76,7 @@
 	>
 		<div class="title-flip">
 			<div class="title-face title-face-default text-xs">{name}</div>
-			<div
-				class="title-face title-face-hover text-xs"
-				onclick={(event) => event.stopPropagation()}
-			>
+			<div class="title-face title-face-hover text-xs">
 				<span class="public-id truncate">{publicId}</span>
 				<CopyIconButton text={publicId} ariaLabel="Copy public ID" class="shrink-0" />
 			</div>
