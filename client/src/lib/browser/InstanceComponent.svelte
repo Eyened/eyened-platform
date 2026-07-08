@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Dialog from "$lib/components/ui/dialog";
+	import CopyIconButton from "$lib/components/CopyIconButton.svelte";
 	import { getThumbUrl } from "$lib/data-loading/utils";
-	import CopyIcon from "@lucide/svelte/icons/copy";
 
 	import { getContext } from "svelte";
 	import type { ImageGET } from "../../types/openapi_types";
@@ -60,12 +60,6 @@
 	function openInfoPanel() {
 		popupOpen = true;
 	}
-
-	function copyPublicId(event: MouseEvent) {
-		event.stopPropagation();
-		event.preventDefault();
-		void navigator.clipboard.writeText(publicId);
-	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -84,14 +78,7 @@
 			<div class="title-face title-face-default text-xs">{name}</div>
 			<div class="title-face title-face-hover text-xs">
 				<span class="public-id truncate">{publicId}</span>
-				<button
-					type="button"
-					class="copy-btn shrink-0"
-					aria-label="Copy public ID"
-					onclick={copyPublicId}
-				>
-					<CopyIcon class="size-3" />
-				</button>
+				<CopyIconButton text={publicId} ariaLabel="Copy public ID" class="shrink-0" />
 			</div>
 		</div>
 	</div>
@@ -151,7 +138,7 @@
 		inset: 0;
 		gap: 0.15rem;
 		padding-inline: 0.1rem;
-		transform: rotateX(180deg);
+		transform: rotateX(180deg) translateZ(1px);
 		pointer-events: none;
 	}
 
@@ -165,21 +152,6 @@
 
 	.public-id {
 		min-width: 0;
-	}
-
-	.copy-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.1rem;
-		border-radius: 0.15rem;
-		color: inherit;
-		opacity: 0.7;
-	}
-
-	.copy-btn:hover {
-		opacity: 1;
-		background-color: rgb(0 0 0 / 0.06);
 	}
 
 	.thumbnail-container {
