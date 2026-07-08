@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CopyIconButton from "$lib/components/CopyIconButton.svelte";
 	import Viewer from "$lib/viewer/Viewer.svelte";
 	import { getContext, setContext } from "svelte";
 	import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
@@ -12,6 +13,8 @@
 	}
 
 	let { image }: Props = $props();
+
+	const publicId = image.instance.id;
 
 	const viewerWindowContext = getContext<ViewerWindowContext>(
 		"viewerWindowContext",
@@ -61,6 +64,10 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="item" class:wide={image.is3D} onclick={(e) => selectImage(e)}>
 	<Viewer showInfo={false} />
+	<div class="copy-bar">
+		<span class="public-id">{publicId}</span>
+		<CopyIconButton text={publicId} ariaLabel="Copy public ID" />
+	</div>
 	{#if hasLocators}
 		<div class="header overlay">
 			<div class="content outer">
@@ -112,5 +119,33 @@
 		color: white;
 		display: flex;
 		margin: 0.5em;
+	}
+	.copy-bar {
+		position: absolute;
+		top: 0.5em;
+		right: 0.5em;
+		z-index: 3;
+		display: flex;
+		align-items: center;
+		gap: 0.15rem;
+		max-width: calc(100% - 1em);
+		padding: 0.1rem 0.35rem;
+		border-radius: 0.15rem;
+		background-color: rgb(0 0 0 / 0.55);
+		color: rgb(255 255 255 / 0.85);
+		font-size: 0.75rem;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.15s ease;
+	}
+	.item:hover .copy-bar {
+		opacity: 1;
+		pointer-events: auto;
+	}
+	.public-id {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>
