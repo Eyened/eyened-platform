@@ -1,0 +1,176 @@
+from __future__ import annotations
+
+from sqlalchemy.orm import Session
+
+from eyened_orm import Task
+from eyened_orm.task import TaskState
+from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
+
+from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
+from .acting_user import ActingUser
+from .exceptions import NotFoundError
+
+
+class TaskService:
+    """Business logic for tasks and their subtask listings."""
+
+    def __init__(
+        self,
+        task_repository: TaskRepository,
+        subtask_repository: SubTaskRepository,
+        logger: DatabaseModificationLogger | None = None,
+    ) -> None:
+        self.tasks = task_repository
+        self.subtasks = subtask_repository
+        self.logger = logger
+
+    def create_task(
+        self,
+        session: Session,
+        name: str,
+        description: str | None,
+        contact_id: int | None,
+        task_definition_id: int,
+        actor: ActingUser,
+    ) -> Task:
+        """Create a task owned by the acting user (TaskState.NotStarted)."""
+        task = Task(
+            TaskName=name,
+            Description=description,
+            ContactID=contact_id,
+            TaskDefinitionID=task_definition_id,
+            CreatorID=actor.id,
+            TaskState=TaskState.NotStarted,
+        )
+        session.add(task)
+        session.commit()
+        task = self.tasks.get_with_relations(session, task.TaskID)
+        if self.logger is not None:
+            self.logger.log_insert(
+                user=actor.username,
+                user_id=actor.id,
+                endpoint="POST /api/task",
+                entity="Task",
+                entity_id=task.TaskID,
+                fields={
+                    "name": task.TaskName,
+                    "description": task.Description,
+                    "contact_id": task.ContactID,
+                    "task_definition_id": task.TaskDefinitionID,
+                },
+            )
+        return task
+
+    def list_tasks(
+        self, session: Session
+    ) -> tuple[list[Task], dict[int, tuple[int, int]]]:
+        """Return all tasks (TaskID order) and their {id: (total, ready)} counts."""
+        tasks = self.tasks.list_all(session)
+        counts = self.tasks.subtask_counts(session, [t.TaskID for t in tasks])
+        return tasks, counts
+
+    def get_task(
+        self, session: Session, task_id: int
+    ) -> tuple[Task, tuple[int, int]]:
+        """Return a task and its (total, ready) subtask counts.
+
+        Raises:
+            NotFoundError: If the task does not exist.
+        """
+        task = self.tasks.get_with_relations(session, task_id)
+        if task is None:
+            raise NotFoundError(f"Task {task_id} not found")
+        return task, self.tasks.subtask_counts(session, [task_id])[task_id]
+
+    def update_task(
+        self,
+        session: Session,
+        task_id: int,
+        name: str | None,
+        description: str | None,
+        contact_id: int | None,
+        task_definition_id: int | None,
+        task_state: TaskState | None,
+        actor: ActingUser,
+    ) -> tuple[Task, tuple[int, int]]:
+        """Update a task's mutable fields (each optional).
+
+        Raises:
+            NotFoundError: If the task does not exist.
+        """
+        task = self.tasks.get_by_id(session, task_id)
+        if task is None:
+            raise NotFoundError(f"Task {task_id} not found")
+
+        changes: dict[str, str] = {}
+        if name is not None:
+            changes["name"] = f"{task.TaskName} -> {name}"
+            task.TaskName = name
+        if description is not None:
+            changes["description"] = f"{task.Description} -> {description}"
+            task.Description = description
+        if contact_id is not None:
+            changes["contact_id"] = f"{task.ContactID} -> {contact_id}"
+            task.ContactID = contact_id
+        if task_definition_id is not None:
+            changes["task_definition_id"] = (
+                f"{task.TaskDefinitionID} -> {task_definition_id}"
+            )
+            task.TaskDefinitionID = task_definition_id
+        if task_state is not None:
+            changes["task_state"] = f"{task.TaskState} -> {task_state}"
+            task.TaskState = task_state
+
+        session.commit()
+        task = self.tasks.get_with_relations(session, task_id)
+        counts = self.tasks.subtask_counts(session, [task_id])[task_id]
+        if self.logger is not None:
+            self.logger.log_update(
+                user=actor.username,
+                user_id=actor.id,
+                endpoint=f"PATCH /api/task/{task_id}",
+                entity="Task",
+                entity_id=task_id,
+                changes=changes if changes else None,
+            )
+        return task, counts
+
+    def delete_task(
+        self, session: Session, task_id: int, actor: ActingUser
+    ) -> None:
+        """Delete a task (its subtasks cascade at the DB level).
+
+        Raises:
+            NotFoundError: If the task does not exist.
+        """
+        task = self.tasks.get_by_id(session, task_id)
+        if task is None:
+            raise NotFoundError(f"Task {task_id} not found")
+
+        deleted_data = {
+            "name": task.TaskName,
+            "description": task.Description,
+            "contact_id": task.ContactID,
+            "task_definition_id": task.TaskDefinitionID,
+            "creator_id": task.CreatorID,
+            "task_state": str(task.TaskState) if task.TaskState else None,
+        }
+        session.delete(task)
+        session.commit()
+        if self.logger is not None:
+            self.logger.log_delete(
+                user=actor.username,
+                user_id=actor.id,
+                endpoint=f"DELETE /api/task/{task_id}",
+                entity="Task",
+                entity_id=task_id,
+                deleted_data=deleted_data,
+            )
+        return None
+
+
+def get_task_service() -> TaskService:
+    """Default TaskService wiring for FastAPI ``Depends()``."""
+    return TaskService(
+        TaskRepository(), SubTaskRepository(), logger=get_db_logger()
+    )
