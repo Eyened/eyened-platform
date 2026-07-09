@@ -3,7 +3,7 @@ from eyened_orm.repositories.form_schema_repository import FormSchemaRepository
 
 
 def test_list_all_orders_by_schema_name(session):
-    # list_all returns every schema sorted by name ascending.
+    """list_all returns every schema sorted by name ascending."""
     session.add_all(
         [
             FormSchema(SchemaName="Zeta"),
@@ -19,7 +19,7 @@ def test_list_all_orders_by_schema_name(session):
 
 
 def test_get_by_id_returns_the_schema(session):
-    # A known id returns that schema.
+    """A known id returns that schema."""
     schema = FormSchema(SchemaName="Alpha")
     session.add(schema)
     session.flush()
@@ -31,5 +31,5 @@ def test_get_by_id_returns_the_schema(session):
 
 
 def test_get_by_id_unknown_id_returns_none(session):
-    # An unknown id returns None — the repository never raises for "not found".
+    """An unknown id returns None — the repository never raises for "not found"."""
     assert FormSchemaRepository().get_by_id(session, 999_999) is None

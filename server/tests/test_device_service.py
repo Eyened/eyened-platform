@@ -5,7 +5,7 @@ from server.services.device_service import DeviceService
 
 
 def test_list_devices_returns_repository_rows_in_order(session):
-    # The service hands back exactly what the repository returns, order intact.
+    """The service hands back exactly what the repository returns, order intact."""
     session.add_all(
         [
             DeviceModel(Manufacturer="Zeiss", ManufacturerModelName="Cirrus"),
