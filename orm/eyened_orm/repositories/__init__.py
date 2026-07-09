@@ -3,6 +3,7 @@ from .feature_repository import FeatureRepository
 from .form_schema_repository import FormSchemaRepository
 from .patient_repository import PatientRepository
 from .study_repository import StudyRepository
+from .tag_repository import TagRepository
 
 __all__ = [
     "DeviceRepository",
@@ -10,4 +11,5 @@ __all__ = [
     "FormSchemaRepository",
     "StudyRepository",
     "FeatureRepository",
+    "TagRepository",
 ]
