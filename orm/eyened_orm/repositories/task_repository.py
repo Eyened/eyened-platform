@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import SubTask, Task
+from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState
 
 # Load task metadata without eager-loading every SubTask row (mirrors the
@@ -68,3 +68,68 @@ class TaskRepository:
         ).all()
         counts = {int(tid): (int(n), int(r)) for tid, n, r in rows}
         return {tid: counts.get(tid, (0, 0)) for tid in task_ids}
+
+
+# Eager-load the subtask's images down to their storage backend (mirrors the
+# route's former with_images option chain).
+_SUBTASK_IMAGE_LOADER = (
+    selectinload(SubTask.SubTaskImageLinks)
+    .selectinload(SubTaskImageLink.ImageInstance)
+    .selectinload(ImageInstance.ImageStorages)
+    .selectinload(ImageStorage.StorageBackend)
+)
+
+
+class SubTaskRepository:
+    """Data access for a task's SubTask rows (reads used by task.py)."""
+
+    def all_ids_for_task(self, session: Session, task_id: int) -> list[int]:
+        """Return the task's SubTaskIDs ordered ascending (backs absolute index)."""
+        return list(
+            session.execute(
+                select(SubTask.SubTaskID)
+                .where(SubTask.TaskID == task_id)
+                .order_by(SubTask.SubTaskID)
+            )
+            .scalars()
+            .all()
+        )
+
+    def count_for_task(
+        self,
+        session: Session,
+        task_id: int,
+        *,
+        status: SubTaskState | None = None,
+    ) -> int:
+        """Return the task's subtask count, optionally filtered by state."""
+        stmt = select(func.count()).select_from(SubTask).where(
+            SubTask.TaskID == task_id
+        )
+        if status is not None:
+            stmt = stmt.where(SubTask.TaskState == status)
+        return session.scalar(stmt) or 0
+
+    def list_for_task(
+        self,
+        session: Session,
+        task_id: int,
+        *,
+        status: SubTaskState | None = None,
+        limit: int,
+        offset: int,
+        with_images: bool = False,
+    ) -> list[SubTask]:
+        """Return a limit/offset window of the task's subtasks (SubTaskID order).
+
+        Optionally filters by ``status`` and eager-loads each subtask's images.
+        """
+        stmt = select(SubTask).where(SubTask.TaskID == task_id)
+        if status is not None:
+            stmt = stmt.where(SubTask.TaskState == status)
+        stmt = stmt.order_by(SubTask.SubTaskID)
+        if with_images:
+            stmt = stmt.options(_SUBTASK_IMAGE_LOADER)
+        return list(
+            session.execute(stmt.limit(limit).offset(offset)).scalars().all()
+        )
