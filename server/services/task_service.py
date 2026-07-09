@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from eyened_orm import Task
-from eyened_orm.task import TaskState
+from eyened_orm import SubTask, Task
+from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
 
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
@@ -167,6 +167,72 @@ class TaskService:
                 deleted_data=deleted_data,
             )
         return None
+
+    def list_task_subtasks(
+        self,
+        session: Session,
+        task_id: int,
+        *,
+        with_images: bool,
+        limit: int,
+        page: int,
+        status: SubTaskState | None,
+    ) -> tuple[list[tuple[SubTask, int]], int]:
+        """Return one page of a task's subtasks, each with its absolute index.
+
+        ``absolute_index`` is the subtask's 0-based position within *all* the
+        task's subtasks ordered by SubTaskID (computed before the ``status``
+        filter). The returned count honors ``status``.
+
+        Raises:
+            NotFoundError: If the task does not exist.
+        """
+        if self.tasks.get_by_id(session, task_id) is None:
+            raise NotFoundError(f"Task {task_id} not found")
+
+        index_of = {
+            sid: i
+            for i, sid in enumerate(self.subtasks.all_ids_for_task(session, task_id))
+        }
+        rows = self.subtasks.list_for_task(
+            session,
+            task_id,
+            status=status,
+            limit=limit,
+            offset=limit * page,
+            with_images=with_images,
+        )
+        count = self.subtasks.count_for_task(session, task_id, status=status)
+        # Every returned row is one of the task's subtasks, so its id is always
+        # in index_of (rows are a subset of all_ids_for_task).
+        return [(st, index_of[st.SubTaskID]) for st in rows], count
+
+    def get_task_subtask(
+        self,
+        session: Session,
+        task_id: int,
+        subtask_index: int,
+        *,
+        with_images: bool,
+        with_next: bool,
+    ) -> tuple[SubTask, SubTask | None]:
+        """Return the subtask at ``subtask_index`` and, if asked, the next one.
+
+        Raises:
+            NotFoundError: If no subtask sits at ``subtask_index``.
+        """
+        rows = self.subtasks.list_for_task(
+            session,
+            task_id,
+            status=None,
+            limit=2 if with_next else 1,
+            offset=subtask_index,
+            with_images=with_images,
+        )
+        if not rows:
+            raise NotFoundError("SubTask not found")
+        nxt = rows[1] if (with_next and len(rows) > 1) else None
+        return rows[0], nxt
 
 
 def get_task_service() -> TaskService:

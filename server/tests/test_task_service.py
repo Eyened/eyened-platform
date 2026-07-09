@@ -199,3 +199,102 @@ def test_delete_task_logs_delete(session):
 
     assert len(logger.deletes) == 1
     assert logger.deletes[0]["entity"] == "Task"
+
+
+def _make_subtask(session, task_id: int, state: SubTaskState) -> SubTask:
+    st = SubTask(TaskID=task_id, TaskState=state)
+    session.add(st)
+    session.flush()
+    return st
+
+
+def test_list_task_subtasks_paginates_with_absolute_index(session):
+    """list_task_subtasks returns a page, each row tagged with its absolute index."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    made = [_make_subtask(session, task.TaskID, SubTaskState.NotStarted) for _ in range(5)]
+    session.commit()
+
+    rows, count = _service().list_task_subtasks(
+        session, task.TaskID, with_images=False, limit=2, page=1, status=None
+    )
+
+    assert count == 5
+    assert [(st.SubTaskID, idx) for st, idx in rows] == [
+        (made[2].SubTaskID, 2),
+        (made[3].SubTaskID, 3),
+    ]
+
+
+def test_list_task_subtasks_filters_by_status_keeps_absolute_index(session):
+    """A status filter narrows rows/count but indices stay absolute (pre-filter)."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    _make_subtask(session, task.TaskID, SubTaskState.NotStarted)  # abs index 0
+    ready = _make_subtask(session, task.TaskID, SubTaskState.Ready)  # abs index 1
+    session.commit()
+
+    rows, count = _service().list_task_subtasks(
+        session, task.TaskID, with_images=False, limit=10, page=0,
+        status=SubTaskState.Ready,
+    )
+
+    assert count == 1
+    assert [(st.SubTaskID, idx) for st, idx in rows] == [(ready.SubTaskID, 1)]
+
+
+def test_list_task_subtasks_unknown_task_raises_not_found(session):
+    """Listing subtasks of a missing task is translated to NotFoundError (-> 404)."""
+    with pytest.raises(NotFoundError):
+        _service().list_task_subtasks(
+            session, 999_999, with_images=False, limit=10, page=0, status=None
+        )
+
+
+def test_get_task_subtask_returns_by_index(session):
+    """get_task_subtask returns the subtask at the given absolute index."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    made = [_make_subtask(session, task.TaskID, SubTaskState.NotStarted) for _ in range(3)]
+    session.commit()
+
+    main, nxt = _service().get_task_subtask(
+        session, task.TaskID, 1, with_images=False, with_next=False
+    )
+
+    assert main.SubTaskID == made[1].SubTaskID
+    assert nxt is None
+
+
+def test_get_task_subtask_with_next_returns_following(session):
+    """with_next also returns the subtask after the requested index."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    made = [_make_subtask(session, task.TaskID, SubTaskState.NotStarted) for _ in range(3)]
+    session.commit()
+
+    main, nxt = _service().get_task_subtask(
+        session, task.TaskID, 1, with_images=False, with_next=True
+    )
+
+    assert main.SubTaskID == made[1].SubTaskID
+    assert nxt is not None
+    assert nxt.SubTaskID == made[2].SubTaskID
+
+
+def test_get_task_subtask_out_of_range_raises_not_found(session):
+    """An index past the last subtask is translated to NotFoundError (-> 404)."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    session.commit()
+
+    with pytest.raises(NotFoundError):
+        _service().get_task_subtask(
+            session, task.TaskID, 5, with_images=False, with_next=False
+        )
