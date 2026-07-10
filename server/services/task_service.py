@@ -359,9 +359,6 @@ class SubTaskService:
         )
         session.add(link)
         session.commit()
-        # Mirror production's commit-time expiry so the re-query below returns the
-        # current image set even when the session uses expire_on_commit=False.
-        session.expire_all()
         if self.logger is not None:
             self.logger.log_insert(
                 user=actor.username,
@@ -398,9 +395,6 @@ class SubTaskService:
 
         session.delete(link)
         session.commit()
-        # Mirror production's commit-time expiry so the re-query below returns the
-        # current image set even when the session uses expire_on_commit=False.
-        session.expire_all()
         if self.logger is not None:
             self.logger.log_delete(
                 user=actor.username,
