@@ -154,3 +154,176 @@ def test_delete_subtask_logs_delete(session):
 
     assert len(logger.deletes) == 1
     assert logger.deletes[0]["entity"] == "SubTask"
+
+
+def _make_image(session, public_id: str) -> int:
+    """Build the minimal Series/Device graph an ImageInstance FK-requires.
+
+    Returns the new ImageInstanceID (mirrors the helper in test_task_repository.py).
+    """
+    import datetime
+
+    from eyened_orm import (
+        DeviceInstance,
+        DeviceModel,
+        ImageInstance,
+        Patient,
+        Project,
+        Series,
+        Study,
+    )
+    from eyened_orm.project import ExternalEnum
+
+    project = Project(ProjectName=f"P-{public_id}", External=ExternalEnum.N)
+    session.add(project)
+    session.flush()
+    patient = Patient(PatientIdentifier=f"ID-{public_id}", ProjectID=project.ProjectID)
+    session.add(patient)
+    session.flush()
+    study = Study(PatientID=patient.PatientID, StudyDate=datetime.date(2020, 1, 1))
+    session.add(study)
+    session.flush()
+    series = Series(StudyID=study.StudyID)
+    session.add(series)
+    session.flush()
+    model = DeviceModel(Manufacturer=f"Mf-{public_id}", ManufacturerModelName=f"M-{public_id}")
+    session.add(model)
+    session.flush()
+    device = DeviceInstance(DeviceModelID=model.DeviceModelID, Description=f"d-{public_id}")
+    session.add(device)
+    session.flush()
+    image = ImageInstance(
+        PublicID=public_id,
+        SeriesID=series.SeriesID,
+        DeviceInstanceID=device.DeviceInstanceID,
+        DatasetIdentifier="ds",
+    )
+    session.add(image)
+    session.flush()
+    return image.ImageInstanceID
+
+
+def test_add_image_appends_link_at_next_index(session):
+    """add_image links the image to the subtask at the next ImageIndex."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    _make_image(session, "pub-1")
+    session.commit()
+
+    updated = _service().add_image(session, st.SubTaskID, "pub-1", actor)
+
+    assert [link.ImageInstance.PublicID for link in updated.SubTaskImageLinks] == ["pub-1"]
+    assert [link.ImageIndex for link in updated.SubTaskImageLinks] == [0]
+
+
+def test_add_image_second_image_gets_next_index(session):
+    """A second add_image lands at ImageIndex 1, keeping insertion order."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    _make_image(session, "pub-1")
+    _make_image(session, "pub-2")
+    session.commit()
+    service = _service()
+
+    service.add_image(session, st.SubTaskID, "pub-1", actor)
+    updated = service.add_image(session, st.SubTaskID, "pub-2", actor)
+
+    assert [link.ImageIndex for link in updated.SubTaskImageLinks] == [0, 1]
+
+
+def test_add_image_unknown_subtask_raises_not_found(session):
+    """add_image on a missing subtask is translated to NotFoundError (-> 404)."""
+    actor = _actor(session)
+    _make_image(session, "pub-1")
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().add_image(session, 999_999, "pub-1", actor)
+
+
+def test_add_image_unknown_image_raises_not_found(session):
+    """add_image with an unknown PublicID is translated to NotFoundError (-> 404)."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().add_image(session, st.SubTaskID, "nope", actor)
+
+
+def test_add_image_logs_insert(session):
+    """add_image emits one insert audit record for the SubTaskImageLink entity."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    _make_image(session, "pub-1")
+    session.commit()
+    logger = FakeAuditLogger()
+
+    _service(logger).add_image(session, st.SubTaskID, "pub-1", actor)
+
+    assert len(logger.inserts) == 1
+    assert logger.inserts[0]["entity"] == "SubTaskImageLink"
+
+
+def test_remove_image_deletes_the_link(session):
+    """remove_image deletes the link for that image, leaving the subtask empty."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    _make_image(session, "pub-1")
+    session.commit()
+    service = _service()
+    service.add_image(session, st.SubTaskID, "pub-1", actor)
+
+    updated = service.remove_image(session, st.SubTaskID, "pub-1", actor)
+
+    assert updated.SubTaskImageLinks == []
+
+
+def test_remove_image_unknown_image_raises_not_found(session):
+    """remove_image with an unknown PublicID is translated to NotFoundError (-> 404)."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().remove_image(session, st.SubTaskID, "nope", actor)
+
+
+def test_remove_image_unlinked_image_raises_not_found(session):
+    """remove_image for an image not linked to the subtask raises NotFoundError."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    _make_image(session, "pub-1")  # exists, but never linked
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().remove_image(session, st.SubTaskID, "pub-1", actor)
+
+
+def test_remove_image_logs_delete(session):
+    """remove_image emits one delete audit record for the SubTaskImageLink entity."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    _make_image(session, "pub-1")
+    session.commit()
+    service = _service()
+    service.add_image(session, st.SubTaskID, "pub-1", actor)
+    logger = FakeAuditLogger()
+    SubTaskService(SubTaskRepository(), logger=logger).remove_image(
+        session, st.SubTaskID, "pub-1", actor
+    )
+
+    assert len(logger.deletes) == 1
+    assert logger.deletes[0]["entity"] == "SubTaskImageLink"
