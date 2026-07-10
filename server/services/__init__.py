@@ -3,6 +3,7 @@ from .device_service import DeviceService
 from .exceptions import BadRequestError, ConflictError, NotFoundError, ServiceError
 from .feature_service import FeatureService
 from .form_schema_service import FormSchemaService
+from .image_instance_service import ImageInstanceService
 from .patient_service import PatientService
 from .study_service import StudyService
 from .tag_service import TagService
@@ -19,6 +20,7 @@ __all__ = [
     "FormSchemaService",
     "StudyService",
     "FeatureService",
+    "ImageInstanceService",
     "TagService",
     "TaskService",
     "SubTaskService",
