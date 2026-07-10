@@ -249,3 +249,30 @@ def test_untag_instance_absent_link_is_idempotent(session):
 
     # Does not raise even though no link exists.
     _service().untag_instance(session, "pub-1", tag.TagID, actor)
+
+
+def test_tag_instance_update_logs_raw_string_public_id(session):
+    """Tag update audit logs use raw-string public_id, not int ImageInstanceID."""
+    actor = _actor(session)
+    _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    logger = FakeAuditLogger()
+    service = _service(logger)
+
+    service.tag_instance(session, "pub-1", tag.TagID, "first", actor)
+    service.tag_instance(session, "pub-1", tag.TagID, "second", actor)
+
+    assert len(logger.updates) == 1
+    assert logger.updates[0]["entity"] == "ImageInstanceTagLink"
+    assert logger.updates[0]["fields"]["image_instance_id"] == "pub-1"
+
+
+def test_patch_instance_tag_wrong_tag_type_raises_bad_request(session):
+    """patch_instance_tag with a non-ImageInstance tag raises BadRequestError (-> 400)."""
+    actor = _actor(session)
+    _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id, tag_type=TagType.Segmentation)
+    session.commit()
+    with pytest.raises(BadRequestError):
+        _service().patch_instance_tag(session, "pub-1", tag.TagID, "x", actor)
