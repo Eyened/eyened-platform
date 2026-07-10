@@ -6,7 +6,7 @@ from .form_schema_service import FormSchemaService
 from .patient_service import PatientService
 from .study_service import StudyService
 from .tag_service import TagService
-from .task_service import TaskService
+from .task_service import SubTaskService, TaskService
 
 __all__ = [
     "ServiceError",
@@ -21,4 +21,5 @@ __all__ = [
     "FeatureService",
     "TagService",
     "TaskService",
+    "SubTaskService",
 ]
