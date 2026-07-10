@@ -35,8 +35,10 @@ itself into this change.
 - Migrating CLI/worker code (`orm/eyened_orm/commands/`) to use the new
   Repositories. Explicitly desired for the future, but out of scope here.
 - Converting `search.py` (1257 lines, a large cross-cutting/ad hoc query
-  surface) or `auth.py` (831 lines, token/session logic, not model-CRUD
-  shaped) to this pattern.
+  surface), `auth.py` (831 lines, token/session logic, not model-CRUD
+  shaped), or `import_api.py` (341 lines, import-pipeline and RQ job
+  orchestration built on the `eyened_orm.importer` subsystem, not
+  model-CRUD shaped) to this pattern.
 - Deprecating or removing `Base`'s existing generic query classmethods
   (`where`, `by_columns`, `get_or_create`, `by_name`, `select`) — they stay
   as-is and may still be used, including internally by new Repositories.
@@ -147,8 +149,8 @@ model(s), switch the corresponding route module to use them, ship.
 | 1 | `form_schema.py` (25 lines), `patients.py` (34 lines) | Still small; `patients.py` is RBAC-relevant (Step 2), an early real-world validation of the pattern on a meaningful model |
 | 2 | `studies.py`, `feature.py`, `tag.py` | Medium-sized, self-contained |
 | 3 | `subtask.py`, `task.py` | RBAC-relevant (Step 2); larger, touch `Task`, `SubTask`, `TaskDefinition` |
-| 4 | `import_api.py`, `instances.py`, `form_annotations.py`, `segmentations.py` | RBAC-relevant (Step 2: `FormAnnotation`, `Segmentation`); largest, most complex query logic to extract |
-| Out of scope | `search.py`, `auth.py` | See Non-goals |
+| 4 | `instances.py`, `form_annotations.py`, `segmentations.py` | RBAC-relevant (Step 2: `FormAnnotation`, `Segmentation`); largest, most complex query logic to extract |
+| Out of scope | `search.py`, `auth.py`, `import_api.py` | See Non-goals |
 
 ## Error Handling
 
@@ -197,3 +199,17 @@ model(s), switch the corresponding route module to use them, ship.
   enforcement via Service-layer authz checks) — separate brainstorm.
 - Migrate CLI/worker code in `orm/eyened_orm/commands/` to use Repositories.
 - Decide whether/how to convert `search.py` and `auth.py`.
+- **Transaction ownership — revisit across all Services once the layer
+  refactoring is done.** The mutating Services carried over today's
+  route behavior of calling `session.commit()` (and `session.refresh()`)
+  directly inside each method. This couples the Service to the transaction
+  lifecycle, has no explicit rollback on error, and runs audit logging
+  *after* commit (so a logging failure can't undo a persisted write). It
+  matches the pre-refactor behavior, so it is not a regression, but the
+  boundary should be decided deliberately for the layer as a whole rather
+  than per-method. Once all phases have migrated, review every Service and
+  pick one consistent model — e.g. move the commit boundary into the
+  `get_db` dependency / a unit-of-work context manager (Services `flush`,
+  the caller commits once), so rollback-on-error and audit-inside-the-
+  transaction come for free. Check for double-commit before changing
+  (`grep -rn "\.commit()" server/services server/routes server/db.py`).
