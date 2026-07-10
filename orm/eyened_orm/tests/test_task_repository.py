@@ -219,3 +219,53 @@ def test_list_for_task_with_images_loads_links(session):
     assert [link.ImageInstance.PublicID for link in rows[0].SubTaskImageLinks] == [
         "pub-1"
     ]
+
+
+def test_get_with_images_loads_link_chain(session):
+    """get_with_images returns the subtask with its image links eager-loaded."""
+    creator = _creator(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    image_id = _make_image(session, "pub-1")
+    from eyened_orm import SubTaskImageLink
+
+    session.add(
+        SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0)
+    )
+    session.flush()
+
+    loaded = SubTaskRepository().get_with_images(session, st.SubTaskID)
+
+    assert loaded is not None
+    assert [link.ImageInstance.PublicID for link in loaded.SubTaskImageLinks] == ["pub-1"]
+
+
+def test_resolve_image_instance_id_found_and_missing(session):
+    """resolve_image_instance_id maps a PublicID to its int id, or None if absent."""
+    image_id = _make_image(session, "pub-42")
+    repo = SubTaskRepository()
+
+    assert repo.resolve_image_instance_id(session, "pub-42") == image_id
+    assert repo.resolve_image_instance_id(session, "nope") is None
+
+
+def test_next_image_index_starts_at_zero_then_increments(session):
+    """next_image_index is 0 for a subtask with no links, else max(ImageIndex)+1."""
+    creator = _creator(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    image_id = _make_image(session, "pub-1")
+    repo = SubTaskRepository()
+
+    assert repo.next_image_index(session, st.SubTaskID) == 0
+
+    from eyened_orm import SubTaskImageLink
+
+    session.add(
+        SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=3)
+    )
+    session.flush()
+
+    assert repo.next_image_index(session, st.SubTaskID) == 4
