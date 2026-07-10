@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from eyened_orm import ImageInstance
+from eyened_orm import ImageInstance, ImageInstanceTagLink
 from eyened_orm.repositories.image_instance_repository import ImageInstanceRepository
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.tag import TagType
 
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
-from .exceptions import NotFoundError
+from .acting_user import ActingUser
+from .exceptions import BadRequestError, NotFoundError
 
 
 class ImageInstanceService:
@@ -83,6 +85,160 @@ class ImageInstanceService:
         if item is None:
             raise NotFoundError("ImageInstance not found")
         return item
+
+    def tag_instance(
+        self,
+        session: Session,
+        public_id: str,
+        tag_id: int,
+        comment: str | None,
+        actor: ActingUser,
+    ) -> ImageInstanceTagLink:
+        """Attach a Tag to an instance (idempotent; updates comment if re-tagged).
+
+        Raises:
+            NotFoundError: If the instance or the tag does not exist.
+            BadRequestError: If the tag is not an ImageInstance-type tag.
+        """
+        instance = self.repository.get_with_storage_by_public_id(session, public_id)
+        if instance is None:
+            raise NotFoundError("ImageInstance not found")
+        tag = self.tags.get_by_id(session, tag_id)
+        if tag is None:
+            raise NotFoundError("Tag not found")
+        if tag.TagType != TagType.ImageInstance:
+            raise BadRequestError("Tag type must be ImageInstance")
+
+        link = self.repository.get_tag_link(
+            session, tag.TagID, instance.ImageInstanceID
+        )
+        if link is None:
+            link = ImageInstanceTagLink(
+                TagID=tag.TagID,
+                ImageInstanceID=instance.ImageInstanceID,
+                CreatorID=actor.id,
+                Comment=comment,
+            )
+            session.add(link)
+            session.commit()
+            session.refresh(link)
+            if self.logger is not None:
+                self.logger.log_insert(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=f"POST /api/instances/{public_id}/tags",
+                    entity="ImageInstanceTagLink",
+                    fields={
+                        "tag_id": tag.TagID,
+                        "image_instance_id": instance.ImageInstanceID,
+                        "comment": comment,
+                    },
+                )
+        elif comment is not None:
+            old_comment = link.Comment
+            link.Comment = comment
+            session.commit()
+            session.refresh(link)
+            if self.logger is not None:
+                self.logger.log_update(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=f"POST /api/instances/{public_id}/tags",
+                    entity="ImageInstanceTagLink",
+                    fields={
+                        "tag_id": tag.TagID,
+                        "image_instance_id": public_id,
+                    },
+                    changes={"comment": f"{old_comment} -> {comment}"},
+                )
+
+        link.Tag = tag  # avoid a Tag lazy-load at DTO time
+        return link
+
+    def patch_instance_tag(
+        self,
+        session: Session,
+        public_id: str,
+        tag_id: int,
+        comment: str | None,
+        actor: ActingUser,
+    ) -> ImageInstanceTagLink:
+        """Update the comment on an existing instance tag link.
+
+        Raises:
+            NotFoundError: If the instance, tag, or link does not exist.
+            BadRequestError: If the tag is not an ImageInstance-type tag.
+        """
+        instance = self.repository.get_with_storage_by_public_id(session, public_id)
+        if instance is None:
+            raise NotFoundError("ImageInstance not found")
+        tag = self.tags.get_by_id(session, tag_id)
+        if tag is None:
+            raise NotFoundError("Tag not found")
+        if tag.TagType != TagType.ImageInstance:
+            raise BadRequestError("Tag type must be ImageInstance")
+
+        link = self.repository.get_tag_link(
+            session, tag_id, instance.ImageInstanceID
+        )
+        if link is None:
+            raise NotFoundError("Link not found")
+
+        if comment is not None:
+            old_comment = link.Comment
+            link.Comment = comment
+            session.commit()
+            session.refresh(link)
+            if self.logger is not None:
+                self.logger.log_update(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=f"PATCH /api/instances/{public_id}/tags/{tag_id}",
+                    entity="ImageInstanceTagLink",
+                    fields={
+                        "tag_id": tag_id,
+                        "image_instance_id": instance.ImageInstanceID,
+                    },
+                    changes={"comment": f"{old_comment} -> {comment}"},
+                )
+
+        link.Tag = tag
+        return link
+
+    def untag_instance(
+        self, session: Session, public_id: str, tag_id: int, actor: ActingUser
+    ) -> None:
+        """Remove a Tag from an instance (idempotent; no error if not linked).
+
+        Raises:
+            NotFoundError: If the instance does not exist.
+        """
+        instance = self.repository.get_with_storage_by_public_id(session, public_id)
+        if instance is None:
+            raise NotFoundError("ImageInstance not found")
+
+        link = self.repository.get_tag_link(
+            session, tag_id, instance.ImageInstanceID
+        )
+        if link is not None:
+            deleted_data = {
+                "tag_id": tag_id,
+                "image_instance_id": instance.ImageInstanceID,
+                "comment": link.Comment,
+                "creator_id": link.CreatorID,
+            }
+            session.delete(link)
+            session.commit()
+            if self.logger is not None:
+                self.logger.log_delete(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=f"DELETE /api/instances/{public_id}/tags/{tag_id}",
+                    entity="ImageInstanceTagLink",
+                    fields={"tag_id": tag_id, "image_instance_id": public_id},
+                    deleted_data=deleted_data,
+                )
+        return None
 
 
 def get_image_instance_service() -> ImageInstanceService:
