@@ -147,3 +147,16 @@ class ImageInstanceRepository:
             ImageInstanceTagLink,
             {"TagID": tag_id, "ImageInstanceID": image_instance_id},
         )
+
+    def get_by_public_id(
+        self, session: Session, public_id: str
+    ) -> ImageInstance | None:
+        """Return the instance with this PublicID (no eager loads), or None.
+
+        Plain PublicID resolver used to map an external image id to its row —
+        the faithful equivalent of the legacy ``_resolve_image_instance_id``
+        helper (no PK/digit fallback, unlike ``get_full_graph_by_public_id``).
+        """
+        return session.scalars(
+            select(ImageInstance).where(ImageInstance.PublicID == public_id)
+        ).first()
