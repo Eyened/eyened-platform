@@ -9,6 +9,10 @@ from .patient_service import PatientService
 from .study_service import StudyService
 from .tag_service import TagService
 from .task_service import SubTaskService, TaskService
+from .segmentation_service import (
+    ModelSegmentationService,
+    SegmentationService,
+)
 
 __all__ = [
     "ServiceError",
@@ -26,4 +30,6 @@ __all__ = [
     "TagService",
     "TaskService",
     "SubTaskService",
+    "SegmentationService",
+    "ModelSegmentationService",
 ]
