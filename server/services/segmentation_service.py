@@ -350,6 +350,95 @@ class SegmentationService:
             )
         return segmentation
 
+    def tag(
+        self,
+        session: Session,
+        segmentation_id: int,
+        tag_id: int,
+        actor: ActingUser,
+    ) -> SegmentationTagLink:
+        """Attach a Tag to a segmentation (idempotent).
+
+        Behavior-preserving: the client-supplied comment is NOT stored (matches
+        the pre-refactor handler). See deferred findings.
+
+        Raises:
+            NotFoundError: If the segmentation or the tag does not exist.
+            BadRequestError: If the tag is not a Segmentation-type tag.
+        """
+        segmentation = self.repository.get_by_id(session, segmentation_id)
+        if segmentation is None:
+            raise NotFoundError("Segmentation not found")
+        tag = self.tags.get_by_id(session, tag_id)
+        if tag is None:
+            raise NotFoundError("Tag not found")
+        if tag.TagType != TagType.Segmentation:
+            raise BadRequestError("Tag type must be Segmentation")
+
+        link = self.repository.get_tag_link(session, tag.TagID, segmentation_id)
+        if link is None:
+            link = SegmentationTagLink(
+                TagID=tag.TagID,
+                SegmentationID=segmentation_id,
+                CreatorID=actor.id,
+            )
+            session.add(link)
+            session.commit()
+            session.refresh(link)
+            if self.logger is not None:
+                self.logger.log_insert(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=f"POST /api/segmentations/{segmentation_id}/tags",
+                    entity="SegmentationTagLink",
+                    fields={
+                        "tag_id": tag.TagID,
+                        "segmentation_id": segmentation_id,
+                    },
+                )
+
+        link.Tag = tag  # avoid a Tag lazy-load at DTO time
+        return link
+
+    def untag(
+        self,
+        session: Session,
+        segmentation_id: int,
+        tag_id: int,
+        actor: ActingUser,
+    ) -> None:
+        """Remove a Tag from a segmentation (idempotent; no error if unlinked).
+
+        Raises:
+            NotFoundError: If the segmentation does not exist.
+        """
+        segmentation = self.repository.get_by_id(session, segmentation_id)
+        if segmentation is None:
+            raise NotFoundError("Segmentation not found")
+
+        link = self.repository.get_tag_link(session, tag_id, segmentation_id)
+        if link is not None:
+            deleted_data = {
+                "tag_id": tag_id,
+                "segmentation_id": segmentation_id,
+                "creator_id": link.CreatorID,
+            }
+            session.delete(link)
+            session.commit()
+            if self.logger is not None:
+                self.logger.log_delete(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=(
+                        f"DELETE /api/segmentations/{segmentation_id}"
+                        f"/tags/{tag_id}"
+                    ),
+                    entity="SegmentationTagLink",
+                    fields={"tag_id": tag_id, "segmentation_id": segmentation_id},
+                    deleted_data=deleted_data,
+                )
+        return None
+
 
 class ModelSegmentationService:
     """Business logic for ModelSegmentation binary data endpoints."""

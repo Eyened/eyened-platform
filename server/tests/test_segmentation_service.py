@@ -296,3 +296,106 @@ def test_patch_unknown_raises_not_found(session):
             threshold=1.0,
             actor=_actor(session),
         )
+
+
+from eyened_orm import Tag
+from eyened_orm.tag import TagType
+
+
+def _make_tag(
+    session, creator_id: int, tag_type: TagType = TagType.Segmentation
+) -> Tag:
+    tag = Tag(
+        TagName=f"t-{tag_type.name}-{creator_id}",
+        TagDescription="d",
+        TagType=tag_type,
+        CreatorID=creator_id,
+    )
+    session.add(tag)
+    session.flush()
+    return tag
+
+
+def test_tag_creates_link(session):
+    """tag links a Segmentation-type tag and returns the link."""
+    actor = _actor(session)
+    seg = _make_segmentation(session, "t1")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+
+    link = _service().tag(session, seg.SegmentationID, tag.TagID, actor)
+
+    assert link.TagID == tag.TagID
+    assert link.SegmentationID == seg.SegmentationID
+    assert link.Tag.TagID == tag.TagID
+
+
+def test_tag_unknown_segmentation_raises_not_found(session):
+    """tag on a missing segmentation raises NotFoundError (-> 404)."""
+    actor = _actor(session)
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().tag(session, 999_999, tag.TagID, actor)
+
+
+def test_tag_unknown_tag_raises_not_found(session):
+    """tag with an unknown tag id raises NotFoundError (-> 404)."""
+    actor = _actor(session)
+    seg = _make_segmentation(session, "t2")
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().tag(session, seg.SegmentationID, 999_999, actor)
+
+
+def test_tag_wrong_type_raises_bad_request(session):
+    """tag with a non-Segmentation tag raises BadRequestError (-> 400)."""
+    actor = _actor(session)
+    seg = _make_segmentation(session, "t3")
+    tag = _make_tag(session, actor.id, tag_type=TagType.ImageInstance)
+    session.commit()
+    with pytest.raises(BadRequestError):
+        _service().tag(session, seg.SegmentationID, tag.TagID, actor)
+
+
+def test_tag_is_idempotent(session):
+    """A second tag with the same (seg, tag) returns the existing link, no dup."""
+    actor = _actor(session)
+    seg = _make_segmentation(session, "t4")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    service = _service()
+
+    service.tag(session, seg.SegmentationID, tag.TagID, actor)
+    link = service.tag(session, seg.SegmentationID, tag.TagID, actor)
+
+    assert link.TagID == tag.TagID
+
+
+def test_untag_removes_link(session):
+    """untag deletes the link for that (segmentation, tag)."""
+    actor = _actor(session)
+    seg = _make_segmentation(session, "t5")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    service = _service()
+    service.tag(session, seg.SegmentationID, tag.TagID, actor)
+
+    service.untag(session, seg.SegmentationID, tag.TagID, actor)
+
+    assert (
+        SegmentationRepository().get_tag_link(
+            session, tag.TagID, seg.SegmentationID
+        )
+        is None
+    )
+
+
+def test_untag_absent_link_is_idempotent(session):
+    """untag with no link present is a no-op (no error)."""
+    actor = _actor(session)
+    seg = _make_segmentation(session, "t6")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+
+    _service().untag(session, seg.SegmentationID, tag.TagID, actor)
