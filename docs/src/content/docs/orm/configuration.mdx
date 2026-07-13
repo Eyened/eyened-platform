@@ -31,12 +31,18 @@ The following sections describe all available configuration options:
 
 ### Storage Settings
 
-Used by the ORM, workers, and thumbnail generation when reading/writing files locally.
+Eyened uses two separate storage layers. They are configured independently:
+
+**Platform storage** (`EYENED_STORAGE_ROOT`) — writable data owned by the platform: thumbnails and segmentations. 
+
+**Image datasets** (`EYENED_STORAGE_MOUNTS`) — read-only access to original image files (DICOM, PNG, etc.) on the machine where the ORM runs. **Optional.** Only set this when a process on that host must read source images directly from disk — for example a GPU worker, a notebook, or `eorm update-thumbnails` — instead of fetching bytes through the API/nginx. The browser and API never use this variable; nginx serves images via `GET /api/images/{public_id}/data`.
+
+Each key in `EYENED_STORAGE_MOUNTS` must match a `StorageBackend.Key` in the database (not individual `ObjectKey` values). The ORM resolves a file as `{mount}/{ObjectKey}`.
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
-| EYENED_STORAGE_ROOT | No | `/storage` | Root directory for thumbnails (`thumbnails/`) and segmentations (`segmentations.zarr`) |
-| EYENED_STORAGE_MOUNTS | No | `{}` | JSON object mapping storage backend keys to local filesystem paths (for image `ObjectKey` resolution) |
+| EYENED_STORAGE_ROOT | No | `/storage` | Root for platform-owned data: `thumbnails/` and `segmentations.zarr` |
+| EYENED_STORAGE_MOUNTS | No | unset | JSON map of `StorageBackend.Key` → local mount path; enables direct filesystem reads on this host |
 
 ## Creating Environment Files
 
@@ -56,9 +62,12 @@ EYENED_API_URL=http://localhost:3000
 EYENED_API_USERNAME=myuser
 EYENED_API_PASSWORD=mypassword
 
-# Storage (local file access — thumbnails, segmentations, import preparation)
+# Platform storage (thumbnails, segmentations)
 EYENED_STORAGE_ROOT=/storage
-EYENED_STORAGE_MOUNTS='{"local":"/path/to/images"}'
+
+# Optional — only on hosts that read source images from disk (GPU worker, notebooks, thumbnail CLI).
+# Keys match StorageBackend.Key rows; ObjectKey paths in the DB are relative to each mount.
+# EYENED_STORAGE_MOUNTS='{"local":"/path/to/images"}'
 ```
 
 You can maintain multiple environment files for different environments (for example `.env.dev`, `.env.prod`, `.env.test`).

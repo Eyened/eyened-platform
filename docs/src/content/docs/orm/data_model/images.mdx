@@ -87,7 +87,7 @@ Backends are shared lookup rows — one per nginx mount or future object-store c
 
 ### Resolving and reading files
 
-Local paths are resolved at runtime via `EYENED_STORAGE_MOUNTS` (JSON map from backend `Key` to host path). The data-access adapter combines mount + `ObjectKey`:
+When `EYENED_STORAGE_MOUNTS` is set on the host running the ORM, local paths are resolved as `{mount}/{ObjectKey}` (one mount per `StorageBackend.Key`). Without it, the ORM fetches image bytes through the API instead. Platform thumbnails and segmentations use `EYENED_STORAGE_ROOT`, not this map. See [Configuration — Storage](/eyened-platform/orm/configuration#storage-settings).
 
 ```python
 image = ImageInstance.by_id(session, image_id)

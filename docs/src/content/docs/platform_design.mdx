@@ -44,7 +44,7 @@ See [Getting Started](/eyened-platform/getting_started) for setup.
 
 Two distinct layers:
 
-**Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Configure a matching nginx `location /{key}/` and read-only mount on the fileserver for each backend. The server and worker resolve local paths via the JSON env var `EYENED_STORAGE_MOUNTS` (e.g. `'{"local":"/path/to/images"}'`); the API serves files through nginx with `GET /api/images/{public_id}/data`.
+**Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Configure a matching nginx `location /{key}/` and read-only mount on the fileserver for each backend. The API serves files through nginx with `GET /api/images/{public_id}/data` — it does not read image bytes from disk itself. Optionally, ORM processes on a host with datasets mounted locally (GPU workers, notebooks, thumbnail CLI) can set `EYENED_STORAGE_MOUNTS` to read source files directly instead of via the API; see [ORM Configuration](/eyened-platform/orm/configuration#storage-settings).
 
 **Platform storage** — writable data under `EYENED_STORAGE_ROOT` (default `/storage`):
 
