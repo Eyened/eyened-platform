@@ -20,6 +20,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest-setup.ts'],
+    restoreMocks: true,
   },
   // Per svelte.dev/docs/svelte/testing: use the package "browser" entry points
   // while Vitest runs in Node, without affecting the real `vite build`.
