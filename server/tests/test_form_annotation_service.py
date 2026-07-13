@@ -1,4 +1,5 @@
 import pytest
+from datetime import date
 
 from eyened_orm import (
     Creator,
@@ -21,6 +22,7 @@ from eyened_orm.repositories.image_instance_repository import (
 )
 from eyened_orm.repositories.tag_repository import TagRepository
 
+from server.services.acting_user import ActingUser
 from server.services.exceptions import NotFoundError
 from server.services.form_annotation_service import FormAnnotationService
 
@@ -73,7 +75,7 @@ def _make_image(session, public_id: str) -> int:
     patient = Patient(PatientIdentifier=f"IID-{public_id}", ProjectID=project.ProjectID)
     session.add(patient)
     session.flush()
-    study = Study(PatientID=patient.PatientID)
+    study = Study(PatientID=patient.PatientID, StudyDate=date.today())
     session.add(study)
     session.flush()
     series = Series(StudyID=study.StudyID)
@@ -147,3 +149,107 @@ def test_get_value_unknown_raises_not_found(session):
     """get_value on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
         _service().get_value(session, 999_999)
+
+
+def _actor(session, key: str = "actor") -> ActingUser:
+    creator = Creator(CreatorName=f"u-{key}", IsHuman=True)
+    session.add(creator)
+    session.flush()
+    return ActingUser(id=creator.CreatorID, username=creator.CreatorName)
+
+
+def test_create_resolves_image_and_persists(session):
+    """create resolves image_id and persists the row."""
+    actor = _actor(session)
+    patient_id, schema_id = _make_patient_and_schema(session, "c1")
+    image_id = _make_image(session, "img-1")
+    session.commit()
+
+    ann = _service().create(
+        session,
+        form_schema_id=schema_id,
+        patient_id=patient_id,
+        study_id=None,
+        image_id="img-1",
+        laterality=None,
+        sub_task_id=None,
+        form_data={"a": 1},
+        form_annotation_reference_id=None,
+        actor=actor,
+    )
+
+    assert ann.FormAnnotationID is not None
+    assert ann.ImageInstanceID == image_id
+
+
+def test_create_unknown_image_raises_not_found(session):
+    """create with an unresolvable image_id raises NotFoundError (-> 404)."""
+    actor = _actor(session)
+    patient_id, schema_id = _make_patient_and_schema(session, "c2")
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().create(
+            session,
+            form_schema_id=schema_id,
+            patient_id=patient_id,
+            study_id=None,
+            image_id="no-image",
+            laterality=None,
+            sub_task_id=None,
+            form_data=None,
+            form_annotation_reference_id=None,
+            actor=actor,
+        )
+
+
+def test_update_applies_field(session):
+    """update applies a provided field to the annotation."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "u1")
+    session.commit()
+
+    updated = _service().update(
+        session, ann.FormAnnotationID, {"form_data": {"b": 2}}, actor
+    )
+
+    assert updated.FormData == {"b": 2}
+
+
+def test_update_unknown_raises_not_found(session):
+    """update on a missing annotation raises NotFoundError (-> 404)."""
+    with pytest.raises(NotFoundError):
+        _service().update(session, 999_999, {"form_data": {}}, _actor(session))
+
+
+def test_soft_delete_sets_inactive(session):
+    """soft_delete flags the row Inactive."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "d1")
+    session.commit()
+
+    _service().soft_delete(session, ann.FormAnnotationID, actor)
+
+    assert ann.Inactive is True
+
+
+def test_soft_delete_unknown_raises_not_found(session):
+    """soft_delete on a missing annotation raises NotFoundError (-> 404)."""
+    with pytest.raises(NotFoundError):
+        _service().soft_delete(session, 999_999, _actor(session))
+
+
+def test_set_value_overwrites_form_data(session):
+    """set_value overwrites the annotation's FormData payload."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "v1")
+    session.commit()
+
+    _service().set_value(session, ann.FormAnnotationID, {"new": 9}, actor)
+
+    assert ann.FormData == {"new": 9}
+
+
+def test_set_value_unknown_raises_not_found(session):
+    """set_value on a missing annotation raises NotFoundError (-> 404)."""
+    with pytest.raises(NotFoundError):
+        _service().set_value(session, 999_999, {}, _actor(session))
