@@ -369,3 +369,32 @@ ownership review above. Listed earliest phase first.
 - `ModelSegmentation` write happy-path and repository `get_by_id` positive path are
   unit-tested only via the 404 branches (a `SegmentationModel` test factory does
   not exist yet); add once one does, alongside the Phase 2b positive-count test.
+
+**Phase 4c code-quality cleanup — actionable follow-up tasks** (non-blocking Minors
+surfaced by the per-task reviews; verbatim-from-plan cosmetics + small coverage
+gaps. None block a feature-branch merge; sweep together with the cross-phase
+transaction-ownership / audit-logging cleanup above):
+- [ ] `orm/eyened_orm/repositories/segmentation_repository.py` — drop or expand the
+  vague `ModelSegmentationRepository` docstring aside "(data endpoints only)";
+  state what it returns instead.
+- [ ] `server/tests/test_segmentation_service.py` — delete the unused
+  `_image_public_id` helper (defined, never called).
+- [ ] `server/tests/test_segmentation_service.py` — hoist the mid-file imports
+  (`from eyened_orm.segmentation import DataRepresentation, Datatype`;
+  `from eyened_orm import Tag`; `from eyened_orm.tag import TagType`) into the
+  top-of-file import block (E402 / isort ordering).
+- [ ] `server/tests/test_segmentation_service.py` — add an `untag`-on-unknown-
+  segmentation test (the `NotFoundError`/404 path, currently untested).
+- [ ] `server/tests/test_segmentation_service.py` — `test_tag_creates_link` asserts
+  `link.Tag.TagID`, which passes even under a lazy-load and so does not actually
+  pin the `link.Tag = tag` no-lazy-load intent; if that intent is worth pinning,
+  assert it without triggering a load (e.g. check `'Tag' in link.__dict__`).
+- [ ] `server/routes/segmentations.py` — restore the rationale comment lost from
+  `create_segmentation` (why the endpoint accepts multipart form-data with an
+  optional array upload — an omitted array yields an empty zeros volume so the
+  segmentation's metadata and data stay consistent) as a sentence in
+  `SegmentationService.create`'s docstring.
+- [ ] Spec co-location: itemize the `ModelSegmentationService.write_data`
+  "no audit logging" asymmetry in this block (it is currently only in the plan's
+  endpoint→service map). Behavior is correctly preserved — this is only a
+  documentation-completeness task.
