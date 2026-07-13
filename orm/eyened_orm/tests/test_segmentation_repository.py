@@ -40,7 +40,7 @@ def _make_segmentation(
     series = Series(StudyID=study.StudyID)
     session.add(series)
     session.flush()
-    model = DeviceModel(Manufacturer="Mf", ManufacturerModelName="M")
+    model = DeviceModel(Manufacturer=f"Mf-{key}", ManufacturerModelName=f"M-{key}")
     session.add(model)
     session.flush()
     device = DeviceInstance(DeviceModelID=model.DeviceModelID, Description="d")
