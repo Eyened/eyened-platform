@@ -12,7 +12,7 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "verify:runes": "rg -n \"export let \" src --glob \"**/*.svelte\" && echo \"Found legacy export let (should be 0)\" && exit 1 || exit 0",
+    "verify:runes": "if grep -rEn '^[[:space:]]*export[[:space:]]+let[[:space:]]' src --include='*.svelte'; then echo 'Found legacy export let declarations above (Svelte 5 uses runes props); expected 0'; exit 1; fi",
     "check:unused": "unimported",
     "test": "vitest run",
     "test:watch": "vitest"
