@@ -335,6 +335,21 @@ ownership review above. Listed earliest phase first.
   RQ-worker path; and the server path (this port) and the client path
   (`DataAccessAdapter`) are two seams to the same store — unifying them so the
   fix lives once is the real long-term win.
+- **400-vs-404 precedence flip on simultaneous errors (thin-route consequence).**
+  The migration moved the entity-existence check into the Service (→404) while
+  the HTTP-level checks stay in the thin route (content-type → 400 on
+  `PUT .../data`; non-3D upload → 400 on `POST /segmentations`), so the route's
+  400 now fires before the Service's 404 — the reverse of the pre-refactor
+  route, which resolved the entity (404) before the content-type/parse check
+  (400). Observable ONLY when both conditions coincide: e.g.
+  `PUT /segmentations/{unknown_id}/data` with a wrong `Content-Type` now returns
+  400 (was 404), and `POST /segmentations` with an unknown `image_id` AND a
+  non-3D array now returns 400 (was 404). Every single-error case is unchanged
+  (unknown id with a valid request still 404; valid id with a bad request still
+  400). Affects `create_segmentation`, `update_segmentation_data`,
+  `update_model_segmentation_data`. Preserving exact precedence would require
+  reintroducing a DB existence check into the thin route (undoing the layering),
+  so it is recorded here rather than fixed; revisit if strict precedence matters.
 - `POST /segmentations/{id}/tags` ignores the client-supplied `ObjectTagPOST.comment`
   (no `Comment` persisted), unlike the instance/form-annotation taggers which do
   store it. Preserved verbatim from the pre-refactor handler; revisit for
