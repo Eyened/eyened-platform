@@ -12,8 +12,10 @@ from eyened_orm import (
     Project,
     Series,
     Study,
+    Tag,
 )
 from eyened_orm.project import ExternalEnum
+from eyened_orm.tag import TagType
 from eyened_orm.repositories.form_annotation_repository import (
     FormAnnotationRepository,
 )
@@ -23,7 +25,7 @@ from eyened_orm.repositories.image_instance_repository import (
 from eyened_orm.repositories.tag_repository import TagRepository
 
 from server.services.acting_user import ActingUser
-from server.services.exceptions import NotFoundError
+from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.form_annotation_service import FormAnnotationService
 
 
@@ -253,3 +255,127 @@ def test_set_value_unknown_raises_not_found(session):
     """set_value on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
         _service().set_value(session, 999_999, {}, _actor(session))
+
+
+def _make_tag(session, creator_id: int, tag_type: TagType = TagType.FormAnnotation) -> Tag:
+    tag = Tag(
+        TagName=f"t-{tag_type.name}-{creator_id}",
+        TagDescription="d",
+        TagType=tag_type,
+        CreatorID=creator_id,
+    )
+    session.add(tag)
+    session.flush()
+    return tag
+
+
+def test_tag_creates_link(session):
+    """tag links a FormAnnotation tag and returns the link."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t1")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+
+    link = _service().tag(
+        session, ann.FormAnnotationID, tag.TagID, "hi", actor
+    )
+
+    assert link.TagID == tag.TagID
+    assert link.Comment == "hi"
+    assert link.Tag.TagID == tag.TagID
+
+
+def test_tag_unknown_annotation_raises_not_found(session):
+    """tag on a missing annotation is translated to NotFoundError (-> 404)."""
+    actor = _actor(session)
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().tag(session, 999_999, tag.TagID, None, actor)
+
+
+def test_tag_unknown_tag_raises_not_found(session):
+    """tag with an unknown tag id is translated to NotFoundError (-> 404)."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t2")
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().tag(session, ann.FormAnnotationID, 999_999, None, actor)
+
+
+def test_tag_wrong_type_raises_bad_request(session):
+    """tag with a non-FormAnnotation tag raises BadRequestError (-> 400)."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t3")
+    tag = _make_tag(session, actor.id, tag_type=TagType.ImageInstance)
+    session.commit()
+    with pytest.raises(BadRequestError):
+        _service().tag(session, ann.FormAnnotationID, tag.TagID, None, actor)
+
+
+def test_tag_existing_updates_comment(session):
+    """A second tag with a comment updates the existing link, not duplicates."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t4")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    service = _service()
+
+    service.tag(session, ann.FormAnnotationID, tag.TagID, "first", actor)
+    link = service.tag(session, ann.FormAnnotationID, tag.TagID, "second", actor)
+
+    assert link.Comment == "second"
+
+
+def test_patch_tag_updates_comment(session):
+    """patch_tag overwrites the comment on an existing link."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t5")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    service = _service()
+    service.tag(session, ann.FormAnnotationID, tag.TagID, "old", actor)
+
+    link = service.patch_tag(session, ann.FormAnnotationID, tag.TagID, "new", actor)
+
+    assert link.Comment == "new"
+
+
+def test_patch_tag_unknown_link_raises_not_found(session):
+    """patch_tag with no existing link raises NotFoundError (-> 404)."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t6")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    with pytest.raises(NotFoundError):
+        _service().patch_tag(session, ann.FormAnnotationID, tag.TagID, "x", actor)
+
+
+def test_untag_removes_link(session):
+    """untag deletes the link for that (annotation, tag)."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t7")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+    service = _service()
+    service.tag(session, ann.FormAnnotationID, tag.TagID, None, actor)
+
+    service.untag(session, ann.FormAnnotationID, tag.TagID, actor)
+
+    assert (
+        FormAnnotationRepository().get_tag_link(
+            session, tag.TagID, ann.FormAnnotationID
+        )
+        is None
+    )
+
+
+def test_untag_absent_link_is_idempotent(session):
+    """untag with no link present is a no-op (no error)."""
+    actor = _actor(session)
+    ann = _make_annotation(session, "t8")
+    tag = _make_tag(session, actor.id)
+    session.commit()
+
+    # Does not raise even though no link exists.
+    _service().untag(session, ann.FormAnnotationID, tag.TagID, actor)

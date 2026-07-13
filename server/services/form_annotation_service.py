@@ -4,7 +4,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from eyened_orm import FormAnnotation
+from eyened_orm import FormAnnotation, FormAnnotationTagLink
+from eyened_orm.tag import TagType
 from eyened_orm.repositories.form_annotation_repository import (
     FormAnnotationRepository,
 )
@@ -15,7 +16,7 @@ from eyened_orm.repositories.tag_repository import TagRepository
 
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
-from .exceptions import NotFoundError
+from .exceptions import BadRequestError, NotFoundError
 
 
 _FIELD_MAP = {
@@ -269,6 +270,160 @@ class FormAnnotationService:
                 entity="FormAnnotation",
                 entity_id=annotation_id,
             )
+        return None
+
+    def tag(
+        self,
+        session: Session,
+        annotation_id: int,
+        tag_id: int,
+        comment: str | None,
+        actor: ActingUser,
+    ) -> FormAnnotationTagLink:
+        """Attach a Tag to an annotation (idempotent; updates comment if re-tagged).
+
+        Raises:
+            NotFoundError: If the annotation or the tag does not exist.
+            BadRequestError: If the tag is not a FormAnnotation-type tag.
+        """
+        annotation = self.repository.get_by_id(session, annotation_id)
+        if annotation is None:
+            raise NotFoundError("FormAnnotation not found")
+        tag = self.tags.get_by_id(session, tag_id)
+        if tag is None:
+            raise NotFoundError("Tag not found")
+        if tag.TagType != TagType.FormAnnotation:
+            raise BadRequestError("Tag type must be FormAnnotation")
+
+        link = self.repository.get_tag_link(session, tag.TagID, annotation_id)
+        if link is None:
+            link = FormAnnotationTagLink(
+                TagID=tag.TagID,
+                FormAnnotationID=annotation_id,
+                CreatorID=actor.id,
+                Comment=comment,
+            )
+            session.add(link)
+            session.commit()
+            session.refresh(link)
+            if self.logger is not None:
+                self.logger.log_insert(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
+                    entity="FormAnnotationTagLink",
+                    fields={
+                        "tag_id": tag.TagID,
+                        "form_annotation_id": annotation_id,
+                        "comment": comment,
+                    },
+                )
+        elif comment is not None:
+            old_comment = link.Comment
+            link.Comment = comment
+            session.commit()
+            session.refresh(link)
+            if self.logger is not None:
+                self.logger.log_update(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
+                    entity="FormAnnotationTagLink",
+                    fields={
+                        "tag_id": tag.TagID,
+                        "form_annotation_id": annotation_id,
+                    },
+                    changes={"comment": f"{old_comment} -> {comment}"},
+                )
+
+        link.Tag = tag  # avoid a Tag lazy-load at DTO time
+        return link
+
+    def patch_tag(
+        self,
+        session: Session,
+        annotation_id: int,
+        tag_id: int,
+        comment: str | None,
+        actor: ActingUser,
+    ) -> FormAnnotationTagLink:
+        """Update the comment on an existing annotation tag link.
+
+        Raises:
+            NotFoundError: If the annotation, tag, or link does not exist.
+            BadRequestError: If the tag is not a FormAnnotation-type tag.
+        """
+        annotation = self.repository.get_by_id(session, annotation_id)
+        if annotation is None:
+            raise NotFoundError("FormAnnotation not found")
+        tag = self.tags.get_by_id(session, tag_id)
+        if tag is None:
+            raise NotFoundError("Tag not found")
+        if tag.TagType != TagType.FormAnnotation:
+            raise BadRequestError("Tag type must be FormAnnotation")
+
+        link = self.repository.get_tag_link(session, tag_id, annotation_id)
+        if link is None:
+            raise NotFoundError("Link not found")
+
+        if comment is not None:
+            old_comment = link.Comment
+            link.Comment = comment
+            session.commit()
+            session.refresh(link)
+            if self.logger is not None:
+                self.logger.log_update(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=(
+                        f"PATCH /api/form-annotations/{annotation_id}"
+                        f"/tags/{tag_id}"
+                    ),
+                    entity="FormAnnotationTagLink",
+                    fields={
+                        "tag_id": tag_id,
+                        "form_annotation_id": annotation_id,
+                    },
+                    changes={"comment": f"{old_comment} -> {comment}"},
+                )
+
+        link.Tag = tag
+        return link
+
+    def untag(
+        self, session: Session, annotation_id: int, tag_id: int, actor: ActingUser
+    ) -> None:
+        """Remove a Tag from an annotation (idempotent; no error if not linked).
+
+        Raises:
+            NotFoundError: If the annotation does not exist.
+        """
+        annotation = self.repository.get_by_id(session, annotation_id)
+        if annotation is None:
+            raise NotFoundError("FormAnnotation not found")
+
+        link = self.repository.get_tag_link(session, tag_id, annotation_id)
+        if link is not None:
+            deleted_data = {
+                "tag_id": tag_id,
+                "form_annotation_id": annotation_id,
+                "comment": link.Comment,
+                "creator_id": link.CreatorID,
+            }
+            session.delete(link)
+            session.commit()
+            if self.logger is not None:
+                self.logger.log_delete(
+                    user=actor.username,
+                    user_id=actor.id,
+                    endpoint=(
+                        f"DELETE /api/form-annotations/{annotation_id}"
+                        f"/tags/{tag_id}"
+                    ),
+                    entity="FormAnnotationTagLink",
+                    fields={"tag_id": tag_id, "form_annotation_id": annotation_id},
+                    deleted_data=deleted_data,
+                )
         return None
 
 
