@@ -119,6 +119,13 @@ src/types/openapi.ts
 src/types/openapi.json
 src/types/openapi_types.ts
 src/types/openapi_constants.ts
+
+# GLSL shader sources. Prettier has NO GLSL parser, and it maps `.frag` to its
+# babel/JS parser — so it throws `SyntaxError` on valid GLSL (e.g. `for(int i…)`)
+# and exits 2. Not a style opinion: prettier fundamentally cannot read these.
+*.frag
+*.vert
+*.glsl
 ```
 
 - [ ] **Step 6: Add the `format` and `format:check` scripts**
@@ -136,7 +143,13 @@ In `client/package.json`, add these two entries to the `"scripts"` object (place
 npm run format:check
 ```
 
-Expected: **FAILS** (exit 2), printing `[warn] ...` lines that now **include `.svelte` files** (e.g. `[warn] src/routes/+layout.svelte`) and ending with `Code style issues found in <N> files.` where `<N>` is well above 161 (the pre-svelte-plugin count). This red state is the deliverable — Task 2 turns it green.
+Expected: **FAILS with exit 1**, printing `[warn] ...` lines that now **include `.svelte` files** (e.g. `[warn] src/routes/+layout.svelte`) and ending with `Code style issues found in <N> files.` where `<N>` is well above 161 (the pre-svelte-plugin count). This red state is the deliverable — Task 2 turns it green.
+
+**Exit code is load-bearing — check it, don't just eyeball the output.** Prettier exits **1** for "files differ" (what we want here) and **2** for "an error occurred" (a file it could not parse). Do not accept exit 2: prettier prints `[error] <file>: SyntaxError…` *and still prints* `All matched files use Prettier code style!`, so the success text is not evidence. If you see exit 2, find the `[error]` line — an unparseable file type is escaping `.prettierignore`:
+
+```bash
+npm run format:check; echo "EXIT=$?"    # want EXIT=1 here, never EXIT=2
+```
 
 Sanity check that `.prettierignore` works — this must print nothing:
 
@@ -195,10 +208,10 @@ Expected: prettier prints each rewritten file with a timing suffix and exits 0. 
 - [ ] **Step 3: Verify the gate is now green**
 
 ```bash
-npm run format:check
+npm run format:check; echo "EXIT=$?"
 ```
 
-Expected: `All matched files use Prettier code style!`, exit 0.
+Expected: `All matched files use Prettier code style!` **and `EXIT=0`**. Verify the exit code — that success line is also printed alongside `[error] … SyntaxError` failures (exit 2), so the text alone proves nothing.
 
 - [ ] **Step 4: Verify the change is formatting-only (no behavior change)**
 
