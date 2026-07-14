@@ -126,8 +126,12 @@ export class LinePhotoLocator implements PhotoLocator {
     }
 
     paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
-        const s = viewerContext.imageToViewerCoordinates(this.start);
-        const e = viewerContext.imageToViewerCoordinates(this.end);
+        const { start, end } = this;
+        if (!start || !end || !Number.isFinite(start.x) || !Number.isFinite(start.y) || !Number.isFinite(end.x) || !Number.isFinite(end.y)) {
+            return;
+        }
+        const s = viewerContext.imageToViewerCoordinates(start);
+        const e = viewerContext.imageToViewerCoordinates(end);
 
         ctx.beginPath();
         ctx.moveTo(s.x, s.y);
@@ -142,7 +146,7 @@ export class CirclePhotoLocator implements PhotoLocator {
     constructor(
         public readonly enfaceImageId: string,
         public readonly octImageId: string,
-        public readonly centre: Point,
+        public readonly center: Point,
         public readonly radius: number,
         public readonly start_angle: number,
         public readonly index: number,
@@ -151,16 +155,16 @@ export class CirclePhotoLocator implements PhotoLocator {
 
     OCTToEnface(p: Position): Position {
         const r = p.x / this.width;
-        const { centre, radius, start_angle } = this;
+        const { center, radius, start_angle } = this;
         const angle = start_angle + 2 * r * Math.PI;
-        const x = centre.x + radius * Math.cos(angle);
-        const y = centre.y + radius * Math.sin(angle);
+        const x = center.x + radius * Math.cos(angle);
+        const y = center.y + radius * Math.sin(angle);
         return { x, y, index: 0 };
     }
 
     enfaceToOCT(p: Position): { position: Position, distance: number } {
-        const { centre, radius, start_angle } = this;
-        const vec = vec2(p).sub(centre);
+        const { center, radius, start_angle } = this;
+        const vec = vec2(p).sub(center);
         const distance = Math.abs(vec.length() - radius);
         const angle = vec.angle() - start_angle;
         const r = angle / (2 * Math.PI);
@@ -174,11 +178,14 @@ export class CirclePhotoLocator implements PhotoLocator {
     }
 
     paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
-        const { centre, radius } = this;
-        const c = viewerContext.imageToViewerCoordinates(centre);
+        const { center, radius } = this;
+        if (!center || !Number.isFinite(center.x) || !Number.isFinite(center.y) || !Number.isFinite(radius)) {
+            return;
+        }
+        const c = viewerContext.imageToViewerCoordinates(center);
 
-        const crx = viewerContext.imageToViewerCoordinates({ x: centre.x + radius, y: centre.y });
-        const cry = viewerContext.imageToViewerCoordinates({ x: centre.x, y: centre.y + radius });
+        const crx = viewerContext.imageToViewerCoordinates({ x: center.x + radius, y: center.y });
+        const cry = viewerContext.imageToViewerCoordinates({ x: center.x, y: center.y + radius });
         const radiusX = crx.x - c.x;
         const radiusY = cry.y - c.y;
         const { x, y } = c;

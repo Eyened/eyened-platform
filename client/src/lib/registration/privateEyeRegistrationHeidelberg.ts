@@ -1,7 +1,8 @@
 import { instances } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { ImageGET } from "../../types/openapi_types";
-import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
+import type { PhotoLocator } from "./photoLocators";
+import { createPhotoLocator, parseHeidelbergPhotoLocator } from "./parsePhotoLocator";
 
 function getSourceID(instance: ImageGET) {
     return instance.data_source_id ?? "";
@@ -30,18 +31,15 @@ export function getPrivateEyeRegistrationHeidelberg(image: AbstractImage): Photo
     const enfaceID = `${enfaceInstance.id}`;
     const octID = `${instance.id}`;
 
-    const photoLocators: PhotoLocator[] = oct_image_meta.contents.map(
-        (item: { photo_locations: any[] }, index: number) => {
-            const locator = item.photo_locations[0];
-            const { start, end, centre, radius, start_angle } = locator;
-            if (start && end) {
-                return new LinePhotoLocator(enfaceID, octID, start, end, index, instance.columns);
+    return oct_image_meta.contents.flatMap(
+        (item: { photo_locations: unknown[] }, index: number) => {
+            const locator = item.photo_locations?.[0];
+            const parsed = parseHeidelbergPhotoLocator(locator, enfaceID, index);
+            if (!parsed) {
+                return [];
             }
-            if (centre && radius) {
-                return new CirclePhotoLocator(enfaceID, octID, centre, radius, start_angle, index, instance.columns);
-            }
-            return null;
-        }
-    ).filter(Boolean);
-    return photoLocators;
+            const runtime = createPhotoLocator(parsed, octID, instance.columns);
+            return runtime ? [runtime] : [];
+        },
+    );
 }

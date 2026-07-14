@@ -22,7 +22,11 @@ export class OCTLinesOverlay implements Overlay {
                 } else {
                     context2D.strokeStyle = 'rgba(0,255,0,0.2)';
                 }
-                locator.paint(context2D, viewerContext);
+                try {
+                    locator.paint(context2D, viewerContext);
+                } catch (error) {
+                    console.warn('PhotoLocator overlay paint failed', error);
+                }
             }
         }
 

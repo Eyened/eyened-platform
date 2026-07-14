@@ -76,10 +76,10 @@ export class SetBrushRadiusTool implements Overlay {
 
         const radius = this.segmentationContext.brushRadius;
 
-        const centre = this.lastPosition;
-        const c = viewerContext.imageToViewerCoordinates(centre);
-        const crx = viewerContext.imageToViewerCoordinates({ x: centre.x + radius, y: centre.y });
-        const cry = viewerContext.imageToViewerCoordinates({ x: centre.x, y: centre.y + radius });
+        const center = this.lastPosition;
+        const c = viewerContext.imageToViewerCoordinates(center);
+        const crx = viewerContext.imageToViewerCoordinates({ x: center.x + radius, y: center.y });
+        const cry = viewerContext.imageToViewerCoordinates({ x: center.x, y: center.y + radius });
         const radiusX = crx.x - c.x;
         const radiusY = (cry.y - c.y) * this.viewerContext.aspectRatio;
         const { x, y } = c;
