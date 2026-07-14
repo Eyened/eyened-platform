@@ -13,3 +13,10 @@ src/types/openapi.ts
 src/types/openapi.json
 src/types/openapi_types.ts
 src/types/openapi_constants.ts
+
+# GLSL shader sources. Prettier has NO GLSL parser, and it maps `.frag` to its
+# babel/JS parser — so it throws `SyntaxError` on valid GLSL (e.g. `for(int i…)`)
+# and exits 2. Not a style opinion: prettier fundamentally cannot read these.
+*.frag
+*.vert
+*.glsl
