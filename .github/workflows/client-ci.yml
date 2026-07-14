@@ -24,3 +24,4 @@ jobs:
       - run: npm run verify:runes # export-let guard   (Phase 1)
       - run: npm run test         # vitest run          (Phase 1)
       - run: npm run build        # vite build          (Phase 1)
+      - run: npm run format:check # prettier --check .  (Phase 2)
