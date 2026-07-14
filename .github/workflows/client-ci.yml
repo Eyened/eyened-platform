@@ -1,0 +1,26 @@
+name: Client CI
+on:
+  pull_request:
+    branches: [main, development]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-ci.yml'
+
+defaults:
+  run:
+    working-directory: client
+
+jobs:
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: client/.nvmrc   # node 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm run verify:runes # export-let guard   (Phase 1)
+      - run: npm run test         # vitest run          (Phase 1)
+      - run: npm run build        # vite build          (Phase 1)
