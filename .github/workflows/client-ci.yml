@@ -21,7 +21,7 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
-      - run: npm run verify:runes # export-let guard   (Phase 1)
-      - run: npm run test         # vitest run          (Phase 1)
-      - run: npm run build        # vite build          (Phase 1)
-      - run: npm run format:check # prettier --check .  (Phase 2)
+      - run: npm run verify:runes # export-let guard
+      - run: npm run test         # vitest run
+      - run: npm run build        # vite build
+      - run: npm run format:check # prettier --check .
