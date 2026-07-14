@@ -1,151 +1,151 @@
 <script lang="ts">
-	import CopyIconButton from "$lib/components/CopyIconButton.svelte";
-	import Viewer from "$lib/viewer/Viewer.svelte";
-	import { getContext, setContext } from "svelte";
-	import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
-	import type { AbstractImage } from "$lib/webgl/abstractImage";
-	import MainIcon from "./icons/MainIcon.svelte";
-	import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
-	import Lines from "./icons/Lines.svelte";
+    import CopyIconButton from "$lib/components/CopyIconButton.svelte";
+    import Viewer from "$lib/viewer/Viewer.svelte";
+    import { getContext, setContext } from "svelte";
+    import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import MainIcon from "./icons/MainIcon.svelte";
+    import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
+    import Lines from "./icons/Lines.svelte";
 
-	interface Props {
-		image: AbstractImage;
-	}
+    interface Props {
+        image: AbstractImage;
+    }
 
-	let { image }: Props = $props();
+    let { image }: Props = $props();
 
-	const publicId = image.instance.id;
+    const publicId = image.instance.id;
 
-	const viewerWindowContext = getContext<ViewerWindowContext>(
-		"viewerWindowContext",
-	);
+    const viewerWindowContext = getContext<ViewerWindowContext>(
+        "viewerWindowContext",
+    );
 
-	const viewerContext = viewerWindowContext.topViewers.get(image)!;
-	setContext("viewerContext", viewerContext);
+    const viewerContext = viewerWindowContext.topViewers.get(image)!;
+    setContext("viewerContext", viewerContext);
 
-	// const registration = viewerContext.registration;
-	// let linkedImages = $derived(registration.getLinkedImgIds(image.image_id));
+    // const registration = viewerContext.registration;
+    // let linkedImages = $derived(registration.getLinkedImgIds(image.image_id));
 
-	let photoLocators = $derived(
-		viewerWindowContext.photoLocators.get(image.image_id)!,
-	);
-	let hasLocators = $derived(
-		image.is2D && photoLocators && photoLocators.length,
-	);
-	let removeOverlay = () => {};
-	let hideOverlay = $state(false);
+    let photoLocators = $derived(
+        viewerWindowContext.photoLocators.get(image.image_id)!,
+    );
+    let hasLocators = $derived(
+        image.is2D && photoLocators && photoLocators.length,
+    );
+    let removeOverlay = () => {};
+    let hideOverlay = $state(false);
 
-	$effect(() => {
-		removeOverlay();
-		if (hasLocators && !hideOverlay) {
-			removeOverlay = viewerContext.addOverlay(
-				new OCTLinesOverlay(photoLocators),
-			);
-		} else {
-			removeOverlay();
-		}
-		return removeOverlay;
-	});
-	function toggleOverlay(e: MouseEvent) {
-		e.stopPropagation();
-		hideOverlay = !hideOverlay;
-	}
+    $effect(() => {
+        removeOverlay();
+        if (hasLocators && !hideOverlay) {
+            removeOverlay = viewerContext.addOverlay(
+                new OCTLinesOverlay(photoLocators),
+            );
+        } else {
+            removeOverlay();
+        }
+        return removeOverlay;
+    });
+    function toggleOverlay(e: MouseEvent) {
+        e.stopPropagation();
+        hideOverlay = !hideOverlay;
+    }
 
-	function selectImage(e: any) {
-		if (e.shiftKey) {
-			viewerWindowContext.addImagePanel(image);
-		} else {
-			viewerWindowContext.setImagePanel(image);
-		}
-	}
+    function selectImage(e: any) {
+        if (e.shiftKey) {
+            viewerWindowContext.addImagePanel(image);
+        } else {
+            viewerWindowContext.setImagePanel(image);
+        }
+    }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="item" class:wide={image.is3D} onclick={(e) => selectImage(e)}>
-	<Viewer showInfo={false} />
-	<div class="copy-bar">
-		<span class="public-id">{publicId}</span>
-		<CopyIconButton text={publicId} ariaLabel="Copy public ID" />
-	</div>
-	{#if hasLocators}
-		<div class="header overlay">
-			<div class="content outer">
-				<div class="content">
-					<MainIcon
-						onclick={toggleOverlay}
-						active={!hideOverlay}
-						Icon={Lines}
-					/>
-				</div>
-			</div>
-		</div>
-	{/if}
+    <Viewer showInfo={false} />
+    <div class="copy-bar">
+        <span class="public-id">{publicId}</span>
+        <CopyIconButton text={publicId} ariaLabel="Copy public ID" />
+    </div>
+    {#if hasLocators}
+        <div class="header overlay">
+            <div class="content outer">
+                <div class="content">
+                    <MainIcon
+                        onclick={toggleOverlay}
+                        active={!hideOverlay}
+                        Icon={Lines}
+                    />
+                </div>
+            </div>
+        </div>
+    {/if}
 </div>
 
 <style>
-	div {
-		flex: 1;
-		display: flex;
-	}
-	div.overlay {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		pointer-events: none;
-	}
-	div.content {
-		pointer-events: auto;
-		flex: 0;
-	}
-	div.content.outer {
-		flex-direction: column;
-	}
-	div.item {
-		border-bottom: 1px solid gray;
-		z-index: 2;
-		border-right: 1px solid gray;
-		position: relative;
-	}
-	div.item:hover {
-		border-bottom: 1px solid white;
-	}
-	div.wide {
-		flex: 2;
-	}
-	div.header {
-		color: white;
-		display: flex;
-		margin: 0.5em;
-	}
-	.copy-bar {
-		position: absolute;
-		top: 0.5em;
-		right: 0.5em;
-		z-index: 3;
-		display: flex;
-		align-items: center;
-		gap: 0.15rem;
-		max-width: calc(100% - 1em);
-		padding: 0.1rem 0.35rem;
-		border-radius: 0.15rem;
-		background-color: rgb(0 0 0 / 0.55);
-		color: rgb(255 255 255 / 0.85);
-		font-size: 0.75rem;
-		opacity: 0;
-		pointer-events: none;
-		transition: opacity 0.15s ease;
-	}
-	.item:hover .copy-bar {
-		opacity: 1;
-		pointer-events: auto;
-	}
-	.public-id {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
+    div {
+        flex: 1;
+        display: flex;
+    }
+    div.overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+    }
+    div.content {
+        pointer-events: auto;
+        flex: 0;
+    }
+    div.content.outer {
+        flex-direction: column;
+    }
+    div.item {
+        border-bottom: 1px solid gray;
+        z-index: 2;
+        border-right: 1px solid gray;
+        position: relative;
+    }
+    div.item:hover {
+        border-bottom: 1px solid white;
+    }
+    div.wide {
+        flex: 2;
+    }
+    div.header {
+        color: white;
+        display: flex;
+        margin: 0.5em;
+    }
+    .copy-bar {
+        position: absolute;
+        top: 0.5em;
+        right: 0.5em;
+        z-index: 3;
+        display: flex;
+        align-items: center;
+        gap: 0.15rem;
+        max-width: calc(100% - 1em);
+        padding: 0.1rem 0.35rem;
+        border-radius: 0.15rem;
+        background-color: rgb(0 0 0 / 0.55);
+        color: rgb(255 255 255 / 0.85);
+        font-size: 0.75rem;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+    .item:hover .copy-bar {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .public-id {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 </style>

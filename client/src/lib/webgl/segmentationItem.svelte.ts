@@ -1,5 +1,8 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import type { ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
+import type {
+    ModelSegmentationGET,
+    SegmentationGET,
+} from "../../types/openapi_types";
 import { getSegmentationData, getModelSegmentationData } from "../data/helpers";
 import type { NPYArray } from "../utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
@@ -9,7 +12,6 @@ import { TextureData } from "./texture";
 
 // manages the segmentation states (one per scan) for a single segmentation
 export class SegmentationItem {
-
     // mapping of scanNr to SegmentationState
     segmentationStates: SvelteMap<number, SegmentationState> = new SvelteMap();
     /** Scan indices with server data; updated on successful slice PUTs (API object stays static). */
@@ -25,8 +27,8 @@ export class SegmentationItem {
 
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: SegmentationGET | ModelSegmentationGET) {
-
+        readonly segmentation: SegmentationGET | ModelSegmentationGET,
+    ) {
         // Initialize threshold from segmentation or default to 0.5
         this.threshold = this.segmentation.threshold ?? 0.5;
 
@@ -36,8 +38,12 @@ export class SegmentationItem {
             }
         }
 
-        if (Array.isArray(this.segmentation.scan_indices) && this.segmentation.scan_indices.length < 5) {
-            for (const scanNr of this.segmentation.scan_indices ?? Array.from({ length: this.image.depth }, (_, i) => i)) {
+        if (
+            Array.isArray(this.segmentation.scan_indices) &&
+            this.segmentation.scan_indices.length < 5
+        ) {
+            for (const scanNr of this.segmentation.scan_indices ??
+                Array.from({ length: this.image.depth }, (_, i) => i)) {
                 this.getSegmentationState(scanNr, true);
             }
         } else {
@@ -51,9 +57,10 @@ export class SegmentationItem {
 
             // Don't pass axis/scan_nr when loading full volume
             // API requires both axis AND scan_nr together, or neither
-            const array: (NPYArray | null) = this.segmentation.annotation_type === 'model_segmentation'
-                ? await getModelSegmentationData(this.segmentation.id)
-                : await getSegmentationData(this.segmentation.id);
+            const array: NPYArray | null =
+                this.segmentation.annotation_type === "model_segmentation"
+                    ? await getModelSegmentationData(this.segmentation.id)
+                    : await getSegmentationData(this.segmentation.id);
             if (array == null) {
                 // 204: no data - create states for each scan index; each will fetch and set isEmptyForSlice
                 const scanIndices =
@@ -67,7 +74,7 @@ export class SegmentationItem {
             const shape = array.shape as number[];
             // Expecting [depth, height, width]
             if (shape.length != 3) {
-                throw new Error('Invalid shape: ' + shape.join(', '));
+                throw new Error("Invalid shape: " + shape.join(", "));
             }
             const [depth, height, width] = shape;
 
@@ -76,14 +83,19 @@ export class SegmentationItem {
             let scanIndices = this.segmentation.scan_indices;
             if (!scanIndices) {
                 let length;
-                if (this.segmentation.sparse_axis == null || this.segmentation.sparse_axis == undefined) {
+                if (
+                    this.segmentation.sparse_axis == null ||
+                    this.segmentation.sparse_axis == undefined
+                ) {
                     length = this.image.depth;
                     planeSize = this.image.height * this.image.width;
                     if (
                         !this.segmentation.image_projection_matrix &&
-                        (depth != this.image.depth || height != this.image.height || width != this.image.width)
+                        (depth != this.image.depth ||
+                            height != this.image.height ||
+                            width != this.image.width)
                     ) {
-                        throw new Error('Invalid shape: ' + shape.join(', '));
+                        throw new Error("Invalid shape: " + shape.join(", "));
                     }
                 } else if (this.segmentation.sparse_axis == 0) {
                     // sparse along depth, slices of width x height
@@ -91,26 +103,35 @@ export class SegmentationItem {
                     planeSize = height * width;
                     if (
                         !this.segmentation.image_projection_matrix &&
-                        (height != this.image.height || width != this.image.width)
+                        (height != this.image.height ||
+                            width != this.image.width)
                     ) {
-                        throw new Error('Invalid shape: ' + shape.join(', '));
+                        throw new Error("Invalid shape: " + shape.join(", "));
                     }
                 } else if (this.segmentation.sparse_axis == 1) {
                     // sparse along height, slices of width x depth
                     length = height;
                     planeSize = width * depth;
-                    if (depth != this.image.height || width != this.image.width) {
-                        throw new Error('Invalid shape: ' + shape.join(', '));
+                    if (
+                        depth != this.image.height ||
+                        width != this.image.width
+                    ) {
+                        throw new Error("Invalid shape: " + shape.join(", "));
                     }
                 } else if (this.segmentation.sparse_axis == 2) {
                     // sparse along width, slices of depth x height
                     length = width;
                     planeSize = depth * height;
-                    if (height != this.image.height || depth != this.image.depth) {
-                        throw new Error('Invalid shape: ' + shape.join(', '));
+                    if (
+                        height != this.image.height ||
+                        depth != this.image.depth
+                    ) {
+                        throw new Error("Invalid shape: " + shape.join(", "));
                     }
                 } else {
-                    throw new Error('Invalid sparse axis: ' + this.segmentation.sparse_axis);
+                    throw new Error(
+                        "Invalid sparse axis: " + this.segmentation.sparse_axis,
+                    );
                 }
                 scanIndices = Array.from({ length }, (_, i) => i);
             }
@@ -122,7 +143,7 @@ export class SegmentationItem {
                 this.addSavedScanIndex(scanNr);
             }
         } catch (error) {
-            console.error('SegmentationItem loadFull failed', error);
+            console.error("SegmentationItem loadFull failed", error);
         } finally {
             this.loading = false;
         }
@@ -148,9 +169,19 @@ export class SegmentationItem {
         return false;
     }
 
-    getSegmentationState(scanNr: number, create: boolean = false, initialData?: Uint8Array | Uint16Array | Uint32Array | Float32Array): SegmentationState | undefined {
+    getSegmentationState(
+        scanNr: number,
+        create: boolean = false,
+        initialData?: Uint8Array | Uint16Array | Uint32Array | Float32Array,
+    ): SegmentationState | undefined {
         if (create && !this.segmentationStates.has(scanNr)) {
-            const segmentationState = new SegmentationState(this.image, this.segmentation, scanNr, initialData, this);
+            const segmentationState = new SegmentationState(
+                this.image,
+                this.segmentation,
+                scanNr,
+                initialData,
+                this,
+            );
             this.segmentationStates.set(scanNr, segmentationState);
         }
         return this.segmentationStates.get(scanNr)!;
@@ -161,7 +192,11 @@ export class SegmentationItem {
         segmentationState.importOther(mask);
     }
 
-    async draw(scanNr: number, drawing: HTMLCanvasElement, settings: PaintSettings) {
+    async draw(
+        scanNr: number,
+        drawing: HTMLCanvasElement,
+        settings: PaintSettings,
+    ) {
         const segmentationState = this.getSegmentationState(scanNr, true)!;
         await segmentationState.draw(drawing, settings);
     }
@@ -171,7 +206,10 @@ export class SegmentationItem {
         if (segmentationState) {
             segmentationState.undo();
         } else {
-            console.warn("SegmentationItem.undo: segmentationState not found", scanNr);
+            console.warn(
+                "SegmentationItem.undo: segmentationState not found",
+                scanNr,
+            );
         }
     }
 
@@ -180,7 +218,10 @@ export class SegmentationItem {
         if (segmentationState) {
             segmentationState.redo();
         } else {
-            console.warn("SegmentationItem.redo: segmentationState not found", scanNr);
+            console.warn(
+                "SegmentationItem.redo: segmentationState not found",
+                scanNr,
+            );
         }
     }
 
@@ -199,7 +240,9 @@ export class SegmentationItem {
         const { gl } = webgl;
 
         // Get all slices that have segmentation data
-        const scanIndices = this.segmentation.scan_indices ?? Array.from({ length: depth }, (_, i) => i);
+        const scanIndices =
+            this.segmentation.scan_indices ??
+            Array.from({ length: depth }, (_, i) => i);
         const slicesWithData: number[] = [];
 
         for (const scanNr of scanIndices) {
@@ -215,7 +258,7 @@ export class SegmentationItem {
 
         // Create output texture for accumulation (width × depth, R32F)
         // Each horizontal line (y) corresponds to one slice (scanNr)
-        const outputTexture = new TextureData(gl, width, depth, 'R32F');
+        const outputTexture = new TextureData(gl, width, depth, "R32F");
 
         // Initialize to zero
         outputTexture.clearData();
@@ -228,20 +271,25 @@ export class SegmentationItem {
 
             // Get the mask texture - ensure it's synced to GPU
             let maskTexture: WebGLTexture;
-            if ('textureData' in mask && (mask as any).textureData) {
+            if ("textureData" in mask && (mask as any).textureData) {
                 // For AbstractDataMask (ProbabilityMask, MultiClassMask, etc.)
                 (mask as any).textureData.updateGPU();
                 maskTexture = (mask as any).textureData.texture;
-            } else if ('texture' in mask && typeof (mask as any).texture !== 'undefined') {
+            } else if (
+                "texture" in mask &&
+                typeof (mask as any).texture !== "undefined"
+            ) {
                 // For BinaryMask which has a texture getter
                 maskTexture = (mask as any).texture;
             } else {
-                throw new Error(`Cannot get texture from mask type: ${mask.constructor.name}`);
+                throw new Error(
+                    `Cannot get texture from mask type: ${mask.constructor.name}`,
+                );
             }
 
             // Get bitmask for this mask
             let maskBitmask = 1;
-            if ('bitmask' in mask) {
+            if ("bitmask" in mask) {
                 maskBitmask = (mask as any).bitmask;
             }
 
@@ -253,14 +301,14 @@ export class SegmentationItem {
                 height: 1, // Single line height
                 left: 0,
                 bottom: i, // Offset to the correct line (y position)
-                attachments: outputTexture.renderTarget.attachments
+                attachments: outputTexture.renderTarget.attachments,
             };
 
             const uniforms = {
                 u_volume: this.image.texture, // 3D volume texture (may not be used)
                 u_mask: maskTexture,
                 u_mask_bitmask: maskBitmask,
-                height: height // Height dimension to loop over
+                height: height, // Height dimension to loop over
             };
 
             // Render this slice's projection to the specific line

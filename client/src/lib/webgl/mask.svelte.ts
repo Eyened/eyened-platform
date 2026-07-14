@@ -6,11 +6,21 @@ import type { AbstractImage } from "./abstractImage";
 import { segmentationPlaneSize } from "./segmentationProjection";
 import type { TextureShaderProgram } from "./FragmentShaderProgram";
 import type { Shaders } from "./shaders";
-import { BitMaskTexture, createTextureR8UI, imageToTexture, TextureData, type ImageType } from "./texture";
+import {
+    BitMaskTexture,
+    createTextureR8UI,
+    imageToTexture,
+    TextureData,
+    type ImageType,
+} from "./texture";
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
 
-export type DrawingArray = Uint8Array | Uint16Array | Uint32Array | Float32Array;
+export type DrawingArray =
+    | Uint8Array
+    | Uint16Array
+    | Uint32Array
+    | Float32Array;
 
 export interface ImportOptions {
     threshold?: number;
@@ -30,7 +40,7 @@ export abstract class Mask {
 
     constructor(
         readonly image: AbstractImage,
-        readonly segmentation: SegmentationGET
+        readonly segmentation: SegmentationGET,
     ) {
         const plane = segmentationPlaneSize(segmentation, image);
         this.planeWidth = plane.width;
@@ -45,9 +55,7 @@ export abstract class Mask {
     abstract render(renderTarget: RenderTarget, uniforms: any): void;
 }
 
-
 export class BinaryMask extends Mask {
-
     protected _binaryMask: BitMaskTexture | null = null;
     protected webgl: WebGL;
     protected shaders: Shaders;
@@ -61,7 +69,10 @@ export class BinaryMask extends Mask {
 
     get bitMaskTexture(): BitMaskTexture {
         if (!this._binaryMask) {
-            this._binaryMask = this.webgl.binaryMaskManager.allocateMask(this.planeWidth, this.planeHeight);
+            this._binaryMask = this.webgl.binaryMaskManager.allocateMask(
+                this.planeWidth,
+                this.planeHeight,
+            );
         }
         return this._binaryMask!;
     }
@@ -94,7 +105,11 @@ export class BinaryMask extends Mask {
         this._drawMask(this.bitMaskTexture, drawing, paintSettings);
     }
 
-    protected _drawMask(mask: BitMaskTexture, drawing: ImageType, paintSettings: PaintSettings): void {
+    protected _drawMask(
+        mask: BitMaskTexture,
+        drawing: ImageType,
+        paintSettings: PaintSettings,
+    ): void {
         const drawingTexture = imageToTexture(this.webgl.gl, drawing);
         if (paintSettings.dilateErode) {
             mask.passShader(this.shaders.erodeDilate, {
@@ -131,7 +146,6 @@ export class BinaryMask extends Mask {
     }
 
     protected getRenderUniforms(uniforms: any): any {
-
         return {
             ...uniforms,
             u_binary_mask: this.texture,
@@ -140,17 +154,18 @@ export class BinaryMask extends Mask {
             u_questionable_mask: this.texture,
             u_questionable_bitmask: 0,
             u_has_questionable_mask: false,
-        }
+        };
     }
 
     render(renderTarget: RenderTarget, uniforms: any): void {
-        this.shaders.renderBinary.pass(renderTarget, this.getRenderUniforms(uniforms));
+        this.shaders.renderBinary.pass(
+            renderTarget,
+            this.getRenderUniforms(uniforms),
+        );
     }
-
 
     private connectedComponents: WebGLTexture | undefined;
     private connectedComponentsValid: boolean = false;
-
 
     computeConnectedComponents() {
         const data = this.bitMaskTexture.getData();
@@ -160,14 +175,28 @@ export class BinaryMask extends Mask {
         // upload to texture
         const gl = this.webgl.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.connectedComponents!);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, this.planeWidth, this.planeHeight, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, label);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.R8UI,
+            this.planeWidth,
+            this.planeHeight,
+            0,
+            gl.RED_INTEGER,
+            gl.UNSIGNED_BYTE,
+            label,
+        );
 
         this.connectedComponentsValid = true;
     }
 
     getConnectedComponents(): WebGLTexture {
         if (this.connectedComponents === undefined) {
-            this.connectedComponents = createTextureR8UI(this.webgl.gl, this.planeWidth, this.planeHeight);
+            this.connectedComponents = createTextureR8UI(
+                this.webgl.gl,
+                this.planeWidth,
+                this.planeHeight,
+            );
         }
         if (this.connectedComponentsValid == false) {
             this.computeConnectedComponents();
@@ -179,8 +208,8 @@ export class BinaryMask extends Mask {
         uniforms = {
             ...uniforms,
             u_annotation: this.getConnectedComponents(),
-            u_colors: colorsFlat
-        }
+            u_colors: colorsFlat,
+        };
         this.shaders.renderConnectedComponents.pass(renderTarget, uniforms);
     }
 }
@@ -194,7 +223,10 @@ export class QuestionableMask extends BinaryMask {
 
     get questionableMask(): BitMaskTexture {
         if (!this._questionableMask) {
-            this._questionableMask = this.webgl.binaryMaskManager.allocateMask(this.planeWidth, this.planeHeight);
+            this._questionableMask = this.webgl.binaryMaskManager.allocateMask(
+                this.planeWidth,
+                this.planeHeight,
+            );
         }
         return this._questionableMask!;
     }
@@ -224,7 +256,7 @@ export class QuestionableMask extends BinaryMask {
         for (let i = 0; i < planeSize; i++) {
             let bitmask = 0;
             if (b[i] > 0) {
-                bitmask |= 1
+                bitmask |= 1;
             }
             if (q[i] > 0) {
                 bitmask |= 1 << 1;
@@ -234,15 +266,12 @@ export class QuestionableMask extends BinaryMask {
         return result;
     }
 
-
     draw(drawing: HTMLCanvasElement, paintSettings: PaintSettings): void {
         if (paintSettings.questionable) {
             this._drawMask(this.questionableMask, drawing, paintSettings);
-
         } else {
             super.draw(drawing, paintSettings);
         }
-
     }
 
     clear(): void {
@@ -255,14 +284,13 @@ export class QuestionableMask extends BinaryMask {
         super.dispose();
     }
 
-
     protected getRenderUniforms(uniforms: any): any {
         return {
             ...super.getRenderUniforms(uniforms),
             u_questionable_mask: this.questionableMask.texture,
             u_questionable_bitmask: this.questionableMask.bitmask,
-            u_has_questionable_mask: true
-        }
+            u_has_questionable_mask: true,
+        };
     }
 }
 abstract class AbstractDataMask extends Mask {
@@ -270,7 +298,12 @@ abstract class AbstractDataMask extends Mask {
     constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
         const dataType = segmentation.data_type;
-        this.textureData = new TextureData(image.webgl.gl, this.planeWidth, this.planeHeight, dataType);
+        this.textureData = new TextureData(
+            image.webgl.gl,
+            this.planeWidth,
+            this.planeHeight,
+            dataType,
+        );
     }
 
     importData(data: DrawingArray): void {
@@ -302,7 +335,7 @@ export class ProbabilityMask extends AbstractDataMask {
         const data = this.textureData.data;
         const dataType = this.segmentation.data_type;
         let count = 0;
-        if (dataType === 'R32F') {
+        if (dataType === "R32F") {
             for (let i = 0; i < data.length; i++) {
                 if ((data as Float32Array)[i] > threshold) {
                     count++;
@@ -334,14 +367,13 @@ export class ProbabilityMask extends AbstractDataMask {
     }
 
     drawEnhance(settings: {
-        radiusX: number,
-        radiusY: number,
-        hardness: number,
-        pressure: number,
-        erase: boolean,
-        point: Position2D,
+        radiusX: number;
+        radiusY: number;
+        hardness: number;
+        pressure: number;
+        erase: boolean;
+        point: Position2D;
     }): void {
-
         const uniforms = {
             u_current: this.textureData.texture,
             u_position: [settings.point.x, settings.point.y],
@@ -350,9 +382,12 @@ export class ProbabilityMask extends AbstractDataMask {
             u_hardness: settings.hardness,
             u_erase: settings.erase,
             u_aspectRatio: 1.0,
-        }
+        };
         this.u_hard = false;
-        this.textureData.passShader(this.image.webgl.shaders.drawEnhance, uniforms);
+        this.textureData.passShader(
+            this.image.webgl.shaders.drawEnhance,
+            uniforms,
+        );
         this.afterUpdate(this.segmentation.threshold ?? 0.5);
     }
 
@@ -366,9 +401,12 @@ export class ProbabilityMask extends AbstractDataMask {
             u_current: this.textureData.texture,
             u_drawing: imageToTexture(this.image.webgl.gl, drawing),
             u_paint: paintSettings.paint,
-            u_questionable: paintSettings.questionable
+            u_questionable: paintSettings.questionable,
         };
-        this.textureData.passShader(this.image.webgl.shaders.drawHard, uniforms);
+        this.textureData.passShader(
+            this.image.webgl.shaders.drawHard,
+            uniforms,
+        );
         this.afterUpdate(this.segmentation.threshold ?? 0.5);
     }
 
@@ -377,13 +415,12 @@ export class ProbabilityMask extends AbstractDataMask {
             ...uniforms,
             u_annotation: this.textureData.texture,
             u_hard: this.u_hard,
-        }
+        };
         this.image.webgl.shaders.renderProbability.pass(renderTarget, uniforms);
     }
 }
 
 abstract class BaseMultiMask extends AbstractDataMask {
-
     constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
     }
@@ -397,7 +434,8 @@ abstract class BaseMultiMask extends AbstractDataMask {
             return;
         }
         const activeFeature = this.getBitmask(paintSettings.activeIndices);
-        const isMultiLabel = this.segmentation.data_representation == 'MultiLabel';
+        const isMultiLabel =
+            this.segmentation.data_representation == "MultiLabel";
         const drawingTexture = imageToTexture(this.image.webgl.gl, drawing);
         if (paintSettings.dilateErode) {
             this.textureData.passShader(this.image.webgl.shaders.erodeDilate, {
@@ -432,8 +470,8 @@ abstract class BaseMultiMask extends AbstractDataMask {
             u_annotation: this.textureData.texture,
             u_colors: colorsFlat,
             u_boundaries: undefined,
-            u_active_feature_mask: this.getBitmask(uniforms.activeIndices)
-        }
+            u_active_feature_mask: this.getBitmask(uniforms.activeIndices),
+        };
         this.getRenderShader().pass(renderTarget, uniforms);
     }
 }

@@ -1,13 +1,16 @@
 import type { Position } from "$lib/types";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { photoLocatorsToRegistrationItems, type PhotoLocator } from "./photoLocators";
+import {
+    photoLocatorsToRegistrationItems,
+    type PhotoLocator,
+} from "./photoLocators";
 import { OCTToProj, ProjToOCT } from "./projectionRegistration";
 import type { mappingFunction, RegistrationItem } from "./registrationItem";
 import { getRegistrationSets, type RegistrationSet } from "./registrationItem";
 
 export type Pointer = {
-    image_id: string,
-    position: Position
+    image_id: string;
+    position: Position;
 };
 
 class Mapper<T> {
@@ -34,20 +37,22 @@ class Mapper<T> {
 }
 
 export class Registration {
-
-
-    private pointer: Pointer = { image_id: '', position: { x: 0, y: 0, index: 0 } };
+    private pointer: Pointer = {
+        image_id: "",
+        position: { x: 0, y: 0, index: 0 },
+    };
     private cache = new Map<string, Position | undefined>();
 
     private readonly mappings = new Mapper<mappingFunction>();
     private readonly registrationItems = new Mapper<RegistrationItem>();
-    private shortestPaths: { [node: string]: { [node: string]: string[] } } = allPairsShortestPaths(this.mappings);
+    private shortestPaths: { [node: string]: { [node: string]: string[] } } =
+        allPairsShortestPaths(this.mappings);
 
     // Debounce state for coalescing path recomputation across multiple imports
     private pathsDirty = false;
     private recomputeScheduled = false;
 
-    constructor() { }
+    constructor() {}
 
     // set the pointer position for the given image
     setPosition(source: string, position: Position) {
@@ -56,7 +61,11 @@ export class Registration {
         this.cache.set(source, position);
     }
 
-    private mapPositionAlongPath(source: string, target: string, startPosition: Position): Position | undefined {
+    private mapPositionAlongPath(
+        source: string,
+        target: string,
+        startPosition: Position,
+    ): Position | undefined {
         const path = this.shortestPaths[source]?.[target];
         if (!path) {
             return;
@@ -67,7 +76,7 @@ export class Registration {
             const next = path[i];
             const func = this.mappings.get(current, next);
             if (!func) {
-                console.log('no mapping found', current, next);
+                console.log("no mapping found", current, next);
                 return;
             }
             currentPosition = func(currentPosition);
@@ -80,14 +89,17 @@ export class Registration {
     }
 
     getPosition(image_id: string): Position | undefined {
-        
         if (this.cache.has(image_id)) {
             return this.cache.get(image_id);
         }
-        
+
         const source = this.pointer.image_id;
         const target = image_id;
-        const currentPosition = this.mapPositionAlongPath(source, target, this.pointer.position);
+        const currentPosition = this.mapPositionAlongPath(
+            source,
+            target,
+            this.pointer.position,
+        );
         if (currentPosition !== undefined) {
             this.cache.set(image_id, currentPosition);
         }
@@ -108,7 +120,7 @@ export class Registration {
     // Expose an explicit synchronous recomputation when needed by callers
     public recomputePathsNow() {
         this.pathsDirty = false;
-        this.recomputeScheduled = false;        
+        this.recomputeScheduled = false;
         this.shortestPaths = allPairsShortestPaths(this.mappings);
     }
 
@@ -121,15 +133,19 @@ export class Registration {
         this.importRegistrationItems(items);
     }
 
-
-    importRegistrationItems(items: Iterable<RegistrationItem>, addInverse = true) {
+    importRegistrationItems(
+        items: Iterable<RegistrationItem>,
+        addInverse = true,
+    ) {
         for (const item of items) {
             this.registrationItems.set(item.source, item.target, item);
-            this.mappings.set(item.source, item.target, p => item.mapping(p));
+            this.mappings.set(item.source, item.target, (p) => item.mapping(p));
             if (addInverse) {
                 const inverse = item.inverse;
                 this.registrationItems.set(item.target, item.source, inverse);
-                this.mappings.set(item.target, item.source, p => inverse.mapping(p));
+                this.mappings.set(item.target, item.source, (p) =>
+                    inverse.mapping(p),
+                );
             }
         }
         this.pathsDirty = true;
@@ -147,23 +163,28 @@ export class Registration {
         return new Set(Object.keys(this.shortestPaths[source] ?? {}));
     }
 
-    mapPosition(source: string, target: string, position: Position): Position | undefined {
+    mapPosition(
+        source: string,
+        target: string,
+        position: Position,
+    ): Position | undefined {
         if (source == target) {
             return position;
         }
         return this.mapPositionAlongPath(source, target, position);
     }
 
-
-    getRegistrationItem(source: string, target: string): RegistrationItem | undefined {
+    getRegistrationItem(
+        source: string,
+        target: string,
+    ): RegistrationItem | undefined {
         return this.registrationItems.get(source, target);
     }
 }
 
-
-function allPairsShortestPaths(
-    graph: Mapper<mappingFunction>,
-): { [node: string]: { [node: string]: string[] } } {
+function allPairsShortestPaths(graph: Mapper<mappingFunction>): {
+    [node: string]: { [node: string]: string[] };
+} {
     const allNodes = new Set<string>();
     for (const [source, neighbors] of graph.sourceEntries()) {
         allNodes.add(source);
@@ -176,7 +197,11 @@ function allPairsShortestPaths(
 
     const paths: { [node: string]: { [node: string]: string[] } } = {};
 
-    function reconstructPath(source: string, target: string, prev: Map<string, string | null>): string[] | null {
+    function reconstructPath(
+        source: string,
+        target: string,
+        prev: Map<string, string | null>,
+    ): string[] | null {
         if (!prev.has(target)) {
             return null;
         }

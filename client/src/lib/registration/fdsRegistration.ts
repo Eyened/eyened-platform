@@ -1,6 +1,10 @@
 // import { getInstanceByDataSourceId } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
+import {
+    CirclePhotoLocator,
+    LinePhotoLocator,
+    type PhotoLocator,
+} from "./photoLocators";
 
 // API types (different from the PhotoLocator interface):
 // type Point = {
@@ -30,25 +34,40 @@ export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
 
     if (instance.attrs?.PhotoLocators) {
         const parsePhotoLocator = (photoLocator: any): PhotoLocator => {
-            if (photoLocator.type === 'LinePhotoLocator') {
+            if (photoLocator.type === "LinePhotoLocator") {
                 const enfaceImageId = photoLocator.image_id;
                 const start = photoLocator.start;
                 const end = photoLocator.end;
                 const index = photoLocator.index;
                 const width = image.width;
-                return new LinePhotoLocator(enfaceImageId, octID, start, end, index, width);
+                return new LinePhotoLocator(
+                    enfaceImageId,
+                    octID,
+                    start,
+                    end,
+                    index,
+                    width,
+                );
             }
-            if (photoLocator.type === 'CirclePhotoLocator') {
+            if (photoLocator.type === "CirclePhotoLocator") {
                 const enfaceImageId = photoLocator.image_id;
                 const centre = photoLocator.centre;
                 const radius = photoLocator.radius;
                 const start_angle = photoLocator.start_angle;
                 const index = photoLocator.index;
                 const width = image.width;
-                return new CirclePhotoLocator(enfaceImageId, octID, centre, radius, start_angle, index, width);
+                return new CirclePhotoLocator(
+                    enfaceImageId,
+                    octID,
+                    centre,
+                    radius,
+                    start_angle,
+                    index,
+                    width,
+                );
             }
             throw new Error(`Unknown photo locator type: ${photoLocator.type}`);
-        }
+        };
         return instance.attrs.PhotoLocators.map(parsePhotoLocator);
     }
 
@@ -83,8 +102,6 @@ export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
     // const [n_scans, h, w] = oct_shape;
     // const [x0, y0] = top_left;
     // const [x1, y1] = bottom_right;
-
-
 
     // const photoLocations: LinePhotoLocator[] = Array.from({ length: n_scans }, (_, i) => {
     //     const r = i / n_scans;

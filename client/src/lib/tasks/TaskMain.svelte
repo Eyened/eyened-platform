@@ -10,7 +10,7 @@
 
     globalContext.updateConfig(taskContext.task.task_definition.config);
 
-    const instanceIDs = taskContext.subTask.images.map(image => image.id);
+    const instanceIDs = taskContext.subTask.images.map((image) => image.id);
 </script>
 
 <ViewerWindowLoader {instanceIDs} />

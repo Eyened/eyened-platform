@@ -1,47 +1,74 @@
 import { instances } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { ImageGET } from "../../types/openapi_types";
-import { CirclePhotoLocator, LinePhotoLocator, type PhotoLocator } from "./photoLocators";
+import {
+    CirclePhotoLocator,
+    LinePhotoLocator,
+    type PhotoLocator,
+} from "./photoLocators";
 
 function getSourceID(instance: ImageGET) {
     return instance.data_source_id ?? "";
 }
-export function getPrivateEyeRegistrationHeidelberg(image: AbstractImage): PhotoLocator[] {
+export function getPrivateEyeRegistrationHeidelberg(
+    image: AbstractImage,
+): PhotoLocator[] {
     const { instance, meta } = image;
     if (!meta?.images?.images?.length) return [];
     const source_id = getSourceID(instance);
-    if (!source_id.startsWith('OCT')) return [];
+    if (!source_id.startsWith("OCT")) return [];
 
-    const oct_image_meta = meta.images.images.find((image: any) => image.source_id == source_id);
+    const oct_image_meta = meta.images.images.find(
+        (image: any) => image.source_id == source_id,
+    );
     if (!oct_image_meta) return [];
 
-    const source_id_nr = source_id.split('-').pop();
+    const source_id_nr = source_id.split("-").pop();
 
     const linked_image = meta.images.images.find((image: any) => {
         if (image.source_id === source_id) return false;
-        if (image.source_id.split('-').pop() !== source_id_nr) return false;
+        if (image.source_id.split("-").pop() !== source_id_nr) return false;
         return true;
     });
     if (!linked_image) return [];
 
-    const instance_series = instances.filter(i => i.series.id == instance.series.id);
-    const enfaceInstance = instance_series.find(i => getSourceID(i) == linked_image.source_id);
+    const instance_series = instances.filter(
+        (i) => i.series.id == instance.series.id,
+    );
+    const enfaceInstance = instance_series.find(
+        (i) => getSourceID(i) == linked_image.source_id,
+    );
     if (!enfaceInstance) return [];
     const enfaceID = `${enfaceInstance.id}`;
     const octID = `${instance.id}`;
 
-    const photoLocators: PhotoLocator[] = oct_image_meta.contents.map(
-        (item: { photo_locations: any[] }, index: number) => {
+    const photoLocators: PhotoLocator[] = oct_image_meta.contents
+        .map((item: { photo_locations: any[] }, index: number) => {
             const locator = item.photo_locations[0];
             const { start, end, centre, radius, start_angle } = locator;
             if (start && end) {
-                return new LinePhotoLocator(enfaceID, octID, start, end, index, instance.columns);
+                return new LinePhotoLocator(
+                    enfaceID,
+                    octID,
+                    start,
+                    end,
+                    index,
+                    instance.columns,
+                );
             }
             if (centre && radius) {
-                return new CirclePhotoLocator(enfaceID, octID, centre, radius, start_angle, index, instance.columns);
+                return new CirclePhotoLocator(
+                    enfaceID,
+                    octID,
+                    centre,
+                    radius,
+                    start_angle,
+                    index,
+                    instance.columns,
+                );
             }
             return null;
-        }
-    ).filter(Boolean);
+        })
+        .filter(Boolean);
     return photoLocators;
 }

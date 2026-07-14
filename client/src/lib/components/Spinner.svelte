@@ -1,4 +1,7 @@
-<div class="lds-ripple"><div></div><div></div></div>
+<div class="lds-ripple">
+    <div></div>
+    <div></div>
+</div>
 
 <style type="text/css">
     .lds-ripple {
