@@ -15,7 +15,9 @@
     "verify:runes": "if grep -rEn '^[[:space:]]*export[[:space:]]+let[[:space:]]' src --include='*.svelte'; then echo 'Found legacy export let declarations above (Svelte 5 uses runes props); expected 0'; exit 1; fi",
     "check:unused": "unimported",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@iconify/json": "^2.2.142",
