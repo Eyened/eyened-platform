@@ -135,10 +135,10 @@ def _modality_where(modality: str | None):
     return ImageInstance.Modality == mod
 
 
-def _validate_image_spec(spec: TargetSpec) -> None:
+def _validate_image_spec(spec: TargetSpec, *, allow_default: bool = False) -> None:
     explicit = bool(spec.image_ids_file or spec.image_ids)
     scoped = bool(spec.project or spec.patient)
-    if not explicit and not scoped:
+    if not explicit and not scoped and not allow_default:
         raise click.UsageError(
             "Provide a target via --path, --image-ids, --project, and/or --patient"
         )
@@ -158,9 +158,30 @@ def _validate_patient_spec(spec: TargetSpec) -> None:
         )
 
 
-def resolve_image_target(session: Session, spec: TargetSpec) -> ImageTarget:
+def _resolve_all_image_ids(
+    session: Session,
+    *,
+    modality: str | None = None,
+    include_inactive: bool = False,
+) -> set[int]:
+    """All image instance IDs, optionally filtered by modality and active status."""
+    from eyened_orm import ImageInstance
+    from sqlalchemy import select
+
+    statement = select(ImageInstance.ImageInstanceID)
+    if not include_inactive:
+        statement = statement.where(~ImageInstance.Inactive)
+    modality_where = _modality_where(modality)
+    if modality_where is not None:
+        statement = statement.where(modality_where)
+    return set(session.scalars(statement).all())
+
+
+def resolve_image_target(
+    session: Session, spec: TargetSpec, *, allow_default: bool = False
+) -> ImageTarget:
     """Resolve a :class:`TargetSpec` to a set of ``ImageInstanceID`` values."""
-    _validate_image_spec(spec)
+    _validate_image_spec(spec, allow_default=allow_default)
     where = _modality_where(spec.modality)
     image_ids: set[int] = set()
     summary_parts: list[str] = []
@@ -199,6 +220,14 @@ def resolve_image_target(session: Session, spec: TargetSpec) -> ImageTarget:
             summary_parts.append(
                 f"{len(image_ids)} images in project {proj.ProjectName!r}{mod_note}"
             )
+        elif allow_default:
+            image_ids = _resolve_all_image_ids(
+                session,
+                modality=spec.modality,
+                include_inactive=spec.include_inactive,
+            )
+            mod_note = f" ({spec.modality})" if spec.modality else ""
+            summary_parts.append(f"all {len(image_ids)} images{mod_note}")
 
     if spec.exclude:
         exclude_ids = {resolve_identifier(session, token) for token in spec.exclude}
@@ -347,7 +376,7 @@ def image_target_options(*, require_one: bool = True) -> Callable:
             "--modality",
             type=_modality_click_type(),
             default=None,
-            help="Filter by modality when using --project or --patient",
+            help="Filter by modality (also applies when targeting all images)",
         )(f)
         f = click.option(
             "--include-inactive",

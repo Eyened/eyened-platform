@@ -13,7 +13,8 @@ Command utilities for the eyened ORM.
 
 The following commands are available:
 - update-thumbnails: Update thumbnails for all images in the database.
-- run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
+- run-cfi-models: Run CFI attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality).
+- run-models: Deprecated alias for run-cfi-models.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
 - run-cfi-amd: Run CFI AMD segmentation models.
 - run-registration: Pairwise CFI/AF/IR registration per patient; scope with --patient or --project.

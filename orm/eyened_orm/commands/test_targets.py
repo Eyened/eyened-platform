@@ -149,3 +149,23 @@ def test_load_ids_from_file_skips_comments(session, tmp_path):
     path.write_text(f"\n# skip\n{images[0].ImageInstanceID}\n")
     ids = load_ids_from_file(session, str(path))
     assert ids == {images[0].ImageInstanceID}
+
+
+def test_resolve_image_target_default_all_images(session):
+    _proj, images = _import_images(session)
+    target = resolve_image_target(session, TargetSpec(), allow_default=True)
+    assert target.image_ids == {im.ImageInstanceID for im in images}
+    assert "all" in target.summary
+
+
+def test_resolve_image_target_default_with_modality(session):
+    _proj, images = _import_images(session)
+    spec = TargetSpec(modality="ColorFundus")
+    target = resolve_image_target(session, spec, allow_default=True)
+    cfi = next(im for im in images if im.Modality.name == "ColorFundus")
+    assert target.image_ids == {cfi.ImageInstanceID}
+
+
+def test_resolve_image_target_requires_target_without_allow_default(session):
+    with pytest.raises(click.UsageError, match="Provide a target"):
+        resolve_image_target(session, TargetSpec())

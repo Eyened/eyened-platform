@@ -7,7 +7,7 @@ sidebar:
 
 The ORM runs inference through `eorm` commands that write results to the database (`AttributeValue`, `ModelSegmentation`, or patient-level registration JSON). All image-scoped commands share the same **[targeting flags](/eyened-platform/orm/cli#targeting)**.
 
-## Attribute models (`run-models`)
+## Attribute models (`run-cfi-models`)
 
 Runs **AttributesModel** pipelines — CFI ROI, keypoints, quality scores, etc. Each model:
 - Registers as a `Model` row (`ModelName` + `Version`)
@@ -15,9 +15,14 @@ Runs **AttributesModel** pipelines — CFI ROI, keypoints, quality scores, etc. 
 - Skips images that already have output (use `--overwrite` to reprocess)
 
 ```bash
-eorm run-models --project "My Study" --modality ColorFundus
-eorm run-models --path ids.txt
+eorm run-cfi-models
+eorm run-cfi-models --project "My Study" --modality ColorFundus
+eorm run-cfi-models --path ids.txt
 ```
+
+With no targeting flags, processes all active images. Each model only runs on supported modalities (currently ColorFundus).
+
+`run-models` is a deprecated alias for `run-cfi-models`.
 
 Implementation uses optional preprocess → batch → postprocess stages; see `orm/eyened_orm/commands/` in the repository for extending with custom models.
 
