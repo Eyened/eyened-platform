@@ -35,6 +35,14 @@ class ModelInputSpec:
         return self.input_name or self.attribute_name
 
 
+CFI_ROI_INPUT = ModelInputSpec(
+    attribute_name="CFI_ROI",
+    model_name="CFI_ROI",
+    min_version="1.0",
+    attribute_data_type=AttributeDataType.JSON,
+)
+
+
 def _version_rank(model_name: str, version: str) -> int:
     order = VERSION_ORDER.get(model_name)
     if order is None:
@@ -151,12 +159,14 @@ def resolve_inputs_for_images(
     return resolved
 
 
-def roi_value_from_inputs(inputs: dict[str, AttributeValue] | None) -> dict | None:
-    """Extract CFI_ROI JSON from resolved input values."""
-    if not inputs:
-        return None
-    roi_av = inputs.get("CFI_ROI")
-    if roi_av is None:
-        return None
-    value = roi_av.value
-    return value if isinstance(value, dict) else None
+def attribute_value_data(av: AttributeValue) -> Any:
+    """Read the stored value from column fields (no lazy-loaded relationships)."""
+    if av.ValueJSON is not None:
+        return av.ValueJSON
+    if av.ValueFloat is not None:
+        return av.ValueFloat
+    if av.ValueInt is not None:
+        return av.ValueInt
+    if av.ValueText is not None:
+        return av.ValueText
+    return None

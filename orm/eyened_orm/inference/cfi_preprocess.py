@@ -2,26 +2,28 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
+from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
 from eyened_orm.inference.utils import normalize
-
-
-@dataclass(frozen=True)
-class PreprocessItem:
-    """Picklable worker payload: decoded RGB + optional stored CFI_ROI dict."""
-
-    image_rgb: np.ndarray | None
-    roi_dict: dict | None = None
 
 
 def roi_dict_usable(roi_dict: dict | None) -> bool:
     if roi_dict is None:
         return False
     return roi_dict.get("success") is not False
+
+
+def cfi_roi_from_input_values(
+    input_values: dict[str, Any] | None,
+) -> dict | None:
+    """Extract CFI_ROI JSON from resolved model input data."""
+    if not input_values:
+        return None
+    value = input_values.get(CFI_ROI_INPUT.resolved_input_name)
+    return value if isinstance(value, dict) else None
 
 
 def bounds_from_roi_dict(

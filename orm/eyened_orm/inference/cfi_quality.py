@@ -5,9 +5,12 @@ import torch
 import torch.nn.functional as F
 
 from eyened_orm import AttributeDataType, Modality
-from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
-from eyened_orm.inference.cfi_preprocess import PreprocessItem, crop_fundus_from_roi
-from eyened_orm.inference.model_inputs import ModelInputSpec
+from eyened_orm.inference.attribute_inference import (
+    InferenceItem,
+    TorchAttributeInferencePipeline,
+)
+from eyened_orm.inference.cfi_preprocess import cfi_roi_from_input_values, crop_fundus_from_roi
+from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
 from rtnls_inference import ClassificationEnsemble
 
 
@@ -30,14 +33,7 @@ class CFI_Quality(TorchAttributeInferencePipeline):
     attribute_name = "CFI_Quality"
     attribute_data_type = AttributeDataType.Float
     supported_modalities = (Modality.ColorFundus,)
-    required_inputs = (
-        ModelInputSpec(
-            "CFI_ROI",
-            "CFI_ROI",
-            "1.0",
-            attribute_data_type=AttributeDataType.JSON,
-        ),
-    )
+    required_inputs = (CFI_ROI_INPUT,)
 
     def __init__(
         self,
@@ -62,13 +58,13 @@ class CFI_Quality(TorchAttributeInferencePipeline):
         assert self.ensemble.config["datamodule"]["test_transform"]["resize"] == 224
         self.resize = 224
 
-    def preprocess(self, item: PreprocessItem | None) -> Tuple[Any, np.ndarray] | None:
+    def preprocess(self, item: InferenceItem | None) -> Tuple[Any, np.ndarray] | None:
         """Preprocess image for quality assessment using stored CFI_ROI."""
         if item is None or item.image_rgb is None:
             return None
         return crop_fundus_from_roi(
             item.image_rgb,
-            item.roi_dict,
+            cfi_roi_from_input_values(item.input_values),
             resize=self.resize,
             apply_ce=False,
         )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, Iterator, List, Set, Tuple
 
 import numpy as np
@@ -13,18 +14,25 @@ from eyened_orm import (
     ImageInstance,
     Modality,
 )
-from eyened_orm.inference.cfi_preprocess import PreprocessItem
 from eyened_orm.inference.model_inputs import (
     ModelInputSpec,
+    attribute_value_data,
     register_model_inputs,
     register_model_output,
     resolve_inputs_for_images,
-    roi_value_from_inputs,
 )
 from eyened_orm.inference.multi_process_inference import (
     BaseInferencePipeline,
     MultiProcessInference,
 )
+
+
+@dataclass(frozen=True)
+class InferenceItem:
+    """Picklable worker payload: decoded pixels and optional resolved input data."""
+
+    image_rgb: np.ndarray | None
+    input_values: dict[str, Any] | None = None
 
 
 class AttributeInferencePipeline(BaseInferencePipeline):
@@ -137,6 +145,14 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             av.InputValues = set(input_values.values())
             self.session.add(av)
 
+    def _ensure_inputs_resolved(self, image_ids: Iterable[int]) -> None:
+        if not self.required_inputs:
+            self._input_values_by_image = {}
+            return
+        self._input_values_by_image = resolve_inputs_for_images(
+            self.session, set(image_ids), self.required_inputs
+        )
+
     def _filter_images_with_required_inputs(
         self, image_ids: Iterable[int]
     ) -> Set[int]:
@@ -147,11 +163,9 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         missing = 0
         for image_id in image_ids:
             inputs = self._input_values_by_image.get(image_id, {})
-            if len(inputs) != len(self.required_inputs):
-                missing += 1
-                continue
-            roi_dict = roi_value_from_inputs(inputs)
-            if roi_dict is None or roi_dict.get("success") is False:
+            if not all(
+                spec.resolved_input_name in inputs for spec in self.required_inputs
+            ):
                 missing += 1
                 continue
             ready.add(image_id)
@@ -177,30 +191,46 @@ class AttributeInferencePipeline(BaseInferencePipeline):
 
         pending = image_ids_set - existing_ids
         if self.required_inputs:
-            self._input_values_by_image = resolve_inputs_for_images(
-                self.session, pending, self.required_inputs
-            )
+            self._ensure_inputs_resolved(pending)
             pending = self._filter_images_with_required_inputs(pending)
         else:
             self._input_values_by_image = {}
 
         return pending
 
+    def _input_data_for_image(self, image_id: int) -> dict[str, Any] | None:
+        """Plain input values for worker processes (ORM objects stay in the parent)."""
+        if not self.required_inputs:
+            return None
+        inputs = self._input_values_by_image.get(image_id)
+        if not inputs:
+            return None
+        return {
+            name: attribute_value_data(av) for name, av in inputs.items()
+        }
+
+    def _load_image_rgb(self, image: ImageInstance) -> np.ndarray:
+        """Load decoded pixels for one image. Override in modality-specific subclasses."""
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement _load_image_rgb"
+        )
+
     def _build_preprocess_items(
         self, images: list[ImageInstance]
-    ) -> list[tuple[int, PreprocessItem | None]]:
-        from eyened_orm.inference.utils import load_fundus_rgb
-
-        items: list[tuple[int, PreprocessItem | None]] = []
+    ) -> list[tuple[int, InferenceItem | None]]:
+        items: list[tuple[int, InferenceItem | None]] = []
         for img in images:
-            inputs = self._input_values_by_image.get(img.ImageInstanceID, {})
-            roi_dict = roi_value_from_inputs(inputs) if self.required_inputs else None
             try:
-                image_rgb = load_fundus_rgb(img)
+                image_rgb = self._load_image_rgb(img)
                 items.append(
                     (
                         img.ImageInstanceID,
-                        PreprocessItem(image_rgb=image_rgb, roi_dict=roi_dict),
+                        InferenceItem(
+                            image_rgb=image_rgb,
+                            input_values=self._input_data_for_image(
+                                img.ImageInstanceID
+                            ),
+                        ),
                     )
                 )
             except Exception as exc:
@@ -216,10 +246,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         if not image_ids_set:
             return
 
-        if self.required_inputs and not self._input_values_by_image:
-            self._input_values_by_image = resolve_inputs_for_images(
-                self.session, image_ids_set, self.required_inputs
-            )
+        self._ensure_inputs_resolved(image_ids_set)
 
         images = ImageInstance.by_ids(self.session, image_ids_set)
         items = self._build_preprocess_items(images)
@@ -247,7 +274,16 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         self.session.commit()
 
 
-class TorchAttributeInferencePipeline(AttributeInferencePipeline):
+class CFIAttributeInferencePipeline(AttributeInferencePipeline):
+    """Color fundus attribute pipelines: load pixels via the ORM data-access layer."""
+
+    def _load_image_rgb(self, image: ImageInstance) -> np.ndarray:
+        from eyened_orm.inference.utils import load_fundus_rgb
+
+        return load_fundus_rgb(image)
+
+
+class TorchAttributeInferencePipeline(CFIAttributeInferencePipeline):
     """Attribute pipeline that runs PyTorch models (imports ``torch`` only when used)."""
 
     def _prepare_torch_batch(self, prep_batch: List[Any]) -> Any:

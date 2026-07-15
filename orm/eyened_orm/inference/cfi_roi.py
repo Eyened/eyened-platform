@@ -3,13 +3,15 @@ from typing import Any, Dict, Optional
 import numpy as np
 
 from eyened_orm import AttributeDataType, Modality
-from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
-from eyened_orm.inference.cfi_preprocess import PreprocessItem
+from eyened_orm.inference.attribute_inference import (
+    CFIAttributeInferencePipeline,
+    InferenceItem,
+)
 
 from rtnls_fundusprep.mask_extraction import get_cfi_bounds
 
 
-class CFI_ROI(AttributeInferencePipeline):
+class CFI_ROI(CFIAttributeInferencePipeline):
     """CFI ROI detection pipeline - extracts CFI bounds from fundus images."""
 
     model_name = "CFI_ROI"
@@ -22,7 +24,7 @@ class CFI_ROI(AttributeInferencePipeline):
     def __init__(self, session, n_workers: int = 8, **kwargs):
         super().__init__(session, n_workers=n_workers)
 
-    def preprocess(self, item: PreprocessItem | None) -> Optional[Dict[str, Any]]:
+    def preprocess(self, item: InferenceItem | None) -> Optional[Dict[str, Any]]:
         if item is None or item.image_rgb is None:
             return None
         try:

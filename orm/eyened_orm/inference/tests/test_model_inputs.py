@@ -11,6 +11,7 @@ from eyened_orm import (
 from eyened_orm.commands.test_targets import _import_images
 from eyened_orm.inference.model_inputs import (
     ModelInputSpec,
+    attribute_value_data,
     resolve_input_attribute_value,
     version_at_least,
 )
@@ -56,6 +57,11 @@ def test_resolve_input_attribute_value_picks_matching_version(session):
     )
     assert resolved is not None
     assert resolved.AttributeValueID == av.AttributeValueID
+
+
+def test_attribute_value_data_reads_columns_without_relationships():
+    av = AttributeValue(ValueJSON={"center": [1, 2]})
+    assert attribute_value_data(av) == {"center": [1, 2]}
 
 
 def test_pipeline_registers_model_inputs_and_outputs(session):
