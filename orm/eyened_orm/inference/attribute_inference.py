@@ -21,6 +21,11 @@ from eyened_orm.inference.model_inputs import (
     register_model_output,
     resolve_inputs_for_images,
 )
+from eyened_orm.inference.attribute_value_outcome import (
+    failure_update_values,
+    image_ids_with_recorded_outcome,
+    success_update_values,
+)
 from eyened_orm.inference.multi_process_inference import (
     BaseInferencePipeline,
     MultiProcessInference,
@@ -123,13 +128,6 @@ class AttributeInferencePipeline(BaseInferencePipeline):
 
     def _save_result(self, image_id: int, result: Any) -> None:
         """Save result to database and link input provenance when available."""
-        if self.attribute_data_type == AttributeDataType.JSON:
-            update_values = {"ValueJSON": result}
-        elif self.attribute_data_type == AttributeDataType.Float:
-            update_values = {"ValueFloat": result}
-        else:
-            update_values = {"ValueJSON": result}
-
         av = AttributeValue.upsert(
             self.session,
             match_by={
@@ -137,13 +135,25 @@ class AttributeInferencePipeline(BaseInferencePipeline):
                 "ModelID": self.model.ModelID,
                 "ImageInstanceID": image_id,
             },
-            update_values=update_values,
+            update_values=success_update_values(self.attribute_data_type, result),
         )
 
         input_values = self._input_values_by_image.get(image_id)
         if input_values:
             av.InputValues = set(input_values.values())
             self.session.add(av)
+
+    def _save_failure(self, image_id: int) -> None:
+        """Record a failed inference attempt (null value columns, row retained)."""
+        AttributeValue.upsert(
+            self.session,
+            match_by={
+                "AttributeID": self.attr_definition.AttributeID,
+                "ModelID": self.model.ModelID,
+                "ImageInstanceID": image_id,
+            },
+            update_values=failure_update_values(),
+        )
 
     def _ensure_inputs_resolved(self, image_ids: Iterable[int]) -> None:
         if not self.required_inputs:
@@ -174,22 +184,22 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         return ready
 
     def filter_image_ids(self, image_ids: Iterable[int]) -> Set[int]:
-        """Filter out image IDs that already have results."""
+        """Filter out image IDs that already have succeeded or failed results."""
+        from sqlalchemy import select
+
         image_ids_set = set(image_ids)
 
-        existing_ids = set(
-            AttributeValue.select(
-                self.session,
-                "ImageInstanceID",
-                AttributeID=self.attr_definition.AttributeID,
-                ModelID=self.model.ModelID,
-                ImageInstanceID=image_ids_set,
-            )
+        stmt = select(AttributeValue).where(
+            AttributeValue.AttributeID == self.attr_definition.AttributeID,
+            AttributeValue.ModelID == self.model.ModelID,
+            AttributeValue.ImageInstanceID.in_(image_ids_set),
         )
-        if existing_ids:
-            print(f"Skipping {len(existing_ids)} existing images")
+        existing = list(self.session.scalars(stmt).all())
+        recorded_ids = image_ids_with_recorded_outcome(existing)
+        if recorded_ids:
+            print(f"Skipping {len(recorded_ids)} images with existing results")
 
-        pending = image_ids_set - existing_ids
+        pending = image_ids_set - recorded_ids
         if self.required_inputs:
             self._ensure_inputs_resolved(pending)
             pending = self._filter_images_with_required_inputs(pending)
@@ -269,6 +279,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
                 self.session.commit()
             if result is None:
                 print(f"Image {image_id} failed to process")
+                self._save_failure(image_id)
                 continue
             self._save_result(image_id, result)
         self.session.commit()

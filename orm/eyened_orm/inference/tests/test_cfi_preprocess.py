@@ -4,16 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from eyened_orm.inference.cfi_preprocess import (
-    crop_fundus_from_roi,
-    roi_dict_usable,
-)
+from eyened_orm.inference.cfi_preprocess import crop_fundus_from_roi
 from rtnls_fundusprep.cfi_bounds import CFIBounds
-
-
-def test_roi_dict_usable_rejects_failed_roi():
-    assert roi_dict_usable({"success": False}) is False
-    assert roi_dict_usable({"center": [1, 2], "radius": 3}) is True
 
 
 def test_crop_fundus_from_roi_uses_stored_bounds():

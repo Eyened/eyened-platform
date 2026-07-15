@@ -10,12 +10,6 @@ from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
 from eyened_orm.inference.utils import normalize
 
 
-def roi_dict_usable(roi_dict: dict | None) -> bool:
-    if roi_dict is None:
-        return False
-    return roi_dict.get("success") is not False
-
-
 def cfi_roi_from_input_values(
     input_values: dict[str, Any] | None,
 ) -> dict | None:
@@ -49,7 +43,7 @@ def crop_fundus_from_roi(
     hw: tuple[int | None, int | None] | None = None,
 ) -> tuple[Any, np.ndarray] | None:
     """Crop and normalize a fundus image using a stored CFI_ROI attribute."""
-    if not roi_dict_usable(roi_dict):
+    if roi_dict is None:
         return None
     bounds = bounds_from_roi_dict(roi_dict, image_rgb, hw=hw)
     transform, bounds_cropped = bounds.crop(resize)

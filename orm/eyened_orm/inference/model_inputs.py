@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 from eyened_orm import AttributeDataType
+from eyened_orm.inference.attribute_value_outcome import is_available_input
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -132,6 +133,7 @@ def resolve_input_attribute_value(
         and version_at_least(
             spec.model_name, av.ProducingModel.Version, spec.min_version
         )
+        and is_available_input(av)
     ]
     if not eligible:
         return None

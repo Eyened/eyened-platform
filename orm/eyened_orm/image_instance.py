@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import re
 import secrets
 import tempfile
@@ -26,6 +27,8 @@ from eyened_orm.data_access import get_data_access_adapter
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
 from .types import OptionalEnum
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series, Tag
@@ -483,11 +486,32 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def roi(self) -> Optional[Dict[str, Any]]:
-        roi = self.get_attribute_value(attribute_name="CFI_ROI")
-        if roi is not None:
-            # this may be missing in the database for older images
-            if "hw" not in roi:
-                roi["hw"] = (self.Rows_y, self.Columns_x)
+        from eyened_orm.inference.attribute_value_outcome import (
+            AttributeValueOutcome,
+            attribute_value_outcome,
+        )
+
+        av = self.find_attribute_value(attribute_name="CFI_ROI")
+        if av is None:
+            logger.warning(
+                "Image %s: CFI_ROI attribute not found (model has not run)",
+                self.ImageInstanceID,
+            )
+            return None
+
+        if attribute_value_outcome(av) == AttributeValueOutcome.FAILED:
+            logger.warning(
+                "Image %s: CFI_ROI computation failed (attribute value is empty)",
+                self.ImageInstanceID,
+            )
+            return None
+
+        roi = av.ValueJSON
+        if not isinstance(roi, dict):
+            return None
+        # this may be missing in the database for older images
+        if "hw" not in roi:
+            roi["hw"] = (self.Rows_y, self.Columns_x)
         return roi
 
     @property
@@ -619,21 +643,13 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def bounds(self) -> Optional[CFIBounds]:
         if self.roi is None:
             return None
-        else:
-            if "success" in self.roi and self.roi["success"] is False:
-                return None
-            # use bounds from database
-            return CFIBounds(**self.roi)
+        return CFIBounds(**self.roi)
 
     @property
     def bounds_with_image(self) -> Optional[CFIBounds]:
         if self.roi is None:
             return None
-        else:
-            if "success" in self.roi and self.roi["success"] is False:
-                return None
-            # use bounds from database
-            return CFIBounds(**self.roi, image=self.pixel_array)
+        return CFIBounds(**self.roi, image=self.pixel_array)
 
     @property
     def _attrs_keypoints(self):

@@ -182,10 +182,7 @@ def _needs_cfi_roi(im: ImageInstance) -> bool:
 
     if im.Modality != Modality.ColorFundus:
         return False
-    roi = im.roi
-    if roi is None:
-        return True
-    return roi.get("success") is False
+    return im.roi is None
 
 
 def ensure_cfi_roi_for_thumbnails(session: Session, images: list[ImageInstance]) -> None:
