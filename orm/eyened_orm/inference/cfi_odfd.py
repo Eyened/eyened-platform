@@ -1,11 +1,9 @@
-import os
-from os import PathLike
 from typing import Any, Iterable, List, Optional, Tuple
 
 import numpy as np
 import torch
 
-from eyened_orm import AttributeDataType
+from eyened_orm import AttributeDataType, Modality
 from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
 from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference import RegressionEnsemble
@@ -16,11 +14,10 @@ class CFI_ODFD(TorchAttributeInferencePipeline):
 
     model_name = "CFI_ODFD"
     model_version = "odfd_march25"
-    model_description = (
-        "Estimates the distance from the fovea to optic disc border in pixels"
-    )
+    model_description = "Eyened/vascx:odfd/odfd_march25.pt"
     attribute_name = "CFI_ODFD"
     attribute_data_type = AttributeDataType.Float
+    supported_modalities = (Modality.ColorFundus,)
 
     def __init__(
         self,
@@ -41,18 +38,17 @@ class CFI_ODFD(TorchAttributeInferencePipeline):
 
     def _load_models(self) -> None:
         """Load regression ensemble model."""
-        # print(
-        #     f"Loading model {self.model_version} from {os.getenv('RTNLS_MODEL_RELEASES')}"
-        # )
-        self.ensemble = RegressionEnsemble.from_release(f"{self.model_version}.pt").to(
-            self.device
-        )
+        self.ensemble = RegressionEnsemble.from_huggingface(
+            "Eyened/vascx:odfd/odfd_march25.pt"
+        ).to(self.device)
         assert self.ensemble.config["datamodule"]["test_transform"]["resize"] == 512
         self.resize = 512
 
-    def preprocess(self, image_path: PathLike[str]) -> Tuple[Any, np.ndarray]:
+    def preprocess(self, image_rgb: np.ndarray | None) -> Tuple[Any, np.ndarray] | None:
         """Preprocess image for ODFD estimation."""
-        return preprocess_image(image_path, resize=self.resize)
+        if image_rgb is None:
+            return None
+        return preprocess_image(image_rgb, resize=self.resize)
 
     def process_batch(
         self, prep_batch: List[Tuple[Any, np.ndarray]]

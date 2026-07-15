@@ -20,18 +20,41 @@ def normalize(im, ce=None):
     return im_norm
 
 
-def load_image_rgb(image_path) -> np.ndarray:
-    """Load a fundus image as a uint8 RGB array. Supports DICOM and raster formats."""
-    from rtnls_fundusprep.utils import open_image
-    return open_image(image_path)
+def as_uint8_rgb(array: np.ndarray) -> np.ndarray:
+    """Convert a decoded pixel array to uint8 RGB."""
+    arr = np.asarray(array)
+    if arr.dtype != np.uint8:
+        arr = arr.astype(np.float32)
+        arr = arr - arr.min()
+        mx = arr.max()
+        if mx > 0:
+            arr = arr / mx
+        arr = (arr * 255).astype(np.uint8)
+    if arr.ndim == 2:
+        return np.stack([arr, arr, arr], axis=-1)
+    if arr.shape[2] == 1:
+        return np.repeat(arr, 3, axis=2)
+    if arr.shape[2] >= 3:
+        return arr[:, :, :3]
+    raise ValueError(f"Unsupported image shape for fundus preprocessing: {arr.shape}")
 
 
-def preprocess_image(image_path, resize=512, apply_ce=False):
+def load_fundus_rgb(image: ImageInstance) -> np.ndarray:
+    """Load a fundus image as uint8 RGB via the ORM data-access layer."""
+    from eyened_orm.importer.thumbnails import pixel_array_to_2d
+
+    arr = pixel_array_to_2d(
+        image.pixel_array,
+        resolution_horizontal=image.ResolutionHorizontal,
+        resolution_vertical=image.ResolutionVertical,
+    )
+    return as_uint8_rgb(arr)
+
+
+def preprocess_image(image_rgb: np.ndarray, resize=512, apply_ce=False):
     from rtnls_fundusprep.mask_extraction import get_cfi_bounds
-    from rtnls_inference.utils import load_image
 
-    image = load_image(image_path)
-    bounds = get_cfi_bounds(image)
+    bounds = get_cfi_bounds(image_rgb)
     T, bounds_cropped = bounds.crop(resize)
     im = bounds_cropped.image
     ce = bounds_cropped.contrast_enhanced_5 if apply_ce else None

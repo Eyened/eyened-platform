@@ -1,10 +1,9 @@
-from os import PathLike
 from typing import Any, Iterable, List, Optional, Tuple
 
 import numpy as np
 import torch
 
-from eyened_orm import AttributeDataType
+from eyened_orm import AttributeDataType, Modality
 from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
 from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference.ensembles import HeatmapRegressionEnsemble
@@ -41,6 +40,7 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
     model_description = "https://github.com/Eyened/retinalysis-inference Eyened/vascx:fovea Eyened/vascx:discedge"
     attribute_name = "CFI_Keypoints"
     attribute_data_type = AttributeDataType.JSON
+    supported_modalities = (Modality.ColorFundus,)
 
     def __init__(
         self,
@@ -87,9 +87,11 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         self.resize = 512
         self.apply_ce = True
 
-    def preprocess(self, image_path: PathLike[str]) -> Tuple[Any, np.ndarray]:
+    def preprocess(self, image_rgb: np.ndarray | None) -> Tuple[Any, np.ndarray] | None:
         """Preprocess image for keypoint detection."""
-        return preprocess_image(image_path, resize=self.resize, apply_ce=self.apply_ce)
+        if image_rgb is None:
+            return None
+        return preprocess_image(image_rgb, resize=self.resize, apply_ce=self.apply_ce)
 
     def process_batch(
         self, prep_batch: List[Tuple[Any, np.ndarray]]

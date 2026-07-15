@@ -1,11 +1,10 @@
-from os import PathLike
 from typing import Any, Iterable, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from eyened_orm import AttributeDataType
+from eyened_orm import AttributeDataType, Modality
 from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
 from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference import ClassificationEnsemble
@@ -29,6 +28,7 @@ class CFI_Quality(TorchAttributeInferencePipeline):
     model_description = "Eyened/vascx:quality"
     attribute_name = "CFI_Quality"
     attribute_data_type = AttributeDataType.Float
+    supported_modalities = (Modality.ColorFundus,)
 
     def __init__(
         self,
@@ -53,9 +53,11 @@ class CFI_Quality(TorchAttributeInferencePipeline):
         assert self.ensemble.config["datamodule"]["test_transform"]["resize"] == 224
         self.resize = 224
 
-    def preprocess(self, image_path: PathLike[str]) -> Tuple[Any, np.ndarray]:
+    def preprocess(self, image_rgb: np.ndarray | None) -> Tuple[Any, np.ndarray] | None:
         """Preprocess image for quality assessment."""
-        return preprocess_image(image_path, resize=self.resize)
+        if image_rgb is None:
+            return None
+        return preprocess_image(image_rgb, resize=self.resize)
 
     def process_batch(
         self, prep_batch: List[Tuple[Any, np.ndarray]]

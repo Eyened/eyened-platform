@@ -1,4 +1,4 @@
-from typing import Any, Iterable, Iterator, List, Set, Tuple
+from typing import Any, ClassVar, Iterable, Iterator, List, Set, Tuple
 
 import numpy as np
 from tqdm import tqdm
@@ -9,6 +9,7 @@ from eyened_orm import (
     AttributesModel,
     AttributeValue,
     ImageInstance,
+    Modality,
 )
 from eyened_orm.inference.multi_process_inference import (
     BaseInferencePipeline,
@@ -41,6 +42,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
     model_description: str = ""
     attribute_name: str
     attribute_data_type: AttributeDataType
+    supported_modalities: ClassVar[tuple[Modality, ...]] = ()
 
     def __init__(
         self,
@@ -156,9 +158,17 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         if not image_ids_set:
             return
 
-        # Fetch images from database
+        # Fetch images and decode pixels in-process (local storage or API adapter).
         images = ImageInstance.by_ids(self.session, image_ids_set)
-        items = [(img.ImageInstanceID, img.path) for img in images]
+        from eyened_orm.inference.utils import load_fundus_rgb
+
+        items: list[tuple[int, np.ndarray | None]] = []
+        for img in images:
+            try:
+                items.append((img.ImageInstanceID, load_fundus_rgb(img)))
+            except Exception as exc:
+                print(f"Failed to load image {img.ImageInstanceID}: {exc}")
+                items.append((img.ImageInstanceID, None))
 
         mpi = MultiProcessInference(
             items,
