@@ -33,7 +33,58 @@ for attr_val in image.AttributeValues:
 
 ## AttributesModel and ModelInput
 
-An **AttributesModel** declares required inputs (`ModelInput`) and output definitions, then writes `AttributeValue` rows. Run via **`eorm run-models`** — see **[Inference](/eyened-platform/orm/inference)**.
+An **AttributesModel** declares required inputs (`ModelInput`) and output definitions, then writes `AttributeValue` rows. Run via **`eorm run-cfi-models`** — see **[Inference](/eyened-platform/orm/inference)**.
+
+## Reserved attribute names (platform-defined)
+
+Some `AttributeName` values are part of the platform contract: inference pipelines, the API, and the viewer read them by **exact name**. Do not rename these rows or reuse the names for unrelated metadata without updating every consumer listed below.
+
+Custom attributes for study-specific metadata should use different names (for example `study_arm`, `vessel_tortuosity`).
+
+### CFI fundus attributes (`ImageInstance`)
+
+Produced by **`eorm run-cfi-models`**. Attribute name matches producing model name for each pipeline.
+
+| `AttributeName` | Type | CLI slug | Primary consumers |
+|-----------------|------|----------|-------------------|
+| `CFI_ROI` | JSON | `cfi-roi` | Dependent CFI models (`cfi-keypoints`, `cfi-odfd`, `cfi-quality`), thumbnail cropping, `ImageInstance.roi` / `cfi_roi`, API `cf_roi` |
+| `CFI_Keypoints` | JSON | `cfi-keypoints` | ETDRS / Measure panels (automatic grid via API `cf_keypoints`), `run-etdrs-model` input, `ImageInstance.keypoints` / `cfi_keypoints` |
+| `CFI_ODFD` | Float | `cfi-odfd` | `run-etdrs-model` input (µm/pixel scale), `ImageInstance.cfi_odfd` / `odfd` |
+| `CFI_Quality` | Float | `cfi-quality` | `ImageInstance.cfi_quality` / `quality`, API `cf_quality` |
+
+The viewer does **not** read these names from `attrs` directly for CFI landmarks. The API exposes convenience fields `cf_roi`, `cf_keypoints`, and `cf_quality` on `ImageGET`, populated from legacy `ImageInstance` columns when present, otherwise from the attributes above via version-aware selection (same rules as `select_attribute_value`).
+
+There is **no** `CFI_ETDRS` attribute. ETDRS grid placement in the viewer uses **FormAnnotations** (schema `ETDRS-grid coordinates`) or the automatic preview from `cf_keypoints` (`CFI_Keypoints`). The `etdrs_field` shown in the browser and Info panel is the `ImageInstance.ETDRSField` **column** (`F1`–`F7`), not an attribute.
+
+### Patient registration (`Patient`)
+
+| `AttributeName` | Type | Produced by | Primary consumers |
+|-----------------|------|-------------|-------------------|
+| `Registration` | JSON (array of edges) | `eorm run-registration` | Viewer registration graph (`patient.attrs.Registration` via `collectPatientRegistrationSets`) |
+
+See **[Registration](/eyened-platform/orm/registration)** for JSON shape and how the viewer merges model output with manual FormAnnotations.
+
+### Segmentation ETDRS summaries (`ModelSegmentation`)
+
+| `AttributeName` | Type | Produced by | Primary consumers |
+|-----------------|------|-------------|-------------------|
+| `ETDRS area` | JSON | `eorm run-etdrs-model` | Downstream analysis / reporting on segmentation subfield counts; **not** read by the viewer client |
+
+Inputs are `CFI_Keypoints` and `CFI_ODFD` (resolved automatically). See **[Inference — ETDRS](/eyened-platform/orm/inference#etdrs-summary-run-etdrs-model)**.
+
+### Other image attributes read by the client
+
+| `AttributeName` | Type | Produced by | Primary consumers |
+|-----------------|------|-------------|-------------------|
+| `PhotoLocators` | JSON | Import / external pipelines (not written by bundled CFI commands) | OCT–enface registration (`instance.attrs.PhotoLocators` in `fdsRegistration.ts`) |
+
+Generic image attributes also appear in API `attrs` (flat, no producing model) and `model_attrs` (nested by `ModelName`). The viewer and search features only depend on the names above plus the legacy columns noted in the CFI table.
+
+### Legacy `ImageInstance` columns (not attributes)
+
+Older databases may still populate `CFROI`, `CFKeypoints`, and `CFQuality` columns. ORM accessors and API `cf_*` fields prefer these columns when set, then fall back to the matching `CFI_*` attributes. New inference should use `eorm run-cfi-models` so values live in `AttributeValue` rows with model provenance.
+
+Search still filters **Color Fundus Quality** against the `ImageInstance.CFQuality` column, not the `CFI_Quality` attribute directly.
 
 ## AttributeValueInput
 

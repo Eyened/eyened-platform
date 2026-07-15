@@ -40,6 +40,8 @@ Version strings are derived automatically from installed packages or HuggingFace
 
 Run `eorm migrate-cfi-model-versions` once on existing databases to rename legacy version strings (for example `1.0`, `july24`) on the single row per `ModelName`. If a canonical row already exists, the migration is a no-op for that model.
 
+Attribute names `CFI_ROI`, `CFI_Keypoints`, `CFI_ODFD`, and `CFI_Quality` are platform-defined — see **[Attributes — reserved names](/eyened-platform/orm/data_model/attributes#reserved-attribute-names-platform-defined)** for API and client consumers.
+
 ### Skip and re-run behaviour
 
 | Mode | When an image is processed |
