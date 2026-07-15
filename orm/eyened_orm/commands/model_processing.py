@@ -476,7 +476,7 @@ def run_registration(path, image_ids, project, patient, exclude, replace):
                 "ModelName": "retinalysis-registration",
                 "Version": rtnls_registration.__version__,
             },
-            create_kwargs={
+            update_values={
                 "Description": "Pairwise image registration for CFI, AF and IR"
             },
         )

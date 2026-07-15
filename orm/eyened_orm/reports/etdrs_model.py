@@ -81,7 +81,7 @@ class ETDRSModelProcessor:
         self.model = AttributesModel.get_or_create(
             session,
             match_by={"ModelName": model_name, "Version": version},
-            create_kwargs={"Description": description},
+            update_values={"Description": description},
         )
 
         self.attribute_definition = AttributeDefinition.get_or_create(

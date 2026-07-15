@@ -64,11 +64,11 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        # Create or retrieve AttributesModel
+        # Create or retrieve AttributesModel; sync Description on each run (see layer_segmentation / cfi_amd).
         self.model = AttributesModel.get_or_create(
             session,
             match_by={"ModelName": self.model_name, "Version": self.model_version},
-            create_kwargs={"Description": self.model_description},
+            update_values={"Description": self.model_description},
         )
 
         # Create or retrieve AttributeDefinition
