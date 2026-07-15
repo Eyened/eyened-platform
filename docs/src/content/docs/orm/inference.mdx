@@ -74,8 +74,10 @@ Pairwise enface registration via `eorm run-registration`. Writes transforms to p
 
 Computes ETDRS subfield areas from segmentations and keypoint/attribute data — not directly from manual FormAnnotation coordinates unless also present in attributes.
 
+Keypoints (`CFI_Keypoints`) and ODFD (`CFI_ODFD`) inputs are resolved with the same `ModelInputSpec` / highest-version selection as CFI attribute pipelines (no manual `--keypoints-model-version` flags).
+
 ```bash
-eorm run-etdrs-model --project "My Study"
+eorm run-etdrs-model --project "My Study" -s <segmentation-model-id>
 ```
 
 See also **[ETDRS Panel](/eyened-platform/client/panels/etdrs)** and **[CLI](/eyened-platform/orm/cli)**.

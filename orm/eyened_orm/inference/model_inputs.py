@@ -72,6 +72,22 @@ CFI_ROI_INPUT = ModelInputSpec(
     attribute_data_type=AttributeDataType.JSON,
 )
 
+CFI_KEYPOINTS_INPUT = ModelInputSpec(
+    attribute_name="CFI_Keypoints",
+    model_name="CFI_Keypoints",
+    min_version="0.0.0",
+    attribute_data_type=AttributeDataType.JSON,
+)
+
+CFI_ODFD_INPUT = ModelInputSpec(
+    attribute_name="CFI_ODFD",
+    model_name="CFI_ODFD",
+    min_version="0.0.0",
+    attribute_data_type=AttributeDataType.Float,
+)
+
+ETDRS_INPUTS: tuple[ModelInputSpec, ...] = (CFI_KEYPOINTS_INPUT, CFI_ODFD_INPUT)
+
 
 def _eligible_attribute_values(
     candidates: Iterable[AttributeValue],
