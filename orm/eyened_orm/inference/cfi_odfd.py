@@ -10,14 +10,16 @@ from eyened_orm.inference.attribute_inference import (
 )
 from eyened_orm.inference.cfi_preprocess import cfi_roi_from_input_values, crop_fundus_from_roi
 from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+from eyened_orm.inference.model_versions import huggingface_artifact_version
 from rtnls_inference import RegressionEnsemble
 
 
 class CFI_ODFD(TorchAttributeInferencePipeline):
     """CFI Optic Disc to Fovea Distance estimation pipeline."""
 
+    HF_ARTIFACT = "Eyened/vascx:odfd/odfd_march25.pt"
+
     model_name = "CFI_ODFD"
-    model_version = "odfd_march25"
     model_description = "Eyened/vascx:odfd/odfd_march25.pt"
     attribute_name = "CFI_ODFD"
     attribute_data_type = AttributeDataType.Float
@@ -32,6 +34,7 @@ class CFI_ODFD(TorchAttributeInferencePipeline):
         batch_size: int = 8,
         **kwargs,
     ):
+        self.model_version = huggingface_artifact_version(self.HF_ARTIFACT)
         super().__init__(
             session,
             n_workers=n_workers,
@@ -43,9 +46,9 @@ class CFI_ODFD(TorchAttributeInferencePipeline):
 
     def _load_models(self) -> None:
         """Load regression ensemble model."""
-        self.ensemble = RegressionEnsemble.from_huggingface(
-            "Eyened/vascx:odfd/odfd_march25.pt"
-        ).to(self.device)
+        self.ensemble = RegressionEnsemble.from_huggingface(self.HF_ARTIFACT).to(
+            self.device
+        )
         assert self.ensemble.config["datamodule"]["test_transform"]["resize"] == 512
         self.resize = 512
 

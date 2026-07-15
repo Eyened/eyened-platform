@@ -96,3 +96,27 @@ def image_ids_with_recorded_outcome(
         if av.ImageInstanceID is not None
         and attribute_value_outcome(av) != AttributeValueOutcome.MISSING
     }
+
+
+def image_ids_with_succeeded_outcome(
+    attribute_values: list[AttributeValue],
+) -> set[int]:
+    """Image IDs that already have a succeeded AttributeValue row."""
+    return {
+        av.ImageInstanceID
+        for av in attribute_values
+        if av.ImageInstanceID is not None
+        and attribute_value_outcome(av) == AttributeValueOutcome.SUCCEEDED
+    }
+
+
+def image_ids_with_failed_outcome(
+    attribute_values: list[AttributeValue],
+) -> set[int]:
+    """Image IDs that have a failed AttributeValue row (null value columns)."""
+    return {
+        av.ImageInstanceID
+        for av in attribute_values
+        if av.ImageInstanceID is not None
+        and attribute_value_outcome(av) == AttributeValueOutcome.FAILED
+    }

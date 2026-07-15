@@ -14,6 +14,7 @@ Command utilities for the eyened ORM.
 The following commands are available:
 - update-thumbnails: Update thumbnails for all images in the database.
 - run-cfi-models: Run CFI attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality).
+- migrate-cfi-model-versions: Rename legacy AttributesModel.Version values to canonical ids (one-time, idempotent).
 - run-models: Deprecated alias for run-cfi-models.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
 - run-cfi-amd: Run CFI AMD segmentation models.

@@ -88,6 +88,8 @@ def run_cfi_attribute_pipeline(
     batch_size: int = 8,
     n_workers: int = 16,
     overwrite: bool = False,
+    upgrade: bool = False,
+    failed: bool = False,
     commit_interval: int = 100,
 ) -> None:
     """Run a single CFI attribute pipeline (one slug). RQ jobs call this once per job."""
@@ -103,12 +105,26 @@ def run_cfi_attribute_pipeline(
         n_workers=n_workers,
         batch_size=batch_size,
     )
+    if failed:
+        image_ids = pipeline.failed_image_ids_in_scope(image_ids)
+        print(f"Scoped to {len(image_ids)} images with failed {model_slug} output")
+        if not image_ids:
+            print("No failed images in scope")
+            return
     if overwrite:
         filtered = image_ids
         print(f"Processing {len(filtered)} images (overwrite)")
     else:
-        filtered = pipeline.filter_image_ids(image_ids)
-        print(f"Processing {len(filtered)} images (after filtering existing)")
+        filtered = pipeline.filter_image_ids(
+            image_ids, upgrade=upgrade, failed=failed
+        )
+        if failed:
+            scope = "failed"
+        elif upgrade:
+            scope = "upgrade"
+        else:
+            scope = "default"
+        print(f"Processing {len(filtered)} images (after filtering, {scope})")
     if not filtered:
         print("No images to process")
         return
@@ -130,6 +146,8 @@ def _run_cfi_models_impl(
     batch_size,
     n_workers,
     overwrite,
+    upgrade,
+    failed,
     commit_interval,
 ):
     spec = target_spec_from_cli(
@@ -159,6 +177,8 @@ def _run_cfi_models_impl(
                 batch_size=batch_size,
                 n_workers=n_workers,
                 overwrite=overwrite,
+                upgrade=upgrade,
+                failed=failed,
                 commit_interval=commit_interval,
             )
 
@@ -197,7 +217,26 @@ def _run_cfi_models_impl(
     "--overwrite",
     is_flag=True,
     default=False,
-    help="Overwrite existing attribute values (skips filtering)",
+    help="Overwrite existing attribute values for the current model version",
+)
+@click.option(
+    "--upgrade",
+    is_flag=True,
+    default=False,
+    help=(
+        "Run the current model version on images that lack its output, even when "
+        "older versions already have AttributeValue rows (stored alongside; reads "
+        "prefer the newer version). Default: skip when any version has output."
+    ),
+)
+@click.option(
+    "--failed",
+    is_flag=True,
+    default=False,
+    help=(
+        "Retry only images with a failed AttributeValue for this model (null value "
+        "columns), within the selected target (project, patient, path, etc.)"
+    ),
 )
 @click.option(
     "--commit-interval",
@@ -218,6 +257,8 @@ def run_cfi_models(
     batch_size,
     n_workers,
     overwrite,
+    upgrade,
+    failed,
     commit_interval,
 ):
     """Run CFI attribute inference models on images.
@@ -245,6 +286,8 @@ def run_cfi_models(
         batch_size,
         n_workers,
         overwrite,
+        upgrade,
+        failed,
         commit_interval,
     )
 
@@ -283,7 +326,19 @@ def run_cfi_models(
     "--overwrite",
     is_flag=True,
     default=False,
-    help="Overwrite existing attribute values (skips filtering)",
+    help="Overwrite existing attribute values for the current model version",
+)
+@click.option(
+    "--upgrade",
+    is_flag=True,
+    default=False,
+    help="See run-cfi-models --upgrade",
+)
+@click.option(
+    "--failed",
+    is_flag=True,
+    default=False,
+    help="See run-cfi-models --failed",
 )
 @click.option(
     "--commit-interval",
@@ -304,6 +359,8 @@ def run_models(
     batch_size,
     n_workers,
     overwrite,
+    upgrade,
+    failed,
     commit_interval,
 ):
     """Deprecated alias for run-cfi-models."""
@@ -324,8 +381,30 @@ def run_models(
         batch_size,
         n_workers,
         overwrite,
+        upgrade,
+        failed,
         commit_interval,
     )
+
+
+@click.command(name="migrate-cfi-model-versions")
+def migrate_cfi_model_versions():
+    """Set legacy CFI AttributesModel.Version values to the current canonical id.
+
+    Idempotent: safe to run multiple times. Updates the existing row per ModelName
+    when the target version row does not already exist.
+    """
+    from eyened_orm.inference.migrate_model_versions import (
+        migrate_cfi_attributes_model_versions,
+    )
+
+    database = get_database()
+    with database.get_session() as session:
+        results = migrate_cfi_attributes_model_versions(session)
+        session.commit()
+
+    for model_name, status in results.items():
+        print(f"{model_name}: {status}")
 
 
 @click.command(name="run-segmentation")
@@ -489,6 +568,7 @@ def run_registration(path, image_ids, project, patient, exclude, replace):
 model_commands = [
     run_cfi_models,
     run_models,
+    migrate_cfi_model_versions,
     run_etdrs_model,
     run_segmentation,
     run_registration,

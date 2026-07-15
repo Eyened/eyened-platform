@@ -11,6 +11,7 @@ from eyened_orm.inference.attribute_inference import (
 )
 from eyened_orm.inference.cfi_preprocess import cfi_roi_from_input_values, crop_fundus_from_roi
 from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+from eyened_orm.inference.model_versions import huggingface_artifact_version
 from rtnls_inference import ClassificationEnsemble
 
 
@@ -27,8 +28,9 @@ def logits_to_continuous_score(logits, temperature=3.0):
 class CFI_Quality(TorchAttributeInferencePipeline):
     """CFI image quality assessment pipeline."""
 
+    HF_ARTIFACT = "Eyened/vascx:quality/quality.pt"
+
     model_name = "CFI_Quality"
-    model_version = "1.0"
     model_description = "Eyened/vascx:quality"
     attribute_name = "CFI_Quality"
     attribute_data_type = AttributeDataType.Float
@@ -43,6 +45,7 @@ class CFI_Quality(TorchAttributeInferencePipeline):
         batch_size: int = 8,
         **kwargs,
     ):
+        self.model_version = huggingface_artifact_version(self.HF_ARTIFACT)
         super().__init__(
             session, n_workers=n_workers, batch_size=batch_size, device=device
         )
@@ -51,9 +54,9 @@ class CFI_Quality(TorchAttributeInferencePipeline):
 
     def _load_models(self) -> None:
         """Load quality assessment ensemble model."""
-        self.ensemble = ClassificationEnsemble.from_huggingface(
-            "Eyened/vascx:quality/quality.pt"
-        ).to(self.device)
+        self.ensemble = ClassificationEnsemble.from_huggingface(self.HF_ARTIFACT).to(
+            self.device
+        )
 
         assert self.ensemble.config["datamodule"]["test_transform"]["resize"] == 224
         self.resize = 224

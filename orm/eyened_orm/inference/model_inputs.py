@@ -1,4 +1,34 @@
-"""Model input resolution and AttributesModel I/O registration."""
+"""Model input resolution and AttributesModel I/O registration.
+
+Attribute value selection
+-------------------------
+Use :func:`select_attribute_value` whenever one stored row must be chosen from
+several candidates (inference input resolution, ORM shorthand properties, API
+payloads).
+
+**Returned row:** among candidates matching all supplied filters, the row whose
+producing model has the **highest version** (``version_sort_key``). Returns
+``None`` when no row qualifies.
+
+**Filters** (combined with AND; omit a filter to ignore it):
+
+- ``attribute_name`` — ``AttributeDefinition.AttributeName``
+- ``producing_model_name`` — ``AttributesModel.ModelName``
+- ``producing_model_id`` — ``AttributesModel.ModelID``
+- ``min_version`` — producing-model version must be >= this threshold
+
+**Availability** (``require_available=True``, default): rows with all value
+columns NULL (failed inference) are excluded. Set ``require_available=False``
+only when inspecting failure state (e.g. ``ImageInstance.roi`` warnings).
+
+**Version ordering** (``version_sort_key``): PEP 440 semver strings rank before
+opaque artifact ids; within each kind, higher version wins.
+
+Inference pipelines resolve inputs via :func:`resolve_input_attribute_value`,
+which applies the :class:`ModelInputSpec` filters for that dependency. ORM
+shorthand properties and :meth:`~eyened_orm.attribute_value_lookup_mixin.AttributeValueLookupMixin.find_attribute_value`
+call the same selector on ``ImageInstance.AttributeValues``.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +37,7 @@ from typing import TYPE_CHECKING, Any, Iterable
 
 from eyened_orm import AttributeDataType
 from eyened_orm.inference.attribute_value_outcome import is_available_input
+from eyened_orm.inference.model_versions import version_at_least, version_sort_key
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -14,20 +45,18 @@ if TYPE_CHECKING:
     from eyened_orm import AttributeDefinition, AttributeValue, AttributesModel
 
 
-# Known version order per producing model (opaque strings, highest last).
-VERSION_ORDER: dict[str, tuple[str, ...]] = {
-    "CFI_ROI": ("1.0",),
-    "CFI_Keypoints": ("july24",),
-    "CFI_ODFD": ("odfd_march25",),
-    "CFI_Quality": ("1.0",),
-}
-
-
 @dataclass(frozen=True)
 class ModelInputSpec:
+    """Declares one model input dependency for inference pipelines.
+
+    :func:`resolve_input_attribute_value` selects the highest-version available
+    ``AttributeValue`` for ``(attribute_name, model_name)`` with producing-model
+    version >= ``min_version``.
+    """
+
     attribute_name: str
     model_name: str
-    min_version: str = "1.0"
+    min_version: str = "0.0.0"
     input_name: str | None = None
     attribute_data_type: AttributeDataType | None = None
 
@@ -39,23 +68,88 @@ class ModelInputSpec:
 CFI_ROI_INPUT = ModelInputSpec(
     attribute_name="CFI_ROI",
     model_name="CFI_ROI",
-    min_version="1.0",
+    min_version="0.0.0",
     attribute_data_type=AttributeDataType.JSON,
 )
 
 
-def _version_rank(model_name: str, version: str) -> int:
-    order = VERSION_ORDER.get(model_name)
-    if order is None:
-        return 0
-    try:
-        return order.index(version)
-    except ValueError:
-        return -1
+def _eligible_attribute_values(
+    candidates: Iterable[AttributeValue],
+    *,
+    attribute_name: str | None = None,
+    producing_model_name: str | None = None,
+    producing_model_id: int | None = None,
+    min_version: str | None = None,
+    require_available: bool = True,
+) -> list[AttributeValue]:
+    eligible: list[AttributeValue] = []
+    for av in candidates:
+        producing_model = av.ProducingModel
+
+        if producing_model_id is not None:
+            if producing_model is None or producing_model.ModelID != producing_model_id:
+                continue
+
+        if producing_model_name is not None:
+            if (
+                producing_model is None
+                or producing_model.ModelName != producing_model_name
+            ):
+                continue
+
+        if attribute_name is not None:
+            if av.AttributeDefinition.AttributeName != attribute_name:
+                continue
+
+        if require_available and not is_available_input(av):
+            continue
+
+        if min_version is not None and producing_model is not None:
+            if not version_at_least(producing_model.Version, min_version):
+                continue
+
+        eligible.append(av)
+
+    return eligible
 
 
-def version_at_least(model_name: str, version: str, min_version: str) -> bool:
-    return _version_rank(model_name, version) >= _version_rank(model_name, min_version)
+def select_attribute_value(
+    candidates: Iterable[AttributeValue],
+    *,
+    attribute_name: str | None = None,
+    producing_model_name: str | None = None,
+    producing_model_id: int | None = None,
+    min_version: str | None = None,
+    require_available: bool = True,
+) -> AttributeValue | None:
+    """Select one AttributeValue row by filter match and version precedence.
+
+    See module docstring for the full selection contract. At least one of
+    ``attribute_name``, ``producing_model_name``, or ``producing_model_id`` must
+    be provided.
+    """
+    if (
+        attribute_name is None
+        and producing_model_name is None
+        and producing_model_id is None
+    ):
+        return None
+
+    eligible = _eligible_attribute_values(
+        candidates,
+        attribute_name=attribute_name,
+        producing_model_name=producing_model_name,
+        producing_model_id=producing_model_id,
+        min_version=min_version,
+        require_available=require_available,
+    )
+    if not eligible:
+        return None
+
+    return max(
+        eligible,
+        key=lambda av: version_sort_key(av.ProducingModel.Version),
+    )
 
 
 def register_model_output(
@@ -110,7 +204,14 @@ def resolve_input_attribute_value(
     image_id: int,
     spec: ModelInputSpec,
 ) -> AttributeValue | None:
-    """Pick the best matching input AttributeValue for one image."""
+    """Resolve one pipeline input for an image.
+
+    Loads all ``AttributeValue`` rows for ``image_id`` where the attribute name
+    is ``spec.attribute_name`` and the producing model name is ``spec.model_name``,
+    then returns the highest-version available row with producing-model version
+    >= ``spec.min_version``. Returns ``None`` when no row qualifies (missing,
+    failed, or below ``min_version``).
+    """
     from sqlalchemy import select
 
     from eyened_orm import AttributeDefinition, AttributesModel, AttributeValue
@@ -126,20 +227,11 @@ def resolve_input_attribute_value(
         )
     )
     candidates = list(session.scalars(stmt).all())
-    eligible = [
-        av
-        for av in candidates
-        if av.ProducingModel is not None
-        and version_at_least(
-            spec.model_name, av.ProducingModel.Version, spec.min_version
-        )
-        and is_available_input(av)
-    ]
-    if not eligible:
-        return None
-    return max(
-        eligible,
-        key=lambda av: _version_rank(spec.model_name, av.ProducingModel.Version),
+    return select_attribute_value(
+        candidates,
+        attribute_name=spec.attribute_name,
+        producing_model_name=spec.model_name,
+        min_version=spec.min_version,
     )
 
 

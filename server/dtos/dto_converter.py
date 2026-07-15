@@ -320,7 +320,7 @@ class DTOConverter:
                 )
                 for ms in (getattr(image_instance, "ModelSegmentations", []) or [])
             ]
-        # Populate attributes
+        # attrs / model_attrs: highest-version available row per attribute (see ImageInstance.attrs)
         try:
             dto.attrs, dto.model_attrs = image_instance.attrs
         except Exception:

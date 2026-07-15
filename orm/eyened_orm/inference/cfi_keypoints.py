@@ -10,6 +10,10 @@ from eyened_orm.inference.attribute_inference import (
 )
 from eyened_orm.inference.cfi_preprocess import cfi_roi_from_input_values, crop_fundus_from_roi
 from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+from eyened_orm.inference.model_versions import (
+    huggingface_artifact_version,
+    huggingface_pipeline_version,
+)
 from rtnls_inference.ensembles import HeatmapRegressionEnsemble
 
 
@@ -39,8 +43,12 @@ def get_coordinate(T, heatmap):
 class CFIKeypoints(TorchAttributeInferencePipeline):
     """CFI keypoints detection pipeline - detects fovea and disc edge locations."""
 
+    HF_ARTIFACTS = (
+        "Eyened/vascx:fovea/fovea_july24.pt",
+        "Eyened/vascx:discedge/discedge_july24.pt",
+    )
+
     model_name = "CFI_Keypoints"
-    model_version = "july24"
     model_description = "https://github.com/Eyened/retinalysis-inference Eyened/vascx:fovea Eyened/vascx:discedge"
     attribute_name = "CFI_Keypoints"
     attribute_data_type = AttributeDataType.JSON
@@ -55,6 +63,7 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         batch_size: int = 8,
         **kwargs,
     ):
+        self.model_version = huggingface_pipeline_version(*self.HF_ARTIFACTS)
         super().__init__(
             session, n_workers=n_workers, batch_size=batch_size, device=device
         )
@@ -67,12 +76,12 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         """Load both fovea and disc edge ensemble models."""
         print("loading fovea models")
         self.ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface(
-            "Eyened/vascx:fovea/fovea_july24.pt"
+            self.HF_ARTIFACTS[0]
         ).to(self.device)
 
         print("loading discedge models")
         self.ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface(
-            "Eyened/vascx:discedge/discedge_july24.pt"
+            self.HF_ARTIFACTS[1]
         ).to(self.device)
 
         assert (

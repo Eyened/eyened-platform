@@ -20,9 +20,9 @@ import torch
 from eyened_orm.inference.cfi_odfd import CFI_ODFD
 
 
-def test_version_at_least_uses_declared_order():
-    assert version_at_least("CFI_ROI", "1.0", "1.0")
-    assert not version_at_least("CFI_ROI", "0.9", "1.0")
+def test_version_at_least_uses_semver_ordering():
+    assert version_at_least("1.0", "1.0")
+    assert not version_at_least("0.9", "1.0")
 
 
 def test_resolve_input_attribute_value_picks_matching_version(session):
@@ -65,10 +65,12 @@ def test_attribute_value_data_reads_columns_without_relationships():
 
 
 def test_pipeline_registers_model_inputs_and_outputs(session):
-    CFI_ODFD(session, device=torch.device("cpu"), n_workers=1)
+    pipeline = CFI_ODFD(session, device=torch.device("cpu"), n_workers=1)
     session.flush()
 
-    model = AttributesModel.by_column(session, ModelName="CFI_ODFD", Version="odfd_march25")
+    model = AttributesModel.by_column(
+        session, ModelName="CFI_ODFD", Version=pipeline.model_version
+    )
     assert model is not None
     assert any(
         out.AttributeName == "CFI_ODFD" for out in model.OutputAttributes

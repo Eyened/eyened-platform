@@ -43,9 +43,12 @@ eorm create-user
 |---------|---------|
 | `run-cfi-models` | CFI attribute inference (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`) |
 | `run-models` | Deprecated alias for `run-cfi-models` |
+| `migrate-cfi-model-versions` | One-time idempotent bump of legacy `AttributesModel.Version` values |
 | `run-segmentation` | Segmentation model inference |
 | `run-registration` | Enface image registration — see **[Registration](/eyened-platform/orm/registration)** |
 | `run-etdrs-model` | ETDRS subfield areas |
+
+`run-cfi-models` flags include `--overwrite` (reprocess current version), `--upgrade` (add current version output when only older versions exist), and `--failed` (retry failed rows within the target). Attribute read precedence: **[Attributes](/eyened-platform/orm/data_model/attributes#selecting-which-attributevalue-to-use)**.
 
 Details: **[Inference](/eyened-platform/orm/inference)**.
 

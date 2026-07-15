@@ -13,7 +13,7 @@ from eyened_orm import (
 )
 from eyened_orm.commands.test_targets import _import_images
 from eyened_orm.inference.cfi_quality import CFI_Quality
-from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+from eyened_orm.inference.model_inputs import CFI_ROI_INPUT, ModelInputSpec
 
 
 def _seed_cfi_roi(
@@ -52,16 +52,16 @@ def test_cfi_quality_declares_cfi_roi_dependency():
     assert CFI_Quality.required_inputs == (CFI_ROI_INPUT,)
     assert CFI_ROI_INPUT.attribute_name == "CFI_ROI"
     assert CFI_ROI_INPUT.model_name == "CFI_ROI"
-    assert CFI_ROI_INPUT.min_version == "1.0"
+    assert CFI_ROI_INPUT.min_version == "0.0.0"
 
 
 def test_cfi_quality_registers_input_dependency_in_database(session):
     """Step 1 (persisted): init registers ModelInput row for CFI_ROI."""
-    CFI_Quality(session, device=torch.device("cpu"), n_workers=1)
+    pipeline = CFI_Quality(session, device=torch.device("cpu"), n_workers=1)
     session.flush()
 
     model = AttributesModel.by_column(
-        session, ModelName="CFI_Quality", Version="1.0"
+        session, ModelName="CFI_Quality", Version=pipeline.model_version
     )
     assert model is not None
     assert len(model.ModelInputs) == 1
@@ -93,15 +93,19 @@ def test_filter_image_ids_includes_image_with_cfi_roi(session):
 
 
 def test_filter_image_ids_rejects_cfi_roi_below_min_version(session):
-    """Step 2: version below min_version is not resolved as an input."""
+    """Step 2: version below an explicit min_version is not resolved as an input."""
+    from eyened_orm.inference.model_inputs import resolve_input_attribute_value
+
     _proj, images = _import_images(session, count=1)
     image = images[0]
-    _seed_cfi_roi(session, image.ImageInstanceID, model_version="0.9")
+    _seed_cfi_roi(session, image.ImageInstanceID, model_version="0.9.0")
 
-    pipeline = CFI_Quality(session, device=torch.device("cpu"), n_workers=1)
-    filtered = pipeline.filter_image_ids([image.ImageInstanceID])
-
-    assert filtered == set()
+    resolved = resolve_input_attribute_value(
+        session,
+        image_id=image.ImageInstanceID,
+        spec=ModelInputSpec("CFI_ROI", "CFI_ROI", "1.0.0"),
+    )
+    assert resolved is None
 
 
 def test_input_data_passed_in_worker_payload(session, monkeypatch):

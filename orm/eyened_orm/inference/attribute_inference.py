@@ -23,7 +23,9 @@ from eyened_orm.inference.model_inputs import (
 )
 from eyened_orm.inference.attribute_value_outcome import (
     failure_update_values,
+    image_ids_with_failed_outcome,
     image_ids_with_recorded_outcome,
+    image_ids_with_succeeded_outcome,
     success_update_values,
 )
 from eyened_orm.inference.multi_process_inference import (
@@ -45,7 +47,8 @@ class AttributeInferencePipeline(BaseInferencePipeline):
 
     Subclasses should define:
     - model_name: str - name of the AttributesModel
-    - model_version: str - version of the AttributesModel (or set in __init__)
+    - model_version: str - version of the AttributesModel; set ``self.model_version``
+      before ``super().__init__`` when derived from an installed package or HF artifact
     - model_description: Optional[str] - description for model creation
     - attribute_name: str - name of the AttributeDefinition
     - attribute_data_type: AttributeDataType - data type (JSON, Float, etc.)
@@ -183,23 +186,91 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             print(f"Skipping {missing} images missing required inputs")
         return ready
 
-    def filter_image_ids(self, image_ids: Iterable[int]) -> Set[int]:
-        """Filter out image IDs that already have succeeded or failed results."""
+    def _attribute_values_for_model_name(
+        self, image_ids_set: set[int]
+    ) -> list[AttributeValue]:
+        from sqlalchemy import select
+
+        stmt = (
+            select(AttributeValue)
+            .join(
+                AttributesModel,
+                AttributeValue.ModelID == AttributesModel.ModelID,
+            )
+            .where(
+                AttributeValue.AttributeID == self.attr_definition.AttributeID,
+                AttributesModel.ModelName == self.model_name,
+                AttributeValue.ImageInstanceID.in_(image_ids_set),
+            )
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def failed_image_ids_in_scope(self, image_ids: Iterable[int]) -> Set[int]:
+        """Image IDs in scope that have a failed row for this model (any version)."""
+        image_ids_set = set(image_ids)
+        existing = self._attribute_values_for_model_name(image_ids_set)
+        return image_ids_with_failed_outcome(existing) & image_ids_set
+
+    def filter_image_ids(
+        self,
+        image_ids: Iterable[int],
+        *,
+        upgrade: bool = False,
+        failed: bool = False,
+    ) -> Set[int]:
+        """Return image IDs that still need inference for this pipeline.
+
+        **Default** (``upgrade=False``, ``failed=False``): exclude images that
+        already have any ``AttributeValue`` row for this attribute from any
+        version of ``model_name`` (succeeded or failed).
+
+        **Upgrade** (``upgrade=True``): exclude only images that already have a
+        row for the **current** pipeline version (``self.model.ModelID``).
+        Images with older versions only are included so a new version can be
+        written alongside existing output without overwriting it.
+
+        **Failed** (``failed=True``): exclude only images that already have a
+        **succeeded** row for this model (any version). Failed rows are
+        retried. Combine with a prior call to :meth:`failed_image_ids_in_scope`
+        to limit the target set to failed images only.
+        """
         from sqlalchemy import select
 
         image_ids_set = set(image_ids)
 
-        stmt = select(AttributeValue).where(
-            AttributeValue.AttributeID == self.attr_definition.AttributeID,
-            AttributeValue.ModelID == self.model.ModelID,
-            AttributeValue.ImageInstanceID.in_(image_ids_set),
-        )
-        existing = list(self.session.scalars(stmt).all())
-        recorded_ids = image_ids_with_recorded_outcome(existing)
-        if recorded_ids:
-            print(f"Skipping {len(recorded_ids)} images with existing results")
-
-        pending = image_ids_set - recorded_ids
+        if upgrade:
+            stmt = select(AttributeValue).where(
+                AttributeValue.AttributeID == self.attr_definition.AttributeID,
+                AttributeValue.ModelID == self.model.ModelID,
+                AttributeValue.ImageInstanceID.in_(image_ids_set),
+            )
+            existing = list(self.session.scalars(stmt).all())
+            if failed:
+                excluded_ids = image_ids_with_succeeded_outcome(existing)
+                if excluded_ids:
+                    print(
+                        f"Skipping {len(excluded_ids)} images with successful results"
+                    )
+                pending = image_ids_set - excluded_ids
+            else:
+                recorded_ids = image_ids_with_recorded_outcome(existing)
+                if recorded_ids:
+                    print(f"Skipping {len(recorded_ids)} images with existing results")
+                pending = image_ids_set - recorded_ids
+        else:
+            existing = self._attribute_values_for_model_name(image_ids_set)
+            if failed:
+                excluded_ids = image_ids_with_succeeded_outcome(existing)
+                if excluded_ids:
+                    print(
+                        f"Skipping {len(excluded_ids)} images with successful results"
+                    )
+                pending = image_ids_set - excluded_ids
+            else:
+                recorded_ids = image_ids_with_recorded_outcome(existing)
+                if recorded_ids:
+                    print(f"Skipping {len(recorded_ids)} images with existing results")
+                pending = image_ids_set - recorded_ids
         if self.required_inputs:
             self._ensure_inputs_resolved(pending)
             pending = self._filter_images_with_required_inputs(pending)

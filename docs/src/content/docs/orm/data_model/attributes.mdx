@@ -38,3 +38,64 @@ An **AttributesModel** declares required inputs (`ModelInput`) and output defini
 ## AttributeValueInput
 
 Links output values to input values for dependency tracking.
+
+## Selecting which AttributeValue to use
+
+An image may have several `AttributeValue` rows for the same attribute (different model versions, retries, or legacy migrations). The platform uses one shared selector everywhere values are **read** — inference input resolution, ORM shorthand properties, and API payloads served to the client.
+
+Implementation: `eyened_orm.inference.model_inputs.select_attribute_value`.
+
+### Returned row
+
+Among candidates matching all supplied filters, the row whose producing model has the **highest version** (`version_sort_key`). Returns nothing when no row qualifies.
+
+### Filters (combined with AND)
+
+| Filter | Matches |
+|--------|---------|
+| `attribute_name` | `AttributeDefinition.AttributeName` |
+| `producing_model_name` | `AttributesModel.ModelName` |
+| `producing_model_id` | `AttributesModel.ModelID` |
+| `min_version` | producing-model version ≥ threshold |
+
+Omit a filter to ignore it. At least one of `attribute_name`, `producing_model_name`, or `producing_model_id` must be set.
+
+### Availability
+
+By default, rows with all value columns `NULL` (failed inference) are **excluded**. Pass `require_available=False` only when inspecting failure state (for example `ImageInstance.roi` warning messages).
+
+### Version ordering
+
+`version_sort_key` compares producing-model versions:
+
+1. PEP 440 semver strings (package versions such as `1.1.0`)
+2. Opaque artifact ids (HuggingFace-derived strings such as `Eyened/vascx/odfd/odfd_march25`)
+
+Within each kind, a higher version wins. Semver and artifact ids are not mixed with each other.
+
+### Where the selector is used
+
+| Consumer | Typical filters |
+|----------|-----------------|
+| Inference pipelines | `ModelInputSpec` → `resolve_input_attribute_value` (attribute + model name + `min_version`) |
+| `ImageInstance.find_attribute_value` / `get_attribute_value` | Same function on `ImageInstance.AttributeValues` |
+| `ImageInstance.roi`, `keypoints`, `quality` | Explicit `attribute_name` and `producing_model_name` per CFI attribute |
+| `ImageInstance.attrs` | One row per `(producing_model_name, attribute_name)` group |
+| API `ImageInstanceGET.attrs` / `model_attrs` | Built from `ImageInstance.attrs` in the DTO converter |
+
+### Examples
+
+```python
+# Latest successful CFI_ROI (ORM shorthand and API attrs use the same rules)
+im.roi
+im.get_attribute_value(attribute_name="CFI_ROI", producing_model_name="CFI_ROI")
+
+# Full AttributeValue row (version, provenance)
+im.find_attribute_value(attribute_name="CFI_Keypoints", producing_model_name="CFI_Keypoints")
+
+# Pipeline input: highest CFI_ROI version >= 0.0.0 from model CFI_ROI
+from eyened_orm.inference.model_inputs import CFI_ROI_INPUT, resolve_input_attribute_value
+resolve_input_attribute_value(session, image_id=im.ImageInstanceID, spec=CFI_ROI_INPUT)
+```
+
+See **[Inference](/eyened-platform/orm/inference)** for when models write new rows, version strings, and CLI skip/upgrade flags.

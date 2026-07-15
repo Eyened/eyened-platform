@@ -10,14 +10,16 @@ from eyened_orm import (
 )
 from eyened_orm.commands.test_targets import _import_images
 from eyened_orm.inference.cfi_odfd import CFI_ODFD
+from eyened_orm.inference.model_versions import huggingface_artifact_version
 import torch
 
 
 def test_attributes_model_description_synced_on_pipeline_init(session):
     """get_or_create update_values keeps Model.Description in sync with pipeline code."""
+    odfd_version = huggingface_artifact_version(CFI_ODFD.HF_ARTIFACT)
     existing = AttributesModel(
         ModelName="CFI_ODFD",
-        Version="odfd_march25",
+        Version=odfd_version,
         Description="old description",
     )
     session.add(existing)

@@ -490,23 +490,38 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             AttributeValueOutcome,
             attribute_value_outcome,
         )
+        from eyened_orm.inference.model_inputs import (
+            attribute_value_data,
+            select_attribute_value,
+        )
 
-        av = self.find_attribute_value(attribute_name="CFI_ROI")
+        av = self.find_attribute_value(
+            attribute_name="CFI_ROI",
+            producing_model_name="CFI_ROI",
+        )
         if av is None:
-            logger.warning(
-                "Image %s: CFI_ROI attribute not found (model has not run)",
-                self.ImageInstanceID,
+            failed_av = select_attribute_value(
+                self.AttributeValues,
+                attribute_name="CFI_ROI",
+                producing_model_name="CFI_ROI",
+                require_available=False,
             )
+            if (
+                failed_av is not None
+                and attribute_value_outcome(failed_av) == AttributeValueOutcome.FAILED
+            ):
+                logger.warning(
+                    "Image %s: CFI_ROI computation failed (attribute value is empty)",
+                    self.ImageInstanceID,
+                )
+            else:
+                logger.warning(
+                    "Image %s: CFI_ROI attribute not found (model has not run)",
+                    self.ImageInstanceID,
+                )
             return None
 
-        if attribute_value_outcome(av) == AttributeValueOutcome.FAILED:
-            logger.warning(
-                "Image %s: CFI_ROI computation failed (attribute value is empty)",
-                self.ImageInstanceID,
-            )
-            return None
-
-        roi = av.ValueJSON
+        roi = attribute_value_data(av)
         if not isinstance(roi, dict):
             return None
         # this may be missing in the database for older images
@@ -653,22 +668,27 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def _attrs_keypoints(self):
-        _, attrs = self.attrs
-        if "CFI_Keypoints" in attrs:
-            kps = attrs["CFI_Keypoints"]["CFI_Keypoints"]
-            bounds = self.bounds
-            kps["prep_fovea_xy"] = (
-                bounds.get_cropping_transform(1024)
-                .apply([[kps["fovea_xy"][0], kps["fovea_xy"][1]]])[0]
-                .tolist()
-            )
-            kps["prep_disc_edge_xy"] = (
-                bounds.get_cropping_transform(1024)
-                .apply([[kps["disc_edge_xy"][0], kps["disc_edge_xy"][1]]])[0]
-                .tolist()
-            )
+        kps = self.get_attribute_value(
+            attribute_name="CFI_Keypoints",
+            producing_model_name="CFI_Keypoints",
+        )
+        if kps is None:
+            return None
+        bounds = self.bounds
+        if bounds is None:
             return kps
-        return None
+        kps = dict(kps)
+        kps["prep_fovea_xy"] = (
+            bounds.get_cropping_transform(1024)
+            .apply([[kps["fovea_xy"][0], kps["fovea_xy"][1]]])[0]
+            .tolist()
+        )
+        kps["prep_disc_edge_xy"] = (
+            bounds.get_cropping_transform(1024)
+            .apply([[kps["disc_edge_xy"][0], kps["disc_edge_xy"][1]]])[0]
+            .tolist()
+        )
+        return kps
 
     @property
     def keypoints(self):
@@ -680,10 +700,10 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def quality(self):
         if self.CFQuality is not None:
             return self.CFQuality
-        _, attrs = self.attrs
-        if "CFI_Quality" in attrs:
-            return attrs["CFI_Quality"]["CFI_Quality"]
-        return None
+        return self.get_attribute_value(
+            attribute_name="CFI_Quality",
+            producing_model_name="CFI_Quality",
+        )
 
     def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
         if self.bounds is None:
@@ -888,36 +908,47 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def attrs(self) -> Dict[str, Any]:
-        attrs_by_model: dict[str, dict[str, object]] = {}
-        attrs_flat: dict[str, object] = {}
+        """Attribute values for API payloads, using version-aware selection.
 
+        Returns ``(attrs_flat, attrs_by_model)`` where each attribute appears
+        at most once per scope, selected by
+        :func:`~eyened_orm.inference.model_inputs.select_attribute_value`
+        (highest producing-model version among available rows).
+        """
+        from collections import defaultdict
+
+        from eyened_orm.inference.model_inputs import (
+            attribute_value_data,
+            select_attribute_value,
+        )
+
+        grouped: dict[tuple[str | None, str], list] = defaultdict(list)
         for av in getattr(self, "AttributeValues", []) or []:
             attr_def = getattr(av, "AttributeDefinition", None)
             if not attr_def:
                 continue
-
             producing_model = getattr(av, "ProducingModel", None)
+            model_name = producing_model.ModelName if producing_model else None
+            grouped[(model_name, attr_def.AttributeName)].append(av)
 
-            value = None
-            if av.ValueInt is not None:
-                value = av.ValueInt
-            elif av.ValueFloat is not None:
-                value = av.ValueFloat
-            elif av.ValueText is not None:
-                value = av.ValueText
-            elif av.ValueJSON is not None:
-                value = av.ValueJSON
+        attrs_by_model: dict[str, dict[str, object]] = {}
+        attrs_flat: dict[str, object] = {}
 
+        for (model_name, attr_name), candidates in grouped.items():
+            av = select_attribute_value(
+                candidates,
+                attribute_name=attr_name,
+                producing_model_name=model_name,
+            )
+            if av is None:
+                continue
+            value = attribute_value_data(av)
             if value is None:
                 continue
-
-            if producing_model:
-                model_name = producing_model.ModelName
-                if model_name not in attrs_by_model:
-                    attrs_by_model[model_name] = {}
-                attrs_by_model[model_name][attr_def.AttributeName] = value
+            if model_name:
+                attrs_by_model.setdefault(model_name, {})[attr_name] = value
             else:
-                attrs_flat[attr_def.AttributeName] = value
+                attrs_flat[attr_name] = value
 
         return attrs_flat, attrs_by_model
 
