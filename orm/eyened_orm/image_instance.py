@@ -484,6 +484,41 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         raw = adapter.read_thumbnail(self, size=size)
         return Image.open(io.BytesIO(raw))
 
+    def _cfi_attribute_value(self, spec) -> Any | None:
+        """Latest available value for a ``run-cfi-models`` attribute (version-aware)."""
+        return self.get_attribute_value(
+            attribute_name=spec.attribute_name,
+            producing_model_name=spec.model_name,
+        )
+
+    @property
+    def cfi_roi(self) -> Optional[Dict[str, Any]]:
+        from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+
+        return self._cfi_attribute_value(CFI_ROI_INPUT)
+
+    @property
+    def cfi_keypoints(self) -> Optional[Dict[str, Any]]:
+        from eyened_orm.inference.model_inputs import CFI_KEYPOINTS_INPUT
+
+        return self._cfi_attribute_value(CFI_KEYPOINTS_INPUT)
+
+    @property
+    def cfi_odfd(self) -> Optional[float]:
+        from eyened_orm.inference.model_inputs import CFI_ODFD_INPUT
+
+        return self._cfi_attribute_value(CFI_ODFD_INPUT)
+
+    @property
+    def cfi_quality(self) -> Optional[float]:
+        from eyened_orm.inference.model_inputs import CFI_QUALITY_INPUT
+
+        return self._cfi_attribute_value(CFI_QUALITY_INPUT)
+
+    @property
+    def odfd(self) -> Optional[float]:
+        return self.cfi_odfd
+
     @property
     def roi(self) -> Optional[Dict[str, Any]]:
         from eyened_orm.inference.attribute_value_outcome import (
@@ -668,10 +703,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def _attrs_keypoints(self):
-        kps = self.get_attribute_value(
-            attribute_name="CFI_Keypoints",
-            producing_model_name="CFI_Keypoints",
-        )
+        from eyened_orm.inference.model_inputs import CFI_KEYPOINTS_INPUT
+
+        kps = self._cfi_attribute_value(CFI_KEYPOINTS_INPUT)
         if kps is None:
             return None
         bounds = self.bounds
@@ -700,10 +734,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def quality(self):
         if self.CFQuality is not None:
             return self.CFQuality
-        return self.get_attribute_value(
-            attribute_name="CFI_Quality",
-            producing_model_name="CFI_Quality",
-        )
+        return self.cfi_quality
 
     def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
         if self.bounds is None:

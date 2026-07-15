@@ -86,6 +86,20 @@ CFI_ODFD_INPUT = ModelInputSpec(
     attribute_data_type=AttributeDataType.Float,
 )
 
+CFI_QUALITY_INPUT = ModelInputSpec(
+    attribute_name="CFI_Quality",
+    model_name="CFI_Quality",
+    min_version="0.0.0",
+    attribute_data_type=AttributeDataType.Float,
+)
+
+CFI_ATTRIBUTE_INPUTS: tuple[ModelInputSpec, ...] = (
+    CFI_ROI_INPUT,
+    CFI_KEYPOINTS_INPUT,
+    CFI_ODFD_INPUT,
+    CFI_QUALITY_INPUT,
+)
+
 ETDRS_INPUTS: tuple[ModelInputSpec, ...] = (CFI_KEYPOINTS_INPUT, CFI_ODFD_INPUT)
 
 
