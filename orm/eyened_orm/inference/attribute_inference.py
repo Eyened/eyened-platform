@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, ClassVar, Iterable, Iterator, List, Set, Tuple
 
 import numpy as np
@@ -10,6 +12,14 @@ from eyened_orm import (
     AttributeValue,
     ImageInstance,
     Modality,
+)
+from eyened_orm.inference.cfi_preprocess import PreprocessItem
+from eyened_orm.inference.model_inputs import (
+    ModelInputSpec,
+    register_model_inputs,
+    register_model_output,
+    resolve_inputs_for_images,
+    roi_value_from_inputs,
 )
 from eyened_orm.inference.multi_process_inference import (
     BaseInferencePipeline,
@@ -26,6 +36,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
     - model_description: Optional[str] - description for model creation
     - attribute_name: str - name of the AttributeDefinition
     - attribute_data_type: AttributeDataType - data type (JSON, Float, etc.)
+    - required_inputs: tuple of ModelInputSpec for input dependencies
 
     Subclasses can override:
     - _load_models() - called before processing starts
@@ -43,6 +54,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
     attribute_name: str
     attribute_data_type: AttributeDataType
     supported_modalities: ClassVar[tuple[Modality, ...]] = ()
+    required_inputs: ClassVar[tuple[ModelInputSpec, ...]] = ()
 
     def __init__(
         self,
@@ -59,6 +71,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         """
         self.session = session
         self.n_workers = n_workers
+        self._input_values_by_image: dict[int, dict[str, AttributeValue]] = {}
 
         # Store any additional kwargs as instance attributes
         for key, value in kwargs.items():
@@ -80,8 +93,15 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             },
         )
 
+        self._register_model_io()
+
         # Track if models have been loaded
         self._models_loaded = False
+
+    def _register_model_io(self) -> None:
+        """Register declared model outputs and inputs in the database."""
+        register_model_output(self.session, self.model, self.attr_definition)
+        register_model_inputs(self.session, self.model, self.required_inputs)
 
     def _load_models(self) -> None:
         """Load models before processing. Override in subclasses that need model loading."""
@@ -94,22 +114,15 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             self._models_loaded = True
 
     def _save_result(self, image_id: int, result: Any) -> None:
-        """Save result to database. Override for custom saving logic.
-
-        Args:
-            image_id: Image instance ID
-            result: Result to save
-        """
-        # Determine which value field to use based on attribute data type
+        """Save result to database and link input provenance when available."""
         if self.attribute_data_type == AttributeDataType.JSON:
             update_values = {"ValueJSON": result}
         elif self.attribute_data_type == AttributeDataType.Float:
             update_values = {"ValueFloat": result}
         else:
-            # Fallback to JSON for other types
             update_values = {"ValueJSON": result}
 
-        AttributeValue.upsert(
+        av = AttributeValue.upsert(
             self.session,
             match_by={
                 "AttributeID": self.attr_definition.AttributeID,
@@ -119,15 +132,35 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             update_values=update_values,
         )
 
+        input_values = self._input_values_by_image.get(image_id)
+        if input_values:
+            av.InputValues = set(input_values.values())
+            self.session.add(av)
+
+    def _filter_images_with_required_inputs(
+        self, image_ids: Iterable[int]
+    ) -> Set[int]:
+        if not self.required_inputs:
+            return set(image_ids)
+
+        ready: set[int] = set()
+        missing = 0
+        for image_id in image_ids:
+            inputs = self._input_values_by_image.get(image_id, {})
+            if len(inputs) != len(self.required_inputs):
+                missing += 1
+                continue
+            roi_dict = roi_value_from_inputs(inputs)
+            if roi_dict is None or roi_dict.get("success") is False:
+                missing += 1
+                continue
+            ready.add(image_id)
+        if missing:
+            print(f"Skipping {missing} images missing required inputs")
+        return ready
+
     def filter_image_ids(self, image_ids: Iterable[int]) -> Set[int]:
-        """Filter out image IDs that already have results.
-
-        Args:
-            image_ids: Iterable of image IDs to filter
-
-        Returns:
-            Set of image IDs that don't have existing results
-        """
+        """Filter out image IDs that already have results."""
         image_ids_set = set(image_ids)
 
         existing_ids = set(
@@ -141,34 +174,55 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         )
         if existing_ids:
             print(f"Skipping {len(existing_ids)} existing images")
-        return image_ids_set - existing_ids
+
+        pending = image_ids_set - existing_ids
+        if self.required_inputs:
+            self._input_values_by_image = resolve_inputs_for_images(
+                self.session, pending, self.required_inputs
+            )
+            pending = self._filter_images_with_required_inputs(pending)
+        else:
+            self._input_values_by_image = {}
+
+        return pending
+
+    def _build_preprocess_items(
+        self, images: list[ImageInstance]
+    ) -> list[tuple[int, PreprocessItem | None]]:
+        from eyened_orm.inference.utils import load_fundus_rgb
+
+        items: list[tuple[int, PreprocessItem | None]] = []
+        for img in images:
+            inputs = self._input_values_by_image.get(img.ImageInstanceID, {})
+            roi_dict = roi_value_from_inputs(inputs) if self.required_inputs else None
+            try:
+                image_rgb = load_fundus_rgb(img)
+                items.append(
+                    (
+                        img.ImageInstanceID,
+                        PreprocessItem(image_rgb=image_rgb, roi_dict=roi_dict),
+                    )
+                )
+            except Exception as exc:
+                print(f"Failed to load image {img.ImageInstanceID}: {exc}")
+                items.append((img.ImageInstanceID, None))
+        return items
 
     def process(self, image_ids: Iterable[int]) -> Iterator[Tuple[int, Any]]:
-        """Process images and yield (image_id, result) tuples.
-
-        Args:
-            image_ids: Iterable of image instance IDs to process
-
-        Yields:
-            Tuples of (image_id, result) for each processed image
-        """
+        """Process images and yield (image_id, result) tuples."""
         self._ensure_models_loaded()
 
         image_ids_set = set(image_ids)
         if not image_ids_set:
             return
 
-        # Fetch images and decode pixels in-process (local storage or API adapter).
-        images = ImageInstance.by_ids(self.session, image_ids_set)
-        from eyened_orm.inference.utils import load_fundus_rgb
+        if self.required_inputs and not self._input_values_by_image:
+            self._input_values_by_image = resolve_inputs_for_images(
+                self.session, image_ids_set, self.required_inputs
+            )
 
-        items: list[tuple[int, np.ndarray | None]] = []
-        for img in images:
-            try:
-                items.append((img.ImageInstanceID, load_fundus_rgb(img)))
-            except Exception as exc:
-                print(f"Failed to load image {img.ImageInstanceID}: {exc}")
-                items.append((img.ImageInstanceID, None))
+        images = ImageInstance.by_ids(self.session, image_ids_set)
+        items = self._build_preprocess_items(images)
 
         mpi = MultiProcessInference(
             items,
@@ -179,13 +233,7 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         yield from mpi.run()
 
     def run(self, image_ids: Iterable[int], commit_interval: int = 100) -> None:
-        """Run inference on a list of image IDs and save results.
-
-        Args:
-            image_ids: Iterable of image instance IDs to process
-        """
-
-        # Process results
+        """Run inference on a list of image IDs and save results."""
         image_ids_set = set(image_ids)
         for i, (image_id, result) in enumerate(
             tqdm(self.process(image_ids_set), total=len(image_ids_set))

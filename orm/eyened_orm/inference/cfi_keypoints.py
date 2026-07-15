@@ -5,7 +5,8 @@ import torch
 
 from eyened_orm import AttributeDataType, Modality
 from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
-from eyened_orm.inference.utils import preprocess_image
+from eyened_orm.inference.cfi_preprocess import PreprocessItem, crop_fundus_from_roi
+from eyened_orm.inference.model_inputs import ModelInputSpec
 from rtnls_inference.ensembles import HeatmapRegressionEnsemble
 
 
@@ -41,6 +42,14 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
     attribute_name = "CFI_Keypoints"
     attribute_data_type = AttributeDataType.JSON
     supported_modalities = (Modality.ColorFundus,)
+    required_inputs = (
+        ModelInputSpec(
+            "CFI_ROI",
+            "CFI_ROI",
+            "1.0",
+            attribute_data_type=AttributeDataType.JSON,
+        ),
+    )
 
     def __init__(
         self,
@@ -87,11 +96,16 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         self.resize = 512
         self.apply_ce = True
 
-    def preprocess(self, image_rgb: np.ndarray | None) -> Tuple[Any, np.ndarray] | None:
-        """Preprocess image for keypoint detection."""
-        if image_rgb is None:
+    def preprocess(self, item: PreprocessItem | None) -> Tuple[Any, np.ndarray] | None:
+        """Preprocess image for keypoint detection using stored CFI_ROI."""
+        if item is None or item.image_rgb is None:
             return None
-        return preprocess_image(image_rgb, resize=self.resize, apply_ce=self.apply_ce)
+        return crop_fundus_from_roi(
+            item.image_rgb,
+            item.roi_dict,
+            resize=self.resize,
+            apply_ce=self.apply_ce,
+        )
 
     def process_batch(
         self, prep_batch: List[Tuple[Any, np.ndarray]]

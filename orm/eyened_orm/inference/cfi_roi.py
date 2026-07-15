@@ -4,6 +4,7 @@ import numpy as np
 
 from eyened_orm import AttributeDataType, Modality
 from eyened_orm.inference.attribute_inference import AttributeInferencePipeline
+from eyened_orm.inference.cfi_preprocess import PreprocessItem
 
 from rtnls_fundusprep.mask_extraction import get_cfi_bounds
 
@@ -21,11 +22,11 @@ class CFI_ROI(AttributeInferencePipeline):
     def __init__(self, session, n_workers: int = 8, **kwargs):
         super().__init__(session, n_workers=n_workers)
 
-    def preprocess(self, image_rgb: np.ndarray | None) -> Optional[Dict[str, Any]]:
-        if image_rgb is None:
+    def preprocess(self, item: PreprocessItem | None) -> Optional[Dict[str, Any]]:
+        if item is None or item.image_rgb is None:
             return None
         try:
-            bounds = get_cfi_bounds(image_rgb)
+            bounds = get_cfi_bounds(item.image_rgb)
             return bounds.to_dict_all()
         except Exception as exc:
             print(f"CFI_ROI preprocessing failed: {exc}")

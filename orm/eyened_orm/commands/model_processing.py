@@ -150,6 +150,7 @@ def _run_cfi_models_impl(
         print(f"Target: {target.summary}")
 
         for slug in [model] if model is not None else CFI_ATTRIBUTE_MODEL_SLUGS:
+            # cfi-roi runs first so dependent models can reuse stored CFI_ROI attributes
             run_cfi_attribute_pipeline(
                 session,
                 target.image_ids,

@@ -51,16 +51,6 @@ def load_fundus_rgb(image: ImageInstance) -> np.ndarray:
     return as_uint8_rgb(arr)
 
 
-def preprocess_image(image_rgb: np.ndarray, resize=512, apply_ce=False):
-    from rtnls_fundusprep.mask_extraction import get_cfi_bounds
-
-    bounds = get_cfi_bounds(image_rgb)
-    T, bounds_cropped = bounds.crop(resize)
-    im = bounds_cropped.image
-    ce = bounds_cropped.contrast_enhanced_5 if apply_ce else None
-    return T, normalize(im, ce)
-
-
 def transform_kps(colname):
     from rtnls_fundusprep.cfi_bounds import CFIBounds
 
