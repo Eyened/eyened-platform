@@ -133,3 +133,47 @@ class SubTaskRepository:
         return list(
             session.execute(stmt.limit(limit).offset(offset)).scalars().all()
         )
+
+    def get_by_id(self, session: Session, subtask_id: int) -> SubTask | None:
+        """Return the subtask with the given id, or None if absent."""
+        return session.get(SubTask, subtask_id)
+
+    def get_with_images(self, session: Session, subtask_id: int) -> SubTask | None:
+        """Return the subtask with its image links eager-loaded, or None."""
+        return (
+            session.execute(
+                select(SubTask)
+                .options(_SUBTASK_IMAGE_LOADER)
+                .where(SubTask.SubTaskID == subtask_id)
+            )
+            .scalars()
+            .first()
+        )
+
+    def resolve_image_instance_id(
+        self, session: Session, public_id: str
+    ) -> int | None:
+        """Return the ImageInstanceID for a PublicID, or None if no image matches."""
+        return session.scalar(
+            select(ImageInstance.ImageInstanceID).where(
+                ImageInstance.PublicID == public_id
+            )
+        )
+
+    def next_image_index(self, session: Session, subtask_id: int) -> int:
+        """Return the next ImageIndex for the subtask (max+1, or 0 if it has none)."""
+        current_max = session.scalar(
+            select(func.max(SubTaskImageLink.ImageIndex)).where(
+                SubTaskImageLink.SubTaskID == subtask_id
+            )
+        )
+        return 0 if current_max is None else current_max + 1
+
+    def get_image_link(
+        self, session: Session, subtask_id: int, image_instance_id: int
+    ) -> SubTaskImageLink | None:
+        """Return the link for (subtask_id, image_instance_id), or None if absent."""
+        return session.get(
+            SubTaskImageLink,
+            {"SubTaskID": subtask_id, "ImageInstanceID": image_instance_id},
+        )

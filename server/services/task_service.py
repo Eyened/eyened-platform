@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from eyened_orm import SubTask, Task
+from eyened_orm import SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
 
@@ -235,8 +235,189 @@ class TaskService:
         return rows[0], nxt
 
 
+class SubTaskService:
+    """Business logic for individual subtasks and their image links."""
+
+    def __init__(
+        self,
+        subtask_repository: SubTaskRepository,
+        logger: DatabaseModificationLogger | None = None,
+    ) -> None:
+        self.subtasks = subtask_repository
+        self.logger = logger
+
+    def get_subtask(
+        self, session: Session, subtask_id: int, *, with_images: bool
+    ) -> SubTask:
+        """Return a subtask, image-loaded iff ``with_images``.
+
+        Raises:
+            NotFoundError: If the subtask does not exist.
+        """
+        subtask = (
+            self.subtasks.get_with_images(session, subtask_id)
+            if with_images
+            else self.subtasks.get_by_id(session, subtask_id)
+        )
+        if subtask is None:
+            raise NotFoundError(f"SubTask {subtask_id} not found")
+        return subtask
+
+    def update_subtask(
+        self,
+        session: Session,
+        subtask_id: int,
+        comments: str | None,
+        task_state: SubTaskState | None,
+        actor: ActingUser,
+    ) -> SubTask:
+        """Update a subtask's comments/state (each optional).
+
+        Raises:
+            NotFoundError: If the subtask does not exist.
+        """
+        subtask = self.subtasks.get_by_id(session, subtask_id)
+        if subtask is None:
+            raise NotFoundError(f"SubTask {subtask_id} not found")
+
+        changes: dict[str, str] = {}
+        if comments is not None:
+            changes["comments"] = f"{subtask.Comments} -> {comments}"
+            subtask.Comments = comments
+        if task_state is not None:
+            changes["task_state"] = f"{subtask.TaskState} -> {task_state}"
+            subtask.TaskState = task_state
+
+        session.commit()
+        session.refresh(subtask)
+        if self.logger is not None:
+            self.logger.log_update(
+                user=actor.username,
+                user_id=actor.id,
+                endpoint=f"PATCH /api/subtasks/{subtask_id}",
+                entity="SubTask",
+                entity_id=subtask_id,
+                changes=changes if changes else None,
+            )
+        return subtask
+
+    def delete_subtask(
+        self, session: Session, subtask_id: int, actor: ActingUser
+    ) -> None:
+        """Delete a subtask (its image links cascade at the DB level).
+
+        Raises:
+            NotFoundError: If the subtask does not exist.
+        """
+        subtask = self.subtasks.get_by_id(session, subtask_id)
+        if subtask is None:
+            raise NotFoundError(f"SubTask {subtask_id} not found")
+
+        deleted_data = {
+            "task_id": subtask.TaskID,
+            "comments": subtask.Comments,
+            "task_state": str(subtask.TaskState) if subtask.TaskState else None,
+            "creator_id": subtask.CreatorID,
+        }
+        session.delete(subtask)
+        session.commit()
+        if self.logger is not None:
+            self.logger.log_delete(
+                user=actor.username,
+                user_id=actor.id,
+                endpoint=f"DELETE /api/subtasks/{subtask_id}",
+                entity="SubTask",
+                entity_id=subtask_id,
+                deleted_data=deleted_data,
+            )
+        return None
+
+    def add_image(
+        self,
+        session: Session,
+        subtask_id: int,
+        image_public_id: str,
+        actor: ActingUser,
+    ) -> SubTask:
+        """Link an image (by PublicID) to a subtask at the next ImageIndex.
+
+        Raises:
+            NotFoundError: If the subtask or the image does not exist.
+        """
+        if self.subtasks.get_by_id(session, subtask_id) is None:
+            raise NotFoundError(f"SubTask {subtask_id} not found")
+        image_instance_id = self.subtasks.resolve_image_instance_id(
+            session, image_public_id
+        )
+        if image_instance_id is None:
+            raise NotFoundError("ImageInstance not found")
+
+        link = SubTaskImageLink(
+            SubTaskID=subtask_id,
+            ImageInstanceID=image_instance_id,
+            ImageIndex=self.subtasks.next_image_index(session, subtask_id),
+        )
+        session.add(link)
+        session.commit()
+        if self.logger is not None:
+            self.logger.log_insert(
+                user=actor.username,
+                user_id=actor.id,
+                endpoint=f"POST /api/subtasks/{subtask_id}/images",
+                entity="SubTaskImageLink",
+                fields={
+                    "subtask_id": subtask_id,
+                    "image_instance_id": image_instance_id,
+                },
+            )
+        return self.subtasks.get_with_images(session, subtask_id)
+
+    def remove_image(
+        self,
+        session: Session,
+        subtask_id: int,
+        image_public_id: str,
+        actor: ActingUser,
+    ) -> SubTask:
+        """Unlink an image (by PublicID) from a subtask.
+
+        Raises:
+            NotFoundError: If the image or the (subtask, image) link is absent.
+        """
+        image_instance_id = self.subtasks.resolve_image_instance_id(
+            session, image_public_id
+        )
+        if image_instance_id is None:
+            raise NotFoundError("ImageInstance not found")
+        link = self.subtasks.get_image_link(session, subtask_id, image_instance_id)
+        if link is None:
+            raise NotFoundError("Link not found")
+
+        session.delete(link)
+        session.commit()
+        if self.logger is not None:
+            self.logger.log_delete(
+                user=actor.username,
+                user_id=actor.id,
+                endpoint=(
+                    f"DELETE /api/subtasks/{subtask_id}/images/{image_public_id}"
+                ),
+                entity="SubTaskImageLink",
+                deleted_data={
+                    "subtask_id": subtask_id,
+                    "image_instance_id": image_instance_id,
+                },
+            )
+        return self.subtasks.get_with_images(session, subtask_id)
+
+
 def get_task_service() -> TaskService:
     """Default TaskService wiring for FastAPI ``Depends()``."""
     return TaskService(
         TaskRepository(), SubTaskRepository(), logger=get_db_logger()
     )
+
+
+def get_subtask_service() -> SubTaskService:
+    """Default SubTaskService wiring for FastAPI ``Depends()``."""
+    return SubTaskService(SubTaskRepository(), logger=get_db_logger())
