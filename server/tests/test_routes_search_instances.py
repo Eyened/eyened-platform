@@ -1,70 +1,171 @@
-from datetime import date, datetime
+import pytest
 
-from eyened_orm import (
-    DeviceInstance,
-    DeviceModel,
-    ImageInstance,
-    ImageStorage,
-    Patient,
-    Project,
-    Series,
-    StorageBackend,
-    Study,
+from eyened_orm.utils.factories import seed_search_dataset
+
+
+@pytest.fixture()
+def data(session):
+    return seed_search_dataset(session)
+
+
+def _search(client, conditions, **kw):
+    body = {"conditions": conditions, "order_by": "Date Inserted", "order": "ASC"}
+    body.update(kw)
+    resp = client.post("/instances/search", json=body)
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def _cond(variable, value, operator="=="):
+    return {"type": "default", "variable": variable, "operator": operator, "value": value}
+
+
+def test_unfiltered_search_returns_active_instances_only(client, data):
+    """No conditions returns every active instance in Date Inserted order; inactive is excluded."""
+    body = _search(client, [], include_count=True)
+
+    assert body["result_ids"] == ["img-a1", "img-a2", "img-b1"]
+    assert body["count"] == 3
+
+
+def test_include_count_defaults_to_null(client, data):
+    """count is omitted (None) unless include_count is requested."""
+    body = _search(client, [])
+
+    assert body.get("count") is None
+
+
+@pytest.mark.parametrize(
+    "variable,value,expected",
+    [
+        ("Project Name", "Alpha", ["img-a1", "img-a2"]),
+        ("Patient Identifier", "PAT-B", ["img-b1"]),
+        ("Segmentation Feature Name", "feat-x", ["img-a1"]),
+        ("Segmentation Creator Name", "seg-creator", ["img-a1"]),
+        ("Segmentation Tag Name", "seg-tag", ["img-a1"]),
+        ("Form Schema Name", "schema-x", ["img-a1"]),
+        ("Form Creator Name", "form-creator", ["img-a1"]),
+        ("Form Tag Name", "form-tag", ["img-a1"]),
+        ("Image Tag Name", "img-tag", ["img-a1"]),
+    ],
 )
-from eyened_orm.project import ExternalEnum
+def test_each_exists_branch_filters_to_the_expected_instances(
+    client, data, variable, value, expected
+):
+    """Each searchable field routes through its EXISTS branch and matches the right rows."""
+    assert _search(client, [_cond(variable, value)])["result_ids"] == expected
 
 
-def test_instance_search_returns_a_seeded_instance(client, session):
-    """The harness reaches the real endpoint and renders one seeded instance."""
-    backend = StorageBackend(Key="bk", Kind="local")
-    session.add(backend)
-    session.flush()
-    project = Project(ProjectName="P", External=ExternalEnum.N)
-    session.add(project)
-    session.flush()
-    patient = Patient(PatientIdentifier="ID", ProjectID=project.ProjectID)
-    session.add(patient)
-    session.flush()
-    study = Study(PatientID=patient.PatientID, StudyDate=date(2024, 1, 1))
-    session.add(study)
-    session.flush()
-    series = Series(StudyID=study.StudyID)
-    session.add(series)
-    session.flush()
-    model = DeviceModel(Manufacturer="Mf", ManufacturerModelName="M")
-    session.add(model)
-    session.flush()
-    device = DeviceInstance(DeviceModelID=model.DeviceModelID, Description="d")
-    session.add(device)
-    session.flush()
-    image = ImageInstance(
-        PublicID="img-a",
-        SeriesID=series.SeriesID,
-        DeviceInstanceID=device.DeviceInstanceID,
-        DatasetIdentifier="ds-a",
-        Rows_y=4,
-        Columns_x=4,
-        DateInserted=datetime(2024, 1, 1),
+@pytest.mark.parametrize(
+    "variable,value",
+    [
+        ("Project Name", "NoSuchProject"),
+        ("Segmentation Feature Name", "no-such-feature"),
+        ("Form Tag Name", "no-such-tag"),
+        ("Image Tag Name", "no-such-tag"),
+    ],
+)
+def test_each_exists_branch_has_an_empty_case(client, data, variable, value):
+    """A non-matching value returns no rows rather than falling open."""
+    body = _search(client, [_cond(variable, value)], include_count=True)
+
+    assert body["result_ids"] == []
+    assert body["has_more"] is False
+
+
+def test_conditions_are_and_ed_together(client, data):
+    """Multiple conditions AND globally (today's semantics): the result is their intersection.
+
+    NOTE: the plan asserted OR here; verified against the code it is AND
+    (`_build_instance_select` combines every group with `and_(*and_predicates)`).
+    """
+    # Alpha images are a1,a2; feat-x is on a1 only. AND narrows to a1 (OR would give a1,a2).
+    narrowed = _search(
+        client, [_cond("Project Name", "Alpha"), _cond("Segmentation Feature Name", "feat-x")]
     )
-    session.add(image)
-    session.flush()
-    session.add(
-        ImageStorage(
-            ImageInstanceID=image.ImageInstanceID,
-            StorageBackendID=backend.StorageBackendID,
-            ObjectKey="obj-a",
-            Format="png",
-            IsPrimary=True,
-        )
-    )
-    session.commit()
+    assert narrowed["result_ids"] == ["img-a1"]
 
+    # Contradictory conditions (Alpha project, but PAT-B lives in Beta) yield no rows.
+    contradictory = _search(
+        client, [_cond("Project Name", "Alpha"), _cond("Patient Identifier", "PAT-B")]
+    )
+    assert contradictory["result_ids"] == []
+
+
+def test_in_operator_matches_any_listed_value(client, data):
+    """A list value becomes an IN over the mapped column."""
+    body = _search(client, [_cond("Patient Identifier", ["PAT-A", "PAT-B"], operator="IN")])
+
+    assert body["result_ids"] == ["img-a1", "img-a2", "img-b1"]
+
+
+def test_attribute_condition_filters_by_model_produced_value(client, data):
+    """An attribute condition resolves the definition and filters on the typed value column."""
+    body = _search(
+        client,
+        [{"type": "attribute", "model": "M1", "variable": "Quality", "operator": "==", "value": 5}],
+    )
+
+    assert body["result_ids"] == ["img-a1"]
+
+
+def test_order_desc_reverses_results(client, data):
+    """order=DESC reverses the sort while keeping the ImageInstanceID tiebreaker."""
+    body = _search(client, [], order="DESC")
+
+    assert body["result_ids"] == ["img-b1", "img-a2", "img-a1"]
+
+
+def test_pagination_reports_has_more_and_walks_pages(client, data):
+    """limit+1 lookahead drives has_more; page N returns the Nth window."""
+    page0 = _search(client, [], limit=2, page=0)
+    page1 = _search(client, [], limit=2, page=1)
+
+    assert page0["result_ids"] == ["img-a1", "img-a2"]
+    assert page0["has_more"] is True
+    assert page1["result_ids"] == ["img-b1"]
+    assert page1["has_more"] is False
+
+
+def test_studies_are_derived_from_instances_in_instance_order(client, data):
+    """The studies block is the instances' distinct studies, in first-appearance order."""
+    body = _search(client, [])
+
+    assert [s["id"] for s in body["studies"]] == [
+        data.studies["a"].StudyID,
+        data.studies["b"].StudyID,
+    ]
+
+
+def test_empty_result_returns_the_empty_envelope(client, data):
+    """A search matching nothing returns empty lists and has_more False, not a 404."""
+    body = _search(client, [_cond("Project Name", "NoSuchProject")], include_count=True)
+
+    assert body["instances"] == []
+    assert body["studies"] == []
+    assert body["result_ids"] == []
+    assert body["has_more"] is False
+
+
+def test_unknown_static_field_is_rejected_by_pydantic(client, data):
+    """An unknown static field 422s at request parsing -- the reason both asserts are dead code."""
     resp = client.post(
         "/instances/search",
-        json={"conditions": [], "order_by": "Study Date", "order": "ASC", "include_count": True},
+        json={
+            "conditions": [_cond("Patient Identifir", "PAT-A")],
+            "order_by": "Study Date",
+            "order": "ASC",
+        },
     )
 
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["result_ids"] == ["img-a"]
-    assert body["count"] == 1
+    assert resp.status_code == 422
+
+
+def test_unknown_order_by_is_rejected_by_pydantic(client, data):
+    """order_by is Literal-typed, so an unknown sort field 422s rather than KeyError-ing."""
+    resp = client.post(
+        "/instances/search",
+        json={"conditions": [], "order_by": "Nonsense", "order": "ASC"},
+    )
+
+    assert resp.status_code == 422
