@@ -3,15 +3,21 @@ import { cubicOut } from "svelte/easing";
 import type { TransitionConfig } from "svelte/transition";
 import { twMerge } from "tailwind-merge";
 
-import { readable, type Readable, type Unsubscriber } from 'svelte/store';
+import { readable, type Readable, type Unsubscriber } from "svelte/store";
 
-export function groupBy(xs: { [key: string | number]: any }[], key: string | number) {
+export function groupBy(
+    xs: { [key: string | number]: any }[],
+    key: string | number,
+) {
     return xs.reduce(function (rv, x) {
         (rv[x[key]] = rv[x[key]] || []).push(x);
         return rv;
     }, {});
 }
-export function groupByFunction<K, V>(xs: V[], key: (arg0: V) => K): Map<K, V[]> {
+export function groupByFunction<K, V>(
+    xs: V[],
+    key: (arg0: V) => K,
+): Map<K, V[]> {
     return xs.reduce(function (map, x) {
         const k = key(x);
         if (map.has(k)) {
@@ -37,20 +43,17 @@ export function splitTail(str: string, sep: string) {
     return [str.substring(0, index), str.substring(index + 1)];
 }
 
-
-
 export type Color = [number, number, number];
 
 export function toHex(color: Color) {
     const [r, g, b] = color;
-    return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+    return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
 }
 
 export function fromHex(hex: string): [number, number, number] {
     const bigint = parseInt(hex.slice(1), 16);
     return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
 }
-
 
 export function get_url_params() {
     const urlSearchParams = new URLSearchParams(window.location.search);
@@ -70,15 +73,14 @@ export class Deferred<T> {
     }
 }
 
-
 export function asyncReadable<T>(
     promise: Promise<Readable<T>>,
-    initialValue: T
+    initialValue: T,
 ): Readable<T> {
     return readable<T>(initialValue, (set) => {
         let unsub: Unsubscriber | undefined;
 
-        promise.then(store => {
+        promise.then((store) => {
             unsub = store.subscribe(set);
         });
 
@@ -87,7 +89,14 @@ export function asyncReadable<T>(
         };
     });
 }
-export function toggleInSet<T>(set: { has: (item: T) => boolean, delete: (item: T) => void, add: (item: T) => void }, item: T) {
+export function toggleInSet<T>(
+    set: {
+        has: (item: T) => boolean;
+        delete: (item: T) => void;
+        add: (item: T) => void;
+    },
+    item: T,
+) {
     if (set.has(item)) {
         set.delete(item);
     } else {
@@ -95,63 +104,62 @@ export function toggleInSet<T>(set: { has: (item: T) => boolean, delete: (item: 
     }
 }
 
-
 export function cn(...inputs: ClassValue[]) {
-	return twMerge(clsx(inputs));
+    return twMerge(clsx(inputs));
 }
 
 type FlyAndScaleParams = {
-	y?: number;
-	x?: number;
-	start?: number;
-	duration?: number;
+    y?: number;
+    x?: number;
+    start?: number;
+    duration?: number;
 };
 
 export const flyAndScale = (
-	node: Element,
-	params: FlyAndScaleParams = { y: -8, x: 0, start: 0.95, duration: 150 }
+    node: Element,
+    params: FlyAndScaleParams = { y: -8, x: 0, start: 0.95, duration: 150 },
 ): TransitionConfig => {
-	const style = getComputedStyle(node);
-	const transform = style.transform === "none" ? "" : style.transform;
+    const style = getComputedStyle(node);
+    const transform = style.transform === "none" ? "" : style.transform;
 
-	const scaleConversion = (
-		valueA: number,
-		scaleA: [number, number],
-		scaleB: [number, number]
-	) => {
-		const [minA, maxA] = scaleA;
-		const [minB, maxB] = scaleB;
+    const scaleConversion = (
+        valueA: number,
+        scaleA: [number, number],
+        scaleB: [number, number],
+    ) => {
+        const [minA, maxA] = scaleA;
+        const [minB, maxB] = scaleB;
 
-		const percentage = (valueA - minA) / (maxA - minA);
-		const valueB = percentage * (maxB - minB) + minB;
+        const percentage = (valueA - minA) / (maxA - minA);
+        const valueB = percentage * (maxB - minB) + minB;
 
-		return valueB;
-	};
+        return valueB;
+    };
 
-	const styleToString = (
-		style: Record<string, number | string | undefined>
-	): string => {
-		return Object.keys(style).reduce((str, key) => {
-			if (style[key] === undefined) return str;
-			return str + `${key}:${style[key]};`;
-		}, "");
-	};
+    const styleToString = (
+        style: Record<string, number | string | undefined>,
+    ): string => {
+        return Object.keys(style).reduce((str, key) => {
+            if (style[key] === undefined) return str;
+            return str + `${key}:${style[key]};`;
+        }, "");
+    };
 
-	return {
-		duration: params.duration ?? 200,
-		delay: 0,
-		css: (t) => {
-			const y = scaleConversion(t, [0, 1], [params.y ?? 5, 0]);
-			const x = scaleConversion(t, [0, 1], [params.x ?? 0, 0]);
-			const scale = scaleConversion(t, [0, 1], [params.start ?? 0.95, 1]);
+    return {
+        duration: params.duration ?? 200,
+        delay: 0,
+        css: (t) => {
+            const y = scaleConversion(t, [0, 1], [params.y ?? 5, 0]);
+            const x = scaleConversion(t, [0, 1], [params.x ?? 0, 0]);
+            const scale = scaleConversion(t, [0, 1], [params.start ?? 0.95, 1]);
 
-			return styleToString({
-				transform: `${transform} translate3d(${x}px, ${y}px, 0) scale(${scale})`,
-				opacity: t
-			});
-		},
-		easing: cubicOut
-	};
+            return styleToString({
+                transform: `${transform} translate3d(${x}px, ${y}px, 0) scale(${scale})`,
+                opacity: t,
+            });
+        },
+        easing: cubicOut,
+    };
 };
 
 export function timeAgo(date: Date): string {
@@ -178,9 +186,9 @@ export function timeAgo(date: Date): string {
     if (weeks < 4) {
         return weeks === 1 ? "a week ago" : `${weeks} weeks ago`;
     }
-    return date.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
+    return date.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
     });
 }

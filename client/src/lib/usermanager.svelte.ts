@@ -3,29 +3,36 @@ import { page } from "$app/state";
 import { authClient, type UserResponse } from "../auth";
 
 export class UserManager {
-
     public user = $state<UserResponse>({
         id: -1,
-        username: '',
+        username: "",
         role: null,
-        starred_tags: []
+        starred_tags: [],
     });
     public loggedIn = $derived(this.user.id !== -1);
     public starredTagIds = $state<number[]>([]);
 
-
     async init(pathname: string) {
-        if (pathname.startsWith('/users/login') || pathname.startsWith('/users/oidc-callback')) {
+        if (
+            pathname.startsWith("/users/login") ||
+            pathname.startsWith("/users/oidc-callback")
+        ) {
             return;
         }
 
         const user = await authClient.me();
         if (user === null) {
-            console.log('User is not logged in');
+            console.log("User is not logged in");
             // Only redirect if we're not already on the login page
-            if (!page.url.pathname.startsWith('/users/login')) {
-                console.log('redirecting to', encodeURIComponent(window.location.href));
-                await goto('/users/login?next=' + encodeURIComponent(window.location.href));
+            if (!page.url.pathname.startsWith("/users/login")) {
+                console.log(
+                    "redirecting to",
+                    encodeURIComponent(window.location.href),
+                );
+                await goto(
+                    "/users/login?next=" +
+                        encodeURIComponent(window.location.href),
+                );
             }
             return;
         }
@@ -43,13 +50,13 @@ export class UserManager {
 
         // Get the 'next' URL from the query parameters
         const params = new URLSearchParams(window.location.search);
-        const nextUrl = params.get('next');
+        const nextUrl = params.get("next");
 
         // If there's a 'next' URL, go there, otherwise go to the root
         if (nextUrl) {
             await goto(decodeURIComponent(nextUrl));
         } else {
-            await goto('/');
+            await goto("/");
         }
     }
 
@@ -65,7 +72,7 @@ export class UserManager {
         if (nextUrl) {
             await goto(decodeURIComponent(nextUrl));
         } else {
-            await goto('/');
+            await goto("/");
         }
     }
 
@@ -73,12 +80,12 @@ export class UserManager {
         await authClient.logout();
         this.user = {
             id: -1,
-            username: '',
+            username: "",
             role: null,
-            starred_tags: []
+            starred_tags: [],
         };
         this.starredTagIds = [];
-        goto('/users/login');
+        goto("/users/login");
     }
 
     async changePassword(oldPassword: string, newPassword: string) {

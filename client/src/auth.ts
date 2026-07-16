@@ -1,4 +1,4 @@
-import { apiErrorFromResponse, fetchApi } from '$lib/api/client';
+import { apiErrorFromResponse, fetchApi } from "$lib/api/client";
 
 export interface UserResponse {
     id: number;
@@ -32,7 +32,7 @@ interface OIDCAuthorizationResponse {
 class AuthClient {
     private baseUrl: string;
 
-    constructor(baseUrl: string = '/api/auth') {
+    constructor(baseUrl: string = "/api/auth") {
         this.baseUrl = baseUrl;
     }
 
@@ -42,28 +42,32 @@ class AuthClient {
             return null;
         }
         if (!response.ok) {
-            throw new Error('Failed to get profile');
+            throw new Error("Failed to get profile");
         }
 
         return response.json();
     }
 
-    async login(username: string, password: string, rememberMe: boolean = false): Promise<UserResponse> {
+    async login(
+        username: string,
+        password: string,
+        rememberMe: boolean = false,
+    ): Promise<UserResponse> {
         const response = await fetchApi(`${this.baseUrl}/login`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
             skipAuthRetry: true,
             body: JSON.stringify({
                 username,
                 password,
-                remember_me: rememberMe
-            } as UserLogin)
+                remember_me: rememberMe,
+            } as UserLogin),
         });
 
         if (!response.ok) {
-            throw new Error('Login failed');
+            throw new Error("Login failed");
         }
 
         return response.json(); // Direct user response, no token handling
@@ -71,30 +75,33 @@ class AuthClient {
 
     async logout(): Promise<void> {
         const response = await fetchApi(`${this.baseUrl}/logout`, {
-            method: 'POST',
-            skipAuthRetry: true
+            method: "POST",
+            skipAuthRetry: true,
         });
 
         if (!response.ok) {
-            throw new Error('Logout failed');
+            throw new Error("Logout failed");
         }
     }
 
-    async changePassword(oldPassword: string, newPassword: string): Promise<UserResponse> {
+    async changePassword(
+        oldPassword: string,
+        newPassword: string,
+    ): Promise<UserResponse> {
         const response = await fetchApi(`${this.baseUrl}/change-password`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
             skipAuthRetry: true,
             body: JSON.stringify({
                 old_password: oldPassword,
-                new_password: newPassword
-            } as ChangePasswordRequest)
+                new_password: newPassword,
+            } as ChangePasswordRequest),
         });
 
         if (!response.ok) {
-            throw new Error('Password change failed');
+            throw new Error("Password change failed");
         }
 
         return response.json();
@@ -102,20 +109,20 @@ class AuthClient {
 
     async register(username: string, password: string): Promise<UserResponse> {
         const response = await fetchApi(`${this.baseUrl}/register`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
             skipAuthRetry: true,
             body: JSON.stringify({
                 username,
                 password,
-                remember_me: false
-            } as UserLogin)
+                remember_me: false,
+            } as UserLogin),
         });
 
         if (!response.ok) {
-            throw new Error('Registration failed');
+            throw new Error("Registration failed");
         }
 
         return response.json();
@@ -123,12 +130,12 @@ class AuthClient {
 
     async refresh(): Promise<UserResponse> {
         const response = await fetchApi(`${this.baseUrl}/refresh`, {
-            method: 'POST',
-            skipAuthRetry: true
+            method: "POST",
+            skipAuthRetry: true,
         });
 
         if (!response.ok) {
-            throw new Error('Token refresh failed');
+            throw new Error("Token refresh failed");
         }
 
         return response.json();
@@ -140,17 +147,17 @@ class AuthClient {
         });
 
         if (!response.ok) {
-            throw new Error('Could not fetch authentication options');
+            throw new Error("Could not fetch authentication options");
         }
 
         return response.json();
     }
 
     async OIDCAuthorize(): Promise<OIDCAuthorizationResponse> {
-        let nextUrl = new URLSearchParams(window.location.search).get('next');
+        let nextUrl = new URLSearchParams(window.location.search).get("next");
         let queryParams = new URLSearchParams();
         if (nextUrl) {
-            queryParams.append('next', nextUrl);
+            queryParams.append("next", nextUrl);
         }
         const response = await fetchApi(`${this.baseUrl}/oidc/authorize`, {
             skipAuthRetry: true,
@@ -158,7 +165,7 @@ class AuthClient {
         });
 
         if (!response.ok) {
-            throw new Error('OIDC authorize failed');
+            throw new Error("OIDC authorize failed");
         }
 
         return response.json();
@@ -166,13 +173,13 @@ class AuthClient {
 
     async OIDCAuthenticate(code: string, state: string): Promise<UserResponse> {
         const response = await fetchApi(`${this.baseUrl}/oidc/authenticate`, {
-            method: 'POST',
+            method: "POST",
             skipAuthRetry: true,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 code: code,
                 state: state,
-            })
+            }),
         });
         if (!response.ok) {
             throw await apiErrorFromResponse(response);

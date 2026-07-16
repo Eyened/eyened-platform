@@ -7,19 +7,18 @@ import type { RegistrationItem } from "./registrationItem";
  * The mapping is defined as:
  * x_out = x - (a00 + a0 + a1*x + a2*y + a3*x^2 + a4*x*y + a5*y^2)
  * y_out = y - (b00 + b0 + b1*x + b2*y + b3*x^2 + b4*x*y + b5*y^2)
- * 
- * The coefficients are stored in dx and dy arrays with a redundant intercept 
+ *
+ * The coefficients are stored in dx and dy arrays with a redundant intercept
  * dx = [a00, a0, a1, a2, a3, a4, a5]
  * dy = [b00, b0, b1, b2, b3, b4, b5]
  */
 export class ParabolicRegistration implements RegistrationItem {
-    
     constructor(
         public readonly source: string,
         public readonly target: string,
         public readonly dx: number[],
         public readonly dy: number[],
-    ) { }
+    ) {}
 
     mapping(p: Position): Position {
         const { x, y } = p;
@@ -64,10 +63,14 @@ export class ParabolicRegistration implements RegistrationItem {
     get inverse(): ParabolicRegistration {
         const dx_inverse = this.dx.map((val, i) => -val);
         const dy_inverse = this.dy.map((val, i) => -val);
-        return new ParabolicRegistration(this.target, this.source, dx_inverse, dy_inverse);
+        return new ParabolicRegistration(
+            this.target,
+            this.source,
+            dx_inverse,
+            dy_inverse,
+        );
     }
 }
-
 
 function dot(a: number[], b: number[]): number {
     return a.reduce((sum, ai, i) => sum + ai * b[i], 0);

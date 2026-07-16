@@ -1,4 +1,7 @@
-import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type {
+    ModelSegmentationGET,
+    SegmentationGET,
+} from "../../../types/openapi_types";
 
 export type Segmentation = SegmentationGET | ModelSegmentationGET;
 /**
@@ -23,7 +26,7 @@ export function groupByCreator(
  * 1. Model segmentations first
  * 2. User's own grader segmentations (grouped by creator)
  * 3. Other graders' segmentations (grouped by creator)
- * 
+ *
  * Returns a flat array maintaining the grouping order.
  */
 export function orderSegmentationsByCreator(
@@ -45,7 +48,10 @@ export function orderSegmentationsByCreator(
     }
 
     // 4. Other graders' segmentations
-    for (const [creatorId, segmentations] of segmentationsByCreators.entries()) {
+    for (const [
+        creatorId,
+        segmentations,
+    ] of segmentationsByCreators.entries()) {
         if (creatorId !== userId) {
             result.push(...segmentations);
         }

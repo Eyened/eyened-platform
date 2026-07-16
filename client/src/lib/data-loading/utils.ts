@@ -1,4 +1,4 @@
-import type { ImageGET } from '../../types/openapi_types';
+import type { ImageGET } from "../../types/openapi_types";
 
 export class DefaultDict<T, Q> extends Map<T, Q> {
     defaultFactory: () => Q;
@@ -19,10 +19,11 @@ export class DefaultDict<T, Q> extends Map<T, Q> {
 
 export function parseDate(dateString: string): Date | undefined {
     try {
-        const [year, month, day, hour, minute, second] = dateString.split(/[- :]/).map(Number);
+        const [year, month, day, hour, minute, second] = dateString
+            .split(/[- :]/)
+            .map(Number);
         return new Date(year, month - 1, day, hour, minute, second);
-    } catch (error) {
-    }
+    } catch (error) {}
 }
 
 export function getThumbUrl(image: ImageGET, size: number = 144) {

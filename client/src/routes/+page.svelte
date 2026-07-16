@@ -1,34 +1,33 @@
 <script lang="ts">
-	import Browser from '$lib/browser/Browser.svelte';
-	import Main from '../lib/components/Main.svelte';
-	
+    import Browser from "$lib/browser/Browser.svelte";
+    import Main from "../lib/components/Main.svelte";
 </script>
 
 <svelte:head>
-	<title>Eyened browser</title>
+    <title>Eyened browser</title>
 </svelte:head>
 
-
 <Main>
-	{#snippet children()}
-		<Browser />
-	{/snippet}
+    {#snippet children()}
+        <Browser />
+    {/snippet}
 </Main>
+
 <!-- <Browser /> -->
 
 <style>
-	:global(body) {
-		margin: 0;
-		height: 100vh;
-		font-family: Verdana, sans-serif;
-		background-color: white;
-		color: rgb(99, 99, 99);
-	}
-	:global(canvas) {
-		position: absolute;
-		left: 0;
-		top: 0;
-		bottom: 0;
-		right: 0;
-	}
+    :global(body) {
+        margin: 0;
+        height: 100vh;
+        font-family: Verdana, sans-serif;
+        background-color: white;
+        color: rgb(99, 99, 99);
+    }
+    :global(canvas) {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        right: 0;
+    }
 </style>

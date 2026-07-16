@@ -22,7 +22,8 @@
         try {
             await globalContext.userManager.OIDCLogin(code, state);
         } catch (err) {
-            error = err instanceof Error ? err.message : "Unknown error occurred";
+            error =
+                err instanceof Error ? err.message : "Unknown error occurred";
         }
     }
 
@@ -31,15 +32,19 @@
     });
 </script>
 
-<div class="min-h-screen flex flex-col items-center justify-center p-4">
-    <div class="w-[440px] border border-gray-200 rounded-xl shadow-sm p-8 m-4 bg-white">
+<div class="flex min-h-screen flex-col items-center justify-center p-4">
+    <div
+        class="m-4 w-[440px] rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
+    >
         {#if error}
-            <h1 class="text-lg font-semibold mb-2">Sign-in failed</h1>
-            <p class="text-sm text-red-600 mb-6">{error}</p>
+            <h1 class="mb-2 text-lg font-semibold">Sign-in failed</h1>
+            <p class="mb-6 text-sm text-red-600">{error}</p>
             <Button href="/users/login" class="w-full">Back to login</Button>
         {:else}
-            <h1 class="text-lg font-semibold mb-2">Signing in</h1>
-            <p class="text-sm text-gray-600">Completing OpenID Connect sign-in…</p>
+            <h1 class="mb-2 text-lg font-semibold">Signing in</h1>
+            <p class="text-sm text-gray-600">
+                Completing OpenID Connect sign-in…
+            </p>
         {/if}
     </div>
 </div>
