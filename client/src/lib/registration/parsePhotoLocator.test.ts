@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { getFdsRegistration } from "./fdsRegistration";
+import { parseHeidelbergPhotoLocator } from "./parsePhotoLocator";
 import { CirclePhotoLocator } from "./photoLocators";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -63,6 +64,39 @@ describe("getFdsRegistration", () => {
             x: 1197,
             y: 917,
         });
+    });
+});
+
+describe("parseHeidelbergPhotoLocator", () => {
+    it("infers a CirclePhotoLocator from legacy centre + injected type/image_id/index", () => {
+        const item = parseHeidelbergPhotoLocator(
+            { centre: { x: 1197, y: 917 }, radius: 216, start_angle: Math.PI },
+            "enface-1",
+            3,
+        );
+        expect(item).toEqual({
+            type: "CirclePhotoLocator",
+            image_id: "enface-1",
+            index: 3,
+            center: { x: 1197, y: 917 },
+            radius: 216,
+            start_angle: Math.PI,
+        });
+    });
+
+    it("infers a LinePhotoLocator when start/end are present", () => {
+        const item = parseHeidelbergPhotoLocator(
+            { start: { x: 0, y: 0 }, end: { x: 10, y: 10 } },
+            "enface-1",
+            0,
+        );
+        expect(item?.type).toBe("LinePhotoLocator");
+    });
+
+    it("returns null (skips) when neither line nor circle fields are valid", () => {
+        expect(
+            parseHeidelbergPhotoLocator({ radius: 216 }, "enface-1", 0),
+        ).toBeNull();
     });
 });
 
