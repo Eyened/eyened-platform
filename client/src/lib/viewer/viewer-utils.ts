@@ -16,7 +16,7 @@ export type RenderMode =
 
 export type WindowLevel = { min: number; max: number };
 
-export type PanelName =
+export type BuiltinPanelName =
     | "Info"
     | "Rendering"
     | "ETDRS"
@@ -25,6 +25,9 @@ export type PanelName =
     | "Form"
     | "Segmentation"
     | "LayerSegmentation";
+
+/** Builtin names or task-configured custom panel titles (e.g. "Grading"). */
+export type PanelName = BuiltinPanelName | (string & {});
 
 export type ToolName =
     | "brush"

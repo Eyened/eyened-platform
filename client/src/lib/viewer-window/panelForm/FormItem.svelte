@@ -2,13 +2,12 @@
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { createFormAnnotation, deleteFormAnnotation } from "$lib/data";
     import { formSchemas } from "$lib/data/stores.svelte";
-    import { openNewWindow } from "$lib/newWindow";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
     import Duplicate from "../icons/Duplicate.svelte";
     import { PanelIcon, Trash } from "../icons/icons";
-    import FormItemContent from "./FormItemContent.svelte";
+    import { openFormInNewWindow } from "./openFormInNewWindow";
 
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -57,22 +56,8 @@
         });
     }
 
-    let window: Window | null = null;
-    async function openInNewWindow(form: FormAnnotationGET) {
-        if (window) {
-            window.close();
-        }
-        const props = {
-            form,
-            canEdit: canEditForm,
-        };
-
-        window = openNewWindow(
-            // @ts-expect-error - openNewWindow has loose typing for component props
-            FormItemContent,
-            props,
-            `${formSchema.name} ${form.id}`,
-        );
+    function openInNewWindow(form: FormAnnotationGET) {
+        openFormInNewWindow(form, canEditForm);
     }
 
     function formatDateTime(dateString: string) {

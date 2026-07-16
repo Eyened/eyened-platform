@@ -112,14 +112,29 @@ Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**, n
 ```json
 {
   "form_schema_name": "Naevi grading",
-  "form_image_scope": true
+  "form_image_scope": true,
+  "layout": {
+    "hide": ["Form"],
+    "prepend": [
+      {
+        "type": "quick-form",
+        "title": "Grading",
+        "expanded": true
+      }
+    ]
+  }
 }
 ```
 
 | Field | Meaning |
 |-------|---------|
-| `form_schema_name` | `FormSchema.SchemaName` to pre-select in the Form panel when the task is active (clinical forms only; builtin ETDRS and registration schemas are excluded) |
+| `form_schema_name` | `FormSchema.SchemaName` to pre-select in the Form panel when the task is active (clinical forms only; builtin ETDRS and registration schemas are excluded). Also used by the `quick-form` layout panel. |
 | `form_image_scope` | When `true`, list only form annotations for the current image |
+| `layout.hide` | Builtin sidebar panel names to omit (e.g. `"Form"`) |
+| `layout.prepend` | Custom panels inserted before the default sidebar list |
+| `layout.prepend[].type` | Panel type — v1 supports `"quick-form"` |
+| `layout.prepend[].title` | Panel header label (e.g. `"Grading"`) |
+| `layout.prepend[].expanded` | When `true`, panel starts expanded |
 
 Example task import row (see **[Importer — tasks](/eyened-platform/orm/importer)**):
 
@@ -128,6 +143,17 @@ ImportTaskRow(
     task_definition_name="Naevi grading",
     task_definition_config={
         "form_schema_name": "Naevi grading",
+        "form_image_scope": True,
+        "layout": {
+            "hide": ["Form"],
+            "prepend": [
+                {
+                    "type": "quick-form",
+                    "title": "Grading",
+                    "expanded": True,
+                }
+            ],
+        },
     },
     task_name="Naevi batch 2025",
     creator_name="admin",

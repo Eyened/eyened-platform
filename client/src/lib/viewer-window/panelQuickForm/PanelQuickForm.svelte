@@ -1,0 +1,138 @@
+<script lang="ts">
+    import {
+        createFormAnnotation,
+        formAnnotations,
+        formSchemasByName,
+    } from "$lib/data";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { resolveRefs, type JSONSchema } from "$lib/forms/schemaType";
+    import { SchemaValidator } from "$lib/forms/schemaValidator.svelte";
+    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { getContext } from "svelte";
+    import type { TaskConfig } from "../taskConfigLayout";
+    import { findFormAnnotation } from "../panelForm/findFormAnnotation";
+    import { openFormInNewWindow } from "../panelForm/openFormInNewWindow";
+
+    interface Props {
+        title?: string;
+        active?: boolean;
+    }
+    let { title = "Grading" }: Props = $props();
+
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const taskContext = getContext<TaskContext>("taskContext");
+    const viewerContext = getContext<ViewerContext>("viewerContext");
+
+    const taskConfig = taskContext?.task.task_definition
+        .config as TaskConfig | undefined;
+    const instance = viewerContext.image.instance;
+
+    const schema = $derived.by(() => {
+        const name = taskConfig?.form_schema_name;
+        if (!name) return undefined;
+        return formSchemasByName.get(name);
+    });
+
+    const annotation = $derived.by(() => {
+        if (!schema) return undefined;
+        return findFormAnnotation({
+            annotations: Array.from(formAnnotations.values()),
+            schemaId: schema.id,
+            userId: globalContext.user.id,
+            patientId: instance.patient.id,
+            studyId: instance.study?.id,
+            imageId: instance.id,
+            laterality: instance.laterality ?? undefined,
+            subTaskId: taskContext?.subTask?.id,
+            formImageScope: taskConfig?.form_image_scope ?? false,
+            entityType: schema.entity_type,
+        });
+    });
+
+    const validator = $derived.by(() => {
+        if (!schema || !annotation) return undefined;
+        const resolved = resolveRefs(schema.schema as JSONSchema);
+        return new SchemaValidator(resolved, annotation.form_data ?? {});
+    });
+
+    const statusLabel = $derived.by(() => {
+        if (!annotation) return "Not graded";
+        if (!validator) return "—";
+        if (validator.isValid) return "Valid ✓";
+        return `Incomplete (${validator.errors.length})`;
+    });
+
+    const buttonLabel = $derived(annotation ? "Open grading" : "Grade");
+    const canEdit = $derived(
+        annotation ? globalContext.canEdit(annotation) : true,
+    );
+    const gradeDisabled = $derived(!schema);
+
+    async function onGradeClick() {
+        if (!schema) return;
+
+        let form = annotation;
+        if (!form) {
+            form = await createFormAnnotation({
+                form_schema_id: schema.id,
+                patient_id: instance.patient.id,
+                study_id: instance.study?.id ?? undefined,
+                image_id: instance.id,
+                laterality: instance.laterality ?? undefined,
+                sub_task_id: taskContext?.subTask?.id,
+                form_data: {},
+            });
+        }
+
+        openFormInNewWindow(form, canEdit);
+    }
+</script>
+
+<div class="main">
+    {#if !schema}
+        <p class="warning">Form schema not configured or not found.</p>
+    {:else}
+        <p class="schema">Schema: {schema.name}</p>
+        <p class="status">Status: {statusLabel}</p>
+    {/if}
+
+    <button onclick={onGradeClick} disabled={gradeDisabled}>
+        {buttonLabel}
+    </button>
+</div>
+
+<style>
+    .main {
+        display: flex;
+        flex-direction: column;
+        padding: 0.5em;
+        flex: 1;
+        gap: 0.4em;
+    }
+    .warning {
+        color: #f87171;
+        font-size: 0.85em;
+    }
+    .schema,
+    .status {
+        font-size: 0.85em;
+        margin: 0;
+    }
+    button {
+        color: rgba(255, 255, 255, 0.8);
+        padding: 0.2em;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+        margin-top: 0.25em;
+    }
+    button:disabled {
+        cursor: not-allowed;
+        opacity: 0.3;
+    }
+    button:not(:disabled):hover {
+        cursor: pointer;
+        background-color: rgba(255, 255, 255, 0.3);
+    }
+</style>

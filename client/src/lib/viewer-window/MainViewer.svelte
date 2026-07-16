@@ -1,43 +1,22 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
+    import type { ViewerEvent } from "$lib/viewer/viewer-utils";
     import Viewer from "$lib/viewer/Viewer.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext, onDestroy, setContext, type Component } from "svelte";
+    import { getContext, onDestroy, onMount, setContext } from "svelte";
     import MainIcon from "./icons/MainIcon.svelte";
-    import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
-    import PanelForm from "./panelForm/PanelForm.svelte";
     import PanelHeader from "./PanelHeader.svelte";
-    import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
-    import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
-    import PanelRendering from "./panelRendering/PanelRendering.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import { formSchemas } from "$lib/data/stores.svelte";
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
     import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
-    import {
-        Close,
-        Draw,
-        ETDRS,
-        Form,
-        Info,
-        Registration,
-        Rendering,
-    } from "./icons/icons";
-    import Measure from "./icons/Measure.svelte";
-    import PanelInfo from "./panelInfo/panelInfo.svelte";
-    import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
+    import { Close } from "./icons/icons";
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
-    import EtdrsPanelHelp from "./panelHelp/EtdrsPanelHelp.svelte";
-    import FormPanelHelp from "./panelHelp/FormPanelHelp.svelte";
-    import InfoPanelHelp from "./panelHelp/InfoPanelHelp.svelte";
-    import MeasurePanelHelp from "./panelHelp/MeasurePanelHelp.svelte";
-    import RegistrationPanelHelp from "./panelHelp/RegistrationPanelHelp.svelte";
-    import RenderingPanelHelp from "./panelHelp/RenderingPanelHelp.svelte";
-    import SegmentationPanelHelp from "./panelHelp/SegmentationPanelHelp.svelte";
+    import { resolvePanels } from "./resolvePanels";
+    import type { TaskConfig } from "./taskConfigLayout";
     interface Props {
         image: AbstractImage;
     }
@@ -113,58 +92,24 @@
             BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
     )!;
 
-    const panels: {
-        name: PanelName;
-        component: Component<any>;
-        Icon: Component;
-        Help?: Component;
-        props?: Record<string, unknown>;
-    }[] = [
-        { name: "Info", component: PanelInfo, Icon: Info, Help: InfoPanelHelp },
-        {
-            name: "Rendering",
-            component: PanelRendering,
-            Icon: Rendering,
-            Help: RenderingPanelHelp,
-        },
-    ];
+    const taskConfig = taskContext?.task.task_definition.config as
+        | TaskConfig
+        | undefined;
 
-    if (image.is2D && etdrsSchema) {
-        panels.push({
-            name: "ETDRS",
-            component: PanelETDRS,
-            Icon: ETDRS,
-            Help: EtdrsPanelHelp,
-            props: { etdrsSchema, active: false },
-        });
-    }
-
-    if (image.is2D && registrationSchema) {
-        panels.push({
-            name: "Registration",
-            component: PanelRegistration,
-            Icon: Registration,
-            Help: RegistrationPanelHelp,
-            props: { registrationSchema, active: false },
-        });
-    }
-
-    panels.push(
+    const { panels, expandedPanelNames } = resolvePanels(
         {
-            name: "Measure",
-            component: PanelMeasure,
-            Icon: Measure,
-            Help: MeasurePanelHelp,
-            props: { active: false },
+            is2D: image.is2D,
+            etdrsSchema,
+            registrationSchema,
         },
-        { name: "Form", component: PanelForm, Icon: Form, Help: FormPanelHelp },
-        {
-            name: "Segmentation",
-            component: PanelSegmentation,
-            Icon: Draw,
-            Help: SegmentationPanelHelp,
-        },
+        taskConfig,
     );
+
+    onMount(() => {
+        for (const name of expandedPanelNames) {
+            activePanels.add(name);
+        }
+    });
 </script>
 
 <div class="main">
