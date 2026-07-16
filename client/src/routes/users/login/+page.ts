@@ -1,4 +1,3 @@
-
 export const ssr = false;
 
 /** @type {import('./$types').PageLoad} */

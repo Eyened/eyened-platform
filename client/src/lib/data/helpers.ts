@@ -1,15 +1,42 @@
-import type { FeatureGET, FeaturePATCH, FeaturePUT, FormAnnotationGET, ImageGET, SegmentationGET, StudyGET, SubTaskWithImagesGET, TagType, TaskGET, TaskPATCH, TaskPUT } from '../../types/openapi_types';
-import { api, fetchApi } from '../api/client';
-import { apiInvoke, apiInvokeAllowEmpty } from './api';
-import { decodeNpy, NPYArray } from '../utils/npy_loader';
-import { features, featuresByName, formAnnotations, ingestSubTasks, ingestTasks, instances, segmentations, studies, tags, tasks } from './stores.svelte';
-
+import type {
+    FeatureGET,
+    FeaturePATCH,
+    FeaturePUT,
+    FormAnnotationGET,
+    ImageGET,
+    SegmentationGET,
+    StudyGET,
+    SubTaskWithImagesGET,
+    TagType,
+    TaskGET,
+    TaskPATCH,
+    TaskPUT,
+} from "../../types/openapi_types";
+import { api, fetchApi } from "../api/client";
+import { apiInvoke, apiInvokeAllowEmpty } from "./api";
+import { decodeNpy, NPYArray } from "../utils/npy_loader";
+import {
+    features,
+    featuresByName,
+    formAnnotations,
+    ingestSubTasks,
+    ingestTasks,
+    instances,
+    segmentations,
+    studies,
+    tags,
+    tasks,
+} from "./stores.svelte";
 
 // ===== Tag Helpers =====
 
-export async function tagInstance(instance: ImageGET, tagId: number, comment?: string) {
+export async function tagInstance(
+    instance: ImageGET,
+    tagId: number,
+    comment?: string,
+) {
     const { data } = await apiInvoke(() =>
-        api.POST('/instances/{instance_id}/tags' as any, {
+        api.POST("/instances/{instance_id}/tags" as any, {
             params: { path: { instance_id: instance.id } } as any,
             body: { tag_id: tagId, comment } as any,
         }),
@@ -19,14 +46,18 @@ export async function tagInstance(instance: ImageGET, tagId: number, comment?: s
     if (instances.has(instance.id)) {
         instances.set(instance.id, {
             ...instances.get(instance.id)!,
-            tags: [...instances.get(instance.id)!.tags, data as any]
+            tags: [...instances.get(instance.id)!.tags, data as any],
         });
     }
 }
 
-export async function updateTagInstance(instanceId: string, tagId: number, comment?: string) {
+export async function updateTagInstance(
+    instanceId: string,
+    tagId: number,
+    comment?: string,
+) {
     const res = await apiInvoke(() =>
-        api.PATCH('/instances/{instance_id}/tags/{tag_id}' as any, {
+        api.PATCH("/instances/{instance_id}/tags/{tag_id}" as any, {
             params: { path: { instance_id: instanceId, tag_id: tagId } } as any,
             body: { comment } as any,
         }),
@@ -34,28 +65,37 @@ export async function updateTagInstance(instanceId: string, tagId: number, comme
     const inst = instances.get(instanceId);
     if (inst && res.data) {
         const tm = res.data as any;
-        instances.set(instanceId, { ...inst, tags: inst.tags.map(t => t.id === tagId ? tm : t) });
+        instances.set(instanceId, {
+            ...inst,
+            tags: inst.tags.map((t) => (t.id === tagId ? tm : t)),
+        });
     }
 }
 
 export async function untagInstance(instance: ImageGET, tagId: number) {
     await apiInvoke(() =>
-        api.DELETE('/instances/{instance_id}/tags/{tag_id}' as any, {
-            params: { path: { instance_id: instance.id, tag_id: tagId } } as any,
+        api.DELETE("/instances/{instance_id}/tags/{tag_id}" as any, {
+            params: {
+                path: { instance_id: instance.id, tag_id: tagId },
+            } as any,
         }),
     );
     if (instances.has(instance.id)) {
         const inst = instances.get(instance.id)!;
         instances.set(instance.id, {
             ...inst,
-            tags: inst.tags.filter(t => t.id !== tagId)
+            tags: inst.tags.filter((t) => t.id !== tagId),
         });
     }
 }
 
-export async function tagStudy(study: StudyGET, tagId: number, comment?: string) {
+export async function tagStudy(
+    study: StudyGET,
+    tagId: number,
+    comment?: string,
+) {
     const { data } = await apiInvoke(() =>
-        api.POST('/studies/{study_id}/tags' as any, {
+        api.POST("/studies/{study_id}/tags" as any, {
             params: { path: { study_id: Number(study.id) } } as any,
             body: { tag_id: tagId, comment } as any,
         }),
@@ -64,83 +104,128 @@ export async function tagStudy(study: StudyGET, tagId: number, comment?: string)
 
     studies.set(study.id, {
         ...study,
-        tags: [...study.tags, data as any]
+        tags: [...study.tags, data as any],
     });
 }
 
-export async function updateTagStudy(studyId: number, tagId: number, comment?: string) {
+export async function updateTagStudy(
+    studyId: number,
+    tagId: number,
+    comment?: string,
+) {
     const res = await apiInvoke(() =>
-        api.PATCH('/studies/{study_id}/tags/{tag_id}' as any, {
-            params: { path: { study_id: Number(studyId), tag_id: tagId } } as any,
+        api.PATCH("/studies/{study_id}/tags/{tag_id}" as any, {
+            params: {
+                path: { study_id: Number(studyId), tag_id: tagId },
+            } as any,
             body: { comment } as any,
         }),
     );
     const s = studies.get(studyId);
     if (s && res.data) {
         const tm = res.data as any;
-        studies.set(studyId, { ...s, tags: s.tags.map(t => t.id === tagId ? tm : t) });
+        studies.set(studyId, {
+            ...s,
+            tags: s.tags.map((t) => (t.id === tagId ? tm : t)),
+        });
     }
 }
 
-export async function tagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number, comment?: string) {
+export async function tagFormAnnotation(
+    formAnnotation: FormAnnotationGET,
+    tagId: number,
+    comment?: string,
+) {
     const { data } = await apiInvoke(() =>
-        api.POST('/form-annotations/{form_annotation_id}/tags' as any, {
-            params: { path: { form_annotation_id: Number(formAnnotation.id) } } as any,
+        api.POST("/form-annotations/{form_annotation_id}/tags" as any, {
+            params: {
+                path: { form_annotation_id: Number(formAnnotation.id) },
+            } as any,
             body: { tag_id: tagId, comment } as any,
         }),
     );
     // Update store
     formAnnotations.set(formAnnotation.id, {
         ...formAnnotation,
-        tags: [...(formAnnotation.tags ?? []), data as any]
+        tags: [...(formAnnotation.tags ?? []), data as any],
     });
 }
 
-export async function updateTagFormAnnotation(annotationId: number, tagId: number, comment?: string) {
+export async function updateTagFormAnnotation(
+    annotationId: number,
+    tagId: number,
+    comment?: string,
+) {
     const res = await apiInvoke(() =>
-        api.PATCH('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
-            params: { path: { form_annotation_id: Number(annotationId), tag_id: tagId } } as any,
-            body: { comment } as any,
-        }),
+        api.PATCH(
+            "/form-annotations/{form_annotation_id}/tags/{tag_id}" as any,
+            {
+                params: {
+                    path: {
+                        form_annotation_id: Number(annotationId),
+                        tag_id: tagId,
+                    },
+                } as any,
+                body: { comment } as any,
+            },
+        ),
     );
     const fa = formAnnotations.get(annotationId);
     if (fa && res.data) {
         const tm = res.data as any;
-        formAnnotations.set(annotationId, { ...fa, tags: (fa.tags ?? []).map(t => t.id === tagId ? tm : t) });
+        formAnnotations.set(annotationId, {
+            ...fa,
+            tags: (fa.tags ?? []).map((t) => (t.id === tagId ? tm : t)),
+        });
     }
 }
 
-export async function untagFormAnnotation(formAnnotation: FormAnnotationGET, tagId: number) {
+export async function untagFormAnnotation(
+    formAnnotation: FormAnnotationGET,
+    tagId: number,
+) {
     await apiInvoke(() =>
-        api.DELETE('/form-annotations/{form_annotation_id}/tags/{tag_id}' as any, {
-            params: { path: { form_annotation_id: Number(formAnnotation.id), tag_id: tagId } } as any,
-        }),
+        api.DELETE(
+            "/form-annotations/{form_annotation_id}/tags/{tag_id}" as any,
+            {
+                params: {
+                    path: {
+                        form_annotation_id: Number(formAnnotation.id),
+                        tag_id: tagId,
+                    },
+                } as any,
+            },
+        ),
     );
     // Update store
     formAnnotations.set(formAnnotation.id, {
         ...formAnnotation,
-        tags: (formAnnotation.tags ?? []).filter(t => t.id !== tagId)
+        tags: (formAnnotation.tags ?? []).filter((t) => t.id !== tagId),
     });
 }
 
-
-
 export async function untagStudy(study: StudyGET, tagId: number) {
     await apiInvoke(() =>
-        api.DELETE('/studies/{study_id}/tags/{tag_id}' as any, {
-            params: { path: { study_id: Number(study.id), tag_id: tagId } } as any,
+        api.DELETE("/studies/{study_id}/tags/{tag_id}" as any, {
+            params: {
+                path: { study_id: Number(study.id), tag_id: tagId },
+            } as any,
         }),
     );
     // Update store
     studies.set(study.id, {
         ...study,
-        tags: study.tags.filter(t => t.id !== tagId)
+        tags: study.tags.filter((t) => t.id !== tagId),
     });
 }
 
-export async function tagSegmentation(seg: SegmentationGET, tagId: number, comment?: string) {
+export async function tagSegmentation(
+    seg: SegmentationGET,
+    tagId: number,
+    comment?: string,
+) {
     const { data } = await apiInvoke(() =>
-        api.POST('/segmentations/{segmentation_id}/tags' as any, {
+        api.POST("/segmentations/{segmentation_id}/tags" as any, {
             params: { path: { segmentation_id: Number(seg.id) } } as any,
             body: { tag_id: tagId, comment } as any,
         }),
@@ -148,37 +233,42 @@ export async function tagSegmentation(seg: SegmentationGET, tagId: number, comme
     // Update store
     segmentations.set(seg.id, {
         ...seg,
-        tags: [...seg.tags, data as any]
+        tags: [...seg.tags, data as any],
     });
 }
 
 export async function untagSegmentation(seg: SegmentationGET, tagId: number) {
     await apiInvoke(() =>
-        api.DELETE('/segmentations/{segmentation_id}/tags/{tag_id}' as any, {
-            params: { path: { segmentation_id: Number(seg.id), tag_id: tagId } } as any,
+        api.DELETE("/segmentations/{segmentation_id}/tags/{tag_id}" as any, {
+            params: {
+                path: { segmentation_id: Number(seg.id), tag_id: tagId },
+            } as any,
         }),
     );
     // Update store
     segmentations.set(seg.id, {
         ...seg,
-        tags: seg.tags.filter(t => t.id !== tagId)
+        tags: seg.tags.filter((t) => t.id !== tagId),
     });
 }
 
 // ===== Segmentation Data Helpers =====
 
-export async function getSegmentationData(segmentationId: number, params?: { scan_nr?: number; sparse_axis?: number }): Promise<NPYArray | null> {
+export async function getSegmentationData(
+    segmentationId: number,
+    params?: { scan_nr?: number; sparse_axis?: number },
+): Promise<NPYArray | null> {
     const query: any = {};
 
     query.axis = params?.sparse_axis;
     query.scan_nr = params?.scan_nr;
     const res = await apiInvokeAllowEmpty(() =>
-        api.GET('/segmentations/{segmentation_id}/data', {
+        api.GET("/segmentations/{segmentation_id}/data", {
             params: {
                 path: { segmentation_id: segmentationId },
                 query,
             },
-            parseAs: 'arrayBuffer',
+            parseAs: "arrayBuffer",
         }),
     );
     if (res.response.status == 204) {
@@ -190,21 +280,21 @@ export async function getSegmentationData(segmentationId: number, params?: { sca
 export async function updateSegmentationData(
     segmentationId: number,
     data: ArrayBuffer,
-    params?: { scan_nr?: number; sparse_axis?: number; keepalive?: boolean }
+    params?: { scan_nr?: number; sparse_axis?: number; keepalive?: boolean },
 ) {
     const urlParams = new URLSearchParams();
     const sparseAxis = params?.sparse_axis;
     if (sparseAxis != null) {
-        urlParams.append('axis', sparseAxis.toString());
+        urlParams.append("axis", sparseAxis.toString());
     }
     if (params?.scan_nr != null) {
-        urlParams.append('scan_nr', params.scan_nr.toString());
+        urlParams.append("scan_nr", params.scan_nr.toString());
     }
 
     const keepalive = params?.keepalive ?? false;
     return fetchApi(`/segmentations/${segmentationId}/data`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
+        method: "PUT",
+        headers: { "Content-Type": "application/octet-stream" },
         body: data,
         query: urlParams,
         keepalive,
@@ -213,7 +303,10 @@ export async function updateSegmentationData(
     });
 }
 
-export async function getModelSegmentationData(modelSegmentationId: number, params?: { axis?: number; scan_nr?: number; sparse_axis?: number }): Promise<NPYArray | null> {
+export async function getModelSegmentationData(
+    modelSegmentationId: number,
+    params?: { axis?: number; scan_nr?: number; sparse_axis?: number },
+): Promise<NPYArray | null> {
     // Match original logic:
     // - axis only sent if sparse_axis != null AND scan_nr != undefined
     // - scan_nr can be sent alone
@@ -227,12 +320,12 @@ export async function getModelSegmentationData(modelSegmentationId: number, para
     }
 
     const res = await apiInvokeAllowEmpty(() =>
-        api.GET('/model-segmentations/{model_segmentation_id}/data', {
+        api.GET("/model-segmentations/{model_segmentation_id}/data", {
             params: {
                 path: { model_segmentation_id: modelSegmentationId },
                 query,
             },
-            parseAs: 'arrayBuffer',
+            parseAs: "arrayBuffer",
         }),
     );
     if (res.response.status == 204) {
@@ -245,17 +338,20 @@ export async function getModelSegmentationData(modelSegmentationId: number, para
 
 export async function getFormAnnotationValue(annotationId: number) {
     const res = await apiInvoke(() =>
-        api.GET('/form-annotations/{form_annotation_id}/value', {
+        api.GET("/form-annotations/{form_annotation_id}/value", {
             params: { path: { form_annotation_id: annotationId } },
         }),
     );
     return res.data as unknown;
 }
 
-export async function setFormAnnotationValue(annotationId: number, form_data: unknown) {
+export async function setFormAnnotationValue(
+    annotationId: number,
+    form_data: unknown,
+) {
     // Save to server first (server is source of truth)
     await apiInvoke(() =>
-        api.PUT('/form-annotations/{form_annotation_id}/value', {
+        api.PUT("/form-annotations/{form_annotation_id}/value", {
             params: { path: { form_annotation_id: annotationId } },
             body: form_data as any,
         }),
@@ -266,7 +362,7 @@ export async function setFormAnnotationValue(annotationId: number, form_data: un
     if (existing) {
         formAnnotations.set(annotationId, {
             ...existing,
-            form_data: form_data as any
+            form_data: form_data as any,
         });
     } else {
         console.error(`Form annotation ${annotationId} not found`);
@@ -276,8 +372,12 @@ export async function setFormAnnotationValue(annotationId: number, form_data: un
 // ===== Feature Helpers =====
 
 /** Create a new feature on the server and update local feature stores. */
-export async function createFeature(data: FeaturePUT): Promise<FeatureGET | null> {
-    const res = await apiInvoke(() => api.POST('/features' as any, { body: data }));
+export async function createFeature(
+    data: FeaturePUT,
+): Promise<FeatureGET | null> {
+    const res = await apiInvoke(() =>
+        api.POST("/features" as any, { body: data }),
+    );
     if (res.data) {
         const feature = res.data as FeatureGET;
         features.set(feature.id, feature);
@@ -289,7 +389,7 @@ export async function createFeature(data: FeaturePUT): Promise<FeatureGET | null
 
 export async function updateFeature(featureId: number, patch: FeaturePATCH) {
     const res = await apiInvoke(() =>
-        api.PATCH('/features/{feature_id}' as any, {
+        api.PATCH("/features/{feature_id}" as any, {
             params: { path: { feature_id: featureId } } as any,
             body: patch,
         }),
@@ -309,7 +409,7 @@ export async function deleteFeature(featureId: number) {
     const feature = features.get(featureId);
 
     await apiInvoke(() =>
-        api.DELETE('/features/{feature_id}' as any, {
+        api.DELETE("/features/{feature_id}" as any, {
             params: { path: { feature_id: featureId } } as any,
         }),
     );
@@ -326,13 +426,13 @@ export async function deleteFeature(featureId: number) {
 export async function createTag(
     name: string,
     tagType: TagType,
-    description?: string
+    description?: string,
 ) {
     const res = await apiInvoke(() =>
-        api.POST('/tags' as any, {
+        api.POST("/tags" as any, {
             body: {
                 name,
-                description: description ?? '',
+                description: description ?? "",
                 tag_type: tagType,
             },
         }),
@@ -350,7 +450,7 @@ export async function createTag(
 
 export async function deleteTag(tagId: number) {
     await apiInvoke(() =>
-        api.DELETE('/tags/{tag_id}' as any, {
+        api.DELETE("/tags/{tag_id}" as any, {
             params: { path: { tag_id: tagId } } as any,
         }),
     );
@@ -362,7 +462,7 @@ export async function deleteTag(tagId: number) {
 // ===== Task CRUD Helpers =====
 
 export async function createTask(data: TaskPUT) {
-    const res = await apiInvoke(() => api.POST('/task', { body: data }));
+    const res = await apiInvoke(() => api.POST("/task", { body: data }));
     if (res.data) {
         ingestTasks([res.data as TaskGET]);
     }
@@ -371,7 +471,7 @@ export async function createTask(data: TaskPUT) {
 
 export async function updateTask(id: number, patch: TaskPATCH) {
     const res = await apiInvoke(() =>
-        api.PATCH('/task/{task_id}' as any, {
+        api.PATCH("/task/{task_id}" as any, {
             params: { path: { task_id: id } } as any,
             body: patch,
         }),
@@ -384,7 +484,7 @@ export async function updateTask(id: number, patch: TaskPATCH) {
 
 export async function deleteTask(id: number) {
     await apiInvoke(() =>
-        api.DELETE('/task/{task_id}' as any, {
+        api.DELETE("/task/{task_id}" as any, {
             params: { path: { task_id: id } } as any,
         }),
     );
@@ -395,7 +495,7 @@ export async function deleteTask(id: number) {
 
 export async function addSubTaskImage(subtaskId: number, instanceId: string) {
     const res = await apiInvoke(() =>
-        api.POST('/subtasks/{subtaskid}/images' as any, {
+        api.POST("/subtasks/{subtaskid}/images" as any, {
             params: {
                 path: {
                     subtaskid: subtaskId,
@@ -411,9 +511,12 @@ export async function addSubTaskImage(subtaskId: number, instanceId: string) {
     return res.data;
 }
 
-export async function removeSubTaskImage(subtaskId: number, instanceId: string) {
+export async function removeSubTaskImage(
+    subtaskId: number,
+    instanceId: string,
+) {
     const res = await apiInvoke(() =>
-        api.DELETE('/subtasks/{subtaskid}/images/{instance_id}' as any, {
+        api.DELETE("/subtasks/{subtaskid}/images/{instance_id}" as any, {
             params: {
                 path: {
                     subtaskid: subtaskId,
@@ -429,9 +532,12 @@ export async function removeSubTaskImage(subtaskId: number, instanceId: string) 
     return res.data;
 }
 
-export async function updateSubTaskComments(subtaskId: number, comments: string) {
+export async function updateSubTaskComments(
+    subtaskId: number,
+    comments: string,
+) {
     const res = await apiInvoke(() =>
-        api.PATCH('/subtasks/{subtaskid}' as any, {
+        api.PATCH("/subtasks/{subtaskid}" as any, {
             params: {
                 path: {
                     subtaskid: subtaskId,
@@ -447,6 +553,8 @@ export async function updateSubTaskComments(subtaskId: number, comments: string)
     return res.data;
 }
 
-export function getInstanceBySOPInstanceUID(SOPInstanceUid: string): ImageGET | undefined {
-    return instances.find(inst => inst.sop_instance_uid === SOPInstanceUid);
+export function getInstanceBySOPInstanceUID(
+    SOPInstanceUid: string,
+): ImageGET | undefined {
+    return instances.find((inst) => inst.sop_instance_uid === SOPInstanceUid);
 }

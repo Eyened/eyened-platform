@@ -8,7 +8,7 @@ import { ParabolicRegistration } from "./parabolic";
 export interface RegistrationItem {
     source: string;
     target: string;
-    mapping: mappingFunction
+    mapping: mappingFunction;
     glslMapping: string;
     inverse: RegistrationItem;
 }
@@ -17,18 +17,18 @@ export type mappingFunction = (from: Position) => Position | undefined;
 
 type Transform = CompositeTransform | ProjectiveTransform | ParabolicTransform;
 type CompositeTransform = {
-    type: 'CompositeTransform';
+    type: "CompositeTransform";
     transforms: Transform[];
-}
+};
 type ProjectiveTransform = {
-    type: 'ProjectiveTransform';
+    type: "ProjectiveTransform";
     Matrix: number[];
-}
+};
 type ParabolicTransform = {
-    type: 'ParabolicTransform' | 'Polynomial2DTransform';
+    type: "ParabolicTransform" | "Polynomial2DTransform";
     dx: number[];
     dy: number[];
-}
+};
 
 /** Registration edge stored in patient Registration attribute JSON (PublicID keys). */
 export type RegistrationSet = {
@@ -55,19 +55,31 @@ export function getRegistrationSets(value: RegistrationSet[]) {
     return value.map(loadRegistrationSet);
 }
 
-function getTransform(source: string, target: string, item: Transform): RegistrationItem {
+function getTransform(
+    source: string,
+    target: string,
+    item: Transform,
+): RegistrationItem {
     switch (item.type) {
-        case 'CompositeTransform':
-            const transforms = item.transforms.map(t => getTransform(source, target, t));
+        case "CompositeTransform":
+            const transforms = item.transforms.map((t) =>
+                getTransform(source, target, t),
+            );
             return new CompositeRegistration(source, target, transforms);
-        case 'ProjectiveTransform':
+        case "ProjectiveTransform":
             const [a, b, c, d, e, f, g, h, i] = item.Matrix;
-            return new AffineRegistration(source, target, new Matrix(a, b, c, d, e, f, g, h, i));
-        case 'ParabolicTransform':
-        case 'Polynomial2DTransform':
+            return new AffineRegistration(
+                source,
+                target,
+                new Matrix(a, b, c, d, e, f, g, h, i),
+            );
+        case "ParabolicTransform":
+        case "Polynomial2DTransform":
             return new ParabolicRegistration(source, target, item.dx, item.dy);
         default:
-            throw new Error(`Unknown transform type: ${(item as { type: string }).type}`);
+            throw new Error(
+                `Unknown transform type: ${(item as { type: string }).type}`,
+            );
     }
 }
 

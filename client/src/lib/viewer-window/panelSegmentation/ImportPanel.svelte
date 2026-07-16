@@ -10,7 +10,8 @@
     import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
     import { type Segmentation } from "./segmentationContext.svelte";
 
-    const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
+    const mainViewerContext =
+        getContext<MainViewerContext>("mainViewerContext");
 
     interface Props {
         segmentation: Segmentation;
@@ -24,7 +25,6 @@
     const globalContext = getContext<GlobalContext>("globalContext");
 
     async function importFromOther() {
-        
         globalContext.dialogue = {
             component: ImportSegmentationSelector,
             props: {
@@ -69,7 +69,7 @@
 
         font-size: small;
         font-weight: bold;
-        
+
         display: flex;
         align-items: center;
         gap: 0.5em;
@@ -77,6 +77,5 @@
     }
     div.main:hover {
         background-color: rgba(255, 255, 255, 0.2);
-        
     }
 </style>

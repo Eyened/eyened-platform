@@ -57,7 +57,11 @@
         <ul>
             {#each filtered as feature (feature.id)}
                 <li>
-                    <button type="button" class="item" onclick={() => pick(feature)}>
+                    <button
+                        type="button"
+                        class="item"
+                        onclick={() => pick(feature)}
+                    >
                         {feature.name}
                     </button>
                 </li>

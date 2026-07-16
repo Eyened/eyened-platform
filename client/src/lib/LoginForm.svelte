@@ -4,7 +4,7 @@
     import * as Field from "$lib/components/ui/field/index.js";
     import { Input } from "$lib/components/ui/input/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import {getContext, onMount} from "svelte";
+    import { getContext, onMount } from "svelte";
     import { authClient } from "../auth";
 
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -40,7 +40,8 @@
             let resp = await authClient.OIDCAuthorize();
             authorizeUrl = resp.url;
         } catch (err) {
-            oidcError = err instanceof Error ? err.message : "Unknown error occurred";
+            oidcError =
+                err instanceof Error ? err.message : "Unknown error occurred";
         }
 
         // Redirect the browser to the OIDC authorize URL
@@ -62,48 +63,71 @@
     });
 </script>
 
-<div class="min-h-screen flex flex-col items-center justify-center p-4">
-    {#if passwordModalEnabled }
-    <div class="w-[440px] border border-gray-200 rounded-xl shadow-sm p-8 m-4 bg-white">
-        <form onsubmit={handlePasswordLogin} class="space-y-6">
-            <Field.Set>
-                <Field.Group>
-                    <Field.Field>
-                        <Field.Label for="username">Username</Field.Label>
-                        <Input id="username" type="text" placeholder="Enter your username" bind:value={username} />
-                    </Field.Field>
+<div class="flex min-h-screen flex-col items-center justify-center p-4">
+    {#if passwordModalEnabled}
+        <div
+            class="m-4 w-[440px] rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
+        >
+            <form onsubmit={handlePasswordLogin} class="space-y-6">
+                <Field.Set>
+                    <Field.Group>
+                        <Field.Field>
+                            <Field.Label for="username">Username</Field.Label>
+                            <Input
+                                id="username"
+                                type="text"
+                                placeholder="Enter your username"
+                                bind:value={username}
+                            />
+                        </Field.Field>
 
-                    <Field.Field>
-                        <Field.Label for="password">Password</Field.Label>
-                        <Input id="password" type="password" placeholder="Enter your password" bind:value={password} />
-                    </Field.Field>
+                        <Field.Field>
+                            <Field.Label for="password">Password</Field.Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                placeholder="Enter your password"
+                                bind:value={password}
+                            />
+                        </Field.Field>
 
-                    <Field.Field>
-                        <div class="flex items-center gap-2">
-                            <Checkbox id="rememberMe" bind:checked={rememberMe} />
-                            <Field.Label for="rememberMe" class="cursor-pointer select-none">Remember me</Field.Label>
-                        </div>
-                    </Field.Field>
-                </Field.Group>
-            </Field.Set>
+                        <Field.Field>
+                            <div class="flex items-center gap-2">
+                                <Checkbox
+                                    id="rememberMe"
+                                    bind:checked={rememberMe}
+                                />
+                                <Field.Label
+                                    for="rememberMe"
+                                    class="cursor-pointer select-none"
+                                    >Remember me</Field.Label
+                                >
+                            </div>
+                        </Field.Field>
+                    </Field.Group>
+                </Field.Set>
 
-            {#if passwordError}
-                <p class="text-sm text-red-600">{passwordError}</p>
-            {/if}
+                {#if passwordError}
+                    <p class="text-sm text-red-600">{passwordError}</p>
+                {/if}
 
-            <Button type="submit" class="w-full">Login</Button>
-        </form>
-    </div>
+                <Button type="submit" class="w-full">Login</Button>
+            </form>
+        </div>
     {/if}
 
-    {#if oidcModalEnabled }
-    <div class="w-[440px] border border-gray-200 rounded-xl shadow-sm p-8 m-4 bg-white">
-        <Button class="w-full" onclick={handleOIDCLogin}>Login with {oidcProviderName}</Button>
+    {#if oidcModalEnabled}
+        <div
+            class="m-4 w-[440px] rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
+        >
+            <Button class="w-full" onclick={handleOIDCLogin}
+                >Login with {oidcProviderName}</Button
+            >
 
-        {#if oidcError}
-            <p class="text-sm text-red-600">{oidcError}</p>
-        {/if}
-    </div>
+            {#if oidcError}
+                <p class="text-sm text-red-600">{oidcError}</p>
+            {/if}
+        </div>
     {/if}
 </div>
 

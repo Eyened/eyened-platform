@@ -31,12 +31,12 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<ul class="flex flex-wrap p-0 m-0 list-none">
+<ul class="m-0 flex list-none flex-wrap p-0">
     {#each values as value}
         {@const isActive = selectedValues.includes(value[name])}
         {@const isHighlight = filter == "" || filteredValues.includes(value)}
         <li
-            class="item text-[0.9em] text-black/60 cursor-pointer px-[0.2em] py-[0.1em] m-[0.1em] border border-black/10 rounded-[0.2em] opacity-20 hover:bg-gray-100"
+            class="item m-[0.1em] cursor-pointer rounded-[0.2em] border border-black/10 px-[0.2em] py-[0.1em] text-[0.9em] text-black/60 opacity-20 hover:bg-gray-100"
             class:bg-[#b6ddf9]={isActive}
             class:opacity-100={isHighlight}
             onclick={() => toggle(value[name])}
@@ -47,5 +47,4 @@
 </ul>
 
 <style>
-
 </style>

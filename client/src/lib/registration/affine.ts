@@ -7,11 +7,11 @@ import type { RegistrationItem } from "./registrationItem";
  * So more general transformations (projective) could also be applied (perhaps the class should be renamed).
  */
 export class AffineRegistration implements RegistrationItem {
-
     constructor(
         public readonly source: string,
         public readonly target: string,
-        public readonly M: Matrix) { }
+        public readonly M: Matrix,
+    ) {}
 
     mapping(p: Position): Position {
         return { ...this.M.apply(p), index: 0 };
@@ -27,11 +27,10 @@ export class AffineRegistration implements RegistrationItem {
     }
 
     get inverse(): AffineRegistration {
-        const inverseMatrix = this.M.inverse
+        const inverseMatrix = this.M.inverse;
         return new AffineRegistration(this.target, this.source, inverseMatrix);
     }
 }
-
 
 export function mat3(M: Matrix): string {
     return `mat3(

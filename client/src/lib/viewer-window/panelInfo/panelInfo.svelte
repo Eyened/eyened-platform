@@ -10,7 +10,7 @@
 
     const instanceProperties = {
         "Patient ID": instance.patient.identifier,
-        Date: instance.study.date.split('T')[0],
+        Date: instance.study.date.split("T")[0],
         Modality: instance.modality,
         Laterality: instance.laterality,
         Manufacturer: instance.device?.manufacturer,

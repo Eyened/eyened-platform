@@ -1,17 +1,38 @@
-type segment = [point, point]
+type segment = [point, point];
 type point = [number, number];
 
-export function findContours(img_pixels: Uint8Array, level: number, width: number, height: number, stride: number = 1, offset: number = 0): point[][] {
-    const segments = getContourSegments(img_pixels, level, width, height, stride, offset);
+export function findContours(
+    img_pixels: Uint8Array,
+    level: number,
+    width: number,
+    height: number,
+    stride: number = 1,
+    offset: number = 0,
+): point[][] {
+    const segments = getContourSegments(
+        img_pixels,
+        level,
+        width,
+        height,
+        stride,
+        offset,
+    );
     return _assemble_contours(segments);
 }
 
-function getContourSegments(img_pixels: Uint8Array, level: number, width: number, height: number, stride: number, offset: number): segment[] {
+function getContourSegments(
+    img_pixels: Uint8Array,
+    level: number,
+    width: number,
+    height: number,
+    stride: number,
+    offset: number,
+): segment[] {
     const vertex_connect_high = true;
     const get = (x: number, y: number) => {
         const i = x + width * y;
         return img_pixels[stride * i + offset];
-    }
+    };
 
     const segments: segment[] = [];
     for (let r0 = 0; r0 < width - 1; r0++) {
@@ -40,16 +61,11 @@ function getContourSegments(img_pixels: Uint8Array, level: number, width: number
             const left: point = [r0 + _get_fraction(ul, ll, level), c0];
             const right: point = [r0 + _get_fraction(ur, lr, level), c1];
 
-            if (square_case == 1)
-                segments.push([top, left]);
-            else if (square_case == 2)
-                segments.push([right, top]);
-            else if (square_case == 3)
-                segments.push([right, left]);
-            else if (square_case == 4)
-                segments.push([left, bottom]);
-            else if (square_case == 5)
-                segments.push([top, bottom]);
+            if (square_case == 1) segments.push([top, left]);
+            else if (square_case == 2) segments.push([right, top]);
+            else if (square_case == 3) segments.push([right, left]);
+            else if (square_case == 4) segments.push([left, bottom]);
+            else if (square_case == 5) segments.push([top, bottom]);
             else if (square_case == 6)
                 if (vertex_connect_high) {
                     segments.push([left, top]);
@@ -58,10 +74,8 @@ function getContourSegments(img_pixels: Uint8Array, level: number, width: number
                     segments.push([right, top]);
                     segments.push([left, bottom]);
                 }
-            else if (square_case == 7)
-                segments.push([right, bottom]);
-            else if (square_case == 8)
-                segments.push([bottom, right]);
+            else if (square_case == 7) segments.push([right, bottom]);
+            else if (square_case == 8) segments.push([bottom, right]);
             else if (square_case == 9)
                 if (vertex_connect_high) {
                     segments.push([top, right]);
@@ -70,16 +84,11 @@ function getContourSegments(img_pixels: Uint8Array, level: number, width: number
                     segments.push([top, left]);
                     segments.push([bottom, right]);
                 }
-            else if (square_case == 10)
-                segments.push([bottom, top]);
-            else if (square_case == 11)
-                segments.push([bottom, left]);
-            else if (square_case == 12)
-                segments.push([left, right]);
-            else if (square_case == 13)
-                segments.push([top, right]);
-            else if (square_case == 14)
-                segments.push([left, top]);
+            else if (square_case == 10) segments.push([bottom, top]);
+            else if (square_case == 11) segments.push([bottom, left]);
+            else if (square_case == 12) segments.push([left, right]);
+            else if (square_case == 13) segments.push([top, right]);
+            else if (square_case == 14) segments.push([left, top]);
         }
     }
 
@@ -87,11 +96,9 @@ function getContourSegments(img_pixels: Uint8Array, level: number, width: number
 }
 
 function _get_fraction(from_value: number, to_value: number, level: number) {
-    if (to_value == from_value)
-        return 0;
-    return ((level - from_value) / (to_value - from_value));
+    if (to_value == from_value) return 0;
+    return (level - from_value) / (to_value - from_value);
 }
-
 
 function _assemble_contours(segments: [point, point][]) {
     const None: undefined = undefined;
@@ -102,8 +109,7 @@ function _assemble_contours(segments: [point, point][]) {
     const ends = new TupleDict<point, [point[], number]>();
 
     for (const [from_point, to_point] of segments) {
-        if (from_point === to_point)
-            continue;
+        if (from_point === to_point) continue;
 
         const [tail, tail_num] = starts.pop(to_point) ?? [None, None];
         const [head, head_num] = ends.pop(from_point) ?? [None, None];
@@ -113,17 +119,14 @@ function _assemble_contours(segments: [point, point][]) {
                 head.push(to_point);
             } else {
                 if (tail_num > head_num) {
-
                     head.push(...tail);
                     ends.pop(tail[tail.length - 1]);
                     contours.pop(tail_num);
 
-                    const item: [point[], number] = [head, head_num]
+                    const item: [point[], number] = [head, head_num];
                     starts.set(head[0], item);
                     ends.set(head[head.length - 1], item);
-
                 } else {
-
                     tail.unshift(...head);
                     starts.pop(head[0]);
                     contours.pop(head_num);

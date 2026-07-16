@@ -1,22 +1,28 @@
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
-import { fetchInstance, fetchFormAnnotations, fetchPatient } from "$lib/data/api";
+import {
+    fetchInstance,
+    fetchFormAnnotations,
+    fetchPatient,
+} from "$lib/data/api";
 import { instances } from "$lib/data/stores.svelte";
-import { loadPhotoLocators, type PhotoLocator } from "$lib/registration/photoLocators";
+import {
+    loadPhotoLocators,
+    type PhotoLocator,
+} from "$lib/registration/photoLocators";
 import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
-import MainViewer from './MainViewer.svelte';
+import MainViewer from "./MainViewer.svelte";
 
 export type MainPanelType = {
     component: any;
     props: any;
-}
+};
 
 export class ViewerWindowContext {
-
     private imagesIndex = new Map<string, Promise<LoadedImages>>();
     private bySOPInstanceUID = new Map<string, LoadedImages>();
 
@@ -47,7 +53,7 @@ export class ViewerWindowContext {
         const loop = () => {
             this.frame = requestAnimationFrame(loop);
             this.repaint();
-        }
+        };
         loop();
 
         this.setInstanceIDs(instanceIDs);
@@ -63,7 +69,12 @@ export class ViewerWindowContext {
     }
 
     repaint() {
-        this.webgl.clear({ left: 0, bottom: 0, width: this.webgl.canvas.width, height: this.webgl.canvas.height });
+        this.webgl.clear({
+            left: 0,
+            bottom: 0,
+            width: this.webgl.canvas.width,
+            height: this.webgl.canvas.height,
+        });
         this.viewers.forEach((viewer) => viewer.repaint());
     }
 
@@ -77,21 +88,25 @@ export class ViewerWindowContext {
         const idsNeedingFetch = ids.filter((id) => {
             const inst = instances.get(id);
             // Search-ingested instances lack embedded segmentations / form annotations
-            return !inst || !('segmentations' in inst);
+            return !inst || !("segmentations" in inst);
         });
         if (idsNeedingFetch.length) {
-            await Promise.all(idsNeedingFetch.map((id) => fetchInstance(id, fetchOptions)));
+            await Promise.all(
+                idsNeedingFetch.map((id) => fetchInstance(id, fetchOptions)),
+            );
             // Data is automatically ingested into global stores by fetchInstance
         }
 
         this.instanceIds = ids;
-        
+
         // Fetch all form annotations for the involved patient(s)
-        const patientIds = Array.from(new Set(
-            ids
-                .map((id) => instances.get(id)?.patient?.id)
-                .filter((pid): pid is number => typeof pid === 'number')
-        ));
+        const patientIds = Array.from(
+            new Set(
+                ids
+                    .map((id) => instances.get(id)?.patient?.id)
+                    .filter((pid): pid is number => typeof pid === "number"),
+            ),
+        );
         if (patientIds.length) {
             await Promise.all(
                 patientIds
@@ -102,7 +117,7 @@ export class ViewerWindowContext {
                             include_attributes: true,
                         });
                         this.loadedPatientIds.add(pid);
-                    })
+                    }),
             );
         }
 
@@ -126,7 +141,10 @@ export class ViewerWindowContext {
             try {
                 image.dispose();
             } catch (error) {
-                console.error(`Error disposing image ${image.image_id}:`, error);
+                console.error(
+                    `Error disposing image ${image.image_id}:`,
+                    error,
+                );
             }
         }
 
@@ -144,23 +162,30 @@ export class ViewerWindowContext {
     async loadImage(instance: ImageGET): Promise<LoadedImages> {
         // Start loading if not already in progress
         if (!this.imagesIndex.has(instance.id)) {
-            const loadPromise = this.imageLoader.load(instance).then(loadedImages => {
+            const loadPromise = this.imageLoader
+                .load(instance)
+                .then((loadedImages) => {
+                    // Process images once loaded
+                    for (const image of loadedImages) {
+                        this.importPhotoLocators(image);
+                    }
 
-                // Process images once loaded
-                for (const image of loadedImages) {
-                    this.importPhotoLocators(image);
-                }
+                    // Set up indices
+                    this.bySOPInstanceUID.set(
+                        instance.sop_instance_uid,
+                        loadedImages,
+                    );
 
-                // Set up indices
-                this.bySOPInstanceUID.set(instance.sop_instance_uid, loadedImages);
+                    // Create viewer contexts
+                    for (const image of loadedImages) {
+                        this.topViewers.set(
+                            image,
+                            new ViewerContext(image, this),
+                        );
+                    }
 
-                // Create viewer contexts
-                for (const image of loadedImages) {
-                    this.topViewers.set(image, new ViewerContext(image, this));
-                }
-
-                return loadedImages;
-            });
+                    return loadedImages;
+                });
 
             this.imagesIndex.set(instance.id, loadPromise);
         }
@@ -173,7 +198,7 @@ export class ViewerWindowContext {
         this.photoLocatorSets.push(photoLocators);
 
         for (const locator of photoLocators) {
-            for (const key of ['enfaceImageId', 'octImageId']) {
+            for (const key of ["enfaceImageId", "octImageId"]) {
                 const image_id = String(locator[key as keyof PhotoLocator]);
                 if (!this.photoLocators.has(image_id)) {
                     this.photoLocators.set(image_id, []);
@@ -184,7 +209,6 @@ export class ViewerWindowContext {
         const locators = this.photoLocators.get(image.image_id) ?? [];
         this.registration.addImage(image, locators);
     }
-
 
     addImagePanel(image: AbstractImage) {
         this.mainPanels.push({ component: MainViewer, props: { image } });
@@ -213,5 +237,4 @@ export class ViewerWindowContext {
         }
         return this.loadImage(instance);
     }
-
 }

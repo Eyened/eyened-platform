@@ -6,11 +6,9 @@ import { BrushTool } from "./Brush";
 import type { DrawingExecutor } from "./segmentation";
 
 export class EnhanceTool extends BrushTool {
-
     private drawInterval: ReturnType<typeof setInterval> | undefined;
     public readonly hardness = $state(0.5); // higher hardness means sharper edge near brush border
     public readonly pressure = $state(0.25); // higher pressure means more effect
-
 
     constructor(
         drawingExecutor: DrawingExecutor,
@@ -21,7 +19,6 @@ export class EnhanceTool extends BrushTool {
         super(drawingExecutor, viewerContext, segmentationContext);
     }
 
-
     async startDraw() {
         const segmentationItem = this.segmentationContext.segmentationItem;
         if (!segmentationItem) {
@@ -30,29 +27,34 @@ export class EnhanceTool extends BrushTool {
             return;
         }
 
-        const segmentationState = segmentationItem.getSegmentationState(this.viewerContext.index, true)!;
+        const segmentationState = segmentationItem.getSegmentationState(
+            this.viewerContext.index,
+            true,
+        )!;
         const mask = segmentationState.mask;
         if (!(mask instanceof ProbabilityMask)) {
             console.warn("No probability segmentation");
-            this.globalContext.dialogue = "Enhance tool requires a probability segmentation";
+            this.globalContext.dialogue =
+                "Enhance tool requires a probability segmentation";
             return;
         }
 
         this.drawInterval = setInterval(() => {
             if (this.lastPosition) {
-                const { rx, ry } = this.imageBrushRadiiToSegmentation(this.lastPosition);
+                const { rx, ry } = this.imageBrushRadiiToSegmentation(
+                    this.lastPosition,
+                );
                 const settings = {
                     radiusX: rx,
                     radiusY: ry,
                     hardness: this.hardness,
                     pressure: this.pressure,
-                    erase: this.mode === 'erase',
+                    erase: this.mode === "erase",
                     point: this.lastPosition,
                 };
-                mask.drawEnhance(settings)
+                mask.drawEnhance(settings);
             }
         }, 1000 / 30); // 30 times per second
-
     }
 
     endDraw() {
@@ -69,5 +71,4 @@ export class EnhanceTool extends BrushTool {
             segmentationItem.draw(scanNr, null, {});
         }
     }
-
 }
