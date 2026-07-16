@@ -13,9 +13,19 @@ from .fields import (
     study_order_by_fields,
     study_searchable_fields,
 )
+from .search_service import (
+    InstanceSearchResult,
+    SearchService,
+    StudySearchResult,
+    get_search_service,
+)
 
 __all__ = [
+    "InstanceSearchResult",
+    "SearchService",
     "SignatureField",
+    "StudySearchResult",
+    "get_search_service",
     "instance_order_by_fields",
     "operators",
     "searchable_fields",
