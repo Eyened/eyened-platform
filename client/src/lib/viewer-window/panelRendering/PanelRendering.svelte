@@ -42,6 +42,7 @@
                                 bind:group={viewerContext.renderMode}
                                 value={option}
                             />
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, non-user content -->
                             {@html label}
                         </label>
                     </li>

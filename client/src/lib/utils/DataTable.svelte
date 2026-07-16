@@ -14,6 +14,7 @@
                 <tr>
                     {#each row as cell}
                         <td>
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, non-user content -->
                             {@html cell}
                         </td>
                     {/each}

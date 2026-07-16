@@ -29,7 +29,6 @@
 
 <input type="text" placeholder="Filter..." bind:value={filter} />
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <ul class="m-0 flex list-none flex-wrap p-0">
     {#each values as value}

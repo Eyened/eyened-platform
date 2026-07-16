@@ -20,9 +20,6 @@
         onchange,
     }: { value?: string; onchange?: (v: string) => void } = $props();
 
-    // Internal calendar value
-    let internalDate: DateValue | undefined = $state(undefined);
-
     function fromString(s: string): DateValue | undefined {
         if (!s) return undefined;
         try {
@@ -36,9 +33,9 @@
         return d ? d.toString() : "";
     }
 
-    $effect(() => {
-        internalDate = fromString(value);
-    });
+    // Internal calendar value, derived from the external string prop.
+    // Reassigned directly by bind:value / onCalendarChange (writable derived).
+    let internalDate: DateValue | undefined = $derived(fromString(value));
 
     function onCalendarChange(d?: DateValue) {
         internalDate = d;

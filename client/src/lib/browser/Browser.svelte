@@ -117,16 +117,12 @@
     );
 
     // Handle limit as string for MySelect component
-    let limitAsString = $state(String(browserContext.limit));
+    let limitAsString = $derived(String(browserContext.limit));
 
     const handleSearch = () => {
         browserContext.page = 0;
         browserContext.search();
     };
-
-    $effect(() => {
-        limitAsString = String(browserContext.limit);
-    });
 
     $effect(() => {
         if (limitAsString && limitAsString !== String(browserContext.limit)) {

@@ -205,13 +205,13 @@ export class ViewerContext {
         const instance = this.image.instance;
         if (instance.cf_roi) {
             let center;
-            let cx = this.image.width / 2;
-            let cy = this.image.height / 2;
-            let min_x = 0;
-            let max_x = this.image.width;
-            let min_y = 0;
-            let max_y = this.image.height;
-            let radius = Math.min(this.image.width, this.image.height) / 2;
+            let cx: number;
+            let cy: number;
+            let min_x: number;
+            let max_x: number;
+            let min_y: number;
+            let max_y: number;
+            let radius: number;
             try {
                 ({ center, radius, min_x, max_x, min_y, max_y } =
                     instance.cf_roi as any);

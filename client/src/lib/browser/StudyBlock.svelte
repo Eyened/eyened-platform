@@ -53,7 +53,6 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="main mb-4 block flex flex-col rounded-[2px] border border-[rgb(181,188,206)] p-[0.3em] shadow-[0_6px_12px_rgba(149,157,165,0.2)]"

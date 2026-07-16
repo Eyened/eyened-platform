@@ -47,7 +47,7 @@
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
-    const closePanel = getContext<() => {}>("closePanel");
+    const closePanel = getContext<() => void>("closePanel");
 
     const viewerContext = new ViewerContext(image, viewerWindowContext);
     setContext("viewerContext", viewerContext);

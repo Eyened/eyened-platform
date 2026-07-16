@@ -112,53 +112,51 @@
     <FixedSpinner />
 {:else}
     <Main>
-        {#snippet children()}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div id="main">
-                <h3>
-                    <span onclick={deselect} onkeypress={deselect}> ... </span>
-                </h3>
-                {#if !task}
-                    Task not found
-                {:else}
-                    <h1>{task.name}</h1>
-                    {#if task.task_state}
-                        <h3>Status: {task.task_state}</h3>
-                    {/if}
-                    <Label>Status:</Label>
-                    <ButtonGroup class="mb-4">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div id="main">
+            <h3>
+                <span onclick={deselect} onkeypress={deselect}> ... </span>
+            </h3>
+            {#if !task}
+                Task not found
+            {:else}
+                <h1>{task.name}</h1>
+                {#if task.task_state}
+                    <h3>Status: {task.task_state}</h3>
+                {/if}
+                <Label>Status:</Label>
+                <ButtonGroup class="mb-4">
+                    <Button
+                        variant={subtasksStatus === null
+                            ? "default"
+                            : "outline"}
+                        aria-pressed={subtasksStatus === null}
+                        onclick={() => selectStatus(null)}
+                    >
+                        All
+                    </Button>
+                    {#each subTaskStates as s}
                         <Button
-                            variant={subtasksStatus === null
+                            variant={subtasksStatus === s
                                 ? "default"
                                 : "outline"}
-                            aria-pressed={subtasksStatus === null}
-                            onclick={() => selectStatus(null)}
+                            aria-pressed={subtasksStatus === s}
+                            onclick={() => selectStatus(s)}
                         >
-                            All
+                            {s}
                         </Button>
-                        {#each subTaskStates as s}
-                            <Button
-                                variant={subtasksStatus === s
-                                    ? "default"
-                                    : "outline"}
-                                aria-pressed={subtasksStatus === s}
-                                onclick={() => selectStatus(s)}
-                            >
-                                {s}
-                            </Button>
-                        {/each}
-                    </ButtonGroup>
-                    <SubtasksTable
-                        rows={subtasksArray}
-                        taskId={data.taskid}
-                        count={subtasksCount}
-                        page={subtasksPage}
-                        perPage={subtasksLimit}
-                        onPageChange={loadPage}
-                    />
-                {/if}
-            </div>
-        {/snippet}
+                    {/each}
+                </ButtonGroup>
+                <SubtasksTable
+                    rows={subtasksArray}
+                    taskId={data.taskid}
+                    count={subtasksCount}
+                    page={subtasksPage}
+                    perPage={subtasksLimit}
+                    onPageChange={loadPage}
+                />
+            {/if}
+        </div>
     </Main>
 {/if}
 
