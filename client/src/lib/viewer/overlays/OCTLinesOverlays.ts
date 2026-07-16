@@ -26,7 +26,7 @@ export class OCTLinesOverlay implements Overlay {
                 try {
                     locator.paint(context2D, viewerContext);
                 } catch (error) {
-                    console.warn('PhotoLocator overlay paint failed', error);
+                    console.warn("PhotoLocator overlay paint failed", error);
                 }
             }
         }

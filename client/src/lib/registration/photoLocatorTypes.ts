@@ -5,7 +5,7 @@ export type Point2D = {
 
 /** PhotoLocators attribute / API JSON shape for a line locator. */
 export type LinePhotoLocator = {
-    type: 'LinePhotoLocator';
+    type: "LinePhotoLocator";
     image_id: string;
     index: number;
     start: Point2D;
@@ -14,7 +14,7 @@ export type LinePhotoLocator = {
 
 /** PhotoLocators attribute / API JSON shape for a circle locator. */
 export type CirclePhotoLocator = {
-    type: 'CirclePhotoLocator';
+    type: "CirclePhotoLocator";
     image_id: string;
     index: number;
     center: Point2D;

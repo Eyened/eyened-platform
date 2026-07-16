@@ -2,30 +2,33 @@ import {
     CirclePhotoLocator as CirclePhotoLocatorModel,
     LinePhotoLocator as LinePhotoLocatorModel,
     type PhotoLocator,
-} from './photoLocators';
+} from "./photoLocators";
 import type {
     CirclePhotoLocator,
     HeidelbergPhotoLocatorInput,
     LinePhotoLocator,
     PhotoLocatorItem,
     Point2D,
-} from './photoLocatorTypes';
+} from "./photoLocatorTypes";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isPoint2D(value: unknown): value is Point2D {
     return (
         isRecord(value) &&
-        typeof value.x === 'number' &&
+        typeof value.x === "number" &&
         Number.isFinite(value.x) &&
-        typeof value.y === 'number' &&
+        typeof value.y === "number" &&
         Number.isFinite(value.y)
     );
 }
 
-function readCenter(raw: Record<string, unknown>): { center: Point2D | null; usedLegacyCentre: boolean } {
+function readCenter(raw: Record<string, unknown>): {
+    center: Point2D | null;
+    usedLegacyCentre: boolean;
+} {
     if (isPoint2D(raw.center)) {
         return { center: raw.center, usedLegacyCentre: false };
     }
@@ -35,18 +38,20 @@ function readCenter(raw: Record<string, unknown>): { center: Point2D | null; use
     return { center: null, usedLegacyCentre: false };
 }
 
-function normalizeCircleFields(raw: Record<string, unknown>): Record<string, unknown> | null {
+function normalizeCircleFields(
+    raw: Record<string, unknown>,
+): Record<string, unknown> | null {
     const { center, usedLegacyCentre } = readCenter(raw);
     if (!center) {
         return null;
     }
     if (usedLegacyCentre) {
-        console.warn('PhotoLocator: legacy field centre converted to center');
+        console.warn("PhotoLocator: legacy field centre converted to center");
     }
     if (
-        typeof raw.radius !== 'number' ||
+        typeof raw.radius !== "number" ||
         !Number.isFinite(raw.radius) ||
-        typeof raw.start_angle !== 'number' ||
+        typeof raw.start_angle !== "number" ||
         !Number.isFinite(raw.start_angle)
     ) {
         return null;
@@ -65,7 +70,7 @@ function inferHeidelbergPhotoLocator(
 ): PhotoLocatorItem | null {
     if (isPoint2D(raw.start) && isPoint2D(raw.end)) {
         return {
-            type: 'LinePhotoLocator',
+            type: "LinePhotoLocator",
             image_id: enfaceImageId,
             index,
             start: raw.start,
@@ -80,7 +85,7 @@ function inferHeidelbergPhotoLocator(
 
     const center = normalized.center as Point2D;
     return {
-        type: 'CirclePhotoLocator',
+        type: "CirclePhotoLocator",
         image_id: enfaceImageId,
         index,
         center,
@@ -91,24 +96,26 @@ function inferHeidelbergPhotoLocator(
 
 export function parsePhotoLocatorItem(raw: unknown): PhotoLocatorItem | null {
     if (!isRecord(raw)) {
-        console.warn('PhotoLocator: expected object, skipping entry');
+        console.warn("PhotoLocator: expected object, skipping entry");
         return null;
     }
 
     const locatorType = raw.type;
-    if (locatorType === 'LinePhotoLocator') {
+    if (locatorType === "LinePhotoLocator") {
         if (
-            typeof raw.image_id !== 'string' ||
-            typeof raw.index !== 'number' ||
+            typeof raw.image_id !== "string" ||
+            typeof raw.index !== "number" ||
             !Number.isInteger(raw.index) ||
             !isPoint2D(raw.start) ||
             !isPoint2D(raw.end)
         ) {
-            console.warn('PhotoLocator: invalid LinePhotoLocator entry, skipping');
+            console.warn(
+                "PhotoLocator: invalid LinePhotoLocator entry, skipping",
+            );
             return null;
         }
         return {
-            type: 'LinePhotoLocator',
+            type: "LinePhotoLocator",
             image_id: raw.image_id,
             index: raw.index,
             start: raw.start,
@@ -116,19 +123,21 @@ export function parsePhotoLocatorItem(raw: unknown): PhotoLocatorItem | null {
         };
     }
 
-    if (locatorType === 'CirclePhotoLocator') {
+    if (locatorType === "CirclePhotoLocator") {
         const normalized = normalizeCircleFields(raw);
         if (
             !normalized ||
-            typeof raw.image_id !== 'string' ||
-            typeof raw.index !== 'number' ||
+            typeof raw.image_id !== "string" ||
+            typeof raw.index !== "number" ||
             !Number.isInteger(raw.index)
         ) {
-            console.warn('PhotoLocator: invalid CirclePhotoLocator entry, skipping');
+            console.warn(
+                "PhotoLocator: invalid CirclePhotoLocator entry, skipping",
+            );
             return null;
         }
         return {
-            type: 'CirclePhotoLocator',
+            type: "CirclePhotoLocator",
             image_id: raw.image_id as string,
             index: raw.index as number,
             center: normalized.center as Point2D,
@@ -147,12 +156,20 @@ export function parseHeidelbergPhotoLocator(
     index: number,
 ): PhotoLocatorItem | null {
     if (!isRecord(raw)) {
-        console.warn('PhotoLocator: expected Heidelberg locator object, skipping');
+        console.warn(
+            "PhotoLocator: expected Heidelberg locator object, skipping",
+        );
         return null;
     }
-    const item = inferHeidelbergPhotoLocator(raw as HeidelbergPhotoLocatorInput, enfaceImageId, index);
+    const item = inferHeidelbergPhotoLocator(
+        raw as HeidelbergPhotoLocatorInput,
+        enfaceImageId,
+        index,
+    );
     if (!item) {
-        console.warn('PhotoLocator: invalid Heidelberg locator entry, skipping');
+        console.warn(
+            "PhotoLocator: invalid Heidelberg locator entry, skipping",
+        );
     }
     return item;
 }
@@ -162,13 +179,17 @@ export function createPhotoLocator(
     octID: string,
     width: number,
 ): PhotoLocator | null {
-    if (item.type === 'LinePhotoLocator') {
+    if (item.type === "LinePhotoLocator") {
         return linePhotoLocatorFromItem(item, octID, width);
     }
     return circlePhotoLocatorFromItem(item, octID, width);
 }
 
-function linePhotoLocatorFromItem(item: LinePhotoLocator, octID: string, width: number): LinePhotoLocatorModel {
+function linePhotoLocatorFromItem(
+    item: LinePhotoLocator,
+    octID: string,
+    width: number,
+): LinePhotoLocatorModel {
     return new LinePhotoLocatorModel(
         item.image_id,
         octID,

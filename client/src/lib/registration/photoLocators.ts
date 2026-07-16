@@ -132,7 +132,14 @@ export class LinePhotoLocator implements PhotoLocator {
 
     paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
         const { start, end } = this;
-        if (!start || !end || !Number.isFinite(start.x) || !Number.isFinite(start.y) || !Number.isFinite(end.x) || !Number.isFinite(end.y)) {
+        if (
+            !start ||
+            !end ||
+            !Number.isFinite(start.x) ||
+            !Number.isFinite(start.y) ||
+            !Number.isFinite(end.x) ||
+            !Number.isFinite(end.y)
+        ) {
             return;
         }
         const s = viewerContext.imageToViewerCoordinates(start);
@@ -165,7 +172,7 @@ export class CirclePhotoLocator implements PhotoLocator {
         return { x, y, index: 0 };
     }
 
-    enfaceToOCT(p: Position): { position: Position, distance: number } {
+    enfaceToOCT(p: Position): { position: Position; distance: number } {
         const { center, radius, start_angle } = this;
         const vec = vec2(p).sub(center);
         const distance = Math.abs(vec.length() - radius);
@@ -181,13 +188,24 @@ export class CirclePhotoLocator implements PhotoLocator {
 
     paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
         const { center, radius } = this;
-        if (!center || !Number.isFinite(center.x) || !Number.isFinite(center.y) || !Number.isFinite(radius)) {
+        if (
+            !center ||
+            !Number.isFinite(center.x) ||
+            !Number.isFinite(center.y) ||
+            !Number.isFinite(radius)
+        ) {
             return;
         }
         const c = viewerContext.imageToViewerCoordinates(center);
 
-        const crx = viewerContext.imageToViewerCoordinates({ x: center.x + radius, y: center.y });
-        const cry = viewerContext.imageToViewerCoordinates({ x: center.x, y: center.y + radius });
+        const crx = viewerContext.imageToViewerCoordinates({
+            x: center.x + radius,
+            y: center.y,
+        });
+        const cry = viewerContext.imageToViewerCoordinates({
+            x: center.x,
+            y: center.y + radius,
+        });
         const radiusX = crx.x - c.x;
         const radiusY = cry.y - c.y;
         const { x, y } = c;

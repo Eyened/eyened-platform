@@ -2,7 +2,10 @@ import { instances } from "$lib/data";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { ImageGET } from "../../types/openapi_types";
 import type { PhotoLocator } from "./photoLocators";
-import { createPhotoLocator, parseHeidelbergPhotoLocator } from "./parsePhotoLocator";
+import {
+    createPhotoLocator,
+    parseHeidelbergPhotoLocator,
+} from "./parsePhotoLocator";
 
 function getSourceID(instance: ImageGET) {
     return instance.data_source_id ?? "";
@@ -42,7 +45,11 @@ export function getPrivateEyeRegistrationHeidelberg(
     return oct_image_meta.contents.flatMap(
         (item: { photo_locations: unknown[] }, index: number) => {
             const locator = item.photo_locations?.[0];
-            const parsed = parseHeidelbergPhotoLocator(locator, enfaceID, index);
+            const parsed = parseHeidelbergPhotoLocator(
+                locator,
+                enfaceID,
+                index,
+            );
             if (!parsed) {
                 return [];
             }
