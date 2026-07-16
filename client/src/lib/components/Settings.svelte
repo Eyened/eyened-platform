@@ -2,12 +2,7 @@
     import ChangePasswordForm from "$lib/ChangePasswordForm.svelte";
     import FeaturesEditor from "$lib/components/FeaturesEditor.svelte";
     import * as Tabs from "$lib/components/ui/tabs";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import TagsEditorJoint from "$lib/tags/TagsEditorJoint.svelte";
-    import { getContext } from "svelte";
-
-    const globalContext = getContext<GlobalContext>("globalContext");
-    const { userManager } = globalContext;
 </script>
 
 <div class="h-full w-full">

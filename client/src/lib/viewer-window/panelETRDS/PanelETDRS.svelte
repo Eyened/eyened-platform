@@ -22,7 +22,7 @@
         active: boolean;
         etdrsSchema: FormSchemaGET;
     }
-    let { active, etdrsSchema }: Props = $props();
+    let { etdrsSchema }: Props = $props();
 
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",

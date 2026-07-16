@@ -29,7 +29,7 @@ import {
 // export type PhotoLocator = LinePhotoLocator | CirclePhotoLocator;
 
 export function getFdsRegistration(image: AbstractImage): PhotoLocator[] {
-    const { instance, meta } = image;
+    const { instance } = image;
     const octID = `${instance.id}`;
 
     if (instance.attrs?.PhotoLocators) {

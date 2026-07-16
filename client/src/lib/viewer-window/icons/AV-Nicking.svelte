@@ -4,7 +4,7 @@
         size?: string;
     }
 
-    let { stroke = "#ffffff", size = "3em" }: Props = $props();
+    let { size = "3em" }: Props = $props();
 </script>
 
 <svg

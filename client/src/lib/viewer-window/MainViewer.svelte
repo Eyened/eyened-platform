@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { PanelName, ViewerEvent } from "$lib/viewer/viewer-utils";
     import Viewer from "$lib/viewer/Viewer.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -45,7 +44,6 @@
     let { image }: Props = $props();
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const taskContext = getContext<TaskContext>("taskContext");
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );

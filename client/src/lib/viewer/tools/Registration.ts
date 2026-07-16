@@ -137,7 +137,7 @@ export class RegistrationTool implements Overlay {
         }
     }
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         if (!this.points) return;
 
         const { context2D } = viewerContext;

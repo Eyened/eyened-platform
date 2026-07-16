@@ -2,7 +2,6 @@
     import MultiSelectWithSearch from "$lib/components/MultiSelectWithSearch.svelte";
     import * as Input from "$lib/components/ui/input";
     import { features } from "$lib/data/stores.svelte";
-    import { getContext } from "svelte";
     import type { FeatureGET, FeaturePATCH } from "../../types/openapi_types";
     import { Button } from "$lib/components/ui/button";
 

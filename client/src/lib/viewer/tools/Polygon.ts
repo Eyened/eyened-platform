@@ -46,7 +46,7 @@ export class PolygonTool extends SegmentationTool {
 
     executeDraw(
         ctx: CanvasRenderingContext2D,
-        viewerContext: ViewerContext,
+        _viewerContext: ViewerContext,
     ): void {
         ctx.fillStyle = "white";
 

@@ -49,7 +49,7 @@
             </ul>
         {:else}
             <select bind:value={viewerContext.renderMode}>
-                {#each Object.entries(options) as [option, label]}
+                {#each Object.entries(options) as [option]}
                     <option value={option}>
                         {option}
                     </option>

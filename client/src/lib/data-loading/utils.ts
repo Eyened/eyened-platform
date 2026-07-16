@@ -23,7 +23,7 @@ export function parseDate(dateString: string): Date | undefined {
             .split(/[- :]/)
             .map(Number);
         return new Date(year, month - 1, day, hour, minute, second);
-    } catch (error) {}
+    } catch (_error) {}
 }
 
 export function getThumbUrl(image: ImageGET, size: number = 144) {

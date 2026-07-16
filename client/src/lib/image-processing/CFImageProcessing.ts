@@ -384,7 +384,7 @@ function getHistogram(image: Image2D): Histogram {
             radius = cfROI.radius;
             ({ min_x, max_x, min_y, max_y } = cfROI);
         }
-    } catch (e) {
+    } catch (_e) {
         console.warn("Error in cfROI");
     }
 

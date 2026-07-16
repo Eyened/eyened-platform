@@ -22,8 +22,8 @@ export class WebGL {
         // needed for odd width textures
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
         gl.enable(gl.SCISSOR_TEST);
-        const ext0 = gl.getExtension("OES_texture_float_linear");
-        const ext1 = gl.getExtension("EXT_color_buffer_float");
+        gl.getExtension("OES_texture_float_linear");
+        gl.getExtension("EXT_color_buffer_float");
 
         this.shaders = new Shaders(this);
         this.binaryMaskManager = new BinaryMaskManager(this.gl);

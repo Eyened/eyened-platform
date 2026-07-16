@@ -155,7 +155,7 @@ async function fetchWithAuthRetry(
                 // Authentication failed even after refresh - redirect to login
                 redirectToLogin();
             }
-        } catch (error) {
+        } catch (_error) {
             // If refresh fails, handleTokenRefresh already redirected to login
             // Return the original 401 response
             return response;

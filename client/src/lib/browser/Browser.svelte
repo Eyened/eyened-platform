@@ -5,8 +5,7 @@
     import MySelect from "$lib/components/MySelect.svelte";
     import { Button } from "$lib/components/ui/button";
     import * as Card from "$lib/components/ui/card";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { getContext, onMount, setContext } from "svelte";
+    import { onMount, setContext } from "svelte";
     import {
         searchOrderBy,
         studiesSearchOrderBy,
@@ -42,16 +41,10 @@
         initialSelectedIds,
     }: Props = $props();
 
-    const globalContext = getContext<GlobalContext>("globalContext");
-    const { user } = globalContext;
-
     const browserContext: BrowserContext = context ?? new BrowserContext();
     setContext("browserContext", browserContext);
 
-    let initializing = true;
-
     onMount(async () => {
-        initializing = true;
         browserContext.urlSync = syncUrl;
         await browserContext.loadSignatures();
 
@@ -72,7 +65,6 @@
                 browserContext.selectedIds = [...initialSelectedIds];
             }
         }
-        initializing = false;
     });
 
     function initParamState() {

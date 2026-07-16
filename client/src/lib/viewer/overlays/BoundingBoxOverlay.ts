@@ -20,7 +20,7 @@ export class BoundingBoxOverlay implements Overlay {
         this.boundingBoxes.push(bb);
     }
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         if (this.hide) return;
         if (!this.boundingBoxes) return;
 
