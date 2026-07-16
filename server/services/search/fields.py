@@ -10,42 +10,25 @@ from __future__ import annotations
 from typing import Any, Dict, Literal, Optional
 
 from eyened_orm import (
-    Creator,
     DeviceModel,
     Feature,
-    FormAnnotation,
     FormSchema,
     ImageInstance,
     Patient,
     Project,
-    Segmentation,
     Study,
-    Tag,
+)
+from eyened_orm.repositories.search import (
+    ActiveFormAnnotation,  # noqa: F401  (re-exported: tests import InstTag from here)
+    ActiveSegmentation,  # noqa: F401
+    FormCreator,
+    FormTag,
+    InstTag,
+    SegCreator,
+    SegTag,
+    StudyTag,
 )
 from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.orm import aliased
-
-ActiveSegmentation = aliased(
-    Segmentation,
-    select(Segmentation)
-    .filter(~Segmentation.Inactive)
-    .subquery(name="active_segmentation"),
-    name="active_segmentation",
-)
-ActiveFormAnnotation = aliased(
-    FormAnnotation,
-    select(FormAnnotation)
-    .filter(~FormAnnotation.Inactive)
-    .subquery(name="active_form_annot"),
-    name="active_form_annot",
-)
-SegCreator = aliased(Creator, name="seg_creator")
-FormCreator = aliased(Creator, name="form_creator")
-SegTag = aliased(Tag, name="seg_tag")
-FormTag = aliased(Tag, name="form_tag")
-InstTag = aliased(Tag, name="image_tag")
-StudyTag = aliased(Tag, name="study_tag")
 
 # list of properties that are searchable with identifier and mapped ORM property
 searchable_fields = Literal[
