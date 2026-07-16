@@ -58,7 +58,7 @@ from .exists import (
 )
 
 
-def instance_options() -> list:
+def instance_options() -> list[Any]:
     """Eager-load option-set shared by every ImageInstance result."""
     return [
         selectinload(ImageInstance.Series)
@@ -86,7 +86,7 @@ def instance_options() -> list:
     ]
 
 
-def study_options() -> list:
+def study_options() -> list[Any]:
     """Eager-load option-set for a Study result and its active instances."""
     return [
         selectinload(Study.Series).selectinload(

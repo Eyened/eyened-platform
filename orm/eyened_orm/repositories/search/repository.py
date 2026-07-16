@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any, List, Literal
 
 from eyened_orm import ImageInstance, Series, Study
+from eyened_orm.attributes import AttributeDefinition
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -71,7 +72,7 @@ class SearchRepository:
 
     def resolve_attribute_definitions(
         self, session: Session, specs: List[AttributeConditionSpec]
-    ) -> dict:
+    ) -> dict[tuple[str | None, str, str | None], AttributeDefinition]:
         """Resolve attribute specs to their definitions, keyed by (model, attr, feature).
 
         A spec whose definition does not resolve is absent from the result -- the
