@@ -171,15 +171,6 @@ study_order_by_fields_map: Dict[study_order_by_fields, Any] = {
 }
 
 
-def _map_mysql_operator(operator: str, value: Any) -> str:
-    """Map user-provided operator to a MySQL-valid operator, considering NULL semantics."""
-    if operator == "==":
-        return "IS" if value is None else "="
-    if operator == "!=":
-        return "IS NOT" if value is None else "!="
-    return operator
-
-
 def format_condition(variable: Any, condition: Dict[str, Any]) -> Any:
     """Return a SQLAlchemy boolean expression for one condition."""
     op = condition["operator"]
@@ -205,35 +196,6 @@ def format_condition(variable: Any, condition: Dict[str, Any]) -> Any:
     if op == "<=":
         return variable <= value
     raise ValueError(f"Unsupported operator: {op}")
-
-
-def create_condition(
-    conditions: List[Dict[str, Any]], fields_map: Optional[Dict[str, Any]] = None
-) -> Any:
-    """Build a SQLAlchemy boolean expression from user conditions."""
-    if fields_map is None:
-        fields_map = instance_search_fields_map
-
-    # Map variables to ORM attributes
-    for c in conditions:
-        assert c["variable"] in fields_map, f"Invalid variable: {c['variable']}"
-        c["variable"] = fields_map[c["variable"]]
-
-    # OR all conditions globally (no per-variable grouping)
-    exprs: List[Any] = [format_condition(c["variable"], c) for c in conditions]
-    return or_(*exprs) if exprs else true()
-
-
-ATTRIBUTE_VAR_RE = r"^(?P<model>[^\[]+)\[(?P<attr>[^\]]+)\]$"
-
-
-def parse_attribute_var(name: str) -> Optional[Tuple[str, str]]:
-    import re
-
-    m = re.match(ATTRIBUTE_VAR_RE, name)
-    if not m:
-        return None
-    return m.group("model"), m.group("attr")
 
 
 def get_value_column_for_attribute(attr_def: AttrDef) -> Any:
@@ -306,12 +268,6 @@ def format_attr_condition_with_definition(
     # Create a new condition with the converted value
     converted_condition = {**condition, "value": converted_value}
     return format_condition(value_column, converted_condition)
-
-
-def format_attr_condition(value_column: Any, condition: Dict[str, Any]) -> Any:
-    """Legacy function - use format_attr_condition_with_definition instead."""
-    cond = {**condition, "variable": value_column}
-    return format_condition(value_column, cond)
 
 
 # ----------------------------------------
