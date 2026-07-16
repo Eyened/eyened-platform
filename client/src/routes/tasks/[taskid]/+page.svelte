@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import { page as appPage } from "$app/state";
     import FixedSpinner from "$lib/components/FixedSpinner.svelte";
     import Main from "$lib/components/Main.svelte";
@@ -57,11 +58,18 @@
             if (subtasksStatus)
                 url.searchParams.set("status", String(subtasksStatus));
             else url.searchParams.delete("status");
-            await goto(url.pathname + "?" + url.searchParams.toString(), {
-                replaceState: true,
-                noScroll: true,
-                keepFocus: true,
-            });
+            // Same route (/tasks/[taskid]), only the query string changes;
+            // the route id is statically known here so resolve() applies.
+            await goto(
+                resolve(`/tasks/[taskid]?${url.searchParams.toString()}`, {
+                    taskid: String(data.taskid),
+                }),
+                {
+                    replaceState: true,
+                    noScroll: true,
+                    keepFocus: true,
+                },
+            );
         } finally {
             isLoading = false;
         }
@@ -97,14 +105,10 @@
     }
 
     function deselect() {
-        const currentUrl = window.location.href;
-        const lastSlashIndex = currentUrl.lastIndexOf("/");
-
-        const suffix_string = `?${appPage.url.searchParams.toString()}`;
-        const newUrl =
-            currentUrl.substring(0, lastSlashIndex + 1) + suffix_string;
-
-        goto(newUrl);
+        // Deselecting the task navigates up to the /tasks list, preserving
+        // the current filter query string. The target route is statically
+        // known (a sibling of this page), so resolve() applies.
+        goto(resolve(`/tasks?${appPage.url.searchParams.toString()}`));
     }
 </script>
 

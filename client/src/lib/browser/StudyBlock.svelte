@@ -33,7 +33,7 @@
                   operator: "==",
                   value: study.patient.identifier,
               })
-            : "",
+            : undefined,
     );
 
     const urlByDate = $derived(
@@ -77,6 +77,7 @@
                     <span>{study.project.name}</span>
                     &nbsp;/&nbsp;
                     {#if urlByPatient}
+                        <!-- eslint-disable svelte/no-navigation-without-resolve -- urlByPatient is built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally; static analysis can't trace through the helper -->
                         <a
                             href={urlByPatient}
                             onclick={(e) => e.stopPropagation()}
@@ -84,10 +85,12 @@
                         >
                             {study.patient.identifier}
                         </a>
+                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                     {:else}
                         <span>{study.patient.identifier}</span>
                     {/if}
                     &nbsp;/&nbsp;
+                    <!-- eslint-disable svelte/no-navigation-without-resolve -- urlByDate is built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally; static analysis can't trace through the helper -->
                     <a
                         href={urlByDate}
                         onclick={(e) => e.stopPropagation()}
@@ -95,6 +98,7 @@
                     >
                         {study.date}
                     </a>
+                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
                     <span class="ml-1">
                         [{study.patient.sex}
                         {study.age ? Math.round(study.age) : "?"} years]
