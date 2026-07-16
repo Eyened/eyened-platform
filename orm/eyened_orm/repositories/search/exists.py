@@ -202,25 +202,20 @@ def exists_study_tags_for_study(tags_group: Dict[Any, List[Dict[str, Any]]]) -> 
     return subq.exists()
 
 
-def exists_attributes_for_instance(
-    attr_conds: List[Tuple[Optional[str], str, Optional[str], Dict[str, Any]]],
-    db: Session,
-) -> Any:
-    """EXISTS subqueries for attributes correlated by ImageInstance."""
-    if not attr_conds:
-        return None
+def resolve_attribute_definitions(
+    session: Session,
+    keys: List[Tuple[Optional[str], str, Optional[str]]],
+) -> Dict[Tuple[Optional[str], str, Optional[str]], AttrDef]:
+    """Resolve each unique (model, attr, feature) key to its AttributeDefinition.
 
-    # First, collect all unique attribute definitions we need to look up
-    attr_lookups = {}
-    for model_name, attr_name, feature_name, c in attr_conds:
-        key = (model_name, attr_name, feature_name)
-        if key not in attr_lookups:
-            attr_lookups[key] = []
-        attr_lookups[key].append(c)
-
-    # Look up attribute definitions
-    attr_defs = {}
-    for model_name, attr_name, feature_name in attr_lookups.keys():
+    One query per unique key -- the attribute-def N+1, preserved verbatim as gated
+    follow-up work. A key whose definition does not resolve is simply absent from
+    the returned dict; callers decide whether that is a skip or a hard error. The
+    lookup keys on model+attr only; feature is carried in the key but filtered
+    later in the EXISTS subquery, exactly as before.
+    """
+    attr_defs: Dict[Tuple[Optional[str], str, Optional[str]], AttrDef] = {}
+    for model_name, attr_name, feature_name in dict.fromkeys(keys):
         if model_name:
             attr_def_stmt = (
                 select(AttrDef)
@@ -238,12 +233,28 @@ def exists_attributes_for_instance(
         else:
             attr_def_stmt = select(AttrDef).where(AttrDef.AttributeName == attr_name)
 
-        attr_def = db.execute(attr_def_stmt).scalar_one_or_none()
+        attr_def = session.execute(attr_def_stmt).scalar_one_or_none()
 
         if not attr_def:
             continue
 
         attr_defs[(model_name, attr_name, feature_name)] = attr_def
+    return attr_defs
+
+
+def exists_attributes_for_instance(
+    attr_conds: List[Tuple[Optional[str], str, Optional[str], Dict[str, Any]]],
+    db: Session,
+) -> Any:
+    """EXISTS subqueries for attributes correlated by ImageInstance."""
+    if not attr_conds:
+        return None
+
+    keys = [
+        (model_name, attr_name, feature_name)
+        for model_name, attr_name, feature_name, c in attr_conds
+    ]
+    attr_defs = resolve_attribute_definitions(db, keys)
 
     and_predicates = []
 

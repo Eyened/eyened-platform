@@ -169,3 +169,24 @@ def test_unknown_order_by_is_rejected_by_pydantic(client, data):
     )
 
     assert resp.status_code == 422
+
+
+def test_unknown_attribute_field_is_rejected(client, data):
+    """An unresolvable attribute 400s rather than silently returning every row.
+
+    Behavior change (was: filter dropped, full result set returned). See
+    docs/superpowers/plans/2026-07-14-search-refactor.md Task 12.
+    """
+    resp = client.post(
+        "/instances/search",
+        json={
+            "conditions": [
+                {"type": "attribute", "model": None, "variable": "NoSuchAttr",
+                 "operator": "==", "value": 1}
+            ],
+            "order_by": "Study Date",
+            "order": "ASC",
+        },
+    )
+
+    assert resp.status_code == 400

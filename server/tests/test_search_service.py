@@ -104,3 +104,16 @@ def test_study_signature_lists_the_vocabulary(service, session, data):
     names = {f.name for f in service.study_signature(session)}
 
     assert "Study Tag Name" in names
+
+
+def test_unresolvable_attribute_raises_bad_request(service, session, data):
+    """An attribute that resolves to nothing is a 400, not a silently-dropped filter."""
+    from server.services.exceptions import BadRequestError
+
+    with pytest.raises(BadRequestError):
+        _search(
+            service,
+            session,
+            [{"type": "attribute", "model": None, "variable": "NoSuchAttr",
+              "operator": "==", "value": 1}],
+        )

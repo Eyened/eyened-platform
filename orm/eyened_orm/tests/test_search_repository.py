@@ -104,7 +104,8 @@ def test_attribute_exists_branch_positive_and_empty(repo, session, data, value, 
 
 
 def test_unresolvable_attribute_is_skipped(repo, session, data):
-    """Today's behavior, preserved verbatim: an unresolved definition drops the predicate."""
+    """The repository still drops an unresolved definition; the *service* rejects it
+    with a 400 before the repository is ever asked (see SearchService.search_instances)."""
     spec = AttributeConditionSpec(attribute="NoSuchAttr", operator="==", value=1)
 
     assert _ids(_instances(repo, session, attr_conditions=[spec])) == [

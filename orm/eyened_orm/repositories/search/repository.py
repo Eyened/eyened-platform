@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .conditions import AttributeConditionSpec, ResolvedCondition
+from .exists import resolve_attribute_definitions as _resolve_attribute_definitions
 from .selects import (
     build_instance_select,
     build_study_select,
@@ -67,6 +68,18 @@ class SearchRepository:
         return session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
+
+    def resolve_attribute_definitions(
+        self, session: Session, specs: List[AttributeConditionSpec]
+    ) -> dict:
+        """Resolve attribute specs to their definitions, keyed by (model, attr, feature).
+
+        A spec whose definition does not resolve is absent from the result -- the
+        service inspects this to reject unresolvable attributes rather than silently
+        dropping the filter. Data access only; the HTTP-status policy stays upstream.
+        """
+        keys = [(s.model, s.attribute, s.feature) for s in specs]
+        return _resolve_attribute_definitions(session, keys)
 
     def search_studies(
         self,

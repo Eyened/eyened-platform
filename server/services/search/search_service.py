@@ -41,6 +41,7 @@ from eyened_orm.repositories.search import SearchRepository
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from ..exceptions import BadRequestError
 from .conditions import translate_instance_conditions, translate_study_conditions
 from .fields import (
     SignatureField,
@@ -97,6 +98,21 @@ class SearchService:
     ) -> InstanceSearchResult:
         """Search instances, derive their studies, and optionally count the total."""
         static_conds, attr_conds = translate_instance_conditions(conditions)
+        if attr_conds:
+            resolved = self.repository.resolve_attribute_definitions(session, attr_conds)
+            missing = [
+                spec.attribute
+                for spec in attr_conds
+                if (spec.model, spec.attribute, spec.feature) not in resolved
+            ]
+            if missing:
+                # Name the fix, not just the failure: the signature endpoint is the
+                # authoritative list of attributes this surface accepts. A dropped
+                # attribute filter would otherwise return the whole result set.
+                raise BadRequestError(
+                    f"Unknown search attribute(s): {', '.join(sorted(set(missing)))}. "
+                    f"See GET /instances/search/signature for the available attributes."
+                )
         # RBAC Step 2 seam: append the visible-project predicate for the acting
         # user to `static_conds` here -- this is the one place both the search and
         # the count read, so a filter added here cannot be bypassed by either.
