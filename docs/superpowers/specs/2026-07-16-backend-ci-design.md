@@ -40,6 +40,19 @@ Python-3.8 install artifact and is **wrong** — it resolves fine on CI's Python
 depends on a third-party httpx *fork* in its auth path; whether that is intentional is
 a question for the team, not for this branch.
 
+## Design principle: CI is read-only
+
+No CI job may mutate committed source. All checks are report-only and the workflow
+never pushes to the repo:
+
+- `ruff check` runs **without `--fix`**; `ruff format` runs **with `--check`** — both
+  only report and fail, never rewrite files.
+- `pytest` does not modify source.
+- The only mutating command, plain `ruff format server orm`, is a **one-time local
+  commit** during implementation (§2) — never a workflow step.
+- `pip install -e ./orm` writes an ephemeral `*.egg-info/` build artifact into the
+  runner checkout; it is never committed or pushed and does not alter source.
+
 ## Approach (inherited, approved)
 
 **Approach A — native runner**: check out, `pip install` deps + pytest, run `pytest`
