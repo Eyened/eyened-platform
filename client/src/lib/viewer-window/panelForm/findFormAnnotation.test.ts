@@ -10,19 +10,26 @@ const baseAnnotation = {
     form_data: {},
 } as FormAnnotationGET;
 
+const ctx = {
+    patientId: 100,
+    studyId: 50,
+    imageId: "img-200",
+    laterality: "R" as const,
+};
+
 describe("findFormAnnotation", () => {
-    it("returns matching annotation for current user, schema, and image", () => {
+    it("returns matching annotation for ImageInstance scope", () => {
         const annotations = [
             {
                 ...baseAnnotation,
                 id: 1,
-                image_id: 200,
+                image_id: "img-200",
                 creator: { id: 5, name: "grader" },
             },
             {
                 ...baseAnnotation,
                 id: 2,
-                image_id: 200,
+                image_id: "img-200",
                 creator: { id: 99, name: "other" },
             },
         ] as FormAnnotationGET[];
@@ -31,10 +38,9 @@ describe("findFormAnnotation", () => {
             annotations,
             schemaId: 10,
             userId: 5,
-            patientId: 100,
-            imageId: 200,
-            formImageScope: true,
-            entityType: "ImageInstance",
+            ctx,
+            taskConfig: { form_entity_scope: "ImageInstance" },
+            schemaEntityType: "ImageInstance",
         });
 
         expect(result?.id).toBe(1);
@@ -45,23 +51,21 @@ describe("findFormAnnotation", () => {
             annotations: [baseAnnotation],
             schemaId: 10,
             userId: 5,
-            patientId: 100,
-            imageId: 999,
-            formImageScope: true,
-            entityType: "ImageInstance",
+            ctx: { ...ctx, imageId: "missing" },
+            taskConfig: { form_entity_scope: "ImageInstance" },
+            schemaEntityType: "ImageInstance",
         });
 
         expect(result).toBeUndefined();
     });
 
-    it("matches StudyEye by study and laterality when formImageScope is false", () => {
+    it("matches StudyEye when form_entity_scope is StudyEye", () => {
         const annotations = [
             {
                 ...baseAnnotation,
                 id: 3,
                 study_id: 50,
                 laterality: "R",
-                image_id: undefined,
             },
         ] as FormAnnotationGET[];
 
@@ -69,30 +73,44 @@ describe("findFormAnnotation", () => {
             annotations,
             schemaId: 10,
             userId: 5,
-            patientId: 100,
-            studyId: 50,
-            laterality: "R",
-            formImageScope: false,
-            entityType: "StudyEye",
+            ctx,
+            taskConfig: { form_entity_scope: "StudyEye" },
+            schemaEntityType: "StudyEye",
         });
 
         expect(result?.id).toBe(3);
     });
 
-    it("returns highest id when multiple match (defensive)", () => {
+    it("supports legacy form_image_scope true", () => {
         const annotations = [
-            { ...baseAnnotation, id: 1, image_id: 200 },
-            { ...baseAnnotation, id: 2, image_id: 200 },
+            { ...baseAnnotation, id: 1, image_id: "img-200" },
         ] as FormAnnotationGET[];
 
         const result = findFormAnnotation({
             annotations,
             schemaId: 10,
             userId: 5,
-            patientId: 100,
-            imageId: 200,
-            formImageScope: true,
-            entityType: "ImageInstance",
+            ctx,
+            taskConfig: { form_image_scope: true },
+            schemaEntityType: "StudyEye",
+        });
+
+        expect(result?.id).toBe(1);
+    });
+
+    it("returns highest id when multiple match (defensive)", () => {
+        const annotations = [
+            { ...baseAnnotation, id: 1, image_id: "img-200" },
+            { ...baseAnnotation, id: 2, image_id: "img-200" },
+        ] as FormAnnotationGET[];
+
+        const result = findFormAnnotation({
+            annotations,
+            schemaId: 10,
+            userId: 5,
+            ctx,
+            taskConfig: { form_entity_scope: "ImageInstance" },
+            schemaEntityType: "ImageInstance",
         });
 
         expect(result?.id).toBe(2);

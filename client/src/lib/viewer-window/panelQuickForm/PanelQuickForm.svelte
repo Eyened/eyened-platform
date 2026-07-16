@@ -12,6 +12,10 @@
     import { getContext } from "svelte";
     import type { TaskConfig } from "../taskConfigLayout";
     import { findFormAnnotation } from "../panelForm/findFormAnnotation";
+    import {
+        buildFormAnnotationCreatePayload,
+        resolveFormEntityScope,
+    } from "../panelForm/formEntityScope";
     import { openFormInNewWindow } from "../panelForm/openFormInNewWindow";
 
     interface Props {
@@ -34,19 +38,27 @@
         return formSchemasByName.get(name);
     });
 
+    const formContext = $derived({
+        patientId: instance.patient.id,
+        studyId: instance.study?.id,
+        imageId: instance.id,
+        laterality: instance.laterality ?? undefined,
+    });
+
+    const entityScope = $derived.by(() =>
+        resolveFormEntityScope(taskConfig, schema?.entity_type),
+    );
+
     const annotation = $derived.by(() => {
         if (!schema) return undefined;
         return findFormAnnotation({
             annotations: Array.from(formAnnotations.values()),
             schemaId: schema.id,
             userId: globalContext.user.id,
-            patientId: instance.patient.id,
-            studyId: instance.study?.id,
-            imageId: instance.id,
-            laterality: instance.laterality ?? undefined,
+            ctx: formContext,
             subTaskId: taskContext?.subTask?.id,
-            formImageScope: taskConfig?.form_image_scope ?? false,
-            entityType: schema.entity_type,
+            taskConfig,
+            schemaEntityType: schema.entity_type,
         });
     });
 
@@ -74,15 +86,14 @@
 
         let form = annotation;
         if (!form) {
-            form = await createFormAnnotation({
-                form_schema_id: schema.id,
-                patient_id: instance.patient.id,
-                study_id: instance.study?.id ?? undefined,
-                image_id: instance.id,
-                laterality: instance.laterality ?? undefined,
-                sub_task_id: taskContext?.subTask?.id,
-                form_data: {},
-            });
+            form = await createFormAnnotation(
+                buildFormAnnotationCreatePayload({
+                    formSchemaId: schema.id,
+                    scope: entityScope,
+                    ctx: formContext,
+                    subTaskId: taskContext?.subTask?.id,
+                }),
+            );
         }
 
         openFormInNewWindow(form, canEdit);
@@ -93,7 +104,7 @@
     {#if !schema}
         <p class="warning">Form schema not configured or not found.</p>
     {:else}
-        <p class="schema">Schema: {schema.name}</p>
+        <p class="schema">Schema: {schema.name} ({entityScope})</p>
         <p class="status">Status: {statusLabel}</p>
     {/if}
 

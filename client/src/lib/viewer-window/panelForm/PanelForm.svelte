@@ -17,6 +17,11 @@
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import { HIDE_FROM_FORM_PANEL_NAMES } from "$lib/config/builtinFormSchemas";
     import FormItem from "./FormItem.svelte";
+    import {
+        buildFormAnnotationCreatePayload,
+        matchesFormEntityScope,
+        resolveFormEntityScope,
+    } from "./formEntityScope";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -33,6 +38,15 @@
 
     let selectedSchema: FormSchemaGET | undefined = $state();
 
+    const taskConfig = taskContext?.task.task_definition.config;
+
+    const formContext = $derived({
+        patientId: instance.patient.id,
+        studyId: instance.study?.id,
+        imageId: instance.id,
+        laterality: instance.laterality ?? undefined,
+    });
+
     const filters = [
         (annotation: FormAnnotationGET) => {
             const schema = formSchemas.get(annotation.form_schema_id);
@@ -43,6 +57,22 @@
         (annotation: FormAnnotationGET) => {
             const schema = formSchemas.get(annotation.form_schema_id);
             if (!schema) return false;
+
+            if (
+                taskConfig?.form_entity_scope !== undefined ||
+                taskConfig?.form_image_scope !== undefined
+            ) {
+                const scope = resolveFormEntityScope(
+                    taskConfig,
+                    schema.entity_type,
+                );
+                return matchesFormEntityScope(
+                    annotation,
+                    scope,
+                    formContext,
+                );
+            }
+
             if (schema.entity_type == "StudyEye") {
                 return (
                     annotation.study_id == instance.study?.id &&
@@ -54,19 +84,11 @@
             return annotation.image_id == instance.id;
         },
     ];
-
-    const taskConfig = taskContext?.task.task_definition.config;
     if (taskConfig?.form_schema_name) {
         const schema = formSchemasByName.get(taskConfig.form_schema_name);
         if (schema && !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name)) {
             selectedSchema = schema;
         }
-    }
-    if (taskConfig?.form_image_scope) {
-        filters.push(
-            (annotation: FormAnnotationGET) =>
-                annotation.image_id == instance.id,
-        );
     }
 
     const forms = $derived(
@@ -91,15 +113,15 @@
 
     async function addFormWithSchema(schema: FormSchemaGET | undefined) {
         if (!schema) return;
-        await createFormAnnotation({
-            form_schema_id: schema.id,
-            patient_id: instance.patient.id,
-            study_id: instance.study?.id ?? undefined,
-            image_id: instance.id,
-            laterality: instance.laterality ?? undefined,
-            sub_task_id: taskContext?.subTask?.id,
-            form_data: {},
-        });
+        const scope = resolveFormEntityScope(taskConfig, schema.entity_type);
+        await createFormAnnotation(
+            buildFormAnnotationCreatePayload({
+                formSchemaId: schema.id,
+                scope,
+                ctx: formContext,
+                subTaskId: taskContext?.subTask?.id,
+            }),
+        );
     }
 </script>
 
