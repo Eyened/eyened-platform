@@ -218,6 +218,21 @@ export class ViewerWindowContext {
         this.mainPanels = [{ component: MainViewer, props: { image } }];
     }
 
+    /** Open the first image shown in the top row (first slice of the first instance). */
+    async openFirstTopRowImage(): Promise<void> {
+        const firstInstanceId = this.instanceIds[0];
+        if (!firstInstanceId) {
+            this.mainPanels = [];
+            return;
+        }
+        const images = await this.getImages(firstInstanceId);
+        const firstImage = images[0];
+        if (!firstImage) {
+            return;
+        }
+        this.setImagePanel(firstImage);
+    }
+
     setPanel(panel: MainPanelType) {
         this.mainPanels = [panel];
     }

@@ -7,7 +7,6 @@ Keeps track of the main panels and the top row of images.
 <script lang="ts">
     import { onDestroy, onMount, setContext } from "svelte";
     import MainPanel from "./MainPanel.svelte";
-    import MainViewer from "./MainViewer.svelte";
     import TopRowImages from "./TopRowImages.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
@@ -23,20 +22,14 @@ Keeps track of the main panels and the top row of images.
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
 
-    // open first image
-    const instanceIds = viewerWindowContext.instanceIds;
-    if (instanceIds.length) {
-        const openInstance = instanceIds[0];
-        viewerWindowContext.getImages(openInstance).then((images) => {
-            // images is normally a single image
-            // for OCT it is an array: enface projection + oct image
-            const panel = {
-                component: MainViewer,
-                props: { image: images[images.length - 1] }, // last image (in case of OCT)
-            };
-            viewerWindowContext.setPanel(panel);
-        });
-    }
+    $effect(() => {
+        const ids = viewerWindowContext.instanceIds;
+        if (!ids.length) {
+            viewerWindowContext.mainPanels = [];
+            return;
+        }
+        void viewerWindowContext.openFirstTopRowImage();
+    });
 
     let main: HTMLDivElement | undefined = $state();
     let isResizing = false;
