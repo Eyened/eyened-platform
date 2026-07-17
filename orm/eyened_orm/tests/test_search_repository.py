@@ -145,3 +145,23 @@ def test_instances_for_studies_returns_active_instances(repo, session, data):
 def test_instances_for_studies_with_no_ids_returns_empty(repo, session, data):
     """An empty study-id list returns no rows rather than every instance."""
     assert repo.instances_for_studies(session, []) == []
+
+
+def test_attribute_resolves_when_a_model_name_has_several_versions(repo, session, data):
+    """Model allows (ModelName, Version) duplicates, so the def join fans out; resolution must not blow up."""
+    from eyened_orm.attributes import AttributeDefinition
+    from eyened_orm.repositories.search import AttributeConditionSpec
+    from eyened_orm.utils.factories import make_attribute_value, make_attributes_model
+    from sqlalchemy import select
+
+    quality = session.scalar(
+        select(AttributeDefinition).where(AttributeDefinition.AttributeName == "Quality")
+    )
+    m1_v2 = make_attributes_model(session, "M1", outputs=[quality], version="2")
+    make_attribute_value(session, quality, image=data.images["a2"], model=m1_v2, value=5)
+    session.flush()
+
+    spec = AttributeConditionSpec(attribute="Quality", operator="==", value=5, model="M1")
+    resolved = repo.resolve_attribute_definitions(session, [spec])
+
+    assert resolved[("M1", "Quality", None)].AttributeName == "Quality"

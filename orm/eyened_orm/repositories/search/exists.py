@@ -217,6 +217,11 @@ def resolve_attribute_definitions(
     attr_defs: Dict[Tuple[Optional[str], str, Optional[str]], AttrDef] = {}
     for model_name, attr_name, feature_name in dict.fromkeys(keys):
         if model_name:
+            # DISTINCT because Model allows several Versions per ModelName (see
+            # migration 2026_06_30-fix_model_unique_constraints): the output join
+            # returns one row per version, all of them the same AttributeDefinition.
+            # AttributeName is uniquely constrained, so collapsing them is lossless
+            # and scalar_one_or_none still guards a real invariant break.
             attr_def_stmt = (
                 select(AttrDef)
                 .join(
@@ -229,6 +234,7 @@ def resolve_attribute_definitions(
                 )
                 .where(AttributesModel.ModelName == model_name)
                 .where(AttrDef.AttributeName == attr_name)
+                .distinct()
             )
         else:
             attr_def_stmt = select(AttrDef).where(AttrDef.AttributeName == attr_name)
