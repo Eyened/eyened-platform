@@ -197,18 +197,24 @@ def run_registration(image_set, graph, new_transforms):
     ref_key = registration_image_key(reference)
 
     registrator = Registration()
-    registrator.set_reference(get_pixel_array(reference))
+
+    try:
+        registrator.set_reference(get_pixel_array(reference))
+    except Exception as err:
+        print(f"Error setting reference for {ref_key}: {err}")
+        return None, None
 
     for i in image_set:
         i_key = registration_image_key(i)
         if are_connected(ref_key, i_key, graph):
             continue
 
-        registrator.set_target(get_pixel_array(i))
+        print(
+            f"Running registration for {ref_key} -> {i_key} "
+        )
         try:
-            print(
-                f"Running registration for {ref_key} -> {i_key} "
-            )
+            registrator.set_target(get_pixel_array(i))
+
             transform = registrator.run()
             graph[ref_key].add(i_key)
             graph[i_key].add(ref_key)
@@ -221,7 +227,7 @@ def run_registration(image_set, graph, new_transforms):
             )
         except Exception as e:
             print(
-                f"Error running registration for {ref_key}, {i_key}: {e}"
+                f"Error running registration for {ref_key} -> {i_key}: {e}"
             )
 
     return registrator, reference

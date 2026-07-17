@@ -14,7 +14,7 @@ def _make_patient(session, identifier: str = "ID1") -> Patient:
 
 
 def test_get_with_attributes_returns_the_patient(session):
-    # Looking up an existing patient by id returns that patient.
+    """Looking up an existing patient by id returns that patient."""
     patient = _make_patient(session)
 
     result = PatientRepository().get_with_attributes(session, patient.PatientID)
@@ -24,5 +24,5 @@ def test_get_with_attributes_returns_the_patient(session):
 
 
 def test_get_with_attributes_unknown_id_returns_none(session):
-    # An unknown id returns None — the repository never raises for "not found".
+    """An unknown id returns None — the repository never raises for "not found"."""
     assert PatientRepository().get_with_attributes(session, 999_999) is None

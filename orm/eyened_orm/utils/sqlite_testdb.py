@@ -90,7 +90,11 @@ def engine():
 
 @pytest.fixture(scope="function")
 def SessionLocal(engine):
-    return sessionmaker(bind=engine, future=True, expire_on_commit=False, class_=Session)
+    # expire_on_commit=True mirrors the production session factory
+    # (orm/eyened_orm/db.py uses SQLAlchemy's default True), so tests reproduce
+    # production's commit-time expiry: state loaded before a commit is reloaded
+    # from the DB on next access, rather than lingering stale in the identity map.
+    return sessionmaker(bind=engine, future=True, expire_on_commit=True, class_=Session)
 
 
 @pytest.fixture(scope="function")

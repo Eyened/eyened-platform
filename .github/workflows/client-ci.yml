@@ -1,10 +1,19 @@
 name: Client CI
 on:
+  push:
+    branches: [main, development]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-ci.yml'
   pull_request:
     branches: [main, development]
     paths:
       - 'client/**'
       - '.github/workflows/client-ci.yml'
+
+concurrency:
+  group: client-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:

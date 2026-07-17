@@ -13,4 +13,6 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 ## Index
 
 - [PR #145 — RBAC Step 1 service layer](2026-07-16-pr145-rbac-step1-review.md)
+- [Backend Python lint gate (ruff) — follow-up to #118](2026-07-16-backend-ruff-lint-followup.md)
+- [Dependabot vulnerability alerts](2026-07-16-dependabot-vulnerabilities.md)
 - [Frontend CI Phase 3 — ESLint gate follow-ups](2026-07-16-frontend-ci-phase3-eslint-followups.md)

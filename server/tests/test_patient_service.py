@@ -19,7 +19,7 @@ def _make_patient(session, identifier: str = "ID1") -> Patient:
 
 
 def test_get_patient_returns_the_patient(session):
-    # An existing patient is returned by the service unchanged.
+    """An existing patient is returned by the service unchanged."""
     patient = _make_patient(session)
 
     service = PatientService(PatientRepository())
@@ -29,7 +29,7 @@ def test_get_patient_returns_the_patient(session):
 
 
 def test_get_patient_unknown_id_raises_not_found(session):
-    # A missing patient makes the service raise NotFoundError (→ 404 via handler).
+    """A missing patient makes the service raise NotFoundError (→ 404 via handler)."""
     service = PatientService(PatientRepository())
 
     with pytest.raises(NotFoundError):

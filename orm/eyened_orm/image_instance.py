@@ -765,9 +765,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         from eyened_orm.tag import ImageInstanceTagLink
 
         link = ImageInstanceTagLink(
-            Tag=tag,
-            ImageInstance=self,
-            Creator=creator,
+            TagID=tag.TagID,
+            ImageInstanceID=self.ImageInstanceID,
+            CreatorID=creator.CreatorID,
             Comment=comment,
         )
         return link
@@ -816,7 +816,13 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         # Get or create link
         link = ImageInstanceTagLink.by_pk(session, (tag.TagID, self.ImageInstanceID))
         if link is None:
-            link = self.tag(creator=creator, tag=tag, comment=comment)
+            link = ImageInstanceTagLink(
+                TagID=tag.TagID,
+                ImageInstanceID=self.ImageInstanceID,
+                CreatorID=creator.CreatorID,
+                Comment=comment,
+            )
+            session.add(link)
             session.flush()
         elif comment is not None:
             link.Comment = comment

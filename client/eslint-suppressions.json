@@ -175,14 +175,9 @@
       "count": 1
     }
   },
-  "src/lib/registration/fdsRegistration.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/lib/registration/privateEyeRegistrationHeidelberg.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 3
+      "count": 2
     }
   },
   "src/lib/tags/Tagger.svelte": {
