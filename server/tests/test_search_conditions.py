@@ -65,3 +65,29 @@ def test_unknown_static_label_raises():
         translate_instance_conditions(
             [{"type": "default", "variable": "Nope", "operator": "==", "value": 1}]
         )
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        [{"type": "default", "variable": "Patient Identifier", "operator": "IN", "value": "PAT-A"}],
+        [{"type": "attribute", "model": "M1", "variable": "Quality", "operator": "IN", "value": 5}],
+    ],
+    ids=["static", "attribute"],
+)
+def test_in_operator_requires_a_list_value(raw):
+    """IN with a scalar has no SQL expression; reject it instead of raising ValueError downstream."""
+    from server.services.search.conditions import BadOperatorValueError
+
+    with pytest.raises(BadOperatorValueError):
+        translate_instance_conditions(raw)
+
+
+def test_in_operator_requires_a_list_value_on_the_study_surface():
+    """The study DSL shares the same operator/value rule."""
+    from server.services.search.conditions import BadOperatorValueError
+
+    with pytest.raises(BadOperatorValueError):
+        translate_study_conditions(
+            [{"variable": "Patient Identifier", "operator": "IN", "value": "PAT-A"}]
+        )

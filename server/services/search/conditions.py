@@ -30,10 +30,30 @@ class UnknownFieldError(BadRequestError):
     """
 
 
+class BadOperatorValueError(BadRequestError):
+    """Raised when an operator/value pair has no SQL expression.
+
+    ``format_condition`` reaches ``variable.in_()`` only through its
+    ``isinstance(value, list)`` branch, so ``IN`` with a scalar falls through to a
+    bare ``ValueError`` -- a 500 for what is plainly a bad request. That helper
+    lives in ``orm/`` and cannot import ``BadRequestError``, so the check belongs
+    here, at the same boundary that rejects unresolvable attributes.
+    """
+
+
+def _validate_operator_value(operator: str, value: Any) -> None:
+    """Reject operator/value pairs the expression builder cannot express."""
+    if operator == "IN" and not isinstance(value, list):
+        raise BadOperatorValueError(
+            f"Operator 'IN' requires a list value, got {type(value).__name__}."
+        )
+
+
 def _resolve(raw: dict[str, Any], fields_map: dict[str, Any]) -> ResolvedCondition:
     label = raw["variable"]
     if label not in fields_map:
         raise UnknownFieldError(f"Invalid variable: {label}")
+    _validate_operator_value(raw["operator"], raw.get("value"))
     return ResolvedCondition(
         variable=fields_map[label],
         operator=raw["operator"],
@@ -52,6 +72,7 @@ def translate_instance_conditions(
             attribute = cond.get("variable")
             if not isinstance(attribute, str):
                 continue  # preserved verbatim: today's _build_instance_select skips these
+            _validate_operator_value(cond["operator"], cond.get("value"))
             attrs.append(
                 AttributeConditionSpec(
                     attribute=attribute,

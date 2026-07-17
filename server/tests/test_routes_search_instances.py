@@ -190,3 +190,20 @@ def test_unknown_attribute_field_is_rejected(client, data):
     )
 
     assert resp.status_code == 400
+
+
+def test_in_operator_with_a_scalar_value_is_rejected(client, data):
+    """PRE-EXISTING BUG fixed: IN + scalar raised an uncaught ValueError (500); now a 400."""
+    resp = client.post(
+        "/instances/search",
+        json={
+            "conditions": [
+                {"type": "default", "variable": "Patient Identifier",
+                 "operator": "IN", "value": "PAT-A"}
+            ],
+            "order_by": "Study Date",
+            "order": "ASC",
+        },
+    )
+
+    assert resp.status_code == 400
