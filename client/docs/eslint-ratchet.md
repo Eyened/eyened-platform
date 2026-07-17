@@ -1,9 +1,14 @@
 # ESLint ratcheting baseline
 
 `npm run lint` runs `eslint . && prettier --check .` (flat config, `eslint.config.js`).
-Every rule is enforced on **new** code. Three high-volume backlogs are grandfathered in
+Every rule that is **configured** is enforced on **new** code — including inside files that
+already carry suppressions. Three high-volume backlogs are grandfathered in
 `eslint-suppressions.json` (count-per-file): `@typescript-eslint/no-explicit-any`,
 `svelte/require-each-key`, `svelte/prefer-svelte-reactivity`.
+
+One known coverage gap, deliberate: **`prefer-const` is not configured for `.svelte` files**
+(it is for `.ts`/`.svelte.ts`). It fires 729 times there, mostly on `let { x } = $props()` —
+the standard runes idiom. See `docs/backlog/` for the ratchet-down item.
 
 ## Rules
 

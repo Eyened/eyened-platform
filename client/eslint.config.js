@@ -66,5 +66,23 @@ export default tseslint.config(
             ],
         },
     },
+    {
+        // typescript-eslint's eslint-recommended turns these on, but hard-scopes
+        // itself to **/*.{ts,tsx,mts,cts} — so `.svelte` (and only `.svelte`)
+        // silently missed them. `.svelte.ts` matches **/*.ts and was covered.
+        // All three are at 0 violations here; enabling them keeps it that way.
+        //
+        // `prefer-const` is deliberately NOT in this list: it is the fourth rule
+        // eslint-recommended enables, and it fires 729 times in .svelte — ~200 of
+        // them on `let { x } = $props()`, the canonical runes idiom Svelte's own
+        // docs use. (It compiles as `const`, so this is an idiom/scale call, not a
+        // correctness one.) Tracked in docs/backlog/.
+        files: ["**/*.svelte"],
+        rules: {
+            "no-var": "error",
+            "prefer-rest-params": "error",
+            "prefer-spread": "error",
+        },
+    },
     prettier,
 );
