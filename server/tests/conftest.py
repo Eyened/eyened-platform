@@ -47,4 +47,7 @@ def client(session):
     )
     with TestClient(app_api) as c:
         yield c
-    app_api.dependency_overrides.clear()
+    # Pop only what this fixture installed: app_api is a module-level singleton, so
+    # clear() would silently delete overrides another fixture or test owns.
+    app_api.dependency_overrides.pop(get_db, None)
+    app_api.dependency_overrides.pop(get_current_user, None)
