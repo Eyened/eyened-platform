@@ -2,6 +2,7 @@
     import { Button } from "$lib/components/ui/button/index.js";
     import { getContext, onMount } from "svelte";
     import { page } from "$app/state";
+    import { resolve } from "$app/paths";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -39,7 +40,9 @@
         {#if error}
             <h1 class="mb-2 text-lg font-semibold">Sign-in failed</h1>
             <p class="mb-6 text-sm text-red-600">{error}</p>
-            <Button href="/users/login" class="w-full">Back to login</Button>
+            <Button href={resolve("/users/login")} class="w-full"
+                >Back to login</Button
+            >
         {:else}
             <h1 class="mb-2 text-lg font-semibold">Signing in</h1>
             <p class="text-sm text-gray-600">
