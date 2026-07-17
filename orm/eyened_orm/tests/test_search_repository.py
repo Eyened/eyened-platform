@@ -168,3 +168,29 @@ def test_attribute_resolves_when_a_model_name_has_several_versions(repo, session
     resolved = repo.resolve_attribute_definitions(session, [spec])
 
     assert resolved[("M1", "Quality", None)].AttributeName == "Quality"
+
+
+def test_studies_by_ids_loads_the_requested_studies(repo, session, data):
+    """studies_by_ids returns exactly the requested studies, active instances loaded."""
+    # Read the id first, then commit, so the session state matches a real request's.
+    # Study.Series and Series.ImageInstances are both lazy="selectin", so *touching a
+    # Study after the commit expires it* refetches those collections unfiltered -- and
+    # a filtered selectinload populates an empty collection, it never prunes a loaded
+    # one, so the inactive image would survive the filter and this test would pin the
+    # opposite of the truth. The service path is unaffected: it never re-reads a Study
+    # that way, and its studies payload is active-only (verified end to end).
+    study_id = data.studies["a"].StudyID
+    session.commit()
+
+    rows = repo.studies_by_ids(session, [study_id])
+
+    assert [s.StudyID for s in rows] == [study_id]
+    assert sorted(i.PublicID for s in rows for ser in s.Series for i in ser.ImageInstances) == [
+        "img-a1",
+        "img-a2",
+    ]
+
+
+def test_studies_by_ids_with_no_ids_returns_empty(repo, session, data):
+    """An empty id list returns no rows rather than every study."""
+    assert repo.studies_by_ids(session, []) == []

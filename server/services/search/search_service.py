@@ -217,19 +217,7 @@ class SearchService:
                 seen.add(st.StudyID)
                 study_ids_ordered.append(st.StudyID)
 
-        if not study_ids_ordered:
-            return []
-
-        studies_stmt = (
-            select(Study)
-            .where(Study.StudyID.in_(study_ids_ordered))
-            .options(
-                selectinload(Study.Series).selectinload(
-                    Series.ImageInstances.and_(~ImageInstance.Inactive)
-                )
-            )
-        )
-        studies = list(session.execute(studies_stmt).scalars().all())
+        studies = self.repository.studies_by_ids(session, study_ids_ordered)
         s_order = {sid: i for i, sid in enumerate(study_ids_ordered)}
         studies.sort(key=lambda s: s_order[s.StudyID])
         return studies

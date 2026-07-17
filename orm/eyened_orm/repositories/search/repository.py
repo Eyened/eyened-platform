@@ -121,6 +121,21 @@ class SearchRepository:
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
 
+    def studies_by_ids(self, session: Session, study_ids: List[int]) -> List[Study]:
+        """Return the given studies with their active instances eager-loaded.
+
+        Unordered -- the caller owns the ordering, which on the instances surface
+        is the instances' first-appearance order and not a property of the query.
+        """
+        if not study_ids:
+            return []
+        stmt = (
+            select(Study)
+            .where(Study.StudyID.in_(study_ids))
+            .options(*study_options())
+        )
+        return list(session.execute(stmt).scalars().all())
+
     def instances_for_studies(
         self, session: Session, study_ids: List[int]
     ) -> List[ImageInstance]:
