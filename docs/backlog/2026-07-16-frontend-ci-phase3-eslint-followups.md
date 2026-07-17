@@ -1,7 +1,21 @@
 # Follow-ups from Frontend CI Phase 3 — ESLint gate
 
 - **Source:** Phase 3 plan + `svelte5-best-practices` review (2026-07-16) — [plan](../superpowers/plans/2026-07-16-frontend-ci-phase3-eslint.md), [design](../superpowers/specs/2026-07-09-frontend-ci-testing-design.md).
-- **Context:** Phase 3 lands the ESLint gate green by grandfathering three high-volume rules into a ratcheting `eslint-suppressions.json` baseline — enforced on **new** code, existing occurrences tolerated. These are the ratchet-down items plus findings from the Svelte-5 review. See `client/docs/eslint-ratchet.md` for the prune workflow.
+- **Context:** Phase 3 lands the ESLint gate green by grandfathering three high-volume rules into a ratcheting `eslint-suppressions.json` baseline — enforced on **new** code, existing occurrences tolerated. These are the ratchet-down items plus findings from the Svelte-5 review.
+
+---
+
+## How the ratchet works
+
+`npm run lint` (in `client/`) runs `eslint . && prettier --check .`. Every **configured** rule is enforced on new code — including inside files that already carry suppressions. The three rules below are grandfathered in `client/eslint-suppressions.json` as a **count per file**, so the baseline can only shrink.
+
+**"I fixed an `any` and CI went red!"** — expected, and the ratchet working. Removing a suppressed violation leaves a stale count and `eslint .` fails with _"There are suppressions left that do not occur anymore."_ Fix: `cd client && npx eslint . --prune-suppressions`, and commit the updated `eslint-suppressions.json` with your change.
+
+- The exit code there is **2** (error), not 1 (violations found) — a script testing `-eq 1` misreads it.
+- We deliberately do **not** pass `--pass-on-unpruned-suppressions`: it would keep CI green but let the baseline become a floor that never lowers. (This is not theoretical — merging `development` into the Phase 3 branch removed 2 `any`s and pruned the baseline 432 → 430 automatically.)
+- **Never hand-merge a conflict in `eslint-suppressions.json`** — take either side, then re-run `--prune-suppressions`. It's generated: eslint rewrites it in its own format on every prune, which is why it's in `.prettierignore`.
+- Adding an unavoidable new violation needs an inline `// eslint-disable-next-line <rule> -- <reason>`, reviewed in the PR — not a suppressions-file edit. **A disable's stated reason must be true of the code**, not an aspiration; prefer making it true by construction (a type that enforces it) over asserting it in prose. Phase 3's review found two disables that failed this, each hiding a real bug.
+- **Limitation:** counts are per file, not per line — within an already-suppressed file, removing one violation and adding another of the same rule (net count unchanged) is not caught. Adding one _without_ removing one **is** caught.
 
 ---
 

@@ -359,7 +359,8 @@ guard; `eslint-config-prettier` last; bumped the lint devDeps. `lint` gate step 
    — `no-explicit-any` (353), `svelte/require-each-key` (51), `svelte/prefer-svelte-reactivity`
    (28) = **432**. Everything else was **fixed to 0**, not downgraded. Rationale: disabling a rule
    loses the signal permanently; a count-per-file baseline blocks regressions and only shrinks
-   (`--prune-suppressions`). See `client/docs/eslint-ratchet.md`.
+   (`--prune-suppressions`). See `docs/backlog/2026-07-16-frontend-ci-phase3-eslint-followups.md`
+   ("How the ratchet works") for the prune workflow and the ratchet-down items.
 3. **`svelte/no-navigation-without-resolve` was adopted, not deferred** — all 18 sites now route
    through `resolve()` from `$app/paths`; the rule is a clean error with no suppression.
 4. **`lint` is consolidated: `eslint . && prettier --check .`**, and it **replaces** Phase 2's
