@@ -1,493 +1,493 @@
 {
-    "src/lib/browser/AdditionalDataSources.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/AdvancedFilters.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 18
-        },
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/browser/Browser.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/ConditionsMultiSelect.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/ExternalData.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/InstanceInfo.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/InstanceSegmentationTable.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/StudyBlockForm.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/StudyBlockForms.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/browser/browserContext.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 28
-        },
-        "svelte/prefer-svelte-reactivity": {
-            "count": 9
-        }
-    },
-    "src/lib/browser/dataSources.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 3
-        }
-    },
-    "src/lib/components/Autocomplete.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/components/Main.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/components/MultiSelectWithSearch.svelte": {
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/components/MySelect.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/components/SelectWithSearch.svelte": {
-        "svelte/prefer-svelte-reactivity": {
-            "count": 1
-        },
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/components/ui/data-table/data-table.svelte.ts": {
-        "svelte/prefer-svelte-reactivity": {
-            "count": 2
-        }
-    },
-    "src/lib/data-loading/imageLoader.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 7
-        }
-    },
-    "src/lib/data-loading/utils.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/data/api.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 86
-        }
-    },
-    "src/lib/data/globalContext.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 5
-        },
-        "svelte/prefer-svelte-reactivity": {
-            "count": 4
-        }
-    },
-    "src/lib/data/helpers.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 65
-        }
-    },
-    "src/lib/forms/SchemaForm.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 5
-        },
-        "svelte/require-each-key": {
-            "count": 3
-        }
-    },
-    "src/lib/forms/schemaType.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 9
-        }
-    },
-    "src/lib/forms/schemaValidator.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 16
-        }
-    },
-    "src/lib/forms/utils.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/image-processing/clahe-worker-api.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/image-processing/clahe-worker.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/image-processing/contours.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/newWindow.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/openapi/enums.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/registration/fdsRegistration.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/registration/privateEyeRegistrationHeidelberg.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 3
-        }
-    },
-    "src/lib/tags/Tagger.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 3
-        },
-        "svelte/require-each-key": {
-            "count": 3
-        }
-    },
-    "src/lib/tags/TagsEditor.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/tasks/SubTaskRow.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 5
-        },
-        "svelte/prefer-svelte-reactivity": {
-            "count": 1
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/tasks/TaskOverlay.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/usermanager.svelte.ts": {
-        "svelte/prefer-svelte-reactivity": {
-            "count": 1
-        }
-    },
-    "src/lib/utils.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/utils/DataTable.svelte": {
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/utils/deferred.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/utils/npy_loader.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/BrowserOverlay.svelte": {
-        "svelte/prefer-svelte-reactivity": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/HelpOverlay.svelte": {
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/ImageWindow.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/MainViewer.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/MapSelect.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 4
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/MultiImageViewer.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/RegistrationItemLoader.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/TopRowImages.svelte": {
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/TopViewer.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/ViewerWindow.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelETRDS/ETDRSGridItem.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/panelETRDS/PanelETDRS.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/panelForm/FormItemContent.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelForm/PanelForm.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelHelp/SegmentationPanelHelp.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelMeasure/CreatorAreas.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelMeasure/PanelMeasure.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 4
-        },
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelRegistration/PanelRegistration.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/panelRegistration/RegistrationItem.svelte": {
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/panelRendering/PanelRendering.svelte": {
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelSegmentation/FeatureSelect.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelSegmentation/ImportSegmentationSelector.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelSegmentation/MultiFeatureSelector.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/panelSegmentation/PanelSegmentation.svelte": {
-        "svelte/require-each-key": {
-            "count": 2
-        }
-    },
-    "src/lib/viewer-window/panelSegmentation/ReferenceAnnotationSelector.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer-window/viewerWindowContext.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        },
-        "svelte/prefer-svelte-reactivity": {
-            "count": 5
-        }
-    },
-    "src/lib/viewer/overlays/MainViewerContext.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/viewer/viewer-utils.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 9
-        }
-    },
-    "src/lib/viewer/viewerContext.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        },
-        "svelte/prefer-svelte-reactivity": {
-            "count": 1
-        }
-    },
-    "src/lib/webgl/FragmentShaderProgram.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 5
-        }
-    },
-    "src/lib/webgl/abstractImage.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/webgl/baseSegmentation.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/webgl/image2D.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/lib/webgl/image3D.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/webgl/imageRenderer.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/lib/webgl/mask.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 9
-        }
-    },
-    "src/lib/webgl/programInfo.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 10
-        }
-    },
-    "src/lib/webgl/segmentationItem.svelte.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 7
-        }
-    },
-    "src/lib/webgl/segmentationState.svelte.ts": {
-        "svelte/prefer-svelte-reactivity": {
-            "count": 2
-        }
-    },
-    "src/lib/webgl/texture.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 2
-        }
-    },
-    "src/routes/+layout.svelte": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 1
-        }
-    },
-    "src/routes/tasks/[taskid]/+page.svelte": {
-        "svelte/require-each-key": {
-            "count": 1
-        }
-    },
-    "src/routes/view/+page.svelte": {
-        "svelte/prefer-svelte-reactivity": {
-            "count": 1
-        }
-    },
-    "src/types/cornerstone-core.d.ts": {
-        "@typescript-eslint/no-explicit-any": {
-            "count": 6
-        }
+  "src/lib/browser/AdditionalDataSources.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "svelte/require-each-key": {
+      "count": 1
     }
+  },
+  "src/lib/browser/AdvancedFilters.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 18
+    },
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/browser/Browser.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/browser/ConditionsMultiSelect.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/browser/ExternalData.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/browser/InstanceInfo.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/browser/InstanceSegmentationTable.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/browser/StudyBlockForm.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/browser/StudyBlockForms.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/browser/browserContext.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 28
+    },
+    "svelte/prefer-svelte-reactivity": {
+      "count": 9
+    }
+  },
+  "src/lib/browser/dataSources.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "src/lib/components/Autocomplete.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/components/Main.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/components/MultiSelectWithSearch.svelte": {
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/components/MySelect.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/components/SelectWithSearch.svelte": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    },
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/components/ui/data-table/data-table.svelte.ts": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 2
+    }
+  },
+  "src/lib/data-loading/imageLoader.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    }
+  },
+  "src/lib/data-loading/utils.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/data/api.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 86
+    }
+  },
+  "src/lib/data/globalContext.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    },
+    "svelte/prefer-svelte-reactivity": {
+      "count": 4
+    }
+  },
+  "src/lib/data/helpers.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 65
+    }
+  },
+  "src/lib/forms/SchemaForm.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    },
+    "svelte/require-each-key": {
+      "count": 3
+    }
+  },
+  "src/lib/forms/schemaType.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 9
+    }
+  },
+  "src/lib/forms/schemaValidator.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 16
+    }
+  },
+  "src/lib/forms/utils.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/image-processing/clahe-worker-api.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/image-processing/clahe-worker.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/image-processing/contours.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/newWindow.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/openapi/enums.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/registration/fdsRegistration.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/registration/privateEyeRegistrationHeidelberg.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "src/lib/tags/Tagger.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "svelte/require-each-key": {
+      "count": 3
+    }
+  },
+  "src/lib/tags/TagsEditor.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/tasks/SubTaskRow.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    },
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    },
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/tasks/TaskOverlay.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/usermanager.svelte.ts": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    }
+  },
+  "src/lib/utils.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/utils/DataTable.svelte": {
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/utils/deferred.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/utils/npy_loader.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/BrowserOverlay.svelte": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/HelpOverlay.svelte": {
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/ImageWindow.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/MainViewer.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/MapSelect.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    },
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/MultiImageViewer.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/RegistrationItemLoader.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/TopRowImages.svelte": {
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/TopViewer.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/ViewerWindow.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelETRDS/ETDRSGridItem.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/panelETRDS/PanelETDRS.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/panelForm/FormItemContent.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelForm/PanelForm.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelHelp/SegmentationPanelHelp.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelMeasure/CreatorAreas.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelMeasure/PanelMeasure.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    },
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelRegistration/PanelRegistration.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/panelRegistration/RegistrationItem.svelte": {
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/panelRendering/PanelRendering.svelte": {
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelSegmentation/FeatureSelect.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelSegmentation/ImportSegmentationSelector.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelSegmentation/MultiFeatureSelector.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelSegmentation/PanelSegmentation.svelte": {
+    "svelte/require-each-key": {
+      "count": 2
+    }
+  },
+  "src/lib/viewer-window/panelSegmentation/ReferenceAnnotationSelector.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/viewerWindowContext.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "svelte/prefer-svelte-reactivity": {
+      "count": 5
+    }
+  },
+  "src/lib/viewer/overlays/MainViewerContext.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer/viewer-utils.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 9
+    }
+  },
+  "src/lib/viewer/viewerContext.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    }
+  },
+  "src/lib/webgl/FragmentShaderProgram.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "src/lib/webgl/abstractImage.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/webgl/baseSegmentation.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/webgl/image2D.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/lib/webgl/image3D.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/webgl/imageRenderer.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/webgl/mask.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 9
+    }
+  },
+  "src/lib/webgl/programInfo.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 10
+    }
+  },
+  "src/lib/webgl/segmentationItem.svelte.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    }
+  },
+  "src/lib/webgl/segmentationState.svelte.ts": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 2
+    }
+  },
+  "src/lib/webgl/texture.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/routes/+layout.svelte": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/routes/tasks/[taskid]/+page.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/routes/view/+page.svelte": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    }
+  },
+  "src/types/cornerstone-core.d.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  }
 }

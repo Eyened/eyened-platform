@@ -27,6 +27,10 @@ leaves a stale count, and `eslint .` fails with:
 `eslint-suppressions.json` alongside your change. One extra command; it is what
 keeps the baseline honest.
 
+(`eslint-suppressions.json` is listed in `.prettierignore` — eslint rewrites it in
+its own format on every prune, so prettier deliberately does not own it. Don't
+reformat it by hand.)
+
 Note the exit code is **2** (error), not 1 (violations found) — so a script that
 only tests `-eq 1` will misread it. We deliberately do NOT pass
 `--pass-on-unpruned-suppressions`: it would keep CI green but let the baseline
