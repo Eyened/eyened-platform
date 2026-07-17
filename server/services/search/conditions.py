@@ -42,8 +42,15 @@ class BadOperatorValueError(BadRequestError):
 
 
 def _validate_operator_value(operator: str, value: Any) -> None:
-    """Reject operator/value pairs the expression builder cannot express."""
-    if operator == "IN" and not isinstance(value, list):
+    """Reject operator/value pairs the expression builder cannot express.
+
+    Mirrors ``format_condition``'s branch order exactly, which is why ``None`` is
+    excluded: that helper tests ``value is None`` *before* its list branch and
+    answers ``IS NOT NULL`` for ``IN`` + null, so null is a working query and not
+    the ValueError this guard exists to pre-empt. Rejecting it would turn a 200
+    into a 400 -- a behavior change well outside a 500 fix.
+    """
+    if operator == "IN" and value is not None and not isinstance(value, list):
         raise BadOperatorValueError(
             f"Operator 'IN' requires a list value, got {type(value).__name__}."
         )

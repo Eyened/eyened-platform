@@ -28,6 +28,7 @@ from eyened_orm import (
     SourceInfo,
     Study,
 )
+from eyened_orm.attributes import AttributeDefinition as AttrDef
 from eyened_orm.attributes import AttributeValue as AttrVal
 from sqlalchemy import and_, select, true
 from sqlalchemy.orm import selectinload
@@ -42,8 +43,6 @@ from .aliases import (
     SegTag,
     StudyTag,
 )
-from eyened_orm.attributes import AttributeDefinition as AttrDef
-
 from .conditions import (
     AttributeConditionSpec,
     ResolvedCondition,

@@ -1,9 +1,11 @@
 """The six EXISTS (semi-join) builders for the search surfaces.
 
 Moved verbatim from the old route module. Carries two known query-shape
-inefficiencies unchanged (the attribute-def N+1 in ``exists_attributes_for_instance``
-and its OR-of-joins EXISTS); those are gated follow-up work, not to be "fixed"
-here. Each builder takes an entity->conditions grouping and returns an EXISTS
+inefficiencies unchanged (the attribute-def N+1 in ``resolve_attribute_definitions``
+and the OR-of-joins EXISTS); those are gated follow-up work, not to be "fixed"
+here. The N+1's *shape* is untouched, but it no longer runs per select build:
+callers resolve once and pass the map to ``exists_attributes_for_instance``.
+Each builder takes an entity->conditions grouping and returns an EXISTS
 clause (or None when the group is empty).
 """
 from __future__ import annotations

@@ -91,3 +91,24 @@ def test_in_operator_requires_a_list_value_on_the_study_surface():
         translate_study_conditions(
             [{"variable": "Patient Identifier", "operator": "IN", "value": "PAT-A"}]
         )
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        [{"type": "default", "variable": "Patient Identifier", "operator": "IN", "value": None}],
+        [{"type": "default", "variable": "Patient Identifier", "operator": "IN"}],
+    ],
+    ids=["explicit-null", "omitted"],
+)
+def test_in_operator_with_a_null_value_is_still_accepted(raw):
+    """IN + null means IS NOT NULL in format_condition, so it is a query, not a 400.
+
+    Guards the IN/scalar rejection against over-reach: format_condition tests
+    `value is None` before its list branch, so null never reaches the ValueError
+    that rejection exists to pre-empt.
+    """
+    static, _ = translate_instance_conditions(raw)
+
+    assert [c.operator for c in static] == ["IN"]
+    assert static[0].value is None

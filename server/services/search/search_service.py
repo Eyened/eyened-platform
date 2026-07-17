@@ -29,7 +29,7 @@ from eyened_orm import (
     Study,
     StudyTagLink,
 )
-from eyened_orm.attributes import AttributeDataType
+from eyened_orm.attributes import AttributeDataType, AttributeDefinition
 from eyened_orm.image_instance import ETDRSField as ImgETDRS
 from eyened_orm.image_instance import Laterality as ImgLaterality
 from eyened_orm.image_instance import Modality as ImgModality
@@ -85,7 +85,7 @@ class SearchService:
     ) -> InstanceSearchResult:
         """Search instances, derive their studies, and optionally count the total."""
         static_conds, attr_conds = translate_instance_conditions(conditions)
-        attr_defs: dict[tuple[str | None, str, str | None], Any] = {}
+        attr_defs: dict[tuple[str | None, str, str | None], AttributeDefinition] = {}
         if attr_conds:
             # Resolved once here and handed to both the search and the count: the
             # resolution is an N+1, so rebuilding it per select tripled the queries.
