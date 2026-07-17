@@ -15,8 +15,10 @@
         showSegmentationInfo?: boolean;
     }
 
-    let { instance, showSegmentationInfo: _showSegmentationInfo = false }: Props =
-        $props();
+    let {
+        instance,
+        showSegmentationInfo: _showSegmentationInfo = false,
+    }: Props = $props();
     let size = $derived(browserContext.thumbnailSize);
     let popupOpen = $state(false);
 

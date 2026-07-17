@@ -2,7 +2,7 @@ export const ssr = false;
 export const prerender = false;
 
 /** @type {import('./$types').PageLoad} */
-export async function load({ fetch: _fetch, params, url: _url }) {
+export async function load({ params }) {
     return {
         taskid: parseInt(params.taskid),
         subTaskIndex: parseInt(params.setid),
