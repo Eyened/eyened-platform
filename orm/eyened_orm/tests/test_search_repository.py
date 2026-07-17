@@ -194,3 +194,24 @@ def test_studies_by_ids_loads_the_requested_studies(repo, session, data):
 def test_studies_by_ids_with_no_ids_returns_empty(repo, session, data):
     """An empty id list returns no rows rather than every study."""
     assert repo.studies_by_ids(session, []) == []
+
+
+def test_tag_names_lists_linked_tags_sorted(repo, session, data):
+    """tag_names returns the distinct tag names reachable through a link table."""
+    from eyened_orm import ImageInstanceTagLink
+
+    assert repo.tag_names(session, ImageInstanceTagLink) == ["img-tag"]
+
+
+def test_active_form_creator_names_excludes_inactive_annotations(repo, session, data):
+    """Only creators with a live form annotation are listed."""
+    assert repo.active_form_creator_names(session) == ["form-creator"]
+
+
+def test_attribute_signature_rows_carry_name_dtype_and_model(repo, session, data):
+    """Attribute rows describe (name, dtype, producing model) and skip JSON attributes."""
+    from eyened_orm.attributes import AttributeDataType
+
+    assert repo.attribute_signature_rows(session) == [
+        ("Quality", AttributeDataType.Int, "M1")
+    ]

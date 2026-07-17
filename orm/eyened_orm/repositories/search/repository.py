@@ -12,10 +12,15 @@ is faster. Do not "fix" them here.
 """
 from __future__ import annotations
 
-from typing import Any, List, Literal
+from typing import Any, List, Literal, Optional, Tuple
 
-from eyened_orm import ImageInstance, Series, Study
-from eyened_orm.attributes import AttributeDefinition
+from eyened_orm import Creator, FormAnnotation, ImageInstance, Series, Study, Tag
+from eyened_orm.attributes import (
+    AttributeDataType,
+    AttributeDefinition,
+    AttributesModel,
+    AttributesModelOutput,
+)
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -120,6 +125,55 @@ class SearchRepository:
         return session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
+
+    def tag_names(self, session: Session, link_table: Any) -> List[str]:
+        """Distinct tag names reachable through the given tag link table, sorted."""
+        return sorted(
+            session.scalars(
+                select(Tag.TagName)
+                .join(link_table, link_table.TagID == Tag.TagID)
+                .distinct()
+            ).all()
+        )
+
+    def active_form_creator_names(self, session: Session) -> List[str]:
+        """Names of creators with at least one active form annotation, sorted."""
+        return sorted(
+            session.scalars(
+                select(Creator.CreatorName)
+                .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
+                .where(~FormAnnotation.Inactive)
+                .distinct()
+            ).all()
+        )
+
+    def attribute_signature_rows(
+        self, session: Session
+    ) -> List[Tuple[str, AttributeDataType, Optional[str]]]:
+        """(AttributeName, AttributeDataType, ModelName) for every non-JSON attribute.
+
+        Model-less attributes carry ModelName None; an attribute produced by several
+        models yields one row per model, exactly as the signature endpoint expects.
+        """
+        stmt = (
+            select(
+                AttributeDefinition.AttributeName,
+                AttributeDefinition.AttributeDataType,
+                AttributesModel.ModelName,
+            )
+            .select_from(AttributeDefinition)
+            .outerjoin(
+                AttributesModelOutput,
+                AttributeDefinition.AttributeID == AttributesModelOutput.AttributeID,
+            )
+            .outerjoin(
+                AttributesModel,
+                AttributesModelOutput.ModelID == AttributesModel.ModelID,
+            )
+            .where(AttributeDefinition.AttributeDataType != AttributeDataType.JSON)
+            .distinct()
+        )
+        return [tuple(row) for row in session.execute(stmt).all()]
 
     def studies_by_ids(self, session: Session, study_ids: List[int]) -> List[Study]:
         """Return the given studies with their active instances eager-loaded.

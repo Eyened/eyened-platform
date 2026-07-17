@@ -5,6 +5,11 @@ arguments rather than the route's Pydantic ``SearchQuery`` -- importing that
 would invert the routes -> services dependency arrow. ``SearchQuery.model_dump()``
 unpacks to exactly this signature. DTO conversion stays behind in the route; this
 layer returns ORM rows.
+
+No ``select()`` is built here: query construction belongs to ``SearchRepository``.
+Calls to the ``Model.query_column`` ORM helper are the one exception -- they are an
+established codebase pattern for enumerating a reference column, not query
+construction.
 """
 from __future__ import annotations
 
@@ -15,31 +20,22 @@ from eyened_orm import (
     Creator,
     DeviceModel,
     Feature,
-    FormAnnotation,
     FormAnnotationTagLink,
     FormSchema,
     ImageInstance,
     ImageInstanceTagLink,
     Project,
     SegmentationTagLink,
-    Series,
     Study,
     StudyTagLink,
-    Tag,
 )
-from eyened_orm.attributes import (
-    AttributeDataType,
-    AttributesModel,
-    AttributesModelOutput,
-)
-from eyened_orm.attributes import AttributeDefinition as AttrDef
+from eyened_orm.attributes import AttributeDataType
 from eyened_orm.image_instance import ETDRSField as ImgETDRS
 from eyened_orm.image_instance import Laterality as ImgLaterality
 from eyened_orm.image_instance import Modality as ImgModality
 from eyened_orm.patient import SexEnum as PatientSex
 from eyened_orm.repositories.search import SearchRepository
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from ..exceptions import BadRequestError
 from .conditions import translate_instance_conditions, translate_study_conditions
@@ -68,15 +64,6 @@ class StudySearchResult:
     has_more: bool = False
     limit: int = 200
     page: int = 0
-
-
-def _query_tag_names(session: Session, link_table: Any) -> List[str]:
-    """Helper to query distinct tag names from a link table."""
-    return sorted(
-        session.scalars(
-            select(Tag.TagName).join(link_table, link_table.TagID == Tag.TagID).distinct()
-        ).all()
-    )
 
 
 class SearchService:
@@ -247,7 +234,10 @@ class SearchService:
                 name="Segmentation Creator Name",
                 values=creator_names,
             ),
-            SignatureField(name="Segmentation Tag Name", values=_query_tag_names(session, SegmentationTagLink)),
+            SignatureField(
+                name="Segmentation Tag Name",
+                values=self.repository.tag_names(session, SegmentationTagLink),
+            ),
             SignatureField(
                 name="Form Schema Name",
                 values=sorted(FormSchema.query_column(session, FormSchema.SchemaName)),
@@ -256,32 +246,23 @@ class SearchService:
                 name="Form Creator Name",
                 values=creator_names,
             ),
-            SignatureField(name="Form Tag Name", values=_query_tag_names(session, FormAnnotationTagLink)),
-            SignatureField(name="Image Tag Name", values=_query_tag_names(session, ImageInstanceTagLink)),
+            SignatureField(
+                name="Form Tag Name",
+                values=self.repository.tag_names(session, FormAnnotationTagLink),
+            ),
+            SignatureField(
+                name="Image Tag Name",
+                values=self.repository.tag_names(session, ImageInstanceTagLink),
+            ),
         ]
 
-        # Attributes
-        attr_query = (
-            select(
-                AttrDef.AttributeName,
-                AttrDef.AttributeDataType,
-                AttributesModel.ModelName,
-            )
-            .select_from(AttrDef)
-            .outerjoin(AttributesModelOutput, AttrDef.AttributeID == AttributesModelOutput.AttributeID)
-            .outerjoin(AttributesModel, AttributesModelOutput.ModelID == AttributesModel.ModelID)
-            .where(AttrDef.AttributeDataType != AttributeDataType.JSON)
-            .distinct()
-        )
-        attr_rows = session.execute(attr_query).all()
-
-        # Convert to SignatureFields
+        # Convert attribute rows to SignatureFields
         dtype_map = {
             AttributeDataType.String: "string",
             AttributeDataType.Int: "int",
             AttributeDataType.Float: "float",
         }
-        for name, dtype, model_name in attr_rows:
+        for name, dtype, model_name in self.repository.attribute_signature_rows(session):
             items.append(
                 SignatureField(
                     name=name,
@@ -302,71 +283,47 @@ class SearchService:
         return items
 
     def study_signature(self, session: Session) -> List[SignatureField]:
-        """Return signature metadata for study search fields."""
-        items: list[SignatureField] = []
+        """Return signature metadata for study search fields.
 
-        # Enum-backed
-        items.append(
+        NOTE: like ``instance_signature``, this enumerates every project, creator and
+        tag in the database -- it does not pass through the ``static_conds`` seam.
+        RBAC Step 2 must filter here too; the characterization tests pin today's
+        cross-project behavior.
+        """
+        items: list[SignatureField] = [
+            # Enum-backed
             SignatureField(
                 name="Patient Sex", values=[e.value for e in PatientSex], nullable=True
-            )
-        )
-
-        # DB-derived
-        projects = session.execute(select(Project.ProjectName).distinct()).scalars().all()
-        items.append(SignatureField(name="Project Name", values=sorted(projects)))
-
-        form_schema_names = (
-            session.execute(select(FormSchema.SchemaName).distinct()).scalars().all()
-        )
-        items.append(
-            SignatureField(name="Form Schema Name", values=sorted(form_schema_names))
-        )
-
-        form_creators = (
-            session.execute(
-                select(Creator.CreatorName)
-                .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
-                .where(~FormAnnotation.Inactive)
-                .distinct()
-            )
-            .scalars()
-            .all()
-        )
-        items.append(SignatureField(name="Form Creator Name", values=sorted(form_creators)))
-
-        form_tag_names = (
-            session.execute(
-                select(Tag.TagName)
-                .join(FormAnnotationTagLink, FormAnnotationTagLink.TagID == Tag.TagID)
-                .distinct()
-            )
-            .scalars()
-            .all()
-        )
-        items.append(SignatureField(name="Form Tag Name", values=sorted(form_tag_names)))
-
-        study_tag_names = (
-            session.execute(
-                select(Tag.TagName)
-                .join(StudyTagLink, StudyTagLink.TagID == Tag.TagID)
-                .distinct()
-            )
-            .scalars()
-            .all()
-        )
-        items.append(SignatureField(name="Study Tag Name", values=sorted(study_tag_names)))
-
-        # Typed free-entry fields
-        items.append(SignatureField(name="Study Date", values="date"))
-        items.append(
-            SignatureField(name="Study Description", values="string", nullable=True)
-        )
-        items.append(SignatureField(name="Study Round", values="int", nullable=True))
-        items.append(SignatureField(name="Study Instance UID", values="string"))
-        items.append(SignatureField(name="Patient Identifier", values="string", multi=True))
-        items.append(SignatureField(name="Patient Birthdate", values="date", nullable=True))
-
+            ),
+            # DB-derived
+            SignatureField(
+                name="Project Name",
+                values=sorted(Project.query_column(session, Project.ProjectName)),
+            ),
+            SignatureField(
+                name="Form Schema Name",
+                values=sorted(FormSchema.query_column(session, FormSchema.SchemaName)),
+            ),
+            SignatureField(
+                name="Form Creator Name",
+                values=self.repository.active_form_creator_names(session),
+            ),
+            SignatureField(
+                name="Form Tag Name",
+                values=self.repository.tag_names(session, FormAnnotationTagLink),
+            ),
+            SignatureField(
+                name="Study Tag Name",
+                values=self.repository.tag_names(session, StudyTagLink),
+            ),
+            # Typed free-entry fields
+            SignatureField(name="Study Date", values="date"),
+            SignatureField(name="Study Description", values="string", nullable=True),
+            SignatureField(name="Study Round", values="int", nullable=True),
+            SignatureField(name="Study Instance UID", values="string"),
+            SignatureField(name="Patient Identifier", values="string", multi=True),
+            SignatureField(name="Patient Birthdate", values="date", nullable=True),
+        ]
         return items
 
 
