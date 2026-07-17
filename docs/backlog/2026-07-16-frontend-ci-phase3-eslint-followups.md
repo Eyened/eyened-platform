@@ -19,13 +19,13 @@
 
 ---
 
-## 1. Ratchet down `@typescript-eslint/no-explicit-any` (353)
+## 1. Ratchet down `@typescript-eslint/no-explicit-any` (351)
 
 **Status:** open
 
 **What:** Replace `any` with real types incrementally, running `npx eslint . --prune-suppressions` (in `client/`) after each batch so the baseline can only shrink.
 
-**Why:** Typing debt — `any` erases type safety. Already enforced on new code; the 353 existing sites are tolerated until typed. Largest of the three backlogs; no rush, but it should trend to zero.
+**Why:** Typing debt — `any` erases type safety. Already enforced on new code; the 351 existing sites are tolerated until typed. Largest of the three backlogs; no rush, but it should trend to zero.
 
 ---
 
@@ -90,3 +90,17 @@ Note the contrast with the _genuinely_ trusted twin at `PanelRendering.svelte:45
 - **`PanelRendering.svelte:52`** — the `{:else}` branch iterates `Object.entries(options)` (i.e. `{enface, axial}`), so it renders options named "enface"/"axial" instead of render modes; it should index `options[viewerContext.image.orientation]` like the `{#if}` branch does. Normally unreachable (`radio = true` by default). Flagged because Phase 3 touched that line (removing an unused `label` binding — a correct, behavior-preserving fix).
 - **`AV-Nicking.svelte:3`** — `Props` still declares `stroke?: string`, but the component no longer destructures it and the markup hardcodes `stroke:#000000`. The prop was always inert. The component is also **orphaned (0 callers repo-wide)** — drop the dead member or delete the component.
 - **`+layout.ts` / `users/login/+page.ts`** — `load()` is now an empty no-op (pre-existing dead code; Phase 3 only narrowed the signature). Deleting `load` entirely has SvelteKit route-semantics implications, so it was left alone.
+
+---
+
+## 8. Three prop bugs unmasked by defining the missing `$lib/utils` prop-type helpers
+
+**Status:** open · all **pre-existing**, none introduced by Phase 3
+
+**Context:** The shadcn components under `$lib/components/ui` import `WithElementRef`, `WithoutChild` and `WithoutChildrenOrChild` from `$lib/utils`, which never defined them. Every `WithElementRef<…>` therefore referenced an unresolved type, and because an intersection with `any` is `any`, each component's props type collapsed to `any` — silently disabling prop checking across the whole `ui/` family. Phase 3's review defined the three helpers (`utils.ts`), which took `svelte-check` from **157 errors / 128 files to 93 / 66** and surfaced the three real defects below. They are left open deliberately: each is a behavior change needing a domain call, not a lint fix.
+
+- **`TaskOverlay.svelte:93`** — `aria-current="isActive"` passes the **literal string** `"isActive"`, not the `{@const isActive}` declared on line 88; lines 90 and 94 use the same variable correctly with braces, so this one just lost its braces. `"isActive"` is not a valid `aria-current` token, so assistive tech sees *every* state button in the group as current. Likely intended: `aria-current={isActive ? "page" : undefined}` (confirm the right token with a11y).
+- **`Pagination.svelte:34`** — `<Pagination.Item isVisible={currentPage == page.value}>`: `isVisible` is not a prop of `Pagination.Item`, so it is silently dropped. The neighbouring `<Pagination.Link isActive={…}>` on line 37 **is** valid, which is probably where the name came from. Decide whether the intended visibility behavior is already covered by `isActive` or was never implemented.
+- **`SubtasksTable.svelte:46`** — `<Table.Cell colspan="5">` passes a string where `colspan` is typed `number`; should be `colspan={5}`. Benign in the DOM (HTML attributes stringify anyway), so it is a type-cleanliness fix rather than a live bug.
+
+**Why:** These are the concrete cost of the collapsed props type — they were unreportable for as long as `ui/` typed its props as `any`. The helpers are now defined, so `svelte-check` reports them; until Phase 4 gates `svelte-check`, nothing enforces them, hence this entry.
