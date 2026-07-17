@@ -19,8 +19,6 @@ from eyened_orm import (
     Study,
 )
 from eyened_orm.repositories.search import (
-    ActiveFormAnnotation,  # noqa: F401  (re-exported: tests import InstTag from here)
-    ActiveSegmentation,  # noqa: F401
     FormCreator,
     FormTag,
     InstTag,
