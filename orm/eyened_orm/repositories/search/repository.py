@@ -40,14 +40,20 @@ class SearchRepository:
         *,
         conditions: List[ResolvedCondition],
         attr_conditions: List[AttributeConditionSpec],
+        attr_defs: dict[tuple[str | None, str, str | None], AttributeDefinition],
         order_by: Any,
         order: Literal["ASC", "DESC"],
         limit: int,
         offset: int,
     ) -> List[ImageInstance]:
-        """Return instances matching the conditions, ordered and windowed."""
+        """Return instances matching the conditions, ordered and windowed.
+
+        ``attr_defs`` comes from ``resolve_attribute_definitions``; the caller
+        resolves once and passes the same map to ``count_instances`` so the two
+        agree without paying for the resolution twice.
+        """
         stmt = build_instance_select(
-            session, conditions, attr_conditions, order_by, order
+            conditions, attr_conditions, attr_defs, order_by, order
         )
         return list(
             session.execute(
@@ -63,9 +69,10 @@ class SearchRepository:
         *,
         conditions: List[ResolvedCondition],
         attr_conditions: List[AttributeConditionSpec],
+        attr_defs: dict[tuple[str | None, str, str | None], AttributeDefinition],
     ) -> int:
         """Count instances matching the same predicate ``search_instances`` applies."""
-        stmt = instance_filtered_select(session, conditions, attr_conditions)
+        stmt = instance_filtered_select(conditions, attr_conditions, attr_defs)
         return session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()

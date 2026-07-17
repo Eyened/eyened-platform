@@ -11,7 +11,7 @@ without an ORDER BY it does not need.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from eyened_orm import (
     DeviceInstance,
@@ -30,7 +30,7 @@ from eyened_orm import (
 )
 from eyened_orm.attributes import AttributeValue as AttrVal
 from sqlalchemy import and_, select, true
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
 
 from .aliases import (
     ActiveFormAnnotation,
@@ -42,6 +42,8 @@ from .aliases import (
     SegTag,
     StudyTag,
 )
+from eyened_orm.attributes import AttributeDefinition as AttrDef
+
 from .conditions import (
     AttributeConditionSpec,
     ResolvedCondition,
@@ -120,9 +122,9 @@ def _attr_tuples(
 
 
 def instance_filtered_select(
-    session: Session,
     conditions: Sequence[ResolvedCondition],
     attr_conditions: Sequence[AttributeConditionSpec],
+    attr_defs: Dict[Tuple[Optional[str], str, Optional[str]], AttrDef],
 ):
     """Build the filtered ImageInstance select (base + all EXISTS), without ordering."""
     static_dicts = [_as_dict(c) for c in conditions]
@@ -189,7 +191,7 @@ def instance_filtered_select(
         and_predicates.append(tag_exists)
 
     # Attribute EXISTS filters
-    attr_exists = exists_attributes_for_instance(attr_conds_raw, session)
+    attr_exists = exists_attributes_for_instance(attr_conds_raw, attr_defs)
     if attr_exists is not None:
         and_predicates.append(attr_exists)
 
@@ -198,14 +200,14 @@ def instance_filtered_select(
 
 
 def build_instance_select(
-    session: Session,
     conditions: Sequence[ResolvedCondition],
     attr_conditions: Sequence[AttributeConditionSpec],
+    attr_defs: Dict[Tuple[Optional[str], str, Optional[str]], AttrDef],
     order_by: Any,
     order: str,
 ):
     """The filtered instance select plus ordering (resolved order column + PK tiebreaker)."""
-    q = instance_filtered_select(session, conditions, attr_conditions)
+    q = instance_filtered_select(conditions, attr_conditions, attr_defs)
     sort_dir = order_by.asc() if order == "ASC" else order_by.desc()
     return q.order_by(sort_dir, ImageInstance.ImageInstanceID.asc())
 

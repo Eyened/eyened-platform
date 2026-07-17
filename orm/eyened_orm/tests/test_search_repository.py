@@ -24,10 +24,13 @@ def _ids(rows):
 
 
 def _instances(repo, session, conditions=(), attr_conditions=(), limit=100, offset=0):
+    specs = list(attr_conditions)
+    attr_defs = repo.resolve_attribute_definitions(session, specs) if specs else {}
     return repo.search_instances(
         session,
         conditions=list(conditions),
-        attr_conditions=list(attr_conditions),
+        attr_conditions=specs,
+        attr_defs=attr_defs,
         order_by=ImageInstance.DateInserted,
         order="ASC",
         limit=limit,
@@ -42,7 +45,7 @@ def test_search_instances_excludes_inactive(repo, session, data):
 
 def test_count_instances_matches_the_search(repo, session, data):
     """count_instances counts the same predicate the search applies."""
-    assert repo.count_instances(session, conditions=[], attr_conditions=[]) == 3
+    assert repo.count_instances(session, conditions=[], attr_conditions=[], attr_defs={}) == 3
 
 
 def test_search_instances_applies_a_base_condition(repo, session, data):

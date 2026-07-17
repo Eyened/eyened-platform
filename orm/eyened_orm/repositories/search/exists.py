@@ -250,17 +250,17 @@ def resolve_attribute_definitions(
 
 def exists_attributes_for_instance(
     attr_conds: List[Tuple[Optional[str], str, Optional[str], Dict[str, Any]]],
-    db: Session,
+    attr_defs: Dict[Tuple[Optional[str], str, Optional[str]], AttrDef],
 ) -> Any:
-    """EXISTS subqueries for attributes correlated by ImageInstance."""
+    """EXISTS subqueries for attributes correlated by ImageInstance.
+
+    Takes the already-resolved definitions rather than resolving them: the caller
+    resolves once per request and hands the map to both the search and the count,
+    which used to rebuild (and re-resolve) it independently. An unresolved key is
+    still skipped here -- the service rejects it upstream with a 400.
+    """
     if not attr_conds:
         return None
-
-    keys = [
-        (model_name, attr_name, feature_name)
-        for model_name, attr_name, feature_name, c in attr_conds
-    ]
-    attr_defs = resolve_attribute_definitions(db, keys)
 
     and_predicates = []
 

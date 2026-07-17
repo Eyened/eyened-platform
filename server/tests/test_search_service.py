@@ -117,3 +117,38 @@ def test_unresolvable_attribute_raises_bad_request(service, session, data):
             [{"type": "attribute", "model": None, "variable": "NoSuchAttr",
               "operator": "==", "value": 1}],
         )
+
+
+def test_attribute_definitions_are_resolved_once_per_search(service, session, data):
+    """The resolution N+1 runs once, not once per select build (validate + search + count)."""
+    from sqlalchemy import event
+
+    stmts: list[str] = []
+
+    def _rec(conn, cursor, statement, params, context, executemany):
+        stmts.append(" ".join(statement.split()))
+
+    bind = session.get_bind()
+    event.listen(bind, "before_cursor_execute", _rec)
+    try:
+        _search(
+            service,
+            session,
+            [{"type": "attribute", "model": "M1", "variable": "Quality",
+              "operator": "==", "value": 5}],
+            include_count=True,
+        )
+    finally:
+        event.remove(bind, "before_cursor_execute", _rec)
+
+    # Matched on the resolution join rather than the SELECT prefix: the prefix
+    # carries a DISTINCT that is incidental to what this test pins, and matching it
+    # would make the count silently drop to 0 if it changed. This join shape is the
+    # resolution query and nothing else -- the selectinload of AttributeDefinition
+    # aliases its columns and does not join AttributesModelOutput.
+    resolutions = [
+        s
+        for s in stmts
+        if 'FROM "AttributeDefinition" JOIN "AttributesModelOutput"' in s
+    ]
+    assert len(resolutions) == 1

@@ -98,12 +98,15 @@ class SearchService:
     ) -> InstanceSearchResult:
         """Search instances, derive their studies, and optionally count the total."""
         static_conds, attr_conds = translate_instance_conditions(conditions)
+        attr_defs: dict[tuple[str | None, str, str | None], Any] = {}
         if attr_conds:
-            resolved = self.repository.resolve_attribute_definitions(session, attr_conds)
+            # Resolved once here and handed to both the search and the count: the
+            # resolution is an N+1, so rebuilding it per select tripled the queries.
+            attr_defs = self.repository.resolve_attribute_definitions(session, attr_conds)
             missing = [
                 spec.attribute
                 for spec in attr_conds
-                if (spec.model, spec.attribute, spec.feature) not in resolved
+                if (spec.model, spec.attribute, spec.feature) not in attr_defs
             ]
             if missing:
                 # Name the fix, not just the failure: the signature endpoint is the
@@ -123,6 +126,7 @@ class SearchService:
             session,
             conditions=static_conds,
             attr_conditions=attr_conds,
+            attr_defs=attr_defs,
             order_by=instance_order_by_fields_map[order_by],
             order=order,
             limit=limit + 1,  # lookahead: one extra row answers has_more
@@ -138,7 +142,10 @@ class SearchService:
         count = None
         if include_count:
             count = self.repository.count_instances(
-                session, conditions=static_conds, attr_conditions=attr_conds
+                session,
+                conditions=static_conds,
+                attr_conditions=attr_conds,
+                attr_defs=attr_defs,
             )
         return InstanceSearchResult(
             instances=list(instances),
