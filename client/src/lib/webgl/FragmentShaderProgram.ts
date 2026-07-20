@@ -1,5 +1,5 @@
 import type { ProgramInfo } from "./programInfo";
-import type { RenderTarget } from "./types";
+import type { RenderTarget, ShaderUniforms } from "./types";
 import type { WebGL } from "./webgl";
 import { checkFramebufferContext } from "./texture";
 
@@ -10,13 +10,13 @@ export abstract class FragmentShaderProgram {
         protected readonly programInfo: ProgramInfo,
     ) {}
 
-    setUniforms(uniforms: { [name: string]: any }) {
+    setUniforms(uniforms: ShaderUniforms) {
         this.programInfo.setUniforms(uniforms);
     }
 
     abstract pass(
         renderTarget: RenderTarget,
-        uniforms: { [name: string]: any },
+        uniforms: ShaderUniforms,
     ): void;
 }
 
@@ -64,7 +64,7 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
         super(gl, vertexArrayObject, programInfo);
     }
 
-    pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }) {
+    pass(renderTarget: RenderTarget, uniforms: ShaderUniforms) {
         const gl = this.gl;
         const { left, bottom, width, height, framebuffer } = renderTarget;
 
@@ -154,7 +154,7 @@ export class PixelShaderProgram extends FragmentShaderProgram {
         super(gl, vertexArrayObject, programInfo);
     }
 
-    pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }) {
+    pass(renderTarget: RenderTarget, uniforms: ShaderUniforms) {
         const gl = this.gl;
         const { left, bottom, width, height } = renderTarget;
 
@@ -227,7 +227,7 @@ export class AffineShaderProgram extends FragmentShaderProgram {
         super(gl, vertexArrayObject, programInfo);
     }
 
-    pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }) {
+    pass(renderTarget: RenderTarget, uniforms: ShaderUniforms) {
         const gl = this.gl;
         const { left, bottom, width, height } = renderTarget;
 

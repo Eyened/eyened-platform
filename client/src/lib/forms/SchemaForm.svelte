@@ -1,6 +1,6 @@
 <script lang="ts">
     import SchemaForm from "./SchemaForm.svelte";
-    import { type JSONSchema } from "./schemaType";
+    import { type JSONSchema, type JSONSchemaValue } from "./schemaType";
     import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte";
     import { Trash } from "$lib/viewer-window/icons/icons";
     import { SchemaValidator } from "./schemaValidator.svelte";
@@ -17,8 +17,8 @@
 
     interface Props {
         schema: JSONSchema;
-        value: any;
-        onchange: (value: any) => void;
+        value: JSONSchemaValue;
+        onchange: (value: JSONSchemaValue) => void;
         max_radio_options?: number;
         vertical?: boolean;
         canEdit?: boolean;
@@ -49,7 +49,7 @@
         get value() {
             return schemaValidator.value;
         },
-        set value(val: any) {
+        set value(val: JSONSchemaValue) {
             if (val !== undefined) {
                 if (schema.type == "integer") {
                     val = parseInt(val);
@@ -67,7 +67,7 @@
         val.value = undefined;
     }
 
-    function keyUpdate(key: string, value: any) {
+    function keyUpdate(key: string, value: JSONSchemaValue) {
         schemaValidator.setProperty(key, value);
         update();
     }
@@ -76,7 +76,7 @@
         schemaValidator.addArrayValue();
         update();
     }
-    function setArray(i: number, v: any) {
+    function setArray(i: number, v: JSONSchemaValue) {
         schemaValidator.setArrayValue(i, v);
         update();
     }

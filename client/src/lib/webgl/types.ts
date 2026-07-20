@@ -14,6 +14,17 @@ export type RenderBounds = {
     height: number;
 };
 
+export type ShaderUniformValue =
+    | number
+    | boolean
+    | WebGLTexture
+    | Int32Array
+    | Uint32Array
+    | Float32Array
+    | readonly number[];
+
+export type ShaderUniforms = Record<string, ShaderUniformValue>;
+
 export interface RenderTarget {
     left: number;
     bottom: number;

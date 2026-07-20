@@ -1,3 +1,12 @@
+export type JSONSchemaValue =
+    | string
+    | number
+    | boolean
+    | null
+    | JSONSchemaValue[]
+    | { [key: string]: JSONSchemaValue | undefined }
+    | undefined;
+
 export type JSONSchemaType =
     | "string"
     | "number"
