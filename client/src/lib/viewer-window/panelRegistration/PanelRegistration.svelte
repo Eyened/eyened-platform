@@ -10,7 +10,7 @@
     import { RegistrationTool } from "$lib/viewer/tools/Registration";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import type { FormSchemaGET } from "../../../types/openapi_types";
+    import type { FormAnnotationGET, FormSchemaGET } from "../../../types/openapi_types";
     import RegistrationItem from "./RegistrationItem.svelte";
     import { Button } from "$lib/components/ui/button";
 
@@ -69,7 +69,7 @@
     let activeID: number | undefined = $state(undefined);
     let removeTool: (() => void) | undefined = $state(undefined);
 
-    function onactivate(formAnnotation: any) {
+    function onactivate(formAnnotation: FormAnnotationGET) {
         // Check if this annotation still exists in the filtered list
         const stillExists = filtered.some((f) => f.id === formAnnotation.id);
         if (!stillExists) {
@@ -97,7 +97,7 @@
         removeTool = viewerContext.addOverlay(tool);
     }
 
-    function onremove(formAnnotation: any) {
+    function onremove(formAnnotation: FormAnnotationGET) {
         if (activeID === formAnnotation.id) {
             removeTool?.();
             removeTool = undefined;

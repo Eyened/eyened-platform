@@ -51,7 +51,7 @@ export class Image2D extends AbstractImage {
         image_id: string,
         bitmap: ImageBitmap,
         dimensions: Dimensions,
-        meta: any,
+        meta: ImageMetadata,
     ) {
         const texture = initTexture(webgl.gl, bitmap);
         const result = new Image2D(
@@ -82,7 +82,7 @@ export class Image2D extends AbstractImage {
         image_id: string,
         pixelData: Uint8Array,
         dimensions: Dimensions,
-        meta: any,
+        meta: ImageMetadata,
     ) {
         const texture = new TextureData(
             webgl.gl,

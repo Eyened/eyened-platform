@@ -45,7 +45,7 @@ export async function loadDataSource(
  * @param context object with the data to be substituted
  * @returns the resolved URL
  */
-export function resolveURL(template: string, context: any): string {
+export function resolveURL(template: string, context: Record<string, unknown>): string {
     return template.replace(
         /\$\{([^}:]+(?:\.[^}:]+)*)(?::([^}]*))?\}/g,
         (_, key, defaultValue) => {
@@ -76,14 +76,17 @@ export function resolveURL(template: string, context: any): string {
     );
 }
 
-export function resolveValue(key: string, context: any): any {
+export function resolveValue(
+    key: string,
+    context: Record<string, unknown>,
+): unknown {
     const path = key.split(".");
-    let value = context;
+    let value: unknown = context;
     for (const p of path) {
-        if (value == null || !(p in value)) {
+        if (value == null || typeof value !== "object" || !(p in value)) {
             return null;
         }
-        value = value[p];
+        value = (value as Record<string, unknown>)[p];
     }
     return value;
 }

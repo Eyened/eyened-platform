@@ -50,11 +50,6 @@
       "count": 9
     }
   },
-  "src/lib/browser/dataSources.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
   "src/lib/components/Autocomplete.svelte": {
     "svelte/require-each-key": {
       "count": 1
@@ -124,16 +119,6 @@
       "count": 16
     }
   },
-  "src/lib/forms/utils.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "src/lib/registration/privateEyeRegistrationHeidelberg.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/lib/tags/Tagger.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 3
@@ -166,11 +151,6 @@
   "src/lib/usermanager.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
-    }
-  },
-  "src/lib/utils.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/lib/utils/DataTable.svelte": {
@@ -254,11 +234,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelRegistration/PanelRegistration.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelRegistration/RegistrationItem.svelte": {
     "svelte/require-each-key": {
       "count": 2
@@ -295,9 +270,6 @@
     }
   },
   "src/lib/viewer-window/viewerWindowContext.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "svelte/prefer-svelte-reactivity": {
       "count": 5
     }
@@ -325,11 +297,6 @@
       "count": 2
     }
   },
-  "src/lib/webgl/image2D.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/lib/webgl/mask.svelte.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 9
@@ -347,11 +314,6 @@
   },
   "src/lib/webgl/segmentationState.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
-      "count": 2
-    }
-  },
-  "src/lib/webgl/texture.ts": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 2
     }
   },
