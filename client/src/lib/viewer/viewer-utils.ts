@@ -60,8 +60,14 @@ export type ViewerWheelData = {
     zoomIntent: boolean;
 };
 
+export type ViewerDomEvent =
+    | PointerEvent
+    | KeyboardEvent
+    | WheelEvent
+    | MouseEvent;
+
 export interface ViewerEvent<
-    T extends PointerEvent | KeyboardEvent | WheelEvent | MouseEvent,
+    T extends ViewerDomEvent = ViewerDomEvent,
 > {
     event: T;
     viewerContext: ViewerContext;

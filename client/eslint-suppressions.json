@@ -280,9 +280,6 @@
     }
   },
   "src/lib/viewer/viewerContext.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "svelte/prefer-svelte-reactivity": {
       "count": 1
     }
