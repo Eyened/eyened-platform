@@ -5,9 +5,6 @@
     }
   },
   "src/lib/browser/AdvancedFilters.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 18
-    },
     "svelte/require-each-key": {
       "count": 2
     }
