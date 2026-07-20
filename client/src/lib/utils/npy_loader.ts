@@ -23,7 +23,7 @@ const DTYPE_MAP = new Map<TypedArrayCtor, string>([
 ]);
 
 // Reverse map from dtype string to TypedArray constructor
-const DTYPE_REVERSE_MAP = new Map<string, any>([
+const DTYPE_REVERSE_MAP = new Map<string, TypedArrayCtor>([
     ["|u1", Uint8Array],
     ["|i1", Int8Array],
     ["<u2", Uint16Array],

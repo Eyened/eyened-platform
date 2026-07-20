@@ -222,11 +222,6 @@
       "count": 2
     }
   },
-  "src/lib/utils/npy_loader.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/lib/viewer-window/BrowserOverlay.svelte": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
