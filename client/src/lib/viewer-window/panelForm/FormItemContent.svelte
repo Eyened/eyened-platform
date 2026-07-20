@@ -51,7 +51,7 @@
     // 1. Prevent reactivity loops when updating the store
     // 2. Allow future throttling/debouncing of save operations
     // Value initializes from form ONCE on mount, then becomes independent for editing
-    let value: any = $state(undefined);
+    let value: unknown = $state(undefined);
     let status = $state("loading");
     let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 

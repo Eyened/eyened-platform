@@ -236,11 +236,6 @@
       "count": 2
     }
   },
-  "src/lib/viewer-window/panelForm/FormItemContent.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/lib/viewer-window/panelForm/PanelForm.svelte": {
     "svelte/require-each-key": {
       "count": 1
@@ -252,14 +247,6 @@
     }
   },
   "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelMeasure/CreatorAreas.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "svelte/require-each-key": {
       "count": 1
     }
@@ -289,11 +276,6 @@
   },
   "src/lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte": {
     "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelSegmentation/FeatureSelect.svelte": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
@@ -391,6 +373,11 @@
   "src/types/cornerstone-core.d.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 6
+    }
+  },
+  "src/lib/viewer-window/panelMeasure/CreatorAreas.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
     }
   }
 }
