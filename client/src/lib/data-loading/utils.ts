@@ -32,7 +32,7 @@ export function getThumbUrl(image: ImageGET, size: number = 144) {
     return `/api/images/${image.id}/thumbnail?size=${size}`;
 }
 
-export function arraysEqual(a: any[], b: any[]): boolean {
+export function arraysEqual(a: unknown[], b: unknown[]): boolean {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
         if (a[i] !== b[i]) return false;

@@ -88,11 +88,6 @@
       "count": 7
     }
   },
-  "src/lib/data-loading/utils.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/lib/data/api.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 86
