@@ -238,11 +238,6 @@
       "count": 1
     }
   },
-  "src/lib/webgl/programInfo.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 10
-    }
-  },
   "src/lib/webgl/segmentationState.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 2

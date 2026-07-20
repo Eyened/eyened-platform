@@ -1,4 +1,22 @@
-type UniformSetter = (v: any) => void;
+import type { ShaderUniforms, ShaderUniformValue } from "./types";
+
+type UniformSetter = (value: ShaderUniformValue) => void;
+
+type UniformMatrixSetter = (
+    location: WebGLUniformLocation | null,
+    transpose: boolean,
+    data: Float32Array | number[],
+) => void;
+
+type UniformScalarSetter = (
+    location: WebGLUniformLocation | null,
+    value: number,
+) => void;
+
+type UniformArraySetter = (
+    location: WebGLUniformLocation | null,
+    data: Float32Array | Int32Array | Uint32Array | number[],
+) => void;
 
 export class ProgramInfo {
     program: WebGLProgram;
@@ -8,9 +26,9 @@ export class ProgramInfo {
 
     private colorAttachments: number[];
     private samplerToTexture: { [sampler: number]: number };
-    private typeToUniformMatrixSetter: { [type: number]: any };
-    private typeToUniformSetter: { [type: number]: any };
-    private typeToUniformArraySetter: { [type: number]: any };
+    private typeToUniformMatrixSetter: Record<number, UniformMatrixSetter>;
+    private typeToUniformSetter: Record<number, UniformScalarSetter>;
+    private typeToUniformArraySetter: Record<number, UniformArraySetter>;
     private samplerTypes: Set<number>;
     typeToUniformVecSetter: {
         [x: number]: (
@@ -140,7 +158,7 @@ export class ProgramInfo {
         }
     }
 
-    setUniform(name: string, value: any) {
+    setUniform(name: string, value: ShaderUniformValue) {
         if (!Object.prototype.hasOwnProperty.call(this.uniformSetters, name)) {
             return;
         }
@@ -156,19 +174,26 @@ export class ProgramInfo {
         } else if (info.type in this.typeToUniformMatrixSetter) {
             // matrix
             const uniformFunction = this.typeToUniformMatrixSetter[info.type];
-            return (v: any) => uniformFunction(location, false, v);
+            return (value: ShaderUniformValue) =>
+                uniformFunction(location, false, value as Float32Array | number[]);
         } else if (info.size > 1) {
             // array
             const uniformFunction = this.typeToUniformArraySetter[info.type];
-            return (v: any) => uniformFunction(location, v);
+            return (value: ShaderUniformValue) =>
+                uniformFunction(
+                    location,
+                    value as Float32Array | Int32Array | Uint32Array | number[],
+                );
         } else if (info.type in this.typeToUniformVecSetter) {
             // vector
             const uniformFunction = this.typeToUniformVecSetter[info.type];
-            return (v: any) => uniformFunction(location, ...v);
+            return (value: ShaderUniformValue) =>
+                uniformFunction(location, ...(value as readonly number[]));
         } else {
             // other
             const uniformFunction = this.typeToUniformSetter[info.type];
-            return (v: any) => uniformFunction(location, v);
+            return (value: ShaderUniformValue) =>
+                uniformFunction(location, value as number);
         }
     }
 
@@ -189,7 +214,7 @@ export class ProgramInfo {
         };
     }
 
-    setUniforms(uniforms: { [name: string]: any }) {
+    setUniforms(uniforms: ShaderUniforms) {
         for (const [name, value] of Object.entries(uniforms)) {
             this.setUniform(name, value);
         }
