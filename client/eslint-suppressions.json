@@ -78,11 +78,6 @@
       "count": 2
     }
   },
-  "src/lib/data-loading/imageLoader.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    }
-  },
   "src/lib/data/api.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 86
@@ -258,11 +253,6 @@
       "count": 10
     }
   },
-  "src/lib/webgl/segmentationItem.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    }
-  },
   "src/lib/webgl/segmentationState.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 2
@@ -276,11 +266,6 @@
   "src/routes/view/+page.svelte": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
-    }
-  },
-  "src/types/cornerstone-core.d.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 6
     }
   }
 }
