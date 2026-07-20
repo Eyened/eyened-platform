@@ -71,11 +71,6 @@
       "count": 1
     }
   },
-  "src/lib/components/Main.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/lib/components/MultiSelectWithSearch.svelte": {
     "svelte/require-each-key": {
       "count": 2
