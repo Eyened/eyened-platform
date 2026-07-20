@@ -89,9 +89,6 @@
     }
   },
   "src/lib/data/globalContext.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "svelte/prefer-svelte-reactivity": {
       "count": 4
     }
@@ -102,9 +99,6 @@
     }
   },
   "src/lib/forms/SchemaForm.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "svelte/require-each-key": {
       "count": 3
     }
@@ -130,13 +124,7 @@
     }
   },
   "src/lib/tasks/SubTaskRow.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "svelte/prefer-svelte-reactivity": {
-      "count": 1
-    },
-    "svelte/require-each-key": {
       "count": 1
     }
   },
@@ -258,11 +246,6 @@
   "src/lib/viewer/viewerContext.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
-    }
-  },
-  "src/lib/webgl/FragmentShaderProgram.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
     }
   },
   "src/lib/webgl/mask.svelte.ts": {
