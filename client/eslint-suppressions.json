@@ -119,6 +119,11 @@
       "count": 16
     }
   },
+  "src/lib/tags/Tagger.svelte": {
+    "svelte/require-each-key": {
+      "count": 3
+    }
+  },
   "src/lib/tags/TagsEditor.svelte": {
     "svelte/require-each-key": {
       "count": 1
@@ -204,6 +209,11 @@
     }
   },
   "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
+    "svelte/require-each-key": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/panelMeasure/CreatorAreas.svelte": {
     "svelte/require-each-key": {
       "count": 1
     }
@@ -299,16 +309,6 @@
   "src/types/cornerstone-core.d.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 6
-    }
-  },
-  "src/lib/viewer-window/panelMeasure/CreatorAreas.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/tags/Tagger.svelte": {
-    "svelte/require-each-key": {
-      "count": 3
     }
   }
 }
