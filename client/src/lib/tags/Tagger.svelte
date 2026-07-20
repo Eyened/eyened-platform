@@ -37,9 +37,9 @@
         tagType,
         tags: itemTags = [],
         maxTags = 3,
-        tag: onTag = (id: number, comment?: string) => {},
-        untag: onUntag = (id: number) => {},
-        onUpdate = (id: number, comment?: string) => {},
+        tag: onTag = (_id: number, _comment?: string) => {},
+        untag: onUntag = (_id: number) => {},
+        onUpdate = (_id: number, _comment?: string) => {},
     }: {
         tagType: TagType;
         tags?: TagMeta[];

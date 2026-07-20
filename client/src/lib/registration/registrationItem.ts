@@ -61,18 +61,20 @@ function getTransform(
     item: Transform,
 ): RegistrationItem {
     switch (item.type) {
-        case "CompositeTransform":
+        case "CompositeTransform": {
             const transforms = item.transforms.map((t) =>
                 getTransform(source, target, t),
             );
             return new CompositeRegistration(source, target, transforms);
-        case "ProjectiveTransform":
+        }
+        case "ProjectiveTransform": {
             const [a, b, c, d, e, f, g, h, i] = item.Matrix;
             return new AffineRegistration(
                 source,
                 target,
                 new Matrix(a, b, c, d, e, f, g, h, i),
             );
+        }
         case "ParabolicTransform":
         case "Polynomial2DTransform":
             return new ParabolicRegistration(source, target, item.dx, item.dy);

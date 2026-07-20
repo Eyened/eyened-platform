@@ -13,7 +13,7 @@ export class CursorOverlay implements Overlay {
 
     constructor() {}
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         if (viewerContext.active) {
             return; // do not show if cursor is over this image
         }

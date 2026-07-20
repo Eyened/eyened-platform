@@ -137,7 +137,7 @@ export class ViewerWindowContext {
         cancelAnimationFrame(this.frame);
 
         // Dispose all images and their resources
-        for (const [image, viewer] of this.topViewers.entries()) {
+        for (const [image] of this.topViewers.entries()) {
             try {
                 image.dispose();
             } catch (error) {

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from "$app/paths";
     import {
         createSvelteTable,
         FlexRender,
@@ -20,7 +21,15 @@
             header: "Task",
             cell: ({ row }) => {
                 const r = row.original as TaskGET;
-                const url = `/tasks/${r.id}${typeof window !== "undefined" ? window.location.search : ""}`;
+                const searchString =
+                    typeof window !== "undefined"
+                        ? new URLSearchParams(window.location.search).toString()
+                        : "";
+                const url = searchString
+                    ? resolve(`/tasks/[taskid]?${searchString}`, {
+                          taskid: String(r.id),
+                      })
+                    : resolve("/tasks/[taskid]", { taskid: String(r.id) });
 
                 return renderComponent(TaskNameCell, { task: r, url });
             },

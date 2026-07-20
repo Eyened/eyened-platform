@@ -30,7 +30,7 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
-      - run: npm run verify:runes # export-let guard
+      - run: npm run verify:runes # export-let guard (grep, instant)
+      - run: npm run lint         # eslint . && prettier --check . (+ suppressions ratchet)
       - run: npm run test         # vitest run
-      - run: npm run build        # vite build
-      - run: npm run format:check # prettier --check .
+      - run: npm run build        # vite build (most expensive — last)

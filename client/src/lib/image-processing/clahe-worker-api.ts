@@ -73,7 +73,7 @@ export class ClaheWorkerAPI {
 
         // Queue this operation to prevent concurrent processing
         return (this.processingQueue = this.processingQueue.then(() => {
-            return new Promise<Uint8ClampedArray>((resolve, reject) => {
+            return new Promise<Uint8ClampedArray>((resolve, _reject) => {
                 // Set up one-time message handler for this request
                 const messageHandler = (event: MessageEvent) => {
                     if (event.data.result) {

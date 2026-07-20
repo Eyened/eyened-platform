@@ -57,9 +57,7 @@
     {#if Help}
         <span class="help-slot">
             <PanelIcon tooltip="Help" onclick={openHelp} size={1.4}>
-                {#snippet children()}
-                    <CircleHelp size={18} strokeWidth={2} />
-                {/snippet}
+                <CircleHelp size={18} strokeWidth={2} />
             </PanelIcon>
         </span>
     {/if}

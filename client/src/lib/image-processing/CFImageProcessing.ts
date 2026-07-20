@@ -147,24 +147,23 @@ export class CFImageProcessing {
         let [min_x, min_y] = [0, 0];
         let [max_x, max_y] = [width, height];
 
-        let x0, y0, x1, y1;
         if (lines.top) {
-            [[x0, y0], [x1, y1]] = lines.top;
+            const [[, y0], [, y1]] = lines.top;
             min_y = Math.max(min_y, y0);
             min_y = Math.max(min_y, y1);
         }
         if (lines.bottom) {
-            [[x0, y0], [x1, y1]] = lines.bottom;
+            const [[, y0], [, y1]] = lines.bottom;
             max_y = Math.min(max_y, y0);
             max_y = Math.min(max_y, y1);
         }
         if (lines.left) {
-            [[x0, y0], [x1, y1]] = lines.left;
+            const [[x0], [x1]] = lines.left;
             min_x = Math.max(min_x, x0);
             min_x = Math.max(min_x, x1);
         }
         if (lines.right) {
-            [[x0, y0], [x1, y1]] = lines.right;
+            const [[x0], [x1]] = lines.right;
             max_x = Math.min(max_x, x0);
             max_x = Math.min(max_x, x1);
         }
@@ -384,7 +383,7 @@ function getHistogram(image: Image2D): Histogram {
             radius = cfROI.radius;
             ({ min_x, max_x, min_y, max_y } = cfROI);
         }
-    } catch (e) {
+    } catch (_e) {
         console.warn("Error in cfROI");
     }
 

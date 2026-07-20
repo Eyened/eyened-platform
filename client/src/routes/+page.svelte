@@ -8,9 +8,7 @@
 </svelte:head>
 
 <Main>
-    {#snippet children()}
-        <Browser />
-    {/snippet}
+    <Browser />
 </Main>
 
 <!-- <Browser /> -->

@@ -108,6 +108,23 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+// Prop-type helpers imported by the shadcn-svelte components under
+// $lib/components/ui. `unknown` stands in for upstream shadcn's `any`, which
+// the no-explicit-any gate rejects.
+export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & {
+    ref?: U | null;
+};
+
+export type WithoutChild<T> = T extends { child?: unknown }
+    ? Omit<T, "child">
+    : T;
+
+export type WithoutChildren<T> = T extends { children?: unknown }
+    ? Omit<T, "children">
+    : T;
+
+export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
+
 type FlyAndScaleParams = {
     y?: number;
     x?: number;

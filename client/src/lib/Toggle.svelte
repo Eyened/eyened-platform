@@ -16,8 +16,6 @@
     }: Props = $props();
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <label class="toggle" class:disabled style="--fontsize: {fontsize};">
     <input type="checkbox" bind:checked={control} {disabled} />
     <span class="labels on" data-on={textOn} data-off={textOff}></span>

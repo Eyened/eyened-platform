@@ -1,4 +1,5 @@
 import { goto } from "$app/navigation";
+import { resolve } from "$app/paths";
 import { page } from "$app/state";
 import { authClient, type UserResponse } from "../auth";
 
@@ -30,8 +31,9 @@ export class UserManager {
                     encodeURIComponent(window.location.href),
                 );
                 await goto(
-                    "/users/login?next=" +
-                        encodeURIComponent(window.location.href),
+                    resolve(
+                        `/users/login?next=${encodeURIComponent(window.location.href)}`,
+                    ),
                 );
             }
             return;
@@ -54,9 +56,14 @@ export class UserManager {
 
         // If there's a 'next' URL, go there, otherwise go to the root
         if (nextUrl) {
+            // nextUrl is an opaque redirect target captured earlier (e.g. from
+            // window.location.href) and round-tripped through the "next" query
+            // param; it is not a static route literal, so resolve() cannot
+            // validate it at compile time.
+            // eslint-disable-next-line svelte/no-navigation-without-resolve -- decoded redirect target, not a static route literal
             await goto(decodeURIComponent(nextUrl));
         } else {
-            await goto("/");
+            await goto(resolve("/"));
         }
     }
 
@@ -70,9 +77,10 @@ export class UserManager {
 
         // If there's a 'next' URL, go there, otherwise go to the root
         if (nextUrl) {
+            // eslint-disable-next-line svelte/no-navigation-without-resolve -- decoded redirect target, not a static route literal
             await goto(decodeURIComponent(nextUrl));
         } else {
-            await goto("/");
+            await goto(resolve("/"));
         }
     }
 
@@ -85,7 +93,7 @@ export class UserManager {
             starred_tags: [],
         };
         this.starredTagIds = [];
-        goto("/users/login");
+        goto(resolve("/users/login"));
     }
 
     async changePassword(oldPassword: string, newPassword: string) {

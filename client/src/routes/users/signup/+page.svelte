@@ -20,7 +20,7 @@
         try {
             await userManager.signup(username, password);
             status = "done";
-        } catch (error) {
+        } catch (_error) {
             alert("Failed to create user");
             status = "not started";
             return;

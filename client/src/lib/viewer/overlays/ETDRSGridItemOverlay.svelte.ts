@@ -125,7 +125,7 @@ export class ETDRSGridItemOverlay implements Overlay {
 
         // Draw additionalCircles legend with labels (bottom-left), if size allows
         const r_max = 0.5 * additionalCircles["O2"] * pix_per_mm;
-        let y = viewerContext.viewerSize.height - 10 - r_max;
+        const y = viewerContext.viewerSize.height - 10 - r_max;
         let x = 10;
         if (r_max < 0.1 * viewerContext.viewerSize.height) {
             for (const [name, diameter] of Object.entries(additionalCircles)) {

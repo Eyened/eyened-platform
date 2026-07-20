@@ -51,7 +51,7 @@
 
 {#await loadPromise}
     <p>Loading subtask...</p>
-{:then loaded}
+{:then}
     {#if task && subTask}
         <TaskMain {task} {subTask} {subTaskIndex} />
     {:else}

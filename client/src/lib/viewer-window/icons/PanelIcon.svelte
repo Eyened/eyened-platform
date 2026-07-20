@@ -25,7 +25,7 @@
         isText = false,
         children,
         Icon = undefined,
-        onclick = (e: MouseEvent) => {},
+        onclick = (_e: MouseEvent) => {},
         onrightclick = () => {},
         color,
         backgroundColor,
