@@ -98,11 +98,6 @@
       "count": 3
     }
   },
-  "src/lib/forms/schemaType.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 9
-    }
-  },
   "src/lib/forms/schemaValidator.svelte.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 16
@@ -241,11 +236,6 @@
   "src/lib/viewer/viewerContext.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
-    }
-  },
-  "src/lib/webgl/mask.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 9
     }
   },
   "src/lib/webgl/programInfo.ts": {

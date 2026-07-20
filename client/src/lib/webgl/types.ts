@@ -21,7 +21,8 @@ export type ShaderUniformValue =
     | Int32Array
     | Uint32Array
     | Float32Array
-    | readonly number[];
+    | readonly number[]
+    | undefined;
 
 export type ShaderUniforms = Record<string, ShaderUniformValue>;
 
