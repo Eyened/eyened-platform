@@ -201,16 +201,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelETRDS/ETDRSGridItem.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "src/lib/viewer-window/panelETRDS/PanelETDRS.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelForm/PanelForm.svelte": {
     "svelte/require-each-key": {
       "count": 1
@@ -282,11 +272,6 @@
   "src/lib/webgl/FragmentShaderProgram.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 5
-    }
-  },
-  "src/lib/webgl/baseSegmentation.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/lib/webgl/mask.svelte.ts": {

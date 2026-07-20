@@ -1,4 +1,5 @@
 import type { SegmentationDataRepresentation } from "../../types/openapi_types";
+import type { PaintSettings } from "./mask.svelte";
 import type { AbstractImage } from "./abstractImage";
 import type { Shaders } from "./shaders";
 import type { WebGL } from "./webgl";
@@ -10,7 +11,7 @@ export interface Segmentation {
     width: number;
     height: number;
     depth: number;
-    draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void;
+    draw(scanNr: number, drawing: HTMLCanvasElement, settings: PaintSettings): void;
     clear(scanNr: number): void;
     export(
         scanNr: number,
@@ -46,7 +47,7 @@ export abstract class BaseSegmentation implements Segmentation {
     abstract draw(
         scanNr: number,
         drawing: HTMLCanvasElement,
-        settings: any,
+        settings: PaintSettings,
     ): void;
     abstract clear(scanNr: number): void;
     abstract export(
