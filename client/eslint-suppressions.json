@@ -72,11 +72,6 @@
       "count": 2
     }
   },
-  "src/lib/data/api.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 86
-    }
-  },
   "src/lib/data/globalContext.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 4
