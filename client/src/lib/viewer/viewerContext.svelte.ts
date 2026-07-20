@@ -6,6 +6,7 @@ import type { Shaders } from "$lib/webgl/shaders";
 import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import type { Registration } from "../registration/registration";
+import type { CfRoi } from "../image-processing/cfRoi";
 import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
 import { HotKeys } from "./controls/hotkeys";
 import { ScrollOCT } from "./controls/scrollOCT";
@@ -58,16 +59,6 @@ export type cursorStyle =
     | "nwse-resize"
     | "zoom-in"
     | "zoom-out";
-
-/** Subset of color-fundus ROI JSON on ImageGET.cf_roi used to fit the viewer. */
-type CfRoiBounds = {
-    center: [number, number];
-    radius: number;
-    min_x: number;
-    max_x: number;
-    min_y: number;
-    max_y: number;
-};
 
 export class ViewerContext {
     // perhaps the typing should be improved here
@@ -225,7 +216,7 @@ export class ViewerContext {
             let radius: number;
             try {
                 ({ center, radius, min_x, max_x, min_y, max_y } =
-                    instance.cf_roi as CfRoiBounds);
+                    instance.cf_roi as CfRoi);
                 [cx, cy] = center as [number, number];
                 x_min = Math.max(x_min, cx - radius, min_x);
                 x_max = Math.min(x_max, cx + radius, max_x);
