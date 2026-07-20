@@ -53,16 +53,20 @@
 
     let fraction = $state(0.85);
 
-    const cfKeypoints = image.instance.cf_keypoints as Keypoints | null | undefined;
+    type CfKeypoints = Partial<Keypoints>;
+    const cfKeypoints = image.instance.cf_keypoints as
+        | CfKeypoints
+        | null
+        | undefined;
     const autoValue = cfKeypoints
         ? {
               fovea: {
-                  x: cfKeypoints.fovea_xy[0],
-                  y: cfKeypoints.fovea_xy[1],
+                  x: cfKeypoints.fovea_xy?.[0],
+                  y: cfKeypoints.fovea_xy?.[1],
               },
               disc_edge: {
-                  x: cfKeypoints.disc_edge_xy[0],
-                  y: cfKeypoints.disc_edge_xy[1],
+                  x: cfKeypoints.disc_edge_xy?.[0],
+                  y: cfKeypoints.disc_edge_xy?.[1],
               },
           }
         : null;

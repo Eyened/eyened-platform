@@ -12,8 +12,12 @@ type HeidelbergImageEntry = {
     contents?: { photo_locations: unknown[] }[];
 };
 
-function getHeidelbergImages(meta: Record<string, unknown>) {
-    const images = meta.images as { images?: HeidelbergImageEntry[] } | undefined;
+function getHeidelbergImages(
+    meta: Record<string, unknown> | undefined,
+): HeidelbergImageEntry[] | undefined {
+    const images = meta?.images as
+        | { images?: HeidelbergImageEntry[] }
+        | undefined;
     return images?.images;
 }
 
@@ -53,7 +57,7 @@ export function getPrivateEyeRegistrationHeidelberg(
     const enfaceID = `${enfaceInstance.id}`;
     const octID = `${instance.id}`;
 
-    return oct_image_meta.contents.flatMap(
+    return (oct_image_meta.contents ?? []).flatMap(
         (item: { photo_locations: unknown[] }, index: number) => {
             const locator = item.photo_locations?.[0];
             const parsed = parseHeidelbergPhotoLocator(
