@@ -222,11 +222,6 @@
       "count": 2
     }
   },
-  "src/lib/utils/deferred.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/lib/utils/npy_loader.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
