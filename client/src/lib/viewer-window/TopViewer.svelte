@@ -51,7 +51,7 @@
         hideOverlay = !hideOverlay;
     }
 
-    function selectImage(e: any) {
+    function selectImage(e: MouseEvent) {
         if (e.shiftKey) {
             viewerWindowContext.addImagePanel(image);
         } else {

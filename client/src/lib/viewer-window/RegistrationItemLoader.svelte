@@ -25,7 +25,7 @@
             : undefined,
     );
 
-    const updateFromFormAnnotation = (value: any) => {
+    const updateFromFormAnnotation = (value: unknown) => {
         if (value && formSchema) {
             if (
                 formSchema.name ===

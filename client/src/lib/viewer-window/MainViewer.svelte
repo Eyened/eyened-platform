@@ -113,7 +113,7 @@
 
     const panels: {
         name: PanelName;
-        component: Component<any>;
+        component: Component<Record<string, unknown>>;
         Icon: Component;
         Help?: Component;
         props?: Record<string, unknown>;

@@ -30,7 +30,7 @@ export abstract class AbstractImage {
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
-        public readonly meta: any,
+        public readonly meta: Record<string, unknown>,
     ) {
         const { width, height, depth, width_mm, height_mm, depth_mm } =
             this.dimensions;

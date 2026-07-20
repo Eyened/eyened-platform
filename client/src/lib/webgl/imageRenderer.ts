@@ -79,7 +79,13 @@ export class BaseImageRenderer implements ImageRenderer {
     }
 }
 
-export function getBaseUniforms(viewerContext: ViewerContext): any {
+export function getBaseUniforms(viewerContext: ViewerContext): {
+    u_index: number;
+    u_image: WebGLTexture;
+    u_image_size: [number, number, number];
+    u_transform: number[];
+    u_window_level: [number, number];
+} {
     const { webglTransform, image, index, windowLevel } = viewerContext;
 
     return {

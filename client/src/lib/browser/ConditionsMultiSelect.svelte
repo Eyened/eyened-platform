@@ -4,7 +4,7 @@
 
     interface Props {
         variable: string; // api variable name (e.g. 'FeatureName')
-        values: any[];
+        values: Record<string, string>[];
         name: string; // name of the value in the data model (e.g. 'name' => feature.name)
     }
 

@@ -7,7 +7,7 @@
     import ExternalData from "./ExternalData.svelte";
 
     interface Props {
-        context: any;
+        context: Record<string, unknown>;
         additional_data_sources: AdditionalDataSource[];
     }
     let { context, additional_data_sources }: Props = $props();

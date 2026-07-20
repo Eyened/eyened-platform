@@ -65,7 +65,7 @@
     async function handleCreateTag(payload: Partial<TagGET>) {
         await createTag(
             payload.name!,
-            tagType as any,
+            tagType,
             payload.description ?? "",
         );
     }
