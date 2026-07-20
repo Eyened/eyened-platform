@@ -82,11 +82,6 @@
       "count": 4
     }
   },
-  "src/lib/data/helpers.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 65
-    }
-  },
   "src/lib/forms/SchemaForm.svelte": {
     "svelte/require-each-key": {
       "count": 3
