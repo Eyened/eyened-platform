@@ -124,7 +124,7 @@
 
     function openCommentDialog(t: TagMeta) {
         activeTagId = t.id;
-        commentText = (t as any).comment ?? "";
+        commentText = t.comment ?? "";
         commentDialogOpen = true;
     }
 
@@ -229,8 +229,8 @@
                             {#if fullTag}
                                 <p>{fullTag.description}</p>
                             {/if}
-                            {#if (tag as any).comment}
-                                <p>“{(tag as any).comment}”</p>
+                            {#if tag.comment}
+                                <p>“{tag.comment}”</p>
                             {/if}
                             <p>
                                 Tagged by {tag.tagger.name}
