@@ -274,11 +274,6 @@
       "count": 5
     }
   },
-  "src/lib/viewer/viewer-utils.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 9
-    }
-  },
   "src/lib/viewer/viewerContext.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
