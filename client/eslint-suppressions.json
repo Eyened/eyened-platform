@@ -175,14 +175,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/MapSelect.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
   "src/lib/viewer-window/MultiImageViewer.svelte": {
     "svelte/require-each-key": {
       "count": 1
@@ -219,9 +211,6 @@
     }
   },
   "src/lib/viewer-window/panelMeasure/PanelMeasure.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
     "svelte/require-each-key": {
       "count": 1
     }

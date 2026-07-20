@@ -6,6 +6,7 @@
     import MeasureAreas from "./MeasureAreas.svelte";
     import { formAnnotations, formSchemasByName } from "$lib/data";
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
+    import type { Keypoints } from "$lib/types";
     import Line from "./Line.svelte";
     import SetResolutionEtdrs from "./SetResolutionETDRS.svelte";
 
@@ -52,16 +53,16 @@
 
     let fraction = $state(0.85);
 
-    const cfKeypoints = image.instance.cf_keypoints;
+    const cfKeypoints = image.instance.cf_keypoints as Keypoints | null | undefined;
     const autoValue = cfKeypoints
         ? {
               fovea: {
-                  x: (cfKeypoints.fovea_xy as any)?.[0],
-                  y: (cfKeypoints.fovea_xy as any)?.[1],
+                  x: cfKeypoints.fovea_xy[0],
+                  y: cfKeypoints.fovea_xy[1],
               },
               disc_edge: {
-                  x: (cfKeypoints.disc_edge_xy as any)?.[0],
-                  y: (cfKeypoints.disc_edge_xy as any)?.[1],
+                  x: cfKeypoints.disc_edge_xy[0],
+                  y: cfKeypoints.disc_edge_xy[1],
               },
           }
         : null;
