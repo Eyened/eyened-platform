@@ -40,9 +40,6 @@
     }
   },
   "src/lib/browser/browserContext.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 28
-    },
     "svelte/prefer-svelte-reactivity": {
       "count": 9
     }

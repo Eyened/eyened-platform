@@ -9,13 +9,17 @@ import {
 } from "$lib/data/api";
 import { instances, studies } from "$lib/data/stores.svelte";
 import type {
+    AttributeCondition,
+    DefaultCondition,
     ImageGET,
     SearchCondition as SearchConditionT,
     SearchQuery,
+    SearchResponse,
     SignatureField as SignatureFieldT,
     StudyGET,
     StudySearchCondition,
     StudySearchQuery,
+    StudySearchResponse,
 } from "../../types/openapi_types";
 
 export type QueryMode = "studies" | "instances";
@@ -27,6 +31,8 @@ export type SignatureField = SignatureFieldT;
 export type InstancesSortBy = SearchQuery["order_by"];
 export type StudiesSortBy = StudySearchQuery["order_by"];
 export type SortDirection = "ASC" | "DESC";
+
+type BrowserSearchResponse = SearchResponse | StudySearchResponse;
 
 export class BrowserContext {
     // Default smallest per current mode
@@ -148,7 +154,7 @@ export class BrowserContext {
                     ops.push("==");
                     // Free-text fields flagged as multi (e.g. Patient Identifier)
                     // additionally support matching several values at once.
-                    if ((sig as any).multi) ops.push("IN");
+                    if (sig.multi) ops.push("IN");
                     break;
                 case "int":
                 case "float":
@@ -160,7 +166,7 @@ export class BrowserContext {
             }
         }
 
-        if ((sig as any).nullable) {
+        if (sig.nullable) {
             ops.push("IS NULL" as Condition["operator"]);
         }
 
@@ -176,7 +182,7 @@ export class BrowserContext {
 
     // Coerce value based on field type
     private coerceValue(
-        value: any,
+        value: unknown,
         fieldType: string | string[],
     ): Condition["value"] {
         if (Array.isArray(fieldType)) {
@@ -193,15 +199,15 @@ export class BrowserContext {
             case "int":
                 return typeof value === "string"
                     ? parseInt(value, 10) || 0
-                    : value;
+                    : (value as number);
             case "float":
                 return typeof value === "string"
                     ? parseFloat(value) || 0
-                    : value;
+                    : (value as number);
             case "date":
             case "string":
             default:
-                return value;
+                return value as Condition["value"];
         }
     }
 
@@ -225,23 +231,25 @@ export class BrowserContext {
             }
         }
 
-        if ((condition as any).type === "attribute") {
-            return {
+        if (condition.type === "attribute") {
+            const normalized: AttributeCondition = {
                 type: "attribute",
-                model: (condition as any).model || "",
-                variable: condition.variable as any,
-                operator: operator as any,
+                model: condition.model || "",
+                variable: condition.variable,
+                operator,
                 value,
-                feature: (condition as any).feature ?? undefined,
-            } as any;
-        } else {
-            return {
-                type: "default",
-                variable: condition.variable as any,
-                operator: operator as any,
-                value,
-            } as any;
+                feature: condition.feature ?? undefined,
+            };
+            return normalized;
         }
+
+        const normalized: DefaultCondition = {
+            type: "default",
+            variable: condition.variable as DefaultCondition["variable"],
+            operator,
+            value,
+        };
+        return normalized;
     }
 
     // Normalize conditions array against current signature (public for use in components)
@@ -441,20 +449,18 @@ export class BrowserContext {
               } as StudySearchQuery);
     }
 
-    private processSearchResults(res: any) {
+    private processSearchResults(res: BrowserSearchResponse) {
         // searchInstances/searchStudies already ingest; track current result set
-        this.resultIds = new Set(res.result_ids ?? []);
+        this.resultIds = new Set(res.result_ids as unknown as number[]);
         this.count = res.count ?? 0;
 
         // Set ordered IDs based on query mode
-        let studyIds;
+        let studyIds: number[];
         if (this.queryMode === "instances") {
-            this.orderedInstanceIds = (res.result_ids ?? []).map((id: number) =>
-                String(id),
-            );
-            studyIds = (res.studies ?? []).map((s: any) => s.id);
+            this.orderedInstanceIds = (res.result_ids ?? []).map(String);
+            studyIds = (res.studies ?? []).map((s) => s.id);
         } else {
-            studyIds = res.result_ids ?? [];
+            studyIds = (res.result_ids ?? []) as number[];
             this.orderedInstanceIds = [];
         }
 
@@ -490,26 +496,18 @@ function deserializeValue(encoded: string): string | number | string[] | null {
 export function encodeConditions(conditions: Condition[]): string {
     return conditions
         .map((condition) => {
-            const encodedVariable = encodeURIComponent(
-                (condition as any).variable,
-            );
-            const encodedOperator = encodeURIComponent(
-                (condition as any).operator,
-            );
+            const encodedVariable = encodeURIComponent(condition.variable);
+            const encodedOperator = encodeURIComponent(condition.operator);
             const encodedValue = encodeURIComponent(
-                serializeValue((condition as any).value ?? null),
+                serializeValue(condition.value ?? null),
             );
-            const encodedType = encodeURIComponent(
-                (condition as any).type ?? "default",
-            );
+            const encodedType = encodeURIComponent(condition.type);
             const encodedModel = encodeURIComponent(
-                (condition as any).type === "attribute"
-                    ? ((condition as any).model ?? "")
-                    : "",
+                condition.type === "attribute" ? (condition.model ?? "") : "",
             );
             const encodedFeature = encodeURIComponent(
-                (condition as any).type === "attribute"
-                    ? ((condition as any).feature ?? "")
+                condition.type === "attribute"
+                    ? (condition.feature ?? "")
                     : "",
             );
             return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}:${encodedFeature}`;
@@ -525,25 +523,29 @@ export function decodeConditions(urlString: string): Condition[] {
         const variable = decodeURIComponent(v);
         const operator = decodeURIComponent(o) as Condition["operator"];
         const value = deserializeValue(val);
-        const type = t ? (decodeURIComponent(t) as any) : "default";
+        const type: Condition["type"] = t
+            ? (decodeURIComponent(t) as Condition["type"])
+            : "default";
         const model = m ? decodeURIComponent(m) : undefined;
         const feature = f ? decodeURIComponent(f) : undefined; // Decode feature
         if (type === "attribute") {
-            return {
+            const decoded: AttributeCondition = {
                 type: "attribute",
                 variable,
-                operator: operator as any,
+                operator,
                 value,
                 model,
                 feature: feature || undefined, // Include feature, convert empty string to undefined
-            } as any;
+            };
+            return decoded;
         }
-        return {
+        const decoded: DefaultCondition = {
             type: "default",
-            variable: variable as any,
-            operator: operator as any,
+            variable: variable as DefaultCondition["variable"],
+            operator,
             value,
-        } as any;
+        };
+        return decoded;
     });
 }
 
