@@ -69,8 +69,6 @@
             </thead>
             <tbody>
                 {#each referenceSegmentations as segmentation}
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                     <tr onclick={() => _resolve(segmentation)}>
                         <td>
                             {#if segmentation.annotation_type == "model_segmentation"}

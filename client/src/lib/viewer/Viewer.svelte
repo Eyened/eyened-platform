@@ -46,6 +46,10 @@
 
     //
     onMount(() => {
+        // canvas2D is a raw <canvas> created and owned by ViewerContext
+        // (document.createElement, used directly for 2D rendering outside
+        // Svelte's reactivity); it must be attached imperatively.
+        // eslint-disable-next-line svelte/no-dom-manipulating -- canvas2D is owned by ViewerContext, not Svelte-managed
         viewerElement.appendChild(viewerContext.canvas2D);
     });
 

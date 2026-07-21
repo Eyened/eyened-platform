@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import { page as appPage } from "$app/state";
     import FixedSpinner from "$lib/components/FixedSpinner.svelte";
     import Main from "$lib/components/Main.svelte";
@@ -57,11 +58,18 @@
             if (subtasksStatus)
                 url.searchParams.set("status", String(subtasksStatus));
             else url.searchParams.delete("status");
-            await goto(url.pathname + "?" + url.searchParams.toString(), {
-                replaceState: true,
-                noScroll: true,
-                keepFocus: true,
-            });
+            // Same route (/tasks/[taskid]), only the query string changes;
+            // the route id is statically known here so resolve() applies.
+            await goto(
+                resolve(`/tasks/[taskid]?${url.searchParams.toString()}`, {
+                    taskid: String(data.taskid),
+                }),
+                {
+                    replaceState: true,
+                    noScroll: true,
+                    keepFocus: true,
+                },
+            );
         } finally {
             isLoading = false;
         }
@@ -97,14 +105,10 @@
     }
 
     function deselect() {
-        const currentUrl = window.location.href;
-        const lastSlashIndex = currentUrl.lastIndexOf("/");
-
-        const suffix_string = `?${appPage.url.searchParams.toString()}`;
-        const newUrl =
-            currentUrl.substring(0, lastSlashIndex + 1) + suffix_string;
-
-        goto(newUrl);
+        // Deselecting the task navigates up to the /tasks list, preserving
+        // the current filter query string. The target route is statically
+        // known (a sibling of this page), so resolve() applies.
+        goto(resolve(`/tasks?${appPage.url.searchParams.toString()}`));
     }
 </script>
 
@@ -112,53 +116,51 @@
     <FixedSpinner />
 {:else}
     <Main>
-        {#snippet children()}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div id="main">
-                <h3>
-                    <span onclick={deselect} onkeypress={deselect}> ... </span>
-                </h3>
-                {#if !task}
-                    Task not found
-                {:else}
-                    <h1>{task.name}</h1>
-                    {#if task.task_state}
-                        <h3>Status: {task.task_state}</h3>
-                    {/if}
-                    <Label>Status:</Label>
-                    <ButtonGroup class="mb-4">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div id="main">
+            <h3>
+                <span onclick={deselect} onkeypress={deselect}> ... </span>
+            </h3>
+            {#if !task}
+                Task not found
+            {:else}
+                <h1>{task.name}</h1>
+                {#if task.task_state}
+                    <h3>Status: {task.task_state}</h3>
+                {/if}
+                <Label>Status:</Label>
+                <ButtonGroup class="mb-4">
+                    <Button
+                        variant={subtasksStatus === null
+                            ? "default"
+                            : "outline"}
+                        aria-pressed={subtasksStatus === null}
+                        onclick={() => selectStatus(null)}
+                    >
+                        All
+                    </Button>
+                    {#each subTaskStates as s}
                         <Button
-                            variant={subtasksStatus === null
+                            variant={subtasksStatus === s
                                 ? "default"
                                 : "outline"}
-                            aria-pressed={subtasksStatus === null}
-                            onclick={() => selectStatus(null)}
+                            aria-pressed={subtasksStatus === s}
+                            onclick={() => selectStatus(s)}
                         >
-                            All
+                            {s}
                         </Button>
-                        {#each subTaskStates as s}
-                            <Button
-                                variant={subtasksStatus === s
-                                    ? "default"
-                                    : "outline"}
-                                aria-pressed={subtasksStatus === s}
-                                onclick={() => selectStatus(s)}
-                            >
-                                {s}
-                            </Button>
-                        {/each}
-                    </ButtonGroup>
-                    <SubtasksTable
-                        rows={subtasksArray}
-                        taskId={data.taskid}
-                        count={subtasksCount}
-                        page={subtasksPage}
-                        perPage={subtasksLimit}
-                        onPageChange={loadPage}
-                    />
-                {/if}
-            </div>
-        {/snippet}
+                    {/each}
+                </ButtonGroup>
+                <SubtasksTable
+                    rows={subtasksArray}
+                    taskId={data.taskid}
+                    count={subtasksCount}
+                    page={subtasksPage}
+                    perPage={subtasksLimit}
+                    onPageChange={loadPage}
+                />
+            {/if}
+        </div>
     </Main>
 {/if}
 

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import { page } from "$app/state";
     import { getContext } from "svelte";
     import type { GlobalContext } from "../data/globalContext.svelte";
@@ -16,7 +17,9 @@
         // redirect to login page if user not logged
         console.log("User not logged in. Redirecting..");
         goto(
-            `/users/login?next=${encodeURIComponent(page.url.pathname + page.url.search)}`,
+            resolve(
+                `/users/login?next=${encodeURIComponent(page.url.pathname + page.url.search)}`,
+            ),
         );
     }
 </script>

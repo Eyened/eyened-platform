@@ -1,6 +1,5 @@
 import type { ETDRSCoordinates, Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
-import type { RenderTarget } from "$lib/webgl/types";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { FormAnnotationGET } from "../../../types/openapi_types";
 import { setFormAnnotationValue } from "$lib/data";

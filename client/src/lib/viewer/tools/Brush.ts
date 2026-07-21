@@ -54,7 +54,7 @@ export class BrushTool extends SegmentationTool {
     }
 
     pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
-        const { viewerContext, modifiers } = pointerEvent;
+        const { modifiers } = pointerEvent;
 
         if (modifiers.alt) {
             return;
@@ -102,7 +102,7 @@ export class BrushTool extends SegmentationTool {
 
     executeDraw(
         ctx: CanvasRenderingContext2D,
-        viewerContext: ViewerContext,
+        _viewerContext: ViewerContext,
     ): void {
         ctx.fillStyle = "white";
         for (const pt of this.currentPoints!) {

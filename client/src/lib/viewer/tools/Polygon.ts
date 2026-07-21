@@ -46,12 +46,12 @@ export class PolygonTool extends SegmentationTool {
 
     executeDraw(
         ctx: CanvasRenderingContext2D,
-        viewerContext: ViewerContext,
+        _viewerContext: ViewerContext,
     ): void {
         ctx.fillStyle = "white";
 
         ctx.beginPath();
-        let p = this.currentPoints![0];
+        const p = this.currentPoints![0];
         ctx.moveTo(p.x, p.y);
         for (let i = 1; i < this.currentPoints!.length; i++) {
             ctx.lineTo(this.currentPoints![i].x, this.currentPoints![i].y);

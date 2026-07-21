@@ -119,7 +119,7 @@ export class MeasureTool implements Overlay {
         }
     }
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const ctx = viewerContext.context2D;
         ctx.lineWidth = 1;
 

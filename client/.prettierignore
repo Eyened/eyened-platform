@@ -13,6 +13,13 @@ package-lock.json
 src/types/openapi.ts
 src/types/openapi.json
 
+# Generator output, same rule: eslint writes this file (2-space) whenever anyone
+# runs --suppress-rule/--prune-suppressions. Prettier wants 4-space, so if it
+# owned this file every prune would leave the tree prettier-dirty and `npm run
+# lint` would fail on the very command the ratchet doc tells you to run.
+# ESLint owns its own baseline.
+eslint-suppressions.json
+
 # GLSL shader sources. `.frag` is mapped by prettier to its babel/JS parser, so
 # it throws `SyntaxError` on valid GLSL (e.g. `for(int i…)`) and exits 2 — this
 # one is load-bearing. `.vert`/`.glsl` have no matching prettier parser today

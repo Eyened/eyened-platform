@@ -61,8 +61,8 @@ export class ParabolicRegistration implements RegistrationItem {
     }
 
     get inverse(): ParabolicRegistration {
-        const dx_inverse = this.dx.map((val, i) => -val);
-        const dy_inverse = this.dy.map((val, i) => -val);
+        const dx_inverse = this.dx.map((val) => -val);
+        const dy_inverse = this.dy.map((val) => -val);
         return new ParabolicRegistration(
             this.target,
             this.source,

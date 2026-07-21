@@ -27,7 +27,6 @@
     }
     let {
         formAnnotation,
-        settings,
         overlayActive,
         toolActive,
         onToggleOverlay,

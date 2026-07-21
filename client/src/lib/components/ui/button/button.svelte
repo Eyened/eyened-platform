@@ -1,4 +1,5 @@
 <script lang="ts" module>
+    import type { ResolvedPathname } from "$app/types";
     import { cn, type WithElementRef } from "$lib/utils.js";
     import type {
         HTMLAnchorAttributes,
@@ -38,9 +39,12 @@
     export type ButtonSize = VariantProps<typeof buttonVariants>["size"];
 
     export type ButtonProps = WithElementRef<HTMLButtonAttributes> &
-        WithElementRef<HTMLAnchorAttributes> & {
+        WithElementRef<Omit<HTMLAnchorAttributes, "href">> & {
             variant?: ButtonVariant;
             size?: ButtonSize;
+            // Narrowed from HTMLAnchorAttributes' `string`: callers must pass a
+            // resolve()d path, which the eslint-disable below relies on.
+            href?: ResolvedPathname;
         };
 </script>
 
@@ -59,6 +63,7 @@
 </script>
 
 {#if href}
+    <!-- eslint-disable svelte/no-navigation-without-resolve -- href is typed ResolvedPathname, so callers can only supply a resolve()d path; the prop crosses a component boundary so static analysis can't trace it -->
     <a
         bind:this={ref}
         data-slot="button"
@@ -71,6 +76,7 @@
     >
         {@render children?.()}
     </a>
+    <!-- eslint-enable svelte/no-navigation-without-resolve -->
 {:else}
     <button
         bind:this={ref}

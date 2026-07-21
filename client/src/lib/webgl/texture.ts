@@ -154,8 +154,8 @@ export function createTexture(
 
 function createTextureIO(
     gl: WebGL2RenderingContext,
-    width: number,
-    height: number,
+    _width: number,
+    _height: number,
 ): WebGLTexture {
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, texture);

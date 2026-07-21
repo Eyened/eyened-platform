@@ -1,13 +1,10 @@
 <script lang="ts">
     import * as Dialog from "$lib/components/ui/dialog";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { createFeature } from "$lib/data/helpers";
-    import { getContext } from "svelte";
     import type { FeaturePATCH, FeaturePUT } from "../../types/openapi_types";
     import FeatureForm from "./FeatureForm.svelte";
     import FeaturesTable from "./FeaturesTable.svelte";
 
-    const globalContext = getContext<GlobalContext>("globalContext");
     let createOpen = $state(false);
 
     async function handleCreate(payload: FeaturePATCH) {

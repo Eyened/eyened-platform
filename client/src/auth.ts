@@ -154,8 +154,8 @@ class AuthClient {
     }
 
     async OIDCAuthorize(): Promise<OIDCAuthorizationResponse> {
-        let nextUrl = new URLSearchParams(window.location.search).get("next");
-        let queryParams = new URLSearchParams();
+        const nextUrl = new URLSearchParams(window.location.search).get("next");
+        const queryParams = new URLSearchParams();
         if (nextUrl) {
             queryParams.append("next", nextUrl);
         }

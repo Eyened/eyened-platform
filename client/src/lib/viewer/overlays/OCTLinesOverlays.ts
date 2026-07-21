@@ -6,7 +6,7 @@ import type { ViewerContext } from "../viewerContext.svelte";
 export class OCTLinesOverlay implements Overlay {
     constructor(readonly photolocators: PhotoLocator[]) {}
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const { context2D, image } = viewerContext;
 
         // const pointer = viewerContext.registration.pointer;
