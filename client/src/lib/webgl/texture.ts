@@ -489,6 +489,10 @@ export class TextureData {
         this.cpuDirty = false;
     }
 
+    markCPUDirty(): void {
+        this.cpuDirty = true;
+    }
+
     dispose(): void {
         if (this._texture) {
             this.gl.deleteTexture(this._texture);

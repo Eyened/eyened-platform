@@ -24,6 +24,9 @@ import fs_clear from "./glsl/fs_clear.frag";
 
 import fs_calculate_boundaries from "./glsl/fs_calculate_boundaries.frag";
 import fs_enfaceProjection from "./glsl/fs_enface_projection.frag";
+import fs_enfaceProjectMask from "./glsl/fs_enface_project_mask.frag";
+import fs_enfaceProjectProbability from "./glsl/fs_enface_project_probability.frag";
+import fs_renderEnfaceProjection from "$lib/viewer/overlays/fs_render_enface_projection.frag";
 import fs_minmax_reduction from "./glsl/fs_minmax_reduction.frag";
 import fs_normalize from "./glsl/fs_normalize.frag";
 import fs_extract_slice from "./glsl/fs_extract_slice.frag";
@@ -61,6 +64,9 @@ export class Shaders {
 
     calculateBoundaries: PixelShaderProgram;
     enfaceProjection: PixelShaderProgram;
+    enfaceProjectBinary: PixelShaderProgram;
+    enfaceProjectProbability: PixelShaderProgram;
+    renderEnfaceProjection: TextureShaderProgram;
     minMaxReduction: PixelShaderProgram;
     normalize: PixelShaderProgram;
     extractSlice: PixelShaderProgram;
@@ -105,6 +111,18 @@ export class Shaders {
         this.enfaceProjection = new PixelShaderProgram(
             webgl,
             fs_enfaceProjection,
+        );
+        this.enfaceProjectBinary = new PixelShaderProgram(
+            webgl,
+            fs_enfaceProjectMask,
+        );
+        this.enfaceProjectProbability = new PixelShaderProgram(
+            webgl,
+            fs_enfaceProjectProbability,
+        );
+        this.renderEnfaceProjection = new TextureShaderProgram(
+            webgl,
+            fs_renderEnfaceProjection,
         );
         this.minMaxReduction = new PixelShaderProgram(
             webgl,

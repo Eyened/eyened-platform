@@ -25,6 +25,9 @@ export class SegmentationItem {
     // Reactive threshold state for immediate UI updates
     threshold: number = $state(0.5);
 
+    /** Called after a B-scan slice mask changes (draw, undo, redo, import). */
+    onSliceChanged?: (scanNr: number) => void;
+
     constructor(
         readonly image: AbstractImage,
         readonly segmentation: SegmentationGET | ModelSegmentationGET,
@@ -204,7 +207,7 @@ export class SegmentationItem {
     async undo(scanNr: number) {
         const segmentationState = this.segmentationStates.get(scanNr);
         if (segmentationState) {
-            segmentationState.undo();
+            await segmentationState.undo();
         } else {
             console.warn(
                 "SegmentationItem.undo: segmentationState not found",
@@ -216,13 +219,17 @@ export class SegmentationItem {
     async redo(scanNr: number) {
         const segmentationState = this.segmentationStates.get(scanNr);
         if (segmentationState) {
-            segmentationState.redo();
+            await segmentationState.redo();
         } else {
             console.warn(
                 "SegmentationItem.redo: segmentationState not found",
                 scanNr,
             );
         }
+    }
+
+    notifySliceChanged(scanNr: number): void {
+        this.onSliceChanged?.(scanNr);
     }
 
     //TODO: finish this implementation
@@ -312,7 +319,7 @@ export class SegmentationItem {
             };
 
             // Render this slice's projection to the specific line
-            webgl.shaders.enfaceProjectMask.pass(lineRenderTarget, uniforms);
+            webgl.shaders.enfaceProjectBinary.pass(lineRenderTarget, uniforms);
         }
 
         // Return the R32F texture data
