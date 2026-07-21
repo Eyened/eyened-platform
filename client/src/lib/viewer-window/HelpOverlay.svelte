@@ -92,11 +92,11 @@
         the relevant tool or panel is active.
     </p>
 
-    {#each sections as section}
+    {#each sections as section (section.title)}
         <section>
             <h2>{section.title}</h2>
             <dl>
-                {#each section.shortcuts as { action, keys }}
+                {#each section.shortcuts as { action, keys } (action + keys)}
                     <div class="row">
                         <dt>{action}</dt>
                         <dd><kbd>{keys}</kbd></dd>

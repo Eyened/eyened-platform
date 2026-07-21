@@ -45,7 +45,7 @@
                 <CommandList>
                     <CommandEmpty>No tags found.</CommandEmpty>
                     <CommandGroup>
-                        {#each tags as tag}
+                        {#each tags as tag (tag.TagName)}
                             <CommandItem
                                 value={tag.TagName}
                                 onSelect={() => {

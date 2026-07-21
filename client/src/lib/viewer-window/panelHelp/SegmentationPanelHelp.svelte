@@ -215,7 +215,7 @@
         relevant.
     </p>
     <dl>
-        {#each [{ action: "Paint (hold)", keys: "Q" }, { action: "Erase (hold)", keys: "W" }, { action: "Pick feature / segmentation under cursor", keys: "A" }, { action: "Set brush radius 1–9", keys: "1 – 9" }, { action: "Increase / decrease brush radius", keys: "+ / −" }, { action: "Adjust brush radius", keys: "Alt + scroll or Alt + drag" }] as { action, keys }}
+        {#each [{ action: "Paint (hold)", keys: "Q" }, { action: "Erase (hold)", keys: "W" }, { action: "Pick feature / segmentation under cursor", keys: "A" }, { action: "Set brush radius 1–9", keys: "1 – 9" }, { action: "Increase / decrease brush radius", keys: "+ / −" }, { action: "Adjust brush radius", keys: "Alt + scroll or Alt + drag" }] as { action, keys } (action + keys)}
             <div class="row">
                 <dt>{action}</dt>
                 <dd><kbd>{keys}</kbd></dd>

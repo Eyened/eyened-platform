@@ -339,7 +339,7 @@
                             >
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Content>
-                            {#each ops as op}
+                            {#each ops as op (op)}
                                 <DropdownMenu.Item
                                     onSelect={() =>
                                         updateConditionAt(i, {
@@ -450,7 +450,7 @@
                                 >
                             </DropdownMenu.Trigger>
                             <DropdownMenu.Content>
-                                {#each ops as op}
+                                {#each ops as op (op)}
                                     <DropdownMenu.Item
                                         onSelect={() => updateDraftOperator(op)}
                                     >

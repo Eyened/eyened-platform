@@ -13,7 +13,7 @@ import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
-import { SvelteMap } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { Component } from "svelte";
 import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from "./MainViewer.svelte";
@@ -24,10 +24,10 @@ export type MainPanelType = {
 };
 
 export class ViewerWindowContext {
-    private imagesIndex = new Map<string, Promise<LoadedImages>>();
-    private bySOPInstanceUID = new Map<string, LoadedImages>();
+    private imagesIndex = new SvelteMap<string, Promise<LoadedImages>>();
+    private bySOPInstanceUID = new SvelteMap<string, LoadedImages>();
 
-    private viewers = new Set<ViewerContext>();
+    private viewers = new SvelteSet<ViewerContext>();
 
     public instanceIds: string[] = $state([]);
 
@@ -40,7 +40,7 @@ export class ViewerWindowContext {
     photoLocatorSets: PhotoLocator[][] = $state([]);
 
     private frame: number = 0;
-    private loadedPatientIds = new Set<number>();
+    private loadedPatientIds = new SvelteSet<number>();
 
     constructor(
         public readonly webgl: WebGL,
@@ -101,13 +101,13 @@ export class ViewerWindowContext {
         this.instanceIds = ids;
 
         // Fetch all form annotations for the involved patient(s)
-        const patientIds = Array.from(
-            new Set(
-                ids
-                    .map((id) => instances.get(id)?.patient?.id)
-                    .filter((pid): pid is number => typeof pid === "number"),
-            ),
-        );
+        const patientIds: number[] = [];
+        for (const id of ids) {
+            const pid = instances.get(id)?.patient?.id;
+            if (typeof pid === "number" && !patientIds.includes(pid)) {
+                patientIds.push(pid);
+            }
+        }
         if (patientIds.length) {
             await Promise.all(
                 patientIds

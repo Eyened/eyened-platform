@@ -145,7 +145,7 @@
                 {title}
             </header>
             <div class="object" class:collapsed>
-                {#each schemaValidator.keysSorted as key}
+                {#each schemaValidator.keysSorted as key (key)}
                     <div
                         class="key"
                         class:error={errorKeys.includes(key)}
@@ -216,7 +216,7 @@
                 {#if schema.enum.length <= max_radio_options}
                     {#if inputVisible}
                         <ol class:vertical>
-                            {#each schema.enum as option}
+                            {#each schema.enum as option (option)}
                                 <li>
                                     <label>
                                         <input
@@ -234,7 +234,7 @@
                 {:else}
                     <div class="input">
                         <select bind:value={val.value}>
-                            {#each schema.enum as option}
+                            {#each schema.enum as option (option)}
                                 <option value={option}>{option}</option>
                             {/each}
                         </select>

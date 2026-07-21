@@ -3,7 +3,7 @@ import type { Position2D } from "$lib/types";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
 import type { Shaders } from "$lib/webgl/shaders";
-import { SvelteSet } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import type { Registration } from "../registration/registration";
 import type { CfRoi } from "../image-processing/cfRoi";
@@ -63,7 +63,7 @@ export type cursorStyle =
 export class ViewerContext {
     // perhaps the typing should be improved here
     // using the same interface for repaint (Overlay) and controls (ViewerEventListener)
-    private overlays = new Map<symbol, ViewerEventListener | Overlay>();
+    private overlays = new SvelteMap<symbol, ViewerEventListener | Overlay>();
 
     hideOverlays: boolean = $state(false);
     renderMode: RenderMode = $state("Original");

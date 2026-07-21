@@ -257,7 +257,7 @@
         <legend>Type & feature</legend>
 
         <div class="radio-column">
-            {#each SEGMENTATION_TYPE_OPTIONS as opt}
+            {#each SEGMENTATION_TYPE_OPTIONS as opt (opt.value)}
                 <label class="radio-option">
                     <input
                         type="radio"

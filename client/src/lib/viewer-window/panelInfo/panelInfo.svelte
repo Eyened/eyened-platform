@@ -30,7 +30,7 @@
 <div id="main">
     <table>
         <tbody>
-            {#each Object.entries(instanceProperties) as [name, value]}
+            {#each Object.entries(instanceProperties) as [name, value] (name)}
                 <tr>
                     <td>{name}</td>
                     <td>{value}</td>

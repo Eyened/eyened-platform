@@ -156,7 +156,7 @@
     <div class="segmentation-area">
         <h4>Line distances</h4>
         <ul>
-            {#each measureTool.lines as line}
+            {#each measureTool.lines as line (line)}
                 {#if line.index == viewerContext.index}
                     <Line {line} {measureTool} />
                 {/if}

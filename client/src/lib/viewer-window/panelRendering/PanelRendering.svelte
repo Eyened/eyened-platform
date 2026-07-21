@@ -34,7 +34,7 @@
     <div>
         {#if radio}
             <ul>
-                {#each Object.entries(options[viewerContext.image.orientation]) as [option, label]}
+                {#each Object.entries(options[viewerContext.image.orientation]) as [option, label] (option)}
                     <li>
                         <label>
                             <input
@@ -50,7 +50,7 @@
             </ul>
         {:else}
             <select bind:value={viewerContext.renderMode}>
-                {#each Object.entries(options) as [option]}
+                {#each Object.entries(options) as [option] (option)}
                     <option value={option}>
                         {option}
                     </option>

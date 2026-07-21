@@ -44,7 +44,7 @@
 
 <div class="inline-block">
     <div class="inline-block">
-        {#each selectedValues as value}
+        {#each selectedValues as value (value)}
             <div class="m-1 inline-block rounded-full bg-gray-200 px-2 py-1">
                 <button type="button" onclick={() => removeValue(value)}>
                     <Fa
@@ -71,7 +71,7 @@
                 <Command.List class="max-h-[140px] overflow-y-auto">
                     <Command.Empty>No results found.</Command.Empty>
                     <Command.Group>
-                        {#each unselectedOptions as option}
+                        {#each unselectedOptions as option (option.value)}
                             <Command.Item
                                 value={option.value}
                                 onSelect={() => {

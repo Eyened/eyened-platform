@@ -35,7 +35,7 @@
 </script>
 
 <div>
-    {#each additional_data_sources as source}
+    {#each additional_data_sources as source (source.name + source.url)}
         {#if source.conditions.every(condition_applies)}
             <div>
                 {#await loadAdditionalData(source)}

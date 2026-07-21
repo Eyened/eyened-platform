@@ -74,7 +74,7 @@
         </div>
     {/if}
 
-    {#each forms as form}
+    {#each forms as form (form.id)}
         <div>
             <div class="form-item flex w-[20em] flex-col">
                 <FormItem {form} theme="light" />

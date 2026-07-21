@@ -31,7 +31,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {#each segmentations as segmentation}
+                    {#each segmentations as segmentation (segmentation.id)}
                         <tr>
                             <td
                                 class="overflow-hidden px-[0.2em] text-left text-ellipsis whitespace-nowrap"

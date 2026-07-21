@@ -37,13 +37,12 @@
 
     const grouped = $derived(
         (() => {
-            const map = new Map<string, Option[]>();
+            const buckets: Record<string, Option[]> = {};
             for (const o of options) {
                 const g = o.group ?? "Fields";
-                if (!map.has(g)) map.set(g, []);
-                map.get(g)!.push(o);
+                (buckets[g] ??= []).push(o);
             }
-            return Array.from(map.entries());
+            return Object.entries(buckets);
         })(),
     );
 </script>
@@ -65,9 +64,9 @@
                 class="max-h-[280px] overflow-x-hidden overflow-y-auto px-2 pb-2"
             >
                 <Command.Empty>No results found.</Command.Empty>
-                {#each grouped as [g, opts]}
+                {#each grouped as [g, opts] (g)}
                     <Command.Group heading={g}>
-                        {#each opts as option}
+                        {#each opts as option (option.value)}
                             <Command.Item
                                 value={option.value}
                                 onSelect={() => {

@@ -27,18 +27,20 @@
 
     // Default query: all images for the patients already linked to this subtask.
     const pickerConditions = $derived.by((): Condition[] => {
-        const identifiers = new Set<string>();
+        const identifiers: string[] = [];
         for (const img of row.images) {
-            if (img?.patient?.identifier)
-                identifiers.add(img.patient.identifier);
+            const identifier = img?.patient?.identifier;
+            if (identifier && !identifiers.includes(identifier)) {
+                identifiers.push(identifier);
+            }
         }
-        if (identifiers.size === 0) return [];
+        if (identifiers.length === 0) return [];
         return [
             {
                 type: "default",
                 variable: "Patient Identifier",
                 operator: "IN",
-                value: Array.from(identifiers),
+                value: identifiers,
             } as Condition,
         ];
     });

@@ -13,6 +13,7 @@ import type {
 export type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
+import { SvelteSet } from "svelte/reactivity";
 import { Base64Serializer } from "./imageEncoder";
 import {
     BinaryMask,
@@ -48,9 +49,9 @@ export const constructors: Record<
 };
 
 /** Flush pending segmentation PUTs when the tab is hidden or unloaded (best-effort). */
-const segmentationSaveFlushCallbacks = new Set<() => void>();
+const segmentationSaveFlushCallbacks = new SvelteSet<() => void>();
 /** Return true if closing the tab may lose unsaved segmentation data (debounced or in-flight save). */
-const segmentationUnloadWarnCheckers = new Set<() => boolean>();
+const segmentationUnloadWarnCheckers = new SvelteSet<() => boolean>();
 let segmentationSaveLifecycleInstalled = false;
 
 function installSegmentationSaveLifecycle() {

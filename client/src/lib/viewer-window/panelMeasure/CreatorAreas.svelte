@@ -22,7 +22,7 @@
     {creator.name}
 </h3>
 <ul class:collapse>
-    {#each rows as [annotation, scanNr, area]}
+    {#each rows as [annotation, scanNr, area] (annotation.id + "-" + scanNr)}
         <SegmentationArea {annotation} {scanNr} {area} />
     {/each}
 </ul>

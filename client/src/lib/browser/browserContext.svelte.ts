@@ -1,5 +1,6 @@
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
+import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
 import {
     getInstancesSignature,
@@ -61,7 +62,7 @@ export class BrowserContext {
     sortBy: InstancesSortBy | StudiesSortBy = $state("Study Date");
     sortDirection: SortDirection = $state("ASC");
 
-    resultIds: Set<number> = $state(new Set());
+    resultIds: SvelteSet<number> = $state(new SvelteSet());
 
     // NEW: ordered arrays for rendering
     orderedInstanceIds: string[] = $state([]);
@@ -307,7 +308,7 @@ export class BrowserContext {
         this.sortBy = "Study Date";
         this.sortDirection = "ASC";
 
-        this.resultIds = new Set();
+        this.resultIds = new SvelteSet();
         this.orderedInstanceIds = [];
         this.orderedStudyIds = [];
         this.selectedIds = [];
@@ -415,7 +416,7 @@ export class BrowserContext {
 
     private updateURL(query: Condition[]) {
         if (!this.urlSync) return;
-        const params = new URLSearchParams();
+        const params = new SvelteURLSearchParams();
         params.set("page", this.page.toString());
         params.set("limit", this.limit.toString());
         params.set("conditions", encodeConditions(query));
@@ -451,7 +452,7 @@ export class BrowserContext {
 
     private processSearchResults(res: BrowserSearchResponse) {
         // searchInstances/searchStudies already ingest; track current result set
-        this.resultIds = new Set(res.result_ids as unknown as number[]);
+        this.resultIds = new SvelteSet(res.result_ids as unknown as number[]);
         this.count = res.count ?? 0;
 
         // Set ordered IDs based on query mode
@@ -467,7 +468,7 @@ export class BrowserContext {
         // Sort studies by date
         const get_date = (studyId: number) => {
             const study = studies.get(studyId);
-            return study ? new Date(study.date).getTime() : 0;
+            return study ? Date.parse(study.date) : 0;
         };
         this.orderedStudyIds = studyIds.sort(
             (a: number, b: number) => get_date(b) - get_date(a),
@@ -548,9 +549,9 @@ export function decodeConditions(urlString: string): Condition[] {
 }
 
 // URL param helpers for component compatibility
-export function getSearchParams(): URLSearchParams {
+export function getSearchParams(): SvelteURLSearchParams {
     const src = browser ? window.location.search : "";
-    return new URLSearchParams(src);
+    return new SvelteURLSearchParams(src);
 }
 
 export async function setParam(key: string, value: string | null) {
@@ -576,14 +577,12 @@ export async function removeParam(key: string, value?: string) {
 
 export async function toggleParam(key: string, value: string) {
     const params = getSearchParams();
-    const values = new Set(params.getAll(key));
-    if (values.has(value)) {
-        values.delete(value);
-    } else {
-        values.add(value);
-    }
+    const values = params.getAll(key);
+    const nextValues = values.includes(value)
+        ? values.filter((v) => v !== value)
+        : [...values, value];
     params.delete(key);
-    Array.from(values).forEach((v) => params.append(key, v));
+    nextValues.forEach((v) => params.append(key, v));
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
     await goto(`?${params.toString()}`);
 }

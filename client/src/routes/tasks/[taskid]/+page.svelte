@@ -139,7 +139,7 @@
                     >
                         All
                     </Button>
-                    {#each subTaskStates as s}
+                    {#each subTaskStates as s (s)}
                         <Button
                             variant={subtasksStatus === s
                                 ? "default"

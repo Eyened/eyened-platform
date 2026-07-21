@@ -1,6 +1,7 @@
 import { resolve } from "$app/paths";
 import type { ResolvedPathname } from "$app/types";
 import { UserManager } from "$lib/usermanager.svelte";
+import { SvelteURLSearchParams } from "svelte/reactivity";
 import type { Component } from "svelte";
 
 import type {
@@ -87,7 +88,7 @@ export class GlobalContext {
      * Build a Browser URL for a studies query using a single StudySearchCondition.
      */
     makeStudiesBrowserURL(condition: StudySearchCondition): ResolvedPathname {
-        const params = new URLSearchParams();
+        const params = new SvelteURLSearchParams();
         params.set("page", "0");
         params.set("limit", "10");
         params.set("conditions", this._encodeSingleCondition(condition));
@@ -103,7 +104,7 @@ export class GlobalContext {
      * Build a Browser URL for an instances query using a single SearchCondition.
      */
     makeInstancesBrowserURL(condition: SearchCondition): ResolvedPathname {
-        const params = new URLSearchParams();
+        const params = new SvelteURLSearchParams();
         params.set("page", "0");
         params.set("limit", "100");
         params.set(

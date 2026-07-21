@@ -68,7 +68,7 @@
                 </tr>
             </thead>
             <tbody>
-                {#each referenceSegmentations as segmentation}
+                {#each referenceSegmentations as segmentation (segmentation.id)}
                     <tr onclick={() => _resolve(segmentation)}>
                         <td>
                             {#if segmentation.annotation_type == "model_segmentation"}

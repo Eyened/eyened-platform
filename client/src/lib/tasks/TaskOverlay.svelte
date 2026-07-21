@@ -84,7 +84,7 @@
         <div class="controls">
             <div class:busy={isUpdatingState} aria-busy={isUpdatingState}>
                 <ButtonGroup orientation="horizontal">
-                    {#each subTaskStates as state}
+                    {#each subTaskStates as state (state)}
                         {@const isActive = subTask.task_state === state}
                         <Button
                             variant={isActive ? "default" : "outline"}
