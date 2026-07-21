@@ -1,2 +1,27 @@
 {
+  "src/lib/viewer-window/BrowserOverlay.svelte": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    }
+  },
+  "src/lib/viewer-window/viewerWindowContext.svelte.ts": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 5
+    }
+  },
+  "src/lib/viewer/viewerContext.svelte.ts": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    }
+  },
+  "src/lib/webgl/segmentationState.svelte.ts": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 2
+    }
+  },
+  "src/routes/view/+page.svelte": {
+    "svelte/prefer-svelte-reactivity": {
+      "count": 1
+    }
+  }
 }

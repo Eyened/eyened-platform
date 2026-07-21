@@ -35,23 +35,22 @@
 
     // Default query: all images for the patients in the current selection.
     const initialConditions: Condition[] = (() => {
-        const patientIdentifiers: string[] = [];
+        const patientIdentifiers = new Set<string>();
         for (const instanceId of initialInstanceIds) {
             const instance = instances.get(instanceId) as ImageGET | undefined;
-            const identifier = instance?.patient?.identifier;
-            if (identifier && !patientIdentifiers.includes(identifier)) {
-                patientIdentifiers.push(identifier);
+            if (instance?.patient?.identifier) {
+                patientIdentifiers.add(instance.patient.identifier);
             } else if (!instance) {
                 console.error("Instance not found", instanceId);
             }
         }
-        if (patientIdentifiers.length === 0) return [];
+        if (patientIdentifiers.size === 0) return [];
         return [
             {
                 type: "default",
                 variable: "Patient Identifier",
                 operator: "IN",
-                value: patientIdentifiers,
+                value: Array.from(patientIdentifiers),
             } as Condition,
         ];
     })();

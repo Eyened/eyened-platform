@@ -7,7 +7,6 @@
         fetchSegmentation,
     } from "$lib/data/api";
     import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
-    import { SvelteSet } from "svelte/reactivity";
 
     function getURLStrings(param: string): string[] {
         const params = browser ? page.url.searchParams : new URLSearchParams();
@@ -26,7 +25,7 @@
     const urlDeprecatedAnnotationIDs = getURLStrings("annotations");
 
     async function resolveInstanceIDs(): Promise<string[]> {
-        const ids = new SvelteSet<string>();
+        const ids = new Set<string>();
 
         // Normalize URL-provided instance IDs to canonical public IDs.
         // This keeps temporary backwards compatibility for legacy numeric IDs.
