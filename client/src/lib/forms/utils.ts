@@ -23,8 +23,7 @@ export function deepEquals(a: unknown, b: unknown): boolean {
     if (keysA.length !== keysB.length) return false;
 
     return keysA.every(
-        (key) =>
-            keysB.includes(key) && deepEquals(recordA[key], recordB[key]),
+        (key) => keysB.includes(key) && deepEquals(recordA[key], recordB[key]),
     );
 }
 

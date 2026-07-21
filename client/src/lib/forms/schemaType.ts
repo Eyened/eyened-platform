@@ -73,7 +73,9 @@ export function resolveRefs(
 ): JSONSchema {
     // Preserve arrays: resolve recursively without converting them into objects
     if (Array.isArray(schema)) {
-        return schema.map((item) => resolveRefs(item, rootSchema)) as unknown as JSONSchema;
+        return schema.map((item) =>
+            resolveRefs(item, rootSchema),
+        ) as unknown as JSONSchema;
     }
 
     if (schema !== null && typeof schema === "object") {
@@ -86,7 +88,11 @@ export function resolveRefs(
             const parts = ref.split("/");
             let refSchema: unknown = rootSchema;
             for (const part of parts.slice(1)) {
-                if (part && refSchema !== null && typeof refSchema === "object") {
+                if (
+                    part &&
+                    refSchema !== null &&
+                    typeof refSchema === "object"
+                ) {
                     refSchema = (refSchema as Record<string, unknown>)[part];
                 }
             }

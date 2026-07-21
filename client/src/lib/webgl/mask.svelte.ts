@@ -56,7 +56,10 @@ export abstract class Mask {
     abstract draw(drawing: ImageType, paintSettings: PaintSettings): void;
     abstract clear(): void;
     abstract dispose(): void;
-    abstract render(renderTarget: RenderTarget, uniforms: MaskRenderUniforms): void;
+    abstract render(
+        renderTarget: RenderTarget,
+        uniforms: MaskRenderUniforms,
+    ): void;
 }
 
 export class BinaryMask extends Mask {
@@ -218,7 +221,10 @@ export class BinaryMask extends Mask {
             u_annotation: this.getConnectedComponents(),
             u_colors: colorsFlat,
         };
-        this.shaders.renderConnectedComponents.pass(renderTarget, renderUniforms);
+        this.shaders.renderConnectedComponents.pass(
+            renderTarget,
+            renderUniforms,
+        );
     }
 }
 

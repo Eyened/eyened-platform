@@ -163,18 +163,15 @@ export async function updateTagFormAnnotation(
     comment?: string,
 ) {
     const res = await apiInvoke(() =>
-        api.PATCH(
-            "/form-annotations/{annotation_id}/tags/{tag_id}",
-            {
-                params: {
-                    path: {
-                        annotation_id: Number(annotationId),
-                        tag_id: tagId,
-                    },
+        api.PATCH("/form-annotations/{annotation_id}/tags/{tag_id}", {
+            params: {
+                path: {
+                    annotation_id: Number(annotationId),
+                    tag_id: tagId,
                 },
-                body: { comment },
             },
-        ),
+            body: { comment },
+        }),
     );
     const fa = formAnnotations.get(annotationId);
     if (fa && res.data) {
@@ -191,17 +188,14 @@ export async function untagFormAnnotation(
     tagId: number,
 ) {
     await apiInvoke(() =>
-        api.DELETE(
-            "/form-annotations/{annotation_id}/tags/{tag_id}",
-            {
-                params: {
-                    path: {
-                        annotation_id: Number(formAnnotation.id),
-                        tag_id: tagId,
-                    },
+        api.DELETE("/form-annotations/{annotation_id}/tags/{tag_id}", {
+            params: {
+                path: {
+                    annotation_id: Number(formAnnotation.id),
+                    tag_id: tagId,
                 },
             },
-        ),
+        }),
     );
     // Update store
     formAnnotations.set(formAnnotation.id, {
@@ -364,14 +358,11 @@ export async function setFormAnnotationValue(
     form_data: unknown,
 ) {
     // Save to server first (server is source of truth)
-    const response = await fetchApi(
-        `/form-annotations/${annotationId}/value`,
-        {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(form_data),
-        },
-    );
+    const response = await fetchApi(`/form-annotations/${annotationId}/value`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form_data),
+    });
     if (!response.ok) {
         throw new ApiError(
             response.status,
@@ -397,9 +388,7 @@ export async function setFormAnnotationValue(
 export async function createFeature(
     data: FeaturePUT,
 ): Promise<FeatureGET | null> {
-    const res = await apiInvoke(() =>
-        api.POST("/features", { body: data }),
-    );
+    const res = await apiInvoke(() => api.POST("/features", { body: data }));
     if (res.data) {
         const feature = res.data as FeatureGET;
         features.set(feature.id, feature);

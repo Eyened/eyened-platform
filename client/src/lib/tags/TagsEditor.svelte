@@ -63,11 +63,7 @@
     }
 
     async function handleCreateTag(payload: Partial<TagGET>) {
-        await createTag(
-            payload.name!,
-            tagType,
-            payload.description ?? "",
-        );
+        await createTag(payload.name!, tagType, payload.description ?? "");
     }
 
     async function handleDeleteTag() {

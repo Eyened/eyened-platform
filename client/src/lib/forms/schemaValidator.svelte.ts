@@ -27,7 +27,10 @@ export class SchemaValidator {
         if (this.value === undefined) {
             this.value = {};
         }
-        const record = this.value as Record<string, JSONSchemaValue | undefined>;
+        const record = this.value as Record<
+            string,
+            JSONSchemaValue | undefined
+        >;
         record[key] = value;
         if (value === undefined) {
             delete record[key];

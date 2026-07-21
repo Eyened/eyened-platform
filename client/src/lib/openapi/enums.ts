@@ -5,6 +5,5 @@ type OpenApiWithTaskState = {
     components: { schemas: { TaskState: { enum: TaskState[] } } };
 };
 
-export const TASK_STATE_OPTIONS = (
-    openapi as OpenApiWithTaskState
-).components.schemas.TaskState.enum;
+export const TASK_STATE_OPTIONS = (openapi as OpenApiWithTaskState).components
+    .schemas.TaskState.enum;

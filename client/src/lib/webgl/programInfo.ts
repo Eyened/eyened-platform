@@ -175,7 +175,11 @@ export class ProgramInfo {
             // matrix
             const uniformFunction = this.typeToUniformMatrixSetter[info.type];
             return (value: ShaderUniformValue) =>
-                uniformFunction(location, false, value as Float32Array | number[]);
+                uniformFunction(
+                    location,
+                    false,
+                    value as Float32Array | number[],
+                );
         } else if (info.size > 1) {
             // array
             const uniformFunction = this.typeToUniformArraySetter[info.type];

@@ -4,7 +4,10 @@
     import { createFormAnnotation, formAnnotations } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import type { etdrsGridType, toEtdrsGridType } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
+    import type {
+        etdrsGridType,
+        toEtdrsGridType,
+    } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { ETDRSGridItemOverlay } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte";
     import type { Overlay } from "$lib/viewer/viewer-utils";

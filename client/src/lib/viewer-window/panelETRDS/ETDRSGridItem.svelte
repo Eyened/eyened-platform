@@ -40,7 +40,9 @@
         formAnnotation.form_data as EtdrsFormData | null | undefined,
     );
     const fovea: Position2D | undefined = $derived(etdrsFormData?.fovea);
-    const disc_edge: Position2D | undefined = $derived(etdrsFormData?.disc_edge);
+    const disc_edge: Position2D | undefined = $derived(
+        etdrsFormData?.disc_edge,
+    );
 
     const canEditForm = globalContext.canEdit(formAnnotation);
     const showHide = $derived(overlayActive ? Show : Hide);

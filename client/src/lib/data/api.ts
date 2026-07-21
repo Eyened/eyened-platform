@@ -183,8 +183,10 @@ export async function fetchFeatures(params?: {
 
 export async function fetchFormSchemas(): Promise<FormSchemaGET[]> {
     const data =
-        (await invokeGet(() => api.GET("/form-schemas", {}), "fetch form-schemas")) ??
-        [];
+        (await invokeGet(
+            () => api.GET("/form-schemas", {}),
+            "fetch form-schemas",
+        )) ?? [];
     ingestFormSchemas(data);
     return data;
 }
@@ -479,9 +481,7 @@ export async function deleteFormAnnotation(id: number): Promise<void> {
 
 // ===== Segmentation Functions =====
 
-export async function fetchSegmentation(
-    id: number,
-): Promise<SegmentationGET> {
+export async function fetchSegmentation(id: number): Promise<SegmentationGET> {
     const data = await invokeGet(
         () =>
             api.GET("/segmentations/{segmentation_id}", {

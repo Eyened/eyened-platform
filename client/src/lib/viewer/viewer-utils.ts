@@ -66,9 +66,7 @@ export type ViewerDomEvent =
     | WheelEvent
     | MouseEvent;
 
-export interface ViewerEvent<
-    T extends ViewerDomEvent = ViewerDomEvent,
-> {
+export interface ViewerEvent<T extends ViewerDomEvent = ViewerDomEvent> {
     event: T;
     viewerContext: ViewerContext;
     cursor: Position2D;

@@ -10,7 +10,10 @@
     import { RegistrationTool } from "$lib/viewer/tools/Registration";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import type { FormAnnotationGET, FormSchemaGET } from "../../../types/openapi_types";
+    import type {
+        FormAnnotationGET,
+        FormSchemaGET,
+    } from "../../../types/openapi_types";
     import RegistrationItem from "./RegistrationItem.svelte";
     import { Button } from "$lib/components/ui/button";
 

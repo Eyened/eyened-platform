@@ -366,7 +366,10 @@ export class ImageLoader {
                 const first = sharedSeq[0] as Record<string, unknown>;
                 const funcGroups = first.x00289110;
                 if (Array.isArray(funcGroups) && funcGroups.length > 0) {
-                    const resolutions = funcGroups[0] as Record<string, unknown>;
+                    const resolutions = funcGroups[0] as Record<
+                        string,
+                        unknown
+                    >;
                     const spacing = resolutions.x00280030;
                     if (typeof spacing === "string") {
                         [res_h, res_w] = spacing.split("\\").map(Number);

@@ -45,7 +45,10 @@ export async function loadDataSource(
  * @param context object with the data to be substituted
  * @returns the resolved URL
  */
-export function resolveURL(template: string, context: Record<string, unknown>): string {
+export function resolveURL(
+    template: string,
+    context: Record<string, unknown>,
+): string {
     return template.replace(
         /\$\{([^}:]+(?:\.[^}:]+)*)(?::([^}]*))?\}/g,
         (_, key, defaultValue) => {

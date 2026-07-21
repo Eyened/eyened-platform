@@ -436,7 +436,10 @@ export class TextureData {
         this.cpuDirty = false;
     }
 
-    passShader(shader: PixelShaderProgram, uniforms: Record<string, unknown>): void {
+    passShader(
+        shader: PixelShaderProgram,
+        uniforms: Record<string, unknown>,
+    ): void {
         // sync GPU data with CPU data if needed
         this.updateGPU();
         const gl = this.gl;
@@ -514,7 +517,10 @@ export class BitMaskTexture {
         return this.textureData.texture;
     }
 
-    passShader(shader: PixelShaderProgram, uniforms: Record<string, unknown>): void {
+    passShader(
+        shader: PixelShaderProgram,
+        uniforms: Record<string, unknown>,
+    ): void {
         uniforms.u_bitmask = this.bitmask;
         uniforms.u_current = this.textureData.texture;
         this.textureData.passShader(shader, uniforms);

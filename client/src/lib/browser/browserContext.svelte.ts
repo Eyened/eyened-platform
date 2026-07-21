@@ -506,9 +506,7 @@ export function encodeConditions(conditions: Condition[]): string {
                 condition.type === "attribute" ? (condition.model ?? "") : "",
             );
             const encodedFeature = encodeURIComponent(
-                condition.type === "attribute"
-                    ? (condition.feature ?? "")
-                    : "",
+                condition.type === "attribute" ? (condition.feature ?? "") : "",
             );
             return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}:${encodedFeature}`;
         })

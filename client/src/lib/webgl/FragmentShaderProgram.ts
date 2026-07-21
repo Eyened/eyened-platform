@@ -14,10 +14,7 @@ export abstract class FragmentShaderProgram {
         this.programInfo.setUniforms(uniforms);
     }
 
-    abstract pass(
-        renderTarget: RenderTarget,
-        uniforms: ShaderUniforms,
-    ): void;
+    abstract pass(renderTarget: RenderTarget, uniforms: ShaderUniforms): void;
 }
 
 export class BaseTextureShaderProgram extends FragmentShaderProgram {
