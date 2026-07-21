@@ -61,6 +61,8 @@ export class EnfaceProjection {
     private readonly framebuffer: WebGLFramebuffer;
     private readonly shaders: Shaders;
     private readonly gl: WebGL2RenderingContext;
+    private maxThicknessCache = 1;
+    private maxThicknessDirty = true;
 
     constructor(
         gl: WebGL2RenderingContext,
@@ -125,6 +127,7 @@ export class EnfaceProjection {
         }
 
         this.textureData.markCPUDirty();
+        this.invalidateMaxThickness();
     }
 
     projectAll(
@@ -152,10 +155,35 @@ export class EnfaceProjection {
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         this.textureData.markCPUDirty();
+        this.invalidateMaxThickness();
     }
 
     clearAll(): void {
         this.textureData.clearData();
+        this.invalidateMaxThickness();
+    }
+
+    /** Maximum thickness value in the projection texture (at least 1). */
+    getMaxThickness(): number {
+        if (!this.maxThicknessDirty) {
+            return this.maxThicknessCache;
+        }
+
+        const data = this.textureData.data as Float32Array;
+        let max = 0;
+        for (let i = 0; i < data.length; i++) {
+            if (data[i] > max) {
+                max = data[i];
+            }
+        }
+
+        this.maxThicknessCache = Math.max(1, max);
+        this.maxThicknessDirty = false;
+        return this.maxThicknessCache;
+    }
+
+    private invalidateMaxThickness(): void {
+        this.maxThicknessDirty = true;
     }
 
     dispose(): void {

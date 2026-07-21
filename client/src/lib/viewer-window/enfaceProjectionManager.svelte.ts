@@ -152,10 +152,6 @@ export class EnfaceProjectionManager {
         return result;
     }
 
-    get maxThickness(): number {
-        return Math.max(1, this.octImage.height);
-    }
-
     dispose(): void {
         for (const projection of this.projections.values()) {
             projection.dispose();
