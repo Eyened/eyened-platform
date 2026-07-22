@@ -48,7 +48,9 @@ class Database:
             self.database_settings = load_database_settings(database_settings)
 
         self.engine = create_engine(
-            create_connection_string(self.database_settings), pool_pre_ping=True
+            create_connection_string(self.database_settings),
+            pool_pre_ping=True,
+            pool_recycle=280,  # prohibit idle connections from being forcefully closed by the server and re-use instead
         )
         self._session_factory = sessionmaker(
             bind=self.engine,
