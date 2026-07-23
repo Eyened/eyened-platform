@@ -1,5 +1,12 @@
+import { SIMPLE_ENFACE_FEATURE_INDEX } from "$lib/viewer-window/enfaceProjectionKeys";
 import type { Mask } from "./mask.svelte";
-import { BinaryMask, ProbabilityMask, QuestionableMask } from "./mask.svelte";
+import {
+    BinaryMask,
+    MultiClassMask,
+    MultiLabelMask,
+    ProbabilityMask,
+    QuestionableMask,
+} from "./mask.svelte";
 import type { Shaders } from "./shaders";
 import { tagFramebuffer, TextureData } from "./texture";
 import type { RenderTarget } from "./types";
@@ -27,6 +34,8 @@ function syncMaskToGpu(mask: Mask): void {
         void mask.bitMaskTexture.texture;
     } else if (mask instanceof ProbabilityMask) {
         void mask.textureData.texture;
+    } else if (mask instanceof MultiClassMask || mask instanceof MultiLabelMask) {
+        void mask.textureData.texture;
     }
 }
 
@@ -53,6 +62,16 @@ function getProbabilityMaskTexture(mask: Mask): WebGLTexture {
     }
     throw new Error(
         `Expected probability mask for enface projection, got ${mask.constructor.name}`,
+    );
+}
+
+function getMultiMaskTexture(mask: Mask): WebGLTexture {
+    if (mask instanceof MultiClassMask || mask instanceof MultiLabelMask) {
+        syncMaskToGpu(mask);
+        return mask.textureData.texture;
+    }
+    throw new Error(
+        `Expected multi-feature mask for enface projection, got ${mask.constructor.name}`,
     );
 }
 
@@ -95,6 +114,20 @@ export class EnfaceProjection {
     }
 
     projectSlice(scanNr: number, mask: Mask, bscanHeight: number): void {
+        this.projectSliceForFeature(
+            scanNr,
+            mask,
+            SIMPLE_ENFACE_FEATURE_INDEX,
+            bscanHeight,
+        );
+    }
+
+    projectSliceForFeature(
+        scanNr: number,
+        mask: Mask,
+        featureIndex: number,
+        bscanHeight: number,
+    ): void {
         if (scanNr < 0 || scanNr >= this.depth) {
             return;
         }
@@ -110,8 +143,8 @@ export class EnfaceProjection {
         );
 
         const invHeight = 1 / bscanHeight;
-
         const representation = mask.segmentation.data_representation;
+
         if (representation === "Probability") {
             this.shaders.enfaceProjectProbability.pass(renderTarget, {
                 u_mask: getProbabilityMaskTexture(mask),
@@ -126,6 +159,20 @@ export class EnfaceProjection {
             this.shaders.enfaceProjectBinary.pass(renderTarget, {
                 u_mask: texture,
                 u_mask_bitmask: bitmask,
+                height: bscanHeight,
+                u_inv_height: invHeight,
+            });
+        } else if (representation === "MultiClass") {
+            this.shaders.enfaceProjectMultiClass.pass(renderTarget, {
+                u_mask: getMultiMaskTexture(mask),
+                u_feature_index: featureIndex,
+                height: bscanHeight,
+                u_inv_height: invHeight,
+            });
+        } else if (representation === "MultiLabel") {
+            this.shaders.enfaceProjectMultiLabel.pass(renderTarget, {
+                u_mask: getMultiMaskTexture(mask),
+                u_feature_bitmask: 1 << (featureIndex - 1),
                 height: bscanHeight,
                 u_inv_height: invHeight,
             });
