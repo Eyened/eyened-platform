@@ -5,7 +5,9 @@ import {
 import {
     getEnfaceFeatureIndices,
     getEnfaceLayerKey,
+    getEnfaceLayerAlpha,
     getSubfeatureColor,
+    isEnfaceLayerVisible,
     isMultiFeatureEnfaceSegmentation,
     isProjectable,
 } from "$lib/viewer-window/enfaceProjectionKeys";
@@ -24,6 +26,8 @@ export type VisibleEnfaceProjection = {
     projection: EnfaceProjection;
     featureIndex: number;
     color: Color;
+    /** Layer weight before main viewer alpha (matches B-scan MC/ML shaders). */
+    layerAlpha: number;
 };
 
 export class EnfaceProjectionManager {
@@ -161,6 +165,22 @@ export class EnfaceProjectionManager {
             }
 
             for (const featureIndex of getEnfaceFeatureIndices(segmentation)) {
+                if (
+                    !isEnfaceLayerVisible(segmentation, featureIndex, ctx)
+                ) {
+                    continue;
+                }
+
+                const layerAlpha = getEnfaceLayerAlpha(
+                    segmentation,
+                    featureIndex,
+                    ctx,
+                    this.mainViewerContext?.highlightedFeatureIndex,
+                );
+                if (layerAlpha <= 0) {
+                    continue;
+                }
+
                 const projection = this.projections.get(
                     getEnfaceLayerKey(segmentationKey, featureIndex),
                 );
@@ -174,6 +194,7 @@ export class EnfaceProjectionManager {
                     projection,
                     featureIndex,
                     color: this.getEnfaceLayerColor(segmentation, featureIndex),
+                    layerAlpha,
                 });
             }
         }

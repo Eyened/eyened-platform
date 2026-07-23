@@ -26,7 +26,7 @@ export class EnfaceProjectionOverlay implements Overlay {
         const uniforms = getBaseUniforms(viewerContext);
         const renderAsHeatmap = mode === "heatmap";
 
-        for (const { projection, color } of projections) {
+        for (const { projection, color, layerAlpha } of projections) {
             const layerColor = color ?? colors[0];
             viewerContext.image.webgl.shaders.renderEnfaceProjection.pass(
                 renderTarget,
@@ -37,7 +37,7 @@ export class EnfaceProjectionOverlay implements Overlay {
                     u_max_thickness: renderAsHeatmap
                         ? projection.getMaxThickness()
                         : 1,
-                    u_alpha: this.mainViewerContext.alpha,
+                    u_alpha: layerAlpha * this.mainViewerContext.alpha,
                     u_mode: renderAsHeatmap ? 1 : 0,
                     u_outline: false,
                 },
