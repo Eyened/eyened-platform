@@ -1,7 +1,7 @@
 # Enface Projection — Code Review & Refactor Design
 
 **Date:** 2026-07-23  
-**Status:** Draft — pending review  
+**Status:** Approved (Option A — Phases 1–2 only, zero behavior change)  
 **Branch:** `feature/enface-projection`  
 **Scope:** Refactor / compactness pass on the enface projection feature (~1,350 lines added across 7 commits)
 
