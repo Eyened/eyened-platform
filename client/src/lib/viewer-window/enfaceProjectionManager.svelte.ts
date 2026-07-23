@@ -15,7 +15,6 @@ import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.s
 import { colors } from "$lib/viewer/overlays/colors";
 import type { Color } from "$lib/utils";
 import { EnfaceProjection } from "$lib/webgl/enfaceProjection";
-import type { Image2D } from "$lib/webgl/image2D";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import { SvelteMap } from "svelte/reactivity";
@@ -35,10 +34,7 @@ export class EnfaceProjectionManager {
     private readonly attachedItems = new SvelteMap<string, SegmentationItem>();
     mainViewerContext: MainViewerContext | undefined;
 
-    constructor(
-        readonly octImage: Image3D,
-        readonly projImage: Image2D,
-    ) {}
+    constructor(readonly octImage: Image3D) {}
 
     registerMainViewerContext(mainViewerContext: MainViewerContext): void {
         this.mainViewerContext = mainViewerContext;

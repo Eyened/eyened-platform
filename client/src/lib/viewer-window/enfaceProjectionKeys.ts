@@ -5,8 +5,9 @@ import type {
 import { colors } from "$lib/viewer/overlays/colors";
 import type { Color } from "$lib/utils";
 
-/** Feature index for Binary / DualBitMask / Probability (single-layer projection). */
-export const SIMPLE_ENFACE_FEATURE_INDEX = 0;
+import { SIMPLE_ENFACE_FEATURE_INDEX } from "$lib/webgl/enfaceProjectionConstants";
+
+export { SIMPLE_ENFACE_FEATURE_INDEX };
 
 export function getEnfaceLayerKey(
     segmentationKey: string,

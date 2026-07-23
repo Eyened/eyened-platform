@@ -12,7 +12,6 @@ import {
 import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
-import type { Image2D } from "$lib/webgl/image2D";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
@@ -203,10 +202,7 @@ export class ViewerWindowContext {
                     if (projImage?.is2D && octImage?.is3D) {
                         this.enfaceProjectionManagers.set(
                             instance.id,
-                            new EnfaceProjectionManager(
-                                octImage as Image3D,
-                                projImage as Image2D,
-                            ),
+                            new EnfaceProjectionManager(octImage as Image3D),
                         );
                     }
 
