@@ -65,7 +65,10 @@
             }
             return;
         }
-        if (Array.isArray(fromCtx) && !indicesEqual(activeLabelIndices, fromCtx)) {
+        if (
+            Array.isArray(fromCtx) &&
+            !indicesEqual(activeLabelIndices, fromCtx)
+        ) {
             activeLabelIndices = fromCtx;
         }
     });

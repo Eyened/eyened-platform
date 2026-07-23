@@ -7,8 +7,11 @@
         gradientId?: string;
     }
 
-    let { mode, size = "2em", gradientId = "enface-projection-heatmap" }: Props =
-        $props();
+    let {
+        mode,
+        size = "2em",
+        gradientId = "enface-projection-heatmap",
+    }: Props = $props();
 </script>
 
 <svg
@@ -27,13 +30,7 @@
 >
     {#if mode === "heatmap"}
         <defs>
-            <linearGradient
-                id={gradientId}
-                x1="0%"
-                y1="100%"
-                x2="100%"
-                y2="0%"
-            >
+            <linearGradient id={gradientId} x1="0%" y1="100%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="#0000ff" />
                 <stop offset="33%" stop-color="#00ff00" />
                 <stop offset="66%" stop-color="#ffff00" />

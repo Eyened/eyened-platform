@@ -89,8 +89,7 @@
         e.stopPropagation();
         const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
         const index = modes.indexOf(viewerContext.enfaceProjectionMode);
-        viewerContext.enfaceProjectionMode =
-            modes[(index + 1) % modes.length];
+        viewerContext.enfaceProjectionMode = modes[(index + 1) % modes.length];
     }
 
     function selectImage(e: MouseEvent) {

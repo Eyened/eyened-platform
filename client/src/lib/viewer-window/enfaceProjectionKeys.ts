@@ -24,11 +24,7 @@ export function isProjectable(segmentation: Segmentation): boolean {
     }
 
     const rep = segmentation.data_representation;
-    if (
-        rep === "Binary" ||
-        rep === "DualBitMask" ||
-        rep === "Probability"
-    ) {
+    if (rep === "Binary" || rep === "DualBitMask" || rep === "Probability") {
         return true;
     }
 

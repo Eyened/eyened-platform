@@ -32,7 +32,10 @@ function syncMaskToGpu(mask: Mask): void {
         void mask.bitMaskTexture.texture;
     } else if (mask instanceof ProbabilityMask) {
         void mask.textureData.texture;
-    } else if (mask instanceof MultiClassMask || mask instanceof MultiLabelMask) {
+    } else if (
+        mask instanceof MultiClassMask ||
+        mask instanceof MultiLabelMask
+    ) {
         void mask.textureData.texture;
     }
 }
@@ -69,7 +72,11 @@ function getMaskProjectionUniforms(
     ) {
         const u_mask = mask.textureData.texture;
         if (rep === "MultiClass") {
-            return { shader: "multiclass", u_mask, u_feature_index: featureIndex };
+            return {
+                shader: "multiclass",
+                u_mask,
+                u_feature_index: featureIndex,
+            };
         }
         return {
             shader: "multilabel",

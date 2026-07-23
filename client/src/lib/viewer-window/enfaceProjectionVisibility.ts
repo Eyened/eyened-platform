@@ -57,7 +57,10 @@ function isEnfaceLayerVisible(
         return true;
     }
 
-    return segmentationContext.isFeatureLayerVisible(segmentation, featureIndex);
+    return segmentationContext.isFeatureLayerVisible(
+        segmentation,
+        featureIndex,
+    );
 }
 
 function isHighlightedEnfaceLayer(
