@@ -494,6 +494,12 @@ export class TextureData {
         this.cpuDirty = true;
     }
 
+    /** GPU was written directly (e.g. FBO render); do not upload stale CPU on texture access. */
+    markGPUCurrent(): void {
+        this.gpuDirty = false;
+        this.cpuDirty = true;
+    }
+
     dispose(): void {
         if (this._texture) {
             this.gl.deleteTexture(this._texture);

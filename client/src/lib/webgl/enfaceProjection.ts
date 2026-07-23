@@ -173,7 +173,7 @@ export class EnfaceProjection {
                 break;
         }
 
-        this.textureData.markCPUDirty();
+        this.textureData.markGPUCurrent();
         this.invalidateMaxThickness();
     }
 
@@ -206,12 +206,20 @@ export class EnfaceProjection {
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        this.textureData.markCPUDirty();
+        this.textureData.markGPUCurrent();
         this.invalidateMaxThickness();
     }
 
     clearAll(): void {
-        this.textureData.clearData();
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+        gl.viewport(0, 0, this.width, this.depth);
+        gl.scissor(0, 0, this.width, this.depth);
+        gl.disable(gl.BLEND);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this.textureData.markGPUCurrent();
         this.invalidateMaxThickness();
     }
 
