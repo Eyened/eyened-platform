@@ -9,7 +9,7 @@
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import MainIcon from "./icons/MainIcon.svelte";
     import Lines from "./icons/Lines.svelte";
-    import Layers from "@lucide/svelte/icons/layers";
+    import EnfaceProjectionModeIcon from "./icons/EnfaceProjectionModeIcon.svelte";
 
     interface Props {
         image: AbstractImage;
@@ -44,9 +44,15 @@
     let hideLinesOverlay = $state(false);
 
     const projectionModeLabels: Record<EnfaceProjectionMode, string> = {
-        off: "Enface projection off",
-        binary: "Enface projection: binary mask",
-        heatmap: "Enface projection: thickness heatmap",
+        off: "Enface segmentation off",
+        binary: "Enface segmentation: mask",
+        heatmap: "Enface segmentation: thickness heatmap",
+    };
+
+    const projectionModeHoverColors: Record<EnfaceProjectionMode, string> = {
+        off: "rgb(175, 175, 175)",
+        binary: "white",
+        heatmap: "rgb(255, 200, 120)",
     };
 
     $effect(() => {
@@ -116,7 +122,10 @@
                             tooltip={projectionModeLabels[
                                 viewerContext.enfaceProjectionMode
                             ]}
-                            Icon={Layers}
+                            hoverColor={projectionModeHoverColors[
+                                viewerContext.enfaceProjectionMode
+                            ]}
+                            iconSnippet={projectionModeIcon}
                         />
                     {/if}
                     {#if hasLocators}
@@ -131,6 +140,13 @@
         </div>
     {/if}
 </div>
+
+{#snippet projectionModeIcon()}
+    <EnfaceProjectionModeIcon
+        mode={viewerContext.enfaceProjectionMode}
+        gradientId="enface-heatmap-{publicId}"
+    />
+{/snippet}
 
 <style>
     div {

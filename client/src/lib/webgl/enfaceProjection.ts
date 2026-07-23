@@ -57,6 +57,7 @@ function getProbabilityMaskTexture(mask: Mask): WebGLTexture {
 }
 
 export class EnfaceProjection {
+    /** Normalized thickness map (R8): one value per enface pixel. */
     readonly textureData: TextureData;
     private readonly framebuffer: WebGLFramebuffer;
     private readonly shaders: Shaders;
@@ -72,7 +73,7 @@ export class EnfaceProjection {
     ) {
         this.gl = gl;
         this.shaders = shaders;
-        this.textureData = new TextureData(gl, width, depth, "R32F");
+        this.textureData = new TextureData(gl, width, depth, "R8");
         this.textureData.clearData();
 
         this.framebuffer = gl.createFramebuffer()!;
@@ -108,11 +109,14 @@ export class EnfaceProjection {
             this.gl,
         );
 
+        const invHeight = 1 / bscanHeight;
+
         const representation = mask.segmentation.data_representation;
         if (representation === "Probability") {
             this.shaders.enfaceProjectProbability.pass(renderTarget, {
                 u_mask: getProbabilityMaskTexture(mask),
                 height: bscanHeight,
+                u_inv_height: invHeight,
             });
         } else if (
             representation === "Binary" ||
@@ -123,6 +127,7 @@ export class EnfaceProjection {
                 u_mask: texture,
                 u_mask_bitmask: bitmask,
                 height: bscanHeight,
+                u_inv_height: invHeight,
             });
         }
 
@@ -163,13 +168,13 @@ export class EnfaceProjection {
         this.invalidateMaxThickness();
     }
 
-    /** Maximum thickness value in the projection texture (at least 1). */
+    /** Max normalized thickness in [0, 1] for heatmap scaling. */
     getMaxThickness(): number {
         if (!this.maxThicknessDirty) {
             return this.maxThicknessCache;
         }
 
-        const data = this.textureData.data as Float32Array;
+        const data = this.textureData.data as Uint8Array;
         let max = 0;
         for (let i = 0; i < data.length; i++) {
             if (data[i] > max) {
@@ -177,7 +182,8 @@ export class EnfaceProjection {
             }
         }
 
-        this.maxThicknessCache = Math.max(1, max);
+        // Values are normalized thickness in [0, 1] (stored as 0–255).
+        this.maxThicknessCache = Math.max(1 / 255, max / 255);
         this.maxThicknessDirty = false;
         return this.maxThicknessCache;
     }

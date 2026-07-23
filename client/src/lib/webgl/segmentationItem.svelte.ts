@@ -316,6 +316,7 @@ export class SegmentationItem {
                 u_mask: maskTexture,
                 u_mask_bitmask: maskBitmask,
                 height: height, // Height dimension to loop over
+                u_inv_height: 1,
             };
 
             // Render this slice's projection to the specific line

@@ -233,9 +233,10 @@ const TEXTURE_FORMATS: Record<
         type: WebGL2RenderingContext.UNSIGNED_INT,
         internalFormat: WebGL2RenderingContext.R32UI,
     },
-    // Used for probability maps (higher precision alternative to R8)
+    // Used for float accumulation maps (enface projection, probability sums, etc.)
     R32F: {
         ...FLOAT_FORMAT,
+        type: WebGL2RenderingContext.FLOAT,
         internalFormat: WebGL2RenderingContext.R32F,
     },
     // Used for min/max pairs (R=min, G=max)

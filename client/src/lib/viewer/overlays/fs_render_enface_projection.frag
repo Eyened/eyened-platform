@@ -36,9 +36,11 @@ void main() {
     }
 
     if(u_mode == 0) {
+        // Mask: any thickness > 0 renders as a flat feature color.
         vec4 feature_color = vec4(u_color, 1.0);
         color_out = mix(vec4(0.0), feature_color, u_alpha);
     } else {
+        // Heatmap: thickness modulates color and alpha.
         float normalized = clamp(thickness / u_max_thickness, 0.0, 1.0);
         color_out.rgb = heatmap(normalized);
         color_out.a = u_alpha * max(normalized, 0.35);

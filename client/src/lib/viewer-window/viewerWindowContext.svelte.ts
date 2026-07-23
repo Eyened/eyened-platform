@@ -189,10 +189,11 @@ export class ViewerWindowContext {
 
                     // Create viewer contexts
                     for (const image of loadedImages) {
-                        this.topViewers.set(
-                            image,
-                            new ViewerContext(image, this),
-                        );
+                        const viewerContext = new ViewerContext(image, this);
+                        if (image.image_id.endsWith("_proj")) {
+                            viewerContext.enfaceProjectionMode = "binary";
+                        }
+                        this.topViewers.set(image, viewerContext);
                     }
 
                     const projImage = loadedImages.find((img) =>

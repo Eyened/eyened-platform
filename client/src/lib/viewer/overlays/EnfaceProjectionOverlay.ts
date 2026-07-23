@@ -23,7 +23,7 @@ export class EnfaceProjectionOverlay implements Overlay {
         }
 
         const uniforms = getBaseUniforms(viewerContext);
-        const u_mode = mode === "binary" ? 0 : 1;
+        const renderAsHeatmap = mode === "heatmap";
 
         for (const { segmentation, projection } of projections) {
             viewerContext.image.webgl.shaders.renderEnfaceProjection.pass(
@@ -34,10 +34,11 @@ export class EnfaceProjectionOverlay implements Overlay {
                     u_color: this.mainViewerContext
                         .getFeatureColor(segmentation)
                         .map((c) => c / 255),
-                    u_max_thickness:
-                        mode === "heatmap" ? projection.getMaxThickness() : 1,
+                    u_max_thickness: renderAsHeatmap
+                        ? projection.getMaxThickness()
+                        : 1,
                     u_alpha: this.mainViewerContext.alpha,
-                    u_mode,
+                    u_mode: renderAsHeatmap ? 1 : 0,
                     u_outline: false,
                 },
             );
