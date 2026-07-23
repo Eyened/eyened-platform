@@ -1,5 +1,4 @@
 import type { EnfaceProjectionManager } from "$lib/viewer-window/enfaceProjectionManager.svelte";
-import { colors } from "$lib/viewer/overlays/colors";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay } from "../viewer-utils";
@@ -27,13 +26,12 @@ export class EnfaceProjectionOverlay implements Overlay {
         const renderAsHeatmap = mode === "heatmap";
 
         for (const { projection, color, layerAlpha } of projections) {
-            const layerColor = color ?? colors[0];
             viewerContext.image.webgl.shaders.renderEnfaceProjection.pass(
                 renderTarget,
                 {
                     ...uniforms,
                     u_thickness: projection.textureData.texture,
-                    u_color: layerColor.map((c) => c / 255),
+                    u_color: color.map((c) => c / 255),
                     u_max_thickness: renderAsHeatmap
                         ? projection.getMaxThickness()
                         : 1,

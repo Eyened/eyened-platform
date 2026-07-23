@@ -37,39 +37,48 @@ function syncMaskToGpu(mask: Mask): void {
     }
 }
 
-function getBinaryMaskSource(mask: Mask): {
-    texture: WebGLTexture;
-    bitmask: number;
-} {
-    if (mask instanceof BinaryMask || mask instanceof QuestionableMask) {
-        syncMaskToGpu(mask);
+type MaskProjectionUniforms =
+    | { shader: "binary"; u_mask: WebGLTexture; u_mask_bitmask: number }
+    | { shader: "probability"; u_mask: WebGLTexture }
+    | { shader: "multiclass"; u_mask: WebGLTexture; u_feature_index: number }
+    | { shader: "multilabel"; u_mask: WebGLTexture; u_feature_bitmask: number };
+
+function getMaskProjectionUniforms(
+    mask: Mask,
+    featureIndex: number,
+): MaskProjectionUniforms {
+    syncMaskToGpu(mask);
+    const rep = mask.segmentation.data_representation;
+
+    if (rep === "Probability" && mask instanceof ProbabilityMask) {
+        return { shader: "probability", u_mask: mask.textureData.texture };
+    }
+    if (
+        (rep === "Binary" || rep === "DualBitMask") &&
+        (mask instanceof BinaryMask || mask instanceof QuestionableMask)
+    ) {
         return {
-            texture: mask.bitMaskTexture.texture,
-            bitmask: mask.bitMaskTexture.bitmask,
+            shader: "binary",
+            u_mask: mask.bitMaskTexture.texture,
+            u_mask_bitmask: mask.bitMaskTexture.bitmask,
+        };
+    }
+    if (
+        (rep === "MultiClass" || rep === "MultiLabel") &&
+        (mask instanceof MultiClassMask || mask instanceof MultiLabelMask)
+    ) {
+        const u_mask = mask.textureData.texture;
+        if (rep === "MultiClass") {
+            return { shader: "multiclass", u_mask, u_feature_index: featureIndex };
+        }
+        return {
+            shader: "multilabel",
+            u_mask,
+            u_feature_bitmask: 1 << (featureIndex - 1),
         };
     }
     throw new Error(
-        `Expected binary mask for enface projection, got ${mask.constructor.name}`,
-    );
-}
-
-function getProbabilityMaskTexture(mask: Mask): WebGLTexture {
-    if (mask instanceof ProbabilityMask) {
-        syncMaskToGpu(mask);
-        return mask.textureData.texture;
-    }
-    throw new Error(
-        `Expected probability mask for enface projection, got ${mask.constructor.name}`,
-    );
-}
-
-function getMultiMaskTexture(mask: Mask): WebGLTexture {
-    if (mask instanceof MultiClassMask || mask instanceof MultiLabelMask) {
-        syncMaskToGpu(mask);
-        return mask.textureData.texture;
-    }
-    throw new Error(
-        `Expected multi-feature mask for enface projection, got ${mask.constructor.name}`,
+        `Unsupported mask for enface projection: ${mask.constructor.name} / ${rep}`,
     );
 }
 
@@ -121,9 +130,6 @@ export class EnfaceProjection {
             return;
         }
 
-        syncMaskToGpu(mask);
-        this.attachFramebuffer();
-
         const renderTarget = lineRenderTarget(
             this.framebuffer,
             this.width,
@@ -131,40 +137,40 @@ export class EnfaceProjection {
             this.gl,
         );
 
-        const invHeight = 1 / bscanHeight;
-        const representation = mask.segmentation.data_representation;
+        const base = {
+            height: bscanHeight,
+            u_inv_height: 1 / bscanHeight,
+        };
+        const uniforms = getMaskProjectionUniforms(mask, featureIndex);
 
-        if (representation === "Probability") {
-            this.shaders.enfaceProjectProbability.pass(renderTarget, {
-                u_mask: getProbabilityMaskTexture(mask),
-                height: bscanHeight,
-                u_inv_height: invHeight,
-            });
-        } else if (
-            representation === "Binary" ||
-            representation === "DualBitMask"
-        ) {
-            const { texture, bitmask } = getBinaryMaskSource(mask);
-            this.shaders.enfaceProjectBinary.pass(renderTarget, {
-                u_mask: texture,
-                u_mask_bitmask: bitmask,
-                height: bscanHeight,
-                u_inv_height: invHeight,
-            });
-        } else if (representation === "MultiClass") {
-            this.shaders.enfaceProjectMultiClass.pass(renderTarget, {
-                u_mask: getMultiMaskTexture(mask),
-                u_feature_index: featureIndex,
-                height: bscanHeight,
-                u_inv_height: invHeight,
-            });
-        } else if (representation === "MultiLabel") {
-            this.shaders.enfaceProjectMultiLabel.pass(renderTarget, {
-                u_mask: getMultiMaskTexture(mask),
-                u_feature_bitmask: 1 << (featureIndex - 1),
-                height: bscanHeight,
-                u_inv_height: invHeight,
-            });
+        switch (uniforms.shader) {
+            case "binary":
+                this.shaders.enfaceProjectBinary.pass(renderTarget, {
+                    ...base,
+                    u_mask: uniforms.u_mask,
+                    u_mask_bitmask: uniforms.u_mask_bitmask,
+                });
+                break;
+            case "probability":
+                this.shaders.enfaceProjectProbability.pass(renderTarget, {
+                    ...base,
+                    u_mask: uniforms.u_mask,
+                });
+                break;
+            case "multiclass":
+                this.shaders.enfaceProjectMultiClass.pass(renderTarget, {
+                    ...base,
+                    u_mask: uniforms.u_mask,
+                    u_feature_index: uniforms.u_feature_index,
+                });
+                break;
+            case "multilabel":
+                this.shaders.enfaceProjectMultiLabel.pass(renderTarget, {
+                    ...base,
+                    u_mask: uniforms.u_mask,
+                    u_feature_bitmask: uniforms.u_feature_bitmask,
+                });
+                break;
         }
 
         this.textureData.markCPUDirty();
@@ -192,7 +198,6 @@ export class EnfaceProjection {
             return;
         }
 
-        this.attachFramebuffer();
         const gl = this.gl;
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
         gl.viewport(0, scanNr, this.width, 1);

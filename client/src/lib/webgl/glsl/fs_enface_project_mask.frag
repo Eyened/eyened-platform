@@ -1,9 +1,7 @@
 #version 300 es
 precision highp float;
-precision highp sampler3D;
 precision highp usampler2D;
 
-uniform sampler3D u_volume;
 uniform usampler2D u_mask;
 uniform uint u_mask_bitmask;
 uniform int height;
