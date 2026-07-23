@@ -88,8 +88,8 @@ export class EnfaceProjection {
     private readonly framebuffer: WebGLFramebuffer;
     private readonly shaders: Shaders;
     private readonly gl: WebGL2RenderingContext;
-    private maxThicknessCache = 1;
-    private maxThicknessDirty = true;
+    private thicknessRangeCache = { min: 0, max: 1 };
+    private thicknessRangeDirty = true;
 
     constructor(
         gl: WebGL2RenderingContext,
@@ -174,7 +174,7 @@ export class EnfaceProjection {
         }
 
         this.textureData.markGPUCurrent();
-        this.invalidateMaxThickness();
+        this.invalidateThicknessRange();
     }
 
     projectAllLayers(
@@ -207,7 +207,7 @@ export class EnfaceProjection {
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         this.textureData.markGPUCurrent();
-        this.invalidateMaxThickness();
+        this.invalidateThicknessRange();
     }
 
     clearAll(): void {
@@ -220,31 +220,43 @@ export class EnfaceProjection {
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         this.textureData.markGPUCurrent();
-        this.invalidateMaxThickness();
+        this.invalidateThicknessRange();
     }
 
-    /** Max normalized thickness in [0, 1] for heatmap scaling. */
-    getMaxThickness(): number {
-        if (!this.maxThicknessDirty) {
-            return this.maxThicknessCache;
+    /** Min/max normalized thickness among foreground pixels, for heatmap scaling. */
+    getThicknessRange(): { min: number; max: number } {
+        if (!this.thicknessRangeDirty) {
+            return this.thicknessRangeCache;
         }
 
         const data = this.textureData.data as Uint8Array;
+        let min = 255;
         let max = 0;
         for (let i = 0; i < data.length; i++) {
-            if (data[i] > max) {
-                max = data[i];
+            const value = data[i];
+            if (value === 0) {
+                continue;
+            }
+            if (value < min) {
+                min = value;
+            }
+            if (value > max) {
+                max = value;
             }
         }
 
         // Values are normalized thickness in [0, 1] (stored as 0–255).
-        this.maxThicknessCache = Math.max(1 / 255, max / 255);
-        this.maxThicknessDirty = false;
-        return this.maxThicknessCache;
+        if (max === 0) {
+            this.thicknessRangeCache = { min: 0, max: 1 / 255 };
+        } else {
+            this.thicknessRangeCache = { min: min / 255, max: max / 255 };
+        }
+        this.thicknessRangeDirty = false;
+        return this.thicknessRangeCache;
     }
 
-    private invalidateMaxThickness(): void {
-        this.maxThicknessDirty = true;
+    private invalidateThicknessRange(): void {
+        this.thicknessRangeDirty = true;
     }
 
     dispose(): void {

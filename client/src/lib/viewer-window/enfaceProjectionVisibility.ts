@@ -23,11 +23,7 @@ export type EnfaceLayerCandidate = {
 };
 
 function getSubfeatureColor(featureIndex: number): Color {
-    const colorIndex =
-        featureIndex > 0
-            ? (featureIndex - 1) % colors.length
-            : featureIndex % colors.length;
-    return colors[colorIndex] ?? colors[0];
+    return colors[(featureIndex - 1) % colors.length] ?? colors[0];
 }
 
 function getActiveFeatureMask(
@@ -64,18 +60,41 @@ function isEnfaceLayerVisible(
     return segmentationContext.isFeatureLayerVisible(segmentation, featureIndex);
 }
 
+function isHighlightedEnfaceLayer(
+    segmentation: Segmentation,
+    featureIndex: number,
+    mainViewerContext: MainViewerContext,
+): boolean {
+    const highlightedItem = mainViewerContext.highlightedSegmentationItem;
+    if (
+        highlightedItem === undefined ||
+        mainViewerContext.highlightedFeatureIndex !== featureIndex
+    ) {
+        return false;
+    }
+
+    return (
+        getSegmentationKey(highlightedItem.segmentation) ===
+        getSegmentationKey(segmentation)
+    );
+}
+
 function getEnfaceLayerAlpha(
     segmentation: Segmentation,
     featureIndex: number,
     segmentationContext: SegmentationContext,
-    highlightedFeatureIndex: number | undefined,
+    mainViewerContext: MainViewerContext,
 ): number {
     if (!isMultiFeatureEnfaceSegmentation(segmentation)) {
         return 1;
     }
 
     const rep = segmentation.data_representation;
-    const highlighted = highlightedFeatureIndex === featureIndex;
+    const highlighted = isHighlightedEnfaceLayer(
+        segmentation,
+        featureIndex,
+        mainViewerContext,
+    );
     const activeMask = getActiveFeatureMask(
         segmentation,
         segmentationContext.activeIndices,
@@ -147,7 +166,7 @@ export function enumerateVisibleEnfaceLayers(
                 segmentation,
                 featureIndex,
                 ctx,
-                mainViewerContext.highlightedFeatureIndex,
+                mainViewerContext,
             );
             if (layerAlpha <= 0) {
                 continue;

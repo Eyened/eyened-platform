@@ -1,4 +1,5 @@
 import type { Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+import { isDrawableSubfeatureIndex } from "$lib/viewer-window/panelSegmentation/subfeatureBits";
 
 import { SIMPLE_ENFACE_FEATURE_INDEX } from "$lib/webgl/enfaceProjectionConstants";
 
@@ -12,9 +13,9 @@ export function getEnfaceLayerKey(
 }
 
 export function getSubfeatureIndices(segmentation: Segmentation): number[] {
-    return (segmentation.feature.subfeatures ?? []).map(
-        (subfeature) => subfeature.index,
-    );
+    return (segmentation.feature.subfeatures ?? [])
+        .map((subfeature) => subfeature.index)
+        .filter(isDrawableSubfeatureIndex);
 }
 
 export function isProjectable(segmentation: Segmentation): boolean {

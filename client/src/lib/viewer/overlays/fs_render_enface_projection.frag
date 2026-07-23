@@ -4,6 +4,7 @@ precision highp sampler2D;
 
 uniform sampler2D u_thickness;
 uniform vec3 u_color;
+uniform float u_min_thickness;
 uniform float u_max_thickness;
 uniform float u_alpha;
 uniform int u_mode;
@@ -40,8 +41,9 @@ void main() {
         vec4 feature_color = vec4(u_color, 1.0);
         color_out = mix(vec4(0.0), feature_color, u_alpha);
     } else {
-        // Heatmap: thickness modulates color and alpha.
-        float normalized = clamp(thickness / u_max_thickness, 0.0, 1.0);
+        // Heatmap: stretch foreground thickness between min and max.
+        float range = max(u_max_thickness - u_min_thickness, 1e-6);
+        float normalized = clamp((thickness - u_min_thickness) / range, 0.0, 1.0);
         color_out.rgb = heatmap(normalized);
         color_out.a = u_alpha * max(normalized, 0.35);
     }
