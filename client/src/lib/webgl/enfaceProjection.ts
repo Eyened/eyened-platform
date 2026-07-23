@@ -1,4 +1,3 @@
-import { SIMPLE_ENFACE_FEATURE_INDEX } from "$lib/viewer-window/enfaceProjectionKeys";
 import type { Mask } from "./mask.svelte";
 import {
     BinaryMask,
@@ -10,7 +9,6 @@ import {
 import type { Shaders } from "./shaders";
 import { tagFramebuffer, TextureData } from "./texture";
 import type { RenderTarget } from "./types";
-import type { SegmentationState } from "./segmentationState.svelte";
 import type { SegmentationItem } from "./segmentationItem.svelte";
 
 function lineRenderTarget(
@@ -113,15 +111,6 @@ export class EnfaceProjection {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
-    projectSlice(scanNr: number, mask: Mask, bscanHeight: number): void {
-        this.projectSliceForFeature(
-            scanNr,
-            mask,
-            SIMPLE_ENFACE_FEATURE_INDEX,
-            bscanHeight,
-        );
-    }
-
     projectSliceForFeature(
         scanNr: number,
         mask: Mask,
@@ -180,17 +169,6 @@ export class EnfaceProjection {
 
         this.textureData.markCPUDirty();
         this.invalidateMaxThickness();
-    }
-
-    projectAll(
-        segmentationItem: SegmentationItem,
-        bscanHeight: number,
-    ): void {
-        this.projectAllLayers(
-            segmentationItem,
-            SIMPLE_ENFACE_FEATURE_INDEX,
-            bscanHeight,
-        );
     }
 
     projectAllLayers(
@@ -259,15 +237,5 @@ export class EnfaceProjection {
     dispose(): void {
         this.gl.deleteFramebuffer(this.framebuffer);
         this.textureData.dispose();
-    }
-}
-
-export function projectSegmentationStates(
-    projection: EnfaceProjection,
-    states: Iterable<[number, SegmentationState]>,
-    bscanHeight: number,
-): void {
-    for (const [scanNr, state] of states) {
-        projection.projectSlice(scanNr, state.mask, bscanHeight);
     }
 }
