@@ -2,24 +2,19 @@ import {
     getSegmentationKey,
     type Segmentation,
 } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+import {
+    getEnfaceFeatureIndices,
+    getEnfaceLayerKey,
+    isMultiFeatureEnfaceSegmentation,
+    isProjectable,
+    SIMPLE_ENFACE_FEATURE_INDEX,
+} from "$lib/viewer-window/enfaceProjectionKeys";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 import { EnfaceProjection } from "$lib/webgl/enfaceProjection";
 import type { Image2D } from "$lib/webgl/image2D";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import { SvelteMap } from "svelte/reactivity";
-
-function isProjectable(segmentation: Segmentation): boolean {
-    if (segmentation.image_projection_matrix) {
-        return false;
-    }
-    const rep = segmentation.data_representation;
-    return (
-        rep === "Binary" ||
-        rep === "DualBitMask" ||
-        rep === "Probability"
-    );
-}
 
 export class EnfaceProjectionManager {
     private readonly projections = new SvelteMap<string, EnfaceProjection>();
@@ -58,21 +53,19 @@ export class EnfaceProjectionManager {
             return;
         }
 
-        const key = getSegmentationKey(item.segmentation);
-        const alreadyAttached = this.attachedItems.has(key);
+        const segmentationKey = getSegmentationKey(item.segmentation);
+        const alreadyAttached = this.attachedItems.has(segmentationKey);
 
         if (!alreadyAttached) {
-            this.attachedItems.set(key, item);
+            this.attachedItems.set(segmentationKey, item);
             item.onSliceChanged = (scanNr) => {
                 this.onSliceChanged(item, scanNr);
             };
 
-            if (!this.projections.has(key)) {
-                const { webgl, width, depth } = this.octImage;
-                this.projections.set(
-                    key,
-                    new EnfaceProjection(webgl.gl, webgl.shaders, width, depth),
-                );
+            for (const featureIndex of getEnfaceFeatureIndices(
+                item.segmentation,
+            )) {
+                this.getProjection(item, featureIndex);
             }
         }
 
@@ -91,17 +84,32 @@ export class EnfaceProjectionManager {
             }
         }
 
-        const key = getSegmentationKey(item.segmentation);
-        if (!this.attachedItems.has(key)) {
+        const segmentationKey = getSegmentationKey(item.segmentation);
+        if (!this.attachedItems.has(segmentationKey)) {
             return;
         }
 
-        this.getProjection(item).projectAll(item, this.octImage.height);
+        if (isMultiFeatureEnfaceSegmentation(item.segmentation)) {
+            // Task 3: project all layers for MC/ML.
+            return;
+        }
+
+        this.getProjection(item, SIMPLE_ENFACE_FEATURE_INDEX).projectAll(
+            item,
+            this.octImage.height,
+        );
     }
 
     onSliceChanged(item: SegmentationItem, scanNr: number): void {
+        const segmentationKey = getSegmentationKey(item.segmentation);
+
+        if (isMultiFeatureEnfaceSegmentation(item.segmentation)) {
+            // Task 3: reproject all layers for MC/ML.
+            return;
+        }
+
         const projection = this.projections.get(
-            getSegmentationKey(item.segmentation),
+            getEnfaceLayerKey(segmentationKey, SIMPLE_ENFACE_FEATURE_INDEX),
         );
         if (!projection) {
             return;
@@ -120,6 +128,7 @@ export class EnfaceProjectionManager {
         segmentation: Segmentation;
         segmentationItem: SegmentationItem;
         projection: EnfaceProjection;
+        featureIndex: number;
     }[] {
         const ctx = this.mainViewerContext?.segmentationContext;
         if (!ctx) {
@@ -130,6 +139,7 @@ export class EnfaceProjectionManager {
             segmentation: Segmentation;
             segmentationItem: SegmentationItem;
             projection: EnfaceProjection;
+            featureIndex: number;
         }[] = [];
 
         for (const segmentation of [
@@ -139,14 +149,30 @@ export class EnfaceProjectionManager {
             if (!isProjectable(segmentation)) {
                 continue;
             }
-            const key = getSegmentationKey(segmentation);
+
+            if (isMultiFeatureEnfaceSegmentation(segmentation)) {
+                // Task 4: filter by activeIndices.
+                continue;
+            }
+
+            const segmentationKey = getSegmentationKey(segmentation);
             const segmentationItem = ctx.getSegmentationItem(segmentation);
             this.attachSegmentationItem(segmentationItem);
-            const projection = this.projections.get(key);
+            const projection = this.projections.get(
+                getEnfaceLayerKey(
+                    segmentationKey,
+                    SIMPLE_ENFACE_FEATURE_INDEX,
+                ),
+            );
             if (!projection) {
                 continue;
             }
-            result.push({ segmentation, segmentationItem, projection });
+            result.push({
+                segmentation,
+                segmentationItem,
+                projection,
+                featureIndex: SIMPLE_ENFACE_FEATURE_INDEX,
+            });
         }
 
         return result;
@@ -161,9 +187,13 @@ export class EnfaceProjectionManager {
         this.mainViewerContext = undefined;
     }
 
-    private getProjection(item: SegmentationItem): EnfaceProjection {
-        const key = getSegmentationKey(item.segmentation);
-        let projection = this.projections.get(key);
+    private getProjection(
+        item: SegmentationItem,
+        featureIndex: number,
+    ): EnfaceProjection {
+        const segmentationKey = getSegmentationKey(item.segmentation);
+        const layerKey = getEnfaceLayerKey(segmentationKey, featureIndex);
+        let projection = this.projections.get(layerKey);
         if (!projection) {
             const { webgl, width, depth } = this.octImage;
             projection = new EnfaceProjection(
@@ -172,7 +202,7 @@ export class EnfaceProjectionManager {
                 width,
                 depth,
             );
-            this.projections.set(key, projection);
+            this.projections.set(layerKey, projection);
         }
         return projection;
     }
