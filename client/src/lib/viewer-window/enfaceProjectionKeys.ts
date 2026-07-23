@@ -4,6 +4,7 @@ import type {
 } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { colors } from "$lib/viewer/overlays/colors";
 import type { Color } from "$lib/utils";
+import { subfeatureBit } from "$lib/viewer-window/panelSegmentation/subfeatureBits";
 
 import { SIMPLE_ENFACE_FEATURE_INDEX } from "$lib/webgl/enfaceProjectionConstants";
 
@@ -68,13 +69,6 @@ export function isMultiFeatureEnfaceSegmentation(
     return rep === "MultiClass" || rep === "MultiLabel";
 }
 
-/** Bit for a 1-based subfeature index (matches segmentationContext / B-scan shaders). */
-function getSubfeatureBit(featureIndex: number): number {
-    return featureIndex > 0
-        ? ((1 << (featureIndex - 1)) >>> 0)
-        : (1 >>> 0);
-}
-
 /** Active-feature mask for MC/ML (same as MultiClassMask / MultiLabelMask.getBitmask). */
 export function getActiveFeatureMask(
     segmentation: Segmentation,
@@ -90,12 +84,12 @@ export function getActiveFeatureMask(
     if (Array.isArray(activeIndices)) {
         let bitmask = 0;
         for (const index of activeIndices) {
-            bitmask |= getSubfeatureBit(index);
+            bitmask |= subfeatureBit(index);
         }
         return bitmask >>> 0;
     }
 
-    return getSubfeatureBit(activeIndices);
+    return subfeatureBit(activeIndices);
 }
 
 /** Whether an enface layer passes the subfeature eye toggle (u_visible_feature_mask). */
@@ -131,7 +125,7 @@ export function getEnfaceLayerAlpha(
         segmentation,
         segmentationContext.activeIndices,
     );
-    const featureBit = getSubfeatureBit(featureIndex);
+    const featureBit = subfeatureBit(featureIndex);
 
     if (rep === "MultiClass") {
         const showHighlight =
