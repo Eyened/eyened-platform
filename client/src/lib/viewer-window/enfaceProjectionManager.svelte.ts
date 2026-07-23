@@ -5,16 +5,26 @@ import {
 import {
     getEnfaceFeatureIndices,
     getEnfaceLayerKey,
+    getSubfeatureColor,
     isMultiFeatureEnfaceSegmentation,
     isProjectable,
-    SIMPLE_ENFACE_FEATURE_INDEX,
 } from "$lib/viewer-window/enfaceProjectionKeys";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
+import { colors } from "$lib/viewer/overlays/colors";
+import type { Color } from "$lib/utils";
 import { EnfaceProjection } from "$lib/webgl/enfaceProjection";
 import type { Image2D } from "$lib/webgl/image2D";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import { SvelteMap } from "svelte/reactivity";
+
+export type VisibleEnfaceProjection = {
+    segmentation: Segmentation;
+    segmentationItem: SegmentationItem;
+    projection: EnfaceProjection;
+    featureIndex: number;
+    color: Color;
+};
 
 export class EnfaceProjectionManager {
     private readonly projections = new SvelteMap<string, EnfaceProjection>();
@@ -67,9 +77,19 @@ export class EnfaceProjectionManager {
             )) {
                 this.getProjection(item, featureIndex);
             }
-        }
 
-        void this.projectAllWhenReady(item);
+            void this.projectAllWhenReady(item);
+        }
+    }
+
+    private ensureAttached(item: SegmentationItem): boolean {
+        if (!isProjectable(item.segmentation)) {
+            return false;
+        }
+        if (!this.attachedItems.has(getSegmentationKey(item.segmentation))) {
+            this.attachSegmentationItem(item);
+        }
+        return this.attachedItems.has(getSegmentationKey(item.segmentation));
     }
 
     private async projectAllWhenReady(item: SegmentationItem): Promise<void> {
@@ -89,58 +109,42 @@ export class EnfaceProjectionManager {
             return;
         }
 
-        if (isMultiFeatureEnfaceSegmentation(item.segmentation)) {
-            // Task 3: project all layers for MC/ML.
-            return;
+        const bscanHeight = this.octImage.height;
+        for (const featureIndex of getEnfaceFeatureIndices(item.segmentation)) {
+            this.getProjection(item, featureIndex).projectAllLayers(
+                item,
+                featureIndex,
+                bscanHeight,
+            );
         }
-
-        this.getProjection(item, SIMPLE_ENFACE_FEATURE_INDEX).projectAll(
-            item,
-            this.octImage.height,
-        );
     }
 
     onSliceChanged(item: SegmentationItem, scanNr: number): void {
-        const segmentationKey = getSegmentationKey(item.segmentation);
-
-        if (isMultiFeatureEnfaceSegmentation(item.segmentation)) {
-            // Task 3: reproject all layers for MC/ML.
-            return;
-        }
-
-        const projection = this.projections.get(
-            getEnfaceLayerKey(segmentationKey, SIMPLE_ENFACE_FEATURE_INDEX),
-        );
-        if (!projection) {
-            return;
-        }
-
         const state = item.segmentationStates.get(scanNr);
-        if (!state) {
-            projection.clearSlice(scanNr);
-            return;
-        }
+        const bscanHeight = this.octImage.height;
 
-        projection.projectSlice(scanNr, state.mask, this.octImage.height);
+        for (const featureIndex of getEnfaceFeatureIndices(item.segmentation)) {
+            const projection = this.getProjection(item, featureIndex);
+            if (!state) {
+                projection.clearSlice(scanNr);
+            } else {
+                projection.projectSliceForFeature(
+                    scanNr,
+                    state.mask,
+                    featureIndex,
+                    bscanHeight,
+                );
+            }
+        }
     }
 
-    getVisibleProjections(): {
-        segmentation: Segmentation;
-        segmentationItem: SegmentationItem;
-        projection: EnfaceProjection;
-        featureIndex: number;
-    }[] {
+    getVisibleProjections(): VisibleEnfaceProjection[] {
         const ctx = this.mainViewerContext?.segmentationContext;
         if (!ctx) {
             return [];
         }
 
-        const result: {
-            segmentation: Segmentation;
-            segmentationItem: SegmentationItem;
-            projection: EnfaceProjection;
-            featureIndex: number;
-        }[] = [];
+        const result: VisibleEnfaceProjection[] = [];
 
         for (const segmentation of [
             ...ctx.visibleGraderSegmentations,
@@ -150,32 +154,44 @@ export class EnfaceProjectionManager {
                 continue;
             }
 
-            if (isMultiFeatureEnfaceSegmentation(segmentation)) {
-                // Task 4: filter by activeIndices.
+            const segmentationKey = getSegmentationKey(segmentation);
+            const segmentationItem = ctx.getSegmentationItem(segmentation);
+            if (!this.ensureAttached(segmentationItem)) {
                 continue;
             }
 
-            const segmentationKey = getSegmentationKey(segmentation);
-            const segmentationItem = ctx.getSegmentationItem(segmentation);
-            this.attachSegmentationItem(segmentationItem);
-            const projection = this.projections.get(
-                getEnfaceLayerKey(
-                    segmentationKey,
-                    SIMPLE_ENFACE_FEATURE_INDEX,
-                ),
-            );
-            if (!projection) {
-                continue;
+            for (const featureIndex of getEnfaceFeatureIndices(segmentation)) {
+                const projection = this.projections.get(
+                    getEnfaceLayerKey(segmentationKey, featureIndex),
+                );
+                if (!projection) {
+                    continue;
+                }
+
+                result.push({
+                    segmentation,
+                    segmentationItem,
+                    projection,
+                    featureIndex,
+                    color: this.getEnfaceLayerColor(segmentation, featureIndex),
+                });
             }
-            result.push({
-                segmentation,
-                segmentationItem,
-                projection,
-                featureIndex: SIMPLE_ENFACE_FEATURE_INDEX,
-            });
         }
 
         return result;
+    }
+
+    private getEnfaceLayerColor(
+        segmentation: Segmentation,
+        featureIndex: number,
+    ): Color {
+        if (isMultiFeatureEnfaceSegmentation(segmentation)) {
+            return getSubfeatureColor(featureIndex);
+        }
+
+        return (
+            this.mainViewerContext?.getFeatureColor(segmentation) ?? colors[0]
+        );
     }
 
     dispose(): void {

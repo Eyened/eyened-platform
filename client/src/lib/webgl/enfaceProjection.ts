@@ -186,9 +186,26 @@ export class EnfaceProjection {
         segmentationItem: SegmentationItem,
         bscanHeight: number,
     ): void {
+        this.projectAllLayers(
+            segmentationItem,
+            SIMPLE_ENFACE_FEATURE_INDEX,
+            bscanHeight,
+        );
+    }
+
+    projectAllLayers(
+        segmentationItem: SegmentationItem,
+        featureIndex: number,
+        bscanHeight: number,
+    ): void {
         this.clearAll();
         for (const [scanNr, state] of segmentationItem.segmentationStates) {
-            this.projectSlice(scanNr, state.mask, bscanHeight);
+            this.projectSliceForFeature(
+                scanNr,
+                state.mask,
+                featureIndex,
+                bscanHeight,
+            );
         }
     }
 
