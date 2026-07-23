@@ -4,9 +4,11 @@ import type { AbstractImage } from "./abstractImage";
 import type { RenderTarget } from "./types";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import fs_renderImage2D from "./glsl/fs_render_image2D.frag";
+import fs_renderGrayscale2D from "./glsl/fs_render_grayscale2D.frag";
 import fs_renderLuminance from "./glsl/fs_render_luminance.frag";
 import fs_renderImage3D from "./glsl/fs_render_image3D.frag";
 import type { Image3D } from "./image3D";
+import { ImageSliceStack } from "./imageSliceStack";
 
 export interface ImageRenderer {
     renderImage(viewerContext: ViewerContext, renderTarget: RenderTarget): void;
@@ -14,12 +16,17 @@ export interface ImageRenderer {
 
 export class BaseImageRenderer implements ImageRenderer {
     private readonly shaderBase: TextureShaderProgram;
+    private readonly shaderGrayscale: TextureShaderProgram;
     private readonly shaderLuminance: TextureShaderProgram;
     private readonly shader3D: TextureShaderProgram;
 
     constructor(private readonly image: AbstractImage) {
         const { webgl } = image;
         this.shaderBase = new TextureShaderProgram(webgl, fs_renderImage2D);
+        this.shaderGrayscale = new TextureShaderProgram(
+            webgl,
+            fs_renderGrayscale2D,
+        );
         this.shaderLuminance = new TextureShaderProgram(
             webgl,
             fs_renderLuminance,
@@ -32,6 +39,31 @@ export class BaseImageRenderer implements ImageRenderer {
 
         const uniforms = getBaseUniforms(viewerContext);
         const { renderMode } = viewerContext;
+
+        if (image instanceof ImageSliceStack) {
+            image.setActiveSliceIndex(viewerContext.index);
+
+            if (renderMode == "CLAHE") {
+                image.getClaheSliceTexture(viewerContext.index);
+                const claheTexture = image.getClaheSliceTextureSync(
+                    viewerContext.index,
+                );
+                if (claheTexture) {
+                    uniforms.u_image = claheTexture.texture;
+                    this.shaderBase.pass(renderTarget, uniforms);
+                } else {
+                    uniforms.u_image = image.getSliceTexture(
+                        viewerContext.index,
+                    );
+                    this.shaderGrayscale.pass(renderTarget, uniforms);
+                }
+            } else {
+                uniforms.u_image = image.getSliceTexture(viewerContext.index);
+                this.shaderGrayscale.pass(renderTarget, uniforms);
+            }
+
+            return;
+        }
 
         if (image.is3D) {
             if (renderMode == "CLAHE") {

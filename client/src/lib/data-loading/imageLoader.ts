@@ -1,5 +1,7 @@
+import { createVolumeImage } from "$lib/webgl/createVolumeImage";
 import { Image2D } from "$lib/webgl/image2D";
 import { Image3D } from "$lib/webgl/image3D";
+import { ImageSliceStack } from "$lib/webgl/imageSliceStack";
 import type { Dimensions } from "$lib/webgl/types";
 import type { WebGL } from "$lib/webgl/webgl";
 import type { ImageGET } from "../../types/openapi_types";
@@ -19,7 +21,11 @@ cornerstoneWADOImageLoader.configure({
     useWebWorkers: true,
 });
 
-export type LoadedImages = [Image2D] | [Image3D] | [Image2D, Image3D];
+export type LoadedImages =
+    | [Image2D]
+    | [Image3D]
+    | [ImageSliceStack]
+    | [Image2D, Image3D];
 
 export class ImageLoader {
     minBscansForEnface = 5;
@@ -41,7 +47,7 @@ export class ImageLoader {
                 img_id,
                 meta,
             );
-            return this.returnImage3D(image);
+            return this.returnLoadedVolume(image);
         } else if (dataFormat === "dicom") {
             return this.loadDicom(instance, img_id, imageId);
         } else if (dataFormat === "png_series") {
@@ -94,7 +100,7 @@ export class ImageLoader {
                     ),
                 ];
             }
-            const img3d = new Image3D(
+            const volume = createVolumeImage(
                 instance,
                 this.webgl,
                 img_id,
@@ -102,10 +108,20 @@ export class ImageLoader {
                 dimensions!,
                 meta,
             );
-            return await this.returnImage3D(img3d);
+            return await this.returnLoadedVolume(volume);
         }
 
         throw new Error("No image metadata found for png_series");
+    }
+
+    async returnLoadedVolume(
+        volume: Image2D | Image3D | ImageSliceStack,
+    ): Promise<LoadedImages> {
+        if (volume instanceof Image2D || volume instanceof ImageSliceStack) {
+            return [volume];
+        }
+
+        return this.returnImage3D(volume);
     }
 
     async returnImage3D(img3d: Image3D): Promise<LoadedImages> {
@@ -151,7 +167,7 @@ export class ImageLoader {
         url: string,
         img_id: string,
         meta?: any,
-    ): Promise<Image3D> {
+    ): Promise<Image2D | Image3D | ImageSliceStack> {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
         const pixelData = new Uint8Array(buffer);
@@ -196,7 +212,7 @@ export class ImageLoader {
             dimensions.width_mm =
                 instance.resolution_horizontal * dimensions.width;
         }
-        return new Image3D(
+        return createVolumeImage(
             instance,
             this.webgl,
             img_id,
@@ -232,8 +248,8 @@ export class ImageLoader {
                 pixelData.dataOffset,
                 pixelData.dataOffset + pixelData.length,
             );
-            return this.returnImage3D(
-                new Image3D(
+            return this.returnLoadedVolume(
+                createVolumeImage(
                     instance,
                     this.webgl,
                     img_id,
@@ -255,8 +271,8 @@ export class ImageLoader {
                     i * width * height,
                 );
             }
-            return this.returnImage3D(
-                new Image3D(
+            return this.returnLoadedVolume(
+                createVolumeImage(
                     instance,
                     this.webgl,
                     img_id,
@@ -309,8 +325,8 @@ export class ImageLoader {
                 ),
             ];
         }
-        return this.returnImage3D(
-            new Image3D(
+        return this.returnLoadedVolume(
+            createVolumeImage(
                 instance,
                 this.webgl,
                 img_id,
