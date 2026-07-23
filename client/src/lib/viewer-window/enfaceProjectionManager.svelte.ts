@@ -5,14 +5,10 @@ import {
 import {
     getEnfaceFeatureIndices,
     getEnfaceLayerKey,
-    getEnfaceLayerAlpha,
-    getSubfeatureColor,
-    isEnfaceLayerVisible,
-    isMultiFeatureEnfaceSegmentation,
     isProjectable,
 } from "$lib/viewer-window/enfaceProjectionKeys";
+import { enumerateVisibleEnfaceLayers } from "$lib/viewer-window/enfaceProjectionVisibility";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
-import { colors } from "$lib/viewer/overlays/colors";
 import type { Color } from "$lib/utils";
 import { EnfaceProjection } from "$lib/webgl/enfaceProjection";
 import type { Image3D } from "$lib/webgl/image3D";
@@ -144,71 +140,49 @@ export class EnfaceProjectionManager {
             return [];
         }
 
-        const result: VisibleEnfaceProjection[] = [];
-
         for (const segmentation of [
             ...ctx.visibleGraderSegmentations,
             ...ctx.visibleModelSegmentations,
         ]) {
-            if (!isProjectable(segmentation)) {
-                continue;
+            if (isProjectable(segmentation)) {
+                this.ensureAttached(ctx.getSegmentationItem(segmentation));
             }
+        }
 
-            const segmentationKey = getSegmentationKey(segmentation);
-            const segmentationItem = ctx.getSegmentationItem(segmentation);
-            if (!this.ensureAttached(segmentationItem)) {
-                continue;
-            }
-
-            for (const featureIndex of getEnfaceFeatureIndices(segmentation)) {
-                if (
-                    !isEnfaceLayerVisible(segmentation, featureIndex, ctx)
-                ) {
-                    continue;
-                }
-
-                const layerAlpha = getEnfaceLayerAlpha(
-                    segmentation,
-                    featureIndex,
-                    ctx,
-                    this.mainViewerContext?.highlightedFeatureIndex,
-                );
-                if (layerAlpha <= 0) {
-                    continue;
-                }
-
-                const projection = this.projections.get(
-                    getEnfaceLayerKey(segmentationKey, featureIndex),
-                );
-                if (!projection) {
-                    continue;
-                }
-
-                result.push({
+        return enumerateVisibleEnfaceLayers(
+            ctx,
+            this.mainViewerContext,
+            this.attachedItems,
+        )
+            .map(
+                ({
                     segmentation,
                     segmentationItem,
-                    projection,
                     featureIndex,
-                    color: this.getEnfaceLayerColor(segmentation, featureIndex),
                     layerAlpha,
-                });
-            }
-        }
-
-        return result;
-    }
-
-    private getEnfaceLayerColor(
-        segmentation: Segmentation,
-        featureIndex: number,
-    ): Color {
-        if (isMultiFeatureEnfaceSegmentation(segmentation)) {
-            return getSubfeatureColor(featureIndex);
-        }
-
-        return (
-            this.mainViewerContext?.getFeatureColor(segmentation) ?? colors[0]
-        );
+                    color,
+                }) => {
+                    const layerKey = getEnfaceLayerKey(
+                        getSegmentationKey(segmentation),
+                        featureIndex,
+                    );
+                    const projection = this.projections.get(layerKey);
+                    if (!projection) {
+                        return null;
+                    }
+                    return {
+                        segmentation,
+                        segmentationItem,
+                        projection,
+                        featureIndex,
+                        color,
+                        layerAlpha,
+                    };
+                },
+            )
+            .filter(
+                (entry): entry is VisibleEnfaceProjection => entry !== null,
+            );
     }
 
     dispose(): void {
