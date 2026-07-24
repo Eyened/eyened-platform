@@ -1,13 +1,24 @@
 <script lang="ts">
     import Button from "$lib/components/ui/button/button.svelte";
     import Input from "$lib/components/ui/input/input.svelte";
-    import { createFormAnnotation, formAnnotations } from "$lib/data";
+    import {
+        createFormAnnotation,
+        formAnnotations,
+        setFormAnnotationValue,
+    } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { pointArming } from "$lib/forms/pointArming.svelte";
+    import {
+        analyzePointSchema,
+        type ImagePoint,
+    } from "$lib/forms/pointSchema";
+    import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { etdrsGridType } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { ETDRSGridItemOverlay } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
-    import { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte";
+    import { PointTool } from "$lib/viewer/tools/PointTool";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { ViewerEvent } from "$lib/viewer/viewer-utils";
     import { getContext } from "svelte";
     import type {
         FormAnnotationGET,
@@ -17,6 +28,8 @@
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import ETDRSGridItem from "./ETDRSGridItem.svelte";
     import { SvelteMap, SvelteSet } from "svelte/reactivity";
+
+    type LandmarkField = "fovea" | "disc_edge";
 
     interface Props {
         active: boolean;
@@ -45,8 +58,6 @@
 
             if (formAnnotation.image_id == instance.id) return true;
 
-            // also show annotations on linked images
-            // TODO: this should be reactive?
             const linkedIDs = registration.getLinkedImgIds(image_id);
             if (linkedIDs.has(`${formAnnotation.image_id}`)) return true;
             if (linkedIDs.has(`${formAnnotation.image_id}_proj`)) return true;
@@ -55,74 +66,154 @@
     );
 
     let overlayIds = new SvelteSet<number>();
-    let toolIds = new SvelteSet<number>();
     let overlays = new SvelteMap<number, () => void>();
-    let tools = new SvelteMap<number, () => void>();
+
+    let armedAnnotationId = $state<number | undefined>(undefined);
+    let armedField = $state<LandmarkField | undefined>(undefined);
+
+    function landmarkAnalysis(field: LandmarkField) {
+        const props = (etdrsSchema.schema as JSONSchema).properties?.[field];
+        const withWidget: JSONSchema = {
+            ...(props ?? {}),
+            "x-eyened-widget": "point",
+            type: "object",
+            properties: {
+                x: { type: "number" },
+                y: { type: "number" },
+            },
+            required: ["x", "y"],
+        };
+        return analyzePointSchema(withWidget, "ImageInstance")!;
+    }
+
+    function placeLandmarkAtCursor(
+        formAnnotation: FormAnnotationGET,
+        field: LandmarkField,
+        e: ViewerEvent<KeyboardEvent>,
+    ) {
+        if (!globalContext.canEdit(formAnnotation)) return;
+        const position = e.viewerContext.viewerToImageCoordinates(e.cursor);
+        const point: ImagePoint = { x: position.x, y: position.y };
+        const form_data = {
+            ...(formAnnotation.form_data || {}),
+            [field]: point,
+        };
+        formAnnotation.form_data = form_data;
+        setFormAnnotationValue(formAnnotation.id, form_data);
+        armLandmark(formAnnotation, field);
+    }
+
+    function armLandmark(
+        formAnnotation: FormAnnotationGET,
+        field: LandmarkField,
+    ) {
+        if (!filtered.some((f) => f.id === formAnnotation.id)) return;
+        if (!globalContext.canEdit(formAnnotation)) return;
+
+        const key = `etdrs:${formAnnotation.id}:${field}`;
+        const analysis = landmarkAnalysis(field);
+
+        pointArming.arm(key, () => {
+            armedAnnotationId = formAnnotation.id;
+            armedField = field;
+            const dispose = viewerContext.addOverlay(
+                new PointTool({
+                    canEdit: true,
+                    analysis,
+                    label: field,
+                    getPublicId: () => instance.id,
+                    getFieldValue: () =>
+                        (formAnnotation.form_data as any)?.[field],
+                    setFieldValue: (next) => {
+                        const form_data = {
+                            ...(formAnnotation.form_data || {}),
+                            [field]: next,
+                        };
+                        formAnnotation.form_data = form_data;
+                        setFormAnnotationValue(formAnnotation.id, form_data);
+                    },
+                    onKey: (e) => {
+                        const k = e.event.key.toLowerCase();
+                        if (k === "f") {
+                            placeLandmarkAtCursor(formAnnotation, "fovea", e);
+                        } else if (k === "d") {
+                            placeLandmarkAtCursor(
+                                formAnnotation,
+                                "disc_edge",
+                                e,
+                            );
+                        }
+                    },
+                }),
+            );
+            return () => {
+                dispose();
+                if (armedAnnotationId === formAnnotation.id) {
+                    armedAnnotationId = undefined;
+                    armedField = undefined;
+                }
+            };
+        });
+    }
 
     function deactivateAll() {
         removeAutoOverlay?.();
         removeAutoOverlay = undefined;
         for (const remove of overlays.values()) remove();
-        for (const remove of tools.values()) remove();
         overlays.clear();
-        tools.clear();
         overlayIds.clear();
-        toolIds.clear();
-    }
-
-    function toggle(
-        formAnnotation: FormAnnotationGET,
-        activeIds: SvelteSet<number>,
-        items: SvelteMap<number, () => void>,
-        createItem: () => any,
-        active?: boolean,
-        precondition?: () => boolean,
-    ) {
-        if (!filtered.some((f) => f.id === formAnnotation.id)) return;
-        if (precondition && !precondition()) return;
-        const id = formAnnotation.id;
-        const isActive = activeIds.has(id);
-        const shouldBeActive = active !== undefined ? active : !isActive;
-
-        if (shouldBeActive === isActive) return;
-
-        if (shouldBeActive) {
-            activeIds.add(id);
-            items.set(id, viewerContext.addOverlay(createItem()));
-        } else {
-            items.get(id)?.();
-            items.delete(id);
-            activeIds.delete(id);
-        }
+        pointArming.disarm();
+        armedAnnotationId = undefined;
+        armedField = undefined;
     }
 
     function toggleOverlay(
         formAnnotation: FormAnnotationGET,
         active?: boolean,
     ) {
-        toggle(
-            formAnnotation,
-            overlayIds,
-            overlays,
-            () =>
-                new ETDRSGridItemOverlay(
-                    formAnnotation as any,
-                    registration,
-                    settings,
+        if (!filtered.some((f) => f.id === formAnnotation.id)) return;
+        const id = formAnnotation.id;
+        const isActive = overlayIds.has(id);
+        const shouldBeActive = active !== undefined ? active : !isActive;
+        if (shouldBeActive === isActive) return;
+
+        if (shouldBeActive) {
+            overlayIds.add(id);
+            overlays.set(
+                id,
+                viewerContext.addOverlay(
+                    new ETDRSGridItemOverlay(
+                        formAnnotation as any,
+                        registration,
+                        settings,
+                    ),
                 ),
-            active,
-        );
+            );
+        } else {
+            overlays.get(id)?.();
+            overlays.delete(id);
+            overlayIds.delete(id);
+        }
     }
 
     function toggleTool(formAnnotation: FormAnnotationGET, active?: boolean) {
-        toggle(
-            formAnnotation,
-            toolIds,
-            tools,
-            () => new ETDRSGridTool(formAnnotation),
-            active,
-            () => globalContext.canEdit(formAnnotation),
-        );
+        if (!filtered.some((f) => f.id === formAnnotation.id)) return;
+        if (!globalContext.canEdit(formAnnotation)) return;
+
+        const isActive = armedAnnotationId === formAnnotation.id;
+        const shouldBeActive = active !== undefined ? active : !isActive;
+
+        if (!shouldBeActive) {
+            if (isActive) {
+                pointArming.disarm();
+                armedAnnotationId = undefined;
+                armedField = undefined;
+            }
+            return;
+        }
+
+        if (isActive) return;
+        armLandmark(formAnnotation, "fovea");
     }
 
     async function create() {
@@ -137,7 +228,7 @@
             form_data: {},
         });
         toggleOverlay(newAnnotation, true);
-        toggleTool(newAnnotation, true);
+        armLandmark(newAnnotation, "fovea");
     }
 
     const autoItem: etdrsGridType | undefined = $derived.by(() => {
@@ -156,7 +247,6 @@
         };
     });
 
-    // Manage an overlay instance for the auto item
     let removeAutoOverlay: (() => void) | undefined = $state(undefined);
     function toggleVisisble() {
         if (!autoItem) return;
@@ -206,9 +296,13 @@
                 {formAnnotation}
                 {settings}
                 overlayActive={overlayIds.has(formAnnotation.id)}
-                toolActive={toolIds.has(formAnnotation.id)}
+                toolActive={armedAnnotationId === formAnnotation.id}
+                armedField={armedAnnotationId === formAnnotation.id
+                    ? armedField
+                    : undefined}
                 onToggleOverlay={toggleOverlay}
                 onToggleTool={toggleTool}
+                onArmLandmark={armLandmark}
             />
         {/each}
     </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button";
     import { deleteFormAnnotation } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
@@ -11,11 +12,14 @@
     const taskContext = getContext<TaskContext>("taskContext");
     const subTask = taskContext?.subTask;
 
+    type LandmarkField = "fovea" | "disc_edge";
+
     interface Props {
         formAnnotation: FormAnnotationGET;
         settings: { radiusFraction: number };
         overlayActive: boolean;
         toolActive: boolean;
+        armedField?: LandmarkField;
         onToggleOverlay: (
             formAnnotation: FormAnnotationGET,
             active?: boolean,
@@ -24,13 +28,19 @@
             formAnnotation: FormAnnotationGET,
             active?: boolean,
         ) => void;
+        onArmLandmark: (
+            formAnnotation: FormAnnotationGET,
+            field: LandmarkField,
+        ) => void;
     }
     let {
         formAnnotation,
         overlayActive,
         toolActive,
+        armedField,
         onToggleOverlay,
         onToggleTool,
+        onArmLandmark,
     }: Props = $props();
 
     const sameSubTask = formAnnotation.sub_task_id === subTask?.id;
@@ -88,6 +98,24 @@
             <code class="annotation-id-value">[{formAnnotation.id}]</code>
         </div>
     </header>
+    {#if toolActive && canEditForm}
+        <div class="landmarks">
+            <Button
+                size="sm"
+                variant={armedField === "fovea" ? "default" : "outline"}
+                onclick={() => onArmLandmark(formAnnotation, "fovea")}
+            >
+                Fovea (f)
+            </Button>
+            <Button
+                size="sm"
+                variant={armedField === "disc_edge" ? "default" : "outline"}
+                onclick={() => onArmLandmark(formAnnotation, "disc_edge")}
+            >
+                Disc (d)
+            </Button>
+        </div>
+    {/if}
     <dl class="details">
         <div>
             <dt>ImageID:</dt>
@@ -120,7 +148,6 @@
 </article>
 
 <style>
-    /* Article container */
     article.info {
         display: flex;
         background-color: rgba(255, 255, 255, 0.1);
@@ -142,27 +169,30 @@
         background-color: rgba(100, 255, 100, 0.4);
     }
 
-    /* Header section */
     header.top {
         display: flex;
         align-items: center;
         gap: 0.5em;
     }
 
-    /* Icons navigation - non-selectable */
     nav.icons {
         display: flex;
         flex: 1;
         align-items: center;
         gap: 0.2em;
-        user-select: none; /* Prevent selection of UI controls */
+        user-select: none;
     }
 
     span.spacer {
         flex: 1;
     }
 
-    /* Annotation ID - selectable text */
+    div.landmarks {
+        display: flex;
+        gap: 0.35em;
+        padding: 0.2em 0;
+    }
+
     div.annotation-id {
         display: flex;
         gap: 0.3em;
@@ -171,11 +201,11 @@
     }
 
     span.creator-name {
-        user-select: text; /* Allow selection of creator name */
+        user-select: text;
     }
 
     code.annotation-id-value {
-        user-select: text; /* Allow selection of annotation ID */
+        user-select: text;
         font-family: inherit;
         font-size: inherit;
         background: transparent;
@@ -183,7 +213,6 @@
         border: none;
     }
 
-    /* Details list */
     dl.details {
         display: flex;
         flex-direction: column;
@@ -202,7 +231,7 @@
 
     dt {
         font-weight: normal;
-        user-select: text; /* Allow selection of labels */
+        user-select: text;
         min-width: fit-content;
     }
 
@@ -213,7 +242,7 @@
     }
 
     code.value {
-        user-select: text; /* Allow selection of values */
+        user-select: text;
         font-family: inherit;
         font-size: inherit;
         background: transparent;

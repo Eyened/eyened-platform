@@ -33,7 +33,6 @@ export type ToolName =
     | "brush"
     | "polygon"
     | "registration"
-    | "ETRDS-grid"
     | "AV nicking tool"
     | "point";
 
