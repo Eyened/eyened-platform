@@ -1,7 +1,10 @@
 import type { Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { RenderTarget } from "$lib/webgl/types";
-import type { ViewerContext } from "../viewerContext.svelte";
+import {
+    CursorPriority,
+    type ViewerContext,
+} from "../viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { SvelteSet } from "svelte/reactivity";
 
@@ -69,12 +72,10 @@ export class MeasureTool implements Overlay {
                 const dy = pt.y - cursor.y;
 
                 if (dx * dx + dy * dy < radius * radius) {
-                    viewerContext.cursorStyle = "pointer";
                     return { point, line };
                 }
             }
         }
-        viewerContext.cursorStyle = "crosshair";
     }
 
     pointerdown(pointerEvent: ViewerEvent<PointerEvent>) {
@@ -130,9 +131,9 @@ export class MeasureTool implements Overlay {
             }
         }
         if (this.hover) {
-            viewerContext.cursorStyle = "pointer";
+            viewerContext.claimCursor("pointer", CursorPriority.Hover);
         } else {
-            viewerContext.cursorStyle = "crosshair";
+            viewerContext.claimCursor("crosshair", CursorPriority.Tool);
         }
     }
 

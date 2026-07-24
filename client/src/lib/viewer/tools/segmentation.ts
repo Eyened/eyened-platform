@@ -4,7 +4,10 @@ import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/s
 import { segToImageMatrix } from "$lib/webgl/segmentationProjection";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
-import type { ViewerContext } from "../viewerContext.svelte";
+import {
+    CursorPriority,
+    type ViewerContext,
+} from "../viewerContext.svelte";
 
 const paintKey = "Q";
 const eraseKey = "W";
@@ -168,7 +171,7 @@ export abstract class SegmentationTool implements Overlay {
 
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         if (this.syncing) {
-            viewerContext.cursorStyle = "wait";
+            viewerContext.claimCursor("wait", CursorPriority.Busy);
         }
     }
 }

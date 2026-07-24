@@ -13,7 +13,10 @@ import {
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
-import type { ViewerContext } from "../viewerContext.svelte";
+import {
+    CursorPriority,
+    type ViewerContext,
+} from "../viewerContext.svelte";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
@@ -115,9 +118,21 @@ export class PointTool implements Overlay {
         );
         if (newIndex < 0) newIndex = Math.max(0, after.length - 1);
         this.commit(after);
-        this.activePointIndex = newIndex;
-        this.hoverPointIndex = newIndex;
+        this.beginDrag(viewerContext, newIndex);
         this.options.onBecomePlacementTarget?.();
+    }
+
+    private beginDrag(viewerContext: ViewerContext, index: number) {
+        this.activePointIndex = index;
+        this.hoverPointIndex = index;
+        viewerContext.claimCursor("grabbing", CursorPriority.Drag);
+    }
+
+    private endDrag(viewerContext: ViewerContext, cursor: Position2D) {
+        const wasDragging = this.activePointIndex !== undefined;
+        this.activePointIndex = undefined;
+        this.hoverPointIndex = this.findHit(cursor, viewerContext);
+        if (wasDragging) viewerContext.resetCursor();
     }
 
     private siblingOwnsHit(
@@ -130,19 +145,6 @@ export class PointTool implements Overlay {
         return false;
     }
 
-    private siblingHasHighlight(): boolean {
-        for (const tool of liveTools) {
-            if (tool === this) continue;
-            if (
-                tool.activePointIndex !== undefined ||
-                tool.hoverPointIndex !== undefined
-            ) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     keyup(e: ViewerEvent<KeyboardEvent>) {
         const { event, viewerContext, cursor } = e;
 
@@ -150,8 +152,7 @@ export class PointTool implements Overlay {
             this.options.placeKey &&
             event.key.toLowerCase() === this.options.placeKey.toLowerCase()
         ) {
-            this.activePointIndex = undefined;
-            this.hoverPointIndex = this.findHit(cursor, viewerContext);
+            this.endDrag(viewerContext, cursor);
         }
 
         if (
@@ -206,8 +207,7 @@ export class PointTool implements Overlay {
         if (event.button === 0) {
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
-                this.activePointIndex = hit;
-                this.hoverPointIndex = hit;
+                this.beginDrag(viewerContext, hit);
                 this.options.onBecomePlacementTarget?.();
                 return;
             }
@@ -226,8 +226,7 @@ export class PointTool implements Overlay {
         if (event.shiftKey) return;
 
         if (!this.options.canEdit) {
-            this.activePointIndex = undefined;
-            this.hoverPointIndex = this.findHit(cursor, viewerContext);
+            this.endDrag(viewerContext, cursor);
             return;
         }
 
@@ -245,8 +244,7 @@ export class PointTool implements Overlay {
             }
         }
 
-        this.activePointIndex = undefined;
-        this.hoverPointIndex = this.findHit(cursor, viewerContext);
+        this.endDrag(viewerContext, cursor);
     }
 
     pointermove(e: ViewerEvent<PointerEvent>) {
@@ -257,6 +255,7 @@ export class PointTool implements Overlay {
             this.commit(
                 movePointAt(this.points, this.activePointIndex, position),
             );
+            viewerContext.claimCursor("grabbing", CursorPriority.Drag);
         } else {
             this.hoverPointIndex = this.findHit(cursor, viewerContext);
         }
@@ -305,13 +304,9 @@ export class PointTool implements Overlay {
                     viewerContext.imageToViewerCoordinates(highlightPoint);
                 this.fillMarker(context2D, p, r);
             }
-            viewerContext.cursorStyle = "pointer";
-        } else if (
-            this.options.canEdit &&
-            this.isPlacementTarget() &&
-            !this.siblingHasHighlight()
-        ) {
-            viewerContext.cursorStyle = "crosshair";
+        }
+        if (this.activePointIndex !== undefined) {
+            viewerContext.claimCursor("grabbing", CursorPriority.Drag);
         }
     }
 

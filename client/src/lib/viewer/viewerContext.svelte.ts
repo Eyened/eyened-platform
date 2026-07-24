@@ -58,6 +58,18 @@ export type cursorStyle =
     | "zoom-in"
     | "zoom-out";
 
+/** Higher wins for the current frame. Equal priority: last claim wins. */
+export const CursorPriority = {
+    Default: 0,
+    Tool: 1,
+    Hover: 2,
+    Drag: 3,
+    Hide: 4,
+    Busy: 5,
+} as const;
+export type CursorPriorityLevel =
+    (typeof CursorPriority)[keyof typeof CursorPriority];
+
 export class ViewerContext {
     // perhaps the typing should be improved here
     // using the same interface for repaint (Overlay) and controls (ViewerEventListener)
@@ -68,6 +80,7 @@ export class ViewerContext {
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
     cursorStyle: cursorStyle = $state("default");
+    private cursorClaimPriority = 0;
     active: boolean = $state(false);
     updatePosition: boolean = $state(true);
     axis: 0 | 1 | 2 = $state(0);
@@ -289,6 +302,35 @@ export class ViewerContext {
         return this.imageViewerTransform.apply(pixel);
     }
 
+    /**
+     * Claim the canvas cursor for this paint/event frame.
+     * Highest priority wins; equal priority keeps the latest claim.
+     * Applies immediately so event handlers (pointer/key) don't wait for repaint.
+     *
+     * Cursor is set on both the canvas and its parent (the viewer div). Pointer
+     * capture is on the div, and browsers use the capture target's cursor while
+     * a button is held — canvas-only updates are ignored during pointer drags.
+     */
+    claimCursor(style: cursorStyle, priority: CursorPriorityLevel) {
+        if (priority < this.cursorClaimPriority) return;
+        this.cursorClaimPriority = priority;
+        this.cursorStyle = style;
+        this.applyCursor(style);
+    }
+
+    /** Clear claims (e.g. when a drag ends between repaints). */
+    resetCursor() {
+        this.cursorClaimPriority = CursorPriority.Default;
+        this.cursorStyle = "default";
+        this.applyCursor("default");
+    }
+
+    private applyCursor(style: cursorStyle) {
+        this.canvas2D.style.cursor = style;
+        const parent = this.canvas2D.parentElement;
+        if (parent) parent.style.cursor = style;
+    }
+
     viewerToImageCoordinates(cursor: Position2D): Position2D {
         return this.imageViewerTransform.inverse.apply(cursor);
     }
@@ -347,12 +389,13 @@ export class ViewerContext {
             this.canvas2D.height,
         );
 
+        this.cursorClaimPriority = CursorPriority.Default;
         this.cursorStyle = "default";
         if (!this.hideOverlays) {
             for (const overlay of this.overlays.values()) {
                 overlay.repaint?.(this, renderTarget);
             }
         }
-        this.canvas2D.style.cursor = this.cursorStyle;
+        this.applyCursor(this.cursorStyle);
     }
 }

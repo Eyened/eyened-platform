@@ -2,7 +2,10 @@ import { formAnnotations } from "$lib/data";
 import type { Registration } from "$lib/registration/registration";
 import type { Position, Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
-import type { ViewerContext } from "../viewerContext.svelte";
+import {
+    CursorPriority,
+    type ViewerContext,
+} from "../viewerContext.svelte";
 
 const [C, I, O] = [1, 3, 6];
 const additionalCircles: Record<string, number> = {
@@ -219,9 +222,7 @@ export class ETDRSGridItemOverlay implements Overlay {
                 2 * Math.PI,
             );
             ctx.stroke();
-            viewerContext.cursorStyle = "none";
-        } else {
-            viewerContext.cursorStyle = "default";
+            viewerContext.claimCursor("none", CursorPriority.Hide);
         }
     }
 }
