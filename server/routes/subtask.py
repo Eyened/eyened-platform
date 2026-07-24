@@ -19,6 +19,7 @@ router = APIRouter()
 class SubTaskPATCH(BaseModel):
     comments: Optional[str] = None
     task_state: Optional[SubTaskState] = None
+    claim: Optional[bool] = None
 
 
 class AddImageRequest(BaseModel):
@@ -57,6 +58,7 @@ async def patch_subtask(
         dto.comments,
         dto.task_state,
         ActingUser(id=current_user.id, username=current_user.username),
+        claim=dto.claim,
     )
     return DTOConverter.subtask_to_get(st)
 

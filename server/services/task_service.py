@@ -8,7 +8,7 @@ from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepos
 
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
-from .exceptions import NotFoundError
+from .exceptions import ConflictError, NotFoundError
 
 
 class TaskService:
@@ -270,11 +270,18 @@ class SubTaskService:
         comments: str | None,
         task_state: SubTaskState | None,
         actor: ActingUser,
+        claim: bool | None = None,
     ) -> SubTask:
         """Update a subtask's comments/state (each optional).
 
+        If ``claim`` is True, explicitly assign the subtask to ``actor``,
+        raising ConflictError if it is already assigned to someone else.
+        Otherwise, comments/state edits auto-claim an unassigned subtask.
+
         Raises:
             NotFoundError: If the subtask does not exist.
+            ConflictError: If ``claim`` is True and the subtask is already
+                assigned.
         """
         subtask = self.subtasks.get_by_id(session, subtask_id)
         if subtask is None:
@@ -288,7 +295,17 @@ class SubTaskService:
             changes["task_state"] = f"{subtask.TaskState} -> {task_state}"
             subtask.TaskState = task_state
 
-        if comments is not None or task_state is not None:
+        if claim is True:
+            if subtask.CreatorID is not None:
+                raise ConflictError(
+                    {
+                        "code": "subtask_already_claimed",
+                        "message": "SubTask is already assigned",
+                        "creator_id": subtask.CreatorID,
+                    }
+                )
+            self.subtasks.claim_if_unassigned(session, subtask_id, actor.id)
+        elif comments is not None or task_state is not None:
             self.subtasks.claim_if_unassigned(session, subtask_id, actor.id)
 
         session.commit()
