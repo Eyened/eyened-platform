@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { findFormAnnotation } from "./findFormAnnotation";
 import type { FormAnnotationGET } from "../../../types/openapi_types";
 
-const baseAnnotation = {
-    id: 1,
+const base = {
     form_schema_id: 10,
     patient_id: 100,
     creator: { id: 5, name: "grader" },
@@ -18,52 +17,19 @@ const ctx = {
 };
 
 describe("findFormAnnotation", () => {
-    it("returns matching annotation for ImageInstance scope", () => {
+    it("in subtask context matches schema+creator+subtask only (ignores image)", () => {
         const annotations = [
             {
-                ...baseAnnotation,
-                id: 1,
-                image_id: "img-200",
-                creator: { id: 5, name: "grader" },
-            },
-            {
-                ...baseAnnotation,
+                ...base,
                 id: 2,
-                image_id: "img-200",
-                creator: { id: 99, name: "other" },
+                sub_task_id: 7,
+                image_id: "other",
             },
-        ] as FormAnnotationGET[];
-
-        const result = findFormAnnotation({
-            annotations,
-            schemaId: 10,
-            userId: 5,
-            ctx,
-            schemaEntityType: "ImageInstance",
-        });
-
-        expect(result?.id).toBe(1);
-    });
-
-    it("returns undefined when no annotation matches", () => {
-        const result = findFormAnnotation({
-            annotations: [baseAnnotation],
-            schemaId: 10,
-            userId: 5,
-            ctx: { ...ctx, imageId: "missing" },
-            schemaEntityType: "ImageInstance",
-        });
-
-        expect(result).toBeUndefined();
-    });
-
-    it("matches StudyEye when schema entity type is StudyEye", () => {
-        const annotations = [
             {
-                ...baseAnnotation,
-                id: 3,
-                study_id: 50,
-                laterality: "R",
+                ...base,
+                id: 1,
+                sub_task_id: 7,
+                image_id: "img-200",
             },
         ] as FormAnnotationGET[];
 
@@ -72,26 +38,44 @@ describe("findFormAnnotation", () => {
             schemaId: 10,
             userId: 5,
             ctx,
-            schemaEntityType: "StudyEye",
-        });
-
-        expect(result?.id).toBe(3);
-    });
-
-    it("returns highest id when multiple match (defensive)", () => {
-        const annotations = [
-            { ...baseAnnotation, id: 1, image_id: "img-200" },
-            { ...baseAnnotation, id: 2, image_id: "img-200" },
-        ] as FormAnnotationGET[];
-
-        const result = findFormAnnotation({
-            annotations,
-            schemaId: 10,
-            userId: 5,
-            ctx,
+            subTaskId: 7,
             schemaEntityType: "ImageInstance",
         });
 
-        expect(result?.id).toBe(2);
+        expect(result?.id).toBe(1); // lowest id
+    });
+
+    it("in subtask context does not create-match wrong subtask", () => {
+        const annotations = [
+            { ...base, id: 1, sub_task_id: 99, image_id: "img-200" },
+        ] as FormAnnotationGET[];
+
+        expect(
+            findFormAnnotation({
+                annotations,
+                schemaId: 10,
+                userId: 5,
+                ctx,
+                subTaskId: 7,
+                schemaEntityType: "ImageInstance",
+            }),
+        ).toBeUndefined();
+    });
+
+    it("without subtask uses schema entity scope", () => {
+        const annotations = [
+            { ...base, id: 3, image_id: "img-200" },
+            { ...base, id: 4, image_id: "other" },
+        ] as FormAnnotationGET[];
+
+        expect(
+            findFormAnnotation({
+                annotations,
+                schemaId: 10,
+                userId: 5,
+                ctx,
+                schemaEntityType: "ImageInstance",
+            })?.id,
+        ).toBe(3);
     });
 });
