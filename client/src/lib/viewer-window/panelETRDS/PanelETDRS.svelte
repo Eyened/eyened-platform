@@ -8,9 +8,7 @@
     } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { pointArming } from "$lib/forms/pointArming.svelte";
-    import {
-        analyzePointSchema,
-    } from "$lib/forms/pointSchema";
+    import { analyzePointSchema } from "$lib/forms/pointSchema";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { etdrsGridType } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
@@ -29,15 +27,14 @@
 
     type LandmarkField = "fovea" | "disc_edge";
 
-    const LANDMARKS: LandmarkField[] = ["fovea", "disc_edge"];
-    const LANDMARK_LABEL: Record<LandmarkField, string> = {
-        fovea: "fovea",
-        disc_edge: "disc",
-    };
-    const LANDMARK_KEY: Record<LandmarkField, string> = {
-        fovea: "f",
-        disc_edge: "d",
-    };
+    const LANDMARKS: {
+        field: LandmarkField;
+        label: string;
+        key: string;
+    }[] = [
+        { field: "fovea", label: "fovea", key: "f" },
+        { field: "disc_edge", label: "disc", key: "d" },
+    ];
 
     interface Props {
         active: boolean;
@@ -45,10 +42,33 @@
     }
     let { etdrsSchema }: Props = $props();
 
+    const landmarkAnalyses = $derived.by(() => {
+        const out = {} as Record<
+            LandmarkField,
+            NonNullable<ReturnType<typeof analyzePointSchema>>
+        >;
+        for (const { field } of LANDMARKS) {
+            const props = (etdrsSchema.schema as JSONSchema).properties?.[field];
+            out[field] = analyzePointSchema(
+                {
+                    ...(props ?? {}),
+                    "x-eyened-widget": "point",
+                    type: "object",
+                    properties: {
+                        x: { type: "number" },
+                        y: { type: "number" },
+                    },
+                    required: ["x", "y"],
+                },
+                "ImageInstance",
+            )!;
+        }
+        return out;
+    });
+
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
-
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -57,15 +77,12 @@
     const image = viewerContext.image;
     const instance = image.instance;
     const image_id = image.image_id;
-    let settings = $state({
-        radiusFraction: 0.85,
-    });
+    let settings = $state({ radiusFraction: 0.85 });
+
     const filtered = $derived(
         formAnnotations.filter((formAnnotation) => {
             if (formAnnotation.form_schema_id !== etdrsSchema.id) return false;
-
             if (formAnnotation.image_id == instance.id) return true;
-
             const linkedIDs = registration.getLinkedImgIds(image_id);
             if (linkedIDs.has(`${formAnnotation.image_id}`)) return true;
             if (linkedIDs.has(`${formAnnotation.image_id}_proj`)) return true;
@@ -73,27 +90,13 @@
         }),
     );
 
+    // Overlay visibility (eye) is independent of selection.
     let overlayIds = new SvelteSet<number>();
     let overlays = new SvelteMap<number, () => void>();
 
-    let selectedAnnotationId = $state<number | undefined>(undefined);
-    let armedAnnotationId = $state<number | undefined>(undefined);
-    let armedField = $state<LandmarkField | undefined>(undefined);
-
-    function landmarkAnalysis(field: LandmarkField) {
-        const props = (etdrsSchema.schema as JSONSchema).properties?.[field];
-        const withWidget: JSONSchema = {
-            ...(props ?? {}),
-            "x-eyened-widget": "point",
-            type: "object",
-            properties: {
-                x: { type: "number" },
-                y: { type: "number" },
-            },
-            required: ["x", "y"],
-        };
-        return analyzePointSchema(withWidget, "ImageInstance")!;
-    }
+    // Single selection model: which item is open, and which landmark receives empty clicks.
+    let selectedId = $state<number | undefined>(undefined);
+    let placementField = $state<LandmarkField>("fovea");
 
     function writeLandmark(
         annotationId: number,
@@ -104,59 +107,64 @@
             formAnnotations.get(annotationId) ??
             filtered.find((f) => f.id === annotationId);
         if (!existing) return;
-        const form_data = {
-            ...(existing.form_data || {}),
-            [field]: next,
-        };
+        const form_data = { ...(existing.form_data || {}), [field]: next };
         formAnnotations.set(annotationId, { ...existing, form_data });
         setFormAnnotationValue(annotationId, form_data);
     }
 
-    /** Mount both landmark PointTools; armedField selects empty-click placement. */
-    function startEdit(
+    function close() {
+        if (selectedId === undefined) return;
+        const id = selectedId;
+        pointArming.disarm(`etdrs:${id}`);
+        selectedId = undefined;
+    }
+
+    /** Open item (show grid + arm tools). Re-open same id toggles closed. */
+    function open(
         formAnnotation: FormAnnotationGET,
-        initialField: LandmarkField = "fovea",
+        field: LandmarkField = "fovea",
     ) {
         if (!filtered.some((f) => f.id === formAnnotation.id)) return;
-        if (!globalContext.canEdit(formAnnotation)) return;
 
-        const annotationId = formAnnotation.id;
-        const sessionKey = `etdrs:${annotationId}`;
-
-        if (pointArming.isArmed(sessionKey)) {
-            selectedAnnotationId = annotationId;
-            armedAnnotationId = annotationId;
-            armedField = initialField;
+        if (selectedId === formAnnotation.id) {
+            // Same item: switching landmark only, or toggle close on root re-click
+            // (root always passes default fovea — handled by selectItem).
+            placementField = field;
             return;
         }
 
-        pointArming.arm(sessionKey, () => {
-            selectedAnnotationId = annotationId;
-            armedAnnotationId = annotationId;
-            armedField = initialField;
+        ensureOverlay(formAnnotation);
+        placementField = field;
+        selectedId = formAnnotation.id;
 
+        if (!globalContext.canEdit(formAnnotation)) {
+            pointArming.disarm();
+            return;
+        }
+
+        const annotationId = formAnnotation.id;
+        pointArming.arm(`etdrs:${annotationId}`, () => {
             const disposers: Array<() => void> = [];
-
-            for (const field of LANDMARKS) {
+            for (const { field: f, label, key } of LANDMARKS) {
                 const tool = new PointTool({
                     canEdit: true,
-                    analysis: landmarkAnalysis(field),
-                    label: LANDMARK_LABEL[field],
+                    analysis: landmarkAnalyses[f],
+                    label,
                     pointStyle: "circle",
                     radius: 16,
                     color: "rgba(0, 255, 0, 1)",
                     getPublicId: () => instance.id,
                     getFieldValue: () =>
                         (formAnnotations.get(annotationId)?.form_data as any)?.[
-                            field
+                            f
                         ],
                     setFieldValue: (next) =>
-                        writeLandmark(annotationId, field, next),
-                    isPlacementTarget: () => armedField === field,
+                        writeLandmark(annotationId, f, next),
+                    isPlacementTarget: () => placementField === f,
                     onBecomePlacementTarget: () => {
-                        armedField = field;
+                        placementField = f;
                     },
-                    placeKey: LANDMARK_KEY[field],
+                    placeKey: key,
                 });
                 const remove = viewerContext.addOverlay(tool);
                 disposers.push(() => {
@@ -164,65 +172,68 @@
                     remove();
                 });
             }
-
             return () => {
                 for (const d of disposers) d();
-                if (armedAnnotationId === annotationId) {
-                    armedAnnotationId = undefined;
-                    armedField = undefined;
-                }
-                if (selectedAnnotationId === annotationId) {
-                    selectedAnnotationId = undefined;
-                }
+                if (selectedId === annotationId) selectedId = undefined;
             };
         });
     }
 
-    function setPlacementTarget(
+    function selectItem(formAnnotation: FormAnnotationGET) {
+        if (selectedId === formAnnotation.id) {
+            close();
+            return;
+        }
+        open(formAnnotation, "fovea");
+    }
+
+    function armLandmark(
         formAnnotation: FormAnnotationGET,
         field: LandmarkField,
     ) {
-        ensureOverlay(formAnnotation);
-        selectedAnnotationId = formAnnotation.id;
-        if (armedAnnotationId === formAnnotation.id) {
-            armedField = field;
+        if (selectedId === formAnnotation.id) {
+            placementField = field;
             return;
         }
-        startEdit(formAnnotation, field);
+        open(formAnnotation, field);
     }
 
-    function stopEdit() {
-        pointArming.disarm();
-        armedAnnotationId = undefined;
-        armedField = undefined;
+    function ensureOverlay(formAnnotation: FormAnnotationGET) {
+        const id = formAnnotation.id;
+        if (overlayIds.has(id)) return;
+        overlayIds.add(id);
+        overlays.set(
+            id,
+            viewerContext.addOverlay(
+                new ETDRSGridItemOverlay(
+                    { kind: "annotation", id },
+                    registration,
+                    settings,
+                ),
+            ),
+        );
     }
 
-    function stopEditFor(formAnnotation: FormAnnotationGET) {
-        if (armedAnnotationId === formAnnotation.id) stopEdit();
-        if (selectedAnnotationId === formAnnotation.id) {
-            selectedAnnotationId = undefined;
-        }
-    }
-
-    /** Open/select item: show grid overlay and arm point tools (f/d). */
-    function selectItem(formAnnotation: FormAnnotationGET) {
-        if (!filtered.some((f) => f.id === formAnnotation.id)) return;
-
-        if (selectedAnnotationId === formAnnotation.id) {
-            // Clicking the selected item again closes it; overlay stays unless
-            // the user hides it via the eye icon.
-            stopEdit();
-            selectedAnnotationId = undefined;
-            return;
-        }
-
-        ensureOverlay(formAnnotation);
-        selectedAnnotationId = formAnnotation.id;
-        if (globalContext.canEdit(formAnnotation)) {
-            startEdit(formAnnotation, "fovea");
+    function toggleOverlay(
+        formAnnotation: FormAnnotationGET,
+        active?: boolean,
+    ) {
+        const id = formAnnotation.id;
+        const isActive = overlayIds.has(id);
+        const shouldBeActive = active !== undefined ? active : !isActive;
+        if (shouldBeActive === isActive) return;
+        if (shouldBeActive) {
+            ensureOverlay(formAnnotation);
         } else {
-            stopEdit();
+            overlays.get(id)?.();
+            overlays.delete(id);
+            overlayIds.delete(id);
         }
+    }
+
+    function onRemove(formAnnotation: FormAnnotationGET) {
+        toggleOverlay(formAnnotation, false);
+        if (selectedId === formAnnotation.id) close();
     }
 
     function deactivateAll() {
@@ -231,46 +242,7 @@
         for (const remove of overlays.values()) remove();
         overlays.clear();
         overlayIds.clear();
-        stopEdit();
-        selectedAnnotationId = undefined;
-    }
-
-    function ensureOverlay(formAnnotation: FormAnnotationGET) {
-        if (!filtered.some((f) => f.id === formAnnotation.id)) return;
-        const id = formAnnotation.id;
-        if (overlayIds.has(id)) return;
-
-        overlayIds.add(id);
-        overlays.set(
-            id,
-            viewerContext.addOverlay(
-                new ETDRSGridItemOverlay(
-                    { kind: "annotation", id: formAnnotation.id },
-                    registration,
-                    settings,
-                ),
-            ),
-        );
-    }
-
-    /** Eye icon only — show/hide grid overlay; does not open/close selection. */
-    function toggleOverlay(
-        formAnnotation: FormAnnotationGET,
-        active?: boolean,
-    ) {
-        if (!filtered.some((f) => f.id === formAnnotation.id)) return;
-        const id = formAnnotation.id;
-        const isActive = overlayIds.has(id);
-        const shouldBeActive = active !== undefined ? active : !isActive;
-        if (shouldBeActive === isActive) return;
-
-        if (shouldBeActive) {
-            ensureOverlay(formAnnotation);
-        } else {
-            overlays.get(id)?.();
-            overlays.delete(id);
-            overlayIds.delete(id);
-        }
+        close();
     }
 
     async function create() {
@@ -284,7 +256,7 @@
             sub_task_id: taskContext?.subTask?.id,
             form_data: {},
         });
-        selectItem(newAnnotation);
+        open(newAnnotation, "fovea");
     }
 
     const autoItem: etdrsGridType | undefined = $derived.by(() => {
@@ -310,12 +282,13 @@
             removeAutoOverlay();
             removeAutoOverlay = undefined;
         } else {
-            const itemOverlay = new ETDRSGridItemOverlay(
-                { kind: "snapshot", data: autoItem },
-                registration,
-                settings,
+            removeAutoOverlay = viewerContext.addOverlay(
+                new ETDRSGridItemOverlay(
+                    { kind: "snapshot", data: autoItem },
+                    registration,
+                    settings,
+                ),
             );
-            removeAutoOverlay = viewerContext.addOverlay(itemOverlay);
         }
     }
     let showHide = $derived(removeAutoOverlay ? Show : Hide);
@@ -342,7 +315,6 @@
                     tooltip="show/hide"
                     Icon={showHide}
                 />
-
                 Automatic
             </div>
         {/if}
@@ -352,14 +324,14 @@
                 {formAnnotation}
                 {settings}
                 overlayActive={overlayIds.has(formAnnotation.id)}
-                selected={selectedAnnotationId === formAnnotation.id}
-                armedField={armedAnnotationId === formAnnotation.id
-                    ? armedField
+                selected={selectedId === formAnnotation.id}
+                armedField={selectedId === formAnnotation.id
+                    ? placementField
                     : undefined}
                 onToggleOverlay={toggleOverlay}
                 onSelect={selectItem}
-                onStopEdit={stopEditFor}
-                onArmLandmark={setPlacementTarget}
+                onRemove={onRemove}
+                onArmLandmark={armLandmark}
             />
         {/each}
     </div>
@@ -378,7 +350,6 @@
         align-items: center;
         gap: 0.5em;
     }
-
     div.automatic {
         display: flex;
         background-color: rgba(255, 255, 255, 0.1);

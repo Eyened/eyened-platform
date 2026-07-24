@@ -24,7 +24,7 @@
             active?: boolean,
         ) => void;
         onSelect: (formAnnotation: FormAnnotationGET) => void;
-        onStopEdit: (formAnnotation: FormAnnotationGET) => void;
+        onRemove: (formAnnotation: FormAnnotationGET) => void;
         onArmLandmark: (
             formAnnotation: FormAnnotationGET,
             field: LandmarkField,
@@ -37,7 +37,7 @@
         armedField,
         onToggleOverlay,
         onSelect,
-        onStopEdit,
+        onRemove,
         onArmLandmark,
     }: Props = $props();
 
@@ -71,8 +71,7 @@
 
     function remove(e: MouseEvent) {
         e.stopPropagation();
-        onToggleOverlay(formAnnotation, false);
-        onStopEdit(formAnnotation);
+        onRemove(formAnnotation);
         deleteFormAnnotation(formAnnotation.id);
     }
 
