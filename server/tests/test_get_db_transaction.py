@@ -13,8 +13,6 @@ def _drain(gen):
 
 def test_get_db_commits_on_clean_exit(SessionLocal):
     """A generator that adds a row and exits cleanly leaves the row committed."""
-    from server.db import get_db
-
     # Bind get_db to the test engine for this check.
     def bound():
         with SessionLocal() as s:
@@ -52,4 +50,9 @@ def test_get_db_rolls_back_and_reraises_on_exception(SessionLocal):
         gen.throw(ValueError("boom"))
 
     with SessionLocal() as verify:
+        # NOTE: this count()==0 also holds if the rollback above is deleted —
+        # Session.close() (via `with SessionLocal() as s:`) already discards
+        # uncommitted work on any exit. The `pytest.raises(ValueError)` above is
+        # what this test actually proves (re-raise / no suppression); true
+        # atomic-rollback under a real DB is proven end-to-end by Task 18.
         assert verify.query(Feature).filter_by(FeatureName="doomed").count() == 0
