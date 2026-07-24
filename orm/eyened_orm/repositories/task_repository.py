@@ -3,7 +3,14 @@ from __future__ import annotations
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
+from eyened_orm import (
+    Creator,
+    ImageInstance,
+    ImageStorage,
+    SubTask,
+    SubTaskImageLink,
+    Task,
+)
 from eyened_orm.task import SubTaskState
 
 # Load task metadata without eager-loading every SubTask row (mirrors the
@@ -79,6 +86,10 @@ _SUBTASK_IMAGE_LOADER = (
     .selectinload(ImageStorage.StorageBackend)
 )
 
+# Eager-load the subtask's assignee, avoiding an extra lazy query per row on
+# list/get paths that convert to a DTO exposing the assignee.
+_SUBTASK_CREATOR_LOADER = selectinload(SubTask.Creator)
+
 
 class SubTaskRepository:
     """Data access for a task's SubTask rows (reads used by task.py)."""
@@ -101,13 +112,23 @@ class SubTaskRepository:
         task_id: int,
         *,
         status: SubTaskState | None = None,
+        creator_id: int | None = None,
+        unassigned: bool = False,
     ) -> int:
-        """Return the task's subtask count, optionally filtered by state."""
+        """Return the task's subtask count, optionally filtered.
+
+        ``creator_id`` and ``unassigned`` are mutually exclusive; callers
+        must not pass both.
+        """
         stmt = select(func.count()).select_from(SubTask).where(
             SubTask.TaskID == task_id
         )
         if status is not None:
             stmt = stmt.where(SubTask.TaskState == status)
+        if unassigned:
+            stmt = stmt.where(SubTask.CreatorID.is_(None))
+        elif creator_id is not None:
+            stmt = stmt.where(SubTask.CreatorID == creator_id)
         return session.scalar(stmt) or 0
 
     def list_for_task(
@@ -116,18 +137,26 @@ class SubTaskRepository:
         task_id: int,
         *,
         status: SubTaskState | None = None,
+        creator_id: int | None = None,
+        unassigned: bool = False,
         limit: int,
         offset: int,
         with_images: bool = False,
     ) -> list[SubTask]:
         """Return a limit/offset window of the task's subtasks (SubTaskID order).
 
-        Optionally filters by ``status`` and eager-loads each subtask's images.
+        Optionally filters by ``status`` and by assignment (``creator_id`` or
+        ``unassigned``, mutually exclusive; callers must not pass both), and
+        eager-loads each subtask's images. Always eager-loads ``Creator``.
         """
         stmt = select(SubTask).where(SubTask.TaskID == task_id)
         if status is not None:
             stmt = stmt.where(SubTask.TaskState == status)
-        stmt = stmt.order_by(SubTask.SubTaskID)
+        if unassigned:
+            stmt = stmt.where(SubTask.CreatorID.is_(None))
+        elif creator_id is not None:
+            stmt = stmt.where(SubTask.CreatorID == creator_id)
+        stmt = stmt.order_by(SubTask.SubTaskID).options(_SUBTASK_CREATOR_LOADER)
         if with_images:
             stmt = stmt.options(_SUBTASK_IMAGE_LOADER)
         return list(
@@ -139,15 +168,51 @@ class SubTaskRepository:
         return session.get(SubTask, subtask_id)
 
     def get_with_images(self, session: Session, subtask_id: int) -> SubTask | None:
-        """Return the subtask with its image links eager-loaded, or None."""
+        """Return the subtask with its image links + Creator eager-loaded, or None."""
         return (
             session.execute(
                 select(SubTask)
-                .options(_SUBTASK_IMAGE_LOADER)
+                .options(_SUBTASK_IMAGE_LOADER, _SUBTASK_CREATOR_LOADER)
                 .where(SubTask.SubTaskID == subtask_id)
             )
             .scalars()
             .first()
+        )
+
+    def claim_if_unassigned(
+        self, session: Session, subtask_id: int, creator_id: int
+    ) -> bool:
+        """Assign ``creator_id`` to the subtask iff it has no creator yet.
+
+        Returns True if the claim was applied, False if the subtask is
+        missing or already assigned (to anyone, including ``creator_id``).
+        Does not commit; the caller controls the transaction boundary.
+        """
+        subtask = session.get(SubTask, subtask_id)
+        if subtask is None:
+            return False
+        if subtask.CreatorID is not None:
+            return False
+        subtask.CreatorID = creator_id
+        return True
+
+    def list_assignees_for_task(
+        self, session: Session, task_id: int
+    ) -> list[Creator]:
+        """Return the distinct non-null creators assigned to the task's subtasks.
+
+        Ordered by creator name.
+        """
+        return list(
+            session.execute(
+                select(Creator)
+                .join(SubTask, SubTask.CreatorID == Creator.CreatorID)
+                .where(SubTask.TaskID == task_id)
+                .distinct()
+                .order_by(Creator.CreatorName)
+            )
+            .scalars()
+            .all()
         )
 
     def resolve_image_instance_id(
