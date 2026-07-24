@@ -18,8 +18,9 @@
     type Props = {
         subtask: SubTaskWithImagesGET;
         taskId: number;
+        onAssignmentChange?: () => void | Promise<void>;
     };
-    let { subtask, taskId }: Props = $props();
+    let { subtask, taskId, onAssignmentChange }: Props = $props();
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -59,6 +60,7 @@
         try {
             await updateSubTask(row.id, { claim: true });
             toast.success("Subtask claimed");
+            await onAssignmentChange?.();
         } catch (e) {
             toast.error(String(e));
         } finally {
@@ -71,6 +73,7 @@
         try {
             await updateSubTask(row.id, { claim: false });
             toast.success("Subtask unclaimed");
+            await onAssignmentChange?.();
         } catch (e) {
             toast.error(String(e));
         } finally {

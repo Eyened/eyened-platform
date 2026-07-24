@@ -45,56 +45,76 @@
         }
     }
 
+    async function fetchCurrentPage() {
+        const nextPage = Math.max(0, subtasksPage);
+        subtasks.clear();
+        const res = await fetchSubTasks({
+            task_id: data.taskid,
+            with_images: true,
+            limit: subtasksLimit,
+            page: nextPage,
+            subtask_status: subtasksStatus ?? undefined,
+            unassigned: assigneeFilter === "unassigned" ? true : undefined,
+            creator_id:
+                typeof assigneeFilter === "number"
+                    ? assigneeFilter
+                    : undefined,
+        });
+
+        subtasksCount = res.count;
+        subtasksLimit = res.limit;
+        subtasksPage = res.page;
+
+        // If this page emptied after claim/unclaim, step back one page.
+        if (
+            (res.subtasks?.length ?? 0) === 0 &&
+            subtasksPage > 0 &&
+            subtasksCount > 0
+        ) {
+            subtasksPage = subtasksPage - 1;
+            await fetchCurrentPage();
+            return;
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.set("page", String(subtasksPage));
+        url.searchParams.set("limit", String(subtasksLimit));
+        if (subtasksStatus)
+            url.searchParams.set("status", String(subtasksStatus));
+        else url.searchParams.delete("status");
+        if (assigneeFilter === "unassigned") {
+            url.searchParams.set("unassigned", "1");
+            url.searchParams.delete("creator_id");
+        } else if (typeof assigneeFilter === "number") {
+            url.searchParams.set("creator_id", String(assigneeFilter));
+            url.searchParams.delete("unassigned");
+        } else {
+            url.searchParams.delete("unassigned");
+            url.searchParams.delete("creator_id");
+        }
+        await goto(url.pathname + "?" + url.searchParams.toString(), {
+            replaceState: true,
+            noScroll: true,
+            keepFocus: true,
+        });
+    }
+
     async function loadPage(p: number): Promise<void> {
         isLoading = true;
         try {
             await fetchTask(data.taskid);
             await loadAssignees();
-            const nextPage = Math.max(0, Number.isFinite(p) ? p : 0);
-
-            subtasks.clear();
-            const res = await fetchSubTasks({
-                task_id: data.taskid,
-                with_images: true,
-                limit: subtasksLimit,
-                page: nextPage,
-                subtask_status: subtasksStatus ?? undefined,
-                unassigned:
-                    assigneeFilter === "unassigned" ? true : undefined,
-                creator_id:
-                    typeof assigneeFilter === "number"
-                        ? assigneeFilter
-                        : undefined,
-            });
-
-            subtasksCount = res.count;
-            subtasksLimit = res.limit;
-            subtasksPage = res.page;
-
-            const url = new URL(window.location.href);
-            url.searchParams.set("page", String(subtasksPage));
-            url.searchParams.set("limit", String(subtasksLimit));
-            if (subtasksStatus)
-                url.searchParams.set("status", String(subtasksStatus));
-            else url.searchParams.delete("status");
-            if (assigneeFilter === "unassigned") {
-                url.searchParams.set("unassigned", "1");
-                url.searchParams.delete("creator_id");
-            } else if (typeof assigneeFilter === "number") {
-                url.searchParams.set("creator_id", String(assigneeFilter));
-                url.searchParams.delete("unassigned");
-            } else {
-                url.searchParams.delete("unassigned");
-                url.searchParams.delete("creator_id");
-            }
-            await goto(url.pathname + "?" + url.searchParams.toString(), {
-                replaceState: true,
-                noScroll: true,
-                keepFocus: true,
-            });
+            subtasksPage = Math.max(0, Number.isFinite(p) ? p : 0);
+            await fetchCurrentPage();
         } finally {
             isLoading = false;
         }
+    }
+
+    /** Quiet refresh after claim/unclaim — keeps filters, updates rows + assignees. */
+    async function refreshAfterAssignment() {
+        await loadAssignees();
+        await fetchCurrentPage();
     }
 
     onMount(async () => {
@@ -286,6 +306,7 @@
                         page={subtasksPage}
                         perPage={subtasksLimit}
                         onPageChange={loadPage}
+                        onAssignmentChange={refreshAfterAssignment}
                     />
                 {/if}
             </div>

@@ -16,6 +16,7 @@
         page,
         perPage = 20,
         onPageChange,
+        onAssignmentChange,
     }: {
         rows: SubTaskWithImagesGET[];
         taskId: number;
@@ -23,6 +24,7 @@
         page: number;
         perPage?: number;
         onPageChange: (p: number) => void;
+        onAssignmentChange?: () => void | Promise<void>;
     } = $props();
 
     const browserContext = new BrowserContext();
@@ -52,6 +54,7 @@
             } else {
                 toast.message(`Claimed ${claimed}, failed ${failed}`);
             }
+            await onAssignmentChange?.();
         } finally {
             claimingPage = false;
         }
@@ -88,7 +91,11 @@
             </Table.Header>
             <Table.Body>
                 {#each rows as row (row.id)}
-                    <SubTaskRow subtask={row} {taskId} />
+                    <SubTaskRow
+                        subtask={row}
+                        {taskId}
+                        {onAssignmentChange}
+                    />
                 {:else}
                     <Table.Row>
                         <Table.Cell colspan="6" class="h-24 text-center">
