@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, String
+from sqlalchemy import JSON, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
@@ -20,6 +20,10 @@ class AuditLog(Base):
     """
 
     __tablename__ = "AuditLog"
+    __table_args__ = (
+        Index("ix_AuditLog_ActorID", "ActorID"),
+        Index("ix_AuditLog_Timestamp", "Timestamp"),
+    )
 
     AuditLogID: Mapped[int] = mapped_column(primary_key=True)
     # Python-side default so the buffered stdout event mirrors the row without a DB round-trip.
