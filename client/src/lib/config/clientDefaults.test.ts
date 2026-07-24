@@ -44,4 +44,26 @@ describe("mergeClientConfig", () => {
             (resolved as Record<string, unknown>).totally_unknown,
         ).toBeUndefined();
     });
+
+    it("overrides point_marker style, radius, and color", () => {
+        const resolved = mergeClientConfig(CLIENT_DEFAULTS, {
+            point_marker: {
+                style: "rect",
+                radius: 6,
+                color: "rgba(255, 0, 0, 1)",
+            },
+        });
+        expect(resolved.point_marker).toEqual({
+            style: "rect",
+            radius: 6,
+            color: "rgba(255, 0, 0, 1)",
+        });
+    });
+
+    it("ignores invalid point_marker values", () => {
+        const resolved = mergeClientConfig(CLIENT_DEFAULTS, {
+            point_marker: { style: "diamond", radius: -1, color: "" },
+        });
+        expect(resolved.point_marker).toEqual(CLIENT_DEFAULTS.point_marker);
+    });
 });

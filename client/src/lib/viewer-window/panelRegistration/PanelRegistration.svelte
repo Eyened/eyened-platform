@@ -8,6 +8,10 @@
         setFormAnnotationValue,
     } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import {
+        CLIENT_DEFAULTS,
+        mergeClientConfig,
+    } from "$lib/config/clientDefaults";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { analyzePointSchema } from "$lib/forms/pointSchema";
     import type { JSONSchema } from "$lib/forms/schemaType";
@@ -21,6 +25,13 @@
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");
+
+    const pointMarker = $derived(
+        mergeClientConfig(
+            CLIENT_DEFAULTS,
+            taskContext?.task.task_definition.config,
+        ).point_marker,
+    );
 
     interface props {
         active: boolean;
@@ -100,20 +111,23 @@
 
         pointArming.arm(key, () => {
             activeID = formAnnotation.id;
-            const dispose = viewerContext.addOverlay(
-                new PointTool({
-                    canEdit,
-                    analysis,
-                    label: "registration",
-                    getPublicId: () => viewerContext.image.instance.id,
-                    getFieldValue: () => formAnnotation.form_data,
-                    setFieldValue: (next) => {
-                        formAnnotation.form_data = next as any;
-                        setFormAnnotationValue(formAnnotation.id, next);
-                    },
-                }),
-            );
+            const tool = new PointTool({
+                canEdit,
+                analysis,
+                label: "registration",
+                pointStyle: pointMarker.style,
+                radius: pointMarker.radius,
+                color: pointMarker.color,
+                getPublicId: () => viewerContext.image.instance.id,
+                getFieldValue: () => formAnnotation.form_data,
+                setFieldValue: (next) => {
+                    formAnnotation.form_data = next as any;
+                    setFormAnnotationValue(formAnnotation.id, next);
+                },
+            });
+            const dispose = viewerContext.addOverlay(tool);
             return () => {
+                tool.destroy();
                 dispose();
                 if (activeID === formAnnotation.id) {
                     activeID = undefined;

@@ -1,3 +1,4 @@
+import type { PointMarkerStyle } from "$lib/config/clientDefaults";
 import {
     cycleEnumExtra,
     deletePointAt,
@@ -14,8 +15,11 @@ import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
-const strokeStyle = "rgba(0, 255, 0, 1)";
+const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
+
+/** Live PointTool instances — used so empty-click placement ignores siblings' hits. */
+const liveTools = new Set<PointTool>();
 
 export type PointToolOptions = {
     canEdit: boolean;
@@ -24,12 +28,21 @@ export type PointToolOptions = {
     getPublicId: () => string;
     getFieldValue: () => unknown;
     setFieldValue: (next: unknown) => void;
-    pointStyle?: "rect" | "cross";
+    pointStyle?: PointMarkerStyle;
     radius?: number;
-    /** When false, skip marker painting (caller paints landmarks separately). */
-    showMarkers?: boolean;
-    /** Optional extra key handler (e.g. ETDRS f/d). */
-    onKey?: (e: ViewerEvent<KeyboardEvent>) => void;
+    color?: string;
+    /**
+     * When false, this tool still paints and handles hit/drag/delete, but does
+     * not place on empty clicks. Defaults to true.
+     */
+    isPlacementTarget?: () => boolean;
+    /** Called when the user starts interacting with one of this tool's points. */
+    onBecomePlacementTarget?: () => void;
+    /**
+     * Keyboard shortcut: keydown places/starts drag at cursor; keyup releases
+     * (same as pointerup). Case-insensitive single character (e.g. "f").
+     */
+    placeKey?: string;
 };
 
 export class PointTool implements Overlay {
@@ -39,13 +52,21 @@ export class PointTool implements Overlay {
     toolName: ToolName = "point";
     name: string = "Point";
 
-    private readonly pointStyle: "rect" | "cross";
+    private readonly pointStyle: PointMarkerStyle;
     private readonly radius: number;
+    private readonly color: string;
 
     constructor(private readonly options: PointToolOptions) {
-        this.pointStyle = options.pointStyle ?? "cross";
+        this.pointStyle = options.pointStyle ?? "circle";
         this.radius = options.radius ?? 16;
+        this.color = options.color ?? defaultStroke;
         this.name = options.label || "Point";
+        liveTools.add(this);
+    }
+
+    /** Remove from the live registry (call when detaching the overlay). */
+    destroy() {
+        liveTools.delete(this);
     }
 
     private get points() {
@@ -54,6 +75,10 @@ export class PointTool implements Overlay {
             this.options.getPublicId(),
             this.options.analysis,
         );
+    }
+
+    private isPlacementTarget() {
+        return this.options.isPlacementTarget?.() ?? true;
     }
 
     private commit(points: ReturnType<typeof getPointsForImage>) {
@@ -66,10 +91,56 @@ export class PointTool implements Overlay {
         this.options.setFieldValue(next);
     }
 
-    keyup(e: ViewerEvent<KeyboardEvent>) {
-        this.options.onKey?.(e);
+    /** True if this tool owns a marker under the cursor. */
+    hits(cursor: Position2D, viewerContext: ViewerContext): boolean {
+        return this.findHit(cursor, viewerContext) !== undefined;
+    }
 
-        const { event, viewerContext } = e;
+    /**
+     * Place/replace at image coords under the viewer cursor (e.g. keyboard shortcut).
+     * Does not consult isPlacementTarget — caller decides when this is appropriate.
+     */
+    placeAtCursor(viewerContext: ViewerContext, cursor: Position2D) {
+        if (!this.options.canEdit) return;
+        const position = viewerContext.viewerToImageCoordinates(cursor);
+        const before = this.points;
+        const after = placePoint(
+            before,
+            position,
+            this.options.analysis.cardinality,
+            this.options.analysis.registrationMode,
+        );
+        let newIndex = after.findIndex(
+            (p, i) => p && (!before[i] || before[i] !== p),
+        );
+        if (newIndex < 0) newIndex = Math.max(0, after.length - 1);
+        this.commit(after);
+        this.activePointIndex = newIndex;
+        this.hoverPointIndex = newIndex;
+        this.options.onBecomePlacementTarget?.();
+    }
+
+    private siblingOwnsHit(
+        cursor: Position2D,
+        viewerContext: ViewerContext,
+    ): boolean {
+        for (const tool of liveTools) {
+            if (tool !== this && tool.hits(cursor, viewerContext)) return true;
+        }
+        return false;
+    }
+
+    keyup(e: ViewerEvent<KeyboardEvent>) {
+        const { event, viewerContext, cursor } = e;
+
+        if (
+            this.options.placeKey &&
+            event.key.toLowerCase() === this.options.placeKey.toLowerCase()
+        ) {
+            this.activePointIndex = undefined;
+            this.hoverPointIndex = this.findHit(cursor, viewerContext);
+        }
+
         if (
             this.options.analysis.registrationMode &&
             event.key >= "0" &&
@@ -87,7 +158,17 @@ export class PointTool implements Overlay {
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
         if (!this.options.canEdit) return;
-        const { event } = e;
+        const { event, viewerContext, cursor } = e;
+
+        if (
+            this.options.placeKey &&
+            !event.repeat &&
+            event.key.toLowerCase() === this.options.placeKey.toLowerCase()
+        ) {
+            this.placeAtCursor(viewerContext, cursor);
+            return;
+        }
+
         if (event.key !== "e" && event.key !== "E") return;
 
         const index = this.activePointIndex ?? this.hoverPointIndex;
@@ -110,26 +191,20 @@ export class PointTool implements Overlay {
         if (!this.options.canEdit) return;
 
         if (event.button === 0) {
-            if (this.hoverPointIndex === undefined) {
-                const position = viewerContext.viewerToImageCoordinates(cursor);
-                const before = this.points;
-                const after = placePoint(
-                    before,
-                    position,
-                    this.options.analysis.cardinality,
-                    this.options.analysis.registrationMode,
-                );
-                // Find which index was written
-                let newIndex = after.findIndex(
-                    (p, i) => p && (!before[i] || before[i] !== p),
-                );
-                if (newIndex < 0) newIndex = Math.max(0, after.length - 1);
-                this.commit(after);
-                this.activePointIndex = newIndex;
-                this.hoverPointIndex = newIndex;
-            } else {
-                this.activePointIndex = this.hoverPointIndex;
+            const hit = this.findHit(cursor, viewerContext);
+            if (hit !== undefined) {
+                this.activePointIndex = hit;
+                this.hoverPointIndex = hit;
+                this.options.onBecomePlacementTarget?.();
+                return;
             }
+
+            // Empty click: only the placement target places, and only if no
+            // sibling tool owns a marker here.
+            if (!this.isPlacementTarget()) return;
+            if (this.siblingOwnsHit(cursor, viewerContext)) return;
+
+            this.placeAtCursor(viewerContext, cursor);
         }
     }
 
@@ -144,11 +219,13 @@ export class PointTool implements Overlay {
         }
 
         if (event.button === 2) {
-            if (this.hoverPointIndex !== undefined) {
+            const hit = this.findHit(cursor, viewerContext);
+            if (hit !== undefined) {
+                this.options.onBecomePlacementTarget?.();
                 this.commit(
                     deletePointAt(
                         this.points,
-                        this.hoverPointIndex,
+                        hit,
                         this.options.analysis.registrationMode,
                     ),
                 );
@@ -175,16 +252,17 @@ export class PointTool implements Overlay {
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const points = this.points;
         const highlightIndex = this.activePointIndex ?? this.hoverPointIndex;
-        viewerContext.cursorStyle =
-            highlightIndex !== undefined ? "pointer" : "default";
-
-        if (this.options.showMarkers === false) return;
+        if (highlightIndex !== undefined) {
+            viewerContext.cursorStyle = "pointer";
+        }
 
         const { context2D } = viewerContext;
+        const strokeStyle = this.color;
 
         context2D.strokeStyle = strokeStyle;
         context2D.fillStyle = strokeStyle;
         context2D.font = "16px sans-serif";
+        context2D.lineWidth = this.isPlacementTarget() ? 2 : 1;
 
         const r = this.radius;
         const showIndex =
@@ -194,18 +272,7 @@ export class PointTool implements Overlay {
         for (const [index, pt] of points.entries()) {
             if (!pt) continue;
             const p = viewerContext.imageToViewerCoordinates(pt);
-
-            if (this.pointStyle === "rect") {
-                context2D.strokeRect(p.x - r, p.y - r, 2 * r, 2 * r);
-            } else {
-                context2D.beginPath();
-                context2D.arc(p.x, p.y, r, 0, 2 * Math.PI);
-                context2D.moveTo(p.x - r, p.y);
-                context2D.lineTo(p.x + r, p.y);
-                context2D.moveTo(p.x, p.y - r);
-                context2D.lineTo(p.x, p.y + r);
-                context2D.stroke();
-            }
+            this.strokeMarker(context2D, p, r);
 
             let label = showIndex ? `${index + 1}` : this.options.label;
             for (const extra of this.options.analysis.enumExtras) {
@@ -226,15 +293,43 @@ export class PointTool implements Overlay {
             if (highlightPoint) {
                 const p =
                     viewerContext.imageToViewerCoordinates(highlightPoint);
-                if (this.pointStyle === "rect") {
-                    context2D.fillRect(p.x - r, p.y - r, 2 * r, 2 * r);
-                } else {
-                    context2D.beginPath();
-                    context2D.arc(p.x, p.y, r, 0, 2 * Math.PI);
-                    context2D.fill();
-                }
+                this.fillMarker(context2D, p, r);
             }
         }
+    }
+
+    private strokeMarker(
+        ctx: CanvasRenderingContext2D,
+        p: Position2D,
+        r: number,
+    ) {
+        if (this.pointStyle === "rect") {
+            ctx.strokeRect(p.x - r, p.y - r, 2 * r, 2 * r);
+            return;
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+        if (this.pointStyle === "cross") {
+            ctx.moveTo(p.x - r, p.y);
+            ctx.lineTo(p.x + r, p.y);
+            ctx.moveTo(p.x, p.y - r);
+            ctx.lineTo(p.x, p.y + r);
+        }
+        ctx.stroke();
+    }
+
+    private fillMarker(
+        ctx: CanvasRenderingContext2D,
+        p: Position2D,
+        r: number,
+    ) {
+        if (this.pointStyle === "rect") {
+            ctx.fillRect(p.x - r, p.y - r, 2 * r, 2 * r);
+            return;
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+        ctx.fill();
     }
 
     private findHit(

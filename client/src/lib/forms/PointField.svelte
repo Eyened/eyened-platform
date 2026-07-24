@@ -1,6 +1,10 @@
 <script lang="ts">
     import { Button } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
+    import {
+        CLIENT_DEFAULTS,
+        mergeClientConfig,
+    } from "$lib/config/clientDefaults";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import {
         analyzePointSchema,
@@ -10,6 +14,7 @@
         type ImagePoint,
     } from "$lib/forms/pointSchema";
     import type { JSONSchema } from "$lib/forms/schemaType";
+    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { PointTool } from "$lib/viewer/tools/PointTool";
     import { getContext } from "svelte";
@@ -37,6 +42,14 @@
         "pointFormAnnotationId",
     );
     const boundImageId = getContext<string | undefined>("pointBoundImageId");
+    const taskContext = getContext<TaskContext | undefined>("taskContext");
+
+    const pointMarker = $derived(
+        mergeClientConfig(
+            CLIENT_DEFAULTS,
+            taskContext?.task.task_definition.config,
+        ).point_marker,
+    );
 
     const analysis = $derived(analyzePointSchema(schema, entityType));
     const publicId = $derived(viewerContext?.image.instance.id ?? "");
@@ -78,18 +91,24 @@
         if (!viewerContext || !analysis) return;
         if (imageMismatch) return;
 
-        pointArming.arm(armKey, () =>
-            viewerContext.addOverlay(
-                new PointTool({
-                    canEdit,
-                    analysis,
-                    label: schema.title || fieldPath,
-                    getPublicId: () => viewerContext.image.instance.id,
-                    getFieldValue: () => value,
-                    setFieldValue: (next) => onchange(next),
-                }),
-            ),
-        );
+        pointArming.arm(armKey, () => {
+            const tool = new PointTool({
+                canEdit,
+                analysis,
+                label: schema.title || fieldPath,
+                pointStyle: pointMarker.style,
+                radius: pointMarker.radius,
+                color: pointMarker.color,
+                getPublicId: () => viewerContext.image.instance.id,
+                getFieldValue: () => value,
+                setFieldValue: (next) => onchange(next),
+            });
+            const remove = viewerContext.addOverlay(tool);
+            return () => {
+                tool.destroy();
+                remove();
+            };
+        });
     }
 
     function clear() {
