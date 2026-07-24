@@ -1,3 +1,4 @@
+import { formAnnotations } from "$lib/data";
 import type { Registration } from "$lib/registration/registration";
 import type { Position, Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
@@ -20,6 +21,12 @@ export type etdrsGridType = {
         disc_edge: { x: number; y: number };
     };
 };
+
+/** Live FormAnnotation from the store, or a static snapshot (e.g. AI auto grid). */
+export type ETDRSGridSource =
+    | { kind: "annotation"; id: number }
+    | { kind: "snapshot"; data: etdrsGridType };
+
 export class ETDRSGridItemOverlay implements Overlay {
     lineWidth = 1;
     strokeStyle = "rgba(255,255,255, 1)";
@@ -27,10 +34,42 @@ export class ETDRSGridItemOverlay implements Overlay {
     cursorCircle: string | undefined = undefined;
 
     constructor(
-        private readonly annotation: etdrsGridType,
+        private readonly source: ETDRSGridSource,
         private readonly registration: Registration,
         private readonly settings: { radiusFraction: number },
     ) {}
+
+    /** Back-compat: FormAnnotation-like or etdrsGridType snapshot. */
+    static fromAnnotationLike(
+        annotation: etdrsGridType & { id?: number },
+        registration: Registration,
+        settings: { radiusFraction: number },
+    ) {
+        if (typeof annotation.id === "number") {
+            return new ETDRSGridItemOverlay(
+                { kind: "annotation", id: annotation.id },
+                registration,
+                settings,
+            );
+        }
+        return new ETDRSGridItemOverlay(
+            { kind: "snapshot", data: annotation },
+            registration,
+            settings,
+        );
+    }
+
+    private resolveGrid(): etdrsGridType | undefined {
+        if (this.source.kind === "snapshot") {
+            return this.source.data;
+        }
+        const annotation = formAnnotations.get(this.source.id);
+        if (!annotation?.form_data) return undefined;
+        return {
+            image_id: String(annotation.image_id ?? ""),
+            form_data: annotation.form_data as etdrsGridType["form_data"],
+        };
+    }
 
     keydown(keyEvent: ViewerEvent<KeyboardEvent>) {
         const { event } = keyEvent;
@@ -50,10 +89,12 @@ export class ETDRSGridItemOverlay implements Overlay {
 
     repaint(viewerContext: ViewerContext) {
         const { image, context2D } = viewerContext;
+        const resolved = this.resolveGrid();
+        if (!resolved) return;
 
-        const f = this.annotation.form_data?.fovea;
-        const d = this.annotation.form_data?.disc_edge;
-        let srcId = String(this.annotation.image_id);
+        const f = resolved.form_data?.fovea;
+        const d = resolved.form_data?.disc_edge;
+        let srcId = String(resolved.image_id);
         // ETDRS landmarks are 2D enface coords; avoid OCTToProj remapping index → y
         if (image.image_id.endsWith("_proj") && !srcId.endsWith("_proj")) {
             srcId = `${srcId}_proj`;

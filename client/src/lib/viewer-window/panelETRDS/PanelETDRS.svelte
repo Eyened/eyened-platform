@@ -94,13 +94,26 @@
         if (!globalContext.canEdit(formAnnotation)) return;
         const position = e.viewerContext.viewerToImageCoordinates(e.cursor);
         const point: ImagePoint = { x: position.x, y: position.y };
-        const form_data = {
-            ...(formAnnotation.form_data || {}),
-            [field]: point,
-        };
-        formAnnotation.form_data = form_data;
-        setFormAnnotationValue(formAnnotation.id, form_data);
+        writeLandmark(formAnnotation.id, field, point);
         armLandmark(formAnnotation, field);
+    }
+
+    /** Optimistic store write so overlays see landmarks before the API returns. */
+    function writeLandmark(
+        annotationId: number,
+        field: LandmarkField,
+        next: unknown,
+    ) {
+        const existing =
+            formAnnotations.get(annotationId) ??
+            filtered.find((f) => f.id === annotationId);
+        if (!existing) return;
+        const form_data = {
+            ...(existing.form_data || {}),
+            [field]: next,
+        };
+        formAnnotations.set(annotationId, { ...existing, form_data });
+        setFormAnnotationValue(annotationId, form_data);
     }
 
     function armLandmark(
@@ -112,9 +125,10 @@
 
         const key = `etdrs:${formAnnotation.id}:${field}`;
         const analysis = landmarkAnalysis(field);
+        const annotationId = formAnnotation.id;
 
         pointArming.arm(key, () => {
-            armedAnnotationId = formAnnotation.id;
+            armedAnnotationId = annotationId;
             armedField = field;
             const dispose = viewerContext.addOverlay(
                 new PointTool({
@@ -123,15 +137,11 @@
                     label: field,
                     getPublicId: () => instance.id,
                     getFieldValue: () =>
-                        (formAnnotation.form_data as any)?.[field],
-                    setFieldValue: (next) => {
-                        const form_data = {
-                            ...(formAnnotation.form_data || {}),
-                            [field]: next,
-                        };
-                        formAnnotation.form_data = form_data;
-                        setFormAnnotationValue(formAnnotation.id, form_data);
-                    },
+                        (formAnnotations.get(annotationId)?.form_data as any)?.[
+                            field
+                        ],
+                    setFieldValue: (next) =>
+                        writeLandmark(annotationId, field, next),
                     onKey: (e) => {
                         const k = e.event.key.toLowerCase();
                         if (k === "f") {
@@ -148,7 +158,7 @@
             );
             return () => {
                 dispose();
-                if (armedAnnotationId === formAnnotation.id) {
+                if (armedAnnotationId === annotationId) {
                     armedAnnotationId = undefined;
                     armedField = undefined;
                 }
@@ -183,7 +193,7 @@
                 id,
                 viewerContext.addOverlay(
                     new ETDRSGridItemOverlay(
-                        formAnnotation as any,
+                        { kind: "annotation", id: formAnnotation.id },
                         registration,
                         settings,
                     ),
@@ -255,7 +265,7 @@
             removeAutoOverlay = undefined;
         } else {
             const itemOverlay = new ETDRSGridItemOverlay(
-                autoItem,
+                { kind: "snapshot", data: autoItem },
                 registration,
                 settings,
             );
