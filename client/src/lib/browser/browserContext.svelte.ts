@@ -416,6 +416,7 @@ export class BrowserContext {
         params.set("queryMode", this.queryMode);
         params.set("displayMode", this.displayMode);
         params.set("filterMode", this.filterMode);
+        // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
         goto(`?${params.toString()}`);
     }
 
@@ -556,6 +557,7 @@ export async function setParam(key: string, value: string | null) {
     const params = getSearchParams();
     params.delete(key);
     if (value !== null && value !== "") params.set(key, value);
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
     await goto(`?${params.toString()}`);
 }
 
@@ -568,6 +570,7 @@ export async function removeParam(key: string, value?: string) {
         params.delete(key);
         values.forEach((v) => params.append(key, v));
     }
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
     await goto(`?${params.toString()}`);
 }
 
@@ -581,5 +584,6 @@ export async function toggleParam(key: string, value: string) {
     }
     params.delete(key);
     Array.from(values).forEach((v) => params.append(key, v));
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
     await goto(`?${params.toString()}`);
 }

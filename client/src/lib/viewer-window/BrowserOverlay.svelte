@@ -93,6 +93,7 @@
             // updates url (just visual, does not reload the page)
             const searchParams = page.url.searchParams;
             searchParams.set("instances", currentInstanceIds.join(","));
+            // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
             goto(`?${page.url.searchParams.toString()}`.replaceAll("%2C", ","));
         }
         viewerWindowContext.setInstanceIDs(currentInstanceIds);

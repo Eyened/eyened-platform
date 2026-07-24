@@ -147,7 +147,7 @@ export abstract class SegmentationTool implements Overlay {
         }
     }
 
-    startDraw(viewerContext: ViewerContext) {
+    startDraw(_viewerContext: ViewerContext) {
         this.currentPoints = [this.lastPosition!];
         this.segmentationContext.isDrawing = true;
     }
@@ -166,7 +166,7 @@ export abstract class SegmentationTool implements Overlay {
         }
     }
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         if (this.syncing) {
             viewerContext.cursorStyle = "wait";
         }

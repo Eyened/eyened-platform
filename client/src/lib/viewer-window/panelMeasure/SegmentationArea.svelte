@@ -38,7 +38,7 @@
 
         if (mask instanceof ProbabilityMask) {
             // pixelArea tracks data changes; threshold is applied at read time
-            mask.pixelArea;
+            const _pixelAreaDep = mask.pixelArea;
             const pixelArea = mask.computePixelArea(segmentationItem.threshold);
             area = (pixelArea * resX * resY) / 1e6;
             return;

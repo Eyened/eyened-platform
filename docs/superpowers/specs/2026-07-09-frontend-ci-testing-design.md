@@ -14,7 +14,7 @@ mirroring the parallel backend PR-test-CI design
 2. **Introduce a test framework** — Vitest + `@testing-library/svelte` + jsdom, with a
    small green baseline (a few pure-util unit tests + one non-canvas component render).
 
-Delivered as a **phased rollout** (see *Phased delivery* below) so each area lands as an
+Delivered as a **phased rollout** (see _Phased delivery_ below) so each area lands as an
 independently green PR and the CI gate is **never red** — each phase adds only gate steps
 that already pass.
 
@@ -26,26 +26,26 @@ A read-only dry run on worktree HEAD `ac277bd` (`npm ci`, then `check`/`build`, 
 throwaway flat-config `eslint .` + `prettier --check`, node 22) measured the real baseline
 — **this reshaped delivery into phases**:
 
-| Gate step | Result | Detail |
-|---|---|---|
-| `npm run check` (svelte-check) | ❌ **RED** | **158 errors + 103 warnings** in 129 files |
-| `npm run build` (vite build) | ✓ green | 28s (vite strips types, so type errors don't fail it) |
-| `eslint .` (spec flat config) | ❌ **483 errors** | 144 files; only **7 auto-fixable** |
-| `prettier --check .` | ❌ **157 files** | fully auto-fixable via `prettier --write` |
+| Gate step                      | Result            | Detail                                                |
+| ------------------------------ | ----------------- | ----------------------------------------------------- |
+| `npm run check` (svelte-check) | ❌ **RED**        | **158 errors + 103 warnings** in 129 files            |
+| `npm run build` (vite build)   | ✓ green           | 28s (vite strips types, so type errors don't fail it) |
+| `eslint .` (spec flat config)  | ❌ **483 errors** | 144 files; only **7 auto-fixable**                    |
+| `prettier --check .`           | ❌ **157 files**  | fully auto-fixable via `prettier --write`             |
 
 **eslint 483 breakdown:** `283` `@typescript-eslint/no-explicit-any` · `61` `no-unused-vars`
 · `51` `svelte/require-each-key` · `17` `svelte/no-unused-svelte-ignore` · `10`
 `no-useless-assignment` · smaller tails. **20 "parse errors"** on `*.svelte.ts` files were
-a *throwaway-config artifact* (the TS parser wasn't wired for the `.svelte.ts` extension) —
+a _throwaway-config artifact_ (the TS parser wasn't wired for the `.svelte.ts` extension) —
 not real defects, but they flag a real config task (Phase 3 must wire the parser for
 `.svelte.ts`).
 
-**Correction to prior analysis:** the earlier note that *"type check works ✅"* is **false**
+**Correction to prior analysis:** the earlier note that _"type check works ✅"_ is **false**
 on this HEAD — `check` is red. The 158 svelte-check errors are TypeScript-compiler driven
 (the `typescript` package), **not** node-runtime dependent, so node 20/22/24 all report them.
 The samples smell like **generated-type drift** rather than 158 independent bugs — e.g.
-`instanceIDs: string[]` vs `number[]` and *"Two different types with this name exist, but
-they are unrelated"* point at stale `src/types/openapi.ts` / `.svelte-kit` types. Phase 4
+`instanceIDs: string[]` vs `number[]` and _"Two different types with this name exist, but
+they are unrelated"_ point at stale `src/types/openapi.ts` / `.svelte-kit` types. Phase 4
 root-causes this before committing to a fix size.
 
 ---
@@ -53,9 +53,9 @@ root-causes this before committing to a fix size.
 ## Current-setup analysis
 
 - **Frontend:** SvelteKit 5 (runes), Vite 6, TypeScript, Tailwind 4. ~310 `.svelte`
-  + ~144 `.ts` files. npm lockfile (`client/package-lock.json`) present.
+  - ~144 `.ts` files. npm lockfile (`client/package-lock.json`) present.
 - **Type check is currently RED:** `npm run check` (`svelte-check`) → 158 errors (see
-  *Dry-run findings*). ❌ (Phase 4.)
+  _Dry-run findings_). ❌ (Phase 4.)
 - **Lint/format configured but never run:** `.eslintrc.cjs` (eslint 8) and `.prettierrc`
   (prettier 3, tabWidth 4) exist, but there is **no `lint`/`format` npm script**, and
   `.eslintrc.cjs` extends **`@sveltejs/eslint-config-svelte`, which is not declared and
@@ -91,7 +91,7 @@ beyond `npm ci`, runs in seconds, deterministic, no browser binary to download/c
 and no extra flake surface. Browser mode ages better for this WebGL/canvas/DICOM-heavy
 app, but that value only appears once we test canvas components; for a first pass of
 pure-util units + one simple component render, jsdom is the lower-friction choice. A
-browser-based Vitest *project* can be added later, incrementally, when we start testing
+browser-based Vitest _project_ can be added later, incrementally, when we start testing
 components that need a real canvas.
 
 This matches the official Svelte 5 testing guidance
@@ -122,26 +122,35 @@ resurrect a dead-major legacy config, we replace it with a **flat config**
 entirely, so flat config is the only path forward anyway.
 
 Composition (all peer-compatible with our stack — svelte 5.34, TS 5, vite 6, node 24):
+
 - `@eslint/js` recommended — base JS rules.
 - **`typescript-eslint`** recommended, **non-type-aware** (`tseslint.configs.recommended`,
-  *not* `recommendedTypeChecked`) — no `parserOptions.project` wiring, no slow
+  _not_ `recommendedTypeChecked`) — no `parserOptions.project` wiring, no slow
   type-aware pass. This lints `.ts` for the first time in this repo.
 - **`eslint-plugin-svelte@3`** flat recommended (+ `svelte-eslint-parser`), with the TS
   parser wired into `<script lang="ts">` blocks **and into the `*.svelte.ts` / `*.svelte.js`
   rune-module extensions** (the dry run's 20 parse errors came from missing this — see
-  *Dry-run findings*).
+  _Dry-run findings_).
 - **`eslint-config-prettier`** (flat) applied last, to switch off formatting rules that
   would fight prettier.
 - the custom `no-restricted-syntax` **`export let` guard**, ported into the `.svelte`
   block of the flat config.
 
 **Lint scope widens to `.svelte` + `.js` + `.ts`.** `svelte-check`/`tsc` still own type
-*correctness*; eslint now adds lint rules on `.ts` as well. **Reaching green (Phase 3):**
+_correctness_; eslint now adds lint rules on `.ts` as well. ~~**Reaching green (Phase 3):**
 the dry run measured **483 errors** — `283` are `@typescript-eslint/no-explicit-any`
 (dominant; disable or downgrade-to-warn as a baseline decision erases them in one stroke),
 `~7` auto-fix via `eslint --fix`, and the rest (`no-unused-vars`, `require-each-key`,
 `prefer-const`, `no-var`, …) are largely mechanical. Per-rule decision (fix vs
-downgrade/disable) reaches a green baseline without a mass rewrite.
+downgrade/disable) reaches a green baseline without a mass rewrite.~~
+
+> **STALE — corrected by execution (2026-07-17); see the Phase 3 section below.** These
+> numbers came from a throwaway dry-run config. Re-measured on the real flat config:
+> **579 errors / 0 warn / 0 parse, 138 files, only 9 auto-fixable**; `no-explicit-any` = **353**.
+> "Largely mechanical" was wrong — 61% of the baseline was one judgment-heavy rule. And the
+> shipped answer was **not** disable/downgrade: every rule stays `error`, with three
+> high-volume rules grandfathered into a ratcheting `eslint-suppressions.json` (432) and
+> everything else fixed to 0.
 
 ---
 
@@ -154,12 +163,14 @@ consistent with the existing `^x.y.z` entries in `package.json` (no bare names, 
 `latest`). Latest majors verified against npm on 2026-07-09:
 
 _Testing:_
+
 - `vitest@^4` (4.1.10; peer `vite ^6||^7||^8` — compatible with our Vite 6)
 - `@testing-library/svelte@^5` (5.4.2; supports Svelte 5)
 - `@testing-library/jest-dom@^6` (6.9.1)
 - `jsdom@^29` (29.1.1)
 
 _Lint (flat config):_
+
 - `eslint@^10` (10.6.0) — **bump from the current `^8`**
 - `@eslint/js@^10` (10.0.1)
 - `typescript-eslint@^8` (8.63.0; TS peer `>=4.8.4 <6.1.0`, our TS 5 fits)
@@ -200,17 +211,19 @@ Per the Svelte testing docs, set `resolve.conditions: ['browser']` **guarded by
 in Node, without affecting the real `vite build`:
 
 ```ts
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 // ...existing plugins...
 
 export default defineConfig({
-  plugins: [/* existing */],
+  plugins: [
+    /* existing */
+  ],
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
-    setupFiles: ['./vitest-setup.ts'],
+    setupFiles: ["./vitest-setup.ts"],
   },
-  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
+  resolve: process.env.VITEST ? { conditions: ["browser"] } : undefined,
 });
 ```
 
@@ -239,7 +252,7 @@ a handful of tests. Add the split when the suite grows.
 
 Named for its broader gate role (lint + typecheck + test + build), distinct from the
 backend's `tests.yml`. **Built up across phases** — each phase adds only the steps that
-are green by then (see *Phased delivery*). Final shape:
+are green by then (see _Phased delivery_). Final shape:
 
 ```yaml
 name: Client CI
@@ -247,8 +260,8 @@ on:
   pull_request:
     branches: [main, development]
     paths:
-      - 'client/**'
-      - '.github/workflows/client-ci.yml'
+      - "client/**"
+      - ".github/workflows/client-ci.yml"
 
 defaults:
   run:
@@ -261,17 +274,31 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: client/.nvmrc   # node 24
+          node-version-file: client/.nvmrc # node 24
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
       - run: npm run verify:runes # export-let guard   (Phase 1)
-      - run: npm run test         # vitest run          (Phase 1)
-      - run: npm run build        # vite build          (Phase 1)
+      - run: npm run test # vitest run          (Phase 1)
+      - run: npm run build # vite build          (Phase 1)
       - run: npm run format:check # prettier --check .  (Phase 2)
-      - run: npm run lint         # eslint              (Phase 3)
-      - run: npm run check        # svelte-check        (Phase 4)
+      - run: npm run lint # eslint              (Phase 3)
+      - run: npm run check # svelte-check        (Phase 4)
 ```
+
+> **SUPERSEDED as of Phase 3 (2026-07-17).** The shipped workflow runs **fail-fast**
+> (cheapest / most-likely-to-fail first), and `lint` absorbed the prettier check, so the
+> standalone `format:check` step is gone. Actual steps today:
+>
+> ```yaml
+> - run: npm ci
+> - run: npm run verify:runes # export-let guard (grep, instant)
+> - run: npm run lint # eslint . && prettier --check . (+ suppressions ratchet)
+> - run: npm run test # vitest run
+> - run: npm run build # vite build (most expensive — last)
+> ```
+>
+> `check` (svelte-check) remains Phase 4's to add.
 
 - **`paths` filter:** docs/orm/server-only PRs skip the frontend gate (monorepo
   optimization).
@@ -289,7 +316,7 @@ Each phase is its own PR, branched off `development`, independently green. A pha
 its gate step **only once that step passes**, so `client-ci` is never red. Independent of
 the RBAC branch (`feature/rbac-step1-service-layer`).
 
-### Phase 1 — Test harness + minimal (green) CI  ·  node 24
+### Phase 1 — Test harness + minimal (green) CI · node 24
 
 - Add test devDeps (`vitest@^4`, `@testing-library/svelte@^5`, `@testing-library/jest-dom@^6`,
   `jsdom@^29`), `vite.config.ts` `test` block, `vitest-setup.ts`, `test`/`test:watch` scripts.
@@ -309,17 +336,53 @@ the RBAC branch (`feature/rbac-step1-service-layer`).
 - **Exit criteria:** `prettier --check .` clean; gate step green.
 - **Risk:** low — 100% auto-fixable; the only cost is a large review diff.
 
-### Phase 3 — ESLint flat config → green
+### Phase 3 — ESLint flat config → green · ✅ **EXECUTED & COMPLETE 2026-07-17**
 
-- Delete `.eslintrc.cjs`; add `eslint.config.js` (flat) per the ESLint decision — **wiring
-  the TS parser for `.svelte`, `.svelte.ts`, `.svelte.js`**; port the `export let` guard;
-  add `lint` script; bump lint devDeps (eslint 10 + plugins).
-- Reach green from the measured **483**: decide `@typescript-eslint/no-explicit-any`
-  baseline (disable / warn) → −283; `eslint --fix` the auto-fixables; resolve the mechanical
-  remainder per-rule (fix vs downgrade/disable in `eslint.config.js`).
-- Add `lint` step to `client-ci.yml`.
-- **Exit criteria:** `eslint .` clean; gate step green.
-- **Risk:** medium — bounded by the rule-baseline decision + mechanical fixes.
+> **This section is retrospective — it records what was BUILT, which differs from what was
+> designed.** Plan: `docs/superpowers/plans/2026-07-16-frontend-ci-phase3-eslint.md`.
+
+**Delivered as designed:** deleted `.eslintrc.cjs`; added `eslint.config.js` (flat, eslint 10)
+with the TS parser wired for `.svelte`/`.svelte.ts`/`.svelte.js`; ported the `export let`
+guard; `eslint-config-prettier` last; bumped the lint devDeps. `lint` gate step is green in
+`client-ci.yml`.
+
+**Deviations from this design (all deliberate, and load-bearing):**
+
+1. **The baseline numbers here were wrong.** Real measured baseline was **579 errors / 0 warn
+   / 0 parse across 138 files, only 9 auto-fixable** — not "483, ~7 auto-fix, the rest largely
+   mechanical". `no-explicit-any` was **353**, not 283. The "largely mechanical" read did not
+   survive contact: 61% of the baseline was a single judgment-heavy rule.
+2. **No blanket disable/warn.** This design proposed erasing `no-explicit-any` "in one stroke".
+   Instead Phase 3 used **ESLint native bulk suppressions** (`--suppress-rule`, eslint ≥9.24):
+   every rule stays `error` and is **enforced on new code**, while exactly three high-volume
+   judgment-heavy rules are grandfathered into a committed, ratcheting `eslint-suppressions.json`
+   — `no-explicit-any` (353), `svelte/require-each-key` (51), `svelte/prefer-svelte-reactivity`
+   (28) = **432**. Everything else was **fixed to 0**, not downgraded. Rationale: disabling a rule
+   loses the signal permanently; a count-per-file baseline blocks regressions and only shrinks
+   (`--prune-suppressions`). See `docs/backlog/2026-07-16-frontend-ci-phase3-eslint-followups.md`
+   ("How the ratchet works") for the prune workflow and the ratchet-down items.
+3. **`svelte/no-navigation-without-resolve` was adopted, not deferred** — all 18 sites now route
+   through `resolve()` from `$app/paths`; the rule is a clean error with no suppression.
+4. **`lint` is consolidated: `eslint . && prettier --check .`**, and it **replaces** Phase 2's
+   separate `format:check` step (so prettier still runs exactly once). `format`/`format:check`
+   were deleted; `lint:fix` added. This supersedes the "Step order = phase order" convention.
+5. **CI steps reordered fail-fast** (cheapest / most-likely-to-fail first):
+   `verify:runes` → `lint` → `test` → `build`. Supersedes the phase-order rule above, which
+   stopped being a useful organizing principle once every phase's step existed.
+
+**Exit criteria — met:** `eslint .` exit 0; full gate `verify:runes → lint → test → build`
+exit 0; ratchet proven to block a new violation both in a new file and in an already-suppressed
+one. svelte-check untouched at its 158/103 baseline (Phase 4's job).
+
+**Known deliberate gap:** `prefer-const` is not configured for `.svelte` (729 sites, ~200 being
+the canonical `let { x } = $props()` idiom). Tracked in `docs/backlog/`, along with the three
+ratchet-down items and a pre-existing `{@html}` XSS surface in `DataTable.svelte`.
+
+**Risk in hindsight:** the medium rating was right, but for the wrong reason. The cost was not
+the mechanical fixes — it was that two inline `eslint-disable` justifications asserted
+properties the code did not have (one of them mandated by the plan itself), each hiding a real
+latent bug. Cheap verification confirms rule counts; only a careful review catches a disable
+that lies.
 
 ### Phase 4 — svelte-check remediation → green
 
@@ -340,7 +403,7 @@ and `development` (GitHub → Settings → Branches → the rule → "Require st
 pass before merging" → select `client-ci`). One-time manual step, outside the workflow
 file.
 
-**Interaction with the `paths:` filter (handle only when enforcing):** a *path-filtered*
+**Interaction with the `paths:` filter (handle only when enforcing):** a _path-filtered_
 workflow that is skipped never reports its check, so once `client-ci` is required, a PR
 that doesn't touch `client/**` would be blocked forever waiting for a run that never
 happens. Fix at that time by moving the change-detection off `on.paths` and into a
@@ -355,10 +418,10 @@ reports. Not needed until enforcement is turned on.
 - Vitest **browser mode** (`vitest-browser-svelte`) and testing canvas/WebGL/DICOM
   components.
 - **Type-aware** typescript-eslint linting (`recommendedTypeChecked` + `parserOptions.
-  project`) — we use the fast non-type-aware `recommended` only.
+project`) — we use the fast non-type-aware `recommended` only.
 - Splitting Vitest into client/server projects.
 - Actually **configuring** branch protection / required checks — that manual admin step
-  (and its `paths`-filter interaction) is documented under *Enabling enforcement*; the
+  (and its `paths`-filter interaction) is documented under _Enabling enforcement_; the
   phases only make the workflow run and report.
 - Post-merge `push` triggers and cloud CD.
 - Upgrading the docs `deploy.yml` to node 24 (noted for consistency, not done here).

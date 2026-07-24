@@ -17,14 +17,13 @@ export class HotKeys implements ViewerEventListener {
     constructor() {}
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        let {
+        const {
             event: { code, repeat },
-            viewerContext: { hideOverlays },
             viewerContext,
         } = e;
         if (repeat) return;
 
-        hideOverlays = code === "Space";
+        const hideOverlays = code === "Space";
         viewerContext.hideOverlays = hideOverlays;
 
         if (code in this.codes) {

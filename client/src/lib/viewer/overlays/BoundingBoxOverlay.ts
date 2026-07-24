@@ -20,7 +20,7 @@ export class BoundingBoxOverlay implements Overlay {
         this.boundingBoxes.push(bb);
     }
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         if (this.hide) return;
         if (!this.boundingBoxes) return;
 
@@ -29,12 +29,12 @@ export class BoundingBoxOverlay implements Overlay {
         context2D.strokeStyle = this.strokeStyle;
 
         if (!image.is3D) {
-            for (var bb of this.boundingBoxes) {
-                var p1 = viewerContext.imageToViewerCoordinates({
+            for (const bb of this.boundingBoxes) {
+                const p1 = viewerContext.imageToViewerCoordinates({
                     x: bb[0],
                     y: bb[1],
                 });
-                var p2 = viewerContext.imageToViewerCoordinates({
+                const p2 = viewerContext.imageToViewerCoordinates({
                     x: bb[2],
                     y: bb[3],
                 });

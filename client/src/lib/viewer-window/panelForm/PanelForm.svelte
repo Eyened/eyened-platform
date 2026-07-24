@@ -4,7 +4,6 @@
         formSchemas,
         formSchemasByName,
         createFormAnnotation,
-        instances,
     } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
@@ -14,7 +13,6 @@
         FormAnnotationGET,
         FormSchemaGET,
     } from "../../../types/openapi_types";
-    import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import { HIDE_FROM_FORM_PANEL_NAMES } from "$lib/config/builtinFormSchemas";
     import FormItem from "./FormItem.svelte";
     import {
@@ -26,9 +24,6 @@
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const viewerWindowContext = getContext<ViewerWindowContext>(
-        "viewerWindowContext",
-    );
     const { formShortcut } = globalContext;
 
     const {

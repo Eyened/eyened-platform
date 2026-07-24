@@ -9,7 +9,6 @@ Used to create the viewerwindow context.
     import { Deferred } from "$lib/utils";
     import { WebGL } from "$lib/webgl/webgl";
     import { getContext, onMount } from "svelte";
-    import BrowserOverlay from "./BrowserOverlay.svelte";
     import ViewerWindow from "./ViewerWindow.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
@@ -49,7 +48,7 @@ Used to create the viewerwindow context.
         reject(new Error("WebGL context was lost. Please reload the page."));
     }
 
-    function handleContextRestored(event: Event) {
+    function handleContextRestored(_event: Event) {
         console.warn(
             "[WebGL] Context restored - this should not happen during normal navigation",
         );

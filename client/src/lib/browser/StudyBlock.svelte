@@ -33,7 +33,7 @@
                   operator: "==",
                   value: study.patient.identifier,
               })
-            : "",
+            : undefined,
     );
 
     const urlByDate = $derived(
@@ -53,7 +53,6 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="main mb-4 block flex flex-col rounded-[2px] border border-[rgb(181,188,206)] p-[0.3em] shadow-[0_6px_12px_rgba(149,157,165,0.2)]"
@@ -78,6 +77,7 @@
                     <span>{study.project.name}</span>
                     &nbsp;/&nbsp;
                     {#if urlByPatient}
+                        <!-- eslint-disable svelte/no-navigation-without-resolve -- urlByPatient is built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally; static analysis can't trace through the helper -->
                         <a
                             href={urlByPatient}
                             onclick={(e) => e.stopPropagation()}
@@ -85,10 +85,12 @@
                         >
                             {study.patient.identifier}
                         </a>
+                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                     {:else}
                         <span>{study.patient.identifier}</span>
                     {/if}
                     &nbsp;/&nbsp;
+                    <!-- eslint-disable svelte/no-navigation-without-resolve -- urlByDate is built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally; static analysis can't trace through the helper -->
                     <a
                         href={urlByDate}
                         onclick={(e) => e.stopPropagation()}
@@ -96,6 +98,7 @@
                     >
                         {study.date}
                     </a>
+                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
                     <span class="ml-1">
                         [{study.patient.sex}
                         {study.age ? Math.round(study.age) : "?"} years]

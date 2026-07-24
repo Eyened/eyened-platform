@@ -9,7 +9,9 @@ type TypedArray =
     | Float64Array;
 
 // Map TypedArray constructor to numpy dtype string
-const DTYPE_MAP = new Map<Function, string>([
+type TypedArrayCtor = new (...args: unknown[]) => TypedArray;
+
+const DTYPE_MAP = new Map<TypedArrayCtor, string>([
     [Uint8Array, "|u1"],
     [Int8Array, "|i1"],
     [Uint16Array, "<u2"],
@@ -39,14 +41,15 @@ export function encodeNpy(
     version: 1 | 2 = 1,
     fortranOrder = false,
 ): ArrayBuffer {
-    if (!DTYPE_MAP.has(data.constructor)) {
+    const ctor = data.constructor as TypedArrayCtor;
+    if (!DTYPE_MAP.has(ctor)) {
         throw new Error("Unsupported TypedArray type for encoding");
     }
-    const descr = DTYPE_MAP.get(data.constructor)!;
+    const descr = DTYPE_MAP.get(ctor)!;
 
     // Construct header dict string, note trailing comma required by numpy
     const shapeStr = `(${shape.length === 1 ? shape[0] + "," : shape.join(", ")})`;
-    let header = `{'descr': '${descr}', 'fortran_order': ${fortranOrder ? "True" : "False"}, 'shape': ${shapeStr}}`;
+    const header = `{'descr': '${descr}', 'fortran_order': ${fortranOrder ? "True" : "False"}, 'shape': ${shapeStr}}`;
 
     // Encode header as ASCII
     const encoder = new TextEncoder();
@@ -213,15 +216,16 @@ export function decodeNpy(buffer: ArrayBuffer): NPYArray {
     }
 
     const bytesPerElement = TypedArrayConstructor.BYTES_PER_ELEMENT;
+    let data: TypedArray;
     if (byteOffset % bytesPerElement === 0) {
         // Safe to create a view directly
-        var data = new TypedArrayConstructor(buffer, byteOffset, size);
+        data = new TypedArrayConstructor(buffer, byteOffset, size);
     } else {
         // Not aligned: copy to a new buffer
         const src = new Uint8Array(buffer, byteOffset, byteLength);
         const tmp = new ArrayBuffer(byteLength);
         new Uint8Array(tmp).set(src);
-        var data = new TypedArrayConstructor(tmp, 0, size);
+        data = new TypedArrayConstructor(tmp, 0, size);
     }
 
     return new NPYArray(data, shape, fortranOrder);

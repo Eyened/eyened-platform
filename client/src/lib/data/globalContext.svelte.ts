@@ -1,3 +1,5 @@
+import { resolve } from "$app/paths";
+import type { ResolvedPathname } from "$app/types";
 import { UserManager } from "$lib/usermanager.svelte";
 
 import type {
@@ -77,7 +79,7 @@ export class GlobalContext {
     /**
      * Build a Browser URL for a studies query using a single StudySearchCondition.
      */
-    makeStudiesBrowserURL(condition: StudySearchCondition): string {
+    makeStudiesBrowserURL(condition: StudySearchCondition): ResolvedPathname {
         const params = new URLSearchParams();
         params.set("page", "0");
         params.set("limit", "10");
@@ -87,13 +89,13 @@ export class GlobalContext {
         params.set("queryMode", "studies");
         params.set("displayMode", "study");
         params.set("filterMode", "advanced");
-        return `/?${params.toString()}`;
+        return resolve(`/?${params.toString()}`);
     }
 
     /**
      * Build a Browser URL for an instances query using a single SearchCondition.
      */
-    makeInstancesBrowserURL(condition: SearchCondition): string {
+    makeInstancesBrowserURL(condition: SearchCondition): ResolvedPathname {
         const params = new URLSearchParams();
         params.set("page", "0");
         params.set("limit", "100");
@@ -106,7 +108,7 @@ export class GlobalContext {
         params.set("queryMode", "instances");
         params.set("displayMode", "instance");
         params.set("filterMode", "advanced");
-        return `/?${params.toString()}`;
+        return resolve(`/?${params.toString()}`);
     }
 
     // Private helper, compatible with both condition types

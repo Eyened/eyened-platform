@@ -141,7 +141,7 @@ export class ProgramInfo {
     }
 
     setUniform(name: string, value: any) {
-        if (!this.uniformSetters.hasOwnProperty(name)) {
+        if (!Object.prototype.hasOwnProperty.call(this.uniformSetters, name)) {
             return;
         }
         this.uniformSetters[name](value);

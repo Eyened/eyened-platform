@@ -68,18 +68,17 @@ export class Matrix {
     }
 
     multiply(matrix: Matrix): Matrix {
-        const m1 = this;
         const m2 = matrix;
         return new Matrix(
-            m1.a * m2.a + m1.b * m2.d + m1.c * m2.g,
-            m1.a * m2.b + m1.b * m2.e + m1.c * m2.h,
-            m1.a * m2.c + m1.b * m2.f + m1.c * m2.i,
-            m1.d * m2.a + m1.e * m2.d + m1.f * m2.g,
-            m1.d * m2.b + m1.e * m2.e + m1.f * m2.h,
-            m1.d * m2.c + m1.e * m2.f + m1.f * m2.i,
-            m1.g * m2.a + m1.h * m2.d + m1.i * m2.g,
-            m1.g * m2.b + m1.h * m2.e + m1.i * m2.h,
-            m1.g * m2.c + m1.h * m2.f + m1.i * m2.i,
+            this.a * m2.a + this.b * m2.d + this.c * m2.g,
+            this.a * m2.b + this.b * m2.e + this.c * m2.h,
+            this.a * m2.c + this.b * m2.f + this.c * m2.i,
+            this.d * m2.a + this.e * m2.d + this.f * m2.g,
+            this.d * m2.b + this.e * m2.e + this.f * m2.h,
+            this.d * m2.c + this.e * m2.f + this.f * m2.i,
+            this.g * m2.a + this.h * m2.d + this.i * m2.g,
+            this.g * m2.b + this.h * m2.e + this.i * m2.h,
+            this.g * m2.c + this.h * m2.f + this.i * m2.i,
         );
     }
 
@@ -177,7 +176,9 @@ export function getMatrixFromPointSets(
             A.push([x0, y0, 1, 0, 0, 0]);
             A.push([0, 0, 0, x0, y0, 1]);
             B.push(x1, y1);
-        } catch {}
+        } catch {
+            // Skip undefined source/target point pairs
+        }
     }
     try {
         const pseudoInverseA = multiply(

@@ -18,7 +18,6 @@ import { createSegmentation } from "$lib/data/api";
 
 // SimpleDataRepresentation is a subset of SegmentationDataRepresentation
 type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
-type DataRepresentation = SegmentationDataRepresentation;
 
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
     Q: "DualBitMask",

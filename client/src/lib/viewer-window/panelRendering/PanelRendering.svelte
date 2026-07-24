@@ -42,6 +42,7 @@
                                 bind:group={viewerContext.renderMode}
                                 value={option}
                             />
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, non-user content -->
                             {@html label}
                         </label>
                     </li>
@@ -49,7 +50,7 @@
             </ul>
         {:else}
             <select bind:value={viewerContext.renderMode}>
-                {#each Object.entries(options) as [option, label]}
+                {#each Object.entries(options) as [option]}
                     <option value={option}>
                         {option}
                     </option>

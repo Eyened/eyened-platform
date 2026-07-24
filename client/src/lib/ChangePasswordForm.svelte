@@ -23,7 +23,7 @@
             setTimeout(() => {
                 changed = false;
             }, 5000);
-        } catch (e) {
+        } catch (_e) {
             alert("Error changing password");
         }
     }
