@@ -178,6 +178,38 @@ def test_update_subtask_claim_conflict_when_assigned(session):
     assert exc.value.detail["code"] == "subtask_already_claimed"
 
 
+def test_update_subtask_unclaim_releases_own(session):
+    """claim=False clears CreatorID when the actor owns the subtask."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = actor.id
+    session.commit()
+
+    updated = _service().update_subtask(
+        session, st.SubTaskID, None, None, actor, claim=False
+    )
+    assert updated.CreatorID is None
+
+
+def test_update_subtask_unclaim_conflict_when_owned_by_other(session):
+    """claim=False raises ConflictError when a different creator owns it."""
+    owner = _actor(session)
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = owner.id
+    session.commit()
+
+    with pytest.raises(ConflictError) as exc:
+        _service().update_subtask(
+            session, st.SubTaskID, None, None, actor, claim=False
+        )
+    assert exc.value.detail["code"] == "subtask_not_owned"
+
+
 def test_update_subtask_unknown_raises_not_found(session):
     """Updating a missing subtask is translated to NotFoundError (-> 404)."""
     actor = _actor(session)

@@ -5,7 +5,9 @@
     import { Button } from "$lib/components/ui/button";
     import * as Table from "$lib/components/ui/table";
     import { updateSubTask } from "$lib/data/api";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { SubTaskWithImagesGET } from "../../types/openapi_types";
+    import { getContext } from "svelte";
     import { toast } from "svelte-sonner";
     import {
         addSubTaskImage,
@@ -19,8 +21,14 @@
     };
     let { subtask, taskId }: Props = $props();
 
+    const globalContext = getContext<GlobalContext>("globalContext");
+
     const row = $derived(subtask);
-    const isUnassigned = $derived(!(row as any).creator && !row.creator_id);
+    const assigneeId = $derived(
+        (row as any).creator?.id ?? row.creator_id ?? null,
+    );
+    const isUnassigned = $derived(assigneeId == null);
+    const isMine = $derived(assigneeId === globalContext.user.id);
 
     let showPicker = $state(false);
     let claiming = $state(false);
@@ -51,6 +59,18 @@
         try {
             await updateSubTask(row.id, { claim: true });
             toast.success("Subtask claimed");
+        } catch (e) {
+            toast.error(String(e));
+        } finally {
+            claiming = false;
+        }
+    }
+
+    async function unclaim() {
+        claiming = true;
+        try {
+            await updateSubTask(row.id, { claim: false });
+            toast.success("Subtask unclaimed");
         } catch (e) {
             toast.error(String(e));
         } finally {
@@ -110,9 +130,23 @@
                 Claim
             </Button>
         {:else}
-            <span class="text-sm"
-                >{(row as any).creator?.name ?? `Creator #${row.creator_id}`}</span
-            >
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm"
+                    >{(row as any).creator?.name ??
+                        `Creator #${row.creator_id}`}</span
+                >
+                {#if isMine}
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={claiming}
+                        onclick={unclaim}
+                    >
+                        Unclaim
+                    </Button>
+                {/if}
+            </div>
         {/if}
     </Table.Cell>
     <Table.Cell>

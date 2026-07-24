@@ -302,13 +302,15 @@ class SubTaskService:
         """Update a subtask's comments/state (each optional).
 
         If ``claim`` is True, explicitly assign the subtask to ``actor``,
-        raising ConflictError if it is already assigned to someone else.
+        raising ConflictError if it is already assigned.
+        If ``claim`` is False, release the assignment only when the actor
+        currently owns it (cannot unclaim someone else's subtask).
         Otherwise, comments/state edits auto-claim an unassigned subtask.
 
         Raises:
             NotFoundError: If the subtask does not exist.
-            ConflictError: If ``claim`` is True and the subtask is already
-                assigned.
+            ConflictError: If ``claim`` is True and already assigned, or
+                ``claim`` is False and assigned to a different creator.
         """
         subtask = self.subtasks.get_by_id(session, subtask_id)
         if subtask is None:
@@ -332,6 +334,21 @@ class SubTaskService:
                     }
                 )
             self.subtasks.claim_if_unassigned(session, subtask_id, actor.id)
+            changes["creator_id"] = f"None -> {actor.id}"
+        elif claim is False:
+            if subtask.CreatorID is None:
+                pass
+            elif subtask.CreatorID != actor.id:
+                raise ConflictError(
+                    {
+                        "code": "subtask_not_owned",
+                        "message": "Only the assignee can unclaim this SubTask",
+                        "creator_id": subtask.CreatorID,
+                    }
+                )
+            else:
+                changes["creator_id"] = f"{subtask.CreatorID} -> None"
+                subtask.CreatorID = None
         elif comments is not None or task_state is not None:
             self.subtasks.claim_if_unassigned(session, subtask_id, actor.id)
 
