@@ -124,8 +124,16 @@
         if (!globalContext.canEdit(formAnnotation)) return;
 
         const key = `etdrs:${formAnnotation.id}:${field}`;
-        const analysis = landmarkAnalysis(field);
         const annotationId = formAnnotation.id;
+
+        // Already editing this landmark — keep edit mode on (only the edit icon disarms).
+        if (pointArming.isArmed(key)) {
+            armedAnnotationId = annotationId;
+            armedField = field;
+            return;
+        }
+
+        const analysis = landmarkAnalysis(field);
 
         pointArming.arm(key, () => {
             armedAnnotationId = annotationId;
@@ -156,13 +164,9 @@
                     },
                 }),
             );
-            return () => {
-                dispose();
-                if (armedAnnotationId === annotationId) {
-                    armedAnnotationId = undefined;
-                    armedField = undefined;
-                }
-            };
+            // Do not clear armedAnnotationId here — switching landmarks disposes the
+            // previous tool before attaching the next; clearing would flash edit off.
+            return () => dispose();
         });
     }
 
