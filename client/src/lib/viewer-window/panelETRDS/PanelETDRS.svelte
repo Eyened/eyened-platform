@@ -16,6 +16,7 @@
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { etdrsGridType } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { ETDRSGridItemOverlay } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
+    import { ETDRSLandmarksOverlay } from "$lib/viewer/overlays/ETDRSLandmarksOverlay";
     import { PointTool } from "$lib/viewer/tools/PointTool";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { ViewerEvent } from "$lib/viewer/viewer-utils";
@@ -70,6 +71,25 @@
 
     let armedAnnotationId = $state<number | undefined>(undefined);
     let armedField = $state<LandmarkField | undefined>(undefined);
+    let disposeLandmarksOverlay: (() => void) | undefined = undefined;
+
+    function ensureLandmarksOverlay(annotationId: number) {
+        if (
+            disposeLandmarksOverlay &&
+            armedAnnotationId === annotationId
+        ) {
+            return;
+        }
+        disposeLandmarksOverlay?.();
+        disposeLandmarksOverlay = viewerContext.addOverlay(
+            new ETDRSLandmarksOverlay(annotationId, () => armedField),
+        );
+    }
+
+    function clearLandmarksOverlay() {
+        disposeLandmarksOverlay?.();
+        disposeLandmarksOverlay = undefined;
+    }
 
     function landmarkAnalysis(field: LandmarkField) {
         const props = (etdrsSchema.schema as JSONSchema).properties?.[field];
@@ -135,14 +155,17 @@
 
         const analysis = landmarkAnalysis(field);
 
+        ensureLandmarksOverlay(annotationId);
+
         pointArming.arm(key, () => {
             armedAnnotationId = annotationId;
             armedField = field;
-            const dispose = viewerContext.addOverlay(
+            const disposeTool = viewerContext.addOverlay(
                 new PointTool({
                     canEdit: true,
                     analysis,
                     label: field,
+                    showMarkers: false,
                     getPublicId: () => instance.id,
                     getFieldValue: () =>
                         (formAnnotations.get(annotationId)?.form_data as any)?.[
@@ -166,7 +189,8 @@
             );
             // Do not clear armedAnnotationId here — switching landmarks disposes the
             // previous tool before attaching the next; clearing would flash edit off.
-            return () => dispose();
+            // Landmarks overlay stays for the whole edit session.
+            return () => disposeTool();
         });
     }
 
@@ -177,6 +201,7 @@
         overlays.clear();
         overlayIds.clear();
         pointArming.disarm();
+        clearLandmarksOverlay();
         armedAnnotationId = undefined;
         armedField = undefined;
     }
@@ -220,6 +245,7 @@
         if (!shouldBeActive) {
             if (isActive) {
                 pointArming.disarm();
+                clearLandmarksOverlay();
                 armedAnnotationId = undefined;
                 armedField = undefined;
             }

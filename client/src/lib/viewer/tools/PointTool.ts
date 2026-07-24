@@ -26,6 +26,8 @@ export type PointToolOptions = {
     setFieldValue: (next: unknown) => void;
     pointStyle?: "rect" | "cross";
     radius?: number;
+    /** When false, skip marker painting (caller paints landmarks separately). */
+    showMarkers?: boolean;
     /** Optional extra key handler (e.g. ETDRS f/d). */
     onKey?: (e: ViewerEvent<KeyboardEvent>) => void;
 };
@@ -172,6 +174,12 @@ export class PointTool implements Overlay {
 
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const points = this.points;
+        const highlightIndex = this.activePointIndex ?? this.hoverPointIndex;
+        viewerContext.cursorStyle =
+            highlightIndex !== undefined ? "pointer" : "default";
+
+        if (this.options.showMarkers === false) return;
+
         const { context2D } = viewerContext;
 
         context2D.strokeStyle = strokeStyle;
@@ -213,7 +221,6 @@ export class PointTool implements Overlay {
         }
 
         context2D.fillStyle = fillStyle;
-        const highlightIndex = this.activePointIndex ?? this.hoverPointIndex;
         if (highlightIndex !== undefined) {
             const highlightPoint = points[highlightIndex];
             if (highlightPoint) {
@@ -228,8 +235,6 @@ export class PointTool implements Overlay {
                 }
             }
         }
-        viewerContext.cursorStyle =
-            highlightIndex !== undefined ? "pointer" : "default";
     }
 
     private findHit(
