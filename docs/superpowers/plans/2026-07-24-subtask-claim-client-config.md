@@ -548,29 +548,68 @@ Append to `orm/eyened_orm/tests/test_task_repository.py`:
 ```python
 def test_claim_if_unassigned_sets_creator(session):
     """Unassigned subtask is claimed by the given creator_id."""
-    # arrange: task + subtask with CreatorID None (reuse existing helpers)
-    ...
-    claimed = SubTaskRepository().claim_if_unassigned(session, st.SubTaskID, actor_id)
+    actor = _creator(session, "claimer")
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     session.commit()
+
+    claimed = SubTaskRepository().claim_if_unassigned(
+        session, st.SubTaskID, actor.CreatorID
+    )
+    session.commit()
+
     assert claimed is True
-    assert session.get(SubTask, st.SubTaskID).CreatorID == actor_id
+    assert session.get(SubTask, st.SubTaskID).CreatorID == actor.CreatorID
 
 
 def test_claim_if_unassigned_does_not_steal(session):
     """Already-assigned subtask is left unchanged."""
-    ...
-    st.CreatorID = owner_id
+    owner = _creator(session, "owner")
+    other = _creator(session, "other")
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    st.CreatorID = owner.CreatorID
     session.commit()
-    claimed = SubTaskRepository().claim_if_unassigned(session, st.SubTaskID, other_id)
+
+    claimed = SubTaskRepository().claim_if_unassigned(
+        session, st.SubTaskID, other.CreatorID
+    )
+    session.commit()
+
     assert claimed is False
-    assert session.get(SubTask, st.SubTaskID).CreatorID == owner_id
+    assert session.get(SubTask, st.SubTaskID).CreatorID == owner.CreatorID
 
 
 def test_list_for_task_filters_unassigned_and_creator(session):
-    ...
-```
+    """list_for_task honors unassigned=True and creator_id filters."""
+    owner = _creator(session, "owner")
+    other = _creator(session, "other")
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.CreatorID)
+    unassigned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    owned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    owned.CreatorID = owner.CreatorID
+    other_st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    other_st.CreatorID = other.CreatorID
+    session.commit()
 
-(Fill arrange using the file’s existing `_make_task` / `_make_subtask` patterns.)
+    repo = SubTaskRepository()
+    only_unassigned = repo.list_for_task(
+        session, task.TaskID, unassigned=True, limit=50, offset=0
+    )
+    assert [r.SubTaskID for r in only_unassigned] == [unassigned.SubTaskID]
+
+    only_owner = repo.list_for_task(
+        session,
+        task.TaskID,
+        creator_id=owner.CreatorID,
+        limit=50,
+        offset=0,
+    )
+    assert [r.SubTaskID for r in only_owner] == [owned.SubTaskID]
+```
 
 - [ ] **Step 2: Run — expect FAIL**
 
@@ -684,8 +723,17 @@ EOF
 - [ ] **Step 1: Tests**
 
 ```python
+from server.services.exceptions import ConflictError
+
+
 def test_update_subtask_claim_assigns(session):
-    ...
+    """claim=True on an unassigned subtask sets CreatorID to the actor."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+
     updated = _service().update_subtask(
         session, st.SubTaskID, None, None, actor, claim=True
     )
@@ -693,9 +741,15 @@ def test_update_subtask_claim_assigns(session):
 
 
 def test_update_subtask_claim_conflict_when_assigned(session):
-    ...
+    """claim=True on an already-assigned subtask raises ConflictError."""
+    owner = _actor(session)
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.id)
+    st = _make_subtask(session, task.TaskID)
     st.CreatorID = owner.id
     session.commit()
+
     with pytest.raises(ConflictError) as exc:
         _service().update_subtask(
             session, st.SubTaskID, None, None, actor, claim=True
@@ -703,11 +757,12 @@ def test_update_subtask_claim_conflict_when_assigned(session):
     assert exc.value.detail["code"] == "subtask_already_claimed"
 ```
 
+Note: `_actor` creates a new Creator each call — use two calls for owner vs claimer as above.
 - [ ] **Step 2: Run — FAIL**
 
 - [ ] **Step 3: Implement service + route**
 
-Route:
+Route (`server/routes/subtask.py`):
 
 ```python
 st = service.update_subtask(
@@ -715,11 +770,10 @@ st = service.update_subtask(
     subtaskid,
     dto.comments,
     dto.task_state,
-    ActingUser(...),
+    ActingUser(id=current_user.id, username=current_user.username),
     claim=dto.claim,
 )
 ```
-
 - [ ] **Step 4: PASS + commit**
 
 ```bash
@@ -804,10 +858,14 @@ export async function updateSubTask(
         claim?: boolean;
     },
 ): Promise<any> {
-    ...
+    const data = await apiPatch<any>("/subtasks/{subtaskid}" as any, {
+        params: { path: { subtaskid: Number(subtask_id) } } as any,
+        body: patch as any,
+    });
+    ingestSubTasks([data]);
+    return data;
 }
 ```
-
 - [ ] **Step 2: UI wiring on task page + row**
 
 Assignee column between Status and View (or after Status). Batch button above table; disable when no unassigned on page.
