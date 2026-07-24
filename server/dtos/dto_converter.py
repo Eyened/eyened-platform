@@ -659,6 +659,11 @@ class DTOConverter:
             task_id=subtask.TaskID,
             task_state=subtask.TaskState,
             creator_id=subtask.CreatorID,
+            creator=(
+                DTOConverter.creator_to_meta(subtask.Creator)
+                if getattr(subtask, "Creator", None)
+                else None
+            ),
             comments=subtask.Comments,
         )
 
@@ -675,6 +680,11 @@ class DTOConverter:
             task_id=subtask.TaskID,
             task_state=subtask.TaskState,
             creator_id=subtask.CreatorID,
+            creator=(
+                DTOConverter.creator_to_meta(subtask.Creator)
+                if getattr(subtask, "Creator", None)
+                else None
+            ),
             comments=subtask.Comments,
             images=images,
         )

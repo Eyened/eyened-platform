@@ -479,6 +479,8 @@ export async function fetchSubTasks(params: {
     limit?: number;
     page?: number;
     subtask_status?: string;
+    unassigned?: boolean;
+    creator_id?: number;
 }): Promise<any> {
     const data = await apiGet<any>("/task/{task_id}/subtasks" as any, {
         params: {
@@ -488,6 +490,8 @@ export async function fetchSubTasks(params: {
                 limit: params.limit ?? 20,
                 page: params.page ?? 0,
                 subtask_status: params.subtask_status,
+                unassigned: params.unassigned || undefined,
+                creator_id: params.creator_id,
             },
         } as any,
     });
@@ -497,11 +501,23 @@ export async function fetchSubTasks(params: {
     return data;
 }
 
+export async function fetchSubTaskAssignees(
+    task_id: number,
+): Promise<{ id: number; name: string }[]> {
+    return await apiGet<any>("/task/{task_id}/subtask-assignees" as any, {
+        params: { path: { task_id } } as any,
+    });
+}
+
 // ===== SubTask Update Functions =====
 
 export async function updateSubTask(
     subtask_id: number,
-    patch: { task_state?: any; comments?: string | null },
+    patch: {
+        task_state?: any;
+        comments?: string | null;
+        claim?: boolean;
+    },
 ): Promise<any> {
     const data = await apiPatch<any>("/subtasks/{subtaskid}" as any, {
         params: { path: { subtaskid: Number(subtask_id) } } as any,

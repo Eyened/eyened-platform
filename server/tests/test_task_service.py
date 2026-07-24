@@ -5,7 +5,7 @@ from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
 
 from server.services.acting_user import ActingUser
-from server.services.exceptions import NotFoundError
+from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.task_service import TaskService
 
 
@@ -27,9 +27,14 @@ class FakeAuditLogger:
         self.deletes.append(kwargs)
 
 
+_actor_seq = 0
+
+
 def _actor(session) -> ActingUser:
     """An ActingUser backed by a real Creator row (Task.CreatorID is a FK)."""
-    creator = Creator(CreatorName="alice", IsHuman=True)
+    global _actor_seq
+    _actor_seq += 1
+    creator = Creator(CreatorName=f"alice-{_actor_seq}", IsHuman=True)
     session.add(creator)
     session.flush()
     return ActingUser(id=creator.CreatorID, username=creator.CreatorName)
@@ -298,3 +303,64 @@ def test_get_task_subtask_out_of_range_raises_not_found(session):
         _service().get_task_subtask(
             session, task.TaskID, 5, with_images=False, with_next=False
         )
+
+
+def test_list_task_subtasks_filters_unassigned(session):
+    """unassigned=True returns only subtasks with CreatorID NULL."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    unassigned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    assigned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    assigned.CreatorID = actor.id
+    session.commit()
+
+    rows, count = _service().list_task_subtasks(
+        session,
+        task.TaskID,
+        with_images=False,
+        limit=10,
+        page=0,
+        status=None,
+        unassigned=True,
+    )
+
+    assert count == 1
+    assert [st.SubTaskID for st, _ in rows] == [unassigned.SubTaskID]
+
+
+def test_list_task_subtasks_rejects_unassigned_and_creator_id(session):
+    """Passing both unassigned and creator_id raises BadRequestError."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    session.commit()
+
+    with pytest.raises(BadRequestError):
+        _service().list_task_subtasks(
+            session,
+            task.TaskID,
+            with_images=False,
+            limit=10,
+            page=0,
+            status=None,
+            unassigned=True,
+            creator_id=actor.id,
+        )
+
+
+def test_list_subtask_assignees_returns_distinct_creators(session):
+    """list_subtask_assignees returns creators with at least one claimed subtask."""
+    owner = _actor(session)
+    other = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.id)
+    _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    a = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    a.CreatorID = owner.id
+    b = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    b.CreatorID = other.id
+    session.commit()
+
+    assignees = _service().list_subtask_assignees(session, task.TaskID)
+    assert {c.CreatorID for c in assignees} == {owner.id, other.id}

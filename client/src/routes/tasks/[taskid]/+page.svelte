@@ -4,11 +4,15 @@
     import FixedSpinner from "$lib/components/FixedSpinner.svelte";
     import Main from "$lib/components/Main.svelte";
     import SubtasksTable from "$lib/tasks/SubtasksTable.svelte";
-    import { onMount } from "svelte";
-    // Status filter UI
+    import { getContext, onMount } from "svelte";
     import { ButtonGroup } from "$lib/components/ui/button-group";
     import Button from "$lib/components/ui/button/button.svelte";
-    import { fetchSubTasks, fetchTask } from "$lib/data/api";
+    import {
+        fetchSubTaskAssignees,
+        fetchSubTasks,
+        fetchTask,
+    } from "$lib/data/api";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { subtasks, tasks } from "$lib/data/stores.svelte";
     import Label from "../../../lib/components/ui/label/label.svelte";
     import { subTaskStates } from "../../../types/openapi_constants";
@@ -16,26 +20,36 @@
 
     let { data } = $props();
 
+    const globalContext = getContext<GlobalContext>("globalContext");
+
     let isLoading: boolean = $state(true);
 
-    // Derive task from global store
     let task = $derived(tasks.get(data.taskid));
-
-    // Derive subtasks array from global store
     let subtasksArray = $derived(Array.from(subtasks.values()));
 
-    // Pagination metadata state
     let subtasksCount: number = $state(0);
     let subtasksLimit: number = $state(20);
     let subtasksPage: number = $state(0);
 
-    // Status filter state
     let subtasksStatus: SubTaskState | null = $state(null);
+    /** null=all, "unassigned", or creator id number */
+    let assigneeFilter: null | "unassigned" | number = $state(null);
+    let assignees: { id: number; name: string }[] = $state([]);
+
+    async function loadAssignees() {
+        try {
+            assignees = await fetchSubTaskAssignees(data.taskid);
+        } catch (e) {
+            console.error("Failed to load assignees", e);
+            assignees = [];
+        }
+    }
 
     async function loadPage(p: number): Promise<void> {
         isLoading = true;
         try {
             await fetchTask(data.taskid);
+            await loadAssignees();
             const nextPage = Math.max(0, Number.isFinite(p) ? p : 0);
 
             subtasks.clear();
@@ -45,6 +59,12 @@
                 limit: subtasksLimit,
                 page: nextPage,
                 subtask_status: subtasksStatus ?? undefined,
+                unassigned:
+                    assigneeFilter === "unassigned" ? true : undefined,
+                creator_id:
+                    typeof assigneeFilter === "number"
+                        ? assigneeFilter
+                        : undefined,
             });
 
             subtasksCount = res.count;
@@ -57,6 +77,16 @@
             if (subtasksStatus)
                 url.searchParams.set("status", String(subtasksStatus));
             else url.searchParams.delete("status");
+            if (assigneeFilter === "unassigned") {
+                url.searchParams.set("unassigned", "1");
+                url.searchParams.delete("creator_id");
+            } else if (typeof assigneeFilter === "number") {
+                url.searchParams.set("creator_id", String(assigneeFilter));
+                url.searchParams.delete("unassigned");
+            } else {
+                url.searchParams.delete("unassigned");
+                url.searchParams.delete("creator_id");
+            }
             await goto(url.pathname + "?" + url.searchParams.toString(), {
                 replaceState: true,
                 noScroll: true,
@@ -73,6 +103,8 @@
             const qpLimit = Number(sp.get("limit"));
             const qpPage = Number(sp.get("page"));
             const qpStatus = sp.get("status");
+            const qpUnassigned = sp.get("unassigned");
+            const qpCreator = Number(sp.get("creator_id"));
 
             if (Number.isFinite(qpLimit) && qpLimit > 0)
                 subtasksLimit = qpLimit;
@@ -82,6 +114,11 @@
                 (subTaskStates as readonly string[]).includes(qpStatus)
             ) {
                 subtasksStatus = qpStatus as SubTaskState;
+            }
+            if (qpUnassigned === "1" || qpUnassigned === "true") {
+                assigneeFilter = "unassigned";
+            } else if (Number.isFinite(qpCreator) && qpCreator > 0) {
+                assigneeFilter = qpCreator;
             }
 
             await loadPage(subtasksPage);
@@ -93,6 +130,11 @@
 
     function selectStatus(s: SubTaskState | null) {
         subtasksStatus = s;
+        loadPage(0);
+    }
+
+    function selectAssignee(value: null | "unassigned" | number) {
+        assigneeFilter = value;
         loadPage(0);
     }
 
@@ -148,6 +190,63 @@
                             </Button>
                         {/each}
                     </ButtonGroup>
+
+                    <Label>Assignee:</Label>
+                    <ButtonGroup class="mb-4">
+                        <Button
+                            variant={assigneeFilter === null
+                                ? "default"
+                                : "outline"}
+                            aria-pressed={assigneeFilter === null}
+                            onclick={() => selectAssignee(null)}
+                        >
+                            All
+                        </Button>
+                        <Button
+                            variant={assigneeFilter === "unassigned"
+                                ? "default"
+                                : "outline"}
+                            aria-pressed={assigneeFilter === "unassigned"}
+                            onclick={() => selectAssignee("unassigned")}
+                        >
+                            Unassigned
+                        </Button>
+                        <Button
+                            variant={assigneeFilter === globalContext.user.id
+                                ? "default"
+                                : "outline"}
+                            aria-pressed={assigneeFilter ===
+                                globalContext.user.id}
+                            onclick={() =>
+                                selectAssignee(globalContext.user.id)}
+                        >
+                            Mine
+                        </Button>
+                    </ButtonGroup>
+                    {#if assignees.length > 0}
+                        <label class="mb-4 flex items-center gap-2 text-sm">
+                            Pick assignee:
+                            <select
+                                class="rounded border px-2 py-1"
+                                value={typeof assigneeFilter === "number"
+                                    ? String(assigneeFilter)
+                                    : ""}
+                                onchange={(e) => {
+                                    const v = (
+                                        e.currentTarget as HTMLSelectElement
+                                    ).value;
+                                    if (!v) selectAssignee(null);
+                                    else selectAssignee(Number(v));
+                                }}
+                            >
+                                <option value="">—</option>
+                                {#each assignees as a}
+                                    <option value={a.id}>{a.name}</option>
+                                {/each}
+                            </select>
+                        </label>
+                    {/if}
+
                     <SubtasksTable
                         rows={subtasksArray}
                         taskId={data.taskid}

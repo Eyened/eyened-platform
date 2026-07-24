@@ -2195,6 +2195,7 @@ export interface components {
             id: number;
             /** Creator Id */
             creator_id?: number | null;
+            creator?: components["schemas"]["CreatorMeta"] | null;
             /** Index */
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;
@@ -2205,6 +2206,8 @@ export interface components {
             comments?: string | null;
             /** Task State */
             task_state?: string | null;
+            /** Claim */
+            claim?: boolean | null;
         };
         /**
          * SubTaskState
@@ -2225,6 +2228,7 @@ export interface components {
             id: number;
             /** Creator Id */
             creator_id?: number | null;
+            creator?: components["schemas"]["CreatorMeta"] | null;
             /** Index */
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;

@@ -4,6 +4,7 @@
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
     import { Button } from "$lib/components/ui/button";
     import * as Table from "$lib/components/ui/table";
+    import { updateSubTask } from "$lib/data/api";
     import type { SubTaskWithImagesGET } from "../../types/openapi_types";
     import { toast } from "svelte-sonner";
     import {
@@ -19,15 +20,15 @@
     let { subtask, taskId }: Props = $props();
 
     const row = $derived(subtask);
+    const isUnassigned = $derived(!(row as any).creator && !row.creator_id);
 
     let showPicker = $state(false);
+    let claiming = $state(false);
 
-    // Image ids currently linked to this subtask.
     const currentImageIds = $derived(
         ((row as any).images ?? []).map((img: any) => String(img.id)),
     );
 
-    // Default query: all images for the patients already linked to this subtask.
     const pickerConditions = $derived.by((): Condition[] => {
         const identifiers = new Set<string>();
         for (const img of (row as any).images ?? []) {
@@ -45,14 +46,23 @@
         ];
     });
 
+    async function claim() {
+        claiming = true;
+        try {
+            await updateSubTask(row.id, { claim: true });
+            toast.success("Subtask claimed");
+        } catch (e) {
+            toast.error(String(e));
+        } finally {
+            claiming = false;
+        }
+    }
+
     async function confirmImages(selectedIds: string[]) {
         const initial: string[] = currentImageIds;
         const added = selectedIds.filter((id) => !initial.includes(id));
         const removed = initial.filter((id) => !selectedIds.includes(id));
         try {
-            // Run sequentially: each endpoint returns a full snapshot of the
-            // subtask's images, so parallel requests would ingest out-of-order
-            // (stale) snapshots and also race on the next ImageIndex.
             for (const id of removed) {
                 await removeSubTaskImage(row.id, id);
             }
@@ -88,6 +98,23 @@
         <span class="text-xs">{row.id} [{row.index}]</span>
     </Table.Cell>
     <Table.Cell>{row.task_state ?? "-"}</Table.Cell>
+    <Table.Cell>
+        {#if isUnassigned}
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={claiming}
+                onclick={claim}
+            >
+                Claim
+            </Button>
+        {:else}
+            <span class="text-sm"
+                >{(row as any).creator?.name ?? `Creator #${row.creator_id}`}</span
+            >
+        {/if}
+    </Table.Cell>
     <Table.Cell>
         <Button
             href={`/tasks/${taskId}/grade/${row.index}`}

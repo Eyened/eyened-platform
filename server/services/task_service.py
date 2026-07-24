@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from eyened_orm import SubTask, SubTaskImageLink, Task
+from eyened_orm import Creator, SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
 
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
-from .exceptions import ConflictError, NotFoundError
+from .exceptions import BadRequestError, ConflictError, NotFoundError
 
 
 class TaskService:
@@ -177,16 +177,23 @@ class TaskService:
         limit: int,
         page: int,
         status: SubTaskState | None,
+        creator_id: int | None = None,
+        unassigned: bool = False,
     ) -> tuple[list[tuple[SubTask, int]], int]:
         """Return one page of a task's subtasks, each with its absolute index.
 
         ``absolute_index`` is the subtask's 0-based position within *all* the
-        task's subtasks ordered by SubTaskID (computed before the ``status``
-        filter). The returned count honors ``status``.
+        task's subtasks ordered by SubTaskID (computed before status/assignee
+        filters). The returned count honors the filters.
 
         Raises:
             NotFoundError: If the task does not exist.
+            BadRequestError: If both ``unassigned`` and ``creator_id`` are set.
         """
+        if unassigned and creator_id is not None:
+            raise BadRequestError(
+                "unassigned and creator_id are mutually exclusive"
+            )
         if self.tasks.get_by_id(session, task_id) is None:
             raise NotFoundError(f"Task {task_id} not found")
 
@@ -198,14 +205,34 @@ class TaskService:
             session,
             task_id,
             status=status,
+            creator_id=creator_id,
+            unassigned=unassigned,
             limit=limit,
             offset=limit * page,
             with_images=with_images,
         )
-        count = self.subtasks.count_for_task(session, task_id, status=status)
+        count = self.subtasks.count_for_task(
+            session,
+            task_id,
+            status=status,
+            creator_id=creator_id,
+            unassigned=unassigned,
+        )
         # Every returned row is one of the task's subtasks, so its id is always
         # in index_of (rows are a subset of all_ids_for_task).
         return [(st, index_of[st.SubTaskID]) for st in rows], count
+
+    def list_subtask_assignees(
+        self, session: Session, task_id: int
+    ) -> list[Creator]:
+        """Return distinct creators assigned to any subtask of this task.
+
+        Raises:
+            NotFoundError: If the task does not exist.
+        """
+        if self.tasks.get_by_id(session, task_id) is None:
+            raise NotFoundError(f"Task {task_id} not found")
+        return self.subtasks.list_assignees_for_task(session, task_id)
 
     def get_task_subtask(
         self,

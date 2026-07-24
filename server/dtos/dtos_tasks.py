@@ -74,6 +74,7 @@ class SubTaskPUT(SubTaskBase):
 class SubTaskGET(SubTaskBase):
     id: int
     creator_id: Optional[int] = None
+    creator: Optional[CreatorMeta] = None
     # New optional metadata
     index: Optional[int] = None
     next_task: Optional["SubTaskGET"] = None
