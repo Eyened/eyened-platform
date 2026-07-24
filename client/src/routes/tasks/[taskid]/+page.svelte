@@ -167,100 +167,114 @@
                     {#if task.task_state}
                         <h3>Status: {task.task_state}</h3>
                     {/if}
-                    <div class="filters mb-4">
-                        <div class="filter-group">
-                            <Label>Status:</Label>
-                            <ButtonGroup>
-                                <Button
-                                    variant={subtasksStatus === null
-                                        ? "default"
-                                        : "outline"}
-                                    aria-pressed={subtasksStatus === null}
-                                    onclick={() => selectStatus(null)}
-                                >
-                                    All
-                                </Button>
-                                {#each subTaskStates as s}
-                                    <Button
-                                        variant={subtasksStatus === s
-                                            ? "default"
-                                            : "outline"}
-                                        aria-pressed={subtasksStatus === s}
-                                        onclick={() => selectStatus(s)}
-                                    >
-                                        {s}
-                                    </Button>
-                                {/each}
-                            </ButtonGroup>
-                        </div>
-
-                        <div class="filter-group">
-                            <Label>Assignee:</Label>
-                            <div class="assignee-controls">
+                    <div class="filter-bar mb-4">
+                        <h2 class="filter-title">Filter</h2>
+                        <div class="filters">
+                            <div class="filter-group">
+                                <Label>Status:</Label>
                                 <ButtonGroup>
                                     <Button
-                                        variant={assigneeFilter === null
+                                        size="sm"
+                                        variant={subtasksStatus === null
                                             ? "default"
                                             : "outline"}
-                                        aria-pressed={assigneeFilter === null}
-                                        onclick={() => selectAssignee(null)}
+                                        aria-pressed={subtasksStatus === null}
+                                        onclick={() => selectStatus(null)}
                                     >
                                         All
                                     </Button>
-                                    <Button
-                                        variant={assigneeFilter === "unassigned"
-                                            ? "default"
-                                            : "outline"}
-                                        aria-pressed={assigneeFilter ===
-                                            "unassigned"}
-                                        onclick={() =>
-                                            selectAssignee("unassigned")}
-                                    >
-                                        Unassigned
-                                    </Button>
-                                    <Button
-                                        variant={assigneeFilter ===
-                                        globalContext.user.id
-                                            ? "default"
-                                            : "outline"}
-                                        aria-pressed={assigneeFilter ===
-                                            globalContext.user.id}
-                                        onclick={() =>
-                                            selectAssignee(
-                                                globalContext.user.id,
-                                            )}
-                                    >
-                                        Mine
-                                    </Button>
-                                </ButtonGroup>
-                                {#if assignees.length > 0}
-                                    <label
-                                        class="flex items-center gap-2 text-sm"
-                                    >
-                                        Pick:
-                                        <select
-                                            class="rounded border px-2 py-1"
-                                            value={typeof assigneeFilter ===
-                                            "number"
-                                                ? String(assigneeFilter)
-                                                : ""}
-                                            onchange={(e) => {
-                                                const v = (
-                                                    e.currentTarget as HTMLSelectElement
-                                                ).value;
-                                                if (!v) selectAssignee(null);
-                                                else selectAssignee(Number(v));
-                                            }}
+                                    {#each subTaskStates as s}
+                                        <Button
+                                            size="sm"
+                                            variant={subtasksStatus === s
+                                                ? "default"
+                                                : "outline"}
+                                            aria-pressed={subtasksStatus === s}
+                                            onclick={() => selectStatus(s)}
                                         >
-                                            <option value="">—</option>
-                                            {#each assignees as a}
-                                                <option value={a.id}
-                                                    >{a.name}</option
-                                                >
-                                            {/each}
-                                        </select>
-                                    </label>
-                                {/if}
+                                            {s}
+                                        </Button>
+                                    {/each}
+                                </ButtonGroup>
+                            </div>
+
+                            <div class="filter-group">
+                                <Label>Assignee:</Label>
+                                <div class="assignee-controls">
+                                    <ButtonGroup>
+                                        <Button
+                                            size="sm"
+                                            variant={assigneeFilter === null
+                                                ? "default"
+                                                : "outline"}
+                                            aria-pressed={assigneeFilter ===
+                                                null}
+                                            onclick={() => selectAssignee(null)}
+                                        >
+                                            All
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant={assigneeFilter ===
+                                            "unassigned"
+                                                ? "default"
+                                                : "outline"}
+                                            aria-pressed={assigneeFilter ===
+                                                "unassigned"}
+                                            onclick={() =>
+                                                selectAssignee("unassigned")}
+                                        >
+                                            Unassigned
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant={assigneeFilter ===
+                                            globalContext.user.id
+                                                ? "default"
+                                                : "outline"}
+                                            aria-pressed={assigneeFilter ===
+                                                globalContext.user.id}
+                                            onclick={() =>
+                                                selectAssignee(
+                                                    globalContext.user.id,
+                                                )}
+                                        >
+                                            Mine
+                                        </Button>
+                                    </ButtonGroup>
+                                    {#if assignees.length > 0}
+                                        <label
+                                            class="flex items-center gap-2 text-sm"
+                                        >
+                                            Pick:
+                                            <select
+                                                class="rounded border px-2 py-1 text-sm"
+                                                value={typeof assigneeFilter ===
+                                                "number"
+                                                    ? String(assigneeFilter)
+                                                    : ""}
+                                                onchange={(e) => {
+                                                    const v = (
+                                                        e.currentTarget as HTMLSelectElement
+                                                    ).value;
+                                                    if (!v)
+                                                        selectAssignee(null);
+                                                    else
+                                                        selectAssignee(
+                                                            Number(v),
+                                                        );
+                                                }}
+                                            >
+                                                <option value="">—</option>
+                                                {#each assignees as a}
+                                                    <option value={a.id}
+                                                        >{a.name}</option
+                                                    >
+                                                {/each}
+                                            </select>
+                                        </label>
+                                    {/if}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -294,16 +308,39 @@
         flex-direction: column;
         overflow: auto;
     }
+    .filter-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.03);
+    }
+    .filter-title {
+        margin: 0;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: rgba(0, 0, 0, 0.55);
+    }
     .filters {
         display: flex;
         flex-wrap: wrap;
-        gap: 1.5rem 2rem;
+        gap: 1.25rem 2rem;
         align-items: flex-end;
     }
     .filter-group {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
+        gap: 0.25rem;
+    }
+    .filter-group :global(button) {
+        height: 1.75rem;
+        padding-left: 0.55rem;
+        padding-right: 0.55rem;
+        font-size: 0.8rem;
     }
     .assignee-controls {
         display: flex;
