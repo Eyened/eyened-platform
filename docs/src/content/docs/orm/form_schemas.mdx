@@ -105,6 +105,30 @@ with db.get_session() as session:
 
 The JSON file must be a valid JSON Schema (Draft 7). Use `eorm validate-forms` to check schemas and existing annotation data.
 
+## Point widgets (`x-eyened-widget`)
+
+The viewer understands an optional vendor extension on field (or root) schemas:
+
+```json
+"x-eyened-widget": "point"
+```
+
+When present, SchemaForm shows a **PointField** with an Activate control that arms a shared viewer `PointTool` (place with LMB, delete with RMB). Cardinality comes from ordinary JSON Schema:
+
+| Schema shape | Meaning |
+|--------------|---------|
+| `type: "object"` with `x` / `y` | Single landmark |
+| `type: "array"` of point objects | List of landmarks |
+| `additionalProperties` → point or array of points | Per-image map keyed by image **PublicID** (non-`ImageInstance` entity types) |
+
+Optional `"x-eyened-point-mode": "registration"` enables null mid-list slots and numbered focus (used by `Pointset registration`). Validators ignore `x-eyened-*` keys.
+
+After changing builtin JSON, refresh DB rows with:
+
+```bash
+eorm seed-form-schemas --update
+```
+
 ## TaskConfig for grading tasks
 
 Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**.
