@@ -13,6 +13,7 @@ from eyened_orm.repositories.image_instance_repository import (
     ImageInstanceRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.repositories.task_repository import SubTaskRepository
 
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
@@ -38,11 +39,13 @@ class FormAnnotationService:
         repository: FormAnnotationRepository,
         image_repository: ImageInstanceRepository,
         tag_repository: TagRepository,
+        subtask_repository: SubTaskRepository,
         logger: DatabaseModificationLogger | None = None,
     ) -> None:
         self.repository = repository
         self.images = image_repository
         self.tags = tag_repository
+        self.subtasks = subtask_repository
         self.logger = logger
 
     def _resolve_image_instance_id(
@@ -141,6 +144,9 @@ class FormAnnotationService:
             FormAnnotationReferenceID=form_annotation_reference_id,
         )
         session.add(annotation)
+        session.flush()
+        if sub_task_id is not None:
+            self.subtasks.claim_if_unassigned(session, sub_task_id, actor.id)
         session.commit()
         session.refresh(annotation)
         if self.logger is not None:
@@ -433,5 +439,6 @@ def get_form_annotation_service() -> FormAnnotationService:
         FormAnnotationRepository(),
         ImageInstanceRepository(),
         TagRepository(),
+        SubTaskRepository(),
         logger=get_db_logger(),
     )

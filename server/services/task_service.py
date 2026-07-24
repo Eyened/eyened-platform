@@ -288,6 +288,9 @@ class SubTaskService:
             changes["task_state"] = f"{subtask.TaskState} -> {task_state}"
             subtask.TaskState = task_state
 
+        if comments is not None or task_state is not None:
+            self.subtasks.claim_if_unassigned(session, subtask_id, actor.id)
+
         session.commit()
         session.refresh(subtask)
         if self.logger is not None:

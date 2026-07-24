@@ -17,6 +17,7 @@ from eyened_orm.repositories.segmentation_repository import (
     SegmentationRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.repositories.task_repository import SubTaskRepository
 
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
@@ -36,12 +37,14 @@ class SegmentationService:
         image_repository: ImageInstanceRepository,
         tag_repository: TagRepository,
         data_store: SegmentationDataStore,
+        subtask_repository: SubTaskRepository,
         logger: DatabaseModificationLogger | None = None,
     ) -> None:
         self.repository = repository
         self.images = image_repository
         self.tags = tag_repository
         self.store = data_store
+        self.subtasks = subtask_repository
         self.logger = logger
 
     def get_segmentation(
@@ -135,6 +138,8 @@ class SegmentationService:
             self.store.write(segmentation, data)
         except ValueError as e:
             raise BadRequestError(str(e)) from e
+        if subtask_id is not None:
+            self.subtasks.claim_if_unassigned(session, subtask_id, actor.id)
         session.commit()
         session.refresh(segmentation)
 
@@ -510,6 +515,7 @@ def get_segmentation_service() -> SegmentationService:
         ImageInstanceRepository(),
         TagRepository(),
         get_segmentation_data_store(),
+        SubTaskRepository(),
         logger=get_db_logger(),
     )
 

@@ -99,6 +99,52 @@ def test_update_subtask_changes_fields(session):
     assert updated.TaskState == SubTaskState.Ready
 
 
+def test_update_subtask_comments_claims_unassigned_subtask(session):
+    """update_subtask with comments on an unassigned subtask claims it for the actor."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+
+    _service().update_subtask(session, st.SubTaskID, "hi", None, actor)
+
+    session.refresh(st)
+    assert st.CreatorID == actor.id
+
+
+def test_update_subtask_state_claims_unassigned_subtask(session):
+    """update_subtask with task_state on an unassigned subtask claims it for the actor."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+
+    _service().update_subtask(session, st.SubTaskID, None, SubTaskState.Ready, actor)
+
+    session.refresh(st)
+    assert st.CreatorID == actor.id
+
+
+def test_update_subtask_comments_already_assigned_unchanged(session):
+    """update_subtask with comments on an already-assigned subtask leaves CreatorID unchanged."""
+    other_creator = Creator(CreatorName="owner", IsHuman=True)
+    session.add(other_creator)
+    session.flush()
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = other_creator.CreatorID
+    session.commit()
+
+    _service().update_subtask(session, st.SubTaskID, "hi", None, actor)
+
+    session.refresh(st)
+    assert st.CreatorID == other_creator.CreatorID
+
+
 def test_update_subtask_unknown_raises_not_found(session):
     """Updating a missing subtask is translated to NotFoundError (-> 404)."""
     actor = _actor(session)

@@ -9,6 +9,7 @@ from eyened_orm.repositories.segmentation_repository import (
     SegmentationRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.repositories.task_repository import SubTaskRepository
 
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
@@ -48,6 +49,7 @@ def _service(store: FakeSegmentationDataStore | None = None) -> SegmentationServ
         ImageInstanceRepository(),
         TagRepository(),
         store or FakeSegmentationDataStore(),
+        subtask_repository=SubTaskRepository(),
     )
 
 
@@ -171,6 +173,90 @@ def test_create_empty_array_fills_zeros(session):
     )
 
     assert created.shape == (1, 4, 4)
+
+
+def _make_subtask(session, *, creator_id: int | None = None):
+    from eyened_orm import SubTask, Task, TaskDefinition
+    from eyened_orm.task import TaskState
+
+    td = TaskDefinition(TaskDefinitionName="td-seg")
+    session.add(td)
+    session.flush()
+    task = Task(
+        TaskName="T-seg",
+        TaskDefinitionID=td.TaskDefinitionID,
+        CreatorID=creator_id,
+        TaskState=TaskState.NotStarted,
+    )
+    session.add(task)
+    session.flush()
+    st = SubTask(TaskID=task.TaskID, CreatorID=creator_id)
+    session.add(st)
+    session.flush()
+    return st
+
+
+def test_create_with_subtask_claims_unassigned_subtask(session):
+    """create with subtask_id on an unassigned subtask claims it for the actor."""
+    actor = _actor(session, "claim1")
+    seg = _make_segmentation(session, "sc0")
+    image_id = seg.ImageInstance.PublicID
+    st = _make_subtask(session)
+    session.commit()
+
+    _service().create(
+        session,
+        image_id=image_id,
+        feature_id=seg.FeatureID,
+        subtask_id=st.SubTaskID,
+        data_type=Datatype.R8UI,
+        data_representation=DataRepresentation.Binary,
+        depth=1,
+        height=4,
+        width=4,
+        sparse_axis=None,
+        image_projection_matrix=None,
+        scan_indices=None,
+        threshold=None,
+        reference_segmentation_id=None,
+        array=np.zeros((1, 4, 4), dtype=np.uint8),
+        actor=actor,
+    )
+
+    session.refresh(st)
+    assert st.CreatorID == actor.id
+
+
+def test_create_with_subtask_already_assigned_unchanged(session):
+    """create with subtask_id on an already-assigned subtask leaves CreatorID unchanged."""
+    other = _actor(session, "owner1")
+    actor = _actor(session, "claim2")
+    seg = _make_segmentation(session, "sc1")
+    image_id = seg.ImageInstance.PublicID
+    st = _make_subtask(session, creator_id=other.id)
+    session.commit()
+
+    _service().create(
+        session,
+        image_id=image_id,
+        feature_id=seg.FeatureID,
+        subtask_id=st.SubTaskID,
+        data_type=Datatype.R8UI,
+        data_representation=DataRepresentation.Binary,
+        depth=1,
+        height=4,
+        width=4,
+        sparse_axis=None,
+        image_projection_matrix=None,
+        scan_indices=None,
+        threshold=None,
+        reference_segmentation_id=None,
+        array=np.zeros((1, 4, 4), dtype=np.uint8),
+        actor=actor,
+    )
+
+    session.refresh(st)
+    assert st.CreatorID == other.id
 
 
 def test_create_unknown_image_raises_not_found(session):

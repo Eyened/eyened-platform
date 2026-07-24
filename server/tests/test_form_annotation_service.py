@@ -16,6 +16,7 @@ from eyened_orm import (
 )
 from eyened_orm.project import ExternalEnum
 from eyened_orm.tag import TagType
+from eyened_orm.task import TaskState
 from eyened_orm.repositories.form_annotation_repository import (
     FormAnnotationRepository,
 )
@@ -23,6 +24,7 @@ from eyened_orm.repositories.image_instance_repository import (
     ImageInstanceRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.repositories.task_repository import SubTaskRepository
 
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
@@ -34,6 +36,7 @@ def _service() -> FormAnnotationService:
         FormAnnotationRepository(),
         ImageInstanceRepository(),
         TagRepository(),
+        SubTaskRepository(),
     )
 
 
@@ -182,6 +185,75 @@ def test_create_resolves_image_and_persists(session):
 
     assert ann.FormAnnotationID is not None
     assert ann.ImageInstanceID == image_id
+
+
+def _make_subtask(session, *, creator_id: int | None = None) -> "SubTask":
+    from eyened_orm import SubTask, Task, TaskDefinition
+
+    td = TaskDefinition(TaskDefinitionName="td")
+    session.add(td)
+    session.flush()
+    task = Task(
+        TaskName="T",
+        TaskDefinitionID=td.TaskDefinitionID,
+        CreatorID=creator_id,
+        TaskState=TaskState.NotStarted,
+    )
+    session.add(task)
+    session.flush()
+    st = SubTask(TaskID=task.TaskID, CreatorID=creator_id)
+    session.add(st)
+    session.flush()
+    return st
+
+
+def test_create_with_subtask_claims_unassigned_subtask(session):
+    """create with sub_task_id on an unassigned subtask claims it for the actor."""
+    actor = _actor(session, "claim1")
+    patient_id, schema_id = _make_patient_and_schema(session, "claim1")
+    st = _make_subtask(session)
+    session.commit()
+
+    _service().create(
+        session,
+        form_schema_id=schema_id,
+        patient_id=patient_id,
+        study_id=None,
+        image_id=None,
+        laterality=None,
+        sub_task_id=st.SubTaskID,
+        form_data={"a": 1},
+        form_annotation_reference_id=None,
+        actor=actor,
+    )
+
+    session.refresh(st)
+    assert st.CreatorID == actor.id
+
+
+def test_create_with_subtask_already_assigned_unchanged(session):
+    """create with sub_task_id on an already-assigned subtask leaves CreatorID unchanged."""
+    other = _actor(session, "owner1")
+    actor = _actor(session, "claim2")
+    patient_id, schema_id = _make_patient_and_schema(session, "claim2")
+    st = _make_subtask(session, creator_id=other.id)
+    session.commit()
+
+    _service().create(
+        session,
+        form_schema_id=schema_id,
+        patient_id=patient_id,
+        study_id=None,
+        image_id=None,
+        laterality=None,
+        sub_task_id=st.SubTaskID,
+        form_data={"a": 1},
+        form_annotation_reference_id=None,
+        actor=actor,
+    )
+
+    session.refresh(st)
+    assert st.CreatorID == other.id
 
 
 def test_create_unknown_image_raises_not_found(session):
