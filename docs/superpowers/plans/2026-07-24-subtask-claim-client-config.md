@@ -16,7 +16,7 @@ Copied from `docs/superpowers/specs/2026-07-24-subtask-claim-client-config-desig
 - **No steal:** never overwrite a non-null `SubTask.CreatorID`.
 - **Claim batch:** current page unassigned only — no whole-task batch endpoint.
 - **Entity scope:** from `FormSchema.EntityType` only — remove TaskConfig `form_entity_scope` / `form_image_scope`.
-- **Quick-form lookup (when `subTaskId` set):** SubTask + FormSchema + Creator; lowest `id` if multiples; never create a second for that triple.
+- **Quick-form lookup (when `subTaskId` set):** SubTask + FormSchema + Creator; highest `id` if multiples (last created); never create a second for that triple.
 - **Auto-claim triggers only:** FormAnnotation create with SubTaskID; Segmentation create with SubTaskID; SubTask PATCH comments and/or task_state. Not image add/remove; not annotation updates; not tags.
 - **Config rule:** new overridable knobs go in `CLIENT_DEFAULTS` first; TaskConfig overrides same keys; `layout.hide` / `layout.prepend` **replace** arrays when provided.
 - **No mocking library** in Python tests; use real `session` fixture.
@@ -347,8 +347,8 @@ EOF
 
 **Interfaces:**
 - `findFormAnnotation({ annotations, schemaId, userId, ctx, subTaskId?, schemaEntityType })`
-  - When `subTaskId !== undefined`: match schemaId + userId + sub_task_id; **ignore** entity fields; return **lowest** `id`.
-  - Else: match schemaId + userId + `matchesFormEntityScope(..., resolveFormEntityScope(schemaEntityType), ctx)`; return lowest `id`.
+  - When `subTaskId !== undefined`: match schemaId + userId + sub_task_id; **ignore** entity fields; return **highest** `id`.
+  - Else: match schemaId + userId + `matchesFormEntityScope(..., resolveFormEntityScope(schemaEntityType), ctx)`; return highest `id`.
 
 - [ ] **Step 1: Rewrite tests**
 
@@ -397,7 +397,7 @@ describe("findFormAnnotation", () => {
             schemaEntityType: "ImageInstance",
         });
 
-        expect(result?.id).toBe(1); // lowest id
+        expect(result?.id).toBe(2); // highest id (last created)
     });
 
     it("in subtask context does not create-match wrong subtask", () => {
@@ -477,7 +477,7 @@ git add client/src/lib/viewer-window/panelForm client/src/lib/viewer-window/pane
 git commit -m "$(cat <<'EOF'
 fix(viewer): find FormAnnotation by SubTask+Schema+Creator in tasks
 
-Ignore entity fields when subTaskId is set; prefer lowest id if duplicates.
+Ignore entity fields when subTaskId is set; prefer highest id if duplicates.
 EOF
 )"
 ```
@@ -922,7 +922,7 @@ EOF
 |------------------|------|
 | CLIENT_DEFAULTS + merge, array replace | 1–2 |
 | Drop form_entity_scope / form_image_scope | 2, 10 |
-| Quick-form triple + lowest id | 3 |
+| Quick-form triple + highest id | 3 |
 | Image-links checkbox default | 4 |
 | claim_if_unassigned repository | 5 |
 | Auto-claim FA/Seg create + comments PATCH | 6 |

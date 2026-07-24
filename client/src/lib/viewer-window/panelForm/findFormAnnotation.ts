@@ -34,6 +34,6 @@ export function findFormAnnotation(
 
     if (!matches.length) return undefined;
     return matches.reduce((best, current) =>
-        current.id < best.id ? current : best,
+        current.id > best.id ? current : best,
     );
 }

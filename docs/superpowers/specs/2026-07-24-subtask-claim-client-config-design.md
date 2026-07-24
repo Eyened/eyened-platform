@@ -41,7 +41,7 @@ Match where:
 - `creator.id` = current user
 - `sub_task_id` = current subtask
 
-Do **not** filter by patient/study/image/laterality for matching. If multiple rows match, use the **lowest `id`**. Never create a second annotation for that triple.
+Do **not** filter by patient/study/image/laterality for matching. If multiple rows match, use the **highest `id`** (last created). Never create a second annotation for that triple.
 
 ### Create
 
@@ -209,7 +209,7 @@ Same DB session/transaction as the primary write. Importers that bypass these se
 | Claim + comments/state in one PATCH | Allowed; still no overwrite of CreatorID |
 | No unassigned on page | Batch disabled or no-op toast |
 | Assignees list empty | All / Unassigned / Mine only |
-| Multiple FormAnnotations for same triple | Show lowest `id`; do not create |
+| Multiple FormAnnotations for same triple | Show highest `id` (last created); do not create |
 | TaskConfig omits `update_subtask_image_links` | `CLIENT_DEFAULTS` (`false`) |
 | Auto-claim when already assigned | No-op (leave assignee) |
 

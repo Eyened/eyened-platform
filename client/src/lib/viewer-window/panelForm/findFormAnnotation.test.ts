@@ -42,7 +42,7 @@ describe("findFormAnnotation", () => {
             schemaEntityType: "ImageInstance",
         });
 
-        expect(result?.id).toBe(1); // lowest id
+        expect(result?.id).toBe(2); // highest id (last created)
     });
 
     it("in subtask context does not create-match wrong subtask", () => {
