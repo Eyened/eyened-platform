@@ -97,7 +97,7 @@
             );
         }
 
-        openFormInNewWindow(form, canEdit);
+        openFormInNewWindow(form, canEdit, viewerContext);
     }
 </script>
 

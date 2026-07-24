@@ -16,7 +16,8 @@
         resolveRefs,
         type JSONSchema,
     } from "$lib/forms/schemaType";
-    import { onMount } from "svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { onMount, setContext } from "svelte";
     import * as Tooltip from "../../components/ui/tooltip";
     import Tagger from "../../tags/Tagger.svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
@@ -24,8 +25,17 @@
     interface Props {
         form: FormAnnotationGET;
         canEdit: boolean;
+        viewerContext?: ViewerContext;
     }
-    let { form, canEdit }: Props = $props();
+    let { form, canEdit, viewerContext }: Props = $props();
+
+    if (viewerContext) {
+        setContext("viewerContext", viewerContext);
+    }
+    setContext("pointFormAnnotationId", form.id);
+    if (form.image_id) {
+        setContext("pointBoundImageId", form.image_id);
+    }
 
     const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
     const schema = $derived(resolveRefs(formSchema.schema as JSONSchema));
@@ -61,8 +71,11 @@
         status = "loaded";
     });
 
-    async function onchange() {
+    async function onchange(next?: unknown) {
         if (!canEdit) return;
+        if (next !== undefined) {
+            value = next;
+        }
         if (value) {
             // Clear existing timeout
             if (saveTimeout) {
@@ -181,6 +194,7 @@
                 {canEdit}
                 {vertical}
                 {collapse}
+                entityType={formSchema.entity_type}
             />
         {/if}
     </div>

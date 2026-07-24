@@ -3,6 +3,7 @@
     import { createFormAnnotation, deleteFormAnnotation } from "$lib/data";
     import { formSchemas } from "$lib/data/stores.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
     import Duplicate from "../icons/Duplicate.svelte";
@@ -11,6 +12,7 @@
 
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");
+    const viewerContext = getContext<ViewerContext>("viewerContext");
 
     interface Props {
         form: FormAnnotationGET;
@@ -57,7 +59,7 @@
     }
 
     function openInNewWindow(form: FormAnnotationGET) {
-        openFormInNewWindow(form, canEditForm);
+        openFormInNewWindow(form, canEditForm, viewerContext);
     }
 
     function formatDateTime(dateString: string) {
