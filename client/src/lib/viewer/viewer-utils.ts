@@ -34,7 +34,8 @@ export type ToolName =
     | "polygon"
     | "registration"
     | "ETRDS-grid"
-    | "AV nicking tool";
+    | "AV nicking tool"
+    | "point";
 
 export type Dimension2D = { width: number; height: number };
 
