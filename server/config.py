@@ -16,6 +16,10 @@ class DbLogSettings(BaseSettings):
     model_config = SettingsConfigDict(
         frozen=True, extra="forbid", env_prefix="EYENED_DBLOG_"
     )
+    enabled: bool = Field(
+        default=True,
+        description="Emit audit events (AuditLog rows + eyened.audit stdout JSON).",
+    )
     file_path: Path | None = Field(
         default=None,
         description=(

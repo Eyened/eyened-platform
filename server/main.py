@@ -1,4 +1,5 @@
 import logging
+import sys
 import traceback
 from contextlib import asynccontextmanager
 
@@ -78,6 +79,24 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
+def configure_audit_logging() -> None:
+    """Route the eyened.audit logger to stdout as JSON, isolated from app logs.
+
+    Compliance is never debug-gated: audit is always INFO. App/debug logs stay on
+    stderr via logging.basicConfig() (design §3, Operability).
+    """
+    audit = logging.getLogger("eyened.audit")
+    audit.setLevel(settings.db_log.level)
+    audit.propagate = False
+    if not any(
+        isinstance(h, logging.StreamHandler) and getattr(h, "stream", None) is sys.stdout
+        for h in audit.handlers
+    ):
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        audit.addHandler(handler)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up with settings:")
@@ -95,7 +114,9 @@ async def lifespan(app: FastAPI):
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
         logging.getLogger("server").setLevel(logging.INFO)
 
-    # Initialize database modification logger
+    # Audit events go to stdout as JSON; app/debug logs stay on stderr.
+    configure_audit_logging()
+    # Old file logger stays wired until the refactor's cleanup phase.
     init_db_logger(settings)
 
     yield
