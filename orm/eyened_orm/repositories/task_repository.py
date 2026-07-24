@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -164,8 +164,16 @@ class SubTaskRepository:
         )
 
     def get_by_id(self, session: Session, subtask_id: int) -> SubTask | None:
-        """Return the subtask with the given id, or None if absent."""
-        return session.get(SubTask, subtask_id)
+        """Return the subtask with the given id (Creator eager-loaded), or None."""
+        return (
+            session.execute(
+                select(SubTask)
+                .options(_SUBTASK_CREATOR_LOADER)
+                .where(SubTask.SubTaskID == subtask_id)
+            )
+            .scalars()
+            .first()
+        )
 
     def get_with_images(self, session: Session, subtask_id: int) -> SubTask | None:
         """Return the subtask with its image links + Creator eager-loaded, or None."""
@@ -184,17 +192,20 @@ class SubTaskRepository:
     ) -> bool:
         """Assign ``creator_id`` to the subtask iff it has no creator yet.
 
-        Returns True if the claim was applied, False if the subtask is
-        missing or already assigned (to anyone, including ``creator_id``).
-        Does not commit; the caller controls the transaction boundary.
+        Uses a single conditional UPDATE (``WHERE SubTaskID = :id AND
+        CreatorID IS NULL``) so concurrent claims cannot both succeed — only
+        one caller can win the race, unlike a read-then-write check. Returns
+        True iff exactly one row was updated (subtask exists and was
+        unassigned), False if the subtask is missing or already assigned (to
+        anyone, including ``creator_id``). Does not commit; the caller
+        controls the transaction boundary.
         """
-        subtask = session.get(SubTask, subtask_id)
-        if subtask is None:
-            return False
-        if subtask.CreatorID is not None:
-            return False
-        subtask.CreatorID = creator_id
-        return True
+        result = session.execute(
+            update(SubTask)
+            .where(SubTask.SubTaskID == subtask_id, SubTask.CreatorID.is_(None))
+            .values(CreatorID=creator_id)
+        )
+        return result.rowcount == 1
 
     def list_assignees_for_task(
         self, session: Session, task_id: int
