@@ -176,143 +176,135 @@
     <FixedSpinner />
 {:else}
     <Main>
-        {#snippet children()}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div id="main">
-                <h3>
-                    <span onclick={deselect} onkeypress={deselect}> ... </span>
-                </h3>
-                {#if !task}
-                    Task not found
-                {:else}
-                    <h1>{task.name}</h1>
-                    {#if task.task_state}
-                        <h3>Status: {task.task_state}</h3>
-                    {/if}
-                    <div class="filter-bar mb-4">
-                        <h2 class="filter-title">Filter</h2>
-                        <div class="filters">
-                            <div class="filter-group">
-                                <Label>Status:</Label>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div id="main">
+            <h3>
+                <span onclick={deselect} onkeypress={deselect}> ... </span>
+            </h3>
+            {#if !task}
+                Task not found
+            {:else}
+                <h1>{task.name}</h1>
+                {#if task.task_state}
+                    <h3>Status: {task.task_state}</h3>
+                {/if}
+                <div class="filter-bar mb-4">
+                    <h2 class="filter-title">Filter</h2>
+                    <div class="filters">
+                        <div class="filter-group">
+                            <Label>Status:</Label>
+                            <ButtonGroup>
+                                <Button
+                                    size="sm"
+                                    variant={subtasksStatus === null
+                                        ? "default"
+                                        : "outline"}
+                                    aria-pressed={subtasksStatus === null}
+                                    onclick={() => selectStatus(null)}
+                                >
+                                    All
+                                </Button>
+                                {#each subTaskStates as s (s)}
+                                    <Button
+                                        size="sm"
+                                        variant={subtasksStatus === s
+                                            ? "default"
+                                            : "outline"}
+                                        aria-pressed={subtasksStatus === s}
+                                        onclick={() => selectStatus(s)}
+                                    >
+                                        {s}
+                                    </Button>
+                                {/each}
+                            </ButtonGroup>
+                        </div>
+
+                        <div class="filter-group">
+                            <Label>Assignee:</Label>
+                            <div class="assignee-controls">
                                 <ButtonGroup>
                                     <Button
                                         size="sm"
-                                        variant={subtasksStatus === null
+                                        variant={assigneeFilter === null
                                             ? "default"
                                             : "outline"}
-                                        aria-pressed={subtasksStatus === null}
-                                        onclick={() => selectStatus(null)}
+                                        aria-pressed={assigneeFilter === null}
+                                        onclick={() => selectAssignee(null)}
                                     >
                                         All
                                     </Button>
-                                    {#each subTaskStates as s}
-                                        <Button
-                                            size="sm"
-                                            variant={subtasksStatus === s
-                                                ? "default"
-                                                : "outline"}
-                                            aria-pressed={subtasksStatus === s}
-                                            onclick={() => selectStatus(s)}
-                                        >
-                                            {s}
-                                        </Button>
-                                    {/each}
+                                    <Button
+                                        size="sm"
+                                        variant={assigneeFilter === "unassigned"
+                                            ? "default"
+                                            : "outline"}
+                                        aria-pressed={assigneeFilter ===
+                                            "unassigned"}
+                                        onclick={() =>
+                                            selectAssignee("unassigned")}
+                                    >
+                                        Unassigned
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant={assigneeFilter ===
+                                        globalContext.user.id
+                                            ? "default"
+                                            : "outline"}
+                                        aria-pressed={assigneeFilter ===
+                                            globalContext.user.id}
+                                        onclick={() =>
+                                            selectAssignee(
+                                                globalContext.user.id,
+                                            )}
+                                    >
+                                        Mine
+                                    </Button>
                                 </ButtonGroup>
-                            </div>
-
-                            <div class="filter-group">
-                                <Label>Assignee:</Label>
-                                <div class="assignee-controls">
-                                    <ButtonGroup>
-                                        <Button
-                                            size="sm"
-                                            variant={assigneeFilter === null
-                                                ? "default"
-                                                : "outline"}
-                                            aria-pressed={assigneeFilter ===
-                                                null}
-                                            onclick={() => selectAssignee(null)}
+                                {#if assignees.length > 0}
+                                    <label
+                                        class="flex items-center gap-2 text-sm"
+                                    >
+                                        Pick:
+                                        <select
+                                            class="rounded border px-2 py-1 text-sm"
+                                            value={typeof assigneeFilter ===
+                                            "number"
+                                                ? String(assigneeFilter)
+                                                : ""}
+                                            onchange={(e) => {
+                                                const v = (
+                                                    e.currentTarget as HTMLSelectElement
+                                                ).value;
+                                                if (!v) selectAssignee(null);
+                                                else selectAssignee(Number(v));
+                                            }}
                                         >
-                                            All
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant={assigneeFilter ===
-                                            "unassigned"
-                                                ? "default"
-                                                : "outline"}
-                                            aria-pressed={assigneeFilter ===
-                                                "unassigned"}
-                                            onclick={() =>
-                                                selectAssignee("unassigned")}
-                                        >
-                                            Unassigned
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant={assigneeFilter ===
-                                            globalContext.user.id
-                                                ? "default"
-                                                : "outline"}
-                                            aria-pressed={assigneeFilter ===
-                                                globalContext.user.id}
-                                            onclick={() =>
-                                                selectAssignee(
-                                                    globalContext.user.id,
-                                                )}
-                                        >
-                                            Mine
-                                        </Button>
-                                    </ButtonGroup>
-                                    {#if assignees.length > 0}
-                                        <label
-                                            class="flex items-center gap-2 text-sm"
-                                        >
-                                            Pick:
-                                            <select
-                                                class="rounded border px-2 py-1 text-sm"
-                                                value={typeof assigneeFilter ===
-                                                "number"
-                                                    ? String(assigneeFilter)
-                                                    : ""}
-                                                onchange={(e) => {
-                                                    const v = (
-                                                        e.currentTarget as HTMLSelectElement
-                                                    ).value;
-                                                    if (!v)
-                                                        selectAssignee(null);
-                                                    else
-                                                        selectAssignee(
-                                                            Number(v),
-                                                        );
-                                                }}
-                                            >
-                                                <option value="">—</option>
-                                                {#each assignees as a}
-                                                    <option value={a.id}
-                                                        >{a.name}</option
-                                                    >
-                                                {/each}
-                                            </select>
-                                        </label>
-                                    {/if}
-                                </div>
+                                            <option value="">—</option>
+                                            {#each assignees as a (a.id)}
+                                                <option value={a.id}
+                                                    >{a.name}</option
+                                                >
+                                            {/each}
+                                        </select>
+                                    </label>
+                                {/if}
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <SubtasksTable
-                        rows={subtasksArray}
-                        taskId={data.taskid}
-                        count={subtasksCount}
-                        page={subtasksPage}
-                        perPage={subtasksLimit}
-                        onPageChange={loadPage}
-                        onAssignmentChange={refreshAfterAssignment}
-                    />
-                {/if}
-            </div>
-        {/snippet}
+                <SubtasksTable
+                    rows={subtasksArray}
+                    taskId={data.taskid}
+                    count={subtasksCount}
+                    page={subtasksPage}
+                    perPage={subtasksLimit}
+                    onPageChange={loadPage}
+                    onAssignmentChange={refreshAfterAssignment}
+                />
+            {/if}
+        </div>
     </Main>
 {/if}
 

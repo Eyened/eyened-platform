@@ -197,13 +197,7 @@
     }
   },
   "src/lib/tasks/SubTaskRow.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
     "svelte/prefer-svelte-reactivity": {
-      "count": 1
-    },
-    "svelte/require-each-key": {
       "count": 1
     }
   },
@@ -253,9 +247,6 @@
     }
   },
   "src/lib/viewer-window/MainViewer.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "svelte/require-each-key": {
       "count": 1
     }
@@ -467,11 +458,6 @@
   },
   "src/routes/+layout.svelte": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/routes/tasks/[taskid]/+page.svelte": {
-    "svelte/require-each-key": {
       "count": 1
     }
   },

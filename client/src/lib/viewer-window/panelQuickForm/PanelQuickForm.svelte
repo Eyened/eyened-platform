@@ -22,7 +22,7 @@
         title?: string;
         active?: boolean;
     }
-    let { title = "Grading" }: Props = $props();
+    let { title: _title = "Grading" }: Props = $props();
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const taskContext = getContext<TaskContext>("taskContext");

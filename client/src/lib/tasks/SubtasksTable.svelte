@@ -31,7 +31,7 @@
     setContext("browserContext", browserContext);
 
     const unassignedOnPage = $derived(
-        rows.filter((r) => !(r as any).creator && !r.creator_id),
+        rows.filter((r) => !r.creator && !r.creator_id),
     );
     let claimingPage = $state(false);
 

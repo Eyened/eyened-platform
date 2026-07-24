@@ -4,6 +4,7 @@ import type {
     ImageGET,
     PatientDetailGET,
     StudyGET,
+    CreatorMeta,
     SubTaskWithImagesGET,
     TagGET,
     TaskGET,
@@ -503,10 +504,15 @@ export async function fetchSubTasks(params: {
 
 export async function fetchSubTaskAssignees(
     task_id: number,
-): Promise<{ id: number; name: string }[]> {
-    return await apiGet<any>("/task/{task_id}/subtask-assignees" as any, {
-        params: { path: { task_id } } as any,
-    });
+): Promise<CreatorMeta[]> {
+    const res = await apiInvoke(
+        () =>
+            api.GET("/task/{task_id}/subtask-assignees", {
+                params: { path: { task_id } },
+            }),
+        "fetch task subtask assignees",
+    );
+    return res.data ?? [];
 }
 
 // ===== SubTask Update Functions =====
