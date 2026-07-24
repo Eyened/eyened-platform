@@ -130,6 +130,19 @@ export class PointTool implements Overlay {
         return false;
     }
 
+    private siblingHasHighlight(): boolean {
+        for (const tool of liveTools) {
+            if (tool === this) continue;
+            if (
+                tool.activePointIndex !== undefined ||
+                tool.hoverPointIndex !== undefined
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     keyup(e: ViewerEvent<KeyboardEvent>) {
         const { event, viewerContext, cursor } = e;
 
@@ -252,9 +265,6 @@ export class PointTool implements Overlay {
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const points = this.points;
         const highlightIndex = this.activePointIndex ?? this.hoverPointIndex;
-        if (highlightIndex !== undefined) {
-            viewerContext.cursorStyle = "pointer";
-        }
 
         const { context2D } = viewerContext;
         const strokeStyle = this.color;
@@ -262,7 +272,7 @@ export class PointTool implements Overlay {
         context2D.strokeStyle = strokeStyle;
         context2D.fillStyle = strokeStyle;
         context2D.font = "16px sans-serif";
-        context2D.lineWidth = this.isPlacementTarget() ? 2 : 1;
+        context2D.lineWidth = this.isPlacementTarget() ? 1.25 : 0.75;
 
         const r = this.radius;
         const showIndex =
@@ -295,6 +305,13 @@ export class PointTool implements Overlay {
                     viewerContext.imageToViewerCoordinates(highlightPoint);
                 this.fillMarker(context2D, p, r);
             }
+            viewerContext.cursorStyle = "pointer";
+        } else if (
+            this.options.canEdit &&
+            this.isPlacementTarget() &&
+            !this.siblingHasHighlight()
+        ) {
+            viewerContext.cursorStyle = "crosshair";
         }
     }
 

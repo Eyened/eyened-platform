@@ -30,7 +30,7 @@ export const CLIENT_DEFAULTS: ClientConfig = {
     update_subtask_image_links: false,
     layout: { hide: [], prepend: [] },
     point_marker: {
-        style: "circle",
+        style: "cross",
         radius: 16,
         color: "rgba(0, 255, 0, 1)",
     },

@@ -150,7 +150,7 @@
                     canEdit: true,
                     analysis: landmarkAnalyses[f],
                     label,
-                    pointStyle: "circle",
+                    pointStyle: "cross",
                     radius: 16,
                     color: "rgba(0, 255, 0, 1)",
                     getPublicId: () => instance.id,
