@@ -56,9 +56,7 @@
             subtask_status: subtasksStatus ?? undefined,
             unassigned: assigneeFilter === "unassigned" ? true : undefined,
             creator_id:
-                typeof assigneeFilter === "number"
-                    ? assigneeFilter
-                    : undefined,
+                typeof assigneeFilter === "number" ? assigneeFilter : undefined,
         });
 
         subtasksCount = res.count;

@@ -91,11 +91,7 @@
             </Table.Header>
             <Table.Body>
                 {#each rows as row (row.id)}
-                    <SubTaskRow
-                        subtask={row}
-                        {taskId}
-                        {onAssignmentChange}
-                    />
+                    <SubTaskRow subtask={row} {taskId} {onAssignmentChange} />
                 {:else}
                     <Table.Row>
                         <Table.Cell colspan="6" class="h-24 text-center">

@@ -8,10 +8,14 @@ import {
 vi.mock("./panelInfo/panelInfo.svelte", () => ({ default: {} }));
 vi.mock("./panelRendering/PanelRendering.svelte", () => ({ default: {} }));
 vi.mock("./panelETRDS/PanelETDRS.svelte", () => ({ default: {} }));
-vi.mock("./panelRegistration/PanelRegistration.svelte", () => ({ default: {} }));
+vi.mock("./panelRegistration/PanelRegistration.svelte", () => ({
+    default: {},
+}));
 vi.mock("./panelMeasure/PanelMeasure.svelte", () => ({ default: {} }));
 vi.mock("./panelForm/PanelForm.svelte", () => ({ default: {} }));
-vi.mock("./panelSegmentation/PanelSegmentation.svelte", () => ({ default: {} }));
+vi.mock("./panelSegmentation/PanelSegmentation.svelte", () => ({
+    default: {},
+}));
 vi.mock("./panelQuickForm/PanelQuickForm.svelte", () => ({ default: {} }));
 vi.mock("./icons/icons", () => ({
     Info: {},

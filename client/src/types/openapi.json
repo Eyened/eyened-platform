@@ -425,6 +425,7 @@
     "/instances/{instance_id}": {
       "get": {
         "summary": "Get Instance",
+        "description": "Get a single image instance by id, with optional related graphs.",
         "operationId": "get_instance_instances__instance_id__get",
         "parameters": [
           {
@@ -531,6 +532,7 @@
     "/images/{image_id}": {
       "get": {
         "summary": "Get Public Image",
+        "description": "Get a single image instance by PublicID, with optional related graphs.",
         "operationId": "get_public_image_images__image_id__get",
         "parameters": [
           {
@@ -637,6 +639,7 @@
     "/images/{image_id}/data": {
       "get": {
         "summary": "Get Public Image Data",
+        "description": "Redirect to the stored image data for an instance (by PublicID).",
         "operationId": "get_public_image_data_images__image_id__data_get",
         "parameters": [
           {
@@ -718,6 +721,7 @@
     "/images/{image_id}/thumbnail": {
       "get": {
         "summary": "Get Public Image Thumbnail",
+        "description": "Redirect to the stored thumbnail for an instance (by PublicID).",
         "operationId": "get_public_image_thumbnail_images__image_id__thumbnail_get",
         "parameters": [
           {
@@ -2369,6 +2373,7 @@
     "/form-annotations": {
       "post": {
         "summary": "Create Form Annotation",
+        "description": "Create a form annotation.",
         "operationId": "create_form_annotation_form_annotations_post",
         "parameters": [
           {
@@ -2434,6 +2439,7 @@
       },
       "get": {
         "summary": "Get Form Annotations",
+        "description": "List active form annotations, optionally filtered.",
         "operationId": "get_form_annotations_form_annotations_get",
         "parameters": [
           {
@@ -2575,6 +2581,7 @@
     "/form-annotations/{annotation_id}": {
       "get": {
         "summary": "Get Form Annotation",
+        "description": "Get a single form annotation by id.",
         "operationId": "get_form_annotation_form_annotations__annotation_id__get",
         "parameters": [
           {
@@ -2639,6 +2646,7 @@
       },
       "patch": {
         "summary": "Update Form Annotation",
+        "description": "Partially update a form annotation.",
         "operationId": "update_form_annotation_form_annotations__annotation_id__patch",
         "parameters": [
           {
@@ -2713,6 +2721,7 @@
       },
       "delete": {
         "summary": "Delete Form Annotation",
+        "description": "Soft-delete a form annotation.",
         "operationId": "delete_form_annotation_form_annotations__annotation_id__delete",
         "parameters": [
           {
@@ -2772,6 +2781,7 @@
     "/form-annotations/{form_annotation_id}/value": {
       "get": {
         "summary": "Get Form Annotation Value",
+        "description": "Get a form annotation's raw FormData payload.",
         "operationId": "get_form_annotation_value_form_annotations__form_annotation_id__value_get",
         "parameters": [
           {
@@ -2834,6 +2844,7 @@
       },
       "put": {
         "summary": "Update Form Annotation Value",
+        "description": "Overwrite a form annotation's FormData payload.",
         "operationId": "update_form_annotation_value_form_annotations__form_annotation_id__value_put",
         "parameters": [
           {
@@ -3381,6 +3392,7 @@
     "/form-schemas": {
       "get": {
         "summary": "List Form Schemas",
+        "description": "Return all form schemas.",
         "operationId": "list_form_schemas_form_schemas_get",
         "parameters": [
           {
@@ -3508,7 +3520,7 @@
     "/features": {
       "get": {
         "summary": "List Features",
-        "description": "Return all features.",
+        "description": "Return all features (optionally with a per-feature segmentation count).",
         "operationId": "list_features_features_get",
         "parameters": [
           {
@@ -3578,6 +3590,7 @@
       },
       "post": {
         "summary": "Create Feature",
+        "description": "Create a feature and set its subfeature links.",
         "operationId": "create_feature_features_post",
         "parameters": [
           {
@@ -3645,6 +3658,7 @@
     "/features/{feature_id}": {
       "get": {
         "summary": "Get Feature",
+        "description": "Return a single feature by id.",
         "operationId": "get_feature_features__feature_id__get",
         "parameters": [
           {
@@ -3709,6 +3723,7 @@
       },
       "patch": {
         "summary": "Patch Feature",
+        "description": "Update a feature's name and/or subfeature links.",
         "operationId": "patch_feature_features__feature_id__patch",
         "parameters": [
           {
@@ -3783,6 +3798,7 @@
       },
       "delete": {
         "summary": "Delete Feature",
+        "description": "Delete a feature (409 if it has segmentations or is a child of another).",
         "operationId": "delete_feature_features__feature_id__delete",
         "parameters": [
           {
@@ -3842,6 +3858,7 @@
     "/tags": {
       "post": {
         "summary": "Create Tag",
+        "description": "Create a tag owned by the current user.",
         "operationId": "create_tag_tags_post",
         "parameters": [
           {
@@ -3907,6 +3924,7 @@
       },
       "get": {
         "summary": "List Tags",
+        "description": "Return all tags.",
         "operationId": "list_tags_tags_get",
         "parameters": [
           {
@@ -3968,6 +3986,7 @@
     "/tags/{tag_id}": {
       "patch": {
         "summary": "Patch Tag",
+        "description": "Update a tag's name, description, and/or type.",
         "operationId": "patch_tag_tags__tag_id__patch",
         "parameters": [
           {
@@ -4042,6 +4061,7 @@
       },
       "delete": {
         "summary": "Delete Tag",
+        "description": "Delete a tag.",
         "operationId": "delete_tag_tags__tag_id__delete",
         "parameters": [
           {
@@ -4101,6 +4121,7 @@
     "/tags/{tag_id}/star": {
       "post": {
         "summary": "Star Tag",
+        "description": "Star a tag for the current user (idempotent).",
         "operationId": "star_tag_tags__tag_id__star_post",
         "parameters": [
           {
@@ -4158,6 +4179,7 @@
       },
       "delete": {
         "summary": "Unstar Tag",
+        "description": "Remove the current user's star from a tag (idempotent).",
         "operationId": "unstar_tag_tags__tag_id__star_delete",
         "parameters": [
           {
@@ -4217,6 +4239,7 @@
     "/task": {
       "post": {
         "summary": "Create Task",
+        "description": "Create a task owned by the current user.",
         "operationId": "create_task_task_post",
         "parameters": [
           {
@@ -4344,6 +4367,7 @@
     "/task/{task_id}": {
       "get": {
         "summary": "Get Task",
+        "description": "Get a single task with its subtask counts.",
         "operationId": "get_task_task__task_id__get",
         "parameters": [
           {
@@ -4408,6 +4432,7 @@
       },
       "patch": {
         "summary": "Patch Task",
+        "description": "Update a task's name/description/contact/definition/state.",
         "operationId": "patch_task_task__task_id__patch",
         "parameters": [
           {
@@ -4482,6 +4507,7 @@
       },
       "delete": {
         "summary": "Delete Task",
+        "description": "Delete a task.",
         "operationId": "delete_task_task__task_id__delete",
         "parameters": [
           {
@@ -4541,7 +4567,7 @@
     "/task/{task_id}/subtasks": {
       "get": {
         "summary": "List Subtasks",
-        "description": "List subtasks of a task with optional pagination, image inclusion, and status filter.\n\nindex is the 0-based position within all subtasks for the task ordered by SubTaskID \n(computed before any subtask_status filtering).",
+        "description": "List subtasks of a task (pagination, optional images, status/assignee filters).\n\n``index`` is the 0-based position within all subtasks of the task ordered by\nSubTaskID (computed before any filtering). ``unassigned`` and ``creator_id``\nare mutually exclusive.",
         "operationId": "list_subtasks_task__task_id__subtasks_get",
         "parameters": [
           {
@@ -4597,6 +4623,32 @@
                 }
               ],
               "title": "Subtask Status"
+            }
+          },
+          {
+            "name": "unassigned",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Unassigned"
+            }
+          },
+          {
+            "name": "creator_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Creator Id"
             }
           },
           {
@@ -4662,7 +4714,7 @@
     "/task/{task_id}/subtask/{subtask_index}": {
       "get": {
         "summary": "Get Subtask",
-        "description": "Get a single subtask by index with optional image inclusion and next task.",
+        "description": "Get a single subtask by index, optionally with images and the next subtask.",
         "operationId": "get_subtask_task__task_id__subtask__subtask_index__get",
         "parameters": [
           {
@@ -4763,9 +4815,81 @@
         }
       }
     },
+    "/task/{task_id}/subtask-assignees": {
+      "get": {
+        "summary": "List Subtask Assignees",
+        "description": "Distinct creators who have claimed at least one subtask on this task.",
+        "operationId": "list_subtask_assignees_task__task_id__subtask_assignees_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CreatorMeta"
+                  },
+                  "title": "Response List Subtask Assignees Task  Task Id  Subtask Assignees Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/subtasks/{subtaskid}": {
       "get": {
         "summary": "Get Subtask",
+        "description": "Get a single subtask, optionally with its images.",
         "operationId": "get_subtask_subtasks__subtaskid__get",
         "parameters": [
           {
@@ -4848,6 +4972,7 @@
       },
       "patch": {
         "summary": "Patch Subtask",
+        "description": "Update a subtask's comments and/or state.",
         "operationId": "patch_subtask_subtasks__subtaskid__patch",
         "parameters": [
           {
@@ -4922,6 +5047,7 @@
       },
       "delete": {
         "summary": "Delete Subtask",
+        "description": "Delete a subtask.",
         "operationId": "delete_subtask_subtasks__subtaskid__delete",
         "parameters": [
           {
@@ -4981,6 +5107,7 @@
     "/subtasks/{subtaskid}/images": {
       "post": {
         "summary": "Add Subtask Image",
+        "description": "Link an image to a subtask at the next available index.",
         "operationId": "add_subtask_image_subtasks__subtaskid__images_post",
         "parameters": [
           {
@@ -5057,6 +5184,7 @@
     "/subtasks/{subtaskid}/images/{instance_id}": {
       "delete": {
         "summary": "Remove Subtask Image",
+        "description": "Unlink an image from a subtask.",
         "operationId": "remove_subtask_image_subtasks__subtaskid__images__instance_id__delete",
         "parameters": [
           {
@@ -8877,6 +9005,16 @@
             ],
             "title": "Creator Id"
           },
+          "creator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreatorMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "index": {
             "anyOf": [
               {
@@ -8923,13 +9061,23 @@
           "task_state": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/SubTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "claim": {
+            "anyOf": [
+              {
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Task State"
+            "title": "Claim"
           }
         },
         "type": "object",
@@ -8978,6 +9126,16 @@
               }
             ],
             "title": "Creator Id"
+          },
+          "creator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreatorMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "index": {
             "anyOf": [

@@ -113,7 +113,9 @@ export function buildDefaultPanels(
     return panels;
 }
 
-function resolveCustomPanel(config: QuickFormPanelConfig): ResolvedPanel | null {
+function resolveCustomPanel(
+    config: QuickFormPanelConfig,
+): ResolvedPanel | null {
     const entry = CUSTOM_PANEL_REGISTRY[config.type];
     if (!entry) {
         console.warn(`Unknown custom panel type: ${config.type}`);
