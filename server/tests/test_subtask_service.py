@@ -176,6 +176,34 @@ def test_update_subtask_claim_conflict_when_assigned(session):
             session, st.SubTaskID, None, None, actor, claim=True
         )
     assert exc.value.detail["code"] == "subtask_already_claimed"
+    assert exc.value.detail["creator_id"] == owner.id
+
+
+def test_update_subtask_claim_conflict_when_concurrent_claim_wins(session):
+    """claim=True raises ConflictError if the conditional UPDATE loses the race.
+
+    Simulates another writer assigning the subtask after our load: UPDATE the
+    row out from under the identity map, then claim must fail (not succeed).
+    """
+    owner = _actor(session)
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+
+    # Concurrent winner: assign via repository UPDATE (does not sync identity).
+    assert SubTaskRepository().claim_if_unassigned(
+        session, st.SubTaskID, owner.id
+    )
+    session.commit()
+
+    with pytest.raises(ConflictError) as exc:
+        _service().update_subtask(
+            session, st.SubTaskID, None, None, actor, claim=True
+        )
+    assert exc.value.detail["code"] == "subtask_already_claimed"
+    assert exc.value.detail["creator_id"] == owner.id
 
 
 def test_update_subtask_unclaim_releases_own(session):

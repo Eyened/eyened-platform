@@ -325,7 +325,11 @@ class SubTaskService:
             subtask.TaskState = task_state
 
         if claim is True:
-            if subtask.CreatorID is not None:
+            # Conditional UPDATE is the source of truth (covers concurrent claims).
+            if not self.subtasks.claim_if_unassigned(
+                session, subtask_id, actor.id
+            ):
+                session.refresh(subtask)
                 raise ConflictError(
                     {
                         "code": "subtask_already_claimed",
@@ -333,7 +337,6 @@ class SubTaskService:
                         "creator_id": subtask.CreatorID,
                     }
                 )
-            self.subtasks.claim_if_unassigned(session, subtask_id, actor.id)
             changes["creator_id"] = f"None -> {actor.id}"
         elif claim is False:
             if subtask.CreatorID is None:
