@@ -186,7 +186,7 @@ class Dict<K, V> {
     }
 }
 
-class TupleDict<K extends any[], V> {
+class TupleDict<K extends unknown[], V> {
     private map: Map<string, V>;
 
     constructor() {

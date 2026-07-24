@@ -6,7 +6,7 @@ import { twMerge } from "tailwind-merge";
 import { readable, type Readable, type Unsubscriber } from "svelte/store";
 
 export function groupBy(
-    xs: { [key: string | number]: any }[],
+    xs: { [key: string | number]: unknown }[],
     key: string | number,
 ) {
     return xs.reduce(function (rv, x) {
@@ -63,7 +63,7 @@ export function get_url_params() {
 export class Deferred<T> {
     promise: Promise<T>;
     resolve!: (value: T | PromiseLike<T>) => void;
-    reject!: (reason?: any) => void;
+    reject!: (reason?: unknown) => void;
 
     constructor() {
         this.promise = new Promise<T>((res, rej) => {

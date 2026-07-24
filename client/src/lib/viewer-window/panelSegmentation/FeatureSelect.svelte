@@ -11,7 +11,7 @@
         /** Keep search field in sync when feature is chosen elsewhere (e.g. native select). */
         selectedName?: string;
     }
-    let { values, onselect, selectedName = "" }: Props<any> = $props();
+    let { values, onselect, selectedName = "" }: Props<FeatureGET> = $props();
     const placeholder = "Search feature...";
     let filter = $state("");
     /** After a pick, hide matches until the user edits the search text again. */

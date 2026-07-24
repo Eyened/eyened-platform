@@ -13,7 +13,7 @@ import {
     TextureData,
     type ImageType,
 } from "./texture";
-import type { RenderTarget } from "./types";
+import type { RenderTarget, ShaderUniforms } from "./types";
 import type { WebGL } from "./webgl";
 
 export type DrawingArray =
@@ -34,6 +34,10 @@ export interface PaintSettings {
     activeIndices?: number | number[];
 }
 
+export type MaskRenderUniforms = ShaderUniforms & {
+    activeIndices?: number | number[];
+};
+
 export abstract class Mask {
     readonly planeWidth: number;
     readonly planeHeight: number;
@@ -52,7 +56,10 @@ export abstract class Mask {
     abstract draw(drawing: ImageType, paintSettings: PaintSettings): void;
     abstract clear(): void;
     abstract dispose(): void;
-    abstract render(renderTarget: RenderTarget, uniforms: any): void;
+    abstract render(
+        renderTarget: RenderTarget,
+        uniforms: MaskRenderUniforms,
+    ): void;
 }
 
 export class BinaryMask extends Mask {
@@ -145,7 +152,7 @@ export class BinaryMask extends Mask {
         return this.bitMaskTexture.bitmask;
     }
 
-    protected getRenderUniforms(uniforms: any): any {
+    protected getRenderUniforms(uniforms: MaskRenderUniforms): ShaderUniforms {
         return {
             ...uniforms,
             u_binary_mask: this.texture,
@@ -157,7 +164,7 @@ export class BinaryMask extends Mask {
         };
     }
 
-    render(renderTarget: RenderTarget, uniforms: any): void {
+    render(renderTarget: RenderTarget, uniforms: MaskRenderUniforms): void {
         this.shaders.renderBinary.pass(
             renderTarget,
             this.getRenderUniforms(uniforms),
@@ -204,13 +211,20 @@ export class BinaryMask extends Mask {
         return this.connectedComponents;
     }
 
-    renderConnectedComponents(renderTarget: RenderTarget, uniforms: any): void {
-        uniforms = {
-            ...uniforms,
+    renderConnectedComponents(
+        renderTarget: RenderTarget,
+        uniforms: MaskRenderUniforms,
+    ): void {
+        const { activeIndices: _activeIndices, ...baseUniforms } = uniforms;
+        const renderUniforms: ShaderUniforms = {
+            ...baseUniforms,
             u_annotation: this.getConnectedComponents(),
             u_colors: colorsFlat,
         };
-        this.shaders.renderConnectedComponents.pass(renderTarget, uniforms);
+        this.shaders.renderConnectedComponents.pass(
+            renderTarget,
+            renderUniforms,
+        );
     }
 }
 
@@ -284,7 +298,7 @@ export class QuestionableMask extends BinaryMask {
         super.dispose();
     }
 
-    protected getRenderUniforms(uniforms: any): any {
+    protected getRenderUniforms(uniforms: MaskRenderUniforms): ShaderUniforms {
         return {
             ...super.getRenderUniforms(uniforms),
             u_questionable_mask: this.questionableMask.texture,
@@ -410,13 +424,17 @@ export class ProbabilityMask extends AbstractDataMask {
         this.afterUpdate(this.segmentation.threshold ?? 0.5);
     }
 
-    render(renderTarget: RenderTarget, uniforms: any): void {
-        uniforms = {
-            ...uniforms,
+    render(renderTarget: RenderTarget, uniforms: MaskRenderUniforms): void {
+        const { activeIndices: _activeIndices, ...baseUniforms } = uniforms;
+        const renderUniforms: ShaderUniforms = {
+            ...baseUniforms,
             u_annotation: this.textureData.texture,
             u_hard: this.u_hard,
         };
-        this.image.webgl.shaders.renderProbability.pass(renderTarget, uniforms);
+        this.image.webgl.shaders.renderProbability.pass(
+            renderTarget,
+            renderUniforms,
+        );
     }
 }
 
@@ -464,15 +482,16 @@ abstract class BaseMultiMask extends AbstractDataMask {
         this.textureData.dispose();
     }
 
-    render(renderTarget: RenderTarget, uniforms: any): void {
-        uniforms = {
-            ...uniforms,
+    render(renderTarget: RenderTarget, uniforms: MaskRenderUniforms): void {
+        const { activeIndices, ...baseUniforms } = uniforms;
+        const renderUniforms: ShaderUniforms = {
+            ...baseUniforms,
             u_annotation: this.textureData.texture,
             u_colors: colorsFlat,
             u_boundaries: undefined,
-            u_active_feature_mask: this.getBitmask(uniforms.activeIndices),
+            u_active_feature_mask: this.getBitmask(activeIndices ?? []),
         };
-        this.getRenderShader().pass(renderTarget, uniforms);
+        this.getRenderShader().pass(renderTarget, renderUniforms);
     }
 }
 export class MultiClassMask extends BaseMultiMask {

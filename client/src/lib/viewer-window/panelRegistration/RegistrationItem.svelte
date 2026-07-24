@@ -49,11 +49,11 @@
         {/if}
     </div>
     {#if active}
-        {#each formDataEntries() as [instanceID, pointSet]}
+        {#each formDataEntries() as [instanceID, pointSet] (instanceID)}
             <div>{instanceID}:</div>
             {#if instanceID === `${instance.id}`}
                 <ol>
-                    {#each pointSet as PointList as point, index}
+                    {#each pointSet as PointList as point, index (index)}
                         {#if point}
                             <li class="point">
                                 [{index + 1}]: [{point.x.toFixed(2)}, {point.y.toFixed(

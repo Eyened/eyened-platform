@@ -6,6 +6,7 @@
     import MeasureAreas from "./MeasureAreas.svelte";
     import { formAnnotations, formSchemasByName } from "$lib/data";
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
+    import type { Keypoints } from "$lib/types";
     import Line from "./Line.svelte";
     import SetResolutionEtdrs from "./SetResolutionETDRS.svelte";
 
@@ -52,16 +53,20 @@
 
     let fraction = $state(0.85);
 
-    const cfKeypoints = image.instance.cf_keypoints;
+    type CfKeypoints = Partial<Keypoints>;
+    const cfKeypoints = image.instance.cf_keypoints as
+        | CfKeypoints
+        | null
+        | undefined;
     const autoValue = cfKeypoints
         ? {
               fovea: {
-                  x: (cfKeypoints.fovea_xy as any)?.[0],
-                  y: (cfKeypoints.fovea_xy as any)?.[1],
+                  x: cfKeypoints.fovea_xy?.[0],
+                  y: cfKeypoints.fovea_xy?.[1],
               },
               disc_edge: {
-                  x: (cfKeypoints.disc_edge_xy as any)?.[0],
-                  y: (cfKeypoints.disc_edge_xy as any)?.[1],
+                  x: cfKeypoints.disc_edge_xy?.[0],
+                  y: cfKeypoints.disc_edge_xy?.[1],
               },
           }
         : null;
@@ -151,7 +156,7 @@
     <div class="segmentation-area">
         <h4>Line distances</h4>
         <ul>
-            {#each measureTool.lines as line}
+            {#each measureTool.lines as line (line)}
                 {#if line.index == viewerContext.index}
                     <Line {line} {measureTool} />
                 {/if}

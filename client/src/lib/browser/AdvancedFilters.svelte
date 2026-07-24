@@ -89,14 +89,12 @@
 
     // Convert condition to encoded field value for dropdown
     function conditionToFieldValue(condition: Condition): string {
-        if ((condition as any).type === "attribute") {
-            const attrCond = condition as any;
-            const model = attrCond.model || "";
-            const feature = attrCond.feature ?? "none";
-            const name = attrCond.variable;
-            return `${model}__${feature}__${name}`;
+        if (condition.type === "attribute") {
+            const model = condition.model || "";
+            const feature = condition.feature ?? "none";
+            return `${model}__${feature}__${condition.variable}`;
         }
-        return (condition as any).variable;
+        return condition.variable;
     }
 
     // Get operator options for a field
@@ -114,7 +112,7 @@
             if (sig.values === "string") {
                 ops.push("==");
                 // Free-text fields flagged as multi also support IN (multiple values).
-                if ((sig as any).multi) ops.push("IN");
+                if (sig.multi) ops.push("IN");
             } else if (
                 sig.values === "int" ||
                 sig.values === "float" ||
@@ -126,7 +124,7 @@
             }
         }
 
-        if ((sig as any).nullable) {
+        if (sig.nullable) {
             ops.push("IS NULL" as ConditionOperator);
         }
 
@@ -155,7 +153,7 @@
 
     // Coerce value based on field type
     function coerceValue(
-        value: any,
+        value: unknown,
         fieldType: string | string[],
     ): ConditionValue {
         if (Array.isArray(fieldType)) {
@@ -169,12 +167,16 @@
         }
 
         if (fieldType === "int") {
-            return typeof value === "string" ? parseInt(value, 10) || 0 : value;
+            return typeof value === "string"
+                ? parseInt(value, 10) || 0
+                : (value as number);
         }
         if (fieldType === "float") {
-            return typeof value === "string" ? parseFloat(value) || 0 : value;
+            return typeof value === "string"
+                ? parseFloat(value) || 0
+                : (value as number);
         }
-        return value;
+        return value as ConditionValue;
     }
 
     // Parse a comma-separated free-text input into a list of values (for IN).
@@ -196,7 +198,7 @@
         const curr = next[i];
         if (!curr) return;
 
-        const updated: Condition = { ...curr, ...(patch as any) } as Condition;
+        const updated: Condition = { ...curr, ...patch } as Condition;
         next[i] = updated;
         setConditions(next);
     }
@@ -238,21 +240,21 @@
         const isAttribute = sig && (sig.type ?? "default") === "attribute";
         let newCond: Condition;
 
-        if (isAttribute) {
+        if (isAttribute && sig) {
             newCond = {
                 type: "attribute",
                 model: sig.model || "",
-                variable: sig.name as any,
-                operator: draftRow.operator as any,
-                value,
+                variable: sig.name,
+                operator: draftRow.operator,
+                value: value ?? null,
                 feature: sig.feature ?? undefined,
             } as AttributeCondition;
         } else {
             newCond = {
                 type: "default",
-                variable: draftRow.field as any,
-                operator: draftRow.operator as any,
-                value,
+                variable: draftRow.field,
+                operator: draftRow.operator,
+                value: value ?? null,
             } as DefaultCondition;
         }
 
@@ -284,21 +286,27 @@
     // Handler for field selection in existing condition
     function handleFieldSelect(fieldValue: string, conditionIndex: number) {
         const sig = getFieldSignature(fieldValue);
-        const patch: Partial<Condition> = {
-            variable: sig?.name || fieldValue,
-            operator: getDefaultOperator(fieldValue) as any,
-            value: Array.isArray(sig?.values) ? [] : "",
-        } as any;
+        const operator = getDefaultOperator(fieldValue);
+        const value: ConditionValue = Array.isArray(sig?.values) ? [] : "";
 
         if (sig && (sig.type ?? "default") === "attribute") {
-            (patch as any).type = "attribute";
-            (patch as any).model = sig.model || "";
-            (patch as any).feature = sig.feature ?? undefined;
-        } else {
-            (patch as any).type = "default";
+            updateConditionAt(conditionIndex, {
+                type: "attribute",
+                model: sig.model || "",
+                feature: sig.feature ?? undefined,
+                variable: sig.name,
+                operator,
+                value,
+            });
+            return;
         }
 
-        updateConditionAt(conditionIndex, patch);
+        updateConditionAt(conditionIndex, {
+            type: "default",
+            variable: sig?.name || fieldValue,
+            operator,
+            value,
+        });
     }
 </script>
 
@@ -331,11 +339,11 @@
                             >
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Content>
-                            {#each ops as op}
+                            {#each ops as op (op)}
                                 <DropdownMenu.Item
                                     onSelect={() =>
                                         updateConditionAt(i, {
-                                            operator: op as any,
+                                            operator: op,
                                         })}
                                 >
                                     {op}
@@ -442,7 +450,7 @@
                                 >
                             </DropdownMenu.Trigger>
                             <DropdownMenu.Content>
-                                {#each ops as op}
+                                {#each ops as op (op)}
                                     <DropdownMenu.Item
                                         onSelect={() => updateDraftOperator(op)}
                                     >

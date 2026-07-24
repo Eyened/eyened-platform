@@ -99,7 +99,7 @@
                     class:is-hidden={!segmentationContext.modelVisible}
                     aria-hidden={!segmentationContext.modelVisible}
                 >
-                    {#each segmentationContext.modelSegmentations as segmentation}
+                    {#each segmentationContext.modelSegmentations as segmentation (segmentation.id)}
                         <SegmentationItem {segmentation} />
                     {/each}
                 </div>
@@ -111,7 +111,7 @@
             {@render creatorSegmentations(segmentations)}
         {/if}
         <!-- render other segmentations -->
-        {#each segmentationsByCreators.entries() as [creatorId, segmentations]}
+        {#each segmentationsByCreators.entries() as [creatorId, segmentations] (creatorId)}
             {#if creatorId != user_id}
                 {@render creatorSegmentations(segmentations)}
             {/if}

@@ -25,7 +25,7 @@
         {name}
     </h4>
     <ul class:hidden={collapse} class="m-0 ml-4 list-none p-0">
-        {#each Object.entries(data) as [tag, rows]}
+        {#each Object.entries(data) as [tag, rows] (tag)}
             <li>
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->

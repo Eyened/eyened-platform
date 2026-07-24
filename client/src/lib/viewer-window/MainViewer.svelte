@@ -113,7 +113,7 @@
 
     const panels: {
         name: PanelName;
-        component: Component<any>;
+        component: Component<Record<string, unknown>>;
         Icon: Component;
         Help?: Component;
         props?: Record<string, unknown>;
@@ -195,7 +195,7 @@
         </header>
 
         <nav id="panels" class="panels" class:minimize>
-            {#each panels as { name, component: Component, Icon, Help, props = { } }}
+            {#each panels as { name, component: Component, Icon, Help, props = { } } (name)}
                 <PanelHeader text={name} panelName={name} {Icon} {Help} />
                 <section
                     class="panel {activePanels.has(name)

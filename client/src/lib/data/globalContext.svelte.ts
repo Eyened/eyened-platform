@@ -1,6 +1,8 @@
 import { resolve } from "$app/paths";
 import type { ResolvedPathname } from "$app/types";
 import { UserManager } from "$lib/usermanager.svelte";
+import { SvelteURLSearchParams } from "svelte/reactivity";
+import type { Component } from "svelte";
 
 import type {
     FormAnnotationGET,
@@ -11,9 +13,15 @@ import type {
 } from "../../types/openapi_types";
 import { fetchFeatures, fetchFormSchemas, fetchTags } from "./api";
 
+export type GlobalViewerConfig = {
+    showOtherAnnotationsHuman: boolean;
+    showOtherAnnotationsMachine: boolean;
+    [key: string]: unknown;
+};
+
 export type ComponentDef = {
-    component: any;
-    props?: any;
+    component: Component<Record<string, unknown>>;
+    props?: Record<string, unknown>;
 };
 
 export class GlobalContext {
@@ -23,7 +31,7 @@ export class GlobalContext {
     public showUserMenu: boolean = $state(false);
 
     public formShortcut: string | null = $state("WARMGS");
-    public config: any = $state({
+    public config: GlobalViewerConfig = $state({
         showOtherAnnotationsHuman: true,
         showOtherAnnotationsMachine: true,
     });
@@ -72,7 +80,7 @@ export class GlobalContext {
         return annotation.creator.id == this.userManager.user.id;
     }
 
-    updateConfig(config: any) {
+    updateConfig(config: Record<string, unknown>) {
         this.config = { ...this.config, ...config };
     }
 
@@ -80,7 +88,7 @@ export class GlobalContext {
      * Build a Browser URL for a studies query using a single StudySearchCondition.
      */
     makeStudiesBrowserURL(condition: StudySearchCondition): ResolvedPathname {
-        const params = new URLSearchParams();
+        const params = new SvelteURLSearchParams();
         params.set("page", "0");
         params.set("limit", "10");
         params.set("conditions", this._encodeSingleCondition(condition));
@@ -96,12 +104,12 @@ export class GlobalContext {
      * Build a Browser URL for an instances query using a single SearchCondition.
      */
     makeInstancesBrowserURL(condition: SearchCondition): ResolvedPathname {
-        const params = new URLSearchParams();
+        const params = new SvelteURLSearchParams();
         params.set("page", "0");
         params.set("limit", "100");
         params.set(
             "conditions",
-            this._encodeSingleConditionExtended(condition as any),
+            this._encodeSingleConditionExtended(condition),
         );
         params.set("order_by", "Study Date");
         params.set("order", "ASC");
@@ -127,14 +135,7 @@ export class GlobalContext {
         return `${encodedVariable}:${encodedOperator}:${encodedValue}`;
     }
 
-    private _encodeSingleConditionExtended(condition: {
-        variable: string;
-        operator: string;
-        value: string | number | string[] | null;
-        type?: "default" | "attribute";
-        model?: string;
-        feature?: string;
-    }): string {
+    private _encodeSingleConditionExtended(condition: SearchCondition): string {
         const serializeValue = (v: string | number | string[] | null) =>
             JSON.stringify(v);
         const encodedVariable = encodeURIComponent(condition.variable);

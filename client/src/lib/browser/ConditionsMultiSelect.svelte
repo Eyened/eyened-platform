@@ -4,7 +4,7 @@
 
     interface Props {
         variable: string; // api variable name (e.g. 'FeatureName')
-        values: any[];
+        values: Record<string, string>[];
         name: string; // name of the value in the data model (e.g. 'name' => feature.name)
     }
 
@@ -31,7 +31,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <ul class="m-0 flex list-none flex-wrap p-0">
-    {#each values as value}
+    {#each values as value (value[name])}
         {@const isActive = selectedValues.includes(value[name])}
         {@const isHighlight = filter == "" || filteredValues.includes(value)}
         <li

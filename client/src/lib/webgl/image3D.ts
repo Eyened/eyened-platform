@@ -23,7 +23,7 @@ export class Image3D extends AbstractImage {
         img_id: string,
         public readonly data: Uint8Array,
         dimensions: Dimensions, // w: horizontal, h: axial, d: vertical
-        meta: any,
+        meta: Record<string, unknown>,
     ) {
         super(instance, webgl, img_id, dimensions, meta);
         this.texture = initTexture3D(webgl.gl, dimensions, data);

@@ -119,7 +119,7 @@ export function mergeObjects<Sources extends readonly MaybeThunk<any>[]>(
         },
 
         ownKeys(): (string | symbol)[] {
-            const all = new Set<string | symbol>();
+            const all: (string | symbol)[] = [];
             for (const s of sources) {
                 const obj = resolve(s);
                 if (obj) {
@@ -127,11 +127,13 @@ export function mergeObjects<Sources extends readonly MaybeThunk<any>[]>(
                         | string
                         | symbol
                     )[]) {
-                        all.add(k);
+                        if (!all.includes(k)) {
+                            all.push(k);
+                        }
                     }
                 }
             }
-            return [...all];
+            return all;
         },
 
         getOwnPropertyDescriptor(_, key) {

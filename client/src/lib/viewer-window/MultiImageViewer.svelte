@@ -58,7 +58,7 @@
     <Viewer />
     <div class="controls">
         <select oninput={handleSelectChange}>
-            {#each $CFInstances as instance}
+            {#each $CFInstances as instance (instance.id)}
                 <option value={instance.id}>{instance.id}</option>
             {/each}
         </select>

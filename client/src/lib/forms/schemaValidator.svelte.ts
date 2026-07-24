@@ -1,7 +1,10 @@
+import type { JSONSchema, JSONSchemaValue } from "./schemaType";
 import { deepEquals } from "./utils";
 
+type ValidationSchema = JSONSchema | boolean;
+
 export class SchemaValidator {
-    value: any = $state();
+    value: JSONSchemaValue = $state();
     validation_result = $derived.by(() =>
         run_validation(this.schema, this.value),
     );
@@ -10,23 +13,27 @@ export class SchemaValidator {
     isValid = $derived(this.errors.length === 0);
 
     constructor(
-        private schema: any,
-        value: any,
+        private schema: JSONSchema,
+        value: JSONSchemaValue,
     ) {
         this.value = value;
     }
 
-    setValue(value: any) {
+    setValue(value: JSONSchemaValue) {
         this.value = value;
     }
 
-    setProperty(key: string, value: any) {
+    setProperty(key: string, value: JSONSchemaValue) {
         if (this.value === undefined) {
             this.value = {};
         }
-        this.value[key] = value;
+        const record = this.value as Record<
+            string,
+            JSONSchemaValue | undefined
+        >;
+        record[key] = value;
         if (value === undefined) {
-            delete this.value[key];
+            delete record[key];
         }
     }
 
@@ -37,8 +44,8 @@ export class SchemaValidator {
         this.value.push(undefined);
     }
 
-    setArrayValue(index: number, value: any) {
-        if (this.value === undefined) {
+    setArrayValue(index: number, value: JSONSchemaValue) {
+        if (!Array.isArray(this.value)) {
             console.warn("Array value is undefined");
             this.value = [];
             return;
@@ -47,7 +54,7 @@ export class SchemaValidator {
     }
 
     removeArrayValue(index: number) {
-        if (this.value === undefined) {
+        if (!Array.isArray(this.value)) {
             console.warn("Array value is undefined");
             return;
         }
@@ -91,7 +98,7 @@ interface ValidationError {
     message: string;
 }
 
-function run_validation(schema: any, value: any) {
+function run_validation(schema: JSONSchema, value: JSONSchemaValue) {
     const absent_keys: string[] = [];
     const errors = validate(schema, value, "", absent_keys);
     return {
@@ -101,8 +108,8 @@ function run_validation(schema: any, value: any) {
 }
 
 function validate(
-    schema: any,
-    value: any,
+    schema: ValidationSchema,
+    value: JSONSchemaValue,
     path: string = "",
     absent_keys: string[] = [],
 ): ValidationError[] {
@@ -132,7 +139,7 @@ function validate(
 
     // Enum validation
     if (schema.enum && Array.isArray(schema.enum)) {
-        if (!schema.enum.some((item: any) => deepEquals(value, item))) {
+        if (!schema.enum.some((item) => deepEquals(value, item))) {
             const message = `${path || "value"}: Invalid value: ${value}`;
             const error = { path, type: "enum", message };
             errors.push(error);
@@ -187,7 +194,7 @@ function validate(
     }
     // anyOf validation (must satisfy at least one sub-schema)
     if (schema.anyOf && Array.isArray(schema.anyOf)) {
-        const anyOfErrors = schema.anyOf.map((subSchema: any) =>
+        const anyOfErrors = schema.anyOf.map((subSchema) =>
             validate(subSchema, value, path),
         );
         const allFailed = anyOfErrors.every(
@@ -202,7 +209,7 @@ function validate(
     // oneOf validation (must satisfy exactly one sub-schema)
     if (schema.oneOf && Array.isArray(schema.oneOf)) {
         const validSchemas = schema.oneOf.filter(
-            (subSchema: any) => validate(subSchema, value, path).length === 0,
+            (subSchema) => validate(subSchema, value, path).length === 0,
         );
 
         if (validSchemas.length !== 1) {
@@ -242,10 +249,7 @@ function validate(
     return errors;
 }
 
-function formatCondition(
-    schema: Record<string, any>,
-    absent_keys: string[],
-): string {
+function formatCondition(schema: JSONSchema, absent_keys: string[]): string {
     const conditions: string[] = [];
 
     // Handle required fields
@@ -265,8 +269,10 @@ function formatCondition(
                     case prop === false:
                         absent_keys.push(key);
                         return `'${key}' should be absent`;
-                    case Array.isArray(prop.enum):
-                        return `'${key}' in (${prop.enum.map((v: string) => `"${v}"`).join(", ")})`;
+                    case typeof prop === "object" &&
+                        prop !== null &&
+                        Array.isArray(prop.enum):
+                        return `'${key}' in (${prop.enum.map((v) => JSON.stringify(v)).join(", ")})`;
                     default:
                         return `'${key}' must satisfy conditions`;
                 }
@@ -281,7 +287,7 @@ function formatCondition(
         : "conditions must be met";
 }
 
-function formatSatisfies(schema: any): string {
+function formatSatisfies(schema: JSONSchema): string {
     if (!schema.properties) return "condition";
 
     const conditions = Object.entries(schema.properties).map(([key, prop]) => {
@@ -289,7 +295,7 @@ function formatSatisfies(schema: any): string {
             return `'${key}' should be absent`;
         }
         if (Array.isArray(prop.enum)) {
-            return `'${key}' in (${prop.enum.map((v: any) => JSON.stringify(v)).join(", ")})`;
+            return `'${key}' in (${prop.enum.map((v) => JSON.stringify(v)).join(", ")})`;
         }
         if (prop.const !== undefined) {
             return `'${key}' is ${JSON.stringify(prop.const)}`;

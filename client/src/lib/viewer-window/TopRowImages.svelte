@@ -35,14 +35,14 @@
     <div class="empty">Enter instance IDs in url</div>
 {:else}
     <div id="images">
-        {#each viewerWindowContext.instanceIds as instanceId}
+        {#each viewerWindowContext.instanceIds as instanceId (instanceId)}
             {#await viewerWindowContext.getImages(instanceId)}
                 <div class="itemLoading">
                     <div>Loading {instanceId}</div>
                     <Spinner />
                 </div>
             {:then images}
-                {#each images as image}
+                {#each images as image (image.image_id)}
                     <TopViewer {image} />
                 {/each}
             {/await}

@@ -10,9 +10,9 @@
 <div class="form-container">
     <table>
         <tbody>
-            {#each data as row}
+            {#each data as row, rowIndex (rowIndex)}
                 <tr>
-                    {#each row as cell}
+                    {#each row as cell, cellIndex (cellIndex)}
                         <td>
                             <!-- eslint-disable-next-line svelte/no-at-html-tags -- renders an admin-configured external data source fetched over the network (dataSources.ts loadDataSource); NOT end-user input, but NOT sanitized either. Pre-existing XSS surface, knowingly accepted, tracked in docs/backlog/2026-07-16-frontend-ci-phase3-eslint-followups.md -->
                             {@html cell}

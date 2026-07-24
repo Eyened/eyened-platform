@@ -96,7 +96,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {#each Object.entries(flattenToDotPaths(instance)) as [key, value]}
+                        {#each Object.entries(flattenToDotPaths(instance)) as [key, value] (key)}
                             <tr
                                 class="odd:bg-gray-100 even:bg-gray-200 hover:bg-white"
                             >

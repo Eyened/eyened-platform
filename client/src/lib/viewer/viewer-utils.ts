@@ -60,9 +60,13 @@ export type ViewerWheelData = {
     zoomIntent: boolean;
 };
 
-export interface ViewerEvent<
-    T extends PointerEvent | KeyboardEvent | WheelEvent | MouseEvent,
-> {
+export type ViewerDomEvent =
+    | PointerEvent
+    | KeyboardEvent
+    | WheelEvent
+    | MouseEvent;
+
+export interface ViewerEvent<T extends ViewerDomEvent = ViewerDomEvent> {
     event: T;
     viewerContext: ViewerContext;
     cursor: Position2D;
@@ -72,15 +76,15 @@ export interface ViewerEvent<
 }
 
 export interface ViewerEventListener {
-    pointerdown?: (arg0: ViewerEvent<PointerEvent>) => any;
-    pointerup?: (arg0: ViewerEvent<PointerEvent>) => any;
-    pointermove?: (arg0: ViewerEvent<PointerEvent>) => any;
-    pointerenter?: (arg0: ViewerEvent<PointerEvent>) => any;
-    pointerleave?: (arg0: ViewerEvent<PointerEvent>) => any;
-    wheel?: (arg0: ViewerEvent<WheelEvent>) => any;
-    keydown?: (arg0: ViewerEvent<KeyboardEvent>) => any;
-    keyup?: (arg0: ViewerEvent<KeyboardEvent>) => any;
-    dblclick?: (arg0: ViewerEvent<MouseEvent>) => any;
+    pointerdown?: (arg0: ViewerEvent<PointerEvent>) => void;
+    pointerup?: (arg0: ViewerEvent<PointerEvent>) => void;
+    pointermove?: (arg0: ViewerEvent<PointerEvent>) => void;
+    pointerenter?: (arg0: ViewerEvent<PointerEvent>) => void;
+    pointerleave?: (arg0: ViewerEvent<PointerEvent>) => void;
+    wheel?: (arg0: ViewerEvent<WheelEvent>) => void;
+    keydown?: (arg0: ViewerEvent<KeyboardEvent>) => void;
+    keyup?: (arg0: ViewerEvent<KeyboardEvent>) => void;
+    dblclick?: (arg0: ViewerEvent<MouseEvent>) => void;
 }
 
 export interface Overlay extends ViewerEventListener {

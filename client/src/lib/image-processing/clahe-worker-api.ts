@@ -2,7 +2,7 @@ export class ClaheWorkerAPI {
     private worker: Worker | null = null;
     private ready: boolean = false;
     private readyPromise: Promise<void>;
-    private processingQueue: Promise<any> = Promise.resolve();
+    private processingQueue: Promise<unknown> = Promise.resolve();
     private isBrowser: boolean =
         typeof window !== "undefined" && typeof Worker !== "undefined";
 

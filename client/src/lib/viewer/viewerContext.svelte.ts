@@ -6,6 +6,7 @@ import type { Shaders } from "$lib/webgl/shaders";
 import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import type { Registration } from "../registration/registration";
+import type { CfRoi } from "../image-processing/cfRoi";
 import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
 import { HotKeys } from "./controls/hotkeys";
 import { ScrollOCT } from "./controls/scrollOCT";
@@ -20,6 +21,7 @@ import type {
     RenderMode,
     ViewerEvent,
     ViewerEventListener,
+    ViewerDomEvent,
     WindowLevel,
 } from "./viewer-utils";
 
@@ -214,7 +216,7 @@ export class ViewerContext {
             let radius: number;
             try {
                 ({ center, radius, min_x, max_x, min_y, max_y } =
-                    instance.cf_roi as any);
+                    instance.cf_roi as CfRoi);
                 [cx, cy] = center as [number, number];
                 x_min = Math.max(x_min, cx - radius, min_x);
                 x_max = Math.min(x_max, cx + radius, max_x);
@@ -293,11 +295,12 @@ export class ViewerContext {
         return this.imageViewerTransform.inverse.apply(cursor);
     }
 
-    forwardEvent(eventName: EventName, event: ViewerEvent<any>) {
+    forwardEvent(eventName: EventName, event: ViewerEvent<ViewerDomEvent>) {
         for (const overlay of this.overlays.values()) {
-            if (eventName in overlay) {
-                overlay[eventName]!.bind(overlay)(event);
-            }
+            const handler = overlay[eventName] as
+                | ((e: ViewerEvent<ViewerDomEvent>) => void)
+                | undefined;
+            handler?.call(overlay, event);
         }
     }
 

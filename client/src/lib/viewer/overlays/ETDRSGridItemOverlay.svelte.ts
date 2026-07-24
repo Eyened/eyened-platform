@@ -1,5 +1,6 @@
 import type { Registration } from "$lib/registration/registration";
 import type { Position, Position2D } from "$lib/types";
+import type { FormAnnotationGET } from "../../types/openapi_types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
@@ -13,13 +14,23 @@ const additionalCircles: Record<string, number> = {
     O1: O / 8,
     O2: O / 4,
 };
+export type EtdrsFormData = {
+    fovea: Position2D;
+    disc_edge: Position2D;
+};
 export type etdrsGridType = {
     image_id: string;
-    form_data: {
-        fovea: { x: number; y: number };
-        disc_edge: { x: number; y: number };
-    };
+    form_data: EtdrsFormData;
 };
+
+export function toEtdrsGridType(
+    annotation: Pick<FormAnnotationGET, "image_id" | "form_data">,
+): etdrsGridType {
+    return {
+        image_id: String(annotation.image_id ?? ""),
+        form_data: (annotation.form_data ?? {}) as EtdrsFormData,
+    };
+}
 export class ETDRSGridItemOverlay implements Overlay {
     lineWidth = 1;
     strokeStyle = "rgba(255,255,255, 1)";

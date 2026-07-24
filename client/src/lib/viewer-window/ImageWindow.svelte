@@ -34,7 +34,7 @@
     {#await loading}
         <div class="itemLoading">Loading {instance.id}</div>
     {:then images}
-        {#each images as image}
+        {#each images as image (image.image_id)}
             <div class="item">
                 <BaseViewer {image} />
             </div>

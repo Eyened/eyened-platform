@@ -14,12 +14,13 @@ import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
+import type { Component } from "svelte";
 import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from "./MainViewer.svelte";
 
 export type MainPanelType = {
-    component: any;
-    props: any;
+    component: Component<Record<string, unknown>>;
+    props: Record<string, unknown>;
 };
 
 export class ViewerWindowContext {

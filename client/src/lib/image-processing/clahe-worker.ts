@@ -1,7 +1,7 @@
 import { CLAHE } from "./CLAHE";
 
 // Tell TypeScript this is a worker context
-const ctx: Worker = self as any;
+const ctx = self as unknown as Worker;
 
 // Create CLAHE instance with default parameters
 let claheProcessor = new CLAHE();

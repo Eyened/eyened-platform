@@ -138,7 +138,11 @@ export class SegmentationItem {
             for (const scanNr of scanIndices) {
                 const start = scanNr * planeSize;
                 const end = start + planeSize;
-                const slice = (array.data as any).subarray(start, end);
+                const slice = array.data.subarray(start, end) as
+                    | Uint8Array
+                    | Uint16Array
+                    | Uint32Array
+                    | Float32Array;
                 this.getSegmentationState(scanNr, true, slice);
                 this.addSavedScanIndex(scanNr);
             }
@@ -269,29 +273,8 @@ export class SegmentationItem {
             const state = this.segmentationStates.get(scanNr)!;
             const mask = state.mask;
 
-            // Get the mask texture - ensure it's synced to GPU
-            let maskTexture: WebGLTexture;
-            if ("textureData" in mask && (mask as any).textureData) {
-                // For AbstractDataMask (ProbabilityMask, MultiClassMask, etc.)
-                (mask as any).textureData.updateGPU();
-                maskTexture = (mask as any).textureData.texture;
-            } else if (
-                "texture" in mask &&
-                typeof (mask as any).texture !== "undefined"
-            ) {
-                // For BinaryMask which has a texture getter
-                maskTexture = (mask as any).texture;
-            } else {
-                throw new Error(
-                    `Cannot get texture from mask type: ${mask.constructor.name}`,
-                );
-            }
-
-            // Get bitmask for this mask
-            let maskBitmask = 1;
-            if ("bitmask" in mask) {
-                maskBitmask = (mask as any).bitmask;
-            }
+            const maskTexture = this.getMaskTexture(mask);
+            const maskBitmask = this.getMaskBitmask(mask);
 
             // Create a render target that writes to the specific horizontal line (y = i)
             // The shader will project the mask along height and write to this line
@@ -317,6 +300,26 @@ export class SegmentationItem {
 
         // Return the R32F texture data
         return outputTexture;
+    }
+
+    private getMaskTexture(mask: Mask): WebGLTexture {
+        if ("textureData" in mask) {
+            return (mask as Mask & { textureData: TextureData }).textureData
+                .texture;
+        }
+        if ("texture" in mask) {
+            return (mask as Mask & { texture: WebGLTexture }).texture;
+        }
+        throw new Error(
+            `Cannot get texture from mask type: ${mask.constructor.name}`,
+        );
+    }
+
+    private getMaskBitmask(mask: Mask): number {
+        if ("bitmask" in mask) {
+            return (mask as Mask & { bitmask: number }).bitmask;
+        }
+        return 1;
     }
 
     dispose() {

@@ -63,11 +63,7 @@
     }
 
     async function handleCreateTag(payload: Partial<TagGET>) {
-        await createTag(
-            payload.name!,
-            tagType as any,
-            payload.description ?? "",
-        );
+        await createTag(payload.name!, tagType, payload.description ?? "");
     }
 
     async function handleDeleteTag() {
@@ -99,7 +95,7 @@
     <div class="border-radius-5 bg-gray-100 p-4">
         <TagEditForm {tagType} add={handleCreateTag} />
     </div>
-    {#each filtered_tags as tag}
+    {#each filtered_tags as tag (tag.id)}
         <div
             class:!bg-orange-200={favouriteTagIDs.has(tag.id)}
             class="relative m-1 inline-flex items-center rounded-lg border-1 border-gray-500 bg-gray-200 px-2 py-2"

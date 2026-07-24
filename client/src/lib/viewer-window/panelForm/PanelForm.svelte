@@ -105,7 +105,7 @@
                 <option value={undefined} disabled
                     >-- select form type --</option
                 >
-                {#each selectableSchemas as schema}
+                {#each selectableSchemas as schema (schema.id)}
                     <option value={schema}>{schema.name}</option>
                 {/each}
             </select>

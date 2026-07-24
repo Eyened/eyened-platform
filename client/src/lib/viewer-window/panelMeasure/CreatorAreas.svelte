@@ -4,11 +4,11 @@
     // import type { Segmentation } from '$lib/datamodel/segmentation.svelte';
     import SegmentationArea from "./SegmentationArea.svelte";
     import type { CreatorMeta } from "../../../types/openapi_types";
+    import type { Segmentation } from "../panelSegmentation/segmentationContext.svelte";
 
-    // SKIPPED: Proper type replacement - Segmentation type needs investigation
     interface Props {
         creator: CreatorMeta;
-        rows: [any, number, number | undefined][]; // TODO: Replace 'any' with proper Segmentation type
+        rows: [Segmentation, number, number | undefined][];
     }
     let { creator, rows }: Props = $props();
 
@@ -22,7 +22,7 @@
     {creator.name}
 </h3>
 <ul class:collapse>
-    {#each rows as [annotation, scanNr, area]}
+    {#each rows as [annotation, scanNr, area] (annotation.id + "-" + scanNr)}
         <SegmentationArea {annotation} {scanNr} {area} />
     {/each}
 </ul>

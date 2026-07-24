@@ -11,6 +11,7 @@ import { claheWorker } from "./clahe-worker-api";
 import { TextureData } from "$lib/webgl/texture";
 import fs_standardize from "./shaders/standardize.frag";
 import fs_lut from "./shaders/lut.frag";
+import type { CfRoi, CfRoiLines } from "./cfRoi";
 
 export type ceOptions = {
     resolution?: number;
@@ -30,23 +31,6 @@ export interface ClaheInput {
     texture: WebGLTexture;
     instance: ImageGET;
 }
-
-type ROI = {
-    center: [number, number];
-    radius: number;
-    min_x: number;
-    max_x: number;
-    min_y: number;
-    max_y: number;
-    lines: {
-        top?: [[number, number], [number, number]];
-        bottom?: [[number, number], [number, number]];
-        left?: [[number, number], [number, number]];
-        right?: [[number, number], [number, number]];
-    };
-    w: number;
-    h: number;
-};
 
 export class CFImageProcessing {
     mirrorShader: PixelShaderProgram;
@@ -125,21 +109,14 @@ export class CFImageProcessing {
         let cy = height / 2;
         let radius = Math.min(width, height) / 2;
 
-        type LineCoords = [[number, number], [number, number]];
-        type Lines = {
-            top?: LineCoords;
-            bottom?: LineCoords;
-            left?: LineCoords;
-            right?: LineCoords;
-        };
-        let lines: Lines = {};
+        let lines: CfRoiLines = {};
         try {
             if (cfROI) {
                 ({
                     center: [cx, cy],
                     radius,
                     lines,
-                } = cfROI as ROI);
+                } = cfROI as CfRoi);
             }
         } catch (e) {
             console.warn("Error in cfROI", e);

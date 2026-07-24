@@ -4,9 +4,13 @@
     import { createFormAnnotation, formAnnotations } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import type { etdrsGridType } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
+    import type {
+        etdrsGridType,
+        toEtdrsGridType,
+    } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { ETDRSGridItemOverlay } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { ETDRSGridTool } from "$lib/viewer/tools/ETDRSGrid.svelte";
+    import type { Overlay } from "$lib/viewer/viewer-utils";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type {
@@ -74,7 +78,7 @@
         formAnnotation: FormAnnotationGET,
         activeIds: SvelteSet<number>,
         items: SvelteMap<number, () => void>,
-        createItem: () => any,
+        createItem: () => Overlay,
         active?: boolean,
         precondition?: () => boolean,
     ) {
@@ -106,7 +110,7 @@
             overlays,
             () =>
                 new ETDRSGridItemOverlay(
-                    formAnnotation as any,
+                    toEtdrsGridType(formAnnotation),
                     registration,
                     settings,
                 ),

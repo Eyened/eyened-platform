@@ -34,7 +34,7 @@
         <div>No reference annotations found</div>
     {:else}
         <ul>
-            {#each referenceAnnotations as reference}
+            {#each referenceAnnotations as reference (reference.id)}
                 {@const current =
                     reference.id == segmentation.reference_segmentation_id}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->

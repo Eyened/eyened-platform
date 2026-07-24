@@ -21,6 +21,24 @@ cornerstoneWADOImageLoader.configure({
 
 export type LoadedImages = [Image2D] | [Image3D] | [Image2D, Image3D];
 
+type PngSeriesImageEntry = {
+    source_id?: string | number;
+    contents: unknown[];
+    size: { width: number; height: number };
+    dimensions_mm: { width: number; height: number; depth: number };
+};
+
+type PngSeriesMeta = Record<string, unknown> & {
+    images?: {
+        images?: PngSeriesImageEntry[];
+    };
+};
+
+type BinaryVolumeMeta = Record<string, unknown> & {
+    oct_shape?: [number, number, number];
+    resolution?: [number, number, number];
+};
+
 export class ImageLoader {
     minBscansForEnface = 5;
     constructor(public readonly webgl: WebGL) {}
@@ -56,7 +74,7 @@ export class ImageLoader {
 
     async loadPngSeries(
         instance: ImageGET,
-        meta: any,
+        meta: PngSeriesMeta,
         img_id: string,
         imageId: string,
     ): Promise<LoadedImages> {
@@ -64,10 +82,10 @@ export class ImageLoader {
 
         const metaImages = meta?.images?.images;
         const image = Array.isArray(metaImages)
-            ? (metaImages.find((img: any) => img.source_id == sourceId) ??
+            ? (metaImages.find((img) => img.source_id == sourceId) ??
               metaImages[0])
             : null;
-        const n_scans = image?.contents.length;
+        const n_scans = image?.contents.length ?? 0;
         const urls = Array.from({ length: n_scans }, (_, index) => {
             return this.buildDataUrl(imageId, { index });
         });
@@ -150,7 +168,7 @@ export class ImageLoader {
         instance: ImageGET,
         url: string,
         img_id: string,
-        meta?: any,
+        meta?: BinaryVolumeMeta,
     ): Promise<Image3D> {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
@@ -217,7 +235,7 @@ export class ImageLoader {
         const image = await cornerstone.loadImage(dicomImageId);
         const ds = image.data;
 
-        const meta: any = dicomParser.explicitDataSetToJS(ds);
+        const meta = dicomParser.explicitDataSetToJS(ds);
         const dimensions = this.extractDimensions(meta);
 
         const photometricInterpretation = meta.x00280004;
@@ -321,7 +339,7 @@ export class ImageLoader {
         );
     }
 
-    private extractDimensions(meta: any): Dimensions {
+    private extractDimensions(meta: Record<string, unknown>): Dimensions {
         const width = Number(meta.x00280011); // Rows (width)
         const height = Number(meta.x00280010); // Columns (height)
         const depth = Number(meta.x00280008) || 1; // Number of frames (depth)
@@ -331,8 +349,9 @@ export class ImageLoader {
             res_d = -1;
 
         // x00280030: PixelSpacing
-        const pixelSpacing = meta.x00280030?.split("\\").map(Number);
-        if (pixelSpacing) {
+        const pixelSpacingRaw = meta.x00280030;
+        if (typeof pixelSpacingRaw === "string") {
+            const pixelSpacing = pixelSpacingRaw.split("\\").map(Number);
             [res_h, res_w] = pixelSpacing;
         }
 
@@ -342,10 +361,23 @@ export class ImageLoader {
             // if the resolution varies between frames (e.g. radial + circular scans)
 
             // x52009229: Shared Functional Groups Sequence
-            const resolutions = meta.x52009229[0].x00289110[0];
-            [res_h, res_w] = resolutions.x00280030.split("\\").map(Number);
-            // x00180050: Slice Thickness
-            res_d = Number(resolutions.x00180050);
+            const sharedSeq = meta.x52009229;
+            if (Array.isArray(sharedSeq) && sharedSeq.length > 0) {
+                const first = sharedSeq[0] as Record<string, unknown>;
+                const funcGroups = first.x00289110;
+                if (Array.isArray(funcGroups) && funcGroups.length > 0) {
+                    const resolutions = funcGroups[0] as Record<
+                        string,
+                        unknown
+                    >;
+                    const spacing = resolutions.x00280030;
+                    if (typeof spacing === "string") {
+                        [res_h, res_w] = spacing.split("\\").map(Number);
+                    }
+                    // x00180050: Slice Thickness
+                    res_d = Number(resolutions.x00180050);
+                }
+            }
         } catch (e) {
             if (depth > 1) {
                 console.warn("No depth resolution found in DICOM metadata:", e);
@@ -379,7 +411,7 @@ export class ImageLoader {
         return `${url}?${search.toString()}`;
     }
 
-    private async loadBinaryMeta(imageId: string): Promise<any> {
+    private async loadBinaryMeta(imageId: string): Promise<BinaryVolumeMeta> {
         const url = this.buildDataUrl(imageId, { meta: true });
         const response = await fetch(url);
         if (!response.ok) {
@@ -387,10 +419,10 @@ export class ImageLoader {
                 `Failed to load binary metadata (${response.status})`,
             );
         }
-        return await response.json();
+        return (await response.json()) as BinaryVolumeMeta;
     }
 
-    private async loadPngSeriesMeta(imageId: string): Promise<any> {
+    private async loadPngSeriesMeta(imageId: string): Promise<PngSeriesMeta> {
         const metaUrl = this.buildDataUrl(imageId, { meta: true });
         const response = await fetch(metaUrl);
         if (!response.ok) {
@@ -398,7 +430,7 @@ export class ImageLoader {
                 `Failed to load png_series metadata (${response.status})`,
             );
         }
-        return await response.json();
+        return (await response.json()) as PngSeriesMeta;
     }
 }
 

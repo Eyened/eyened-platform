@@ -99,7 +99,7 @@
         </div>
     {/if}
     <ul>
-        {#each feature.subfeatures as subfeature}
+        {#each feature.subfeatures as subfeature (subfeature.index)}
             <li
                 onpointerenter={() => pointerEnter(subfeature.index)}
                 onpointerleave={pointerLeave}

@@ -4,7 +4,7 @@ import { mount, unmount } from "svelte";
 
 export function openNewWindow(
     Component: Component,
-    props: any,
+    props: Record<string, unknown>,
     title: string,
 ): Window | null {
     const screenWidth = window.screen.availWidth;

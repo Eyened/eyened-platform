@@ -1,6 +1,7 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import { page } from "$app/state";
+import { SvelteURLSearchParams } from "svelte/reactivity";
 import { authClient, type UserResponse } from "../auth";
 
 export class UserManager {
@@ -51,7 +52,7 @@ export class UserManager {
         // await this.setCreator(resp.id);
 
         // Get the 'next' URL from the query parameters
-        const params = new URLSearchParams(window.location.search);
+        const params = new SvelteURLSearchParams(window.location.search);
         const nextUrl = params.get("next");
 
         // If there's a 'next' URL, go there, otherwise go to the root

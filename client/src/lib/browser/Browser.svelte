@@ -17,7 +17,9 @@
         BrowserContext,
         decodeConditions,
         type Condition,
+        type InstancesSortBy,
         type QueryMode,
+        type StudiesSortBy,
     } from "./browserContext.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
 
@@ -97,7 +99,7 @@
         }
 
         const ob = params.get("order_by");
-        if (ob) browserContext.sortBy = ob as any;
+        if (ob) browserContext.sortBy = ob as InstancesSortBy | StudiesSortBy;
 
         const od = params.get("order");
         if (od === "ASC" || od === "DESC") browserContext.sortDirection = od;

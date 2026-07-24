@@ -1,19 +1,42 @@
+import type { components } from "../../types/openapi";
 import type {
     FeatureGET,
+    FormAnnotationGET,
+    FormAnnotationPUT,
     FormSchemaGET,
     ImageGET,
     PatientDetailGET,
+    SearchQuery,
+    SearchResponse,
+    SegmentationDataRepresentation,
+    SegmentationDataType,
+    SegmentationGET,
+    SegmentationPATCH,
+    SegmentationPOST,
+    SignatureField,
     StudyGET,
+    StudySearchQuery,
+    StudySearchResponse,
+    SubTaskGET,
+    SubTaskState,
+    SubTasksResponse,
+    SubTasksWithImagesResponse,
     SubTaskWithImagesGET,
     TagGET,
     TaskGET,
 } from "../../types/openapi_types";
+
+type SubTaskPATCH = components["schemas"]["SubTaskPATCH"];
+type SegmentationCreateMetadata = Omit<SegmentationPOST, "$defs">;
 import {
     ApiError,
     api,
+    fetchApi,
     isUnauthorizedStatus,
     withAuthRetry,
 } from "../api/client";
+import type { AbstractImage } from "../webgl/abstractImage";
+import type { NPYArray } from "../utils/npy_loader";
 import {
     formAnnotations,
     ingestFeatures,
@@ -39,7 +62,7 @@ import {
  * @returns The data from the response
  */
 function handleResponse<T>(
-    res: { data?: T; error?: any; response: Response },
+    res: { data?: T; error?: unknown; response: Response },
     operation: string,
 ): T {
     if (res.error || isUnauthorizedStatus(res.response.status)) {
@@ -51,26 +74,6 @@ function handleResponse<T>(
         );
     }
     return res.data as T;
-}
-
-/**
- * Extract operation name from API path for error messages
- */
-function getOperationName(path: string, method: string): string {
-    // Remove leading slash and convert to readable format
-    const cleanPath = path.replace(/^\//, "").replace(/\//g, " ");
-    // Convert method to verb
-    const verb =
-        method === "GET"
-            ? "fetch"
-            : method === "POST"
-              ? "create"
-              : method === "PATCH"
-                ? "update"
-                : method === "DELETE"
-                  ? "delete"
-                  : method.toLowerCase();
-    return `${verb} ${cleanPath}`;
 }
 
 export type ApiCallResult<T = unknown> = {
@@ -114,38 +117,51 @@ export async function apiInvokeAllowEmpty<T = unknown>(
     });
 }
 
-async function apiGet<T = any>(path: string, options?: any): Promise<T> {
+async function invokeGet<T>(
+    call: () => Promise<ApiCallResult<T>>,
+    operation: string,
+): Promise<T> {
     return withAuthRetry(async () => {
-        const res = await api.GET(path as any, options);
-        return handleResponse<T>(res, getOperationName(path, "GET"));
+        const res = await call();
+        return handleResponse<T>(res, operation);
     });
 }
 
-async function apiPost<T = any>(path: string, options?: any): Promise<T> {
+async function invokePost<T>(
+    call: () => Promise<ApiCallResult<T>>,
+    operation: string,
+): Promise<T> {
     return withAuthRetry(async () => {
-        const res = await api.POST(path as any, options);
-        return handleResponse<T>(res, getOperationName(path, "POST"));
+        const res = await call();
+        return handleResponse<T>(res, operation);
     });
 }
 
-async function apiPatch<T = any>(path: string, options?: any): Promise<T> {
+async function invokePatch<T>(
+    call: () => Promise<ApiCallResult<T>>,
+    operation: string,
+): Promise<T> {
     return withAuthRetry(async () => {
-        const res = await api.PATCH(path as any, options);
-        return handleResponse<T>(res, getOperationName(path, "PATCH"));
+        const res = await call();
+        return handleResponse<T>(res, operation);
     });
 }
 
-async function apiDelete(path: string, options?: any): Promise<void> {
+async function invokeDelete(
+    call: () => Promise<ApiCallResult<unknown>>,
+    operation: string,
+): Promise<void> {
     return withAuthRetry(async () => {
-        const res = await api.DELETE(path as any, options);
-        handleResponse(res, getOperationName(path, "DELETE"));
+        const res = await call();
+        handleResponse(res, operation);
     });
 }
 
 // ===== Fetch Functions =====
 
 export async function fetchTags(): Promise<TagGET[]> {
-    const data = ((await apiGet<TagGET[]>("/tags", {})) ?? []) as TagGET[];
+    const data =
+        (await invokeGet(() => api.GET("/tags", {}), "fetch tags")) ?? [];
     ingestTags(data);
     return data;
 }
@@ -153,16 +169,24 @@ export async function fetchTags(): Promise<TagGET[]> {
 export async function fetchFeatures(params?: {
     with_counts?: boolean;
 }): Promise<FeatureGET[]> {
-    const data = ((await apiGet<FeatureGET[]>("/features", {
-        params: { query: params ?? {} } as any,
-    })) ?? []) as FeatureGET[];
+    const data =
+        (await invokeGet(
+            () =>
+                api.GET("/features", {
+                    params: { query: params ?? {} },
+                }),
+            "fetch features",
+        )) ?? [];
     ingestFeatures(data);
     return data;
 }
 
 export async function fetchFormSchemas(): Promise<FormSchemaGET[]> {
-    const data = ((await apiGet<FormSchemaGET[]>("/form-schemas", {})) ??
-        []) as FormSchemaGET[];
+    const data =
+        (await invokeGet(
+            () => api.GET("/form-schemas", {}),
+            "fetch form-schemas",
+        )) ?? [];
     ingestFormSchemas(data);
     return data;
 }
@@ -181,15 +205,19 @@ export async function fetchInstance(
         with_tag_metadata: true,
     },
 ): Promise<ImageGET> {
-    const instance = (await apiGet<ImageGET>("/images/{image_id}" as any, {
-        params: {
-            path: { image_id: id },
-            query: {
-                with_tag_metadata: true,
-                ...options,
-            },
-        } as any,
-    })) as any;
+    const instance = await invokeGet(
+        () =>
+            api.GET("/images/{image_id}", {
+                params: {
+                    path: { image_id: id },
+                    query: {
+                        with_tag_metadata: true,
+                        ...options,
+                    },
+                },
+            }),
+        "fetch images image_id",
+    );
 
     // Ingest the instance
     ingestInstances([instance]);
@@ -209,9 +237,14 @@ export async function fetchInstance(
 }
 
 export async function fetchStudy(id: number): Promise<StudyGET> {
-    const study = await apiGet<StudyGET>("/studies/{study_id}" as any, {
-        params: { path: { study_id: id } } as any,
-    });
+    const response = await fetchApi(`/studies/${id}`, { method: "GET" });
+    if (!response.ok) {
+        throw new ApiError(
+            response.status,
+            `Failed to fetch studies study_id: ${response.status}`,
+        );
+    }
+    const study = (await response.json()) as StudyGET;
     // This will auto-ingest embedded series
     ingestStudies([study]);
     return study;
@@ -221,16 +254,17 @@ export async function fetchPatient(
     id: number,
     options: { include_attributes?: boolean } = { include_attributes: true },
 ): Promise<PatientDetailGET> {
-    const patient = await apiGet<PatientDetailGET>(
-        "/patients/{patient_id}" as any,
-        {
-            params: {
-                path: { patient_id: id },
-                query: {
-                    include_attributes: options.include_attributes ?? true,
+    const patient = await invokeGet(
+        () =>
+            api.GET("/patients/{patient_id}", {
+                params: {
+                    path: { patient_id: id },
+                    query: {
+                        include_attributes: options.include_attributes ?? true,
+                    },
                 },
-            } as any,
-        },
+            }),
+        "fetch patients patient_id",
     );
     ingestPatients([patient]);
     return patient;
@@ -238,8 +272,13 @@ export async function fetchPatient(
 
 // ===== Search Functions =====
 
-export async function searchInstances(query: any): Promise<any> {
-    const data = await apiPost<any>("/instances/search", { body: query });
+export async function searchInstances(
+    query: SearchQuery,
+): Promise<SearchResponse> {
+    const data = await invokePost(
+        () => api.POST("/instances/search", { body: query }),
+        "create instances search",
+    );
 
     // Ingest studies first (which ingests embedded series)
     if (data.studies) {
@@ -254,8 +293,13 @@ export async function searchInstances(query: any): Promise<any> {
     return data;
 }
 
-export async function searchStudies(query: any): Promise<any> {
-    const data = await apiPost<any>("/studies/search", { body: query });
+export async function searchStudies(
+    query: StudySearchQuery,
+): Promise<StudySearchResponse> {
+    const data = await invokePost(
+        () => api.POST("/studies/search", { body: query }),
+        "create studies search",
+    );
 
     // Ingest studies (which ingests embedded series)
     if (data.studies) {
@@ -271,20 +315,30 @@ export async function searchStudies(query: any): Promise<any> {
 
 // ===== Signature Functions =====
 
-export async function getInstancesSignature(): Promise<any[]> {
-    return (await apiGet<any[]>("/instances/search/signature", {})) ?? [];
+export async function getInstancesSignature(): Promise<SignatureField[]> {
+    return (
+        (await invokeGet(
+            () => api.GET("/instances/search/signature", {}),
+            "fetch instances search signature",
+        )) ?? []
+    );
 }
 
-export async function getStudiesSignature(): Promise<any[]> {
-    return (await apiGet<any[]>("/studies/search/signature", {})) ?? [];
+export async function getStudiesSignature(): Promise<SignatureField[]> {
+    return (
+        (await invokeGet(
+            () => api.GET("/studies/search/signature", {}),
+            "fetch studies search signature",
+        )) ?? []
+    );
 }
 
 // ===== Segmentation Creation (specialized) =====
 
 export async function createSegmentation(
-    item: any,
-    np_array?: any,
-): Promise<any> {
+    item: SegmentationPOST,
+    np_array?: NPYArray,
+): Promise<SegmentationGET> {
     const formData = new FormData();
     formData.append("metadata", JSON.stringify(item));
 
@@ -296,12 +350,17 @@ export async function createSegmentation(
         );
     }
 
-    const data = await apiPost<any>(
-        "/segmentations" as any,
-        {
-            body: formData,
-        } as any,
-    );
+    const response = await fetchApi("/segmentations", {
+        method: "POST",
+        body: formData,
+    });
+    if (!response.ok) {
+        throw new ApiError(
+            response.status,
+            `Failed to create segmentations: ${response.status}`,
+        );
+    }
+    const data = (await response.json()) as SegmentationGET;
 
     ingestSegmentations([data]);
 
@@ -320,15 +379,15 @@ export type CreateSegmentationOptions = {
 };
 
 export async function createSegmentationFrom(
-    image: any, // AbstractImage type
+    image: AbstractImage,
     feature_id: number,
-    data_representation: any,
-    data_type: any,
+    data_representation: SegmentationDataRepresentation,
+    data_type: SegmentationDataType,
     threshold?: number,
     sparse_axis?: number,
     subtask_id?: number,
     options?: CreateSegmentationOptions,
-): Promise<any> {
+): Promise<SegmentationGET> {
     const instance = image.instance;
     const scan_indices = image.is3D ? [] : null;
     let shape: CreateSegmentationShape = options?.shape ?? {
@@ -346,29 +405,35 @@ export async function createSegmentationFrom(
         };
     }
 
-    const item = {
+    const item: SegmentationCreateMetadata = {
         image_id: instance.id,
         ...shape,
-        sparse_axis,
+        sparse_axis: sparse_axis ?? null,
         image_projection_matrix: options?.image_projection_matrix ?? null,
         scan_indices,
         data_representation,
         data_type,
-        threshold,
+        threshold: threshold ?? null,
         reference_segmentation_id: null,
-        feature_id: feature_id,
+        feature_id,
         subtask_id: subtask_id ?? null,
     };
 
-    return createSegmentation(item);
+    return createSegmentation(item as SegmentationPOST);
 }
 
 // ===== Form Annotations Functions =====
 
-export async function fetchFormAnnotation(id: number): Promise<any> {
-    const data = await apiGet<any>("/form-annotations/{annotation_id}" as any, {
-        params: { path: { annotation_id: id } } as any,
-    });
+export async function fetchFormAnnotation(
+    id: number,
+): Promise<FormAnnotationGET> {
+    const data = await invokeGet(
+        () =>
+            api.GET("/form-annotations/{annotation_id}", {
+                params: { path: { annotation_id: id } },
+            }),
+        "fetch form-annotations annotation_id",
+    );
     ingestFormAnnotations([data]);
     return data;
 }
@@ -379,96 +444,121 @@ export async function fetchFormAnnotations(filters?: {
     image_id?: string;
     form_schema_id?: number;
     sub_task_id?: number;
-}): Promise<any[]> {
-    const data = ((await apiGet<any[]>("/form-annotations", {
-        params: { query: filters ?? {} },
-    })) ?? []) as any[];
+}): Promise<FormAnnotationGET[]> {
+    const data =
+        (await invokeGet(
+            () =>
+                api.GET("/form-annotations", {
+                    params: { query: filters ?? {} },
+                }),
+            "fetch form-annotations",
+        )) ?? [];
     ingestFormAnnotations(data);
     return data;
 }
 
-export async function createFormAnnotation(data: {
-    form_schema_id: number;
-    patient_id: number;
-    study_id?: number;
-    image_id?: string;
-    laterality?: "L" | "R" | null;
-    sub_task_id?: number;
-    form_data: any;
-    form_annotation_reference_id?: number;
-}): Promise<any> {
-    const result = await apiPost<any>("/form-annotations", {
-        body: data as any,
-    });
+export async function createFormAnnotation(
+    data: FormAnnotationPUT,
+): Promise<FormAnnotationGET> {
+    const result = await invokePost(
+        () => api.POST("/form-annotations", { body: data }),
+        "create form-annotations",
+    );
     ingestFormAnnotations([result]);
     return result;
 }
 
 export async function deleteFormAnnotation(id: number): Promise<void> {
-    await apiDelete("/form-annotations/{annotation_id}" as any, {
-        params: { path: { annotation_id: id } } as any,
-    });
+    await invokeDelete(
+        () =>
+            api.DELETE("/form-annotations/{annotation_id}", {
+                params: { path: { annotation_id: id } },
+            }),
+        "delete form-annotations annotation_id",
+    );
     formAnnotations.delete(id);
 }
 
 // ===== Segmentation Functions =====
 
-export async function fetchSegmentation(id: number): Promise<any> {
-    const data = await apiGet<any>("/segmentations/{segmentation_id}" as any, {
-        params: { path: { segmentation_id: id } } as any,
-    });
+export async function fetchSegmentation(id: number): Promise<SegmentationGET> {
+    const data = await invokeGet(
+        () =>
+            api.GET("/segmentations/{segmentation_id}", {
+                params: { path: { segmentation_id: id } },
+            }),
+        "fetch segmentations segmentation_id",
+    );
     ingestSegmentations([data]);
     return data;
 }
 
 export async function updateSegmentation(
     id: number,
-    data: { threshold?: number; reference_segmentation_id?: number | null },
-): Promise<any> {
-    const result = await apiPatch<any>(
-        "/segmentations/{segmentation_id}" as any,
-        {
-            params: { path: { segmentation_id: id } } as any,
-            body: data as any,
-        },
+    data: SegmentationPATCH,
+): Promise<SegmentationGET> {
+    const result = await invokePatch(
+        () =>
+            api.PATCH("/segmentations/{segmentation_id}", {
+                params: { path: { segmentation_id: id } },
+                body: data,
+            }),
+        "update segmentations segmentation_id",
     );
     ingestSegmentations([result]);
     return result;
 }
 
 export async function deleteSegmentation(id: number): Promise<void> {
-    await apiDelete("/segmentations/{segmentation_id}" as any, {
-        params: { path: { segmentation_id: id } } as any,
-    });
+    await invokeDelete(
+        () =>
+            api.DELETE("/segmentations/{segmentation_id}", {
+                params: { path: { segmentation_id: id } },
+            }),
+        "delete segmentations segmentation_id",
+    );
     segmentations.delete(id);
 }
 
 // ===== Tag Star/Unstar =====
 
 export async function starTag(tagId: number): Promise<void> {
-    await apiPost("/tags/{tag_id}/star" as any, {
-        params: { path: { tag_id: tagId } } as any,
-    });
+    await invokePost(
+        () =>
+            api.POST("/tags/{tag_id}/star", {
+                params: { path: { tag_id: tagId } },
+            }),
+        "create tags tag_id star",
+    );
 }
 
 export async function unstarTag(tagId: number): Promise<void> {
-    await apiDelete("/tags/{tag_id}/star" as any, {
-        params: { path: { tag_id: tagId } } as any,
-    });
+    await invokeDelete(
+        () =>
+            api.DELETE("/tags/{tag_id}/star", {
+                params: { path: { tag_id: tagId } },
+            }),
+        "delete tags tag_id star",
+    );
 }
 
 // ===== Task Functions =====
 
 export async function fetchTasks(): Promise<TaskGET[]> {
-    const data = ((await apiGet<TaskGET[]>("/task", {})) ?? []) as TaskGET[];
+    const data =
+        (await invokeGet(() => api.GET("/task", {}), "fetch task")) ?? [];
     ingestTasks(data);
     return data;
 }
 
 export async function fetchTask(id: number): Promise<TaskGET> {
-    const task = await apiGet<TaskGET>("/task/{task_id}" as any, {
-        params: { path: { task_id: id } } as any,
-    });
+    const task = await invokeGet(
+        () =>
+            api.GET("/task/{task_id}", {
+                params: { path: { task_id: id } },
+            }),
+        "fetch task task_id",
+    );
     ingestTasks([task]);
     return task;
 }
@@ -478,21 +568,25 @@ export async function fetchSubTasks(params: {
     with_images?: boolean;
     limit?: number;
     page?: number;
-    subtask_status?: string;
-}): Promise<any> {
-    const data = await apiGet<any>("/task/{task_id}/subtasks" as any, {
-        params: {
-            path: { task_id: params.task_id },
-            query: {
-                with_images: params.with_images ?? true,
-                limit: params.limit ?? 20,
-                page: params.page ?? 0,
-                subtask_status: params.subtask_status,
-            },
-        } as any,
-    });
-    if (data.subtasks) {
-        ingestSubTasks(data.subtasks);
+    subtask_status?: SubTaskState;
+}): Promise<SubTasksWithImagesResponse | SubTasksResponse> {
+    const data = await invokeGet(
+        () =>
+            api.GET("/task/{task_id}/subtasks", {
+                params: {
+                    path: { task_id: params.task_id },
+                    query: {
+                        with_images: params.with_images ?? true,
+                        limit: params.limit ?? 20,
+                        page: params.page ?? 0,
+                        subtask_status: params.subtask_status,
+                    },
+                },
+            }),
+        "fetch task task_id subtasks",
+    );
+    if ("subtasks" in data && data.subtasks) {
+        ingestSubTasks(data.subtasks as SubTaskWithImagesGET[]);
     }
     return data;
 }
@@ -501,21 +595,31 @@ export async function fetchSubTasks(params: {
 
 export async function updateSubTask(
     subtask_id: number,
-    patch: { task_state?: any; comments?: string | null },
-): Promise<any> {
-    const data = await apiPatch<any>("/subtasks/{subtaskid}" as any, {
-        params: { path: { subtaskid: Number(subtask_id) } } as any,
-        body: patch as any,
-    });
-    ingestSubTasks([data]);
+    patch: SubTaskPATCH,
+): Promise<SubTaskGET> {
+    const data = await invokePatch(
+        () =>
+            api.PATCH("/subtasks/{subtaskid}", {
+                params: { path: { subtaskid: Number(subtask_id) } },
+                body: patch,
+            }),
+        "update subtasks subtaskid",
+    );
+    ingestSubTasks([data as SubTaskWithImagesGET]);
     return data;
 }
 
-export async function fetchSubTask(subtask_id: number): Promise<any> {
-    const data = await apiGet<any>("/subtasks/{subtaskid}" as any, {
-        params: { path: { subtaskid: Number(subtask_id) } } as any,
-    });
-    ingestSubTasks([data]);
+export async function fetchSubTask(
+    subtask_id: number,
+): Promise<SubTaskWithImagesGET | SubTaskGET> {
+    const data = await invokeGet(
+        () =>
+            api.GET("/subtasks/{subtaskid}", {
+                params: { path: { subtaskid: Number(subtask_id) } },
+            }),
+        "fetch subtasks subtaskid",
+    );
+    ingestSubTasks([data as SubTaskWithImagesGET]);
     return data;
 }
 
@@ -526,22 +630,23 @@ export async function fetchSubTaskByIndex(
         with_images?: boolean;
         with_next?: boolean;
     },
-): Promise<SubTaskWithImagesGET> {
-    const data = await apiGet<SubTaskWithImagesGET>(
-        "/task/{task_id}/subtask/{subtask_index}" as any,
-        {
-            params: {
-                path: {
-                    task_id: Number(task_id),
-                    subtask_index: Number(subtask_index),
+): Promise<SubTaskWithImagesGET | SubTaskGET> {
+    const data = await invokeGet(
+        () =>
+            api.GET("/task/{task_id}/subtask/{subtask_index}", {
+                params: {
+                    path: {
+                        task_id: Number(task_id),
+                        subtask_index: Number(subtask_index),
+                    },
+                    query: {
+                        with_images: options?.with_images ?? false,
+                        with_next: options?.with_next ?? false,
+                    },
                 },
-                query: {
-                    with_images: options?.with_images ?? false,
-                    with_next: options?.with_next ?? false,
-                },
-            } as any,
-        },
+            }),
+        "fetch task task_id subtask subtask_index",
     );
-    ingestSubTasks([data]);
+    ingestSubTasks([data as SubTaskWithImagesGET]);
     return data;
 }

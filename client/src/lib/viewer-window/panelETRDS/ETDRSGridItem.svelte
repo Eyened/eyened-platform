@@ -3,6 +3,7 @@
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { Position2D } from "$lib/types";
+    import type { EtdrsFormData } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
     import { Edit, Hide, PanelIcon, Show, Trash } from "../icons/icons";
@@ -35,11 +36,12 @@
 
     const sameSubTask = formAnnotation.sub_task_id === subTask?.id;
 
-    const fovea: Position2D | undefined = $derived(
-        (formAnnotation.form_data as any)?.fovea as Position2D | undefined,
+    const etdrsFormData = $derived(
+        formAnnotation.form_data as EtdrsFormData | null | undefined,
     );
+    const fovea: Position2D | undefined = $derived(etdrsFormData?.fovea);
     const disc_edge: Position2D | undefined = $derived(
-        (formAnnotation.form_data as any)?.disc_edge as Position2D | undefined,
+        etdrsFormData?.disc_edge,
     );
 
     const canEditForm = globalContext.canEdit(formAnnotation);

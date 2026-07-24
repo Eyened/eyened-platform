@@ -124,7 +124,7 @@
 
     function openCommentDialog(t: TagMeta) {
         activeTagId = t.id;
-        commentText = (t as any).comment ?? "";
+        commentText = t.comment ?? "";
         commentDialogOpen = true;
     }
 
@@ -200,7 +200,7 @@
                     <CommandList>
                         <CommandEmpty>No tags found.</CommandEmpty>
                         <CommandGroup>
-                            {#each dropdownTags as tag}
+                            {#each dropdownTags as tag (tag.id)}
                                 <CommandItem
                                     value={tag.name}
                                     onSelect={() => {
@@ -220,7 +220,7 @@
 
         <!-- Display tags -->
         <div class="tags-list">
-            {#each itemTags.slice(0, maxTags) as tag}
+            {#each itemTags.slice(0, maxTags) as tag (tag.id)}
                 {@const fullTag = tags.get(tag.id)}
                 <div class="tag" onclick={() => openCommentDialog(tag)}>
                     <Tooltip>
@@ -229,8 +229,8 @@
                             {#if fullTag}
                                 <p>{fullTag.description}</p>
                             {/if}
-                            {#if (tag as any).comment}
-                                <p>“{(tag as any).comment}”</p>
+                            {#if tag.comment}
+                                <p>“{tag.comment}”</p>
                             {/if}
                             <p>
                                 Tagged by {tag.tagger.name}
@@ -254,7 +254,7 @@
                 <div class="tag plus-tag">
                     <span>+{itemTags.length - maxTags}</span>
                     <div class="overlay">
-                        {#each itemTags.slice(maxTags) as tag}
+                        {#each itemTags.slice(maxTags) as tag (tag.id)}
                             <div class="tag overlay-tag">
                                 <span>{tag.name}</span>
                             </div>

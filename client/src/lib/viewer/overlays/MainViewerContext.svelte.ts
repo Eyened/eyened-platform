@@ -73,7 +73,7 @@ export class MainViewerContext implements Overlay {
         index: number,
         renderTarget: RenderTarget,
         viewerContext: ViewerContext,
-        uniforms: any,
+        uniforms: ReturnType<typeof getBaseUniforms> & Record<string, unknown>,
     ) {
         const segmentationItem =
             this.segmentationContext.getSegmentationItem(segmentation);

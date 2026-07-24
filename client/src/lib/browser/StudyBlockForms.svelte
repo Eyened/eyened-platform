@@ -48,7 +48,7 @@
 </script>
 
 {#await loading then}
-    {#each formsWithSchemas as { formSchema, split_laterality, title, create_new }}
+    {#each formsWithSchemas as { formSchema, split_laterality, title, create_new } (formSchema.id)}
         <StudyBlockForm
             {study}
             {split_laterality}

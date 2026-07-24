@@ -23,24 +23,24 @@
     let showPicker = $state(false);
 
     // Image ids currently linked to this subtask.
-    const currentImageIds = $derived(
-        ((row as any).images ?? []).map((img: any) => String(img.id)),
-    );
+    const currentImageIds = $derived(row.images.map((img) => String(img.id)));
 
     // Default query: all images for the patients already linked to this subtask.
     const pickerConditions = $derived.by((): Condition[] => {
-        const identifiers = new Set<string>();
-        for (const img of (row as any).images ?? []) {
-            if (img?.patient?.identifier)
-                identifiers.add(img.patient.identifier);
+        const identifiers: string[] = [];
+        for (const img of row.images) {
+            const identifier = img?.patient?.identifier;
+            if (identifier && !identifiers.includes(identifier)) {
+                identifiers.push(identifier);
+            }
         }
-        if (identifiers.size === 0) return [];
+        if (identifiers.length === 0) return [];
         return [
             {
                 type: "default",
                 variable: "Patient Identifier",
                 operator: "IN",
-                value: Array.from(identifiers),
+                value: identifiers,
             } as Condition,
         ];
     });
@@ -99,8 +99,8 @@
     </Table.Cell>
     <Table.Cell>
         <div class="instances flex flex-wrap gap-1">
-            {#if (row as any).images?.length > 0}
-                {#each (row as any).images as img}
+            {#if row.images.length > 0}
+                {#each row.images as img (img.id)}
                     <div class="relative inline-block">
                         <InstanceComponent instance={img} />
                         <button

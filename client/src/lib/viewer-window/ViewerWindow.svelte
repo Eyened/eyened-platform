@@ -87,7 +87,7 @@ Keeps track of the main panels and the top row of images.
     }
 </script>
 
-{#each Array.from(formAnnotations.values()) as formAnnotation}
+{#each Array.from(formAnnotations.values()) as formAnnotation (formAnnotation.id)}
     <RegistrationItemLoader {registration} {formAnnotation} />
 {/each}
 

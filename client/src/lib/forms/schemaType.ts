@@ -1,3 +1,12 @@
+export type JSONSchemaValue =
+    | string
+    | number
+    | boolean
+    | null
+    | JSONSchemaValue[]
+    | { [key: string]: JSONSchemaValue | undefined }
+    | undefined;
+
 export type JSONSchemaType =
     | "string"
     | "number"
@@ -59,39 +68,49 @@ export type JSONSchema = {
 };
 
 export function resolveRefs(
-    schema: JSONSchema,
-    rootSchema: JSONSchema = schema,
+    schema: unknown,
+    rootSchema: JSONSchema = schema as JSONSchema,
 ): JSONSchema {
     // Preserve arrays: resolve recursively without converting them into objects
-    if (Array.isArray(schema as any)) {
-        return (schema as unknown[]).map((item) =>
-            resolveRefs(item as any, rootSchema),
+    if (Array.isArray(schema)) {
+        return schema.map((item) =>
+            resolveRefs(item, rootSchema),
         ) as unknown as JSONSchema;
     }
 
     if (schema !== null && typeof schema === "object") {
-        let base: any = {};
+        const schemaRecord = schema as Record<string, unknown>;
+        let base: Record<string, unknown> = {};
 
         // If $ref is present, resolve it first so that local keys override the referenced schema
-        if ((schema as any).$ref && typeof (schema as any).$ref === "string") {
-            const ref = (schema as any).$ref as string;
+        const ref = schemaRecord.$ref;
+        if (typeof ref === "string") {
             const parts = ref.split("/");
-            let refSchema: any = rootSchema;
+            let refSchema: unknown = rootSchema;
             for (const part of parts.slice(1)) {
-                if (part) refSchema = refSchema[part];
+                if (
+                    part &&
+                    refSchema !== null &&
+                    typeof refSchema === "object"
+                ) {
+                    refSchema = (refSchema as Record<string, unknown>)[part];
+                }
             }
-            base = resolveRefs(refSchema, rootSchema);
+            base = resolveRefs(refSchema, rootSchema) as unknown as Record<
+                string,
+                unknown
+            >;
         }
 
-        for (const [key, value] of Object.entries(schema as any)) {
+        for (const [key, value] of Object.entries(schemaRecord)) {
             if (key === "$ref") continue;
-            base[key] = resolveRefs(value as any, rootSchema);
+            base[key] = resolveRefs(value, rootSchema);
         }
 
         return base as JSONSchema;
     }
 
-    return schema;
+    return schema as JSONSchema;
 }
 
 export function getDefault(schema: JSONSchema) {
