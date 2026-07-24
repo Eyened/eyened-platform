@@ -10,7 +10,7 @@
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import type { TaskConfig } from "../taskConfigLayout";
+    import { CLIENT_DEFAULTS, mergeClientConfig } from "../taskConfigLayout";
     import { findFormAnnotation } from "../panelForm/findFormAnnotation";
     import {
         buildFormAnnotationCreatePayload,
@@ -28,8 +28,10 @@
     const taskContext = getContext<TaskContext>("taskContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
-    const taskConfig = taskContext?.task.task_definition
-        .config as TaskConfig | undefined;
+    const taskConfig = mergeClientConfig(
+        CLIENT_DEFAULTS,
+        taskContext?.task.task_definition.config,
+    );
     const instance = viewerContext.image.instance;
 
     const schema = $derived.by(() => {
@@ -46,7 +48,7 @@
     });
 
     const entityScope = $derived.by(() =>
-        resolveFormEntityScope(taskConfig, schema?.entity_type),
+        resolveFormEntityScope(schema?.entity_type),
     );
 
     const annotation = $derived.by(() => {
@@ -57,7 +59,6 @@
             userId: globalContext.user.id,
             ctx: formContext,
             subTaskId: taskContext?.subTask?.id,
-            taskConfig,
             schemaEntityType: schema.entity_type,
         });
     });

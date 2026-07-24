@@ -16,7 +16,7 @@
     import { Close } from "./icons/icons";
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
     import { resolvePanels } from "./resolvePanels";
-    import type { TaskConfig } from "./taskConfigLayout";
+    import { CLIENT_DEFAULTS, mergeClientConfig } from "./taskConfigLayout";
     interface Props {
         image: AbstractImage;
     }
@@ -92,9 +92,10 @@
             BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
     )!;
 
-    const taskConfig = taskContext?.task.task_definition.config as
-        | TaskConfig
-        | undefined;
+    const taskConfig = mergeClientConfig(
+        CLIENT_DEFAULTS,
+        taskContext?.task.task_definition.config,
+    );
 
     const { panels, expandedPanelNames } = resolvePanels(
         {

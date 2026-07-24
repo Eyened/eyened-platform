@@ -15,23 +15,13 @@ const annotation = {
 } as FormAnnotationGET;
 
 describe("resolveFormEntityScope", () => {
-    it("prefers form_entity_scope over legacy form_image_scope", () => {
-        expect(
-            resolveFormEntityScope(
-                { form_entity_scope: "StudyEye", form_image_scope: true },
-                "ImageInstance",
-            ),
-        ).toBe("StudyEye");
+    it("uses schema entity type", () => {
+        expect(resolveFormEntityScope("StudyEye")).toBe("StudyEye");
     });
 
-    it("maps legacy form_image_scope true to ImageInstance", () => {
-        expect(
-            resolveFormEntityScope({ form_image_scope: true }, "StudyEye"),
-        ).toBe("ImageInstance");
-    });
-
-    it("falls back to schema entity type", () => {
-        expect(resolveFormEntityScope({}, "StudyEye")).toBe("StudyEye");
+    it("falls back to ImageInstance when schema type missing", () => {
+        expect(resolveFormEntityScope(undefined)).toBe("ImageInstance");
+        expect(resolveFormEntityScope(null)).toBe("ImageInstance");
     });
 });
 

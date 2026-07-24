@@ -6,7 +6,6 @@ import {
     type FormAnnotationContext,
     matchesFormEntityScope,
     resolveFormEntityScope,
-    type TaskFormScopeConfig,
 } from "./formEntityScope";
 
 export type FindFormAnnotationParams = {
@@ -15,17 +14,13 @@ export type FindFormAnnotationParams = {
     userId: number;
     ctx: FormAnnotationContext;
     subTaskId?: number;
-    taskConfig?: TaskFormScopeConfig;
     schemaEntityType: FormSchemaGET["entity_type"];
 };
 
 export function findFormAnnotation(
     params: FindFormAnnotationParams,
 ): FormAnnotationGET | undefined {
-    const scope = resolveFormEntityScope(
-        params.taskConfig,
-        params.schemaEntityType,
-    );
+    const scope = resolveFormEntityScope(params.schemaEntityType);
 
     const matches = params.annotations.filter((annotation) => {
         if (annotation.form_schema_id !== params.schemaId) return false;

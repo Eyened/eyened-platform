@@ -39,7 +39,6 @@ describe("findFormAnnotation", () => {
             schemaId: 10,
             userId: 5,
             ctx,
-            taskConfig: { form_entity_scope: "ImageInstance" },
             schemaEntityType: "ImageInstance",
         });
 
@@ -52,14 +51,13 @@ describe("findFormAnnotation", () => {
             schemaId: 10,
             userId: 5,
             ctx: { ...ctx, imageId: "missing" },
-            taskConfig: { form_entity_scope: "ImageInstance" },
             schemaEntityType: "ImageInstance",
         });
 
         expect(result).toBeUndefined();
     });
 
-    it("matches StudyEye when form_entity_scope is StudyEye", () => {
+    it("matches StudyEye when schema entity type is StudyEye", () => {
         const annotations = [
             {
                 ...baseAnnotation,
@@ -74,28 +72,10 @@ describe("findFormAnnotation", () => {
             schemaId: 10,
             userId: 5,
             ctx,
-            taskConfig: { form_entity_scope: "StudyEye" },
             schemaEntityType: "StudyEye",
         });
 
         expect(result?.id).toBe(3);
-    });
-
-    it("supports legacy form_image_scope true", () => {
-        const annotations = [
-            { ...baseAnnotation, id: 1, image_id: "img-200" },
-        ] as FormAnnotationGET[];
-
-        const result = findFormAnnotation({
-            annotations,
-            schemaId: 10,
-            userId: 5,
-            ctx,
-            taskConfig: { form_image_scope: true },
-            schemaEntityType: "StudyEye",
-        });
-
-        expect(result?.id).toBe(1);
     });
 
     it("returns highest id when multiple match (defensive)", () => {
@@ -109,7 +89,6 @@ describe("findFormAnnotation", () => {
             schemaId: 10,
             userId: 5,
             ctx,
-            taskConfig: { form_entity_scope: "ImageInstance" },
             schemaEntityType: "ImageInstance",
         });
 

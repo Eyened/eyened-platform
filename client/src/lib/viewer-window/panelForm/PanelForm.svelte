@@ -22,6 +22,7 @@
         matchesFormEntityScope,
         resolveFormEntityScope,
     } from "./formEntityScope";
+    import { CLIENT_DEFAULTS, mergeClientConfig } from "../taskConfigLayout";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -38,7 +39,10 @@
 
     let selectedSchema: FormSchemaGET | undefined = $state();
 
-    const taskConfig = taskContext?.task.task_definition.config;
+    const taskConfig = mergeClientConfig(
+        CLIENT_DEFAULTS,
+        taskContext?.task.task_definition.config,
+    );
 
     const formContext = $derived({
         patientId: instance.patient.id,
@@ -58,30 +62,8 @@
             const schema = formSchemas.get(annotation.form_schema_id);
             if (!schema) return false;
 
-            if (
-                taskConfig?.form_entity_scope !== undefined ||
-                taskConfig?.form_image_scope !== undefined
-            ) {
-                const scope = resolveFormEntityScope(
-                    taskConfig,
-                    schema.entity_type,
-                );
-                return matchesFormEntityScope(
-                    annotation,
-                    scope,
-                    formContext,
-                );
-            }
-
-            if (schema.entity_type == "StudyEye") {
-                return (
-                    annotation.study_id == instance.study?.id &&
-                    annotation.laterality == instance.laterality
-                );
-            }
-
-            //TODO: check for other entity types
-            return annotation.image_id == instance.id;
+            const scope = resolveFormEntityScope(schema.entity_type);
+            return matchesFormEntityScope(annotation, scope, formContext);
         },
     ];
     if (taskConfig?.form_schema_name) {
@@ -113,7 +95,7 @@
 
     async function addFormWithSchema(schema: FormSchemaGET | undefined) {
         if (!schema) return;
-        const scope = resolveFormEntityScope(taskConfig, schema.entity_type);
+        const scope = resolveFormEntityScope(schema.entity_type);
         await createFormAnnotation(
             buildFormAnnotationCreatePayload({
                 formSchemaId: schema.id,

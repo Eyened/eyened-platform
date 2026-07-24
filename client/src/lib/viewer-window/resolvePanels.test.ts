@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import type { TaskConfig } from "./taskConfigLayout";
+import {
+    CLIENT_DEFAULTS,
+    mergeClientConfig,
+    type TaskConfig,
+} from "./taskConfigLayout";
 
 vi.mock("./panelInfo/panelInfo.svelte", () => ({ default: {} }));
 vi.mock("./panelRendering/PanelRendering.svelte", () => ({ default: {} }));
@@ -36,7 +40,10 @@ const baseInput = {
 
 describe("resolvePanels", () => {
     it("returns default panels when taskConfig has no layout", () => {
-        const { panels, expandedPanelNames } = resolvePanels(baseInput, {});
+        const { panels, expandedPanelNames } = resolvePanels(
+            baseInput,
+            CLIENT_DEFAULTS,
+        );
         expect(panels.map((p) => p.name)).toEqual([
             "Info",
             "Rendering",
@@ -48,15 +55,15 @@ describe("resolvePanels", () => {
     });
 
     it("hides panels listed in layout.hide", () => {
-        const taskConfig: TaskConfig = {
+        const taskConfig: TaskConfig = mergeClientConfig(CLIENT_DEFAULTS, {
             layout: { hide: ["Form"] },
-        };
+        });
         const { panels } = resolvePanels(baseInput, taskConfig);
         expect(panels.map((p) => p.name)).not.toContain("Form");
     });
 
     it("prepends quick-form panel and marks it expanded", () => {
-        const taskConfig: TaskConfig = {
+        const taskConfig: TaskConfig = mergeClientConfig(CLIENT_DEFAULTS, {
             form_schema_name: "Naevi grading",
             layout: {
                 hide: ["Form"],
@@ -64,7 +71,7 @@ describe("resolvePanels", () => {
                     { type: "quick-form", title: "Grading", expanded: true },
                 ],
             },
-        };
+        });
         const { panels, expandedPanelNames } = resolvePanels(
             baseInput,
             taskConfig,
@@ -77,7 +84,9 @@ describe("resolvePanels", () => {
     it("skips unknown prepend types with a console warning", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const taskConfig = {
+            ...CLIENT_DEFAULTS,
             layout: {
+                hide: [],
                 prepend: [{ type: "unknown", title: "X" }],
             },
         } as unknown as TaskConfig;

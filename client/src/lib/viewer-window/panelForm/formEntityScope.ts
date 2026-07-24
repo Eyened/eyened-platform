@@ -12,22 +12,9 @@ export type FormAnnotationContext = {
     laterality?: FormAnnotationGET["laterality"];
 };
 
-export type TaskFormScopeConfig = {
-    form_entity_scope?: FormEntityScope;
-    /** @deprecated Use `form_entity_scope: "ImageInstance"` instead. */
-    form_image_scope?: boolean;
-};
-
 export function resolveFormEntityScope(
-    taskConfig: TaskFormScopeConfig | undefined,
-    schemaEntityType: FormSchemaGET["entity_type"],
+    schemaEntityType: FormSchemaGET["entity_type"] | null | undefined,
 ): FormEntityScope {
-    if (taskConfig?.form_entity_scope) {
-        return taskConfig.form_entity_scope;
-    }
-    if (taskConfig?.form_image_scope === true) {
-        return "ImageInstance";
-    }
     return schemaEntityType ?? "ImageInstance";
 }
 
