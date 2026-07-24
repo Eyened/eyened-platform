@@ -37,7 +37,14 @@ def client(session):
     from server.routes.auth import CurrentUser, get_current_user
 
     def _get_db():
-        yield session
+        # Mirror production get_db so HTTP tests exercise the real commit/rollback
+        # boundary once services stop committing (design §4).
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
 
     # A CurrentUser with no backing Creator row: search never calls get_creator(),
     # and seeding one would pollute /instances/search/signature's creator list.
