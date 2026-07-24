@@ -32,7 +32,6 @@ export type PanelName = BuiltinPanelName | (string & {});
 export type ToolName =
     | "brush"
     | "polygon"
-    | "registration"
     | "AV nicking tool"
     | "point";
 

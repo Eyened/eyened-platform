@@ -1,18 +1,22 @@
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button";
     import {
         createFormAnnotation,
         deleteFormAnnotation,
         formAnnotations,
         instances,
+        setFormAnnotationValue,
     } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { pointArming } from "$lib/forms/pointArming.svelte";
+    import { analyzePointSchema } from "$lib/forms/pointSchema";
+    import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { RegistrationTool } from "$lib/viewer/tools/Registration";
+    import { PointTool } from "$lib/viewer/tools/PointTool";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { FormSchemaGET } from "../../../types/openapi_types";
     import RegistrationItem from "./RegistrationItem.svelte";
-    import { Button } from "$lib/components/ui/button";
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
@@ -28,7 +32,6 @@
         image: { instance },
     } = viewerContext;
 
-    //filter all registrations for the same eye
     const filtered = $derived(
         formAnnotations
             .filter((formAnnotation) => {
@@ -53,6 +56,15 @@
             .sort((a, b) => a.id - b.id),
     );
 
+    function registrationAnalysis() {
+        const root: JSONSchema = {
+            ...(registrationSchema.schema as JSONSchema),
+            "x-eyened-widget": "point",
+            "x-eyened-point-mode": "registration",
+        };
+        return analyzePointSchema(root, "Eye")!;
+    }
+
     async function create() {
         const formAnnotation = await createFormAnnotation({
             form_schema_id: registrationSchema.id,
@@ -67,49 +79,62 @@
     }
 
     let activeID: number | undefined = $state(undefined);
-    let removeTool: (() => void) | undefined = $state(undefined);
 
     function onactivate(formAnnotation: any) {
-        // Check if this annotation still exists in the filtered list
         const stillExists = filtered.some((f) => f.id === formAnnotation.id);
         if (!stillExists) {
             console.log("Annotation no longer exists, ignoring onactivate");
             return;
         }
 
+        const key = `registration:${formAnnotation.id}`;
+
         if (activeID === formAnnotation.id) {
-            // deactivate current
-            removeTool?.();
-            removeTool = undefined;
+            pointArming.disarm(key);
             activeID = undefined;
             return;
         }
 
         const canEdit = globalContext.canEdit(formAnnotation);
-        const tool = new RegistrationTool(
-            formAnnotation,
-            viewerContext.image.instance,
-            canEdit,
-        );
-        activeID = formAnnotation.id;
-        // switch to new one
-        removeTool?.();
-        removeTool = viewerContext.addOverlay(tool);
+        const analysis = registrationAnalysis();
+
+        pointArming.arm(key, () => {
+            activeID = formAnnotation.id;
+            const dispose = viewerContext.addOverlay(
+                new PointTool({
+                    canEdit,
+                    analysis,
+                    label: "registration",
+                    getPublicId: () => viewerContext.image.instance.id,
+                    getFieldValue: () => formAnnotation.form_data,
+                    setFieldValue: (next) => {
+                        formAnnotation.form_data = next as any;
+                        setFormAnnotationValue(formAnnotation.id, next);
+                    },
+                }),
+            );
+            return () => {
+                dispose();
+                if (activeID === formAnnotation.id) {
+                    activeID = undefined;
+                }
+            };
+        });
     }
 
     function onremove(formAnnotation: any) {
         if (activeID === formAnnotation.id) {
-            removeTool?.();
-            removeTool = undefined;
+            pointArming.disarm(`registration:${formAnnotation.id}`);
             activeID = undefined;
         }
         deleteFormAnnotation(formAnnotation.id);
     }
     $effect(() => {
         if (!panelActive) {
+            if (activeID !== undefined) {
+                pointArming.disarm(`registration:${activeID}`);
+            }
             activeID = undefined;
-            removeTool?.();
-            removeTool = undefined;
         }
     });
 </script>
