@@ -56,6 +56,10 @@ export type JSONSchema = {
     examples?: readonly unknown[];
     nullable?: boolean;
     _order?: readonly string[];
+    /** Eyened UI widget hint (ignored by jsonschema validators). */
+    "x-eyened-widget"?: "point" | (string & {});
+    /** Optional point-tool mode (e.g. registration null-slots). */
+    "x-eyened-point-mode"?: "registration" | (string & {});
 };
 
 export function resolveRefs(
