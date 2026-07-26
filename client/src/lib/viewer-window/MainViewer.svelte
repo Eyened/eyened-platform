@@ -17,6 +17,8 @@
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
     import { resolvePanels } from "./resolvePanels";
     import { CLIENT_DEFAULTS, mergeClientConfig } from "./taskConfigLayout";
+    import { pointArming } from "$lib/forms/pointArming.svelte";
+    import { PointTool } from "$lib/viewer/tools/PointTool";
     interface Props {
         image: AbstractImage;
     }
@@ -110,6 +112,32 @@
         for (const name of expandedPanelNames) {
             activePanels.add(name);
         }
+    });
+
+    // Form PointField bridge: each MainViewer hosts its own PointTool while a
+    // form field is armed. Tool lifecycle follows this panel (add/replace/close).
+    $effect(() => {
+        const armed = pointArming.armed;
+        if (!armed || armed.kind !== "form") return;
+        const target = armed;
+
+        const tool = new PointTool({
+            canEdit: target.canEdit,
+            analysis: target.analysis,
+            label: target.label,
+            pointStyle: target.pointStyle,
+            radius: target.radius,
+            color: target.color,
+            host: viewerContext,
+            getPublicId: () => viewerContext.image.instance.id,
+            getFieldValue: () => target.getFieldValue(),
+            setFieldValue: (next) => target.setFieldValue(next),
+        });
+        const remove = viewerContext.addOverlay(tool);
+        return () => {
+            tool.destroy();
+            remove();
+        };
     });
 </script>
 

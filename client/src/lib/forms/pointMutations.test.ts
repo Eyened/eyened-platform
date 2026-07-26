@@ -16,6 +16,24 @@ describe("placePoint", () => {
         ]);
     });
 
+    it("stores optional volume index", () => {
+        expect(
+            placePoint([], { x: 9, y: 9 }, "single", false, { index: 12 }),
+        ).toEqual([{ x: 9, y: 9, index: 12 }]);
+    });
+
+    it("stores null index for enface", () => {
+        expect(
+            placePoint([], { x: 9, y: 9 }, "single", false, { index: null }),
+        ).toEqual([{ x: 9, y: 9, index: null }]);
+    });
+
+    it("omits index when option not provided", () => {
+        expect(placePoint([], { x: 9, y: 9 }, "single", false)).toEqual([
+            { x: 9, y: 9 },
+        ]);
+    });
+
     it("list appends", () => {
         expect(
             placePoint([{ x: 1, y: 1 }], { x: 2, y: 2 }, "list", false),
@@ -53,6 +71,18 @@ describe("deletePointAt", () => {
 });
 
 describe("movePointAt / cycleEnumExtra", () => {
+    it("moves and preserves null index", () => {
+        expect(
+            movePointAt([{ x: 1, y: 1, index: null }], 0, { x: 5, y: 6 }),
+        ).toEqual([{ x: 5, y: 6, index: null }]);
+    });
+
+    it("moves and preserves index", () => {
+        expect(
+            movePointAt([{ x: 1, y: 1, index: 3 }], 0, { x: 5, y: 6 }),
+        ).toEqual([{ x: 5, y: 6, index: 3 }]);
+    });
+
     it("moves and cycles", () => {
         expect(movePointAt([{ x: 1, y: 1 }], 0, { x: 5, y: 6 })).toEqual([
             { x: 5, y: 6 },

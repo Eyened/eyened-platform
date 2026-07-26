@@ -123,6 +123,10 @@ When present, SchemaForm shows a **PointField** with an Activate control that ar
 
 Optional `"x-eyened-point-mode": "registration"` enables null mid-list slots and numbered focus (used by `Pointset registration`). Validators ignore `x-eyened-*` keys.
 
+On **OCT volumes** (B-scans), the tool stores a numbered slice `index`. On the volume's **enface projection** (`*_proj`), it stores `index: null` so enface landmarks stay distinct from B-scan points (they share the same ImageInstance PublicID). Plain 2D images omit `index`. Visibility follows that tag: enface shows `index == null`, each B-scan shows only its slice number. If the point object schema uses `additionalProperties: false`, declare `index` as a number-or-null property so validation accepts both.
+
+Form **Activate** publishes an armed field on a shared bridge (`pointArming.armForm`). Each open **MainViewer** mounts its own `PointTool` against that target, so placement works on every main panel and follows add/replace/close without the form owning overlays.
+
 After changing builtin JSON, refresh DB rows with:
 
 ```bash

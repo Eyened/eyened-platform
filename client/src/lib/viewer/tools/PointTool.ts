@@ -8,6 +8,7 @@ import {
 import {
     getPointsForImage,
     setPointsForImage,
+    type ImagePoint,
     type PointSchemaAnalysis,
 } from "$lib/forms/pointSchema";
 import type { Position2D } from "$lib/types";
@@ -35,6 +36,11 @@ export type PointToolOptions = {
     radius?: number;
     color?: string;
     /**
+     * Identity of the hosting viewer. Sibling hit-tests only consider tools
+     * that share this host (ETDRS dual tools on one canvas; not other MainViewers).
+     */
+    host?: object;
+    /**
      * When false, this tool still paints and handles hit/drag/delete, but does
      * not place on empty clicks. Defaults to true.
      */
@@ -58,11 +64,16 @@ export class PointTool implements Overlay {
     private readonly pointStyle: PointMarkerStyle;
     private readonly radius: number;
     private readonly color: string;
+    private readonly host: object;
 
     constructor(private readonly options: PointToolOptions) {
+        if (!options.analysis) {
+            throw new Error("PointTool requires a point schema analysis");
+        }
         this.pointStyle = options.pointStyle ?? "circle";
         this.radius = options.radius ?? 16;
         this.color = options.color ?? defaultStroke;
+        this.host = options.host ?? this;
         this.name = options.label || "Point";
         liveTools.add(this);
     }
@@ -112,6 +123,7 @@ export class PointTool implements Overlay {
             position,
             this.options.analysis.cardinality,
             this.options.analysis.registrationMode,
+            this.placeIndexOptions(viewerContext),
         );
         let newIndex = after.findIndex(
             (p, i) => p && (!before[i] || before[i] !== p),
@@ -120,6 +132,43 @@ export class PointTool implements Overlay {
         this.commit(after);
         this.beginDrag(viewerContext, newIndex);
         this.options.onBecomePlacementTarget?.();
+    }
+
+    /**
+     * Index for OCT: numbered on B-scans, explicit `null` on enface `*_proj`,
+     * omitted on plain 2D (enface and volume share the same PublicID).
+     */
+    private placeIndexOptions(
+        viewerContext: ViewerContext,
+    ): { index: number | null } | undefined {
+        const { image } = viewerContext;
+        if (image.is3D) {
+            return { index: viewerContext.index };
+        }
+        if (image.image_id.endsWith("_proj")) {
+            return { index: null };
+        }
+        return undefined;
+    }
+
+    /** Whether this point should paint/hit on the current viewer. */
+    private visibleOnSlice(
+        pt: ImagePoint,
+        viewerContext: ViewerContext,
+    ): boolean {
+        const { image } = viewerContext;
+        if (image.is3D) {
+            return (
+                typeof pt.index === "number" &&
+                pt.index === viewerContext.index
+            );
+        }
+        if (image.image_id.endsWith("_proj")) {
+            // Enface: only points tagged with null (or legacy missing index).
+            return pt.index == null;
+        }
+        // Plain 2D: hide volume slice points if present in the same list.
+        return typeof pt.index !== "number";
     }
 
     private beginDrag(viewerContext: ViewerContext, index: number) {
@@ -140,7 +189,8 @@ export class PointTool implements Overlay {
         viewerContext: ViewerContext,
     ): boolean {
         for (const tool of liveTools) {
-            if (tool !== this && tool.hits(cursor, viewerContext)) return true;
+            if (tool === this || tool.host !== this.host) continue;
+            if (tool.hits(cursor, viewerContext)) return true;
         }
         return false;
     }
@@ -163,6 +213,9 @@ export class PointTool implements Overlay {
             const index = parseInt(event.key, 10) - 1;
             const point = this.points[index];
             if (point) {
+                if (typeof point.index === "number") {
+                    viewerContext.setIndex(point.index);
+                }
                 const w = viewerContext.viewerSize.width;
                 const w_image = viewerContext.image.width;
                 viewerContext.focusPoint(point.x, point.y, (1 * w_image) / w);
@@ -183,7 +236,7 @@ export class PointTool implements Overlay {
             return;
         }
 
-        if (event.key !== "e" && event.key !== "E") return;
+        if (event.key.toLowerCase() !== "c") return;
 
         const index = this.activePointIndex ?? this.hoverPointIndex;
         if (index === undefined) return;
@@ -280,16 +333,14 @@ export class PointTool implements Overlay {
 
         for (const [index, pt] of points.entries()) {
             if (!pt) continue;
+            if (!this.visibleOnSlice(pt, viewerContext)) continue;
             const p = viewerContext.imageToViewerCoordinates(pt);
             this.strokeMarker(context2D, p, r);
 
             let label = showIndex ? `${index + 1}` : this.options.label;
-            for (const extra of this.options.analysis.enumExtras) {
-                const v = pt[extra.key];
-                if (typeof v === "string") {
-                    label = showIndex ? `${index + 1}:${v}` : v;
-                    break;
-                }
+            const extraLabel = this.extraLabel(pt);
+            if (extraLabel) {
+                label = showIndex ? `${index + 1}:${extraLabel}` : extraLabel;
             }
             if (label) {
                 context2D.fillText(label, p.x + r, p.y + r + 12);
@@ -299,7 +350,10 @@ export class PointTool implements Overlay {
         context2D.fillStyle = fillStyle;
         if (highlightIndex !== undefined) {
             const highlightPoint = points[highlightIndex];
-            if (highlightPoint) {
+            if (
+                highlightPoint &&
+                this.visibleOnSlice(highlightPoint, viewerContext)
+            ) {
                 const p =
                     viewerContext.imageToViewerCoordinates(highlightPoint);
                 this.fillMarker(context2D, p, r);
@@ -307,6 +361,22 @@ export class PointTool implements Overlay {
         }
         if (this.activePointIndex !== undefined) {
             viewerContext.claimCursor("grabbing", CursorPriority.Drag);
+        }
+    }
+
+    private extraLabel(pt: ImagePoint): string | undefined {
+        // Prefer schema-declared enum extras (stable order), then any other
+        // string property on the point (free-text extras).
+        for (const extra of this.options.analysis.enumExtras) {
+            const v = pt[extra.key];
+            if (typeof v === "string" && v.length > 0) return v;
+        }
+        for (const [key, v] of Object.entries(pt)) {
+            if (key === "x" || key === "y" || key === "index") continue;
+            if (this.options.analysis.enumExtras.some((e) => e.key === key)) {
+                continue;
+            }
+            if (typeof v === "string" && v.length > 0) return v;
         }
     }
 
@@ -351,6 +421,7 @@ export class PointTool implements Overlay {
         for (let i = 0; i < this.points.length; i++) {
             const value = this.points[i];
             if (!value) continue;
+            if (!this.visibleOnSlice(value, viewerContext)) continue;
             const pt = viewerContext.imageToViewerCoordinates(value);
             const dx = pt.x - cursor.x;
             const dy = pt.y - cursor.y;

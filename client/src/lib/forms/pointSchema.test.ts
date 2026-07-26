@@ -76,6 +76,27 @@ describe("analyzePointSchema", () => {
         });
     });
 
+    it("accepts anyOf for nullable registration items", () => {
+        const a = analyzePointSchema(
+            {
+                "x-eyened-widget": "point",
+                "x-eyened-point-mode": "registration",
+                type: "object",
+                additionalProperties: {
+                    type: "array",
+                    items: {
+                        anyOf: [pointObject, { type: "null" }],
+                    },
+                },
+            },
+            "Eye",
+        );
+        expect(a).toMatchObject({
+            cardinality: "list",
+            registrationMode: true,
+        });
+    });
+
     it("returns null when widget present but shape is not point-like", () => {
         expect(
             analyzePointSchema(

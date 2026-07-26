@@ -153,6 +153,7 @@
                     pointStyle: "cross",
                     radius: 16,
                     color: "rgba(0, 255, 0, 1)",
+                    host: viewerContext,
                     getPublicId: () => instance.id,
                     getFieldValue: () =>
                         (formAnnotations.get(annotationId)?.form_data as any)?.[

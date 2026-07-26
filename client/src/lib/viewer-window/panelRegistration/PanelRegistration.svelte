@@ -67,13 +67,42 @@
             .sort((a, b) => a.id - b.id),
     );
 
+    const REGISTRATION_POINTS: JSONSchema = {
+        type: "array",
+        items: {
+            oneOf: [
+                {
+                    type: "object",
+                    properties: {
+                        x: { type: "number" },
+                        y: { type: "number" },
+                    },
+                    required: ["x", "y"],
+                },
+                { type: "null" },
+            ],
+        },
+    };
+
     function registrationAnalysis() {
-        const root: JSONSchema = {
-            ...(registrationSchema.schema as JSONSchema),
+        const fromApi = (registrationSchema.schema ?? {}) as JSONSchema;
+        const entityType = registrationSchema.entity_type ?? "Eye";
+        // Prefer API schema, but always force widget markers. If analysis fails
+        // (null/empty/partial seed), fall back to the known registration shape.
+        const withMarkers = (schema: JSONSchema): JSONSchema => ({
+            ...schema,
+            type: "object",
             "x-eyened-widget": "point",
             "x-eyened-point-mode": "registration",
-        };
-        return analyzePointSchema(root, "Eye")!;
+        });
+
+        return (
+            analyzePointSchema(withMarkers(fromApi), entityType) ??
+            analyzePointSchema(
+                withMarkers({ additionalProperties: REGISTRATION_POINTS }),
+                entityType,
+            )
+        );
     }
 
     async function create() {
@@ -106,8 +135,16 @@
             return;
         }
 
-        const canEdit = globalContext.canEdit(formAnnotation);
         const analysis = registrationAnalysis();
+        if (!analysis) {
+            console.error(
+                "Pointset registration schema could not be analyzed",
+                registrationSchema.schema,
+            );
+            return;
+        }
+
+        const canEdit = globalContext.canEdit(formAnnotation);
 
         pointArming.arm(key, () => {
             activeID = formAnnotation.id;
@@ -118,6 +155,7 @@
                 pointStyle: pointMarker.style,
                 radius: pointMarker.radius,
                 color: pointMarker.color,
+                host: viewerContext,
                 getPublicId: () => viewerContext.image.instance.id,
                 getFieldValue: () => formAnnotation.form_data,
                 setFieldValue: (next) => {

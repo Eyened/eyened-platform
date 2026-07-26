@@ -2,7 +2,16 @@ import type { JSONSchema } from "./schemaType";
 
 export const EYENED_POINT_WIDGET = "point" as const;
 
-export type ImagePoint = { x: number; y: number } & Record<string, unknown>;
+export type ImagePoint = {
+    x: number;
+    y: number;
+    /**
+     * OCT volume: B-scan slice number.
+     * Enface `*_proj`: explicitly `null`.
+     * Plain 2D: omitted.
+     */
+    index?: number | null;
+} & Record<string, unknown>;
 export type PointCardinality = "single" | "list";
 export type PointStorageMode = "bare" | "byPublicId";
 export type PointList = (ImagePoint | null)[];
@@ -34,12 +43,13 @@ function isPointObjectSchema(schema: JSONSchema | undefined): boolean {
     return false;
 }
 
-/** Unwrap oneOf that pairs a point object with null (registration). */
+/** Unwrap oneOf/anyOf that pairs a point object with null (registration). */
 function unwrapPointItemSchema(schema: JSONSchema | undefined): JSONSchema | null {
     if (!schema) return null;
     if (isPointObjectSchema(schema)) return schema;
-    if (schema.oneOf) {
-        for (const option of schema.oneOf) {
+    const alts = schema.oneOf ?? schema.anyOf;
+    if (alts) {
+        for (const option of alts) {
             if (isPointObjectSchema(option)) return option;
         }
     }
@@ -141,6 +151,7 @@ export function getPointsForImage(
     publicId: string,
     analysis: PointSchemaAnalysis,
 ): PointList {
+    if (!analysis) return [];
     if (analysis.storageMode === "bare") {
         if (analysis.cardinality === "single") {
             return isImagePoint(fieldValue) ? [fieldValue] : [];

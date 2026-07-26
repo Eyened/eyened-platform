@@ -1,13 +1,25 @@
 import type { ImagePoint, PointCardinality, PointList } from "./pointSchema";
 import type { Position2D } from "$lib/types";
 
+export type PlacePointOptions = {
+    /**
+     * OCT volume B-scan index (number), or `null` for enface `*_proj`.
+     * Omit the option entirely for plain 2D images (no index property).
+     */
+    index?: number | null;
+};
+
 export function placePoint(
     points: PointList,
     position: Position2D,
     cardinality: PointCardinality,
     registrationMode: boolean,
+    options?: PlacePointOptions,
 ): PointList {
     const next: ImagePoint = { x: position.x, y: position.y };
+    if (options && "index" in options) {
+        next.index = options.index;
+    }
 
     if (cardinality === "single") {
         return [next];
