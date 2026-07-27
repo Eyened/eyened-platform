@@ -69,7 +69,7 @@ class StudyService:
         elif comment is not None:
             link.Comment = comment
             # Derive the scalar diff while the mutation is still pending —
-            # before any repo/audit call flushes (a flush clears the history).
+            # before the explicit flush() below clears the history.
             # StudyTagLink has a composite PK, so entity_id is null; fold the
             # composite identity into changes (matches the INSERT branch above
             # and the DELETE below), or the audit row is unidentifiable.
@@ -78,6 +78,7 @@ class StudyService:
                 "study_id": study_id,
                 **AuditService.diff(link, "Comment"),
             }
+            self.repository.flush()
             link.Tag = tag
             if self.audit is not None:
                 self.audit.record(
@@ -150,7 +151,7 @@ class StudyService:
         if comment is not None:
             link.Comment = comment
             # Derive the scalar diff while the mutation is still pending —
-            # before any repo/audit call flushes (a flush clears the history).
+            # before the explicit flush() below clears the history.
             # StudyTagLink has a composite PK, so entity_id is null; fold the
             # composite identity into changes (matches tag_study's INSERT/UPDATE
             # and untag_study's DELETE), or the audit row is unidentifiable.
@@ -159,6 +160,7 @@ class StudyService:
                 "study_id": study_id,
                 **AuditService.diff(link, "Comment"),
             }
+            self.repository.flush()
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",

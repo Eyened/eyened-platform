@@ -151,6 +151,12 @@ class ImageInstanceRepository:
             {"TagID": tag_id, "ImageInstanceID": image_instance_id},
         )
 
+    def flush(self) -> None:
+        """Flush pending in-place ImageInstanceTagLink mutations (e.g.
+        ``Comment``) so integrity errors surface in-request within the
+        request transaction."""
+        self._session.flush()
+
     def get_by_public_id(self, public_id: str) -> ImageInstance | None:
         """Return the instance with this PublicID (no eager loads), or None.
 

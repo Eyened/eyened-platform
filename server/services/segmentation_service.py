@@ -250,7 +250,10 @@ class SegmentationService:
             )
         except (IndexError, ValueError) as e:
             raise BadRequestError(str(e)) from e
-        self.repository.add(segmentation)
+        # segmentation is already persistent (fetched via get_by_id above);
+        # flush() is the honest name for what's needed here -- add() on an
+        # already-tracked instance is a no-op beyond the flush it also does.
+        self.repository.flush()
         if self.audit is not None:
             # Pre-refactor log_simple carried no fields/changes (high-frequency
             # op, deliberately lightweight) — preserved as-is.

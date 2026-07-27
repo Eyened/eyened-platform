@@ -128,7 +128,7 @@ class ImageInstanceService:
         elif comment is not None:
             link.Comment = comment
             # Derive the scalar diff while the mutation is still pending — before
-            # any repo/audit call flushes (a flush clears the pending history).
+            # the explicit flush() below clears the pending history.
             # ImageInstanceTagLink has a composite PK, so entity_id is null;
             # fold the composite identity into changes (matches the INSERT
             # branch above and untag_instance's DELETE below), or the audit row
@@ -140,6 +140,7 @@ class ImageInstanceService:
                 "image_instance_id": public_id,
                 **AuditService.diff(link, "Comment"),
             }
+            self.repository.flush()
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",
@@ -180,7 +181,7 @@ class ImageInstanceService:
         if comment is not None:
             link.Comment = comment
             # Derive the scalar diff while the mutation is still pending — before
-            # any repo/audit call flushes (a flush clears the pending history).
+            # the explicit flush() below clears the pending history.
             # ImageInstanceTagLink has a composite PK, so entity_id is null;
             # fold the composite identity into changes (matches tag_instance's
             # INSERT/UPDATE and untag_instance's DELETE), or the audit row is
@@ -191,6 +192,7 @@ class ImageInstanceService:
                 "image_instance_id": instance.ImageInstanceID,
                 **AuditService.diff(link, "Comment"),
             }
+            self.repository.flush()
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",

@@ -28,6 +28,11 @@ class StudyRepository:
         """Return the StudyTagLink for (tag, study), or None if not linked."""
         return self._session.get(StudyTagLink, {"TagID": tag_id, "StudyID": study_id})
 
+    def flush(self) -> None:
+        """Flush pending in-place StudyTagLink mutations (e.g. ``Comment``) so
+        integrity errors surface in-request within the request transaction."""
+        self._session.flush()
+
     def add_link(
         self, tag_id: int, study_id: int, creator_id: int, comment: str | None
     ) -> StudyTagLink:

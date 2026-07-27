@@ -26,6 +26,12 @@ class TagRepository:
         """Return the tag with the given id, or None if absent."""
         return self._session.get(Tag, tag_id)
 
+    def flush(self) -> None:
+        """Flush pending in-place Tag mutations (e.g. ``TagName``, ``TagType``)
+        so integrity errors surface in-request within the request transaction.
+        """
+        self._session.flush()
+
     def list_all(self) -> list[Tag]:
         """Return all tags, loading only what TagGET needs.
 

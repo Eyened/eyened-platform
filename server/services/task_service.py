@@ -107,11 +107,13 @@ class TaskService:
             task.TaskState = task_state
 
         # Derive the scalar diff while the mutations are still pending — before
-        # the get_with_relations() query below autoflushes (a flush clears the
-        # pending attribute history).
+        # the explicit flush() below clears the pending attribute history.
+        # (Production runs with autoflush=False, so the get_with_relations()
+        # query below does NOT autoflush -- an explicit flush() is required.)
         changes = AuditService.diff(
             task, "TaskName", "Description", "ContactID", "TaskDefinitionID", "TaskState"
         )
+        self.tasks.flush()
 
         task = self.tasks.get_with_relations(task_id)
         counts = self.tasks.subtask_counts([task_id])[task_id]
@@ -264,9 +266,11 @@ class SubTaskService:
             subtask.TaskState = task_state
 
         # Derive the scalar diff while the mutations are still pending — before
-        # any flush clears the pending attribute history (SubTask has no
-        # server-generated columns a caller reads, so no re-fetch is needed).
+        # the explicit flush() below clears the pending attribute history
+        # (SubTask has no server-generated columns a caller reads, so no
+        # re-fetch is needed).
         changes = AuditService.diff(subtask, "Comments", "TaskState")
+        self.subtasks.flush()
 
         if self.audit is not None:
             self.audit.record(

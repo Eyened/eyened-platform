@@ -34,6 +34,11 @@ class TaskRepository:
         """Return the task with the given id, or None if absent."""
         return self._session.get(Task, task_id)
 
+    def flush(self) -> None:
+        """Flush pending in-place Task mutations so integrity errors surface
+        in-request within the request transaction."""
+        self._session.flush()
+
     def get_with_relations(self, task_id: int) -> Task | None:
         """Return the task with Creator + TaskDefinition eager-loaded, or None."""
         return (
@@ -177,6 +182,11 @@ class SubTaskRepository:
     def get_by_id(self, subtask_id: int) -> SubTask | None:
         """Return the subtask with the given id, or None if absent."""
         return self._session.get(SubTask, subtask_id)
+
+    def flush(self) -> None:
+        """Flush pending in-place SubTask mutations so integrity errors
+        surface in-request within the request transaction."""
+        self._session.flush()
 
     def get_with_images(self, subtask_id: int) -> SubTask | None:
         """Return the subtask with its image links eager-loaded, or None."""
