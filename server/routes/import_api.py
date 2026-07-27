@@ -16,7 +16,8 @@ from rq.job import Job
 from rq.exceptions import NoSuchJobError
 
 from ..db import get_db
-from ..utils.db_logging import get_db_logger
+from ..services.acting_user import ActingUser
+from ..services.audit_service import AuditService
 from ..utils.tasks import (
     layer_segmentation_job_timeout,
     run_cfi_amd_for_image_ids,
@@ -116,7 +117,6 @@ async def import_single_image(
         # Run the new importer on a single row
         import_run = plan_image_import(session=session, rows=[request.data])
         import_run.apply()
-        session.commit()
         # Count created image instances for logging/response
         image_creates = [
             change
@@ -126,20 +126,22 @@ async def import_single_image(
         ]
         image_count = len(image_creates)
 
-        logger = get_db_logger()
-        if logger:
-            logger.log_insert(
-                user=current_user.username,
-                user_id=current_user.id,
-                endpoint="POST /api/import/image",
-                entity="Import",
-                summary={
-                    "project_name": request.data.project_name,
-                    "images_created": image_count,
-                },
-            )
+        AuditService(session).record(
+            action="INSERT",
+            entity="Import",
+            actor=ActingUser(id=current_user.id, username=current_user.username),
+            changes={
+                "project_name": request.data.project_name,
+                "images_created": image_count,
+            },
+        )
 
     except Exception as e:
+        # A caught exception here means the request still returns normally (200,
+        # success=False below), so get_db would otherwise commit whatever
+        # import_run.apply() staged before failing. Roll back first so a failed
+        # import leaves nothing.
+        session.rollback()
         include_stack_trace = request.options.include_stack_trace
         error_message = str(e)
         stack_trace = traceback.format_exc() if include_stack_trace else None
