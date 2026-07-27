@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Input } from "$lib/components/ui/input";
     import type { ImagePoint } from "$lib/forms/pointSchema";
+    import { Trash } from "$lib/viewer-window/icons/icons";
 
     export type PointRow = { publicId: string; index: number; pt: ImagePoint };
 
@@ -11,6 +12,7 @@
         enumExtras: { key: string; values: readonly string[] }[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
+        coordLabel: string;
         onUpdateCoord: (
             pid: string,
             index: number,
@@ -23,6 +25,7 @@
             key: string,
             extraValue: string,
         ) => void;
+        onRemove: () => void;
         onCollapse: () => void;
     }
 
@@ -33,13 +36,35 @@
         enumExtras,
         stringExtraKeys,
         indexApplicable,
+        coordLabel,
         onUpdateCoord,
         onUpdateExtra,
+        onRemove,
         onCollapse,
     }: Props = $props();
 </script>
 
 <div class="editor">
+    <div class="editor-header">
+        <span class="editor-label" title={coordLabel}>{coordLabel}</span>
+        <div class="editor-actions">
+            {#if canEdit}
+                <button
+                    type="button"
+                    class="icon-btn"
+                    title="Remove point"
+                    aria-label="Remove point"
+                    onclick={onRemove}
+                >
+                    <Trash size="1.1em" />
+                </button>
+            {/if}
+            <button type="button" class="collapse" onclick={onCollapse}>
+                Done
+            </button>
+        </div>
+    </div>
+
     <div class="editor-coords">
         <label>
             x
@@ -137,8 +162,6 @@
             {/each}
         </div>
     {/if}
-
-    <button type="button" class="collapse" onclick={onCollapse}> Done </button>
 </div>
 
 <style>
@@ -146,10 +169,32 @@
         display: flex;
         flex-direction: column;
         gap: 0.45em;
-        margin-left: 0.25em;
+        margin-left: 0.15em;
         padding: 0.5em;
-        border-left: 2px solid rgba(255, 255, 255, 0.25);
-        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        border-radius: 0.35em;
+        background: rgba(255, 255, 255, 0.07);
+    }
+    .editor-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5em;
+    }
+    .editor-label {
+        font-family: monospace;
+        font-size: 0.9em;
+        opacity: 0.9;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+    .editor-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.35em;
+        flex-shrink: 0;
     }
     .editor-coords,
     .editor-extras {
@@ -164,8 +209,26 @@
         gap: 0.35em;
         font-size: 0.9em;
     }
+    .icon-btn {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        color: inherit;
+        cursor: pointer;
+        opacity: 0.75;
+        padding: 0.15em;
+        margin: 0;
+    }
+    .icon-btn:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.25);
+    }
     .collapse {
-        align-self: flex-start;
         appearance: none;
         background: transparent;
         border: 1px solid rgba(255, 255, 255, 0.25);

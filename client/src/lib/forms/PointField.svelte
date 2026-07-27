@@ -18,6 +18,7 @@
         type ImagePoint,
         type PointList,
     } from "$lib/forms/pointSchema";
+    import { deletePointAt } from "$lib/forms/pointMutations";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -296,6 +297,15 @@
         pts[index] = { ...pt, [key]: n };
         commitPoints(pid, pts);
     }
+
+    function removePoint(pid: string, index: number) {
+        if (!analysis) return;
+        commitPoints(
+            pid,
+            deletePointAt(pointsFor(pid), index, analysis.registrationMode),
+        );
+        expandedKey = null;
+    }
 </script>
 
 <div class="point-field">
@@ -353,6 +363,7 @@
                     onToggleExpand={toggleExpand}
                     onUpdateCoord={updatePointCoord}
                     onUpdateExtra={updatePointExtra}
+                    onRemovePoint={removePoint}
                     onCollapse={() => (expandedKey = null)}
                 />
             {/each}

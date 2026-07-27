@@ -29,6 +29,7 @@
             key: string,
             extraValue: string,
         ) => void;
+        onRemovePoint: (pid: string, index: number) => void;
         onCollapse: () => void;
     }
 
@@ -47,6 +48,7 @@
         onToggleExpand,
         onUpdateCoord,
         onUpdateExtra,
+        onRemovePoint,
         onCollapse,
     }: Props = $props();
 </script>
@@ -89,8 +91,10 @@
                 {enumExtras}
                 {stringExtraKeys}
                 {indexApplicable}
+                coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
                 {onUpdateCoord}
                 {onUpdateExtra}
+                onRemove={() => onRemovePoint(row.publicId, row.index)}
                 {onCollapse}
             />
         {/if}
@@ -143,9 +147,11 @@
         background: color-mix(in srgb, currentColor 8%, transparent);
         border-color: color-mix(in srgb, currentColor 35%, transparent);
     }
+    /* Match PointRowEditor panel so the open chip reads as its tab. */
     .coord-chip.expanded {
-        background: color-mix(in srgb, currentColor 10%, transparent);
-        border-color: color-mix(in srgb, currentColor 45%, transparent);
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.3);
+        border-radius: 0.35em 0.35em 0.15em 0.15em;
     }
     .extra-preview {
         opacity: 0.65;
