@@ -12,11 +12,11 @@
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
+    import { createFieldAdapter } from "$lib/forms/pointAdapters";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { analyzePointSchema } from "$lib/forms/pointSchema";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { PointTool } from "$lib/viewer/tools/PointTool";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { FormSchemaGET } from "../../../types/openapi_types";
@@ -129,7 +129,7 @@
 
         const key = `registration:${formAnnotation.id}`;
 
-        if (activeID === formAnnotation.id) {
+        if (pointArming.session?.key === key) {
             pointArming.disarm(key);
             activeID = undefined;
             return;
@@ -145,33 +145,33 @@
         }
 
         const canEdit = globalContext.canEdit(formAnnotation);
+        const annotationId = formAnnotation.id;
 
-        pointArming.arm(key, () => {
-            activeID = formAnnotation.id;
-            const tool = new PointTool({
-                canEdit,
+        pointArming.arm({
+            key,
+            canEdit,
+            pointStyle: pointMarker.style,
+            radius: pointMarker.radius,
+            color: pointMarker.color,
+            host: viewerContext,
+            adapter: createFieldAdapter({
                 analysis,
-                label: "registration",
-                pointStyle: pointMarker.style,
-                radius: pointMarker.radius,
-                color: pointMarker.color,
-                host: viewerContext,
                 getPublicId: () => viewerContext.image.instance.id,
-                getFieldValue: () => formAnnotation.form_data,
+                getFieldValue: () =>
+                    formAnnotations.get(annotationId)?.form_data ??
+                    formAnnotation.form_data,
                 setFieldValue: (next) => {
-                    formAnnotation.form_data = next as any;
-                    setFormAnnotationValue(formAnnotation.id, next);
+                    const existing =
+                        formAnnotations.get(annotationId) ?? formAnnotation;
+                    formAnnotations.set(annotationId, {
+                        ...existing,
+                        form_data: next as any,
+                    });
+                    setFormAnnotationValue(annotationId, next);
                 },
-            });
-            const dispose = viewerContext.addOverlay(tool);
-            return () => {
-                tool.destroy();
-                dispose();
-                if (activeID === formAnnotation.id) {
-                    activeID = undefined;
-                }
-            };
+            }),
         });
+        activeID = annotationId;
     }
 
     function onremove(formAnnotation: any) {
