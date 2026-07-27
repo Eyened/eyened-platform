@@ -22,3 +22,7 @@ segmentations.zarr/
 client/src/lib/extensions.ts
 venv
 trash
+# Agent / superpowers working docs (local only)
+docs/superpowers/
+.superpowers/
+.agents/
