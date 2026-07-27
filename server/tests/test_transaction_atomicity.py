@@ -1,11 +1,15 @@
 import pytest
+from fastapi import Depends
+from sqlalchemy.orm import Session
 
 from eyened_orm import AuditLog, Feature
 from eyened_orm.repositories.feature_repository import FeatureRepository
 from eyened_orm.utils.sqlite_testdb import session  # noqa: F401
+from server.db import get_db
 from server.services.acting_user import ActingUser
-from server.services.audit_service import AuditService
-from server.services.feature_service import FeatureService
+from server.services.audit_service import AuditService, get_audit_service
+from server.services.exceptions import NotFoundError
+from server.services.feature_service import FeatureService, get_feature_service
 
 
 class _ExplodingRepo(FeatureRepository):
@@ -40,3 +44,39 @@ def test_prior_audit_row_rolls_back_with_a_later_failed_write(session):
 
     assert session.query(AuditLog).count() == 0
     assert session.info.get("_audit_events", []) == []
+
+
+class _NotFoundAfterWriteRepo(FeatureRepository):
+    """Second write raises a domain ServiceError after the first has been
+    staged -- unlike _ExplodingRepo's plain RuntimeError above, this exercises
+    the ServiceError exception-handler path (an intended HTTP status), not
+    the generic 500 handler."""
+    def replace_subfeatures(self, parent_id, sub_ids):
+        raise NotFoundError("subfeature not found")
+
+
+def test_domain_error_mid_request_rolls_back_and_returns_its_status(client, session):
+    """A NotFoundError raised mid-request, after a staged write, through a
+    real HTTP request: the write (and any audit row) rolls back and the
+    client still gets the error's intended status -- design §4's "error paths
+    preserve intent", pinned end-to-end against whatever FastAPI version is
+    installed (dependency-exit-vs-exception-handler ordering changed in
+    0.106)."""
+    from server.main import app_api
+
+    def _failing_feature_service(db: Session = Depends(get_db)) -> FeatureService:
+        return FeatureService(_NotFoundAfterWriteRepo(db), audit=get_audit_service(db))
+
+    app_api.dependency_overrides[get_feature_service] = _failing_feature_service
+    try:
+        response = client.post(
+            "/features", json={"name": "should-not-persist", "subfeature_ids": [1]}
+        )
+    finally:
+        app_api.dependency_overrides.pop(get_feature_service, None)
+
+    assert response.status_code == 404, response.text
+    assert (
+        session.query(Feature).filter_by(FeatureName="should-not-persist").count() == 0
+    )
+    assert session.query(AuditLog).count() == 0
