@@ -7,9 +7,8 @@ unpacks to exactly this signature. DTO conversion stays behind in the route; thi
 layer returns ORM rows.
 
 No ``select()`` is built here: query construction belongs to ``SearchRepository``.
-Calls to the ``Model.query_column`` ORM helper are the one exception -- they are an
-established codebase pattern for enumerating a reference column, not query
-construction.
+Column enumeration (``Model.query_column``) also goes through the repository, via
+its thin ``column_values`` wrapper, so this module never touches a ``Session``.
 """
 from __future__ import annotations
 
@@ -35,8 +34,10 @@ from eyened_orm.image_instance import Laterality as ImgLaterality
 from eyened_orm.image_instance import Modality as ImgModality
 from eyened_orm.patient import SexEnum as PatientSex
 from eyened_orm.repositories.search import SearchRepository
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from ...db import get_db
 from ..exceptions import BadRequestError
 from .conditions import translate_instance_conditions, translate_study_conditions
 from .fields import (
@@ -74,7 +75,6 @@ class SearchService:
 
     def search_instances(
         self,
-        session: Session,
         *,
         conditions: list[dict[str, Any]],
         order_by: str,
@@ -89,7 +89,7 @@ class SearchService:
         if attr_conds:
             # Resolved once here and handed to both the search and the count: the
             # resolution is an N+1, so rebuilding it per select tripled the queries.
-            attr_defs = self.repository.resolve_attribute_definitions(session, attr_conds)
+            attr_defs = self.repository.resolve_attribute_definitions(attr_conds)
             missing = [
                 spec.attribute
                 for spec in attr_conds
@@ -110,7 +110,6 @@ class SearchService:
         offset = limit * page
 
         rows = self.repository.search_instances(
-            session,
             conditions=static_conds,
             attr_conditions=attr_conds,
             attr_defs=attr_defs,
@@ -125,11 +124,10 @@ class SearchService:
         if not instances:
             return InstanceSearchResult(limit=limit, page=page)
 
-        studies = self._studies_for(session, instances)
+        studies = self._studies_for(instances)
         count = None
         if include_count:
             count = self.repository.count_instances(
-                session,
                 conditions=static_conds,
                 attr_conditions=attr_conds,
                 attr_defs=attr_defs,
@@ -145,7 +143,6 @@ class SearchService:
 
     def search_studies(
         self,
-        session: Session,
         *,
         conditions: list[dict[str, Any]],
         order_by: str,
@@ -161,7 +158,6 @@ class SearchService:
         offset = limit * page
 
         rows = self.repository.search_studies(
-            session,
             conditions=static_conds,
             order_by=study_order_by_fields_map[order_by],
             order=order,
@@ -175,11 +171,11 @@ class SearchService:
             return StudySearchResult(limit=limit, page=page)
 
         study_ids = [s.StudyID for s in studies]
-        instances = self.repository.instances_for_studies(session, study_ids)
+        instances = self.repository.instances_for_studies(study_ids)
 
         count = None
         if include_count:
-            count = self.repository.count_studies(session, conditions=static_conds)
+            count = self.repository.count_studies(conditions=static_conds)
 
         s_order = {sid: idx for idx, sid in enumerate(study_ids)}
         studies = sorted(studies, key=lambda s: s_order[s.StudyID])
@@ -192,9 +188,7 @@ class SearchService:
             page=page,
         )
 
-    def _studies_for(
-        self, session: Session, instances: list[ImageInstance]
-    ) -> List[Study]:
+    def _studies_for(self, instances: list[ImageInstance]) -> List[Study]:
         """Distinct studies of the instances, in first-appearance order, series-loaded."""
         seen: set[int] = set()
         study_ids_ordered: list[int] = []
@@ -204,15 +198,17 @@ class SearchService:
                 seen.add(st.StudyID)
                 study_ids_ordered.append(st.StudyID)
 
-        studies = self.repository.studies_by_ids(session, study_ids_ordered)
+        studies = self.repository.studies_by_ids(study_ids_ordered)
         s_order = {sid: i for i, sid in enumerate(study_ids_ordered)}
         studies.sort(key=lambda s: s_order[s.StudyID])
         return studies
 
-    def instance_signature(self, session: Session) -> List[SignatureField]:
+    def instance_signature(self) -> List[SignatureField]:
         """Return signature metadata for instance search fields."""
         creator_names = sorted(
-            Creator.query_column(session, Creator.CreatorName, where=(Creator.IsHuman == True))
+            self.repository.column_values(
+                Creator, Creator.CreatorName, where=(Creator.IsHuman == True)
+            )
         )
         items: list[SignatureField] = [
             # Enum-backed
@@ -221,14 +217,22 @@ class SearchService:
             SignatureField(name="ETDRS Field", values=[e.value for e in ImgETDRS], nullable=True),
             SignatureField(name="Patient Sex", values=[e.value for e in PatientSex], nullable=True),
             # DB-derived simple columns
-            SignatureField(name="Project Name", values=sorted(Project.query_column(session, Project.ProjectName))),
+            SignatureField(
+                name="Project Name",
+                values=sorted(self.repository.column_values(Project, Project.ProjectName)),
+            ),
             SignatureField(
                 name="Device Model ID",
-                values=[str(v) for v in sorted(DeviceModel.query_column(session, DeviceModel.DeviceModelID))],
+                values=[
+                    str(v)
+                    for v in sorted(
+                        self.repository.column_values(DeviceModel, DeviceModel.DeviceModelID)
+                    )
+                ],
             ),
             SignatureField(
                 name="Segmentation Feature Name",
-                values=sorted(Feature.query_column(session, Feature.FeatureName)),
+                values=sorted(self.repository.column_values(Feature, Feature.FeatureName)),
             ),
             SignatureField(
                 name="Segmentation Creator Name",
@@ -236,11 +240,11 @@ class SearchService:
             ),
             SignatureField(
                 name="Segmentation Tag Name",
-                values=self.repository.tag_names(session, SegmentationTagLink),
+                values=self.repository.tag_names(SegmentationTagLink),
             ),
             SignatureField(
                 name="Form Schema Name",
-                values=sorted(FormSchema.query_column(session, FormSchema.SchemaName)),
+                values=sorted(self.repository.column_values(FormSchema, FormSchema.SchemaName)),
             ),
             SignatureField(
                 name="Form Creator Name",
@@ -248,11 +252,11 @@ class SearchService:
             ),
             SignatureField(
                 name="Form Tag Name",
-                values=self.repository.tag_names(session, FormAnnotationTagLink),
+                values=self.repository.tag_names(FormAnnotationTagLink),
             ),
             SignatureField(
                 name="Image Tag Name",
-                values=self.repository.tag_names(session, ImageInstanceTagLink),
+                values=self.repository.tag_names(ImageInstanceTagLink),
             ),
         ]
 
@@ -262,7 +266,7 @@ class SearchService:
             AttributeDataType.Int: "int",
             AttributeDataType.Float: "float",
         }
-        for name, dtype, model_name in self.repository.attribute_signature_rows(session):
+        for name, dtype, model_name in self.repository.attribute_signature_rows():
             items.append(
                 SignatureField(
                     name=name,
@@ -282,7 +286,7 @@ class SearchService:
 
         return items
 
-    def study_signature(self, session: Session) -> List[SignatureField]:
+    def study_signature(self) -> List[SignatureField]:
         """Return signature metadata for study search fields.
 
         NOTE: like ``instance_signature``, this enumerates every project, creator and
@@ -298,23 +302,23 @@ class SearchService:
             # DB-derived
             SignatureField(
                 name="Project Name",
-                values=sorted(Project.query_column(session, Project.ProjectName)),
+                values=sorted(self.repository.column_values(Project, Project.ProjectName)),
             ),
             SignatureField(
                 name="Form Schema Name",
-                values=sorted(FormSchema.query_column(session, FormSchema.SchemaName)),
+                values=sorted(self.repository.column_values(FormSchema, FormSchema.SchemaName)),
             ),
             SignatureField(
                 name="Form Creator Name",
-                values=self.repository.active_form_creator_names(session),
+                values=self.repository.active_form_creator_names(),
             ),
             SignatureField(
                 name="Form Tag Name",
-                values=self.repository.tag_names(session, FormAnnotationTagLink),
+                values=self.repository.tag_names(FormAnnotationTagLink),
             ),
             SignatureField(
                 name="Study Tag Name",
-                values=self.repository.tag_names(session, StudyTagLink),
+                values=self.repository.tag_names(StudyTagLink),
             ),
             # Typed free-entry fields
             SignatureField(name="Study Date", values="date"),
@@ -327,6 +331,6 @@ class SearchService:
         return items
 
 
-def get_search_service() -> SearchService:
+def get_search_service(db: Session = Depends(get_db)) -> SearchService:
     """FastAPI dependency: a SearchService wired to its repository."""
-    return SearchService(SearchRepository())
+    return SearchService(SearchRepository(db))
