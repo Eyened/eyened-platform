@@ -94,7 +94,7 @@ def _with_signed_jwts(monkeypatch):
     )
 
 
-def test_refresh_with_valid_token_returns_user_and_sets_new_cookies(
+def test_refresh_with_valid_token_returns_the_user(
     client, session, monkeypatch
 ):
     """A valid refresh-token cookie yields 200 with the refreshed user's info."""
