@@ -80,3 +80,50 @@ def test_login_with_legacy_password_migrates_hash_and_audits_once(
     # Exactly one commit -- get_db's request-boundary commit. A second commit here
     # would mean check_login is still committing mid-handler.
     assert commit_calls == [1]
+
+
+def _with_signed_jwts(monkeypatch):
+    """Give JWT issuance/verification a usable HMAC key (default test settings
+    leave secret_key empty); same workaround as test_login_with_legacy_password_..."""
+    from server.config import Settings
+
+    monkeypatch.setattr(
+        Settings,
+        "secret_key_value",
+        property(lambda self: "test-secret-key-0123456789abcdef"),
+    )
+
+
+def test_refresh_with_valid_token_returns_user_and_sets_new_cookies(
+    client, session, monkeypatch
+):
+    """A valid refresh-token cookie yields 200 with the refreshed user's info."""
+    from server.routes.auth import create_refresh_token
+
+    _with_signed_jwts(monkeypatch)
+
+    creator = Creator(CreatorName="refresh-user", IsHuman=True)
+    session.add(creator)
+    session.commit()
+    refresh_cookie = create_refresh_token(creator.CreatorID)
+
+    client.cookies.set("refresh_token", refresh_cookie)
+    response = client.post("/auth/refresh")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["username"] == "refresh-user"
+
+
+def test_refresh_without_cookie_returns_401(client):
+    """No refresh-token cookie hits the endpoint's explicit 401 branch."""
+    response = client.post("/auth/refresh")
+
+    assert response.status_code == 401
+
+
+def test_refresh_with_garbage_token_returns_401(client):
+    """An unparseable refresh-token cookie is caught by the endpoint's blanket 401."""
+    client.cookies.set("refresh_token", "not-a-jwt")
+    response = client.post("/auth/refresh")
+
+    assert response.status_code == 401

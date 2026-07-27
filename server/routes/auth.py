@@ -448,8 +448,11 @@ async def refresh_token(
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
 
-        # Get user from database
-        creator = CreatorRepository(session).get_by_id(payload["sub"])
+        # Get user from database. int() mirrors get_current_user's handling of
+        # the same claim; a malformed sub can't arise from a token this process
+        # signed itself, and if it ever did, the ValueError falls through to the
+        # blanket `except Exception` below -- same 401 outcome as before.
+        creator = CreatorRepository(session).get_by_id(int(payload["sub"]))
         if not creator:
             raise HTTPException(status_code=401, detail="User not found")
 

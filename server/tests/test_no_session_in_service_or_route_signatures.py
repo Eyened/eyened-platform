@@ -49,6 +49,14 @@ Exemptions, and what would remove them:
   converting the auth resolvers into FastAPI dependencies, so route handlers
   stop receiving a Session at all and have nothing left to forward. That
   conversion is out of scope for this guard.
+
+Blind spot: both scans key on the bare names ``session``/``db`` (parameter
+name for guard 1, call-receiver name for guard 2), so a local alias (e.g.
+``s = db; s.query(...)``) would evade both. Currently inert -- every DB entry
+point in scope arrives as a ``Depends(get_db)`` parameter, and guard 1's
+annotation check (``text.endswith("Session")``) still catches the
+parameter-rename variant -- but a future maintainer introducing such an alias
+would not be caught here.
 """
 
 import ast
