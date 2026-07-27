@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 import numpy as np
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from eyened_orm import ImageInstance, ModelSegmentation, Segmentation
@@ -18,6 +19,7 @@ from eyened_orm.repositories.segmentation_repository import (
 )
 from eyened_orm.repositories.tag_repository import TagRepository
 
+from ..db import get_db
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
 from .exceptions import BadRequestError, NotFoundError
@@ -369,7 +371,7 @@ class SegmentationService:
         segmentation = self.repository.get_by_id(session, segmentation_id)
         if segmentation is None:
             raise NotFoundError("Segmentation not found")
-        tag = self.tags.get_by_id(session, tag_id)
+        tag = self.tags.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.Segmentation:
@@ -503,12 +505,14 @@ class ModelSegmentationService:
         return item
 
 
-def get_segmentation_service() -> SegmentationService:
+def get_segmentation_service(
+    db: Session = Depends(get_db),
+) -> SegmentationService:
     """Default SegmentationService wiring for FastAPI ``Depends()``."""
     return SegmentationService(
         SegmentationRepository(),
         ImageInstanceRepository(),
-        TagRepository(),
+        TagRepository(db),
         get_segmentation_data_store(),
         logger=get_db_logger(),
     )

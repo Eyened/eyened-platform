@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from eyened_orm import FormAnnotation, FormAnnotationTagLink
@@ -14,6 +15,7 @@ from eyened_orm.repositories.image_instance_repository import (
 )
 from eyened_orm.repositories.tag_repository import TagRepository
 
+from ..db import get_db
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
 from .exceptions import BadRequestError, NotFoundError
@@ -289,7 +291,7 @@ class FormAnnotationService:
         annotation = self.repository.get_by_id(session, annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
-        tag = self.tags.get_by_id(session, tag_id)
+        tag = self.tags.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.FormAnnotation:
@@ -356,7 +358,7 @@ class FormAnnotationService:
         annotation = self.repository.get_by_id(session, annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
-        tag = self.tags.get_by_id(session, tag_id)
+        tag = self.tags.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.FormAnnotation:
@@ -427,11 +429,13 @@ class FormAnnotationService:
         return None
 
 
-def get_form_annotation_service() -> FormAnnotationService:
+def get_form_annotation_service(
+    db: Session = Depends(get_db),
+) -> FormAnnotationService:
     """Default FormAnnotationService wiring for FastAPI ``Depends()``."""
     return FormAnnotationService(
         FormAnnotationRepository(),
         ImageInstanceRepository(),
-        TagRepository(),
+        TagRepository(db),
         logger=get_db_logger(),
     )

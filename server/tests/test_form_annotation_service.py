@@ -29,11 +29,11 @@ from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.form_annotation_service import FormAnnotationService
 
 
-def _service() -> FormAnnotationService:
+def _service(session) -> FormAnnotationService:
     return FormAnnotationService(
         FormAnnotationRepository(),
         ImageInstanceRepository(),
-        TagRepository(),
+        TagRepository(session),
     )
 
 
@@ -106,7 +106,7 @@ def test_list_annotations_excludes_inactive(session):
     _make_annotation(session, "gone", inactive=True)
     session.commit()
 
-    rows = _service().list_annotations(
+    rows = _service(session).list_annotations(
         session,
         patient_id=None,
         study_id=None,
@@ -123,7 +123,7 @@ def test_list_annotations_excludes_inactive(session):
 def test_list_annotations_unknown_image_id_raises_not_found(session):
     """An image_id filter that resolves to nothing raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().list_annotations(
+        _service(session).list_annotations(
             session,
             patient_id=None,
             study_id=None,
@@ -136,7 +136,7 @@ def test_list_annotations_unknown_image_id_raises_not_found(session):
 def test_get_annotation_unknown_raises_not_found(session):
     """Getting a missing annotation is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_annotation(session, 999_999)
+        _service(session).get_annotation(session, 999_999)
 
 
 def test_get_value_returns_form_data(session):
@@ -144,13 +144,13 @@ def test_get_value_returns_form_data(session):
     ann = _make_annotation(session, "val")
     session.commit()
 
-    assert _service().get_value(session, ann.FormAnnotationID) == {"answer": 1}
+    assert _service(session).get_value(session, ann.FormAnnotationID) == {"answer": 1}
 
 
 def test_get_value_unknown_raises_not_found(session):
     """get_value on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_value(session, 999_999)
+        _service(session).get_value(session, 999_999)
 
 
 def _actor(session, key: str = "actor") -> ActingUser:
@@ -167,7 +167,7 @@ def test_create_resolves_image_and_persists(session):
     image_id = _make_image(session, "img-1")
     session.commit()
 
-    ann = _service().create(
+    ann = _service(session).create(
         session,
         form_schema_id=schema_id,
         patient_id=patient_id,
@@ -190,7 +190,7 @@ def test_create_unknown_image_raises_not_found(session):
     patient_id, schema_id = _make_patient_and_schema(session, "c2")
     session.commit()
     with pytest.raises(NotFoundError):
-        _service().create(
+        _service(session).create(
             session,
             form_schema_id=schema_id,
             patient_id=patient_id,
@@ -210,7 +210,7 @@ def test_update_applies_field(session):
     ann = _make_annotation(session, "u1")
     session.commit()
 
-    updated = _service().update(
+    updated = _service(session).update(
         session, ann.FormAnnotationID, {"form_data": {"b": 2}}, actor
     )
 
@@ -220,7 +220,7 @@ def test_update_applies_field(session):
 def test_update_unknown_raises_not_found(session):
     """update on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().update(session, 999_999, {"form_data": {}}, _actor(session))
+        _service(session).update(session, 999_999, {"form_data": {}}, _actor(session))
 
 
 def test_soft_delete_sets_inactive(session):
@@ -229,7 +229,7 @@ def test_soft_delete_sets_inactive(session):
     ann = _make_annotation(session, "d1")
     session.commit()
 
-    _service().soft_delete(session, ann.FormAnnotationID, actor)
+    _service(session).soft_delete(session, ann.FormAnnotationID, actor)
 
     assert ann.Inactive is True
 
@@ -237,7 +237,7 @@ def test_soft_delete_sets_inactive(session):
 def test_soft_delete_unknown_raises_not_found(session):
     """soft_delete on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().soft_delete(session, 999_999, _actor(session))
+        _service(session).soft_delete(session, 999_999, _actor(session))
 
 
 def test_set_value_overwrites_form_data(session):
@@ -246,7 +246,7 @@ def test_set_value_overwrites_form_data(session):
     ann = _make_annotation(session, "v1")
     session.commit()
 
-    _service().set_value(session, ann.FormAnnotationID, {"new": 9}, actor)
+    _service(session).set_value(session, ann.FormAnnotationID, {"new": 9}, actor)
 
     assert ann.FormData == {"new": 9}
 
@@ -254,7 +254,7 @@ def test_set_value_overwrites_form_data(session):
 def test_set_value_unknown_raises_not_found(session):
     """set_value on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().set_value(session, 999_999, {}, _actor(session))
+        _service(session).set_value(session, 999_999, {}, _actor(session))
 
 
 def _make_tag(session, creator_id: int, tag_type: TagType = TagType.FormAnnotation) -> Tag:
@@ -276,7 +276,7 @@ def test_tag_creates_link(session):
     tag = _make_tag(session, actor.id)
     session.commit()
 
-    link = _service().tag(
+    link = _service(session).tag(
         session, ann.FormAnnotationID, tag.TagID, "hi", actor
     )
 
@@ -291,7 +291,7 @@ def test_tag_unknown_annotation_raises_not_found(session):
     tag = _make_tag(session, actor.id)
     session.commit()
     with pytest.raises(NotFoundError):
-        _service().tag(session, 999_999, tag.TagID, None, actor)
+        _service(session).tag(session, 999_999, tag.TagID, None, actor)
 
 
 def test_tag_unknown_tag_raises_not_found(session):
@@ -300,7 +300,7 @@ def test_tag_unknown_tag_raises_not_found(session):
     ann = _make_annotation(session, "t2")
     session.commit()
     with pytest.raises(NotFoundError):
-        _service().tag(session, ann.FormAnnotationID, 999_999, None, actor)
+        _service(session).tag(session, ann.FormAnnotationID, 999_999, None, actor)
 
 
 def test_tag_wrong_type_raises_bad_request(session):
@@ -310,7 +310,7 @@ def test_tag_wrong_type_raises_bad_request(session):
     tag = _make_tag(session, actor.id, tag_type=TagType.ImageInstance)
     session.commit()
     with pytest.raises(BadRequestError):
-        _service().tag(session, ann.FormAnnotationID, tag.TagID, None, actor)
+        _service(session).tag(session, ann.FormAnnotationID, tag.TagID, None, actor)
 
 
 def test_tag_existing_updates_comment(session):
@@ -319,7 +319,7 @@ def test_tag_existing_updates_comment(session):
     ann = _make_annotation(session, "t4")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service()
+    service = _service(session)
 
     service.tag(session, ann.FormAnnotationID, tag.TagID, "first", actor)
     link = service.tag(session, ann.FormAnnotationID, tag.TagID, "second", actor)
@@ -333,7 +333,7 @@ def test_patch_tag_updates_comment(session):
     ann = _make_annotation(session, "t5")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service()
+    service = _service(session)
     service.tag(session, ann.FormAnnotationID, tag.TagID, "old", actor)
 
     link = service.patch_tag(session, ann.FormAnnotationID, tag.TagID, "new", actor)
@@ -348,7 +348,7 @@ def test_patch_tag_unknown_link_raises_not_found(session):
     tag = _make_tag(session, actor.id)
     session.commit()
     with pytest.raises(NotFoundError):
-        _service().patch_tag(session, ann.FormAnnotationID, tag.TagID, "x", actor)
+        _service(session).patch_tag(session, ann.FormAnnotationID, tag.TagID, "x", actor)
 
 
 def test_untag_removes_link(session):
@@ -357,7 +357,7 @@ def test_untag_removes_link(session):
     ann = _make_annotation(session, "t7")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service()
+    service = _service(session)
     service.tag(session, ann.FormAnnotationID, tag.TagID, None, actor)
 
     service.untag(session, ann.FormAnnotationID, tag.TagID, actor)
@@ -378,4 +378,4 @@ def test_untag_absent_link_is_idempotent(session):
     session.commit()
 
     # Does not raise even though no link exists.
-    _service().untag(session, ann.FormAnnotationID, tag.TagID, actor)
+    _service(session).untag(session, ann.FormAnnotationID, tag.TagID, actor)

@@ -72,9 +72,9 @@ def _make_image(session, public_id: str) -> int:
     return image.ImageInstanceID
 
 
-def _service(logger=None) -> ImageInstanceService:
+def _service(session, logger=None) -> ImageInstanceService:
     return ImageInstanceService(
-        ImageInstanceRepository(), TagRepository(), logger=logger
+        ImageInstanceRepository(), TagRepository(session), logger=logger
     )
 
 
@@ -109,7 +109,7 @@ def test_get_instance_returns_it(session):
     image_id = _make_image(session, "pub-1")
     session.commit()
 
-    got = _service().get_instance(session, image_id, **_READ_KW)
+    got = _service(session).get_instance(session, image_id, **_READ_KW)
 
     assert got.ImageInstanceID == image_id
 
@@ -117,19 +117,19 @@ def test_get_instance_returns_it(session):
 def test_get_instance_unknown_raises_not_found(session):
     """Getting a missing instance is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_instance(session, 999_999, **_READ_KW)
+        _service(session).get_instance(session, 999_999, **_READ_KW)
 
 
 def test_get_by_public_id_unknown_raises_not_found(session):
     """Resolving a missing PublicID is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_by_public_id(session, "nope", **_READ_KW)
+        _service(session).get_by_public_id(session, "nope", **_READ_KW)
 
 
 def test_get_for_storage_unknown_raises_not_found(session):
     """get_for_storage on a missing PublicID raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_for_storage(session, "missing")
+        _service(session).get_for_storage(session, "missing")
 
 
 def test_tag_instance_creates_link(session):
@@ -139,7 +139,7 @@ def test_tag_instance_creates_link(session):
     tag = _make_tag(session, actor.id)
     session.commit()
 
-    link = _service().tag_instance(session, "pub-1", tag.TagID, "hi", actor)
+    link = _service(session).tag_instance(session, "pub-1", tag.TagID, "hi", actor)
 
     assert link.TagID == tag.TagID
     assert link.Comment == "hi"
@@ -152,7 +152,7 @@ def test_tag_instance_unknown_instance_raises_not_found(session):
     tag = _make_tag(session, actor.id)
     session.commit()
     with pytest.raises(NotFoundError):
-        _service().tag_instance(session, "nope", tag.TagID, None, actor)
+        _service(session).tag_instance(session, "nope", tag.TagID, None, actor)
 
 
 def test_tag_instance_unknown_tag_raises_not_found(session):
@@ -161,7 +161,7 @@ def test_tag_instance_unknown_tag_raises_not_found(session):
     _make_image(session, "pub-1")
     session.commit()
     with pytest.raises(NotFoundError):
-        _service().tag_instance(session, "pub-1", 999_999, None, actor)
+        _service(session).tag_instance(session, "pub-1", 999_999, None, actor)
 
 
 def test_tag_instance_wrong_tag_type_raises_bad_request(session):
@@ -171,7 +171,7 @@ def test_tag_instance_wrong_tag_type_raises_bad_request(session):
     tag = _make_tag(session, actor.id, tag_type=TagType.Segmentation)
     session.commit()
     with pytest.raises(BadRequestError):
-        _service().tag_instance(session, "pub-1", tag.TagID, None, actor)
+        _service(session).tag_instance(session, "pub-1", tag.TagID, None, actor)
 
 
 def test_tag_instance_existing_updates_comment(session):
@@ -180,7 +180,7 @@ def test_tag_instance_existing_updates_comment(session):
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service()
+    service = _service(session)
 
     service.tag_instance(session, "pub-1", tag.TagID, "first", actor)
     link = service.tag_instance(session, "pub-1", tag.TagID, "second", actor)
@@ -196,7 +196,7 @@ def test_tag_instance_logs_insert(session):
     session.commit()
     logger = FakeAuditLogger()
 
-    _service(logger).tag_instance(session, "pub-1", tag.TagID, None, actor)
+    _service(session, logger).tag_instance(session, "pub-1", tag.TagID, None, actor)
 
     assert len(logger.inserts) == 1
     assert logger.inserts[0]["entity"] == "ImageInstanceTagLink"
@@ -208,7 +208,7 @@ def test_patch_instance_tag_updates_comment(session):
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service()
+    service = _service(session)
     service.tag_instance(session, "pub-1", tag.TagID, "old", actor)
 
     link = service.patch_instance_tag(session, "pub-1", tag.TagID, "new", actor)
@@ -223,7 +223,7 @@ def test_patch_instance_tag_unknown_link_raises_not_found(session):
     tag = _make_tag(session, actor.id)
     session.commit()
     with pytest.raises(NotFoundError):
-        _service().patch_instance_tag(session, "pub-1", tag.TagID, "x", actor)
+        _service(session).patch_instance_tag(session, "pub-1", tag.TagID, "x", actor)
 
 
 def test_untag_instance_removes_link(session):
@@ -232,7 +232,7 @@ def test_untag_instance_removes_link(session):
     image_id = _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service()
+    service = _service(session)
     service.tag_instance(session, "pub-1", tag.TagID, None, actor)
 
     service.untag_instance(session, "pub-1", tag.TagID, actor)
@@ -248,7 +248,7 @@ def test_untag_instance_absent_link_is_idempotent(session):
     session.commit()
 
     # Does not raise even though no link exists.
-    _service().untag_instance(session, "pub-1", tag.TagID, actor)
+    _service(session).untag_instance(session, "pub-1", tag.TagID, actor)
 
 
 def test_tag_instance_update_logs_raw_string_public_id(session):
@@ -258,7 +258,7 @@ def test_tag_instance_update_logs_raw_string_public_id(session):
     tag = _make_tag(session, actor.id)
     session.commit()
     logger = FakeAuditLogger()
-    service = _service(logger)
+    service = _service(session, logger)
 
     service.tag_instance(session, "pub-1", tag.TagID, "first", actor)
     service.tag_instance(session, "pub-1", tag.TagID, "second", actor)
@@ -275,4 +275,4 @@ def test_patch_instance_tag_wrong_tag_type_raises_bad_request(session):
     tag = _make_tag(session, actor.id, tag_type=TagType.Segmentation)
     session.commit()
     with pytest.raises(BadRequestError):
-        _service().patch_instance_tag(session, "pub-1", tag.TagID, "x", actor)
+        _service(session).patch_instance_tag(session, "pub-1", tag.TagID, "x", actor)

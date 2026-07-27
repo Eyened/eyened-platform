@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from eyened_orm import ImageInstance, ImageInstanceTagLink
@@ -7,6 +8,7 @@ from eyened_orm.repositories.image_instance_repository import ImageInstanceRepos
 from eyened_orm.repositories.tag_repository import TagRepository
 from eyened_orm.tag import TagType
 
+from ..db import get_db
 from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
 from .acting_user import ActingUser
 from .exceptions import BadRequestError, NotFoundError
@@ -103,7 +105,7 @@ class ImageInstanceService:
         instance = self.repository.get_with_storage_by_public_id(session, public_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
-        tag = self.tags.get_by_id(session, tag_id)
+        tag = self.tags.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.ImageInstance:
@@ -172,7 +174,7 @@ class ImageInstanceService:
         instance = self.repository.get_with_storage_by_public_id(session, public_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
-        tag = self.tags.get_by_id(session, tag_id)
+        tag = self.tags.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.ImageInstance:
@@ -241,8 +243,10 @@ class ImageInstanceService:
         return None
 
 
-def get_image_instance_service() -> ImageInstanceService:
+def get_image_instance_service(
+    db: Session = Depends(get_db),
+) -> ImageInstanceService:
     """Default ImageInstanceService wiring for FastAPI ``Depends()``."""
     return ImageInstanceService(
-        ImageInstanceRepository(), TagRepository(), logger=get_db_logger()
+        ImageInstanceRepository(), TagRepository(db), logger=get_db_logger()
     )
