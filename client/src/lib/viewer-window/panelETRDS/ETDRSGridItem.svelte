@@ -75,6 +75,7 @@
 
     function armLandmark(e: MouseEvent, field: LandmarkField) {
         e.stopPropagation();
+        if (!canEditForm) return;
         onArmLandmark(formAnnotation, field);
     }
 </script>
@@ -111,6 +112,8 @@
             type="button"
             class="landmark"
             class:armed={selected && armedField === "fovea"}
+            disabled={!canEditForm}
+            title={!canEditForm ? "Editing not allowed" : undefined}
             onclick={(e) => armLandmark(e, "fovea")}
         >
             <span class="name">Fovea (f)</span>
@@ -120,6 +123,8 @@
             type="button"
             class="landmark"
             class:armed={selected && armedField === "disc_edge"}
+            disabled={!canEditForm}
+            title={!canEditForm ? "Editing not allowed" : undefined}
             onclick={(e) => armLandmark(e, "disc_edge")}
         >
             <span class="name">Disc (d)</span>
@@ -209,8 +214,13 @@
         opacity: 1;
     }
 
-    button.landmark:hover {
+    button.landmark:hover:not(:disabled) {
         background: rgba(255, 255, 255, 0.15);
+    }
+
+    button.landmark:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
     }
 
     button.landmark.armed {

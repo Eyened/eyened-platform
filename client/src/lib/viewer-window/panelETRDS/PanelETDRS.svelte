@@ -129,17 +129,23 @@
     ) {
         if (!filtered.some((f) => f.id === formAnnotation.id)) return;
 
-        // Already editing this annotation — just switch slot.
-        if (selectedId === formAnnotation.id && activeTool) {
-            activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
-            return;
-        }
-
+        const editingTool =
+            selectedId === formAnnotation.id ? activeTool : undefined;
         ensureOverlay(formAnnotation);
         selectedId = formAnnotation.id;
 
-        if (!globalContext.canEdit(formAnnotation)) {
+        // PointTool must not run on linked images; landmarks use owner pixel space.
+        if (
+            !belongsToThisImage(formAnnotation) ||
+            !globalContext.canEdit(formAnnotation)
+        ) {
             deactivateTool();
+            return;
+        }
+
+        // Already editing this annotation — just switch slot.
+        if (editingTool) {
+            editingTool.placementIndex = field === "disc_edge" ? 1 : 0;
             return;
         }
 
@@ -187,10 +193,6 @@
         formAnnotation: FormAnnotationGET,
         field: LandmarkField,
     ) {
-        if (selectedId === formAnnotation.id && activeTool) {
-            activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
-            return;
-        }
         open(formAnnotation, field);
     }
 
