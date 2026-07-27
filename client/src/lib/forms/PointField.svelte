@@ -1,11 +1,11 @@
 <script lang="ts">
     import { Button } from "$lib/components/ui/button";
-    import { Input } from "$lib/components/ui/input";
     import {
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
     import { formAnnotations } from "$lib/data";
+    import PointImageGroup from "$lib/forms/PointImageGroup.svelte";
     import { pointArming, FormPointSession } from "$lib/forms/pointArming.svelte";
     import {
         analyzePointSchema,
@@ -341,167 +341,23 @@
             <div class="empty">no points</div>
         {:else}
             {#each imageGroups as group (group.publicId)}
-                <div class="image-group">
-                    <div class="group-line">
-                        {#if analysis.storageMode === "byPublicId"}
-                            <span class="public-id" title={group.publicId}
-                                >{group.publicId}</span
-                            >
-                            <span class="sep">:</span>
-                        {/if}
-                        <span class="count">{group.rows.length} pts</span>
-                        <span class="paren">(</span>
-                        {#each group.rows as row, i (rowKey(row))}
-                            {#if i > 0}<span class="comma">, </span>{/if}
-                            <button
-                                type="button"
-                                class="coord-chip"
-                                class:expanded={expandedKey === rowKey(row)}
-                                title={canEdit
-                                    ? "Click to edit labels / coordinates"
-                                    : formatCoord(row.pt) + extraPreview(row.pt)}
-                                onclick={() => toggleExpand(row)}
-                            >
-                                {formatCoord(row.pt)}{#if extraPreview(row.pt)}<span
-                                        class="extra-preview"
-                                        >{extraPreview(row.pt)}</span
-                                    >{/if}
-                            </button>
-                        {/each}
-                        <span class="paren">)</span>
-                    </div>
-
-                    {#each group.rows as row (rowKey(row))}
-                        {#if expandedKey === rowKey(row)}
-                            <div class="editor">
-                                <div class="editor-coords">
-                                    <label>
-                                        x
-                                        <Input
-                                            type="number"
-                                            step="1"
-                                            disabled={!canEdit}
-                                            value={Math.round(row.pt.x)}
-                                            oninput={(e) =>
-                                                updatePointCoord(
-                                                    row.publicId,
-                                                    row.index,
-                                                    "x",
-                                                    (
-                                                        e.currentTarget as HTMLInputElement
-                                                    ).value,
-                                                )}
-                                        />
-                                    </label>
-                                    <label>
-                                        y
-                                        <Input
-                                            type="number"
-                                            step="1"
-                                            disabled={!canEdit}
-                                            value={Math.round(row.pt.y)}
-                                            oninput={(e) =>
-                                                updatePointCoord(
-                                                    row.publicId,
-                                                    row.index,
-                                                    "y",
-                                                    (
-                                                        e.currentTarget as HTMLInputElement
-                                                    ).value,
-                                                )}
-                                        />
-                                    </label>
-                                    {#if indexApplicable(row.pt)}
-                                        <label
-                                            title="B-scan index; empty = enface (null)"
-                                        >
-                                            i
-                                            <Input
-                                                type="number"
-                                                step="1"
-                                                disabled={!canEdit}
-                                                value={typeof row.pt.index ===
-                                                "number"
-                                                    ? Math.round(row.pt.index)
-                                                    : ""}
-                                                placeholder="null"
-                                                oninput={(e) =>
-                                                    updatePointCoord(
-                                                        row.publicId,
-                                                        row.index,
-                                                        "index",
-                                                        (
-                                                            e.currentTarget as HTMLInputElement
-                                                        ).value,
-                                                    )}
-                                            />
-                                        </label>
-                                    {/if}
-                                </div>
-
-                                {#if hasExtras}
-                                    <div class="editor-extras">
-                                        {#each analysis.enumExtras as extra}
-                                            <label>
-                                                {extra.key}
-                                                <select
-                                                    disabled={!canEdit}
-                                                    value={String(
-                                                        row.pt[extra.key] ?? "",
-                                                    )}
-                                                    onchange={(e) =>
-                                                        updatePointExtra(
-                                                            row.publicId,
-                                                            row.index,
-                                                            extra.key,
-                                                            (
-                                                                e.currentTarget as HTMLSelectElement
-                                                            ).value,
-                                                        )}
-                                                >
-                                                    <option value="">—</option>
-                                                    {#each extra.values as opt}
-                                                        <option value={opt}
-                                                            >{opt}</option
-                                                        >
-                                                    {/each}
-                                                </select>
-                                            </label>
-                                        {/each}
-                                        {#each stringExtraKeys as key}
-                                            <label>
-                                                {key}
-                                                <Input
-                                                    disabled={!canEdit}
-                                                    value={String(
-                                                        row.pt[key] ?? "",
-                                                    )}
-                                                    oninput={(e) =>
-                                                        updatePointExtra(
-                                                            row.publicId,
-                                                            row.index,
-                                                            key,
-                                                            (
-                                                                e.currentTarget as HTMLInputElement
-                                                            ).value,
-                                                        )}
-                                                />
-                                            </label>
-                                        {/each}
-                                    </div>
-                                {/if}
-
-                                <button
-                                    type="button"
-                                    class="collapse"
-                                    onclick={() => (expandedKey = null)}
-                                >
-                                    Done
-                                </button>
-                            </div>
-                        {/if}
-                    {/each}
-                </div>
+                <PointImageGroup
+                    {group}
+                    storageMode={analysis.storageMode}
+                    {expandedKey}
+                    {canEdit}
+                    {hasExtras}
+                    enumExtras={analysis.enumExtras}
+                    {stringExtraKeys}
+                    {formatCoord}
+                    {extraPreview}
+                    {rowKey}
+                    {indexApplicable}
+                    onToggleExpand={toggleExpand}
+                    onUpdateCoord={updatePointCoord}
+                    onUpdateExtra={updatePointExtra}
+                    onCollapse={() => (expandedKey = null)}
+                />
             {/each}
         {/if}
     {/if}
@@ -545,94 +401,5 @@
         font-family: monospace;
         opacity: 0.7;
         color: inherit;
-    }
-    .image-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35em;
-    }
-    .group-line {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        gap: 0.15em 0.2em;
-        font-family: monospace;
-        font-size: 0.9em;
-        line-height: 1.5;
-    }
-    .public-id {
-        max-width: 12em;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        opacity: 0.85;
-    }
-    .sep,
-    .paren,
-    .comma,
-    .count {
-        opacity: 0.7;
-    }
-    .coord-chip {
-        appearance: none;
-        background: transparent;
-        border: 1px solid transparent;
-        border-radius: 0.35em;
-        color: inherit;
-        cursor: pointer;
-        font: inherit;
-        padding: 0.05em 0.3em;
-        margin: 0;
-        transition:
-            background-color 0.12s ease,
-            border-color 0.12s ease;
-    }
-    .coord-chip:hover {
-        background: color-mix(in srgb, currentColor 8%, transparent);
-        border-color: color-mix(in srgb, currentColor 35%, transparent);
-    }
-    .coord-chip.expanded {
-        background: color-mix(in srgb, currentColor 10%, transparent);
-        border-color: color-mix(in srgb, currentColor 45%, transparent);
-    }
-    .extra-preview {
-        opacity: 0.65;
-        font-size: 0.9em;
-    }
-    .editor {
-        display: flex;
-        flex-direction: column;
-        gap: 0.45em;
-        margin-left: 0.25em;
-        padding: 0.5em;
-        border-left: 2px solid rgba(255, 255, 255, 0.25);
-        background: rgba(255, 255, 255, 0.04);
-    }
-    .editor-coords,
-    .editor-extras {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5em 0.75em;
-        align-items: center;
-    }
-    .editor label {
-        display: flex;
-        align-items: center;
-        gap: 0.35em;
-        font-size: 0.9em;
-    }
-    .collapse {
-        align-self: flex-start;
-        appearance: none;
-        background: transparent;
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 3px;
-        color: inherit;
-        cursor: pointer;
-        font-size: 0.8em;
-        padding: 0.15em 0.5em;
-    }
-    .collapse:hover {
-        background: rgba(255, 255, 255, 0.08);
     }
 </style>
