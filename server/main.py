@@ -25,7 +25,6 @@ from server.routes import (
     studies,
     patients,
 )
-from server.utils.db_logging import init_db_logger
 from server.config import get_redis_connection, settings
 from server.services.exceptions import register_exception_handlers
 
@@ -116,8 +115,6 @@ async def lifespan(app: FastAPI):
 
     # Audit events go to stdout as JSON; app/debug logs stay on stderr.
     configure_audit_logging()
-    # Old file logger stays wired until the refactor's cleanup phase.
-    init_db_logger(settings)
 
     yield
     # after shutdown
