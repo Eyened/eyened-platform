@@ -55,7 +55,6 @@ export class SchemaValidator {
     }
 
     get keysSorted() {
-        console.log(this.schema);
         if (this.schema.properties) {
             const keys_sorted = Object.keys(this.schema.properties);
             if (this.schema._order) {

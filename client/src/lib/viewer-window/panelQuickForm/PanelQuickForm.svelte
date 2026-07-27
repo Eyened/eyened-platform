@@ -105,8 +105,9 @@
     {#if !schema}
         <p class="warning">Form schema not configured or not found.</p>
     {:else}
-        <p class="schema">Schema: {schema.name} ({entityScope})</p>
-        <p class="status">Status: {statusLabel}</p>
+        <p class="schema">Schema: {schema.name}</p>
+        <p class="scope">Scope: {entityScope}</p>
+        <p class="status {statusLabel.toLowerCase()}" >Status: {statusLabel}</p>
     {/if}
 
     <button onclick={onGradeClick} disabled={gradeDisabled}>
@@ -127,9 +128,19 @@
         font-size: 0.85em;
     }
     .schema,
+    .scope,
     .status {
         font-size: 0.85em;
         margin: 0;
+    }
+    .status.valid {
+        color: #16a34a;
+    }
+    .status.incomplete {
+        color: #f87171;
+    }
+    .status.invalid {
+        color: #f87171;
     }
     button {
         color: rgba(255, 255, 255, 0.8);

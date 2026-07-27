@@ -17,6 +17,17 @@ describe("placePoint", () => {
         ]);
     });
 
+    it("single replace preserves extras", () => {
+        expect(
+            placePoint(
+                [{ x: 1, y: 1, note: "keep" }],
+                { x: 9, y: 9 },
+                "single",
+                false,
+            ),
+        ).toEqual([{ x: 9, y: 9, note: "keep" }]);
+    });
+
     it("stores optional volume index", () => {
         expect(
             placePoint([], { x: 9, y: 9 }, "single", false, { index: 12 }),

@@ -160,7 +160,8 @@
             radius: 16,
             color: "rgba(0, 255, 0, 1)",
             cardinality: "list",
-            slotLabels: ["fovea", "disc"],
+            sparse: true,
+            slotLabels: ["Fovea", "Disc edge"],
             slotKeys: [
                 { index: 0, key: "f" },
                 { index: 1, key: "d" },

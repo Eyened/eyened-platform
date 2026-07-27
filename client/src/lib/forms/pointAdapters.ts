@@ -60,6 +60,10 @@ const MULTI_FIELD_POINT_SCHEMA = {
     required: ["x", "y"],
 } as const;
 
+/**
+ * ETDRS-style: named sibling keypoint fields ↔ one sparse list for PointTool.
+ * `slotLabels` default to `slots` (use schema titles from the panel when available).
+ */
 export function createMultiFieldAdapter(args: {
     slots: readonly string[];
     slotLabels?: readonly string[];
@@ -69,8 +73,8 @@ export function createMultiFieldAdapter(args: {
 }): PointAdapter {
     const analysis: PointSchemaAnalysis = {
         cardinality: "list",
-        storageMode: "bare",
-        registrationMode: true,
+        addressing: "bare",
+        sparse: true,
         pointObjectSchema: { ...MULTI_FIELD_POINT_SCHEMA },
         enumExtras: [],
     };

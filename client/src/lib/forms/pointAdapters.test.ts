@@ -15,10 +15,10 @@ const pointObject: JSONSchema = {
 describe("createFieldAdapter", () => {
     it("round-trips bare single via get/setPoints", () => {
         let value: unknown = undefined;
-        const analysis = analyzePointSchema(
-            { "x-eyened-widget": "point", ...pointObject },
-            "ImageInstance",
-        )!;
+        const analysis = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            ...pointObject,
+        })!;
         const adapter = createFieldAdapter({
             analysis,
             getPublicId: () => "img-a",
@@ -34,16 +34,13 @@ describe("createFieldAdapter", () => {
         expect(value).toBeUndefined();
     });
 
-    it("round-trips byPublicId list", () => {
+    it("round-trips byImage list", () => {
         let value: unknown = {};
-        const analysis = analyzePointSchema(
-            {
-                "x-eyened-widget": "point",
-                type: "object",
-                additionalProperties: { type: "array", items: pointObject },
-            },
-            "Eye",
-        )!;
+        const analysis = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            additionalProperties: { type: "array", items: pointObject },
+        })!;
         const adapter = createFieldAdapter({
             analysis,
             getPublicId: () => "img-a",
@@ -65,7 +62,7 @@ describe("createMultiFieldAdapter", () => {
         };
         const adapter = createMultiFieldAdapter({
             slots: ["fovea", "disc_edge"],
-            slotLabels: ["fovea", "disc"],
+            slotLabels: ["Fovea", "Disc edge"],
             getPublicId: () => "img-a",
             getFormData: () => form_data,
             setFormData: (next) => {
@@ -83,8 +80,19 @@ describe("createMultiFieldAdapter", () => {
         });
         adapter.setPoints([{ x: 10, y: 20 }, null]);
         expect(form_data).toEqual({ fovea: { x: 10, y: 20 } });
-        expect(adapter.slotLabels).toEqual(["fovea", "disc"]);
+        expect(adapter.slotLabels).toEqual(["Fovea", "Disc edge"]);
         expect(adapter.analysis.cardinality).toBe("list");
-        expect(adapter.analysis.registrationMode).toBe(true);
+        expect(adapter.analysis.sparse).toBe(true);
+        expect(adapter.analysis.addressing).toBe("bare");
+    });
+
+    it("defaults slotLabels to slot keys", () => {
+        const adapter = createMultiFieldAdapter({
+            slots: ["fovea", "disc_edge"],
+            getPublicId: () => "img-a",
+            getFormData: () => ({}),
+            setFormData: () => {},
+        });
+        expect(adapter.slotLabels).toEqual(["fovea", "disc_edge"]);
     });
 });

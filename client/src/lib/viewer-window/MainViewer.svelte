@@ -132,7 +132,7 @@
             radius: session.radius,
             color: session.color,
             cardinality: analysis.cardinality,
-            registrationMode: analysis.registrationMode,
+            sparse: analysis.sparse,
             enumExtras: analysis.enumExtras,
             onChange: (points) => {
                 session.setPoints(publicId(), points);

@@ -1,6 +1,6 @@
 import type { JSONSchema } from "./schemaType";
 
-export const EYENED_POINT_WIDGET = "point" as const;
+export const EYENED_KEYPOINT_WIDGET = "keypoint" as const;
 
 export type ImagePoint = {
     x: number;
@@ -13,20 +13,22 @@ export type ImagePoint = {
     index?: number | null;
 } & Record<string, unknown>;
 export type PointCardinality = "single" | "list";
-export type PointStorageMode = "bare" | "byPublicId";
+/** Where the tool reads/writes relative to the field value. */
+export type PointAddressing = "bare" | "byImage";
 export type PointList = (ImagePoint | null)[];
 
 export type PointSchemaAnalysis = {
     cardinality: PointCardinality;
-    storageMode: PointStorageMode;
+    addressing: PointAddressing;
     /** Schema for one point object (items or the object itself). */
     pointObjectSchema: JSONSchema;
-    registrationMode: boolean;
+    /** List items may be null — mid-delete leaves holes; empty click fills first null. */
+    sparse: boolean;
     enumExtras: { key: string; values: readonly string[] }[];
 };
 
 export function isPointWidget(schema: JSONSchema): boolean {
-    return schema["x-eyened-widget"] === EYENED_POINT_WIDGET;
+    return schema["x-eyened-widget"] === EYENED_KEYPOINT_WIDGET;
 }
 
 function schemaType(schema: JSONSchema | undefined): string | undefined {
@@ -43,7 +45,16 @@ function isPointObjectSchema(schema: JSONSchema | undefined): boolean {
     return false;
 }
 
-/** Unwrap oneOf/anyOf that pairs a point object with null (registration). */
+/** True if items schema allows null (oneOf/anyOf with null, or type null). */
+function itemsAllowNull(items: JSONSchema | undefined): boolean {
+    if (!items) return false;
+    if (schemaType(items) === "null") return true;
+    const alts = items.oneOf ?? items.anyOf;
+    if (!alts) return false;
+    return alts.some((option) => schemaType(option) === "null");
+}
+
+/** Unwrap oneOf/anyOf that pairs a point object with null (sparse lists). */
 function unwrapPointItemSchema(
     schema: JSONSchema | undefined,
 ): JSONSchema | null {
@@ -78,46 +89,45 @@ function enumExtrasFromPointSchema(
 }
 
 /**
- * Classify a point-widget field schema.
+ * Classify a keypoint-widget field schema from shape alone.
  * Returns null if the widget marker is present but the shape is not point-like.
  */
 export function analyzePointSchema(
     schema: JSONSchema,
-    entityType: string | null | undefined,
 ): PointSchemaAnalysis | null {
     if (!isPointWidget(schema)) return null;
 
-    const storageMode: PointStorageMode =
-        entityType === "ImageInstance" ? "bare" : "byPublicId";
-    const registrationMode = schema["x-eyened-point-mode"] === "registration";
-
     let cardinality: PointCardinality;
+    let addressing: PointAddressing = "bare";
+    let sparse = false;
     let pointObjectSchema: JSONSchema | null;
+    let itemsSchema: JSONSchema | undefined;
 
     const t = schemaType(schema);
+    const additional = schema.additionalProperties;
 
-    if (t === "array") {
-        cardinality = "list";
-        pointObjectSchema = unwrapPointItemSchema(schema.items);
-    } else if (t === "object" || schema.additionalProperties) {
-        const additional = schema.additionalProperties;
-        if (additional && typeof additional === "object") {
-            const addType = schemaType(additional);
-            if (addType === "array") {
-                cardinality = "list";
-                pointObjectSchema = unwrapPointItemSchema(additional.items);
-            } else if (isPointObjectSchema(additional)) {
-                cardinality = "single";
-                pointObjectSchema = additional;
-            } else {
-                return null;
-            }
-        } else if (isPointObjectSchema(schema)) {
+    if (additional && typeof additional === "object") {
+        addressing = "byImage";
+        const addType = schemaType(additional);
+        if (addType === "array") {
+            cardinality = "list";
+            itemsSchema = additional.items;
+            pointObjectSchema = unwrapPointItemSchema(itemsSchema);
+            sparse = itemsAllowNull(itemsSchema);
+        } else if (isPointObjectSchema(additional)) {
             cardinality = "single";
-            pointObjectSchema = schema;
+            pointObjectSchema = additional;
         } else {
             return null;
         }
+    } else if (t === "array") {
+        cardinality = "list";
+        itemsSchema = schema.items;
+        pointObjectSchema = unwrapPointItemSchema(itemsSchema);
+        sparse = itemsAllowNull(itemsSchema);
+    } else if (isPointObjectSchema(schema)) {
+        cardinality = "single";
+        pointObjectSchema = schema;
     } else {
         return null;
     }
@@ -126,9 +136,9 @@ export function analyzePointSchema(
 
     return {
         cardinality,
-        storageMode,
+        addressing,
         pointObjectSchema,
-        registrationMode,
+        sparse,
         enumExtras: enumExtrasFromPointSchema(pointObjectSchema),
     };
 }
@@ -149,14 +159,14 @@ function normalizeList(value: unknown): PointList {
     );
 }
 
-/** Always returns an array (0–1 elements for single). Preserves null entries for registration. */
+/** Always returns an array (0–1 elements for single). Preserves null entries when sparse. */
 export function getPointsForImage(
     fieldValue: unknown,
     publicId: string,
     analysis: PointSchemaAnalysis,
 ): PointList {
     if (!analysis) return [];
-    if (analysis.storageMode === "bare") {
+    if (analysis.addressing === "bare") {
         if (analysis.cardinality === "single") {
             return isImagePoint(fieldValue) ? [fieldValue] : [];
         }
@@ -181,7 +191,7 @@ export function setPointsForImage(
     points: PointList,
     analysis: PointSchemaAnalysis,
 ): unknown {
-    if (analysis.storageMode === "bare") {
+    if (analysis.addressing === "bare") {
         if (analysis.cardinality === "single") {
             const first = points.find((p) => p != null);
             return first ?? undefined;

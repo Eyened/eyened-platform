@@ -92,19 +92,16 @@
 
     function registrationAnalysis() {
         const fromApi = (registrationSchema.schema ?? {}) as JSONSchema;
-        const entityType = registrationSchema.entity_type ?? "Eye";
-        const withMarkers = (schema: JSONSchema): JSONSchema => ({
+        const withMarker = (schema: JSONSchema): JSONSchema => ({
             ...schema,
             type: "object",
-            "x-eyened-widget": "point",
-            "x-eyened-point-mode": "registration",
+            "x-eyened-widget": "keypoint",
         });
 
         return (
-            analyzePointSchema(withMarkers(fromApi), entityType) ??
+            analyzePointSchema(withMarker(fromApi)) ??
             analyzePointSchema(
-                withMarkers({ additionalProperties: REGISTRATION_POINTS }),
-                entityType,
+                withMarker({ additionalProperties: REGISTRATION_POINTS }),
             )
         );
     }
@@ -165,8 +162,8 @@
             pointStyle: pointMarker.style,
             radius: pointMarker.radius,
             color: pointMarker.color,
-            cardinality: "list",
-            registrationMode: true,
+            cardinality: analysis.cardinality,
+            sparse: analysis.sparse,
             onChange: (points) => {
                 const existing =
                     formAnnotations.get(annotationId) ?? formAnnotation;

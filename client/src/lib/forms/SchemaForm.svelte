@@ -151,7 +151,6 @@
                 {value}
                 {onchange}
                 {canEdit}
-                entityType={entityType ?? "ImageInstance"}
                 fieldPath={fieldPath || schema.title || "point"}
             />
         {:else if schema.type == "object"}

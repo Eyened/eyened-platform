@@ -21,108 +21,124 @@ const pointObject: JSONSchema = {
 };
 
 describe("isPointWidget", () => {
-    it("detects x-eyened-widget point", () => {
+    it("detects keypoint marker", () => {
         expect(
-            isPointWidget({ "x-eyened-widget": "point", ...pointObject }),
+            isPointWidget({ "x-eyened-widget": "keypoint", ...pointObject }),
         ).toBe(true);
         expect(isPointWidget(pointObject)).toBe(false);
     });
 });
 
 describe("analyzePointSchema", () => {
-    it("ImageInstance single object → bare single", () => {
-        const a = analyzePointSchema(
-            { "x-eyened-widget": "point", ...pointObject },
-            "ImageInstance",
-        );
+    it("bare single object", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            ...pointObject,
+        });
         expect(a).toMatchObject({
             cardinality: "single",
-            storageMode: "bare",
-            registrationMode: false,
+            addressing: "bare",
+            sparse: false,
         });
         expect(a!.enumExtras).toEqual([
             { key: "severity", values: ["mild", "severe"] },
         ]);
     });
 
-    it("ImageInstance array → bare list", () => {
-        const a = analyzePointSchema(
-            {
-                "x-eyened-widget": "point",
-                type: "array",
-                items: pointObject,
-            },
-            "ImageInstance",
-        );
-        expect(a).toMatchObject({ cardinality: "list", storageMode: "bare" });
-    });
-
-    it("Eye map of arrays → byPublicId list + registrationMode", () => {
-        const a = analyzePointSchema(
-            {
-                "x-eyened-widget": "point",
-                "x-eyened-point-mode": "registration",
-                type: "object",
-                additionalProperties: {
-                    type: "array",
-                    items: {
-                        oneOf: [pointObject, { type: "null" }],
-                    },
-                },
-            },
-            "Eye",
-        );
+    it("bare list", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "array",
+            items: pointObject,
+        });
         expect(a).toMatchObject({
             cardinality: "list",
-            storageMode: "byPublicId",
-            registrationMode: true,
+            addressing: "bare",
+            sparse: false,
         });
     });
 
-    it("accepts anyOf for nullable registration items", () => {
-        const a = analyzePointSchema(
-            {
-                "x-eyened-widget": "point",
-                "x-eyened-point-mode": "registration",
-                type: "object",
-                additionalProperties: {
-                    type: "array",
-                    items: {
-                        anyOf: [pointObject, { type: "null" }],
-                    },
-                },
+    it("byImage map of arrays → list, not sparse", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            additionalProperties: {
+                type: "array",
+                items: pointObject,
             },
-            "Eye",
-        );
+        });
         expect(a).toMatchObject({
             cardinality: "list",
-            registrationMode: true,
+            addressing: "byImage",
+            sparse: false,
+        });
+    });
+
+    it("byImage map of nullable arrays → sparse", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            additionalProperties: {
+                type: "array",
+                items: {
+                    oneOf: [pointObject, { type: "null" }],
+                },
+            },
+        });
+        expect(a).toMatchObject({
+            cardinality: "list",
+            addressing: "byImage",
+            sparse: true,
+        });
+    });
+
+    it("accepts anyOf for nullable items", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            additionalProperties: {
+                type: "array",
+                items: {
+                    anyOf: [pointObject, { type: "null" }],
+                },
+            },
+        });
+        expect(a).toMatchObject({ sparse: true, addressing: "byImage" });
+    });
+
+    it("byImage single point per image", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            additionalProperties: pointObject,
+        });
+        expect(a).toMatchObject({
+            cardinality: "single",
+            addressing: "byImage",
+            sparse: false,
         });
     });
 
     it("returns null when widget present but shape is not point-like", () => {
         expect(
-            analyzePointSchema(
-                { "x-eyened-widget": "point", type: "string" },
-                "ImageInstance",
-            ),
+            analyzePointSchema({
+                "x-eyened-widget": "keypoint",
+                type: "string",
+            }),
         ).toBeNull();
     });
 });
 
 describe("get/setPointsForImage", () => {
-    const bareSingle = analyzePointSchema(
-        { "x-eyened-widget": "point", ...pointObject },
-        "ImageInstance",
-    )!;
-    const mapList = analyzePointSchema(
-        {
-            "x-eyened-widget": "point",
-            type: "object",
-            additionalProperties: { type: "array", items: pointObject },
-        },
-        "Eye",
-    )!;
+    const bareSingle = analyzePointSchema({
+        "x-eyened-widget": "keypoint",
+        ...pointObject,
+    })!;
+    const mapList = analyzePointSchema({
+        "x-eyened-widget": "keypoint",
+        type: "object",
+        additionalProperties: { type: "array", items: pointObject },
+    })!;
 
     it("bare single round-trip", () => {
         const pts = [{ x: 1, y: 2 }];
@@ -136,7 +152,7 @@ describe("get/setPointsForImage", () => {
         ).toBeUndefined();
     });
 
-    it("byPublicId list round-trip", () => {
+    it("byImage list round-trip", () => {
         const value = setPointsForImage({}, "img-a", [{ x: 1, y: 2 }], mapList);
         expect(value).toEqual({ "img-a": [{ x: 1, y: 2 }] });
         expect(getPointsForImage(value, "img-a", mapList)).toEqual([

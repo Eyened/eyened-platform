@@ -21,7 +21,7 @@ export class FormPointSession {
     readonly analysis: PointSchemaAnalysis;
     private readonly setFieldValue: (next: unknown) => void;
 
-    /** Live field JSON while armed (bare list or byPublicId map). */
+    /** Live field JSON while armed (bare list or by-image map). */
     fieldValue = $state<unknown>(undefined);
 
     constructor(args: {

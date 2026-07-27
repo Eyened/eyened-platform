@@ -1,12 +1,15 @@
 <script lang="ts">
-    import type { ImagePoint, PointStorageMode } from "$lib/forms/pointSchema";
+    import type {
+        ImagePoint,
+        PointAddressing,
+    } from "$lib/forms/pointSchema";
     import PointRowEditor, {
         type PointRow,
     } from "$lib/forms/PointRowEditor.svelte";
 
     interface Props {
         group: { publicId: string; rows: PointRow[] };
-        storageMode: PointStorageMode;
+        addressing: PointAddressing;
         expandedKey: string | null;
         canEdit: boolean;
         hasExtras: boolean;
@@ -35,7 +38,7 @@
 
     let {
         group,
-        storageMode,
+        addressing,
         expandedKey,
         canEdit,
         hasExtras,
@@ -55,7 +58,7 @@
 
 <div class="image-group">
     <div class="group-line">
-        {#if storageMode === "byPublicId"}
+        {#if addressing === "byImage"}
             <span class="public-id" title={group.publicId}
                 >{group.publicId}</span
             >

@@ -13,7 +13,7 @@ export function placePoint(
     points: PointList,
     position: Position2D,
     cardinality: PointCardinality,
-    registrationMode: boolean,
+    sparse: boolean,
     options?: PlacePointOptions,
 ): PointList {
     const next: ImagePoint = { x: position.x, y: position.y };
@@ -22,11 +22,13 @@ export function placePoint(
     }
 
     if (cardinality === "single") {
-        return [next];
+        const prev = points.find((p) => p != null);
+        // Keep non-spatial extras (note, severity, …) when replacing the one point.
+        return [prev ? { ...prev, ...next } : next];
     }
 
     const copy = [...points];
-    if (registrationMode) {
+    if (sparse) {
         for (let i = 0; i <= copy.length; i++) {
             if (!copy[i]) {
                 copy[i] = next;
@@ -58,12 +60,12 @@ export function placePointAt(
 export function deletePointAt(
     points: PointList,
     index: number,
-    registrationMode: boolean,
+    sparse: boolean,
 ): PointList {
     const copy = [...points];
     if (index < 0 || index >= copy.length) return copy;
 
-    if (registrationMode) {
+    if (sparse) {
         if (index === copy.length - 1) {
             copy.splice(index, 1);
         } else {

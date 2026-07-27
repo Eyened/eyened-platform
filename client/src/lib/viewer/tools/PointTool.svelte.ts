@@ -31,7 +31,7 @@ export type PointToolOptions = {
      * Registration lists: empty click fills first null; mid-list delete → null.
      * Ignored when `placementIndex` is set (fixed-slot / ETDRS mode).
      */
-    registrationMode?: boolean;
+    sparse?: boolean;
     slotLabels?: readonly string[];
     /** Keyboard shortcut → place into that index (also sets placementIndex). */
     slotKeys?: readonly { index: number; key: string }[];
@@ -75,7 +75,7 @@ export class PointTool implements Overlay {
     private readonly radius: number;
     private readonly color: string;
     private readonly cardinality: PointCardinality;
-    private readonly registrationMode: boolean;
+    private readonly sparse: boolean;
     private readonly slotLabels: readonly string[] | undefined;
     private readonly slotKeys:
         | readonly { index: number; key: string }[]
@@ -93,7 +93,7 @@ export class PointTool implements Overlay {
         this.color = options.color ?? defaultStroke;
         this.name = options.label || "Point";
         this.cardinality = options.cardinality ?? "list";
-        this.registrationMode = options.registrationMode ?? false;
+        this.sparse = options.sparse ?? false;
         this.slotLabels = options.slotLabels;
         this.slotKeys = options.slotKeys;
         this.enumExtras = options.enumExtras ?? [];
@@ -131,7 +131,7 @@ export class PointTool implements Overlay {
                       before,
                       position,
                       this.cardinality,
-                      this.registrationMode,
+                      this.sparse,
                       indexOpts,
                   );
 
@@ -208,7 +208,7 @@ export class PointTool implements Overlay {
         }
 
         if (
-            this.registrationMode &&
+            this.sparse &&
             this.placementIndex === undefined &&
             event.key >= "0" &&
             event.key <= "9"
@@ -287,7 +287,7 @@ export class PointTool implements Overlay {
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
                 const useNullDelete =
-                    this.registrationMode || this.placementIndex !== undefined;
+                    this.sparse || this.placementIndex !== undefined;
                 this.setPoints(deletePointAt(this.points, hit, useNullDelete), {
                     persist: true,
                 });
@@ -323,7 +323,7 @@ export class PointTool implements Overlay {
         context2D.font = "16px sans-serif";
 
         const r = this.radius;
-        const showIndex = this.cardinality === "list" || this.registrationMode;
+        const showIndex = this.cardinality === "list" || this.sparse;
 
         for (const [index, pt] of points.entries()) {
             if (!pt) continue;
@@ -338,12 +338,14 @@ export class PointTool implements Overlay {
 
             let label = this.slotLabels?.[index];
             if (!label) {
-                label = showIndex ? `${index + 1}` : this.name;
                 const extraLabel = this.extraLabel(pt);
-                if (extraLabel) {
-                    label = showIndex
+                if (showIndex) {
+                    label = extraLabel
                         ? `${index + 1}:${extraLabel}`
-                        : extraLabel;
+                        : `${index + 1}`;
+                } else {
+                    // Single: extra if set, else field title (this.name).
+                    label = extraLabel ?? this.name;
                 }
             }
             if (label) {

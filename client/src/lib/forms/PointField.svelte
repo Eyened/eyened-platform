@@ -29,7 +29,6 @@
         value: unknown;
         onchange: (value: unknown) => void;
         canEdit?: boolean;
-        entityType?: string | null;
         fieldPath?: string;
     }
 
@@ -38,7 +37,6 @@
         value,
         onchange,
         canEdit = true,
-        entityType = "ImageInstance",
         fieldPath = "point",
     }: Props = $props();
 
@@ -58,7 +56,7 @@
         ).point_marker,
     );
 
-    const analysis = $derived(analyzePointSchema(schema, entityType));
+    const analysis = $derived(analyzePointSchema(schema));
     const armKey = $derived(
         `form:${formAnnotationId ?? "unknown"}:${fieldPath}`,
     );
@@ -76,7 +74,7 @@
 
     const pointRows = $derived.by((): PointRow[] => {
         if (!analysis) return [];
-        if (analysis.storageMode === "bare") {
+        if (analysis.addressing === "bare") {
             const pid = publicId || boundImageId || "";
             if (!pid) return [];
             return getPointsForImage(displayValue, pid, analysis).flatMap(
@@ -217,7 +215,7 @@
             onchange(undefined);
             return;
         }
-        if (analysis.storageMode === "byPublicId") {
+        if (analysis.addressing === "byImage") {
             if (liveSession) {
                 liveSession.fieldValue = {};
                 liveSession.persist();
@@ -236,6 +234,20 @@
         expandedKey = null;
         if (armed) pointArming.disarm(armKey);
     }
+
+    /** Omit the field from form_data (undefined), not an empty list — for optional fields. */
+    function removeField() {
+        if (liveSession) {
+            liveSession.fieldValue = undefined;
+            liveSession.persist();
+        } else {
+            onchange(undefined);
+        }
+        expandedKey = null;
+        if (armed) pointArming.disarm(armKey);
+    }
+
+    const fieldPresent = $derived(displayValue !== undefined);
 
     // Unmount MainViewer PointTools when this annotation is deleted or the field unmounts.
     $effect(() => {
@@ -302,7 +314,7 @@
         if (!analysis) return;
         commitPoints(
             pid,
-            deletePointAt(pointsFor(pid), index, analysis.registrationMode),
+            deletePointAt(pointsFor(pid), index, analysis.sparse),
         );
         expandedKey = null;
     }
@@ -341,6 +353,15 @@
                 >
                     Clear
                 </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onclick={removeField}
+                    disabled={!fieldPresent}
+                    title="Omit this field from the grading (absent, not an empty list)"
+                >
+                    Remove
+                </Button>
             {/if}
         </div>
 
@@ -350,7 +371,7 @@
             {#each imageGroups as group (group.publicId)}
                 <PointImageGroup
                     {group}
-                    storageMode={analysis.storageMode}
+                    addressing={analysis.addressing}
                     {expandedKey}
                     {canEdit}
                     {hasExtras}

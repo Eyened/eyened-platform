@@ -145,17 +145,22 @@
                 </label>
             {/each}
             {#each stringExtraKeys as key (key)}
+                {@const extraVal = row.pt[key]}
                 <label>
                     {key}
-                    <Input
+                    <!-- Native controlled input: shadcn Input's $bindable+bind:value
+                         does not reliably show one-way value={...} updates. -->
+                    <input
+                        type="text"
+                        class="extra-input"
                         disabled={!canEdit}
-                        value={String(row.pt[key] ?? "")}
+                        value={typeof extraVal === "string" ? extraVal : ""}
                         oninput={(e) =>
                             onUpdateExtra(
                                 row.publicId,
                                 row.index,
                                 key,
-                                (e.currentTarget as HTMLInputElement).value,
+                                e.currentTarget.value,
                             )}
                     />
                 </label>
@@ -208,6 +213,18 @@
         align-items: center;
         gap: 0.35em;
         font-size: 0.9em;
+    }
+    .extra-input {
+        min-width: 8em;
+        padding: 0.2em 0.4em;
+        font: inherit;
+        color: inherit;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 3px;
+    }
+    .extra-input:disabled {
+        opacity: 0.55;
     }
     .icon-btn {
         appearance: none;
