@@ -15,11 +15,8 @@
 
     interface Props {
         formAnnotation: FormAnnotationGET;
-        settings: { radiusFraction: number };
         overlayActive: boolean;
         selected: boolean;
-        /** False for linked images — landmarks are only editable on the owner image. */
-        canEditLandmarks?: boolean;
         armedField?: LandmarkField;
         onToggleOverlay: (
             formAnnotation: FormAnnotationGET,
@@ -36,7 +33,6 @@
         formAnnotation,
         overlayActive,
         selected,
-        canEditLandmarks = false,
         armedField,
         onToggleOverlay,
         onSelect,
@@ -62,7 +58,6 @@
     }
 
     function selectRoot(e: MouseEvent) {
-        // Interactive children stopPropagation; anything else selects the item.
         e.stopPropagation();
         onSelect(formAnnotation);
     }
@@ -80,7 +75,6 @@
 
     function armLandmark(e: MouseEvent, field: LandmarkField) {
         e.stopPropagation();
-        if (!canEditLandmarks) return;
         onArmLandmark(formAnnotation, field);
     }
 </script>
@@ -117,11 +111,6 @@
             type="button"
             class="landmark"
             class:armed={selected && armedField === "fovea"}
-            class:editable={canEditLandmarks}
-            disabled={!canEditLandmarks}
-            title={canEditLandmarks
-                ? undefined
-                : "Edit landmarks on the image this annotation belongs to"}
             onclick={(e) => armLandmark(e, "fovea")}
         >
             <span class="name">Fovea (f)</span>
@@ -131,11 +120,6 @@
             type="button"
             class="landmark"
             class:armed={selected && armedField === "disc_edge"}
-            class:editable={canEditLandmarks}
-            disabled={!canEditLandmarks}
-            title={canEditLandmarks
-                ? undefined
-                : "Edit landmarks on the image this annotation belongs to"}
             onclick={(e) => armLandmark(e, "disc_edge")}
         >
             <span class="name">Disc (d)</span>
@@ -221,16 +205,11 @@
         border-radius: 2px;
         background: rgba(0, 0, 0, 0.25);
         color: inherit;
-        cursor: default;
-        opacity: 0.85;
-    }
-
-    button.landmark.editable {
         cursor: pointer;
         opacity: 1;
     }
 
-    button.landmark.editable:hover {
+    button.landmark:hover {
         background: rgba(255, 255, 255, 0.15);
     }
 
@@ -238,10 +217,6 @@
         background: rgb(57, 158, 165);
         border-color: rgb(57, 158, 165);
         color: white;
-    }
-
-    button.landmark:disabled {
-        cursor: default;
     }
 
     button.landmark .name {
