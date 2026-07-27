@@ -81,7 +81,11 @@
     $effect(() => {
         if (selectedId === undefined) return;
         const formAnnotation = filtered.find((f) => f.id === selectedId);
-        if (!formAnnotation || !globalContext.canEdit(formAnnotation)) return;
+        if (!formAnnotation) {
+            close();
+            return;
+        }
+        if (!globalContext.canEdit(formAnnotation)) return;
         if (pointArming.session?.key !== `etdrs:${selectedId}`) {
             selectedId = undefined;
         }
@@ -108,11 +112,14 @@
             return;
         }
 
+        const priorId = selectedId;
         ensureOverlay(formAnnotation);
         selectedId = formAnnotation.id;
 
         if (!globalContext.canEdit(formAnnotation)) {
-            pointArming.disarm();
+            if (priorId !== undefined) {
+                pointArming.disarm(`etdrs:${priorId}`);
+            }
             return;
         }
 
