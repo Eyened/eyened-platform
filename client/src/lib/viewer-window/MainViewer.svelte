@@ -142,7 +142,7 @@
         const tool = new PointTool({
             canEdit: session.canEdit,
             adapter,
-            label: adapter.slotLabels?.[0] ?? "Point",
+            label: session.label ?? adapter.slotLabels?.[0] ?? "Point",
             pointStyle: session.pointStyle,
             radius: session.radius,
             color: session.color,

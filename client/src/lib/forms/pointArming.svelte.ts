@@ -20,6 +20,8 @@ type PointSessionBase = {
     slotKeys?: readonly PointSlotKey[];
     /** When true, empty click uses placePointAt(activeSlot). Default: !!slotKeys?.length */
     useActiveSlotPlacement?: boolean;
+    /** Optional display label for the tool/marker (e.g. the schema field title). */
+    label?: string;
 };
 
 export type PointSession = PointSessionBase &
@@ -46,8 +48,18 @@ class PointArming {
     session: PointSession | null = $state(null);
     activeSlot: number = $state(0);
 
+    /**
+     * Arm a new session. Same key + same host toggles the session off
+     * (re-click to disarm). Same key + different host replaces the current
+     * session rather than toggling it off, so arming keys can collide across
+     * viewers (e.g. the same annotation open in two MainViewers) without one
+     * viewer's click silently disarming another viewer's tool.
+     */
     arm(session: PointSession): void {
-        if (this.session?.key === session.key) {
+        if (
+            this.session?.key === session.key &&
+            this.session?.host === session.host
+        ) {
             this.disarm();
             return;
         }

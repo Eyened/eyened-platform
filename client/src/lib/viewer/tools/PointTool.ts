@@ -151,7 +151,15 @@ export class PointTool implements Overlay {
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {
-        const { event, viewerContext } = e;
+        const { event, viewerContext, cursor } = e;
+
+        if (
+            this.options.slotKeys?.some(
+                (s) => s.key.toLowerCase() === event.key.toLowerCase(),
+            )
+        ) {
+            this.endDrag(viewerContext, cursor);
+        }
 
         if (
             this.options.adapter.analysis.registrationMode &&
@@ -181,7 +189,6 @@ export class PointTool implements Overlay {
                 (s) => s.key.toLowerCase() === event.key.toLowerCase(),
             );
             if (match) {
-                this.options.setActiveSlot?.(match.index);
                 this.placeAtCursor(viewerContext, cursor, match.index);
                 return;
             }

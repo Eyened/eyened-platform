@@ -65,19 +65,24 @@
     let selectedId = $state<number | undefined>(undefined);
 
     /** Which landmark receives empty clicks, derived from the active point session so it
-     * always reflects reality (falls back to fovea when this item isn't the armed one). */
+     * always reflects reality (falls back to fovea when this item isn't the armed one).
+     * Host-scoped: the same `etdrs:${id}` key can be armed from a different
+     * MainViewer (e.g. same annotation open in two viewers), and that must
+     * not be mistaken for this viewer's own armed state. */
     const placementField = $derived<LandmarkField>(
         pointArming.session?.key === `etdrs:${selectedId}` &&
+            pointArming.session?.host === viewerContext &&
             pointArming.activeSlot === 1
             ? "disc_edge"
             : "fovea",
     );
 
-    // If another session takes over arming (a different ETDRS item, or another
-    // panel entirely) while this item was the editable/armed selection, the
-    // selection here goes stale: clear it so highlighting doesn't lie. Items
-    // that were never armed (not editable) are left selected — they only show
-    // as "open", not "armed", and don't depend on the point session.
+    // If another session takes over arming (a different ETDRS item, another
+    // panel entirely, or the same item armed from a different viewer) while
+    // this item was the editable/armed selection, the selection here goes
+    // stale: clear it so highlighting doesn't lie. Items that were never
+    // armed (not editable) are left selected — they only show as "open", not
+    // "armed", and don't depend on the point session.
     $effect(() => {
         if (selectedId === undefined) return;
         const formAnnotation = filtered.find((f) => f.id === selectedId);
@@ -86,7 +91,10 @@
             return;
         }
         if (!globalContext.canEdit(formAnnotation)) return;
-        if (pointArming.session?.key !== `etdrs:${selectedId}`) {
+        if (
+            pointArming.session?.key !== `etdrs:${selectedId}` ||
+            pointArming.session?.host !== viewerContext
+        ) {
             selectedId = undefined;
         }
     });

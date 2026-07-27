@@ -118,8 +118,15 @@
         onactivate(formAnnotation);
     }
 
+    // Scoped to this viewer's own session: other MainViewers (e.g. collapsed
+    // panels for other images) share the same global `pointArming.session`,
+    // so without the host check their `activeID` would also resolve to
+    // whichever annotation is armed elsewhere and their `!panelActive` effect
+    // below would disarm it.
     const activeID = $derived.by(() => {
-        const key = pointArming.session?.key;
+        const session = pointArming.session;
+        if (session?.host !== viewerContext) return undefined;
+        const key = session?.key;
         if (!key?.startsWith("registration:")) return undefined;
         const id = Number(key.slice("registration:".length));
         return Number.isFinite(id) ? id : undefined;
@@ -133,12 +140,6 @@
         }
 
         const key = `registration:${formAnnotation.id}`;
-
-        if (pointArming.session?.key === key) {
-            pointArming.disarm(key);
-            return;
-        }
-
         const analysis = registrationAnalysis();
         if (!analysis) {
             console.error(

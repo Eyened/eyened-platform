@@ -189,6 +189,7 @@
             pointStyle: pointMarker.style,
             radius: pointMarker.radius,
             color: pointMarker.color,
+            label: schema.title || fieldPath,
             // no host → all MainViewers
             fieldBinding: {
                 analysis,
