@@ -118,7 +118,12 @@
         onactivate(formAnnotation);
     }
 
-    let activeID: number | undefined = $state(undefined);
+    const activeID = $derived.by(() => {
+        const key = pointArming.session?.key;
+        if (!key?.startsWith("registration:")) return undefined;
+        const id = Number(key.slice("registration:".length));
+        return Number.isFinite(id) ? id : undefined;
+    });
 
     function onactivate(formAnnotation: any) {
         const stillExists = filtered.some((f) => f.id === formAnnotation.id);
@@ -131,7 +136,6 @@
 
         if (pointArming.session?.key === key) {
             pointArming.disarm(key);
-            activeID = undefined;
             return;
         }
 
@@ -171,13 +175,11 @@
                 },
             }),
         });
-        activeID = annotationId;
     }
 
     function onremove(formAnnotation: any) {
         if (activeID === formAnnotation.id) {
             pointArming.disarm(`registration:${formAnnotation.id}`);
-            activeID = undefined;
         }
         deleteFormAnnotation(formAnnotation.id);
     }
@@ -186,7 +188,6 @@
             if (activeID !== undefined) {
                 pointArming.disarm(`registration:${activeID}`);
             }
-            activeID = undefined;
         }
     });
 </script>
