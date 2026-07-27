@@ -3,18 +3,18 @@ import type { Position2D } from "$lib/types";
 import { AffineRegistration } from "./affine";
 
 export function getPointsetRegistrations(data: {
-    [img_id: string]: (Position2D | undefined)[];
+    [img_id: string]: (Position2D | null | undefined)[];
 }): AffineRegistration[] {
     const result: AffineRegistration[] = [];
     const keys = Object.keys(data).sort();
 
     for (let i = 0; i < keys.length; i++) {
-        const source = keys[i];
-        const sourcePoints = data[source];
+        const source = keys[i]!;
+        const sourcePoints = data[source] ?? [];
 
         for (let j = i + 1; j < keys.length; j++) {
-            const target = keys[j];
-            const targetPoints = data[target];
+            const target = keys[j]!;
+            const targetPoints = data[target] ?? [];
 
             const M = getMatrixFromPointSets(sourcePoints, targetPoints);
             if (M) {

@@ -1,6 +1,12 @@
 <script lang="ts">
-    import { formSchemas } from "$lib/data/stores.svelte";
-    import type { FormAnnotationGET } from "../../types/openapi_types";
+    /**
+     * Keeps `registration` in sync with patient attrs + form-annotation
+     * transforms. Pointset / affine form annotations are applied *after*
+     * patient attrs so the last edited pointset always overrides any
+     * existing edge between the same image ids.
+     */
+    import { formAnnotations, formSchemas } from "$lib/data/stores.svelte";
+    import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
     import {
         getAffineTransforms,
         getPointsetRegistrations,
@@ -10,53 +16,63 @@
         getRegistrationSets,
         type RegistrationSet,
     } from "$lib/registration/registrationItem";
-    import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
 
     interface Props {
         registration: Registration;
-        formAnnotation?: FormAnnotationGET;
         registrationSet?: RegistrationSet[];
     }
-    let { registration, formAnnotation, registrationSet }: Props = $props();
+    let { registration, registrationSet }: Props = $props();
 
-    const formSchema = $derived(
-        formAnnotation
-            ? formSchemas.get(formAnnotation.form_schema_id)
-            : undefined,
-    );
+    $effect(() => {
+        // Track patient sets (new array identity when patients/instances change).
+        const patientSets = registrationSet;
 
-    const updateFromFormAnnotation = (value: any) => {
-        if (value && formSchema) {
+        // Track every builtin registration form_data so point edits re-run this.
+        const formItems: { name: string; form_data: unknown }[] = [];
+        for (const fa of formAnnotations.values()) {
+            const schema = formSchemas.get(fa.form_schema_id);
+            if (!schema || !fa.form_data) continue;
             if (
-                formSchema.name ===
-                BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION
+                schema.name ===
+                    BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION ||
+                schema.name ===
+                    BUILTIN_VIEWER_FORM_SCHEMA_NAMES.AFFINE_REGISTRATION ||
+                schema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.REGISTRATION_SET
             ) {
-                const items = getPointsetRegistrations(value);
-                registration.importRegistrationItems(items);
-                registration.recomputePathsNow();
-            } else if (
-                formSchema.name ===
-                BUILTIN_VIEWER_FORM_SCHEMA_NAMES.AFFINE_REGISTRATION
-            ) {
-                const items = getAffineTransforms(value);
-                registration.importRegistrationItems(items);
-                registration.recomputePathsNow();
-            } else if (
-                formSchema.name ===
-                BUILTIN_VIEWER_FORM_SCHEMA_NAMES.REGISTRATION_SET
-            ) {
-                const items = getRegistrationSets(value);
-                registration.importRegistrationItems(items);
-                registration.recomputePathsNow();
+                formItems.push({ name: schema.name, form_data: fa.form_data });
             }
         }
-    };
 
-    const updateFromPatientAttrs = (value: RegistrationSet[] | undefined) => {
-        if (value?.length) {
-            registration.importPatientRegistrationSets(value);
+        if (patientSets?.length) {
+            registration.importPatientRegistrationSets(patientSets);
         }
-    };
-    $effect(() => updateFromFormAnnotation(formAnnotation?.form_data));
-    $effect(() => updateFromPatientAttrs(registrationSet));
+
+        for (const { name, form_data } of formItems) {
+            if (
+                name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION
+            ) {
+                registration.importRegistrationItems(
+                    getPointsetRegistrations(
+                        form_data as {
+                            [img_id: string]: ({ x: number; y: number } | null)[];
+                        },
+                    ),
+                );
+            } else if (
+                name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.AFFINE_REGISTRATION
+            ) {
+                registration.importRegistrationItems(
+                    getAffineTransforms(form_data as any),
+                );
+            } else if (
+                name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.REGISTRATION_SET
+            ) {
+                registration.importRegistrationItems(
+                    getRegistrationSets(form_data as RegistrationSet[]),
+                );
+            }
+        }
+
+        registration.recomputePathsNow();
+    });
 </script>
