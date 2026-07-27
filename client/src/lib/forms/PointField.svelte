@@ -6,13 +6,14 @@
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
     import { formAnnotations } from "$lib/data";
-    import { pointArming } from "$lib/forms/pointArming.svelte";
+    import { pointArming, FormPointSession } from "$lib/forms/pointArming.svelte";
     import {
         analyzePointSchema,
         getPointsForImage,
         isPointWidget,
         setPointsForImage,
         type ImagePoint,
+        type PointList,
     } from "$lib/forms/pointSchema";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
@@ -58,9 +59,17 @@
         `form:${formAnnotationId ?? "unknown"}:${fieldPath}`,
     );
     const armed = $derived(pointArming.session?.key === armKey);
+    const liveSession = $derived(
+        armed ? pointArming.session : null,
+    );
 
     const publicId = $derived(
         seedViewerContext?.image.instance.id ?? boundImageId ?? "",
+    );
+
+    /** Prefer live session value while armed so chips/labels track the tool. */
+    const displayValue = $derived(
+        liveSession ? liveSession.fieldValue : value,
     );
 
     type PointRow = { publicId: string; index: number; pt: ImagePoint };
@@ -70,13 +79,19 @@
         if (analysis.storageMode === "bare") {
             const pid = publicId || boundImageId || "";
             if (!pid) return [];
-            return getPointsForImage(value, pid, analysis).flatMap((pt, index) =>
-                pt ? [{ publicId: pid, index, pt }] : [],
+            return getPointsForImage(displayValue, pid, analysis).flatMap(
+                (pt, index) => (pt ? [{ publicId: pid, index, pt }] : []),
             );
         }
         const ids = new Set<string>();
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-            for (const key of Object.keys(value as Record<string, unknown>)) {
+        if (
+            displayValue &&
+            typeof displayValue === "object" &&
+            !Array.isArray(displayValue)
+        ) {
+            for (const key of Object.keys(
+                displayValue as Record<string, unknown>,
+            )) {
                 ids.add(key);
             }
         }
@@ -84,7 +99,7 @@
         const rows: PointRow[] = [];
         for (const id of [...ids].sort()) {
             for (const [index, pt] of getPointsForImage(
-                value,
+                displayValue,
                 id,
                 analysis,
             ).entries()) {
@@ -184,17 +199,19 @@
 
     function toggleActivate() {
         if (!analysis || !seedViewerContext) return;
-        pointArming.arm({
-            key: armKey,
-            canEdit,
-            pointStyle: pointMarker.style,
-            radius: pointMarker.radius,
-            color: pointMarker.color,
-            label: schema.title || fieldPath,
-            analysis,
-            getFieldValue: () => value,
-            setFieldValue: (next) => onchange(next),
-        });
+        pointArming.arm(
+            new FormPointSession({
+                key: armKey,
+                canEdit,
+                pointStyle: pointMarker.style,
+                radius: pointMarker.radius,
+                color: pointMarker.color,
+                label: schema.title || fieldPath,
+                analysis,
+                initialValue: value,
+                setFieldValue: (next) => onchange(next),
+            }),
+        );
     }
 
     function clear() {
@@ -203,10 +220,20 @@
             return;
         }
         if (analysis.storageMode === "byPublicId") {
-            onchange({});
+            if (liveSession) {
+                liveSession.fieldValue = {};
+                liveSession.persist();
+            } else {
+                onchange({});
+            }
         } else {
             const pid = publicId || boundImageId || "";
-            onchange(setPointsForImage(value, pid, [], analysis));
+            if (liveSession) {
+                liveSession.setPoints(pid, []);
+                liveSession.persist();
+            } else {
+                onchange(setPointsForImage(value, pid, [], analysis));
+            }
         }
         expandedKey = null;
         if (armed) pointArming.disarm(armKey);
@@ -224,13 +251,19 @@
         pointArming.disarm(armKey);
     });
 
-    function commitPoints(pid: string, pts: (ImagePoint | null)[]) {
+    function commitPoints(pid: string, pts: PointList) {
         if (!analysis) return;
+        if (liveSession) {
+            liveSession.setPoints(pid, pts);
+            liveSession.persist();
+            return;
+        }
         onchange(setPointsForImage(value, pid, pts, analysis));
     }
 
     function pointsFor(pid: string) {
-        if (!analysis) return [] as (ImagePoint | null)[];
+        if (!analysis) return [] as PointList;
+        if (liveSession) return liveSession.getPoints(pid);
         return getPointsForImage(value, pid, analysis);
     }
 

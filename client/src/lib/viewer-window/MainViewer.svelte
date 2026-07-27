@@ -18,10 +18,6 @@
     import { resolvePanels } from "./resolvePanels";
     import { CLIENT_DEFAULTS, mergeClientConfig } from "./taskConfigLayout";
     import { pointArming } from "$lib/forms/pointArming.svelte";
-    import {
-        getPointsForImage,
-        setPointsForImage,
-    } from "$lib/forms/pointSchema";
     import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     interface Props {
         image: AbstractImage;
@@ -118,14 +114,16 @@
         }
     });
 
-    // Form PointField: each MainViewer mounts a PointTool synced to the field
-    // via onChange / initial points load (PublicID = this viewer's image).
+    // Form PointField: mount PointTool while a session is armed. Live SoT is
+    // session.fieldValue — do not remount when it changes (only on session key).
     $effect(() => {
         const session = pointArming.session;
         if (!session) return;
+        const sessionKey = session.key;
+        const { analysis } = session;
+        void sessionKey;
 
         const publicId = () => viewerContext.image.instance.id;
-        const { analysis } = session;
 
         const tool = new PointTool({
             canEdit: session.canEdit,
@@ -137,24 +135,25 @@
             registrationMode: analysis.registrationMode,
             enumExtras: analysis.enumExtras,
             onChange: (points) => {
-                session.setFieldValue(
-                    setPointsForImage(
-                        session.getFieldValue(),
-                        publicId(),
-                        points,
-                        analysis,
-                    ),
-                );
+                session.setPoints(publicId(), points);
+            },
+            onPersist: (points) => {
+                session.setPoints(publicId(), points);
+                session.persist();
             },
         });
-        tool.points = getPointsForImage(
-            session.getFieldValue(),
-            publicId(),
-            analysis,
-        );
 
         const remove = viewerContext.addOverlay(tool);
+
+        // Keep tool.points in sync with session (PointField edits, other viewers).
+        const stopSync = $effect.root(() => {
+            $effect(() => {
+                tool.points = session.getPoints(publicId());
+            });
+        });
+
         return () => {
+            stopSync();
             tool.destroy();
             remove();
         };
