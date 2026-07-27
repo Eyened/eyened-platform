@@ -25,11 +25,12 @@ Two guards live here:
 
 Exemptions, and what would remove them:
 
-- server/routes/import_api.py is excluded entirely (whole file, not
-  individual functions). Human decision: that module is slated for
-  deprecation and will not be converted. It legitimately holds a Session for
-  ``ImportRun.apply()`` and for the explicit ``session.rollback()`` on its
-  caught-failure path (Task 17).
+- server/routes/import_api.py::import_single_image (R1) is exempted by name in
+  both guards -- not a whole-file exclusion; an earlier version of this guard
+  skipped the entire file, which would have hidden any handler later added to
+  it. Human decision: that module is slated for deprecation and will not be
+  converted. It legitimately holds a Session for ``ImportRun.apply()`` and for
+  the explicit ``session.rollback()`` on its caught-failure path (Task 17).
 - audit_service.py's ``_drain``/``_clear`` are SQLAlchemy ``after_commit`` /
   ``after_rollback`` event-listener callbacks; SQLAlchemy dictates their
   ``(session)`` signature. They are part of the already-declared AuditService
@@ -42,13 +43,16 @@ Exemptions, and what would remove them:
 - Seven auth.py route handlers (``login``, ``get_token``,
   ``get_current_user_info``, ``change_password``, ``register_user``,
   ``refresh_token``, ``oidc_authenticate``) hold ``session`` ONLY to forward
-  it to one of the five resolvers above, or to ``AuditService``/
-  ``create_user`` (also declared exceptions). The plan exempted those callees
-  but never named the callers that must obtain and forward the session --
-  fixing that omission is what this exemption set is. What would remove it:
-  converting the auth resolvers into FastAPI dependencies, so route handlers
-  stop receiving a Session at all and have nothing left to forward. That
-  conversion is out of scope for this guard.
+  it to one of the five resolvers above, or to ``create_user`` (also a
+  declared exception). ``change_password``/``register_user`` separately depend
+  on ``AuditService`` via ``Depends(get_audit_service)``, a DI factory
+  parameter -- structurally exempt (``_is_di_factory`` below), not a session
+  forward. The plan exempted the resolver callees but never named the callers
+  that must obtain and forward the session -- fixing that omission is what
+  this exemption set is. What would remove it: converting the auth resolvers
+  into FastAPI dependencies, so route handlers stop receiving a Session at
+  all and have nothing left to forward. That conversion is out of scope for
+  this guard.
 
 Blind spot: both scans key on the bare names ``session``/``db`` (parameter
 name for guard 1, call-receiver name for guard 2), so a local alias (e.g.
@@ -65,9 +69,6 @@ import pathlib
 _ROOT = pathlib.Path(__file__).resolve().parents[1]  # server/
 _SERVICES = _ROOT / "services"
 _ROUTES = _ROOT / "routes"
-
-# R1: whole-file exclusion, applies to both guards. See module docstring.
-_EXCLUDED_FILES = {"import_api.py"}
 
 
 def _is_di_factory(name: str) -> bool:
@@ -97,17 +98,20 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     ("auth.py", "login"): "forwards session to check_login/creator_to_response only",
     ("auth.py", "get_token"): "forwards session to check_login/creator_to_response only",
     ("auth.py", "get_current_user_info"): "forwards session to CurrentUser.get_creator/creator_to_response only",
-    ("auth.py", "change_password"): "forwards session to check_login/AuditService/creator_to_response only",
-    ("auth.py", "register_user"): "forwards session to create_user/AuditService/creator_to_response only",
-    ("auth.py", "refresh_token"): "forwards session to CreatorRepository/AuditService/creator_to_response only",
+    ("auth.py", "change_password"): "forwards session to check_login/creator_to_response only",
+    ("auth.py", "register_user"): "forwards session to create_user/creator_to_response only",
+    ("auth.py", "refresh_token"): "forwards session to CreatorRepository/creator_to_response only",
     ("auth.py", "oidc_authenticate"): "forwards session to check_oidc_login/creator_to_response only",
+    # R1: import_api.py is slated for deprecation (see module docstring); only
+    # import_single_image holds a Session, for ImportRun.apply().
+    ("import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; holds Session for ImportRun.apply()",
 }
 
 
 def _offenders(root: pathlib.Path) -> list[str]:
     bad: list[str] = []
     for path in root.rglob("*.py"):
-        if "__pycache__" in path.parts or path.name in _EXCLUDED_FILES:
+        if "__pycache__" in path.parts:
             continue
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
@@ -146,24 +150,27 @@ _DB_METHODS = {
     "add", "add_all", "delete", "merge", "flush", "commit", "rollback", "refresh",
 }
 
-# Only the five auth resolvers need an entry here: they are the only
-# functions in scope that legitimately call session.<method>()/db.<method>()
-# directly. The seven R3 forwarding handlers need no entry -- they pass
-# `session` as a plain argument and never call a method on it themselves, so
-# they are not offenders here in the first place.
+# The five auth resolvers and import_single_image are the only functions in
+# scope that legitimately call session.<method>()/db.<method>() directly. The
+# seven R3 forwarding handlers need no entry -- they pass `session` as a plain
+# argument and never call a method on it themselves, so they are not
+# offenders here in the first place.
 _DB_ACCESS_ALLOWED: dict[tuple[str, str], str] = {
     ("auth.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
     ("auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
     ("auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
     ("auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
     ("auth.py", "creator_to_response"): "read-only response helper with an optional session param",
+    # R1: human decision: import_api.py is slated for deprecation. Calls
+    # session.rollback() on the caught-failure path (Task 17).
+    ("import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
 }
 
 
 def _db_access_offenders(root: pathlib.Path) -> list[str]:
     bad: list[str] = []
     for path in root.rglob("*.py"):
-        if "__pycache__" in path.parts or path.name in _EXCLUDED_FILES:
+        if "__pycache__" in path.parts:
             continue
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):

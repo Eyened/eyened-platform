@@ -141,7 +141,7 @@ class TaskService:
             "contact_id": task.ContactID,
             "task_definition_id": task.TaskDefinitionID,
             "creator_id": task.CreatorID,
-            "task_state": str(task.TaskState) if task.TaskState else None,
+            "task_state": task.TaskState,
         }
         self.tasks.delete(task)
         if self.audit is not None:
@@ -291,7 +291,7 @@ class SubTaskService:
         deleted_data = {
             "task_id": subtask.TaskID,
             "comments": subtask.Comments,
-            "task_state": str(subtask.TaskState) if subtask.TaskState else None,
+            "task_state": subtask.TaskState,
             "creator_id": subtask.CreatorID,
         }
         self.subtasks.delete(subtask)

@@ -110,3 +110,28 @@ def test_diff_omits_fields_set_to_their_current_value(session):
 
     feature.FeatureName = "stable"
     assert AuditService.diff(feature, "FeatureName") == {}
+
+
+def test_record_persists_enum_member_in_changes_as_its_value(session):
+    """A raw (non-str) Enum member in changes flushes clean and is stored as .value, not the object."""
+    from eyened_orm.tag import TagType
+
+    AuditService(session).record(
+        action="UPDATE", entity="Tag", actor=_actor(), entity_id=1,
+        changes={"tag_type": TagType.ImageInstance},
+    )
+    row = session.query(AuditLog).one()
+    assert row.Changes == {"tag_type": "ImageInstance"}
+
+
+def test_record_persists_datetime_in_changes_as_isoformat(session):
+    """A raw datetime in changes flushes clean and is stored as an ISO 8601 string."""
+    from datetime import datetime, timezone
+
+    ts = datetime(2026, 1, 1, 12, 30, tzinfo=timezone.utc)
+    AuditService(session).record(
+        action="UPDATE", entity="Feature", actor=_actor(), entity_id=1,
+        changes={"updated_at": ts},
+    )
+    row = session.query(AuditLog).one()
+    assert row.Changes == {"updated_at": ts.isoformat()}

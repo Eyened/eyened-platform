@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import enum
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import Depends
 from sqlalchemy import event
@@ -16,6 +17,21 @@ from .acting_user import ActingUser
 
 _AUDIT_LOGGER = logging.getLogger("eyened.audit")
 _BUFFER_KEY = "_audit_events"
+
+
+def _json_safe(o: object) -> object:
+    """``json.dumps(..., default=...)`` fallback for values ``diff()``/callers put
+    in ``changes``. ``TagType``, ``TaskState``, ``SubTaskState`` and ``Laterality``
+    are plain ``Enum`` subclasses (not ``str, Enum``), and ``AuditLog.Changes`` is a
+    stock JSON column (no ``default=``); serializing a raw enum member or a
+    datetime otherwise raises ``StatementError`` on flush. Scoped to this one
+    normalization site so other JSON columns (``FormData``, ``TaskConfig``, ...)
+    keep failing loudly on genuinely unserializable data."""
+    if isinstance(o, enum.Enum):
+        return o.value
+    if isinstance(o, (datetime, date)):
+        return o.isoformat()
+    return str(o)
 
 
 class AuditService:
@@ -41,6 +57,15 @@ class AuditService:
             return
         ts = datetime.now(timezone.utc)
         actor_id = actor.id if actor is not None else None
+        # Normalize once: both the AuditLog row and the stdout mirror must see the
+        # same JSON-safe data. Round-tripping through json.dumps/loads (rather
+        # than a shallow per-value map) also covers enums/datetimes nested inside
+        # dicts or lists, which diff()'s {"old": ..., "new": ...} shape can produce.
+        safe_changes = (
+            json.loads(json.dumps(changes, default=_json_safe))
+            if changes is not None
+            else None
+        )
         row = AuditLog(
             Timestamp=ts,
             ActorID=actor_id,
@@ -49,7 +74,7 @@ class AuditService:
             Entity=entity,
             EntityID=None if entity_id is None else str(entity_id),
             ProjectID=project_id,
-            Changes=changes,
+            Changes=safe_changes,
         )
         self._session.add(row)
         self._session.flush()  # surface integrity errors in-request; assign PK
@@ -61,7 +86,7 @@ class AuditService:
             "entity": entity,
             "entity_id": row.EntityID,
             "project_id": project_id,
-            "changes": changes,
+            "changes": safe_changes,
         }
         self._session.info.setdefault(_BUFFER_KEY, []).append(event_payload)
 

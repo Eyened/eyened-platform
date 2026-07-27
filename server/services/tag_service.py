@@ -107,7 +107,7 @@ class TagService:
         deleted_data = {
             "name": tag.TagName,
             "description": tag.TagDescription,
-            "tag_type": str(tag.TagType),
+            "tag_type": tag.TagType,
         }
         self.repository.delete(tag)
         if self.audit is not None:

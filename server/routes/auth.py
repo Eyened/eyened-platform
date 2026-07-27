@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from ..config import get_oidc_metadata, settings
 from ..db import get_db
 from ..services.acting_user import ActingUser
-from ..services.audit_service import AuditService
+from ..services.audit_service import AuditService, get_audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +300,7 @@ def check_login(username: str, password: str, db: Session) -> Creator:
             # it at the request boundary.
             creator.PasswordHash = hash_password(password)
             creator.Password = None
-            AuditService(db).record(
+            AuditService(db, enabled=settings.db_log.enabled).record(
                 action="UPDATE",
                 entity="Creator",
                 actor=ActingUser(id=creator.CreatorID, username=creator.CreatorName),
@@ -395,6 +395,7 @@ async def change_password(
     change_password_data: ChangePasswordRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
+    audit: AuditService = Depends(get_audit_service),
 ):
     """Change user password."""
     creator = check_login(
@@ -406,7 +407,7 @@ async def change_password(
     creator.PasswordHash = hash_password(change_password_data.new_password)
     creator.Password = None  # Clear old hash if it exists
 
-    AuditService(session).record(
+    audit.record(
         action="UPDATE",
         entity="Creator",
         actor=ActingUser(id=current_user.id, username=current_user.username),
@@ -418,11 +419,15 @@ async def change_password(
 
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register_user(user_data: UserLogin, session: Session = Depends(get_db)):
+async def register_user(
+    user_data: UserLogin,
+    session: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+):
     """Register a new user."""
     new_user = create_user(session, user_data.username, user_data.password)
 
-    AuditService(session).record(
+    audit.record(
         action="INSERT",
         entity="Creator",
         trusted_path="auth:register",
