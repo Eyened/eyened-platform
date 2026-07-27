@@ -22,8 +22,10 @@ Concretely, seven handlers — `login`, `get_token`, `get_current_user_info`,
 take `session: Session = Depends(get_db)`. None of them touches the database
 itself (the guard's second test proves this); each holds the session **only to
 forward it** to `check_login`, `check_oidc_login`, `creator_to_response`,
-`CurrentUser.get_creator`, `create_user`, `AuditService(...)`, or
-`CreatorRepository(...)`.
+`CurrentUser.get_creator`, `create_user`, or `CreatorRepository(...)`.
+(`change_password`/`register_user` also depend on `AuditService`, but via a
+separate `Depends(get_audit_service)` parameter, not by forwarding `session`
+— see the 2026-07-27 update below.)
 
 The fix is **not** "turn the resolvers into FastAPI dependencies" — that doesn't
 work for most of them:
@@ -44,12 +46,22 @@ response building moved behind a repository read, and handlers depending on
 ## Why
 
 - Removes the seven named exemptions in the Task 19 guard, making it near-universal
-  (only `import_api.py` would remain, and that module is slated for deprecation).
-- Closes a partial kill-switch: inline `AuditService(session)` construction (both
-  `auth.py` and `import_api.py`) bypasses `settings.db_log.enabled` / `.level`,
-  which only `get_audit_service()` applies. `DbLogSettings.enabled` was added
-  precisely as the audit kill-switch, so today it does not cover every call site.
+  (only `import_api.py::import_single_image` would remain, and that module is
+  slated for deprecation).
 - Makes auth logic unit-testable without HTTP.
+
+**Closed separately (2026-07-27, commit `8d3359f`):** the partial kill-switch --
+inline `AuditService(session)` construction in `auth.py` and `import_api.py`
+bypassing `settings.db_log.enabled` -- no longer needs the full extraction. The
+fix-wave-1 review flagged it as a standalone bug (four call sites always ran
+with `enabled=True`), and it was closed directly: `change_password`/
+`register_user`/`import_single_image` now take
+`audit: AuditService = Depends(get_audit_service)`; `check_login` (not a route
+handler) passes `enabled=settings.db_log.enabled` explicitly. That commit also
+fixed the `AuditService.record()` JSON-serialization crash on enum/datetime
+`changes` values and narrowed the guard's `import_api.py` exclusion from
+whole-file to the one function that needs it. This item's remaining rationale
+(guard exemption count, testability) stands on its own.
 
 ## Why it was deferred (2026-07-27)
 
