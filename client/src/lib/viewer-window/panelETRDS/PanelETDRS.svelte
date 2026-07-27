@@ -21,6 +21,7 @@
     import { Hide, PanelIcon, Show } from "../icons/icons";
     import { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import ETDRSGridItem from "./ETDRSGridItem.svelte";
+    import ETDRSGridItemLinked from "./ETDRSGridItemLinked.svelte";
     import { SvelteMap, SvelteSet } from "svelte/reactivity";
 
     type LandmarkField = "fovea" | "disc_edge";
@@ -128,12 +129,8 @@
     ) {
         if (!filtered.some((f) => f.id === formAnnotation.id)) return;
 
-        // Already editing this annotation on the owner image — just switch slot.
-        if (
-            belongsToThisImage(formAnnotation) &&
-            selectedId === formAnnotation.id &&
-            activeTool
-        ) {
+        // Already editing this annotation — just switch slot.
+        if (selectedId === formAnnotation.id && activeTool) {
             activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
             return;
         }
@@ -141,12 +138,7 @@
         ensureOverlay(formAnnotation);
         selectedId = formAnnotation.id;
 
-        // Overlay may show on linked images via registration; the PointTool
-        // must not — markers are in the owner image's coordinates only.
-        if (
-            !belongsToThisImage(formAnnotation) ||
-            !globalContext.canEdit(formAnnotation)
-        ) {
+        if (!globalContext.canEdit(formAnnotation)) {
             deactivateTool();
             return;
         }
@@ -195,7 +187,6 @@
         formAnnotation: FormAnnotationGET,
         field: LandmarkField,
     ) {
-        if (!belongsToThisImage(formAnnotation)) return;
         if (selectedId === formAnnotation.id && activeTool) {
             activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
             return;
@@ -341,21 +332,26 @@
         {/if}
 
         {#each filtered as formAnnotation (formAnnotation.id)}
-            <ETDRSGridItem
-                {formAnnotation}
-                {settings}
-                overlayActive={overlayIds.has(formAnnotation.id)}
-                selected={selectedId === formAnnotation.id}
-                canEditLandmarks={belongsToThisImage(formAnnotation) &&
-                    globalContext.canEdit(formAnnotation)}
-                armedField={selectedId === formAnnotation.id && activeTool
-                    ? placementField
-                    : undefined}
-                onToggleOverlay={toggleOverlay}
-                onSelect={selectItem}
-                onRemove={onRemove}
-                onArmLandmark={armLandmark}
-            />
+            {#if belongsToThisImage(formAnnotation)}
+                <ETDRSGridItem
+                    {formAnnotation}
+                    overlayActive={overlayIds.has(formAnnotation.id)}
+                    selected={selectedId === formAnnotation.id}
+                    armedField={selectedId === formAnnotation.id && activeTool
+                        ? placementField
+                        : undefined}
+                    onToggleOverlay={toggleOverlay}
+                    onSelect={selectItem}
+                    onRemove={onRemove}
+                    onArmLandmark={armLandmark}
+                />
+            {:else}
+                <ETDRSGridItemLinked
+                    {formAnnotation}
+                    overlayActive={overlayIds.has(formAnnotation.id)}
+                    onToggleOverlay={toggleOverlay}
+                />
+            {/if}
         {/each}
     </div>
     <div class="new">
