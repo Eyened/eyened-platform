@@ -202,6 +202,12 @@
     $effect(() => {
         if (!panelActive) deactivate();
     });
+
+    // Unmount when the armed annotation is deleted (this viewer or another).
+    $effect(() => {
+        if (activeID === undefined) return;
+        if (!formAnnotations.has(activeID)) deactivate();
+    });
 </script>
 
 <div class="main">

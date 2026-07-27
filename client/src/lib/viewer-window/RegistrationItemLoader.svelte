@@ -54,7 +54,11 @@
                 registration.importRegistrationItems(
                     getPointsetRegistrations(
                         form_data as {
-                            [img_id: string]: ({ x: number; y: number } | null)[];
+                            [img_id: string]: ({
+                                x: number;
+                                y: number;
+                                index?: number | null;
+                            } | null)[];
                         },
                     ),
                 );

@@ -281,6 +281,17 @@
         if (selectedId === undefined) return;
         if (!filtered.some((f) => f.id === selectedId)) close();
     });
+
+    // Drop grid overlays whose FormAnnotation was deleted elsewhere.
+    $effect(() => {
+        const alive = new Set(filtered.map((f) => f.id));
+        for (const id of [...overlayIds]) {
+            if (alive.has(id)) continue;
+            overlays.get(id)?.();
+            overlays.delete(id);
+            overlayIds.delete(id);
+        }
+    });
 </script>
 
 <div class="main">

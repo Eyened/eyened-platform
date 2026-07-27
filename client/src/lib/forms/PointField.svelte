@@ -5,6 +5,7 @@
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
+    import { formAnnotations } from "$lib/data";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import {
         analyzePointSchema,
@@ -16,7 +17,7 @@
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { getContext } from "svelte";
+    import { getContext, onDestroy } from "svelte";
 
     interface Props {
         schema: JSONSchema;
@@ -210,6 +211,18 @@
         expandedKey = null;
         if (armed) pointArming.disarm(armKey);
     }
+
+    // Unmount MainViewer PointTools when this annotation is deleted or the field unmounts.
+    $effect(() => {
+        if (formAnnotationId == null) return;
+        if (!formAnnotations.has(formAnnotationId)) {
+            pointArming.disarm(armKey);
+        }
+    });
+
+    onDestroy(() => {
+        pointArming.disarm(armKey);
+    });
 
     function commitPoints(pid: string, pts: (ImagePoint | null)[]) {
         if (!analysis) return;
