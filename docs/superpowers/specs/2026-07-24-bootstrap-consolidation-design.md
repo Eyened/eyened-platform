@@ -54,7 +54,11 @@ Giving the server container `EYENED_STORAGE_MOUNTS` fixes (1) outright: it selec
 
 ### Migrations cannot run unattended
 
-`orm/migrations/alembic/env.py:56-65` calls bare `input()` for any command outside `{revision, history, current, heads, branches, show, check, list_templates, stamp}` — `upgrade` prompts. There is no `-x` flag, env var, or TTY check, so any non-interactive invocation dies.
+Two gates block unattended database setup, and they behave differently.
+
+`orm/migrations/alembic/env.py:56-65` calls bare `input()` for any command outside `{revision, history, current, heads, branches, show, check, list_templates, stamp}` — `upgrade` prompts. There is no `-x` flag, env var, or TTY check, so a non-interactive `upgrade` dies. The design **routes around this rather than changing it**: bootstrap uses the fresh-install path and only ever calls `current` and `heads`, which are already exempt.
+
+`orm/eyened_orm/commands/shared.py:24-31` is the harder one. `get_database(confirmation=True)` — used by `initialize-database` (`cli.py:86`) and `load-dump` (`cli.py:467`) — prints a **randomly generated four-letter code** and requires it typed back, so it cannot be piped past at all. There is no `--yes` flag. This is the single thing standing between the current code and a one-command bootstrap.
 
 ### Dev writes into production storage
 
@@ -191,12 +195,21 @@ Idempotent, and safe to skip when the database is already populated:
 3. **Existing database** → compare `alembic current` against `heads`. Equal: say so and do nothing. Behind: print both revisions and tell the operator to run `make migrate`. Never migrate an existing database implicitly — the same `.env` can point at shared or production data.
 4. If no accounts exist → `eorm create-user` with the admin credentials from `.env` (passing `--password` on the command line suppresses click's prompt); otherwise skip.
 
-**Two interactive gates block automation, not one:**
+**The one interactive gate in the way, and how it is resolved**
 
-- `orm/migrations/alembic/env.py:56-65` — bare `input()` on any altering command.
-- `orm/eyened_orm/commands/shared.py:24-31` — `get_database(confirmation=True)`, used by `initialize-database`, prints a **random four-letter code** and requires it typed back. This one cannot be piped past at all.
+`eorm initialize-database` goes through `get_database(confirmation=True)` (`orm/eyened_orm/commands/shared.py:24-31`), which prints a **randomly generated four-letter code** and requires it typed back. Unlike a `[y/N]` prompt this cannot be piped past — the code is created at runtime — so the command is unautomatable as written.
 
-Add a single explicit opt-out honored by both: **`EYENED_ASSUME_YES=1`**. Prompting stays the default, so the safety rail is intact for humans, and `bootstrap.sh` sets the variable deliberately for its own commands. This touches deploy/migration tooling rather than application or business logic, and it is the design's only code change (two files).
+The fix is not a skip flag and not a declared-target env var. Both were considered and rejected: a flag (`EYENED_ASSUME_YES`) can be left switched on in `.env` and silently disarms every later command in that container; a declared target (`db@host:port`) only looks specific, because `eyened_database@database:3306` is byte-identical in every developer's stack *and* in any deployment running the bundled `local-db` profile — and its ambiguity (`database` / `127.0.0.1` / `host.docker.internal` / bare IP, port present or omitted) trains operators to edit the guard until it matches.
+
+Instead, **make the gate reflect the actual risk, which is a property of the database's state rather than of the command**:
+
+> `get_database(confirmation=True)` prompts only when the target database **contains tables**. On a database with no tables it proceeds, printing why.
+
+This is sound because nothing in these commands can destroy an empty database. `Base.metadata.create_all` is create-if-not-exists. `--recreate` drops a database that holds nothing. `load-dump` loading into an empty database removes nothing. The genuine hazard is `stamp_alembic_head` (`utils/alembic_utils.py:38-44`), which on a database already at revision X jumps `alembic_version` to head so a later `upgrade head` applies **nothing** — silent schema drift — and that requires an already-versioned, non-empty database, which this rule still gates.
+
+The rule is strictly tighter than today's prompt: it also protects the case where a human confidently types the code against a populated database. It adds **no environment variable and no configuration** — there is nothing to copy wrong between hosts. If the table check cannot be performed (connection or permission failure), it fails safe and prompts. The decision is logged loudly (`target database has no tables — proceeding without confirmation`) so it appears in `make up` output and in CI logs.
+
+Scope: one file, `orm/eyened_orm/commands/shared.py`. Both callers (`initialize-database` at `cli.py:86`, `load-dump` at `cli.py:467`) inherit the behavior unchanged in the dangerous direction. **`orm/migrations/alembic/env.py` is deliberately untouched** — `bootstrap.sh` runs only `alembic current` and `heads`, both already in its `no_prompt_cmds` set (`env.py:45-55`), so its prompt is never reached and continues to guard manual `make migrate` runs.
 
 ### Migrations & DB init (reuse existing tooling)
 
@@ -232,7 +245,7 @@ Related in-flight work to reconcile before merging: open issue #151 and bart's u
 
 **Move (with path fixes):** `dev/entrypoint-client.sh`, `dev/keycloak/*`, `database/load_dump.sh`, `database/save_dump.sh` → under `deploy/`.
 
-**Modify (code):** `orm/migrations/alembic/env.py` and `orm/eyened_orm/commands/shared.py` — both honor `EYENED_ASSUME_YES=1` to skip their confirmation gates; prompting stays the default.
+**Modify (code):** `orm/eyened_orm/commands/shared.py` only — `get_database(confirmation=True)` prompts when the target database has tables and proceeds (loudly) when it has none. No new env var, no flag, and `orm/migrations/alembic/env.py` stays as it is.
 
 **Delete (superseded, timing per the landing plan):** `dev/docker-compose.yml`, `dev/Dockerfile.server`, `dev/Dockerfile.client`, `dev/nginx.conf`, `dev/.env`, `dev/.env.alembic`, `dev/sample.env`, `docker/*`, `database/docker-compose.yaml`, `database/.env`, `database/.env.example`. Merge useful prose from `dev/README.md`, `docker/README.md`, `database/README.md` into `deploy/README.md`. (`dev/generate_openapi.py` is dev tooling, not env/docker — leave it.)
 
@@ -243,7 +256,7 @@ Related in-flight work to reconcile before merging: open issue #151 and bart's u
 ## Out of scope
 
 - Pulling `worker/` GPU stacks into the unified compose (they deploy to separate GPU hosts).
-- Application/business-logic code changes. (The `EYENED_ASSUME_YES` opt-out in `env.py` and `commands/shared.py` is deploy/migration tooling and is the sole exception.)
+- Application/business-logic code changes. (Making the confirmation gate in `commands/shared.py` state-based is CLI tooling and is the sole exception.)
 - Fixing the underlying zarr concurrency issues, issue #119 (tracked separately). This design reduces exposure by defaulting new stacks away from the production store, but does not fix the store.
 
 ## Future / deferred hardening
@@ -259,6 +272,7 @@ Related in-flight work to reconcile before merging: open issue #151 and bart's u
 2. **Idempotence and drift reporting:** a second `make up` on the populated stack re-runs bootstrap harmlessly — no duplicate admin, no implicit migration, no error. Against a database deliberately left one revision behind head, it prints current vs head and points at `make migrate` instead of silently continuing.
 2b. **Secrets are per-deployment:** two fresh `.env` files created by `make up` carry **different** `EYENED_API_SECRET_KEY` values.
 2c. **`make reset` is guarded:** it refuses while `PLATFORM_STORAGE_PATH` or an external `EYENED_DATABASE_HOST` is set, and otherwise requires the typed confirmation before removing volumes.
+2d. **The confirmation gate still bites where it matters:** against a **populated** database, `eorm initialize-database` run non-interactively still stops and demands the code — unattended bootstrap succeeds only on an empty database. Conversely, on an empty one it proceeds and logs why. This is the regression test for the `shared.py` change; `alembic upgrade head` continues to prompt on manual runs.
 3. **The in-process read bug is actually fixed:** in the server container, `image.pixel_array` on a real image returns data instead of raising `ValidationError`. This is the regression proof for the two env bugs.
 4. **Generated artifacts match their source:** `compose.storage.yaml` and `nginx/storage.d/storage.conf` contain exactly the keys in `storage-mounts.json`; an image request served through nginx via X-Accel resolves from the right mount.
 4b. **nginx accepts both extremes:** `nginx -t` passes with an empty `storage.d/` (clean clone) and with generated locations. This is the regression test for putting the snippet outside `conf.d/`.
