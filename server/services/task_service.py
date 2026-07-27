@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-
-from eyened_orm import SubTask, SubTaskImageLink, Task
+from eyened_orm import SubTask, Task
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
+from fastapi import Depends
+from sqlalchemy.orm import Session
 
-from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
+from ..db import get_db
 from .acting_user import ActingUser
+from .audit_service import AuditService, get_audit_service
 from .exceptions import NotFoundError
 
 
@@ -18,15 +19,14 @@ class TaskService:
         self,
         task_repository: TaskRepository,
         subtask_repository: SubTaskRepository,
-        logger: DatabaseModificationLogger | None = None,
+        audit: AuditService | None = None,
     ) -> None:
         self.tasks = task_repository
         self.subtasks = subtask_repository
-        self.logger = logger
+        self.audit = audit
 
     def create_task(
         self,
-        session: Session,
         name: str,
         description: str | None,
         contact_id: int | None,
@@ -42,17 +42,15 @@ class TaskService:
             CreatorID=actor.id,
             TaskState=TaskState.NotStarted,
         )
-        session.add(task)
-        session.commit()
-        task = self.tasks.get_with_relations(session, task.TaskID)
-        if self.logger is not None:
-            self.logger.log_insert(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint="POST /api/task",
+        self.tasks.add(task)
+        task = self.tasks.get_with_relations(task.TaskID)
+        if self.audit is not None:
+            self.audit.record(
+                action="INSERT",
                 entity="Task",
+                actor=actor,
                 entity_id=task.TaskID,
-                fields={
+                changes={
                     "name": task.TaskName,
                     "description": task.Description,
                     "contact_id": task.ContactID,
@@ -61,30 +59,25 @@ class TaskService:
             )
         return task
 
-    def list_tasks(
-        self, session: Session
-    ) -> tuple[list[Task], dict[int, tuple[int, int]]]:
+    def list_tasks(self) -> tuple[list[Task], dict[int, tuple[int, int]]]:
         """Return all tasks (TaskID order) and their {id: (total, ready)} counts."""
-        tasks = self.tasks.list_all(session)
-        counts = self.tasks.subtask_counts(session, [t.TaskID for t in tasks])
+        tasks = self.tasks.list_all()
+        counts = self.tasks.subtask_counts([t.TaskID for t in tasks])
         return tasks, counts
 
-    def get_task(
-        self, session: Session, task_id: int
-    ) -> tuple[Task, tuple[int, int]]:
+    def get_task(self, task_id: int) -> tuple[Task, tuple[int, int]]:
         """Return a task and its (total, ready) subtask counts.
 
         Raises:
             NotFoundError: If the task does not exist.
         """
-        task = self.tasks.get_with_relations(session, task_id)
+        task = self.tasks.get_with_relations(task_id)
         if task is None:
             raise NotFoundError(f"Task {task_id} not found")
-        return task, self.tasks.subtask_counts(session, [task_id])[task_id]
+        return task, self.tasks.subtask_counts([task_id])[task_id]
 
     def update_task(
         self,
-        session: Session,
         task_id: int,
         name: str | None,
         description: str | None,
@@ -98,52 +91,47 @@ class TaskService:
         Raises:
             NotFoundError: If the task does not exist.
         """
-        task = self.tasks.get_by_id(session, task_id)
+        task = self.tasks.get_by_id(task_id)
         if task is None:
             raise NotFoundError(f"Task {task_id} not found")
 
-        changes: dict[str, str] = {}
         if name is not None:
-            changes["name"] = f"{task.TaskName} -> {name}"
             task.TaskName = name
         if description is not None:
-            changes["description"] = f"{task.Description} -> {description}"
             task.Description = description
         if contact_id is not None:
-            changes["contact_id"] = f"{task.ContactID} -> {contact_id}"
             task.ContactID = contact_id
         if task_definition_id is not None:
-            changes["task_definition_id"] = (
-                f"{task.TaskDefinitionID} -> {task_definition_id}"
-            )
             task.TaskDefinitionID = task_definition_id
         if task_state is not None:
-            changes["task_state"] = f"{task.TaskState} -> {task_state}"
             task.TaskState = task_state
 
-        session.commit()
-        task = self.tasks.get_with_relations(session, task_id)
-        counts = self.tasks.subtask_counts(session, [task_id])[task_id]
-        if self.logger is not None:
-            self.logger.log_update(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"PATCH /api/task/{task_id}",
+        # Derive the scalar diff while the mutations are still pending — before
+        # the get_with_relations() query below autoflushes (a flush clears the
+        # pending attribute history).
+        changes = AuditService.diff(
+            task, "TaskName", "Description", "ContactID", "TaskDefinitionID", "TaskState"
+        )
+
+        task = self.tasks.get_with_relations(task_id)
+        counts = self.tasks.subtask_counts([task_id])[task_id]
+        if self.audit is not None:
+            self.audit.record(
+                action="UPDATE",
                 entity="Task",
+                actor=actor,
                 entity_id=task_id,
                 changes=changes if changes else None,
             )
         return task, counts
 
-    def delete_task(
-        self, session: Session, task_id: int, actor: ActingUser
-    ) -> None:
+    def delete_task(self, task_id: int, actor: ActingUser) -> None:
         """Delete a task (its subtasks cascade at the DB level).
 
         Raises:
             NotFoundError: If the task does not exist.
         """
-        task = self.tasks.get_by_id(session, task_id)
+        task = self.tasks.get_by_id(task_id)
         if task is None:
             raise NotFoundError(f"Task {task_id} not found")
 
@@ -155,22 +143,19 @@ class TaskService:
             "creator_id": task.CreatorID,
             "task_state": str(task.TaskState) if task.TaskState else None,
         }
-        session.delete(task)
-        session.commit()
-        if self.logger is not None:
-            self.logger.log_delete(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"DELETE /api/task/{task_id}",
+        self.tasks.delete(task)
+        if self.audit is not None:
+            self.audit.record(
+                action="DELETE",
                 entity="Task",
+                actor=actor,
                 entity_id=task_id,
-                deleted_data=deleted_data,
+                changes=deleted_data,
             )
         return None
 
     def list_task_subtasks(
         self,
-        session: Session,
         task_id: int,
         *,
         with_images: bool,
@@ -187,29 +172,26 @@ class TaskService:
         Raises:
             NotFoundError: If the task does not exist.
         """
-        if self.tasks.get_by_id(session, task_id) is None:
+        if self.tasks.get_by_id(task_id) is None:
             raise NotFoundError(f"Task {task_id} not found")
 
         index_of = {
-            sid: i
-            for i, sid in enumerate(self.subtasks.all_ids_for_task(session, task_id))
+            sid: i for i, sid in enumerate(self.subtasks.all_ids_for_task(task_id))
         }
         rows = self.subtasks.list_for_task(
-            session,
             task_id,
             status=status,
             limit=limit,
             offset=limit * page,
             with_images=with_images,
         )
-        count = self.subtasks.count_for_task(session, task_id, status=status)
+        count = self.subtasks.count_for_task(task_id, status=status)
         # Every returned row is one of the task's subtasks, so its id is always
         # in index_of (rows are a subset of all_ids_for_task).
         return [(st, index_of[st.SubTaskID]) for st in rows], count
 
     def get_task_subtask(
         self,
-        session: Session,
         task_id: int,
         subtask_index: int,
         *,
@@ -222,7 +204,6 @@ class TaskService:
             NotFoundError: If no subtask sits at ``subtask_index``.
         """
         rows = self.subtasks.list_for_task(
-            session,
             task_id,
             status=None,
             limit=2 if with_next else 1,
@@ -241,23 +222,21 @@ class SubTaskService:
     def __init__(
         self,
         subtask_repository: SubTaskRepository,
-        logger: DatabaseModificationLogger | None = None,
+        audit: AuditService | None = None,
     ) -> None:
         self.subtasks = subtask_repository
-        self.logger = logger
+        self.audit = audit
 
-    def get_subtask(
-        self, session: Session, subtask_id: int, *, with_images: bool
-    ) -> SubTask:
+    def get_subtask(self, subtask_id: int, *, with_images: bool) -> SubTask:
         """Return a subtask, image-loaded iff ``with_images``.
 
         Raises:
             NotFoundError: If the subtask does not exist.
         """
         subtask = (
-            self.subtasks.get_with_images(session, subtask_id)
+            self.subtasks.get_with_images(subtask_id)
             if with_images
-            else self.subtasks.get_by_id(session, subtask_id)
+            else self.subtasks.get_by_id(subtask_id)
         )
         if subtask is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
@@ -265,7 +244,6 @@ class SubTaskService:
 
     def update_subtask(
         self,
-        session: Session,
         subtask_id: int,
         comments: str | None,
         task_state: SubTaskState | None,
@@ -276,40 +254,37 @@ class SubTaskService:
         Raises:
             NotFoundError: If the subtask does not exist.
         """
-        subtask = self.subtasks.get_by_id(session, subtask_id)
+        subtask = self.subtasks.get_by_id(subtask_id)
         if subtask is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
 
-        changes: dict[str, str] = {}
         if comments is not None:
-            changes["comments"] = f"{subtask.Comments} -> {comments}"
             subtask.Comments = comments
         if task_state is not None:
-            changes["task_state"] = f"{subtask.TaskState} -> {task_state}"
             subtask.TaskState = task_state
 
-        session.commit()
-        session.refresh(subtask)
-        if self.logger is not None:
-            self.logger.log_update(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"PATCH /api/subtasks/{subtask_id}",
+        # Derive the scalar diff while the mutations are still pending — before
+        # any flush clears the pending attribute history (SubTask has no
+        # server-generated columns a caller reads, so no re-fetch is needed).
+        changes = AuditService.diff(subtask, "Comments", "TaskState")
+
+        if self.audit is not None:
+            self.audit.record(
+                action="UPDATE",
                 entity="SubTask",
+                actor=actor,
                 entity_id=subtask_id,
                 changes=changes if changes else None,
             )
         return subtask
 
-    def delete_subtask(
-        self, session: Session, subtask_id: int, actor: ActingUser
-    ) -> None:
+    def delete_subtask(self, subtask_id: int, actor: ActingUser) -> None:
         """Delete a subtask (its image links cascade at the DB level).
 
         Raises:
             NotFoundError: If the subtask does not exist.
         """
-        subtask = self.subtasks.get_by_id(session, subtask_id)
+        subtask = self.subtasks.get_by_id(subtask_id)
         if subtask is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
 
@@ -319,105 +294,82 @@ class SubTaskService:
             "task_state": str(subtask.TaskState) if subtask.TaskState else None,
             "creator_id": subtask.CreatorID,
         }
-        session.delete(subtask)
-        session.commit()
-        if self.logger is not None:
-            self.logger.log_delete(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"DELETE /api/subtasks/{subtask_id}",
+        self.subtasks.delete(subtask)
+        if self.audit is not None:
+            self.audit.record(
+                action="DELETE",
                 entity="SubTask",
+                actor=actor,
                 entity_id=subtask_id,
-                deleted_data=deleted_data,
+                changes=deleted_data,
             )
         return None
 
     def add_image(
-        self,
-        session: Session,
-        subtask_id: int,
-        image_public_id: str,
-        actor: ActingUser,
+        self, subtask_id: int, image_public_id: str, actor: ActingUser
     ) -> SubTask:
         """Link an image (by PublicID) to a subtask at the next ImageIndex.
 
         Raises:
             NotFoundError: If the subtask or the image does not exist.
         """
-        if self.subtasks.get_by_id(session, subtask_id) is None:
+        if self.subtasks.get_by_id(subtask_id) is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
-        image_instance_id = self.subtasks.resolve_image_instance_id(
-            session, image_public_id
-        )
+        image_instance_id = self.subtasks.resolve_image_instance_id(image_public_id)
         if image_instance_id is None:
             raise NotFoundError("ImageInstance not found")
 
-        link = SubTaskImageLink(
-            SubTaskID=subtask_id,
-            ImageInstanceID=image_instance_id,
-            ImageIndex=self.subtasks.next_image_index(session, subtask_id),
+        self.subtasks.add_link(
+            subtask_id, image_instance_id, self.subtasks.next_image_index(subtask_id)
         )
-        session.add(link)
-        session.commit()
-        if self.logger is not None:
-            self.logger.log_insert(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"POST /api/subtasks/{subtask_id}/images",
+        if self.audit is not None:
+            self.audit.record(
+                action="INSERT",
                 entity="SubTaskImageLink",
-                fields={
+                actor=actor,
+                changes={
                     "subtask_id": subtask_id,
                     "image_instance_id": image_instance_id,
                 },
             )
-        return self.subtasks.get_with_images(session, subtask_id)
+        return self.subtasks.get_with_images(subtask_id)
 
     def remove_image(
-        self,
-        session: Session,
-        subtask_id: int,
-        image_public_id: str,
-        actor: ActingUser,
+        self, subtask_id: int, image_public_id: str, actor: ActingUser
     ) -> SubTask:
         """Unlink an image (by PublicID) from a subtask.
 
         Raises:
             NotFoundError: If the image or the (subtask, image) link is absent.
         """
-        image_instance_id = self.subtasks.resolve_image_instance_id(
-            session, image_public_id
-        )
+        image_instance_id = self.subtasks.resolve_image_instance_id(image_public_id)
         if image_instance_id is None:
             raise NotFoundError("ImageInstance not found")
-        link = self.subtasks.get_image_link(session, subtask_id, image_instance_id)
+        link = self.subtasks.get_image_link(subtask_id, image_instance_id)
         if link is None:
             raise NotFoundError("Link not found")
 
-        session.delete(link)
-        session.commit()
-        if self.logger is not None:
-            self.logger.log_delete(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=(
-                    f"DELETE /api/subtasks/{subtask_id}/images/{image_public_id}"
-                ),
+        self.subtasks.delete_link(link)
+        if self.audit is not None:
+            self.audit.record(
+                action="DELETE",
                 entity="SubTaskImageLink",
-                deleted_data={
+                actor=actor,
+                changes={
                     "subtask_id": subtask_id,
                     "image_instance_id": image_instance_id,
                 },
             )
-        return self.subtasks.get_with_images(session, subtask_id)
+        return self.subtasks.get_with_images(subtask_id)
 
 
-def get_task_service() -> TaskService:
+def get_task_service(db: Session = Depends(get_db)) -> TaskService:
     """Default TaskService wiring for FastAPI ``Depends()``."""
     return TaskService(
-        TaskRepository(), SubTaskRepository(), logger=get_db_logger()
+        TaskRepository(db), SubTaskRepository(db), audit=get_audit_service(db)
     )
 
 
-def get_subtask_service() -> SubTaskService:
+def get_subtask_service(db: Session = Depends(get_db)) -> SubTaskService:
     """Default SubTaskService wiring for FastAPI ``Depends()``."""
-    return SubTaskService(SubTaskRepository(), logger=get_db_logger())
+    return SubTaskService(SubTaskRepository(db), audit=get_audit_service(db))
