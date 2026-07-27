@@ -449,9 +449,7 @@ async def refresh_token(
             raise HTTPException(status_code=401, detail="Invalid token type")
 
         # Get user from database
-        creator = (
-            session.query(Creator).where(Creator.CreatorID == payload["sub"]).first()
-        )
+        creator = CreatorRepository(session).get_by_id(payload["sub"])
         if not creator:
             raise HTTPException(status_code=401, detail="User not found")
 
