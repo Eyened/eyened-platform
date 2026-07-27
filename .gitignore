@@ -3,6 +3,7 @@ docker/.env
 *.zip
 *.pyc
 notebooks/hrfav/**/*
+notebooks/schema.json
 node_modules/**/*
 extensions.ts
 client/src/lib/extensions.ts
