@@ -38,6 +38,7 @@
         </nav>
         <div class="annotation-id">
             <span class="creator-name">{formAnnotation.creator.name}</span>
+            <span class="image-id-value">[{formAnnotation.image_id}]</span>
             <code class="annotation-id-value">[{formAnnotation.id}]</code>
         </div>
     </header>
@@ -86,7 +87,8 @@
         align-items: center;
     }
 
-    span.creator-name {
+    span.creator-name,
+    span.image-id-value {
         user-select: text;
     }
 
