@@ -1,6 +1,8 @@
 from hashlib import pbkdf2_hmac
+from types import SimpleNamespace
 
 from eyened_orm import AuditLog, Creator
+from eyened_orm.utils.db_users import hash_password
 
 from server.routes.auth import generate_secure_token, validate_secure_token
 
@@ -22,22 +24,11 @@ def _legacy_hash(password: str) -> bytes:
 
 
 def test_login_with_legacy_password_migrates_hash_and_audits_once(
-    client, session, monkeypatch
+    client, session, signed_jwts
 ):
     """Legacy-hash login migrates PasswordHash/clears Password and records exactly
     one AuditLog UPDATE row for Creator -- committed only at the request boundary
     (get_db), not mid-handler inside check_login."""
-    from server.config import Settings
-
-    # login() issues a JWT after check_login succeeds; the default test settings
-    # leave secret_key empty, which HMAC-signing rejects. 32+ bytes avoids
-    # jwt's InsecureKeyLengthWarning for HS256.
-    monkeypatch.setattr(
-        Settings,
-        "secret_key_value",
-        property(lambda self: "test-secret-key-0123456789abcdef"),
-    )
-
     creator = Creator(
         CreatorName="legacy-user",
         Password=_legacy_hash("old-password"),
@@ -82,25 +73,11 @@ def test_login_with_legacy_password_migrates_hash_and_audits_once(
     assert commit_calls == [1]
 
 
-def _with_signed_jwts(monkeypatch):
-    """Give JWT issuance/verification a usable HMAC key (default test settings
-    leave secret_key empty); same workaround as test_login_with_legacy_password_..."""
-    from server.config import Settings
-
-    monkeypatch.setattr(
-        Settings,
-        "secret_key_value",
-        property(lambda self: "test-secret-key-0123456789abcdef"),
-    )
-
-
 def test_refresh_with_valid_token_returns_the_user(
-    client, session, monkeypatch
+    client, session, signed_jwts
 ):
     """A valid refresh-token cookie yields 200 with the refreshed user's info."""
     from server.routes.auth import create_refresh_token
-
-    _with_signed_jwts(monkeypatch)
 
     creator = Creator(CreatorName="refresh-user", IsHuman=True)
     session.add(creator)
@@ -127,3 +104,85 @@ def test_refresh_with_garbage_token_returns_401(client):
     response = client.post("/auth/refresh")
 
     assert response.status_code == 401
+
+
+def test_change_password_persists_new_password_and_invalidates_old(
+    client, session, signed_jwts
+):
+    """POST /auth/change-password persists the new password to the request
+    boundary (not mid-handler): a follow-up /auth/login succeeds with the new
+    password and fails (401) with the old one."""
+    creator = Creator(
+        # Must match the `client` fixture's overridden CurrentUser (username="tester"):
+        # change_password looks the acting user up by current_user.username.
+        CreatorName="tester",
+        PasswordHash=hash_password("old-password"),
+        IsHuman=True,
+    )
+    session.add(creator)
+    session.commit()
+
+    response = client.post(
+        "/auth/change-password",
+        json={"old_password": "old-password", "new_password": "new-password"},
+    )
+    assert response.status_code == 200, response.text
+
+    old_login = client.post(
+        "/auth/login", json={"username": "tester", "password": "old-password"}
+    )
+    assert old_login.status_code == 401
+
+    new_login = client.post(
+        "/auth/login", json={"username": "tester", "password": "new-password"}
+    )
+    assert new_login.status_code == 200
+
+
+def test_check_oidc_login_creates_new_account_but_does_not_commit(session, monkeypatch):
+    """check_oidc_login creates a new Creator for an unknown OIDC subject but
+    only flushes -- a rollback (get_db's, on a later exception) discards the
+    new account entirely, since neither it nor create_user commits."""
+    import server.routes.auth as auth_module
+    from server.routes.auth import check_oidc_login
+
+    monkeypatch.setattr(
+        auth_module,
+        "settings",
+        SimpleNamespace(oidc=SimpleNamespace(create_new_accounts=True)),
+    )
+
+    claims = {"sub": "abc123", "preferred_username": "new-oidc-user"}
+    creator = check_oidc_login(claims, session)
+
+    assert creator.CreatorName == "new-oidc-user"
+    assert creator.EmployeeIdentifier == "oidc:sub:abc123"
+
+    session.rollback()  # get_db does this in production on a later exception
+    assert session.query(Creator).filter_by(CreatorName="new-oidc-user").count() == 0
+
+
+def test_check_oidc_login_migrates_non_subject_identifier_but_does_not_commit(session):
+    """check_oidc_login replaces a non-Subject OIDC identifier with the
+    Subject-claim identifier, but only flushes -- same request-boundary-owns-
+    the-commit property as new-account creation above."""
+    from server.routes.auth import check_oidc_login
+
+    creator = Creator(
+        CreatorName="legacy-oidc-user",
+        EmployeeIdentifier="oidc:email:old@example.com",
+        IsHuman=True,
+    )
+    session.add(creator)
+    session.commit()
+    creator_id = creator.CreatorID
+
+    claims = {"sub": "sub-999", "email": "old@example.com"}
+    found = check_oidc_login(claims, session)
+
+    assert found.CreatorID == creator_id
+    assert found.EmployeeIdentifier == "oidc:sub:sub-999"
+
+    session.rollback()  # get_db does this in production on a later exception
+    reloaded = session.get(Creator, creator_id)
+    assert reloaded.EmployeeIdentifier == "oidc:email:old@example.com"
