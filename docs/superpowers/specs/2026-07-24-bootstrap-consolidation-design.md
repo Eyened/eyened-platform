@@ -52,9 +52,9 @@ So **each backend key costs three edits today** — a compose bind mount, an ngi
 
 Giving the server container `EYENED_STORAGE_MOUNTS` fixes (1) outright: it selects `LocalDataAccessAdapter`, so no API URL, no credentials, and no server calling its own HTTP API for bytes it could read directly.
 
-### Migrations cannot run unattended
+### Two prompts block unattended database setup
 
-Two gates block unattended database setup, and they behave differently.
+They behave differently, and only one of them needs changing.
 
 `orm/migrations/alembic/env.py:56-65` calls bare `input()` for any command outside `{revision, history, current, heads, branches, show, check, list_templates, stamp}` — `upgrade` prompts. There is no `-x` flag, env var, or TTY check, so a non-interactive `upgrade` dies. The design **routes around this rather than changing it**: bootstrap uses the fresh-install path and only ever calls `current` and `heads`, which are already exempt.
 
@@ -75,8 +75,9 @@ Two gates block unattended database setup, and they behave differently.
 7. **The server container gets `EYENED_STORAGE_MOUNTS`**, making local reads the default path and retiring the self-API fallback.
 8. **The env-schema bugs are fixed here** — `EYENED_STORAGE_MOUNTS` and `EYENED_API_URL` added, `EYENED_API_USER` → `EYENED_API_USERNAME`, worker names aligned.
 9. **`EYENED_STORAGE_ROOT` is always `/storage` inside the container**, backed by a named volume by default. Pointing at shared or production storage is an explicit opt-in line in the untracked `.env`.
-10. **`make up` bootstraps an empty database** (migrate, seed, create admin) so goal 2 is literally one command.
+10. **`make up` bootstraps an empty database** — creates the schema, seeds form schemas, creates an admin — so goal 2 is literally one command. It **never migrates an existing database**; drift is reported, not fixed.
 11. **Migrations are container-only.** `dev/.env.alembic` disappears; host access to MySQL is opt-in, not default.
+12. **Environment-neutral names.** `DEV_NGINX_PORT` → `HTTP_PORT` and `DEV_PUBLIC_HOST` → `PUBLIC_HOST`: both serve prod as well as dev in the unified stack, so the `DEV_` prefix is actively misleading. The only consumers are the Keycloak service and `keycloak/entrypoint.sh`, which this change is already moving and rewriting.
 
 ## Design
 
@@ -85,7 +86,7 @@ Two gates block unattended database setup, and they behave differently.
 ```
 deploy/
   compose.yaml                # base: all services; local-db + oidc profiles; prod-ready defaults
-  compose.override.yaml       # dev layer (auto-applied by bare `docker compose up`)
+  compose.override.yaml       # dev layer (named in COMPOSE_FILE — see below)
   compose.prod.yaml           # prod/deploy layer (explicit -f; excludes dev override)
   compose.storage.yaml        # GENERATED from storage-mounts.json (gitignored)
   Dockerfile.server           # unified (one build; run command set per env in compose)
@@ -103,7 +104,8 @@ deploy/
   storage-mounts.json.example # committed template
   .env.example                # single committed template (working local defaults)
   README.md                   # the one bootstrap doc
-Makefile                      # (root) up/down/logs/prod/reset/migrate/db-snapshot + first-run .env creation
+Makefile                      # (root) up/down/logs/prod/reset/migrate/db-shell/db-snapshot/
+                              #        db-restore/check-storage + first-run .env creation
 .dockerignore                 # (root) trim the `context: ..` build context
 ```
 
@@ -111,14 +113,23 @@ Per-client deploys add `deploy/compose.<client>.yaml` + `deploy/.env.<client>` (
 
 ### Compose layering — one base serves dev + prod + clients
 
-- **`compose.yaml` (base)** — the shared service graph and prod-ready defaults: `database` + `adminer` under a `local-db` profile; `redis`; `server` (build `Dockerfile.server`, default = prod `gunicorn` CMD, healthcheck); `client` (build target `prod`); `fileserver` (nginx, template mounted, default `CLIENT_UPSTREAM_PORT=4173`). `keycloak` under an `oidc` profile. Named volumes `db_data`, `platform_storage`, `client_node_modules`. **No hardcoded `name:`** — the project name comes from `COMPOSE_PROJECT_NAME`. **Pin all images** (`nginx:1.27-alpine`, `adminer:4.8.1`, `redis:7-alpine`, `mysql:8.0.27`) — no `latest`; today's dev stack runs `nginx:latest` and `adminer:latest`. The `database` service carries a **healthcheck** (`mysqladmin ping`, ~5s interval / 10 retries) — note this is a liveness signal only: `ping` reports success even when credentials are rejected, and a password passed inline would be visible in `ps`, so pass it via `--defaults-extra-file` or omit it.
-- **`compose.override.yaml` (dev, auto-applied)** — dev refinements only: `client` build target `dev` with `CLIENT_UPSTREAM_PORT=5173`; `server` `command:` → `uvicorn --reload` plus source bind mounts (`../server`, `../orm`); `client` node_modules volume + `../client` bind mount. This layer owns **`server depends_on database: condition: service_healthy`** (see below) and modest **resource limits** on `database`/`server` — important because many devs share one host. Use `deploy.resources.limits` throughout (Compose v2 honors it outside swarm) rather than mixing it with the older `mem_limit` style. `deploy/.env.example` ships `COMPOSE_PROFILES=local-db`.
-- **`compose.prod.yaml` (prod/deploy)** — prod-only concerns not already in the base (`restart:` policies, `deploy.resources` limits, external-DB expectations). Run with `docker compose -f compose.yaml -f compose.prod.yaml up`, which does **not** auto-load the dev override.
-- **`compose.storage.yaml` (generated)** — dataset bind mounts only. Included via `COMPOSE_FILE` in `.env` so bare `docker compose up` still works.
+- **`compose.yaml` (base)** — the shared service graph and prod-ready defaults: `database` + `adminer` under a `local-db` profile; `redis`; `server` (build `Dockerfile.server`, default = prod `gunicorn` CMD, healthcheck); `client` (build target `prod`); `fileserver` (nginx; mounts `./nginx/default.conf.template` into `/etc/nginx/templates/` **and** `./nginx/storage.d` into `/etc/nginx/storage.d` — the latter always, since an empty directory is valid; default `CLIENT_UPSTREAM_PORT=4173`). `keycloak` under an `oidc` profile. Named volumes `db_data`, `platform_storage`, `client_node_modules`. **No hardcoded `name:`** — the project name comes from `COMPOSE_PROJECT_NAME`. **Pin all images** (`nginx:1.27-alpine`, `adminer:4.8.1`, `redis:7-alpine`, `mysql:8.0.27`) — no `latest`; today's dev stack runs `nginx:latest` and `adminer:latest`. The `database` service carries a **healthcheck** (`mysqladmin ping`, ~5s interval / 10 retries) — note this is a liveness signal only: `ping` reports success even when credentials are rejected, and a password passed inline would be visible in `ps`, so pass it via `--defaults-extra-file` or omit it.
+- **`compose.override.yaml` (dev)** — dev refinements only: `client` build target `dev` with `CLIENT_UPSTREAM_PORT=5173`; `server` `command:` → `uvicorn --reload` plus source bind mounts (`../server`, `../orm`); `client` node_modules volume + `../client` bind mount. This layer owns **`server depends_on database: condition: service_healthy`** (see below) and modest **resource limits** on `database`/`server` — important because many devs share one host. Use `deploy.resources.limits` throughout (Compose v2 honors it outside swarm) rather than mixing it with the older `mem_limit` style. `deploy/.env.example` ships `COMPOSE_PROFILES=local-db`.
+- **`compose.prod.yaml` (prod/deploy)** — prod-only concerns not already in the base (`restart:` policies, `deploy.resources` limits, external-DB expectations). Run via `make prod`, whose explicit `-f` list omits the dev override and includes the generated storage layer.
+- **`compose.storage.yaml` (generated)** — dataset bind mounts only.
+
+**How the layers are selected (verified, and not the obvious answer).** Compose's automatic `compose.override.yaml` discovery is **disabled the moment `COMPOSE_FILE` is set**. Tested: with three files present and no `COMPOSE_FILE`, `config --services` yields `base overridden`; with `COMPOSE_FILE=compose.yaml:compose.storage.yaml` it yields `base storage` — the dev layer silently disappears. Since the generated storage layer has to come in through `COMPOSE_FILE`, that variable must name **all three**:
+
+```bash
+# deploy/.env — dev. All layers are explicit; there is no implicit override pickup.
+COMPOSE_FILE=compose.yaml:compose.override.yaml:compose.storage.yaml
+```
+
+An explicit `-f` list on the command line overrides `COMPOSE_FILE` entirely, which is how `make prod` drops the dev layer and why it must re-list the storage layer itself.
 
 **Startup ordering & the external-DB toggle (correctness):** the `server → database` `depends_on` must live **only** in the `local-db` context (the dev override, or a small `compose.local-db.yaml` layered with the profile), **never in the base**. If an always-on `server` in the base declared `depends_on: database` while `database` is gated behind `profiles: [local-db]`, then turning the profile off (external DB) would make Compose refuse to start — it cannot depend on a disabled service. Keeping the dependency in the local-db layer means: bundled DB → server waits for MySQL to be healthy (no first-run crash-loop); external DB → no `database` service, no dangling dependency.
 
-Behavior: **bare `docker compose up` = dev** (base + auto override → bundled DB + hot reload); **explicit `-f` list = prod/client** (base + prod [+ client] → external DB).
+Behavior: **`make up` = dev** (base + dev override + storage → bundled DB + hot reload); **`make prod` = prod/client** (base + storage + prod [+ client] → external DB). Both go through the Makefile precisely because the file list is no longer implicit.
 
 ### Compose invocation (host reality, verified)
 
@@ -188,12 +199,12 @@ One committed template with **working local defaults** (dev-only passwords, clea
 
 ### First-run bootstrap (`deploy/scripts/bootstrap.sh`)
 
-Idempotent, and safe to skip when the database is already populated:
+Runs only on the dev path (`make up`), never as part of `make prod`, and is idempotent:
 
-1. Wait for the `database` healthcheck (already declared).
+1. Wait for the `database` service to report healthy. With the `local-db` profile off there is no such service, so bootstrap reports that it cannot verify an external database and exits without touching it.
 2. **Empty database** → `eorm initialize-database --seed-form-schemas`. This is the supported fresh-install path: it runs `Base.metadata.create_all` and **stamps** Alembic at head (`cli.py:95-107`), so later upgrades apply only new migrations (`docs/…/release_notes.mdx:19`). Do **not** use `alembic upgrade head` here — replaying the whole migration chain from zero is not a path this repo maintains.
 3. **Existing database** → compare `alembic current` against `heads`. Equal: say so and do nothing. Behind: print both revisions and tell the operator to run `make migrate`. Never migrate an existing database implicitly — the same `.env` can point at shared or production data.
-4. If no accounts exist → `eorm create-user` with the admin credentials from `.env` (passing `--password` on the command line suppresses click's prompt); otherwise skip.
+4. If no accounts exist → `eorm create-user` for username `admin` with a password **generated at first run and printed once**, the same treatment as `EYENED_API_SECRET_KEY` (passing `--password` on the command line suppresses click's prompt). Otherwise skip. These are deliberately **not** `EYENED_API_USERNAME` / `EYENED_API_PASSWORD`: those name an account the ORM uses to call the API from a host without mounts, which is a different thing from the human admin created here, and conflating them would make one variable mean two things.
 
 **The one interactive gate in the way, and how it is resolved**
 
@@ -215,8 +226,8 @@ Scope: one file, `orm/eyened_orm/commands/shared.py`. Both callers (`initialize-
 
 Drop `dev/.env.alembic`. Migrations and init run **inside the server container**, which already has the unified env loaded and ships `/app/orm/migrations/` plus the `eorm` CLI via `pip install -e /app/orm`:
 
-- `make migrate` → `docker compose exec -it server alembic -c orm/migrations/alembic.ini upgrade head` (interactive, so the confirmation prompt still guards manual runs).
-- `docker compose exec server eorm initialize-database` / `eorm seed-form-schemas` / `eorm create-user`.
+- `make migrate` → `$(COMPOSE) exec -it server alembic -c orm/migrations/alembic.ini upgrade head` (interactive, so the confirmation prompt still guards manual runs). `$(COMPOSE)` is the resolved binary from the section above — never a hardcoded `docker compose`.
+- `$(COMPOSE) exec server eorm initialize-database` / `eorm seed-form-schemas` / `eorm create-user`.
 - Data dumps via `deploy/scripts/{load,save}_dump.sh` and/or `eorm load-dump` / `save-dump`.
 
 Host-side alembic remains possible for anyone who uncomments `DB_PUBLISH_PORT`, but it is no longer the documented path.
@@ -243,7 +254,7 @@ Related in-flight work to reconcile before merging: open issue #151 and bart's u
 
 **Create:** `deploy/compose.yaml`, `deploy/compose.override.yaml`, `deploy/compose.prod.yaml`, `deploy/Dockerfile.server`, `deploy/Dockerfile.client`, `deploy/nginx/default.conf.template`, `deploy/scripts/gen-storage.sh`, `deploy/scripts/bootstrap.sh`, `deploy/storage-mounts.json.example`, `deploy/.env.example`, `deploy/README.md`, root `Makefile` targets, root `.dockerignore`.
 
-**Move (with path fixes):** `dev/entrypoint-client.sh`, `dev/keycloak/*`, `database/load_dump.sh`, `database/save_dump.sh` → under `deploy/`.
+**Move (with path fixes):** `dev/entrypoint-client.sh`, `dev/keycloak/*`, `database/load_dump.sh`, `database/save_dump.sh` → under `deploy/`. The Keycloak service definition and `keycloak/entrypoint.sh` carry the only `${DEV_PUBLIC_HOST}` / `${DEV_NGINX_PORT}` references in the repo (OIDC redirect URI, web origin, issuer validation) and are rewritten to `PUBLIC_HOST` / `HTTP_PORT` as they move.
 
 **Modify (code):** `orm/eyened_orm/commands/shared.py` only — `get_database(confirmation=True)` prompts when the target database has tables and proceeds (loudly) when it has none. No new env var, no flag, and `orm/migrations/alembic/env.py` stays as it is.
 
@@ -268,21 +279,21 @@ Related in-flight work to reconcile before merging: open issue #151 and bart's u
 
 ## Verification
 
-1. **Clean-clone dev bring-up (goals 1+2):** from a fresh checkout, `make up` → the server waits for MySQL to report healthy, migrations apply, form schemas seed, an admin is created, and the UI loads at `http://<host>:${HTTP_PORT}` with `/api/health` responding. Nothing stuck in `restarting`. No manual editing on a solo machine, and no dataset mounts configured.
+1. **Clean-clone dev bring-up (goals 1+2):** from a fresh checkout, `make up` → the server waits for MySQL to report healthy, the schema is created and stamped at head, form schemas seed, an admin is created with a printed one-time password, and the UI loads at `http://<host>:${HTTP_PORT}` with `/api/health` responding. Nothing stuck in `restarting`. No manual editing on a solo machine, and no dataset mounts configured.
 2. **Idempotence and drift reporting:** a second `make up` on the populated stack re-runs bootstrap harmlessly — no duplicate admin, no implicit migration, no error. Against a database deliberately left one revision behind head, it prints current vs head and points at `make migrate` instead of silently continuing.
-2b. **Secrets are per-deployment:** two fresh `.env` files created by `make up` carry **different** `EYENED_API_SECRET_KEY` values.
-2c. **`make reset` is guarded:** it refuses while `PLATFORM_STORAGE_PATH` or an external `EYENED_DATABASE_HOST` is set, and otherwise requires the typed confirmation before removing volumes.
-2d. **The confirmation gate still bites where it matters:** against a **populated** database, `eorm initialize-database` run non-interactively still stops and demands the code — unattended bootstrap succeeds only on an empty database. Conversely, on an empty one it proceeds and logs why. This is the regression test for the `shared.py` change; `alembic upgrade head` continues to prompt on manual runs.
-3. **The in-process read bug is actually fixed:** in the server container, `image.pixel_array` on a real image returns data instead of raising `ValidationError`. This is the regression proof for the two env bugs.
-4. **Generated artifacts match their source:** `compose.storage.yaml` and `nginx/storage.d/storage.conf` contain exactly the keys in `storage-mounts.json`; an image request served through nginx via X-Accel resolves from the right mount.
-4b. **nginx accepts both extremes:** `nginx -t` passes with an empty `storage.d/` (clean clone) and with generated locations. This is the regression test for putting the snippet outside `conf.d/`.
-4c. **`make prod` keeps its mounts:** `docker compose -f … config` for the prod invocation still lists every dataset bind mount — the check that the explicit `-f` list did not drop the generated layer.
-5. **Hot reload (goal 1):** edit a `server/` file and a `client/` file → server reloads and Vite HMR updates without a rebuild.
-6. **Multi-dev isolation (the `-kaustav` requirement):** a second checkout with a different `COMPOSE_PROJECT_NAME` + `HTTP_PORT` → two independent stacks coexist, no container/port/volume collision (`docker compose ls`), with no DB port published by either.
-7. **External DB toggle (goal 3):** drop `local-db` from `COMPOSE_PROFILES` and set `EYENED_DATABASE_HOST` → `docker compose config`/`up` does **not** error on a dangling `depends_on: database`, and the stack connects to the external DB.
-8. **Attached to the shared dev database:** with the real `storage-mounts.json` and `PLATFORM_STORAGE_PATH`, existing images and thumbnails render — proving the generated config reproduces today's hand-maintained setup.
-9. **Prod + client layering (goal 3):** `make prod` (plus a throwaway `compose.<client>.yaml` + `.env.<client>`) brings up the production build (gunicorn, built client on 4173 upstream).
-10. **Snapshot/restore:** `make db-snapshot` then `make db-restore` returns `alembic current` to the pre-migration revision.
-11. **Optional OIDC:** add `oidc` to `COMPOSE_PROFILES` → Keycloak starts and the OIDC login flow works.
-12. **Compose binary fallback:** every target works on a host with only standalone `docker-compose` (the shared dev box) as well as one with the `docker compose` plugin.
-13. **Regression:** the existing `pytest` suite still passes. Run `graphify update .` after the change per project convention.
+3. **Secrets are per-deployment:** two fresh `.env` files created by `make up` carry **different** `EYENED_API_SECRET_KEY` values, and the admin password is generated rather than shipped.
+4. **`make reset` is guarded:** it refuses while `PLATFORM_STORAGE_PATH` or an external `EYENED_DATABASE_HOST` is set, and otherwise requires the typed confirmation before removing volumes.
+5. **The confirmation gate still bites where it matters:** against a **populated** database, `eorm initialize-database` run non-interactively still stops and demands the code — unattended bootstrap succeeds only on an empty database. On an empty one it proceeds and logs why. This is the regression test for the `shared.py` change; `alembic upgrade head` continues to prompt on manual runs.
+6. **The in-process read bug is actually fixed:** in the server container, `image.pixel_array` on a real image returns data instead of raising `ValidationError`. This is the regression proof for the two env bugs.
+7. **Generated artifacts match their source:** `compose.storage.yaml` and `nginx/storage.d/storage.conf` contain exactly the keys in `storage-mounts.json`; an image request served through nginx via X-Accel resolves from the right mount.
+8. **nginx accepts both extremes:** `nginx -t` passes with an empty `storage.d/` (clean clone) and with generated locations. This is the regression test for putting the snippet outside `conf.d/`.
+9. **Every layer is present in both modes:** `config --services` for the dev invocation lists the dev-override services *and* the storage mounts (the check that naming `COMPOSE_FILE` did not silently drop the override), and for `make prod` lists the storage mounts but **not** the dev override.
+10. **Hot reload (goal 1):** edit a `server/` file and a `client/` file → server reloads and Vite HMR updates without a rebuild.
+11. **Multi-dev isolation (the `-kaustav` requirement):** a second checkout with a different `COMPOSE_PROJECT_NAME` + `HTTP_PORT` → two independent stacks coexist, no container/port/volume collision (`docker compose ls`), with no DB port published by either.
+12. **External DB toggle (goal 3):** drop `local-db` from `COMPOSE_PROFILES` and set `EYENED_DATABASE_HOST` → `config`/`up` does **not** error on a dangling `depends_on: database`, the stack connects to the external DB, and bootstrap declines to touch it.
+13. **Attached to the shared dev database:** with the real `storage-mounts.json` and `PLATFORM_STORAGE_PATH`, existing images and thumbnails render — proving the generated config reproduces today's hand-maintained setup.
+14. **Prod + client layering (goal 3):** `make prod` (plus a throwaway `compose.<client>.yaml` + `.env.<client>`) brings up the production build (gunicorn, built client on 4173 upstream).
+15. **Snapshot/restore:** `make db-snapshot` then `make db-restore` returns `alembic current` to the pre-migration revision.
+16. **Optional OIDC:** add `oidc` to `COMPOSE_PROFILES` → Keycloak starts and the OIDC login flow works against `PUBLIC_HOST` / `HTTP_PORT`, confirming the rename reached the realm template and entrypoint.
+17. **Compose binary fallback:** every target works on a host with only standalone `docker-compose` (the shared dev box) as well as one with the `docker compose` plugin.
+18. **Regression:** the existing `pytest` suite still passes. Run `graphify update .` after the change per project convention.
