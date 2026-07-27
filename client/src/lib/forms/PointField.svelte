@@ -190,12 +190,9 @@
             radius: pointMarker.radius,
             color: pointMarker.color,
             label: schema.title || fieldPath,
-            // no host → all MainViewers
-            fieldBinding: {
-                analysis,
-                getFieldValue: () => value,
-                setFieldValue: (next) => onchange(next),
-            },
+            analysis,
+            getFieldValue: () => value,
+            setFieldValue: (next) => onchange(next),
         });
     }
 

@@ -1,5 +1,4 @@
 import type { PointMarkerStyle } from "$lib/config/clientDefaults";
-import type { PointAdapter } from "$lib/forms/pointAdapters";
 import {
     cycleEnumExtra,
     deletePointAt,
@@ -7,7 +6,11 @@ import {
     placePoint,
     placePointAt,
 } from "$lib/forms/pointMutations";
-import type { ImagePoint, PointList } from "$lib/forms/pointSchema";
+import type {
+    ImagePoint,
+    PointCardinality,
+    PointList,
+} from "$lib/forms/pointSchema";
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
@@ -20,74 +23,102 @@ const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
 
 export type PointToolOptions = {
-    canEdit: boolean;
-    adapter: PointAdapter;
+    canEdit?: boolean;
     label?: string;
     pointStyle?: PointMarkerStyle;
     radius?: number;
     color?: string;
-    /** When provided, empty click / slot shortcuts use placePointAt. */
-    getActiveSlot?: () => number;
-    setActiveSlot?: (index: number) => void;
-    /** Keyboard shortcuts into fixed slots (handled in keydown). */
+    /** Default `list`. `single` → empty click replaces the sole point. */
+    cardinality?: PointCardinality;
+    /**
+     * Registration lists: empty click fills first null; mid-list delete → null.
+     * Ignored when `placementIndex` is set (fixed-slot / ETDRS mode).
+     */
+    registrationMode?: boolean;
+    slotLabels?: readonly string[];
+    /** Keyboard shortcut → place into that index (also sets placementIndex). */
     slotKeys?: readonly { index: number; key: string }[];
+    enumExtras?: { key: string; values: readonly string[] }[];
+    /** Fired after every local mutation of `points` (adapter sync hook). */
+    onChange?: (points: PointList) => void;
 };
 
+/**
+ * Viewer overlay that edits an in-memory point list.
+ * FormAnnotation / schema storage stay outside — sync via `onChange` + assigning `points`.
+ */
 export class PointTool implements Overlay {
+    /** Observable point list. Assign to load; mutations go through tool methods. */
+    points: PointList = $state([]);
+
+    /**
+     * When set (ETDRS), empty-click placement always writes this index and
+     * stays there until another point is clicked/dragged (or set externally).
+     * When `undefined` (Registration / free lists), empty click appends /
+     * fill-first-null and never latches an index.
+     */
+    placementIndex: number | undefined = $state(undefined);
+
     private activePointIndex: number | undefined;
     private hoverPointIndex: number | undefined;
 
     toolName: ToolName = "point";
     name: string = "Point";
 
+    private readonly canEdit: boolean;
     private readonly pointStyle: PointMarkerStyle;
     private readonly radius: number;
     private readonly color: string;
+    private readonly cardinality: PointCardinality;
+    private readonly registrationMode: boolean;
+    private readonly slotLabels: readonly string[] | undefined;
+    private readonly slotKeys: readonly { index: number; key: string }[] | undefined;
+    private readonly enumExtras: { key: string; values: readonly string[] }[];
+    private readonly onChange: ((points: PointList) => void) | undefined;
 
-    constructor(private readonly options: PointToolOptions) {
+    constructor(options: PointToolOptions = {}) {
+        this.canEdit = options.canEdit ?? true;
         this.pointStyle = options.pointStyle ?? "circle";
         this.radius = options.radius ?? 16;
         this.color = options.color ?? defaultStroke;
         this.name = options.label || "Point";
+        this.cardinality = options.cardinality ?? "list";
+        this.registrationMode = options.registrationMode ?? false;
+        this.slotLabels = options.slotLabels;
+        this.slotKeys = options.slotKeys;
+        this.enumExtras = options.enumExtras ?? [];
+        this.onChange = options.onChange;
     }
 
-    /** No-op: kept so MainViewer overlay cleanup can call it unconditionally. */
     destroy() {}
 
-    private get points(): PointList {
-        return this.options.adapter.getPoints();
+    private commit(next: PointList) {
+        this.points = next;
+        this.onChange?.(next);
     }
 
-    private commit(points: PointList) {
-        this.options.adapter.setPoints(points);
-    }
-
-    /**
-     * Place/replace at image coords under the viewer cursor (e.g. keyboard shortcut).
-     * When `slot` is given, always writes that slot via `placePointAt` (used by
-     * `slotKeys`); otherwise defers to `getActiveSlot()` when defined, else the
-     * schema-driven `placePoint` (cardinality/registration fill-first-null).
-     */
-    placeAtCursor(viewerContext: ViewerContext, cursor: Position2D, slot?: number) {
-        if (!this.options.canEdit) return;
+    placeAtCursor(
+        viewerContext: ViewerContext,
+        cursor: Position2D,
+        slot?: number,
+    ) {
+        if (!this.canEdit) return;
         const position = viewerContext.viewerToImageCoordinates(cursor);
         const before = this.points;
-        const targetSlot = slot ?? this.options.getActiveSlot?.();
+        const targetSlot = slot ?? this.placementIndex;
+        const indexOpts = this.placeIndexOptions(viewerContext);
+
         const after =
             targetSlot !== undefined
-                ? placePointAt(
-                      before,
-                      targetSlot,
-                      position,
-                      this.placeIndexOptions(viewerContext),
-                  )
+                ? placePointAt(before, targetSlot, position, indexOpts)
                 : placePoint(
                       before,
                       position,
-                      this.options.adapter.analysis.cardinality,
-                      this.options.adapter.analysis.registrationMode,
-                      this.placeIndexOptions(viewerContext),
+                      this.cardinality,
+                      this.registrationMode,
+                      indexOpts,
                   );
+
         let newIndex = targetSlot;
         if (newIndex === undefined) {
             newIndex = after.findIndex(
@@ -95,45 +126,36 @@ export class PointTool implements Overlay {
             );
             if (newIndex < 0) newIndex = Math.max(0, after.length - 1);
         }
+
         this.commit(after);
+        // Restricted mode (ETDRS): keep sticking to the placement index.
+        // Unrestricted (Registration): leave placementIndex undefined so the
+        // next empty click appends instead of rewriting the last point.
+        if (this.placementIndex !== undefined && targetSlot !== undefined) {
+            this.placementIndex = targetSlot;
+        }
         this.beginDrag(viewerContext, newIndex);
-        this.options.setActiveSlot?.(newIndex);
     }
 
-    /**
-     * Index for OCT: numbered on B-scans, explicit `null` on enface `*_proj`,
-     * omitted on plain 2D (enface and volume share the same PublicID).
-     */
     private placeIndexOptions(
         viewerContext: ViewerContext,
     ): { index: number | null } | undefined {
         const { image } = viewerContext;
-        if (image.is3D) {
-            return { index: viewerContext.index };
-        }
-        if (image.image_id.endsWith("_proj")) {
-            return { index: null };
-        }
+        if (image.is3D) return { index: viewerContext.index };
+        if (image.image_id.endsWith("_proj")) return { index: null };
         return undefined;
     }
 
-    /** Whether this point should paint/hit on the current viewer. */
-    private visibleOnSlice(
-        pt: ImagePoint,
-        viewerContext: ViewerContext,
-    ): boolean {
+    private visibleOnSlice(pt: ImagePoint, viewerContext: ViewerContext): boolean {
         const { image } = viewerContext;
         if (image.is3D) {
             return (
-                typeof pt.index === "number" &&
-                pt.index === viewerContext.index
+                typeof pt.index === "number" && pt.index === viewerContext.index
             );
         }
         if (image.image_id.endsWith("_proj")) {
-            // Enface: only points tagged with null (or legacy missing index).
             return pt.index == null;
         }
-        // Plain 2D: hide volume slice points if present in the same list.
         return typeof pt.index !== "number";
     }
 
@@ -154,7 +176,7 @@ export class PointTool implements Overlay {
         const { event, viewerContext, cursor } = e;
 
         if (
-            this.options.slotKeys?.some(
+            this.slotKeys?.some(
                 (s) => s.key.toLowerCase() === event.key.toLowerCase(),
             )
         ) {
@@ -162,8 +184,8 @@ export class PointTool implements Overlay {
         }
 
         if (
-            this.options.adapter.analysis.registrationMode &&
-            !this.options.getActiveSlot &&
+            this.registrationMode &&
+            this.placementIndex === undefined &&
             event.key >= "0" &&
             event.key <= "9"
         ) {
@@ -181,48 +203,48 @@ export class PointTool implements Overlay {
     }
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        if (!this.options.canEdit) return;
+        if (!this.canEdit) return;
         const { event, viewerContext, cursor } = e;
 
-        if (!event.repeat && this.options.slotKeys) {
-            const match = this.options.slotKeys.find(
+        if (!event.repeat && this.slotKeys) {
+            const match = this.slotKeys.find(
                 (s) => s.key.toLowerCase() === event.key.toLowerCase(),
             );
             if (match) {
+                this.placementIndex = match.index;
                 this.placeAtCursor(viewerContext, cursor, match.index);
                 return;
             }
         }
 
         if (event.key.toLowerCase() !== "c") return;
-
         const index = this.activePointIndex ?? this.hoverPointIndex;
         if (index === undefined) return;
         const point = this.points[index];
         if (!point) return;
-
-        const extra = this.options.adapter.analysis.enumExtras[0];
+        const extra = this.enumExtras[0];
         if (!extra) return;
-
-        const updated = cycleEnumExtra(point, extra.key, extra.values);
         const points = [...this.points];
-        points[index] = updated;
+        points[index] = cycleEnumExtra(point, extra.key, extra.values);
         this.commit(points);
     }
 
     pointerdown(pointerEvent: ViewerEvent<PointerEvent>) {
         const { event, viewerContext, cursor } = pointerEvent;
         if (event.shiftKey) return;
-        if (!this.options.canEdit) return;
+        if (!this.canEdit) return;
 
         if (event.button === 0) {
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
+                // Only switch the restricted index when one is already set
+                // (ETDRS). Registration must not latch onto the hit index.
+                if (this.placementIndex !== undefined) {
+                    this.placementIndex = hit;
+                }
                 this.beginDrag(viewerContext, hit);
-                this.options.setActiveSlot?.(hit);
                 return;
             }
-
             this.placeAtCursor(viewerContext, cursor);
         }
     }
@@ -231,7 +253,7 @@ export class PointTool implements Overlay {
         const { event, viewerContext, cursor } = pointerEvent;
         if (event.shiftKey) return;
 
-        if (!this.options.canEdit) {
+        if (!this.canEdit) {
             this.endDrag(viewerContext, cursor);
             return;
         }
@@ -239,13 +261,9 @@ export class PointTool implements Overlay {
         if (event.button === 2) {
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
-                this.commit(
-                    deletePointAt(
-                        this.points,
-                        hit,
-                        this.options.adapter.analysis.registrationMode,
-                    ),
-                );
+                const useNullDelete =
+                    this.registrationMode || this.placementIndex !== undefined;
+                this.commit(deletePointAt(this.points, hit, useNullDelete));
             }
         }
 
@@ -255,11 +273,9 @@ export class PointTool implements Overlay {
     pointermove(e: ViewerEvent<PointerEvent>) {
         const { cursor, viewerContext } = e;
 
-        if (this.activePointIndex !== undefined && this.options.canEdit) {
+        if (this.activePointIndex !== undefined && this.canEdit) {
             const position = viewerContext.viewerToImageCoordinates(cursor);
-            this.commit(
-                movePointAt(this.points, this.activePointIndex, position),
-            );
+            this.commit(movePointAt(this.points, this.activePointIndex, position));
             viewerContext.claimCursor("grabbing", CursorPriority.Drag);
         } else {
             this.hoverPointIndex = this.findHit(cursor, viewerContext);
@@ -269,28 +285,27 @@ export class PointTool implements Overlay {
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const points = this.points;
         const highlightIndex = this.activePointIndex ?? this.hoverPointIndex;
-        const activeSlot = this.options.getActiveSlot?.();
-
         const { context2D } = viewerContext;
-        const strokeStyle = this.color;
 
-        context2D.strokeStyle = strokeStyle;
-        context2D.fillStyle = strokeStyle;
+        context2D.strokeStyle = this.color;
+        context2D.fillStyle = this.color;
         context2D.font = "16px sans-serif";
 
         const r = this.radius;
-        const { analysis, slotLabels } = this.options.adapter;
         const showIndex =
-            analysis.cardinality === "list" || analysis.registrationMode;
+            this.cardinality === "list" || this.registrationMode;
 
         for (const [index, pt] of points.entries()) {
             if (!pt) continue;
             if (!this.visibleOnSlice(pt, viewerContext)) continue;
-            context2D.lineWidth = index === activeSlot ? 2 : 1.25;
+            context2D.lineWidth =
+                this.placementIndex !== undefined && index === this.placementIndex
+                    ? 2
+                    : 1.25;
             const p = viewerContext.imageToViewerCoordinates(pt);
             this.strokeMarker(context2D, p, r);
 
-            let label = slotLabels?.[index];
+            let label = this.slotLabels?.[index];
             if (!label) {
                 label = showIndex ? `${index + 1}` : this.name;
                 const extraLabel = this.extraLabel(pt);
@@ -323,21 +338,13 @@ export class PointTool implements Overlay {
     }
 
     private extraLabel(pt: ImagePoint): string | undefined {
-        // Prefer schema-declared enum extras (stable order), then any other
-        // string property on the point (free-text extras).
-        for (const extra of this.options.adapter.analysis.enumExtras) {
+        for (const extra of this.enumExtras) {
             const v = pt[extra.key];
             if (typeof v === "string" && v.length > 0) return v;
         }
         for (const [key, v] of Object.entries(pt)) {
             if (key === "x" || key === "y" || key === "index") continue;
-            if (
-                this.options.adapter.analysis.enumExtras.some(
-                    (e) => e.key === key,
-                )
-            ) {
-                continue;
-            }
+            if (this.enumExtras.some((e) => e.key === key)) continue;
             if (typeof v === "string" && v.length > 0) return v;
         }
     }

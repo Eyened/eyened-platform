@@ -7,11 +7,11 @@
         setFormAnnotationValue,
     } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { createMultiFieldAdapter } from "$lib/forms/pointAdapters";
-    import { pointArming } from "$lib/forms/pointArming.svelte";
+    import type { ImagePoint, PointList } from "$lib/forms/pointSchema";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { etdrsGridType } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
     import { ETDRSGridItemOverlay } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
+    import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type {
@@ -57,116 +57,110 @@
         }),
     );
 
-    // Overlay visibility (eye) is independent of selection.
     let overlayIds = new SvelteSet<number>();
     let overlays = new SvelteMap<number, () => void>();
 
-    // Single selection model: which item is open, and which landmark receives empty clicks.
     let selectedId = $state<number | undefined>(undefined);
+    let activeTool = $state<PointTool | undefined>(undefined);
+    let removeTool: (() => void) | undefined;
 
-    /** Which landmark receives empty clicks, derived from the active point session so it
-     * always reflects reality (falls back to fovea when this item isn't the armed one).
-     * Host-scoped: the same `etdrs:${id}` key can be armed from a different
-     * MainViewer (e.g. same annotation open in two viewers), and that must
-     * not be mistaken for this viewer's own armed state. */
+    function isImagePoint(value: unknown): value is ImagePoint {
+        return (
+            typeof value === "object" &&
+            value !== null &&
+            typeof (value as ImagePoint).x === "number" &&
+            typeof (value as ImagePoint).y === "number"
+        );
+    }
+
+    function pointsFromFormData(data: Record<string, unknown> | undefined): PointList {
+        const d = data ?? {};
+        return LANDMARK_SLOTS.map((slot) => {
+            const v = d[slot];
+            return isImagePoint(v) ? v : null;
+        });
+    }
+
+    function writeFormData(annotationId: number, points: PointList) {
+        const existing =
+            formAnnotations.get(annotationId) ??
+            filtered.find((f) => f.id === annotationId);
+        if (!existing) return;
+        const data = { ...(existing.form_data as Record<string, unknown>) };
+        for (let i = 0; i < LANDMARK_SLOTS.length; i++) {
+            const slot = LANDMARK_SLOTS[i]!;
+            const pt = points[i] ?? null;
+            if (pt == null) delete data[slot];
+            else data[slot] = pt;
+        }
+        formAnnotations.set(annotationId, { ...existing, form_data: data });
+        setFormAnnotationValue(annotationId, data);
+    }
+
     const placementField = $derived<LandmarkField>(
-        pointArming.session?.key === `etdrs:${selectedId}` &&
-            pointArming.session?.host === viewerContext &&
-            pointArming.activeSlot === 1
-            ? "disc_edge"
-            : "fovea",
+        activeTool?.placementIndex === 1 ? "disc_edge" : "fovea",
     );
 
-    // If another session takes over arming (a different ETDRS item, another
-    // panel entirely, or the same item armed from a different viewer) while
-    // this item was the editable/armed selection, the selection here goes
-    // stale: clear it so highlighting doesn't lie. Items that were never
-    // armed (not editable) are left selected — they only show as "open", not
-    // "armed", and don't depend on the point session.
-    $effect(() => {
-        if (selectedId === undefined) return;
-        const formAnnotation = filtered.find((f) => f.id === selectedId);
-        if (!formAnnotation) {
-            close();
-            return;
-        }
-        if (!globalContext.canEdit(formAnnotation)) return;
-        if (
-            pointArming.session?.key !== `etdrs:${selectedId}` ||
-            pointArming.session?.host !== viewerContext
-        ) {
-            selectedId = undefined;
-        }
-    });
+    function deactivateTool() {
+        removeTool?.();
+        removeTool = undefined;
+        activeTool = undefined;
+    }
 
     function close() {
         if (selectedId === undefined) return;
-        const id = selectedId;
-        pointArming.disarm(`etdrs:${id}`);
+        deactivateTool();
         selectedId = undefined;
     }
 
-    /** Open item (show grid + arm tools). Re-open same id toggles closed. */
     function open(
         formAnnotation: FormAnnotationGET,
         field: LandmarkField = "fovea",
     ) {
         if (!filtered.some((f) => f.id === formAnnotation.id)) return;
 
-        if (selectedId === formAnnotation.id) {
-            // Same item: switching landmark only, or toggle close on root re-click
-            // (root always passes default fovea — handled by selectItem).
-            pointArming.setActiveSlot(field === "disc_edge" ? 1 : 0);
+        if (selectedId === formAnnotation.id && activeTool) {
+            activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
             return;
         }
 
-        const priorId = selectedId;
         ensureOverlay(formAnnotation);
         selectedId = formAnnotation.id;
 
         if (!globalContext.canEdit(formAnnotation)) {
-            if (priorId !== undefined) {
-                pointArming.disarm(`etdrs:${priorId}`);
-            }
+            deactivateTool();
             return;
         }
 
+        deactivateTool();
+
         const annotationId = formAnnotation.id;
-        pointArming.arm({
-            key: `etdrs:${annotationId}`,
+        const tool = new PointTool({
             canEdit: true,
             pointStyle: "cross",
             radius: 16,
             color: "rgba(0, 255, 0, 1)",
-            host: viewerContext,
-            useActiveSlotPlacement: true,
+            cardinality: "list",
+            slotLabels: ["fovea", "disc"],
             slotKeys: [
-                { index: 0, key: "f", label: "fovea" },
-                { index: 1, key: "d", label: "disc" },
+                { index: 0, key: "f" },
+                { index: 1, key: "d" },
             ],
-            adapter: createMultiFieldAdapter({
-                slots: LANDMARK_SLOTS,
-                slotLabels: ["fovea", "disc"],
-                getPublicId: () => instance.id,
-                getFormData: () =>
-                    (formAnnotations.get(annotationId)?.form_data as Record<
-                        string,
-                        unknown
-                    >) ?? {},
-                setFormData: (next) => {
-                    const existing =
-                        formAnnotations.get(annotationId) ??
-                        filtered.find((f) => f.id === annotationId);
-                    if (!existing) return;
-                    formAnnotations.set(annotationId, {
-                        ...existing,
-                        form_data: next,
-                    });
-                    setFormAnnotationValue(annotationId, next);
-                },
-            }),
+            onChange: (points) => writeFormData(annotationId, points),
         });
-        pointArming.setActiveSlot(field === "disc_edge" ? 1 : 0);
+        tool.points = pointsFromFormData(
+            formAnnotations.get(annotationId)?.form_data as
+                | Record<string, unknown>
+                | undefined,
+        );
+        tool.placementIndex = field === "disc_edge" ? 1 : 0;
+
+        const dispose = viewerContext.addOverlay(tool);
+        removeTool = () => {
+            tool.destroy();
+            dispose();
+        };
+        activeTool = tool;
     }
 
     function selectItem(formAnnotation: FormAnnotationGET) {
@@ -181,8 +175,8 @@
         formAnnotation: FormAnnotationGET,
         field: LandmarkField,
     ) {
-        if (selectedId === formAnnotation.id) {
-            pointArming.setActiveSlot(field === "disc_edge" ? 1 : 0);
+        if (selectedId === formAnnotation.id && activeTool) {
+            activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
             return;
         }
         open(formAnnotation, field);
@@ -282,6 +276,11 @@
         }
     }
     let showHide = $derived(removeAutoOverlay ? Show : Hide);
+
+    $effect(() => {
+        if (selectedId === undefined) return;
+        if (!filtered.some((f) => f.id === selectedId)) close();
+    });
 </script>
 
 <div class="main">

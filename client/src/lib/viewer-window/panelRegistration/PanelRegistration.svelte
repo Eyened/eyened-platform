@@ -12,11 +12,14 @@
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
-    import { createFieldAdapter } from "$lib/forms/pointAdapters";
-    import { pointArming } from "$lib/forms/pointArming.svelte";
-    import { analyzePointSchema } from "$lib/forms/pointSchema";
+    import {
+        analyzePointSchema,
+        getPointsForImage,
+        setPointsForImage,
+    } from "$lib/forms/pointSchema";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { FormSchemaGET } from "../../../types/openapi_types";
@@ -87,8 +90,6 @@
     function registrationAnalysis() {
         const fromApi = (registrationSchema.schema ?? {}) as JSONSchema;
         const entityType = registrationSchema.entity_type ?? "Eye";
-        // Prefer API schema, but always force widget markers. If analysis fails
-        // (null/empty/partial seed), fall back to the known registration shape.
         const withMarkers = (schema: JSONSchema): JSONSchema => ({
             ...schema,
             type: "object",
@@ -118,19 +119,15 @@
         onactivate(formAnnotation);
     }
 
-    // Scoped to this viewer's own session: other MainViewers (e.g. collapsed
-    // panels for other images) share the same global `pointArming.session`,
-    // so without the host check their `activeID` would also resolve to
-    // whichever annotation is armed elsewhere and their `!panelActive` effect
-    // below would disarm it.
-    const activeID = $derived.by(() => {
-        const session = pointArming.session;
-        if (session?.host !== viewerContext) return undefined;
-        const key = session?.key;
-        if (!key?.startsWith("registration:")) return undefined;
-        const id = Number(key.slice("registration:".length));
-        return Number.isFinite(id) ? id : undefined;
-    });
+    /** Per-viewer tool — other MainViewers can arm the same annotation independently. */
+    let activeID: number | undefined = $state(undefined);
+    let removeTool: (() => void) | undefined;
+
+    function deactivate() {
+        removeTool?.();
+        removeTool = undefined;
+        activeID = undefined;
+    }
 
     function onactivate(formAnnotation: any) {
         const stillExists = filtered.some((f) => f.id === formAnnotation.id);
@@ -139,7 +136,11 @@
             return;
         }
 
-        const key = `registration:${formAnnotation.id}`;
+        if (activeID === formAnnotation.id) {
+            deactivate();
+            return;
+        }
+
         const analysis = registrationAnalysis();
         if (!analysis) {
             console.error(
@@ -149,47 +150,57 @@
             return;
         }
 
-        const canEdit = globalContext.canEdit(formAnnotation);
-        const annotationId = formAnnotation.id;
+        deactivate();
 
-        pointArming.arm({
-            key,
+        const annotationId = formAnnotation.id;
+        const canEdit = globalContext.canEdit(formAnnotation);
+        const publicId = () => viewerContext.image.instance.id;
+
+        const tool = new PointTool({
             canEdit,
+            label: "registration",
             pointStyle: pointMarker.style,
             radius: pointMarker.radius,
             color: pointMarker.color,
-            host: viewerContext,
-            adapter: createFieldAdapter({
-                analysis,
-                getPublicId: () => viewerContext.image.instance.id,
-                getFieldValue: () =>
-                    formAnnotations.get(annotationId)?.form_data ??
-                    formAnnotation.form_data,
-                setFieldValue: (next) => {
-                    const existing =
-                        formAnnotations.get(annotationId) ?? formAnnotation;
-                    formAnnotations.set(annotationId, {
-                        ...existing,
-                        form_data: next as any,
-                    });
-                    setFormAnnotationValue(annotationId, next);
-                },
-            }),
+            cardinality: "list",
+            registrationMode: true,
+            onChange: (points) => {
+                const existing =
+                    formAnnotations.get(annotationId) ?? formAnnotation;
+                const next = setPointsForImage(
+                    existing.form_data,
+                    publicId(),
+                    points,
+                    analysis,
+                );
+                formAnnotations.set(annotationId, {
+                    ...existing,
+                    form_data: next as any,
+                });
+                setFormAnnotationValue(annotationId, next);
+            },
         });
+
+        const existing =
+            formAnnotations.get(annotationId)?.form_data ??
+            formAnnotation.form_data;
+        tool.points = getPointsForImage(existing, publicId(), analysis);
+
+        const dispose = viewerContext.addOverlay(tool);
+        removeTool = () => {
+            tool.destroy();
+            dispose();
+        };
+        activeID = annotationId;
     }
 
     function onremove(formAnnotation: any) {
-        if (activeID === formAnnotation.id) {
-            pointArming.disarm(`registration:${formAnnotation.id}`);
-        }
+        if (activeID === formAnnotation.id) deactivate();
         deleteFormAnnotation(formAnnotation.id);
     }
+
     $effect(() => {
-        if (!panelActive) {
-            if (activeID !== undefined) {
-                pointArming.disarm(`registration:${activeID}`);
-            }
-        }
+        if (!panelActive) deactivate();
     });
 </script>
 

@@ -18,8 +18,11 @@
     import { resolvePanels } from "./resolvePanels";
     import { CLIENT_DEFAULTS, mergeClientConfig } from "./taskConfigLayout";
     import { pointArming } from "$lib/forms/pointArming.svelte";
-    import { PointTool } from "$lib/viewer/tools/PointTool";
-    import { createFieldAdapter } from "$lib/forms/pointAdapters";
+    import {
+        getPointsForImage,
+        setPointsForImage,
+    } from "$lib/forms/pointSchema";
+    import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     interface Props {
         image: AbstractImage;
     }
@@ -115,45 +118,41 @@
         }
     });
 
-    // Form/panel PointTool bridge: each MainViewer mounts its own PointTool
-    // while a point session is armed. Tool lifecycle follows this panel
-    // (add/replace/close). getActiveSlot/setActiveSlot are wired via closures
-    // so slot changes don't remount the tool.
+    // Form PointField: each MainViewer mounts a PointTool synced to the field
+    // via onChange / initial points load (PublicID = this viewer's image).
     $effect(() => {
         const session = pointArming.session;
         if (!session) return;
-        if (session.host && session.host !== viewerContext) return;
 
-        const adapter =
-            session.adapter ??
-            (session.fieldBinding
-                ? createFieldAdapter({
-                      analysis: session.fieldBinding.analysis,
-                      getPublicId: () => viewerContext.image.instance.id,
-                      getFieldValue: session.fieldBinding.getFieldValue,
-                      setFieldValue: session.fieldBinding.setFieldValue,
-                  })
-                : null);
-        if (!adapter) return;
-
-        const useActiveSlot =
-            session.useActiveSlotPlacement ?? !!session.slotKeys?.length;
+        const publicId = () => viewerContext.image.instance.id;
+        const { analysis } = session;
 
         const tool = new PointTool({
             canEdit: session.canEdit,
-            adapter,
-            label: session.label ?? adapter.slotLabels?.[0] ?? "Point",
+            label: session.label ?? "Point",
             pointStyle: session.pointStyle,
             radius: session.radius,
             color: session.color,
-            slotKeys: session.slotKeys,
-            getActiveSlot: useActiveSlot
-                ? () => pointArming.activeSlot
-                : undefined,
-            setActiveSlot: useActiveSlot
-                ? (i) => pointArming.setActiveSlot(i)
-                : undefined,
+            cardinality: analysis.cardinality,
+            registrationMode: analysis.registrationMode,
+            enumExtras: analysis.enumExtras,
+            onChange: (points) => {
+                session.setFieldValue(
+                    setPointsForImage(
+                        session.getFieldValue(),
+                        publicId(),
+                        points,
+                        analysis,
+                    ),
+                );
+            },
         });
+        tool.points = getPointsForImage(
+            session.getFieldValue(),
+            publicId(),
+            analysis,
+        );
+
         const remove = viewerContext.addOverlay(tool);
         return () => {
             tool.destroy();
