@@ -38,6 +38,23 @@ export function placePoint(
     return copy;
 }
 
+export function placePointAt(
+    points: PointList,
+    index: number,
+    position: Position2D,
+    options?: PlacePointOptions,
+): PointList {
+    if (index < 0) return [...points];
+    const next: ImagePoint = { x: position.x, y: position.y };
+    if (options && "index" in options) {
+        next.index = options.index;
+    }
+    const copy = [...points];
+    while (copy.length <= index) copy.push(null);
+    copy[index] = next;
+    return copy;
+}
+
 export function deletePointAt(
     points: PointList,
     index: number,

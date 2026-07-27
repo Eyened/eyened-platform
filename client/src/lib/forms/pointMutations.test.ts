@@ -4,6 +4,7 @@ import {
     deletePointAt,
     movePointAt,
     placePoint,
+    placePointAt,
 } from "./pointMutations";
 
 describe("placePoint", () => {
@@ -95,5 +96,32 @@ describe("movePointAt / cycleEnumExtra", () => {
         expect(
             cycleEnumExtra({ x: 1, y: 1, severity: "a" }, "severity", ["a", "b"]),
         ).toEqual({ x: 1, y: 1, severity: "b" });
+    });
+});
+
+describe("placePointAt", () => {
+    it("writes or replaces the given index, preserving length", () => {
+        expect(
+            placePointAt([null, { x: 1, y: 1 }], 0, { x: 9, y: 9 }),
+        ).toEqual([{ x: 9, y: 9 }, { x: 1, y: 1 }]);
+        expect(
+            placePointAt([{ x: 1, y: 1 }, null], 1, { x: 2, y: 2 }),
+        ).toEqual([{ x: 1, y: 1 }, { x: 2, y: 2 }]);
+    });
+
+    it("extends with nulls when index is past length", () => {
+        expect(placePointAt([], 1, { x: 3, y: 4 })).toEqual([
+            null,
+            { x: 3, y: 4 },
+        ]);
+    });
+
+    it("stores optional index like placePoint", () => {
+        expect(
+            placePointAt([null], 0, { x: 1, y: 2 }, { index: 7 }),
+        ).toEqual([{ x: 1, y: 2, index: 7 }]);
+        expect(
+            placePointAt([null], 0, { x: 1, y: 2 }, { index: null }),
+        ).toEqual([{ x: 1, y: 2, index: null }]);
     });
 });
