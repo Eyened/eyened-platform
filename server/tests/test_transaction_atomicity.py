@@ -15,7 +15,7 @@ class _ExplodingRepo(FeatureRepository):
 
 
 def test_first_write_rolls_back_when_second_fails(session):
-    """When a later write raises, the earlier write and its audit row both vanish on rollback."""
+    """When a later write raises, the earlier already-flushed write vanishes on rollback."""
     service = FeatureService(_ExplodingRepo(session), audit=AuditService(session))
     with pytest.raises(RuntimeError):
         service.create_feature("parent", [1], ActingUser(id=1, username="alice"))
@@ -23,8 +23,6 @@ def test_first_write_rolls_back_when_second_fails(session):
     session.rollback()  # get_db does this in production on the propagated exception
 
     assert session.query(Feature).filter_by(FeatureName="parent").count() == 0
-    assert session.query(AuditLog).count() == 0
-    assert session.info.get("_audit_events", []) == []
 
 
 def test_prior_audit_row_rolls_back_with_a_later_failed_write(session):
