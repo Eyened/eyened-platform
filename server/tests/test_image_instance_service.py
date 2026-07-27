@@ -151,6 +151,17 @@ def test_tag_instance_creates_link(session):
     assert link.Tag.TagID == tag.TagID
 
 
+def test_tag_instance_creates_link_without_comment(session):
+    """tag_instance with comment=None creates a link with no comment set."""
+    actor = _actor(session)
+    _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+
+    link = _service(session).tag_instance("pub-1", tag.TagID, None, actor)
+
+    assert link.Comment is None
+
+
 def test_tag_instance_unknown_instance_raises_not_found(session):
     """tag_instance on a missing instance is translated to NotFoundError."""
     actor = _actor(session)
