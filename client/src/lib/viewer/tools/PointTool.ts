@@ -1,16 +1,13 @@
 import type { PointMarkerStyle } from "$lib/config/clientDefaults";
+import type { PointAdapter } from "$lib/forms/pointAdapters";
 import {
     cycleEnumExtra,
     deletePointAt,
     movePointAt,
     placePoint,
+    placePointAt,
 } from "$lib/forms/pointMutations";
-import {
-    getPointsForImage,
-    setPointsForImage,
-    type ImagePoint,
-    type PointSchemaAnalysis,
-} from "$lib/forms/pointSchema";
+import type { ImagePoint, PointList } from "$lib/forms/pointSchema";
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
@@ -22,36 +19,18 @@ import {
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
 
-/** Live PointTool instances — used so empty-click placement ignores siblings' hits. */
-const liveTools = new Set<PointTool>();
-
 export type PointToolOptions = {
     canEdit: boolean;
-    analysis: PointSchemaAnalysis;
-    label: string;
-    getPublicId: () => string;
-    getFieldValue: () => unknown;
-    setFieldValue: (next: unknown) => void;
+    adapter: PointAdapter;
+    label?: string;
     pointStyle?: PointMarkerStyle;
     radius?: number;
     color?: string;
-    /**
-     * Identity of the hosting viewer. Sibling hit-tests only consider tools
-     * that share this host (ETDRS dual tools on one canvas; not other MainViewers).
-     */
-    host?: object;
-    /**
-     * When false, this tool still paints and handles hit/drag/delete, but does
-     * not place on empty clicks. Defaults to true.
-     */
-    isPlacementTarget?: () => boolean;
-    /** Called when the user starts interacting with one of this tool's points. */
-    onBecomePlacementTarget?: () => void;
-    /**
-     * Keyboard shortcut: keydown places/starts drag at cursor; keyup releases
-     * (same as pointerup). Case-insensitive single character (e.g. "f").
-     */
-    placeKey?: string;
+    /** When provided, empty click / slot shortcuts use placePointAt. */
+    getActiveSlot?: () => number;
+    setActiveSlot?: (index: number) => void;
+    /** Keyboard shortcuts into fixed slots (handled in keydown). */
+    slotKeys?: readonly { index: number; key: string }[];
 };
 
 export class PointTool implements Overlay {
@@ -64,74 +43,61 @@ export class PointTool implements Overlay {
     private readonly pointStyle: PointMarkerStyle;
     private readonly radius: number;
     private readonly color: string;
-    private readonly host: object;
 
     constructor(private readonly options: PointToolOptions) {
-        if (!options.analysis) {
-            throw new Error("PointTool requires a point schema analysis");
-        }
         this.pointStyle = options.pointStyle ?? "circle";
         this.radius = options.radius ?? 16;
         this.color = options.color ?? defaultStroke;
-        this.host = options.host ?? this;
         this.name = options.label || "Point";
-        liveTools.add(this);
     }
 
-    /** Remove from the live registry (call when detaching the overlay). */
-    destroy() {
-        liveTools.delete(this);
+    /** No-op: kept so MainViewer overlay cleanup can call it unconditionally. */
+    destroy() {}
+
+    private get points(): PointList {
+        return this.options.adapter.getPoints();
     }
 
-    private get points() {
-        return getPointsForImage(
-            this.options.getFieldValue(),
-            this.options.getPublicId(),
-            this.options.analysis,
-        );
-    }
-
-    private isPlacementTarget() {
-        return this.options.isPlacementTarget?.() ?? true;
-    }
-
-    private commit(points: ReturnType<typeof getPointsForImage>) {
-        const next = setPointsForImage(
-            this.options.getFieldValue(),
-            this.options.getPublicId(),
-            points,
-            this.options.analysis,
-        );
-        this.options.setFieldValue(next);
-    }
-
-    /** True if this tool owns a marker under the cursor. */
-    hits(cursor: Position2D, viewerContext: ViewerContext): boolean {
-        return this.findHit(cursor, viewerContext) !== undefined;
+    private commit(points: PointList) {
+        this.options.adapter.setPoints(points);
     }
 
     /**
      * Place/replace at image coords under the viewer cursor (e.g. keyboard shortcut).
-     * Does not consult isPlacementTarget — caller decides when this is appropriate.
+     * When `slot` is given, always writes that slot via `placePointAt` (used by
+     * `slotKeys`); otherwise defers to `getActiveSlot()` when defined, else the
+     * schema-driven `placePoint` (cardinality/registration fill-first-null).
      */
-    placeAtCursor(viewerContext: ViewerContext, cursor: Position2D) {
+    placeAtCursor(viewerContext: ViewerContext, cursor: Position2D, slot?: number) {
         if (!this.options.canEdit) return;
         const position = viewerContext.viewerToImageCoordinates(cursor);
         const before = this.points;
-        const after = placePoint(
-            before,
-            position,
-            this.options.analysis.cardinality,
-            this.options.analysis.registrationMode,
-            this.placeIndexOptions(viewerContext),
-        );
-        let newIndex = after.findIndex(
-            (p, i) => p && (!before[i] || before[i] !== p),
-        );
-        if (newIndex < 0) newIndex = Math.max(0, after.length - 1);
+        const targetSlot = slot ?? this.options.getActiveSlot?.();
+        const after =
+            targetSlot !== undefined
+                ? placePointAt(
+                      before,
+                      targetSlot,
+                      position,
+                      this.placeIndexOptions(viewerContext),
+                  )
+                : placePoint(
+                      before,
+                      position,
+                      this.options.adapter.analysis.cardinality,
+                      this.options.adapter.analysis.registrationMode,
+                      this.placeIndexOptions(viewerContext),
+                  );
+        let newIndex = targetSlot;
+        if (newIndex === undefined) {
+            newIndex = after.findIndex(
+                (p, i) => p && (!before[i] || before[i] !== p),
+            );
+            if (newIndex < 0) newIndex = Math.max(0, after.length - 1);
+        }
         this.commit(after);
         this.beginDrag(viewerContext, newIndex);
-        this.options.onBecomePlacementTarget?.();
+        this.options.setActiveSlot?.(newIndex);
     }
 
     /**
@@ -184,29 +150,12 @@ export class PointTool implements Overlay {
         if (wasDragging) viewerContext.resetCursor();
     }
 
-    private siblingOwnsHit(
-        cursor: Position2D,
-        viewerContext: ViewerContext,
-    ): boolean {
-        for (const tool of liveTools) {
-            if (tool === this || tool.host !== this.host) continue;
-            if (tool.hits(cursor, viewerContext)) return true;
-        }
-        return false;
-    }
-
     keyup(e: ViewerEvent<KeyboardEvent>) {
-        const { event, viewerContext, cursor } = e;
+        const { event, viewerContext } = e;
 
         if (
-            this.options.placeKey &&
-            event.key.toLowerCase() === this.options.placeKey.toLowerCase()
-        ) {
-            this.endDrag(viewerContext, cursor);
-        }
-
-        if (
-            this.options.analysis.registrationMode &&
+            this.options.adapter.analysis.registrationMode &&
+            !this.options.getActiveSlot &&
             event.key >= "0" &&
             event.key <= "9"
         ) {
@@ -227,13 +176,15 @@ export class PointTool implements Overlay {
         if (!this.options.canEdit) return;
         const { event, viewerContext, cursor } = e;
 
-        if (
-            this.options.placeKey &&
-            !event.repeat &&
-            event.key.toLowerCase() === this.options.placeKey.toLowerCase()
-        ) {
-            this.placeAtCursor(viewerContext, cursor);
-            return;
+        if (!event.repeat && this.options.slotKeys) {
+            const match = this.options.slotKeys.find(
+                (s) => s.key.toLowerCase() === event.key.toLowerCase(),
+            );
+            if (match) {
+                this.options.setActiveSlot?.(match.index);
+                this.placeAtCursor(viewerContext, cursor, match.index);
+                return;
+            }
         }
 
         if (event.key.toLowerCase() !== "c") return;
@@ -243,7 +194,7 @@ export class PointTool implements Overlay {
         const point = this.points[index];
         if (!point) return;
 
-        const extra = this.options.analysis.enumExtras[0];
+        const extra = this.options.adapter.analysis.enumExtras[0];
         if (!extra) return;
 
         const updated = cycleEnumExtra(point, extra.key, extra.values);
@@ -261,14 +212,9 @@ export class PointTool implements Overlay {
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
                 this.beginDrag(viewerContext, hit);
-                this.options.onBecomePlacementTarget?.();
+                this.options.setActiveSlot?.(hit);
                 return;
             }
-
-            // Empty click: only the placement target places, and only if no
-            // sibling tool owns a marker here.
-            if (!this.isPlacementTarget()) return;
-            if (this.siblingOwnsHit(cursor, viewerContext)) return;
 
             this.placeAtCursor(viewerContext, cursor);
         }
@@ -286,12 +232,11 @@ export class PointTool implements Overlay {
         if (event.button === 2) {
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
-                this.options.onBecomePlacementTarget?.();
                 this.commit(
                     deletePointAt(
                         this.points,
                         hit,
-                        this.options.analysis.registrationMode,
+                        this.options.adapter.analysis.registrationMode,
                     ),
                 );
             }
@@ -317,6 +262,7 @@ export class PointTool implements Overlay {
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const points = this.points;
         const highlightIndex = this.activePointIndex ?? this.hoverPointIndex;
+        const activeSlot = this.options.getActiveSlot?.();
 
         const { context2D } = viewerContext;
         const strokeStyle = this.color;
@@ -324,23 +270,28 @@ export class PointTool implements Overlay {
         context2D.strokeStyle = strokeStyle;
         context2D.fillStyle = strokeStyle;
         context2D.font = "16px sans-serif";
-        context2D.lineWidth = this.isPlacementTarget() ? 1.25 : 0.75;
 
         const r = this.radius;
+        const { analysis, slotLabels } = this.options.adapter;
         const showIndex =
-            this.options.analysis.cardinality === "list" ||
-            this.options.analysis.registrationMode;
+            analysis.cardinality === "list" || analysis.registrationMode;
 
         for (const [index, pt] of points.entries()) {
             if (!pt) continue;
             if (!this.visibleOnSlice(pt, viewerContext)) continue;
+            context2D.lineWidth = index === activeSlot ? 2 : 1.25;
             const p = viewerContext.imageToViewerCoordinates(pt);
             this.strokeMarker(context2D, p, r);
 
-            let label = showIndex ? `${index + 1}` : this.options.label;
-            const extraLabel = this.extraLabel(pt);
-            if (extraLabel) {
-                label = showIndex ? `${index + 1}:${extraLabel}` : extraLabel;
+            let label = slotLabels?.[index];
+            if (!label) {
+                label = showIndex ? `${index + 1}` : this.name;
+                const extraLabel = this.extraLabel(pt);
+                if (extraLabel) {
+                    label = showIndex
+                        ? `${index + 1}:${extraLabel}`
+                        : extraLabel;
+                }
             }
             if (label) {
                 context2D.fillText(label, p.x + r, p.y + r + 12);
@@ -367,13 +318,17 @@ export class PointTool implements Overlay {
     private extraLabel(pt: ImagePoint): string | undefined {
         // Prefer schema-declared enum extras (stable order), then any other
         // string property on the point (free-text extras).
-        for (const extra of this.options.analysis.enumExtras) {
+        for (const extra of this.options.adapter.analysis.enumExtras) {
             const v = pt[extra.key];
             if (typeof v === "string" && v.length > 0) return v;
         }
         for (const [key, v] of Object.entries(pt)) {
             if (key === "x" || key === "y" || key === "index") continue;
-            if (this.options.analysis.enumExtras.some((e) => e.key === key)) {
+            if (
+                this.options.adapter.analysis.enumExtras.some(
+                    (e) => e.key === key,
+                )
+            ) {
                 continue;
             }
             if (typeof v === "string" && v.length > 0) return v;

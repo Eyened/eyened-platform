@@ -1,70 +1,71 @@
 import type { PointMarkerStyle } from "$lib/config/clientDefaults";
+import type { PointAdapter } from "$lib/forms/pointAdapters";
 import type { PointSchemaAnalysis } from "$lib/forms/pointSchema";
+import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 
-/** Panel-owned tools (ETDRS / Registration) — caller attaches overlays and returns dispose. */
-type PanelArmed = {
-    kind: "panel";
+export type PointSlotKey = {
+    index: number;
     key: string;
-    dispose: () => void;
+    label: string;
 };
 
-/**
- * Form PointField arming — MainViewers each mount a PointTool that reads/writes
- * through these accessors (one destination, many viewer hosts).
- */
-export type FormPointArming = {
-    kind: "form";
+type PointSessionBase = {
     key: string;
-    analysis: PointSchemaAnalysis;
-    label: string;
     canEdit: boolean;
     pointStyle: PointMarkerStyle;
     radius: number;
     color: string;
-    getFieldValue: () => unknown;
-    setFieldValue: (next: unknown) => void;
+    /** If set, only this viewer mounts the tool; if omitted, every MainViewer mounts. */
+    host?: ViewerContext;
+    slotKeys?: readonly PointSlotKey[];
+    /** When true, empty click uses placePointAt(activeSlot). Default: !!slotKeys?.length */
+    useActiveSlotPlacement?: boolean;
 };
 
-type Armed = PanelArmed | FormPointArming;
+export type PointSession = PointSessionBase &
+    (
+        | {
+              /** Panels: adapter already bound to FormData (+ fixed getPublicId). */
+              adapter: PointAdapter;
+              fieldBinding?: never;
+          }
+        | {
+              adapter?: never;
+              /**
+               * Form path: each MainViewer builds a FieldAdapter with that viewer's PublicID.
+               */
+              fieldBinding: {
+                  analysis: PointSchemaAnalysis;
+                  getFieldValue: () => unknown;
+                  setFieldValue: (next: unknown) => void;
+              };
+          }
+    );
 
 class PointArming {
-    armed: Armed | null = $state(null);
+    session: PointSession | null = $state(null);
+    activeSlot: number = $state(0);
 
-    /** Panel pattern: attach overlays now; dispose on disarm / replace. */
-    arm(key: string, attach: () => () => void) {
-        if (this.armed?.key === key) {
+    arm(session: PointSession): void {
+        if (this.session?.key === session.key) {
             this.disarm();
             return;
         }
-        this.disarm();
-        this.armed = { kind: "panel", key, dispose: attach() };
+        this.session = session;
+        this.activeSlot = 0;
     }
 
-    /** Form pattern: publish target; MainViewers mount tools reactively. */
-    armForm(target: Omit<FormPointArming, "kind">) {
-        if (this.armed?.key === target.key) {
-            this.disarm();
-            return;
-        }
-        this.disarm();
-        this.armed = { kind: "form", ...target };
+    disarm(key?: string): void {
+        if (key && this.session?.key !== key) return;
+        this.session = null;
     }
 
-    /** Reactive form target for MainViewer effects (null if panel-armed or idle). */
-    get formTarget(): FormPointArming | null {
-        return this.armed?.kind === "form" ? this.armed : null;
+    setActiveSlot(index: number): void {
+        this.activeSlot = Math.max(0, index);
     }
 
-    disarm(key?: string) {
-        if (key && this.armed?.key !== key) return;
-        if (this.armed?.kind === "panel") {
-            this.armed.dispose();
-        }
-        this.armed = null;
-    }
-
-    isArmed(key: string) {
-        return this.armed?.key === key;
+    isArmed(key: string): boolean {
+        return this.session?.key === key;
     }
 }
 

@@ -56,7 +56,7 @@
     const armKey = $derived(
         `form:${formAnnotationId ?? "unknown"}:${fieldPath}`,
     );
-    const armed = $derived(pointArming.armed?.key === armKey);
+    const armed = $derived(pointArming.session?.key === armKey);
 
     const publicId = $derived(
         seedViewerContext?.image.instance.id ?? boundImageId ?? "",
@@ -183,16 +183,18 @@
 
     function toggleActivate() {
         if (!analysis || !seedViewerContext) return;
-        pointArming.armForm({
+        pointArming.arm({
             key: armKey,
-            analysis,
-            label: schema.title || fieldPath,
             canEdit,
             pointStyle: pointMarker.style,
             radius: pointMarker.radius,
             color: pointMarker.color,
-            getFieldValue: () => value,
-            setFieldValue: (next) => onchange(next),
+            // no host → all MainViewers
+            fieldBinding: {
+                analysis,
+                getFieldValue: () => value,
+                setFieldValue: (next) => onchange(next),
+            },
         });
     }
 

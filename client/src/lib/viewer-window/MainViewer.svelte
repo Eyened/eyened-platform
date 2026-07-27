@@ -19,6 +19,7 @@
     import { CLIENT_DEFAULTS, mergeClientConfig } from "./taskConfigLayout";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { PointTool } from "$lib/viewer/tools/PointTool";
+    import { createFieldAdapter } from "$lib/forms/pointAdapters";
     interface Props {
         image: AbstractImage;
     }
@@ -114,24 +115,44 @@
         }
     });
 
-    // Form PointField bridge: each MainViewer hosts its own PointTool while a
-    // form field is armed. Tool lifecycle follows this panel (add/replace/close).
+    // Form/panel PointTool bridge: each MainViewer mounts its own PointTool
+    // while a point session is armed. Tool lifecycle follows this panel
+    // (add/replace/close). getActiveSlot/setActiveSlot are wired via closures
+    // so slot changes don't remount the tool.
     $effect(() => {
-        const armed = pointArming.armed;
-        if (!armed || armed.kind !== "form") return;
-        const target = armed;
+        const session = pointArming.session;
+        if (!session) return;
+        if (session.host && session.host !== viewerContext) return;
+
+        const adapter =
+            session.adapter ??
+            (session.fieldBinding
+                ? createFieldAdapter({
+                      analysis: session.fieldBinding.analysis,
+                      getPublicId: () => viewerContext.image.instance.id,
+                      getFieldValue: session.fieldBinding.getFieldValue,
+                      setFieldValue: session.fieldBinding.setFieldValue,
+                  })
+                : null);
+        if (!adapter) return;
+
+        const useActiveSlot =
+            session.useActiveSlotPlacement ?? !!session.slotKeys?.length;
 
         const tool = new PointTool({
-            canEdit: target.canEdit,
-            analysis: target.analysis,
-            label: target.label,
-            pointStyle: target.pointStyle,
-            radius: target.radius,
-            color: target.color,
-            host: viewerContext,
-            getPublicId: () => viewerContext.image.instance.id,
-            getFieldValue: () => target.getFieldValue(),
-            setFieldValue: (next) => target.setFieldValue(next),
+            canEdit: session.canEdit,
+            adapter,
+            label: adapter.slotLabels?.[0] ?? "Point",
+            pointStyle: session.pointStyle,
+            radius: session.radius,
+            color: session.color,
+            slotKeys: session.slotKeys,
+            getActiveSlot: useActiveSlot
+                ? () => pointArming.activeSlot
+                : undefined,
+            setActiveSlot: useActiveSlot
+                ? (i) => pointArming.setActiveSlot(i)
+                : undefined,
         });
         const remove = viewerContext.addOverlay(tool);
         return () => {
