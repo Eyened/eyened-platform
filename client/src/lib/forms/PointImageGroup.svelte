@@ -1,8 +1,5 @@
 <script lang="ts">
-    import type {
-        ImagePoint,
-        PointStorageMode,
-    } from "$lib/forms/pointSchema";
+    import type { ImagePoint, PointStorageMode } from "$lib/forms/pointSchema";
     import PointRowEditor, {
         type PointRow,
     } from "$lib/forms/PointRowEditor.svelte";
@@ -57,7 +54,8 @@
 <div class="image-group">
     <div class="group-line">
         {#if storageMode === "byPublicId"}
-            <span class="public-id" title={group.publicId}>{group.publicId}</span
+            <span class="public-id" title={group.publicId}
+                >{group.publicId}</span
             >
             <span class="sep">:</span>
         {/if}

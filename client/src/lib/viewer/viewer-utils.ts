@@ -29,11 +29,7 @@ export type BuiltinPanelName =
 /** Builtin names or task-configured custom panel titles (e.g. "Grading"). */
 export type PanelName = BuiltinPanelName | (string & {});
 
-export type ToolName =
-    | "brush"
-    | "polygon"
-    | "AV nicking tool"
-    | "point";
+export type ToolName = "brush" | "polygon" | "AV nicking tool" | "point";
 
 export type Dimension2D = { width: number; height: number };
 

@@ -22,7 +22,10 @@
     import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import type { FormSchemaGET } from "../../../types/openapi_types";
+    import type {
+        FormAnnotationGET,
+        FormSchemaGET,
+    } from "../../../types/openapi_types";
     import RegistrationItem from "./RegistrationItem.svelte";
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -129,7 +132,7 @@
         activeID = undefined;
     }
 
-    function onactivate(formAnnotation: any) {
+    function onactivate(formAnnotation: FormAnnotationGET) {
         const stillExists = filtered.some((f) => f.id === formAnnotation.id);
         if (!stillExists) {
             console.log("Annotation no longer exists, ignoring onactivate");
@@ -175,7 +178,7 @@
                 );
                 formAnnotations.set(annotationId, {
                     ...existing,
-                    form_data: next as any,
+                    form_data: next,
                 });
             },
             onPersist: (points) => {
@@ -189,7 +192,7 @@
                 );
                 formAnnotations.set(annotationId, {
                     ...existing,
-                    form_data: next as any,
+                    form_data: next,
                 });
                 setFormAnnotationValue(annotationId, next);
             },
@@ -208,7 +211,7 @@
         activeID = annotationId;
     }
 
-    function onremove(formAnnotation: any) {
+    function onremove(formAnnotation: FormAnnotationGET) {
         if (activeID === formAnnotation.id) deactivate();
         deleteFormAnnotation(formAnnotation.id);
     }

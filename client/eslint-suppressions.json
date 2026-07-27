@@ -279,17 +279,7 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/ViewerWindow.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
   "src/lib/viewer-window/panelETRDS/ETDRSGridItem.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "src/lib/viewer-window/panelETRDS/PanelETDRS.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
     }
@@ -328,11 +318,6 @@
     },
     "svelte/require-each-key": {
       "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelRegistration/PanelRegistration.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/lib/viewer-window/panelRegistration/RegistrationItem.svelte": {

@@ -37,7 +37,8 @@
                     BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION ||
                 schema.name ===
                     BUILTIN_VIEWER_FORM_SCHEMA_NAMES.AFFINE_REGISTRATION ||
-                schema.name === BUILTIN_VIEWER_FORM_SCHEMA_NAMES.REGISTRATION_SET
+                schema.name ===
+                    BUILTIN_VIEWER_FORM_SCHEMA_NAMES.REGISTRATION_SET
             ) {
                 formItems.push({ name: schema.name, form_data: fa.form_data });
             }

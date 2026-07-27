@@ -14,10 +14,7 @@ import type {
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
-import {
-    CursorPriority,
-    type ViewerContext,
-} from "../viewerContext.svelte";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
@@ -80,7 +77,9 @@ export class PointTool implements Overlay {
     private readonly cardinality: PointCardinality;
     private readonly registrationMode: boolean;
     private readonly slotLabels: readonly string[] | undefined;
-    private readonly slotKeys: readonly { index: number; key: string }[] | undefined;
+    private readonly slotKeys:
+        | readonly { index: number; key: string }[]
+        | undefined;
     private readonly enumExtras: { key: string; values: readonly string[] }[];
     private readonly onChange: ((points: PointList) => void) | undefined;
     private readonly onPersist: ((points: PointList) => void) | undefined;
@@ -164,7 +163,10 @@ export class PointTool implements Overlay {
         return undefined;
     }
 
-    private visibleOnSlice(pt: ImagePoint, viewerContext: ViewerContext): boolean {
+    private visibleOnSlice(
+        pt: ImagePoint,
+        viewerContext: ViewerContext,
+    ): boolean {
         const { image } = viewerContext;
         if (image.is3D) {
             return (
@@ -321,14 +323,14 @@ export class PointTool implements Overlay {
         context2D.font = "16px sans-serif";
 
         const r = this.radius;
-        const showIndex =
-            this.cardinality === "list" || this.registrationMode;
+        const showIndex = this.cardinality === "list" || this.registrationMode;
 
         for (const [index, pt] of points.entries()) {
             if (!pt) continue;
             if (!this.visibleOnSlice(pt, viewerContext)) continue;
             context2D.lineWidth =
-                this.placementIndex !== undefined && index === this.placementIndex
+                this.placementIndex !== undefined &&
+                index === this.placementIndex
                     ? 2
                     : 1.25;
             const p = viewerContext.imageToViewerCoordinates(pt);

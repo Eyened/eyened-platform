@@ -6,7 +6,10 @@
     } from "$lib/config/clientDefaults";
     import { formAnnotations } from "$lib/data";
     import PointImageGroup from "$lib/forms/PointImageGroup.svelte";
-    import { pointArming, FormPointSession } from "$lib/forms/pointArming.svelte";
+    import {
+        pointArming,
+        FormPointSession,
+    } from "$lib/forms/pointArming.svelte";
     import {
         analyzePointSchema,
         getPointsForImage,
@@ -59,18 +62,14 @@
         `form:${formAnnotationId ?? "unknown"}:${fieldPath}`,
     );
     const armed = $derived(pointArming.session?.key === armKey);
-    const liveSession = $derived(
-        armed ? pointArming.session : null,
-    );
+    const liveSession = $derived(armed ? pointArming.session : null);
 
     const publicId = $derived(
         seedViewerContext?.image.instance.id ?? boundImageId ?? "",
     );
 
     /** Prefer live session value while armed so chips/labels track the tool. */
-    const displayValue = $derived(
-        liveSession ? liveSession.fieldValue : value,
-    );
+    const displayValue = $derived(liveSession ? liveSession.fieldValue : value);
 
     type PointRow = { publicId: string; index: number; pt: ImagePoint };
 
@@ -83,7 +82,7 @@
                 (pt, index) => (pt ? [{ publicId: pid, index, pt }] : []),
             );
         }
-        const ids = new Set<string>();
+        const ids: string[] = [];
         if (
             displayValue &&
             typeof displayValue === "object" &&
@@ -92,12 +91,12 @@
             for (const key of Object.keys(
                 displayValue as Record<string, unknown>,
             )) {
-                ids.add(key);
+                if (!ids.includes(key)) ids.push(key);
             }
         }
-        if (publicId) ids.add(publicId);
+        if (publicId && !ids.includes(publicId)) ids.push(publicId);
         const rows: PointRow[] = [];
-        for (const id of [...ids].sort()) {
+        for (const id of ids.sort()) {
             for (const [index, pt] of getPointsForImage(
                 displayValue,
                 id,
@@ -112,13 +111,11 @@
     type ImageGroup = { publicId: string; rows: PointRow[] };
 
     const imageGroups = $derived.by((): ImageGroup[] => {
-        const byId = new Map<string, PointRow[]>();
+        const byId: Record<string, PointRow[]> = {};
         for (const row of pointRows) {
-            const list = byId.get(row.publicId) ?? [];
-            list.push(row);
-            byId.set(row.publicId, list);
+            (byId[row.publicId] ??= []).push(row);
         }
-        return [...byId.entries()].map(([pid, rows]) => ({
+        return Object.entries(byId).map(([pid, rows]) => ({
             publicId: pid,
             rows,
         }));

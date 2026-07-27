@@ -98,7 +98,7 @@
 
     {#if hasExtras}
         <div class="editor-extras">
-            {#each enumExtras as extra}
+            {#each enumExtras as extra (extra.key)}
                 <label>
                     {extra.key}
                     <select
@@ -113,13 +113,13 @@
                             )}
                     >
                         <option value="">—</option>
-                        {#each extra.values as opt}
+                        {#each extra.values as opt (opt)}
                             <option value={opt}>{opt}</option>
                         {/each}
                     </select>
                 </label>
             {/each}
-            {#each stringExtraKeys as key}
+            {#each stringExtraKeys as key (key)}
                 <label>
                     {key}
                     <Input
@@ -138,9 +138,7 @@
         </div>
     {/if}
 
-    <button type="button" class="collapse" onclick={onCollapse}>
-        Done
-    </button>
+    <button type="button" class="collapse" onclick={onCollapse}> Done </button>
 </div>
 
 <style>

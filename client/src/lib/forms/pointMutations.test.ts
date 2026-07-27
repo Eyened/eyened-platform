@@ -57,16 +57,37 @@ describe("placePoint", () => {
 describe("deletePointAt", () => {
     it("splices in normal list mode", () => {
         expect(
-            deletePointAt([{ x: 1, y: 1 }, { x: 2, y: 2 }], 0, false),
+            deletePointAt(
+                [
+                    { x: 1, y: 1 },
+                    { x: 2, y: 2 },
+                ],
+                0,
+                false,
+            ),
         ).toEqual([{ x: 2, y: 2 }]);
     });
 
     it("nulls mid-list in registration mode; splices last", () => {
         expect(
-            deletePointAt([{ x: 1, y: 1 }, { x: 2, y: 2 }], 0, true),
+            deletePointAt(
+                [
+                    { x: 1, y: 1 },
+                    { x: 2, y: 2 },
+                ],
+                0,
+                true,
+            ),
         ).toEqual([null, { x: 2, y: 2 }]);
         expect(
-            deletePointAt([{ x: 1, y: 1 }, { x: 2, y: 2 }], 1, true),
+            deletePointAt(
+                [
+                    { x: 1, y: 1 },
+                    { x: 2, y: 2 },
+                ],
+                1,
+                true,
+            ),
         ).toEqual([{ x: 1, y: 1 }]);
     });
 });
@@ -94,19 +115,28 @@ describe("movePointAt / cycleEnumExtra", () => {
             severity: "a",
         });
         expect(
-            cycleEnumExtra({ x: 1, y: 1, severity: "a" }, "severity", ["a", "b"]),
+            cycleEnumExtra({ x: 1, y: 1, severity: "a" }, "severity", [
+                "a",
+                "b",
+            ]),
         ).toEqual({ x: 1, y: 1, severity: "b" });
     });
 });
 
 describe("placePointAt", () => {
     it("writes or replaces the given index, preserving length", () => {
-        expect(
-            placePointAt([null, { x: 1, y: 1 }], 0, { x: 9, y: 9 }),
-        ).toEqual([{ x: 9, y: 9 }, { x: 1, y: 1 }]);
-        expect(
-            placePointAt([{ x: 1, y: 1 }, null], 1, { x: 2, y: 2 }),
-        ).toEqual([{ x: 1, y: 1 }, { x: 2, y: 2 }]);
+        expect(placePointAt([null, { x: 1, y: 1 }], 0, { x: 9, y: 9 })).toEqual(
+            [
+                { x: 9, y: 9 },
+                { x: 1, y: 1 },
+            ],
+        );
+        expect(placePointAt([{ x: 1, y: 1 }, null], 1, { x: 2, y: 2 })).toEqual(
+            [
+                { x: 1, y: 1 },
+                { x: 2, y: 2 },
+            ],
+        );
     });
 
     it("extends with nulls when index is past length", () => {
@@ -117,9 +147,9 @@ describe("placePointAt", () => {
     });
 
     it("stores optional index like placePoint", () => {
-        expect(
-            placePointAt([null], 0, { x: 1, y: 2 }, { index: 7 }),
-        ).toEqual([{ x: 1, y: 2, index: 7 }]);
+        expect(placePointAt([null], 0, { x: 1, y: 2 }, { index: 7 })).toEqual([
+            { x: 1, y: 2, index: 7 },
+        ]);
         expect(
             placePointAt([null], 0, { x: 1, y: 2 }, { index: null }),
         ).toEqual([{ x: 1, y: 2, index: null }]);

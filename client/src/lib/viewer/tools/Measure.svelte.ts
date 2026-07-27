@@ -1,10 +1,7 @@
 import type { Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { RenderTarget } from "$lib/webgl/types";
-import {
-    CursorPriority,
-    type ViewerContext,
-} from "../viewerContext.svelte";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { SvelteSet } from "svelte/reactivity";
 

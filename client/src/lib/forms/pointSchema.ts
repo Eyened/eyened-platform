@@ -44,7 +44,9 @@ function isPointObjectSchema(schema: JSONSchema | undefined): boolean {
 }
 
 /** Unwrap oneOf/anyOf that pairs a point object with null (registration). */
-function unwrapPointItemSchema(schema: JSONSchema | undefined): JSONSchema | null {
+function unwrapPointItemSchema(
+    schema: JSONSchema | undefined,
+): JSONSchema | null {
     if (!schema) return null;
     if (isPointObjectSchema(schema)) return schema;
     const alts = schema.oneOf ?? schema.anyOf;
@@ -90,7 +92,7 @@ export function analyzePointSchema(
     const registrationMode = schema["x-eyened-point-mode"] === "registration";
 
     let cardinality: PointCardinality;
-    let pointObjectSchema: JSONSchema | null = null;
+    let pointObjectSchema: JSONSchema | null;
 
     const t = schemaType(schema);
 
@@ -142,7 +144,9 @@ function isImagePoint(value: unknown): value is ImagePoint {
 
 function normalizeList(value: unknown): PointList {
     if (!Array.isArray(value)) return [];
-    return value.map((item) => (isImagePoint(item) ? item : item === null ? null : null));
+    return value.map((item) =>
+        isImagePoint(item) ? item : item === null ? null : null,
+    );
 }
 
 /** Always returns an array (0–1 elements for single). Preserves null entries for registration. */

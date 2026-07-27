@@ -4,10 +4,7 @@ import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/s
 import { segToImageMatrix } from "$lib/webgl/segmentationProjection";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
-import {
-    CursorPriority,
-    type ViewerContext,
-} from "../viewerContext.svelte";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 
 const paintKey = "Q";
 const eraseKey = "W";

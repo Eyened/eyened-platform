@@ -12,7 +12,10 @@ const pointObject: JSONSchema = {
     properties: {
         x: { type: "number" },
         y: { type: "number" },
-        severity: { type: "string", enum: ["mild", "severe"] as unknown as never },
+        severity: {
+            type: "string",
+            enum: ["mild", "severe"] as unknown as never,
+        },
     },
     required: ["x", "y"],
 };
@@ -128,7 +131,9 @@ describe("get/setPointsForImage", () => {
         expect(getPointsForImage(value, "img-a", bareSingle)).toEqual([
             { x: 1, y: 2 },
         ]);
-        expect(setPointsForImage(value, "img-a", [], bareSingle)).toBeUndefined();
+        expect(
+            setPointsForImage(value, "img-a", [], bareSingle),
+        ).toBeUndefined();
     });
 
     it("byPublicId list round-trip", () => {

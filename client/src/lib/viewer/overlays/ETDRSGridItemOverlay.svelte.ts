@@ -2,10 +2,7 @@ import { formAnnotations } from "$lib/data";
 import type { Registration } from "$lib/registration/registration";
 import type { Position, Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
-import {
-    CursorPriority,
-    type ViewerContext,
-} from "../viewerContext.svelte";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 
 const [C, I, O] = [1, 3, 6];
 const additionalCircles: Record<string, number> = {

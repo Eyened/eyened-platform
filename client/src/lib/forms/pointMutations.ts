@@ -95,8 +95,7 @@ export function cycleEnumExtra(
 ): ImagePoint {
     if (values.length === 0) return point;
     const current = point[key];
-    const idx =
-        typeof current === "string" ? values.indexOf(current) : -1;
+    const idx = typeof current === "string" ? values.indexOf(current) : -1;
     const next = values[(idx + 1) % values.length]!;
     return { ...point, [key]: next };
 }

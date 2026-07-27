@@ -74,7 +74,9 @@
         );
     }
 
-    function pointsFromFormData(data: Record<string, unknown> | undefined): PointList {
+    function pointsFromFormData(
+        data: Record<string, unknown> | undefined,
+    ): PointList {
         const d = data ?? {};
         return LANDMARK_SLOTS.map((slot) => {
             const v = d[slot];
@@ -344,7 +346,7 @@
                         : undefined}
                     onToggleOverlay={toggleOverlay}
                     onSelect={selectItem}
-                    onRemove={onRemove}
+                    {onRemove}
                     onArmLandmark={armLandmark}
                 />
             {:else}

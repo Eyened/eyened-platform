@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-    createFieldAdapter,
-    createMultiFieldAdapter,
-} from "./pointAdapters";
+import { createFieldAdapter, createMultiFieldAdapter } from "./pointAdapters";
 import { analyzePointSchema } from "./pointSchema";
 import type { JSONSchema } from "./schemaType";
 

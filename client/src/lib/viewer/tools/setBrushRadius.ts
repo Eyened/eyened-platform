@@ -1,10 +1,7 @@
 import type { Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-import {
-    CursorPriority,
-    type ViewerContext,
-} from "../viewerContext.svelte";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 
 export class SetBrushRadiusTool implements Overlay {
     wheelFactor = 1.05;

@@ -3,7 +3,10 @@ import type { Position2D } from "$lib/types";
 import { AffineRegistration } from "./affine";
 
 /** Landmark as stored in Pointset registration form_data (may carry OCT index). */
-export type PointsetLandmark = (Position2D & { index?: number | null }) | null | undefined;
+export type PointsetLandmark =
+    | (Position2D & { index?: number | null })
+    | null
+    | undefined;
 
 /**
  * Form_data keys are ImageInstance PublicIDs, but enface viewers / OCT↔proj
@@ -27,9 +30,7 @@ export function toEnfaceRegistrationPoints(
     if ("index" in sample && sample.index === null) {
         return {
             nodeId: `${publicId}_proj`,
-            points: points.map((p) =>
-                p != null ? { x: p.x, y: p.y } : p,
-            ),
+            points: points.map((p) => (p != null ? { x: p.x, y: p.y } : p)),
         };
     }
 
