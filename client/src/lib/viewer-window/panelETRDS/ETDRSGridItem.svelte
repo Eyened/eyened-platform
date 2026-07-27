@@ -18,6 +18,8 @@
         settings: { radiusFraction: number };
         overlayActive: boolean;
         selected: boolean;
+        /** False for linked images — landmarks are only editable on the owner image. */
+        canEditLandmarks?: boolean;
         armedField?: LandmarkField;
         onToggleOverlay: (
             formAnnotation: FormAnnotationGET,
@@ -34,6 +36,7 @@
         formAnnotation,
         overlayActive,
         selected,
+        canEditLandmarks = false,
         armedField,
         onToggleOverlay,
         onSelect,
@@ -77,6 +80,7 @@
 
     function armLandmark(e: MouseEvent, field: LandmarkField) {
         e.stopPropagation();
+        if (!canEditLandmarks) return;
         onArmLandmark(formAnnotation, field);
     }
 </script>
@@ -113,8 +117,11 @@
             type="button"
             class="landmark"
             class:armed={selected && armedField === "fovea"}
-            class:editable={canEditForm}
-            disabled={!canEditForm}
+            class:editable={canEditLandmarks}
+            disabled={!canEditLandmarks}
+            title={canEditLandmarks
+                ? undefined
+                : "Edit landmarks on the image this annotation belongs to"}
             onclick={(e) => armLandmark(e, "fovea")}
         >
             <span class="name">Fovea (f)</span>
@@ -124,8 +131,11 @@
             type="button"
             class="landmark"
             class:armed={selected && armedField === "disc_edge"}
-            class:editable={canEditForm}
-            disabled={!canEditForm}
+            class:editable={canEditLandmarks}
+            disabled={!canEditLandmarks}
+            title={canEditLandmarks
+                ? undefined
+                : "Edit landmarks on the image this annotation belongs to"}
             onclick={(e) => armLandmark(e, "disc_edge")}
         >
             <span class="name">Disc (d)</span>

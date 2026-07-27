@@ -177,6 +177,20 @@
                     ...existing,
                     form_data: next as any,
                 });
+            },
+            onPersist: (points) => {
+                const existing =
+                    formAnnotations.get(annotationId) ?? formAnnotation;
+                const next = setPointsForImage(
+                    existing.form_data,
+                    publicId(),
+                    points,
+                    analysis,
+                );
+                formAnnotations.set(annotationId, {
+                    ...existing,
+                    form_data: next as any,
+                });
                 setFormAnnotationValue(annotationId, next);
             },
         });

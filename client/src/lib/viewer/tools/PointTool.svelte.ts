@@ -39,8 +39,16 @@ export type PointToolOptions = {
     /** Keyboard shortcut → place into that index (also sets placementIndex). */
     slotKeys?: readonly { index: number; key: string }[];
     enumExtras?: { key: string; values: readonly string[] }[];
-    /** Fired after every local mutation of `points` (adapter sync hook). */
+    /**
+     * Fired after every local mutation of `points` (including drag moves).
+     * Use for in-memory / UI sync. Prefer `onPersist` for server writes.
+     */
     onChange?: (points: PointList) => void;
+    /**
+     * Fired when an edit is finished (pointerup after place/drag, delete, enum).
+     * Use for server persistence — not called on every pointermove.
+     */
+    onPersist?: (points: PointList) => void;
 };
 
 /**
@@ -75,6 +83,9 @@ export class PointTool implements Overlay {
     private readonly slotKeys: readonly { index: number; key: string }[] | undefined;
     private readonly enumExtras: { key: string; values: readonly string[] }[];
     private readonly onChange: ((points: PointList) => void) | undefined;
+    private readonly onPersist: ((points: PointList) => void) | undefined;
+    /** True while a place/drag gesture may need a persist on pointerup. */
+    private persistOnRelease = false;
 
     constructor(options: PointToolOptions = {}) {
         this.canEdit = options.canEdit ?? true;
@@ -88,13 +99,19 @@ export class PointTool implements Overlay {
         this.slotKeys = options.slotKeys;
         this.enumExtras = options.enumExtras ?? [];
         this.onChange = options.onChange;
+        this.onPersist = options.onPersist;
     }
 
     destroy() {}
 
-    private commit(next: PointList) {
+    /** Local render + optional live UI sync; does not hit the server. */
+    private setPoints(next: PointList, opts?: { persist?: boolean }) {
         this.points = next;
         this.onChange?.(next);
+        if (opts?.persist) {
+            this.onPersist?.(next);
+            this.persistOnRelease = false;
+        }
     }
 
     placeAtCursor(
@@ -127,7 +144,8 @@ export class PointTool implements Overlay {
             if (newIndex < 0) newIndex = Math.max(0, after.length - 1);
         }
 
-        this.commit(after);
+        this.setPoints(after);
+        this.persistOnRelease = true;
         // Restricted mode (ETDRS): keep sticking to the placement index.
         // Unrestricted (Registration): leave placementIndex undefined so the
         // next empty click appends instead of rewriting the last point.
@@ -170,6 +188,10 @@ export class PointTool implements Overlay {
         this.activePointIndex = undefined;
         this.hoverPointIndex = this.findHit(cursor, viewerContext);
         if (wasDragging) viewerContext.resetCursor();
+        if (this.persistOnRelease) {
+            this.onPersist?.(this.points);
+            this.persistOnRelease = false;
+        }
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {
@@ -226,7 +248,7 @@ export class PointTool implements Overlay {
         if (!extra) return;
         const points = [...this.points];
         points[index] = cycleEnumExtra(point, extra.key, extra.values);
-        this.commit(points);
+        this.setPoints(points, { persist: true });
     }
 
     pointerdown(pointerEvent: ViewerEvent<PointerEvent>) {
@@ -242,6 +264,7 @@ export class PointTool implements Overlay {
                 if (this.placementIndex !== undefined) {
                     this.placementIndex = hit;
                 }
+                this.persistOnRelease = true;
                 this.beginDrag(viewerContext, hit);
                 return;
             }
@@ -263,7 +286,9 @@ export class PointTool implements Overlay {
             if (hit !== undefined) {
                 const useNullDelete =
                     this.registrationMode || this.placementIndex !== undefined;
-                this.commit(deletePointAt(this.points, hit, useNullDelete));
+                this.setPoints(deletePointAt(this.points, hit, useNullDelete), {
+                    persist: true,
+                });
             }
         }
 
@@ -275,7 +300,11 @@ export class PointTool implements Overlay {
 
         if (this.activePointIndex !== undefined && this.canEdit) {
             const position = viewerContext.viewerToImageCoordinates(cursor);
-            this.commit(movePointAt(this.points, this.activePointIndex, position));
+            // Live render / local store only — persist on pointerup.
+            this.setPoints(
+                movePointAt(this.points, this.activePointIndex, position),
+            );
+            this.persistOnRelease = true;
             viewerContext.claimCursor("grabbing", CursorPriority.Drag);
         } else {
             this.hoverPointIndex = this.findHit(cursor, viewerContext);

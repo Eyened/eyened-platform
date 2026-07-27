@@ -97,25 +97,37 @@ export class ETDRSGridItemOverlay implements Overlay {
 
         const f = resolved.form_data?.fovea;
         const d = resolved.form_data?.disc_edge;
-        let srcId = String(resolved.image_id);
-        // ETDRS landmarks are 2D enface coords; avoid OCTToProj remapping index → y
-        if (image.image_id.endsWith("_proj") && !srcId.endsWith("_proj")) {
-            srcId = `${srcId}_proj`;
-        }
-
         if (!f || !d) return;
 
+        const srcId = this.enfaceSourceId(String(resolved.image_id));
         const fovea = this.registration.mapPosition(srcId, image.image_id, {
-            ...f,
+            x: f.x,
+            y: f.y,
             index: 0,
         } as Position);
         const discEdge = this.registration.mapPosition(srcId, image.image_id, {
-            ...d,
+            x: d.x,
+            y: d.y,
             index: 0,
         } as Position);
         if (!fovea || !discEdge) return;
 
         this.paint(context2D, viewerContext, fovea, discEdge);
+    }
+
+    /**
+     * ETDRS landmarks are always enface 2D `(x, y)`.
+     * For OCT volumes the enface plane is `${id}_proj` — use that node so we
+     * never go through OCTToProj (which remaps `index → y` and drops enface y).
+     * Plain CF PublicIDs have no proj edge and stay as-is (do *not* append `_proj`).
+     */
+    private enfaceSourceId(annotationImageId: string): string {
+        if (annotationImageId.endsWith("_proj")) return annotationImageId;
+        const projId = `${annotationImageId}_proj`;
+        if (this.registration.getRegistrationItem(annotationImageId, projId)) {
+            return projId;
+        }
+        return annotationImageId;
     }
 
     private paint(

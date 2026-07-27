@@ -81,7 +81,11 @@
         });
     }
 
-    function writeFormData(annotationId: number, points: PointList) {
+    function writeFormData(
+        annotationId: number,
+        points: PointList,
+        persist: boolean,
+    ) {
         const existing =
             formAnnotations.get(annotationId) ??
             filtered.find((f) => f.id === annotationId);
@@ -94,12 +98,17 @@
             else data[slot] = pt;
         }
         formAnnotations.set(annotationId, { ...existing, form_data: data });
-        setFormAnnotationValue(annotationId, data);
+        if (persist) setFormAnnotationValue(annotationId, data);
     }
 
     const placementField = $derived<LandmarkField>(
         activeTool?.placementIndex === 1 ? "disc_edge" : "fovea",
     );
+
+    /** Landmarks live in the annotation image's pixel space — edit only there. */
+    function belongsToThisImage(formAnnotation: FormAnnotationGET): boolean {
+        return formAnnotation.image_id == instance.id;
+    }
 
     function deactivateTool() {
         removeTool?.();
@@ -119,7 +128,12 @@
     ) {
         if (!filtered.some((f) => f.id === formAnnotation.id)) return;
 
-        if (selectedId === formAnnotation.id && activeTool) {
+        // Already editing this annotation on the owner image — just switch slot.
+        if (
+            belongsToThisImage(formAnnotation) &&
+            selectedId === formAnnotation.id &&
+            activeTool
+        ) {
             activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
             return;
         }
@@ -127,7 +141,12 @@
         ensureOverlay(formAnnotation);
         selectedId = formAnnotation.id;
 
-        if (!globalContext.canEdit(formAnnotation)) {
+        // Overlay may show on linked images via registration; the PointTool
+        // must not — markers are in the owner image's coordinates only.
+        if (
+            !belongsToThisImage(formAnnotation) ||
+            !globalContext.canEdit(formAnnotation)
+        ) {
             deactivateTool();
             return;
         }
@@ -146,7 +165,8 @@
                 { index: 0, key: "f" },
                 { index: 1, key: "d" },
             ],
-            onChange: (points) => writeFormData(annotationId, points),
+            onChange: (points) => writeFormData(annotationId, points, false),
+            onPersist: (points) => writeFormData(annotationId, points, true),
         });
         tool.points = pointsFromFormData(
             formAnnotations.get(annotationId)?.form_data as
@@ -175,6 +195,7 @@
         formAnnotation: FormAnnotationGET,
         field: LandmarkField,
     ) {
+        if (!belongsToThisImage(formAnnotation)) return;
         if (selectedId === formAnnotation.id && activeTool) {
             activeTool.placementIndex = field === "disc_edge" ? 1 : 0;
             return;
@@ -325,7 +346,9 @@
                 {settings}
                 overlayActive={overlayIds.has(formAnnotation.id)}
                 selected={selectedId === formAnnotation.id}
-                armedField={selectedId === formAnnotation.id
+                canEditLandmarks={belongsToThisImage(formAnnotation) &&
+                    globalContext.canEdit(formAnnotation)}
+                armedField={selectedId === formAnnotation.id && activeTool
                     ? placementField
                     : undefined}
                 onToggleOverlay={toggleOverlay}
