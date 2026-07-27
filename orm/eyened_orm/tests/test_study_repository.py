@@ -48,7 +48,7 @@ def test_get_link_returns_the_link(session):
     )
     session.flush()
 
-    result = StudyRepository().get_link(session, tag.TagID, study.StudyID)
+    result = StudyRepository(session).get_link(tag.TagID, study.StudyID)
     assert result is not None
     assert result.TagID == tag.TagID
     assert result.StudyID == study.StudyID
@@ -57,4 +57,4 @@ def test_get_link_returns_the_link(session):
 def test_get_link_absent_returns_none(session):
     """get_link returns None (never raises) when the pair is not linked."""
     study = _make_study(session)
-    assert StudyRepository().get_link(session, 999_999, study.StudyID) is None
+    assert StudyRepository(session).get_link(999_999, study.StudyID) is None
