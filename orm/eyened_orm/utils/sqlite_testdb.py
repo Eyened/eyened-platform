@@ -78,6 +78,7 @@ def create_sqlite_memory_sessionmaker(*, expire_on_commit: bool = False):
         bind=engine,
         future=True,
         expire_on_commit=expire_on_commit,
+        autoflush=False,
         class_=Session,
     )
 
@@ -90,11 +91,16 @@ def engine():
 
 @pytest.fixture(scope="function")
 def SessionLocal(engine):
-    # expire_on_commit=True mirrors the production session factory
-    # (orm/eyened_orm/db.py uses SQLAlchemy's default True), so tests reproduce
+    # Mirrors the production session factory (orm/eyened_orm/db.py):
+    # expire_on_commit=True is SQLAlchemy's default, so tests reproduce
     # production's commit-time expiry: state loaded before a commit is reloaded
     # from the DB on next access, rather than lingering stale in the identity map.
-    return sessionmaker(bind=engine, future=True, expire_on_commit=True, class_=Session)
+    # autoflush=False matches db.py's explicit setting -- without it, autoflush
+    # silently papers over any repository write path that forgets to flush()
+    # (the very invariant this refactor's repositories are supposed to uphold).
+    return sessionmaker(
+        bind=engine, future=True, expire_on_commit=True, autoflush=False, class_=Session
+    )
 
 
 @pytest.fixture(scope="function")
