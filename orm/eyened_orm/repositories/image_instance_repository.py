@@ -82,9 +82,11 @@ def _full_graph_options(
 class ImageInstanceRepository:
     """Data access for ImageInstance reads and its Tag links."""
 
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
     def get_full_graph_by_id(
         self,
-        session: Session,
         instance_id: int,
         *,
         with_segmentations: bool,
@@ -95,11 +97,10 @@ class ImageInstanceRepository:
         opts = _full_graph_options(
             with_segmentations, with_form_annotations, with_model_segmentations
         )
-        return session.get(ImageInstance, instance_id, options=tuple(opts))
+        return self._session.get(ImageInstance, instance_id, options=tuple(opts))
 
     def get_full_graph_by_public_id(
         self,
-        session: Session,
         image_id: str,
         *,
         with_segmentations: bool,
@@ -111,7 +112,7 @@ class ImageInstanceRepository:
             with_segmentations, with_form_annotations, with_model_segmentations
         )
         item = (
-            session.scalars(
+            self._session.scalars(
                 select(ImageInstance)
                 .options(*opts)
                 .where(ImageInstance.PublicID == image_id)
@@ -119,11 +120,13 @@ class ImageInstanceRepository:
             .first()
         )
         if item is None and image_id.isdigit():
-            item = session.get(ImageInstance, int(image_id), options=tuple(opts))
+            item = self._session.get(
+                ImageInstance, int(image_id), options=tuple(opts)
+            )
         return item
 
     def get_with_storage_by_public_id(
-        self, session: Session, public_id: str
+        self, public_id: str
     ) -> ImageInstance | None:
         """Return the instance by PublicID with storage loaded (PK fallback), or None.
 
@@ -131,32 +134,54 @@ class ImageInstanceRepository:
         PublicID; on no match fall back to ``session.get`` with the raw id.
         """
         try:
-            return session.scalars(
+            return self._session.scalars(
                 select(ImageInstance)
                 .options(_STORAGE_LOADER)
                 .where(ImageInstance.PublicID == public_id)
             ).one()
         except NoResultFound:
-            return session.get(ImageInstance, public_id)
+            return self._session.get(ImageInstance, public_id)
 
     def get_tag_link(
-        self, session: Session, tag_id: int, image_instance_id: int
+        self, tag_id: int, image_instance_id: int
     ) -> ImageInstanceTagLink | None:
         """Return the link for (tag_id, image_instance_id), or None if absent."""
-        return session.get(
+        return self._session.get(
             ImageInstanceTagLink,
             {"TagID": tag_id, "ImageInstanceID": image_instance_id},
         )
 
-    def get_by_public_id(
-        self, session: Session, public_id: str
-    ) -> ImageInstance | None:
+    def get_by_public_id(self, public_id: str) -> ImageInstance | None:
         """Return the instance with this PublicID (no eager loads), or None.
 
         Plain PublicID resolver used to map an external image id to its row —
         the faithful equivalent of the legacy ``_resolve_image_instance_id``
         helper (no PK/digit fallback, unlike ``get_full_graph_by_public_id``).
         """
-        return session.scalars(
+        return self._session.scalars(
             select(ImageInstance).where(ImageInstance.PublicID == public_id)
         ).first()
+
+    def add_link(
+        self,
+        *,
+        tag_id: int,
+        image_instance_id: int,
+        creator_id: int,
+        comment: str | None,
+    ) -> ImageInstanceTagLink:
+        """Create an ImageInstanceTagLink and flush so its row (and PK) is written."""
+        link = ImageInstanceTagLink(
+            TagID=tag_id,
+            ImageInstanceID=image_instance_id,
+            CreatorID=creator_id,
+            Comment=comment,
+        )
+        self._session.add(link)
+        self._session.flush()
+        return link
+
+    def delete_link(self, link: ImageInstanceTagLink) -> None:
+        """Delete an ImageInstanceTagLink and flush so integrity errors surface in-request."""
+        self._session.delete(link)
+        self._session.flush()

@@ -108,7 +108,7 @@ class SegmentationService:
             BadRequestError: If the array/shape is inconsistent or the store
                 rejects the write.
         """
-        instance = self.images.get_by_public_id(session, image_id)
+        instance = self.images.get_by_public_id(image_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
 
@@ -511,7 +511,7 @@ def get_segmentation_service(
     """Default SegmentationService wiring for FastAPI ``Depends()``."""
     return SegmentationService(
         SegmentationRepository(),
-        ImageInstanceRepository(),
+        ImageInstanceRepository(db),
         TagRepository(db),
         get_segmentation_data_store(),
         logger=get_db_logger(),

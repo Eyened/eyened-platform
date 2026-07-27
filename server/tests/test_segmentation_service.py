@@ -47,7 +47,7 @@ def _service(
 ) -> SegmentationService:
     return SegmentationService(
         SegmentationRepository(),
-        ImageInstanceRepository(),
+        ImageInstanceRepository(session),
         TagRepository(session),
         store or FakeSegmentationDataStore(),
     )

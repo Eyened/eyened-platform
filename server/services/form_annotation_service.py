@@ -57,7 +57,7 @@ class FormAnnotationService:
         """
         if image_id is None:
             return None
-        instance = self.images.get_by_public_id(session, image_id)
+        instance = self.images.get_by_public_id(image_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
         return instance.ImageInstanceID
@@ -435,7 +435,7 @@ def get_form_annotation_service(
     """Default FormAnnotationService wiring for FastAPI ``Depends()``."""
     return FormAnnotationService(
         FormAnnotationRepository(),
-        ImageInstanceRepository(),
+        ImageInstanceRepository(db),
         TagRepository(db),
         logger=get_db_logger(),
     )

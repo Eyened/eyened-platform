@@ -32,7 +32,7 @@ from server.services.form_annotation_service import FormAnnotationService
 def _service(session) -> FormAnnotationService:
     return FormAnnotationService(
         FormAnnotationRepository(),
-        ImageInstanceRepository(),
+        ImageInstanceRepository(session),
         TagRepository(session),
     )
 
