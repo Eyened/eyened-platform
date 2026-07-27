@@ -14,19 +14,18 @@ from eyened_orm import (
 
 
 class FormAnnotationRepository:
-    """Data access for FormAnnotation reads and its Tag links."""
+    """Data access for FormAnnotation reads, mutations, and its Tag links."""
 
-    def get_by_id(
-        self, session: Session, annotation_id: int
-    ) -> FormAnnotation | None:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_id(self, annotation_id: int) -> FormAnnotation | None:
         """Return the annotation by id, or None if absent."""
-        return session.get(FormAnnotation, annotation_id)
+        return self._session.get(FormAnnotation, annotation_id)
 
-    def get_with_tag_links(
-        self, session: Session, annotation_id: int
-    ) -> FormAnnotation | None:
+    def get_with_tag_links(self, annotation_id: int) -> FormAnnotation | None:
         """Return the annotation by id with its tag links loaded, or None."""
-        return session.get(
+        return self._session.get(
             FormAnnotation,
             annotation_id,
             options=(
@@ -41,7 +40,6 @@ class FormAnnotationRepository:
 
     def list_active(
         self,
-        session: Session,
         *,
         patient_id: int | None = None,
         study_id: int | None = None,
@@ -91,13 +89,50 @@ class FormAnnotationRepository:
             query = query.filter(FormAnnotation.FormSchemaID == form_schema_id)
         if sub_task_id is not None:
             query = query.filter(FormAnnotation.SubTaskID == sub_task_id)
-        return list(session.scalars(query).all())
+        return list(self._session.scalars(query).all())
 
     def get_tag_link(
-        self, session: Session, tag_id: int, annotation_id: int
+        self, tag_id: int, annotation_id: int
     ) -> FormAnnotationTagLink | None:
         """Return the link for (tag_id, annotation_id), or None if absent."""
-        return session.get(
+        return self._session.get(
             FormAnnotationTagLink,
             {"TagID": tag_id, "FormAnnotationID": annotation_id},
         )
+
+    def add(self, annotation: FormAnnotation) -> None:
+        """Stage a new FormAnnotation and flush so its PK/server defaults populate."""
+        self._session.add(annotation)
+        self._session.flush()
+
+    def flush(self) -> None:
+        """Flush pending in-place FormAnnotation mutations (e.g. ``Inactive``,
+        ``FormData``) so integrity errors surface in-request and ``onupdate``
+        columns (``DateModified``) are re-fetched (via RETURNING or a postfetch
+        SELECT on next access) within the request transaction.
+        """
+        self._session.flush()
+
+    def add_link(
+        self,
+        *,
+        tag_id: int,
+        form_annotation_id: int,
+        creator_id: int,
+        comment: str | None,
+    ) -> FormAnnotationTagLink:
+        """Create a FormAnnotationTagLink and flush so its row (and PK) is written."""
+        link = FormAnnotationTagLink(
+            TagID=tag_id,
+            FormAnnotationID=form_annotation_id,
+            CreatorID=creator_id,
+            Comment=comment,
+        )
+        self._session.add(link)
+        self._session.flush()
+        return link
+
+    def delete_link(self, link: FormAnnotationTagLink) -> None:
+        """Delete a FormAnnotationTagLink and flush so integrity errors surface in-request."""
+        self._session.delete(link)
+        self._session.flush()
