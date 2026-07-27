@@ -5,13 +5,15 @@ Mark a field with `"x-eyened-widget": "keypoint"` to let graders place points on
 How it behaves depends only on the **JSON Schema shape** of that field:
 
 - a single `{x,y}` object → one point  
-- an array → several points on this annotation  
-- an object whose keys are image ids (`additionalProperties`) → points stored per image  
-- array items that allow `null` → deleted points leave a hole (for matching landmarks across images)
+- an object with `additionalProperties` → points stored per image (image public_id is used as key)  
+- an array → list of points  
+- array items that allow `null` → deleted points leave a hole (e.g. for matching landmarks across images)
 
 Use **`title`** for the fixed name shown on the image (e.g. `"Fovea"`). Optional properties on each point (enums, short strings) can show instead when set. Prefer a short `title`; put longer help text in `description`.
 
 Activate the tool from the form field, then click the image to place. Right-click a point to remove it. For enum properties, press **C** while hovering a point to cycle values.
+
+In the form entry UI you can click on a coordinate to edit it manually (both the coordinates and optional label/text).
 
 ---
 
@@ -212,18 +214,18 @@ Saved value:
 
 ```json
 {
-  "331115": [
+  "hudf99df": [
     { "x": 1470.6, "y": 239.8, "index": 0 },
     { "x": 1972.4, "y": 681.9, "index": 0 }
   ],
-  "331118": [
+  "f7da0s88": [
     { "x": 900.4, "y": 358.2, "index": 0 },
     null
   ]
 }
 ```
 
-On the current image: a click fills the first empty slot; deleting a non-last point leaves `null`; deleting the last point shortens the list.
+On the current image: a click fills the first empty slot; deleting a non-last point leaves `null`; deleting the last point shortens the list. This is the structure used by the built-in Registration panel.
 
 ---
 
@@ -269,4 +271,4 @@ Saved value:
 }
 ```
 
-In a normal form, activate one field at a time. The ETDRS panel can show and edit both markers together; the saved data is still this object.
+Note: in a normal form, you only activate one field at a time. The ETDRS panel has a customized implementation to show and edit both markers together; the saved data is still this object.
