@@ -80,46 +80,57 @@ def _is_di_factory(name: str) -> bool:
 
 # --- Guard 1: signature -----------------------------------------------------
 #
-# Declared exceptions: (filename, function_name) -> why. See module docstring
-# for the full rationale of each group below.
+# Declared exceptions: (path-relative-to-server/, function_name) -> why. Keyed
+# on the path (not the bare filename) so a future server/services/<pkg>/auth.py
+# does not inherit auth.py's exemptions by basename collision. See module
+# docstring for the full rationale of each group below.
 _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     # Auth resolvers that read/write Creator directly.
-    ("auth.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
-    ("auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
-    ("auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
-    ("auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
-    ("auth.py", "creator_to_response"): "read-only response helper with an optional session param",
+    ("routes/auth.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
+    ("routes/auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
+    ("routes/auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
+    ("routes/auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
+    ("routes/auth.py", "creator_to_response"): "read-only response helper with an optional session param",
     # AuditService: audit sink; owns the session for its AuditLog write, like a repository.
-    ("audit_service.py", "__init__"): "AuditService.__init__ -- audit sink owns its session",
+    ("services/audit_service.py", "__init__"): "AuditService.__init__ -- audit sink owns its session",
     # R2: SQLAlchemy event-listener callbacks; signature is SQLAlchemy-mandated.
-    ("audit_service.py", "_drain"): "after_commit listener callback (SQLAlchemy-mandated signature)",
-    ("audit_service.py", "_clear"): "after_rollback/after_soft_rollback listener callback (SQLAlchemy-mandated signature)",
+    ("services/audit_service.py", "_drain"): "after_commit listener callback (SQLAlchemy-mandated signature)",
+    ("services/audit_service.py", "_clear"): "after_rollback/after_soft_rollback listener callback (SQLAlchemy-mandated signature)",
     # R3: forwarding-only route handlers (see module docstring).
-    ("auth.py", "login"): "forwards session to check_login/creator_to_response only",
-    ("auth.py", "get_token"): "forwards session to check_login/creator_to_response only",
-    ("auth.py", "get_current_user_info"): "forwards session to CurrentUser.get_creator/creator_to_response only",
-    ("auth.py", "change_password"): "forwards session to check_login/creator_to_response only",
-    ("auth.py", "register_user"): "forwards session to create_user/creator_to_response only",
-    ("auth.py", "refresh_token"): "forwards session to CreatorRepository/creator_to_response only",
-    ("auth.py", "oidc_authenticate"): "forwards session to check_oidc_login/creator_to_response only",
+    ("routes/auth.py", "login"): "forwards session to check_login/creator_to_response only",
+    ("routes/auth.py", "get_token"): "forwards session to check_login/creator_to_response only",
+    ("routes/auth.py", "get_current_user_info"): "forwards session to CurrentUser.get_creator/creator_to_response only",
+    ("routes/auth.py", "change_password"): "forwards session to check_login/creator_to_response only",
+    ("routes/auth.py", "register_user"): "forwards session to create_user/creator_to_response only",
+    ("routes/auth.py", "refresh_token"): "forwards session to CreatorRepository/creator_to_response only",
+    ("routes/auth.py", "oidc_authenticate"): "forwards session to check_oidc_login/creator_to_response only",
     # R1: import_api.py is slated for deprecation (see module docstring); only
     # import_single_image holds a Session, for ImportRun.apply().
-    ("import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; holds Session for ImportRun.apply()",
+    ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; holds Session for ImportRun.apply()",
 }
 
 
 def _offenders(root: pathlib.Path) -> list[str]:
+    # A moved/renamed test file (_SERVICES/_ROUTES derive from __file__) would
+    # otherwise make rglob() silently yield nothing, and `assert [] == []`
+    # would pass vacuously -- fail loudly instead.
+    assert root.is_dir(), f"{root} is not a directory -- guard would scan nothing"
     bad: list[str] = []
     for path in root.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
+        key_path = path.relative_to(_ROOT).as_posix()
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            if (path.name, node.name) in _SIGNATURE_ALLOWED or _is_di_factory(node.name):
+            if (key_path, node.name) in _SIGNATURE_ALLOWED or _is_di_factory(node.name):
                 continue
-            for arg in [*node.args.args, *node.args.kwonlyargs]:
+            # posonlyargs covers `def f(session: Session, /)`; kwonlyargs covers
+            # `def f(*, session: Session)`; args covers the common case. A bare
+            # `*args: Session`/`**kwargs: Session` is not scanned (vararg/kwarg
+            # nodes, not Session parameters in practice here).
+            for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]:
                 ann = getattr(arg, "annotation", None)
                 text = ast.unparse(ann) if ann is not None else ""
                 if arg.arg in {"session", "db"} or text.endswith("Session"):
@@ -156,27 +167,30 @@ _DB_METHODS = {
 # argument and never call a method on it themselves, so they are not
 # offenders here in the first place.
 _DB_ACCESS_ALLOWED: dict[tuple[str, str], str] = {
-    ("auth.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
-    ("auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
-    ("auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
-    ("auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
-    ("auth.py", "creator_to_response"): "read-only response helper with an optional session param",
+    ("routes/auth.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
+    ("routes/auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
+    ("routes/auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
+    ("routes/auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
+    ("routes/auth.py", "creator_to_response"): "read-only response helper with an optional session param",
     # R1: human decision: import_api.py is slated for deprecation. Calls
     # session.rollback() on the caught-failure path (Task 17).
-    ("import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
+    ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
 }
 
 
 def _db_access_offenders(root: pathlib.Path) -> list[str]:
+    # See _offenders' matching comment: fail loudly rather than vacuously pass.
+    assert root.is_dir(), f"{root} is not a directory -- guard would scan nothing"
     bad: list[str] = []
     for path in root.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
+        key_path = path.relative_to(_ROOT).as_posix()
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            if (path.name, node.name) in _DB_ACCESS_ALLOWED:
+            if (key_path, node.name) in _DB_ACCESS_ALLOWED:
                 continue
             for call in ast.walk(node):
                 if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
