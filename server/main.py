@@ -82,7 +82,7 @@ def configure_audit_logging() -> None:
     """Route the eyened.audit logger to stdout as JSON, isolated from app logs.
 
     Compliance is never debug-gated: audit is always INFO. App/debug logs stay on
-    stderr via logging.basicConfig() (design §3, Operability).
+    stderr via logging.basicConfig().
     """
     audit = logging.getLogger("eyened.audit")
     audit.setLevel(settings.db_log.level)

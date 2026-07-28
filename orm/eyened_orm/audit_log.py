@@ -14,7 +14,7 @@ __all__ = ["AuditLog"]
 class AuditLog(Base):
     """Append-only audit record, written in the same transaction as the data it describes.
 
-    The authoritative compliance sink (design §3, Sink 1). ``ActorID`` is a plain
+    The authoritative compliance sink. ``ActorID`` is a plain
     nullable integer, not a FK: audit rows must outlive the ``Creator`` they name.
     Trusted paths (CLI/worker) leave ``ActorID`` NULL and set ``TrustedPath``.
     """

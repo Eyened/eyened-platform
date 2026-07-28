@@ -19,7 +19,7 @@ def test_patch_tag_tag_type_persists_and_audits(client, session):
     serializable` on flush, because the value AuditService.snapshot() captured
     is the raw TagType enum loaded from the DB, not a string. Discriminator:
     reverting the json-safe normalization in AuditService.record() makes this
-    fail with a 500 (see fix-wave-1 report for the before/after run).
+    fail with a 500.
     """
     creator = Creator(CreatorName="alice", IsHuman=True)
     session.add(creator)

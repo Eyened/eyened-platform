@@ -35,7 +35,7 @@ def _json_safe(o: object) -> object:
 
 class AuditService:
     """Writes the authoritative AuditLog row (Sink 1) and buffers a JSON event
-    for the post-commit stdout mirror (Sink 2). See design §3."""
+    for the post-commit stdout mirror (Sink 2)."""
 
     def __init__(self, session: Session, *, enabled: bool = True) -> None:
         self._session = session

@@ -13,7 +13,7 @@ from server.services.feature_service import FeatureService, get_feature_service
 
 
 class _ExplodingRepo(FeatureRepository):
-    """Second write raises after the first has been staged (design §2 defect (3))."""
+    """Second write raises after the first has been staged."""
     def replace_subfeatures(self, parent_id, sub_ids):
         raise RuntimeError("second call fails")
 
@@ -58,10 +58,9 @@ class _NotFoundAfterWriteRepo(FeatureRepository):
 def test_domain_error_mid_request_rolls_back_and_returns_its_status(client, session):
     """A NotFoundError raised mid-request, after a staged write, through a
     real HTTP request: the write (and any audit row) rolls back and the
-    client still gets the error's intended status -- design §4's "error paths
-    preserve intent", pinned end-to-end against whatever FastAPI version is
-    installed (dependency-exit-vs-exception-handler ordering changed in
-    0.106)."""
+    client still gets the error's intended status. Pinned end-to-end against
+    whatever FastAPI version is installed (dependency-exit-vs-exception-handler
+    ordering changed in 0.106)."""
     from server.main import app_api
 
     def _failing_feature_service(db: Session = Depends(get_db)) -> FeatureService:

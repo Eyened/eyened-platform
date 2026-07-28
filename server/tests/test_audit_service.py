@@ -15,7 +15,7 @@ def _actor() -> ActingUser:
 
 @pytest.fixture(autouse=True)
 def _isolate_audit_logger():
-    """Keep these caplog tests independent of global logger state. Task 4's
+    """Keep these caplog tests independent of global logger state.
     configure_audit_logging() sets propagate=False on the shared eyened.audit
     logger, and (collected first, alphabetically) would otherwise stop caplog's
     root handler from ever seeing audit events. Force propagate=True, then restore."""
@@ -124,7 +124,7 @@ def test_diff_survives_a_flush_between_the_mutation_and_the_diff(session):
 
     ``repository.save()`` flushes, and ``AuditService.record()`` flushes again,
     so under the old attribute-history mechanism this exact sequence returned
-    {} and the audit row recorded nothing -- silently. Design §1.
+    {} and the audit row recorded nothing -- silently.
     """
     from eyened_orm import Feature
 

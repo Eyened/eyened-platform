@@ -4,9 +4,9 @@ Revision ID: a1d1700000a1
 Revises: 624c5700c50f
 Create Date: 2026-07-24
 
-Append-only audit sink written in-transaction with the data it records
-(session-ownership refactor, design §3). ActorID is a plain nullable int,
-not a FK: audit rows must outlive the Creator they name.
+Append-only audit sink written in-transaction with the data it records.
+ActorID is a plain nullable int, not a FK: audit rows must outlive the
+Creator they name.
 """
 from typing import Sequence, Union
 

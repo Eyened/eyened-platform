@@ -1,4 +1,4 @@
-"""Guards for design §4: no layer above the repository touches the database.
+"""Guards that no layer above the repository touches the database.
 
 Repositories take a Session by constructor injection and only flush(); services
 take repositories and never hold a Session; get_db (server/db.py) owns the
@@ -25,16 +25,16 @@ Two guards live here:
 
 Exemptions, and what would remove them:
 
-- server/routes/import_api.py::import_single_image (R1) is exempted by name in
+- server/routes/import_api.py::import_single_image is exempted by name in
   both guards -- not a whole-file exclusion; an earlier version of this guard
   skipped the entire file, which would have hidden any handler later added to
   it. Human decision: that module is slated for deprecation and will not be
   converted. It legitimately holds a Session for ``ImportRun.apply()`` and for
-  the explicit ``session.rollback()`` on its caught-failure path (Task 17).
+  the explicit ``session.rollback()`` on its caught-failure path.
 - audit_service.py's ``_drain``/``_clear`` are SQLAlchemy ``after_commit`` /
   ``after_rollback`` event-listener callbacks; SQLAlchemy dictates their
   ``(session)`` signature. They are part of the already-declared AuditService
-  audit-sink exception -- the original plan's ``_ALLOWED`` named only
+  audit-sink exception: an earlier ``_ALLOWED`` named only
   ``AuditService.__init__``, which was a clerical gap, not a design decision.
 - Five auth.py functions (``get_current_user``, ``check_login``,
   ``check_oidc_login``, ``CurrentUser.get_creator``, ``creator_to_response``)
@@ -47,9 +47,9 @@ Exemptions, and what would remove them:
   declared exception). ``change_password``/``register_user`` separately depend
   on ``AuditService`` via ``Depends(get_audit_service)``, a DI factory
   parameter -- structurally exempt (``_is_di_factory`` below), not a session
-  forward. The plan exempted the resolver callees but never named the callers
-  that must obtain and forward the session -- fixing that omission is what
-  this exemption set is. What would remove it: converting the auth resolvers
+  forward. An earlier exemption set covered the resolver callees but never
+  named the callers that must obtain and forward the session -- fixing that
+  omission is what this set is. What would remove it: converting the auth resolvers
   into FastAPI dependencies, so route handlers stop receiving a Session at
   all and have nothing left to forward. That conversion is out of scope for
   this guard.
@@ -139,7 +139,7 @@ def _offenders(root: pathlib.Path) -> list[str]:
 
 
 def test_no_service_holds_a_session():
-    """No function under server/services takes or annotates a Session (design §4)."""
+    """No function under server/services takes or annotates a Session."""
     assert _offenders(_SERVICES) == []
 
 
@@ -148,11 +148,11 @@ def test_no_route_handler_holds_a_session():
     assert _offenders(_ROUTES) == []
 
 
-# --- Guard 2 (R5): direct DB-access AST scan --------------------------------
+# --- Guard 2: direct DB-access AST scan -------------------------------------
 #
-# Guard 1 checks signatures only, and R1-R3 exempt functions that legitimately
-# hold a Session parameter -- which weakens that check as a discriminator.
-# This guard enforces the design's actual property directly: scan for calls
+# Guard 1 checks signatures only, and the exemptions above cover functions that
+# legitimately hold a Session parameter -- which weakens that check as a
+# discriminator. This guard enforces the actual property directly: scan for calls
 # of the form `session.<method>(...)` / `db.<method>(...)`, for a bare
 # session/db local or parameter, where <method> touches the database.
 
@@ -172,8 +172,8 @@ _DB_ACCESS_ALLOWED: dict[tuple[str, str], str] = {
     ("routes/auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
     ("routes/auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
     ("routes/auth.py", "creator_to_response"): "read-only response helper with an optional session param",
-    # R1: human decision: import_api.py is slated for deprecation. Calls
-    # session.rollback() on the caught-failure path (Task 17).
+    # Human decision: import_api.py is slated for deprecation. Calls
+    # session.rollback() on the caught-failure path.
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
 }
 
@@ -208,5 +208,5 @@ def _db_access_offenders(root: pathlib.Path) -> list[str]:
 
 
 def test_no_direct_db_access_in_service_or_route_functions():
-    """No function under server/routes or server/services calls session.<m>()/db.<m>() directly (design §4; R5)."""
+    """No function under server/routes or server/services calls session.<m>()/db.<m>() directly."""
     assert _db_access_offenders(_SERVICES) + _db_access_offenders(_ROUTES) == []

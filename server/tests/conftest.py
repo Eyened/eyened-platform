@@ -32,8 +32,8 @@ class _SessionBoundDatabase:
     already owns opening/closing it -- this stand-in must not close it.
 
     Monkeypatching server.db.database to this lets the client fixture drive
-    the real, unmodified server.db.get_db (design §4: "match production at
-    the fixture, not in production code") instead of a hand-copied
+    the real, unmodified server.db.get_db -- matching production at the
+    fixture rather than in production code -- instead of a hand-copied
     re-implementation of its commit/rollback body.
     """
 

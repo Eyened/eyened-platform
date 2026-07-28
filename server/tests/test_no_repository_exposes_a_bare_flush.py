@@ -1,4 +1,4 @@
-"""Guard for design §4: repositories name the write-back for intent, not mechanism.
+"""Repositories name the write-back for intent, not mechanism.
 
 Every repository write-back is ``save()``/``save_link()``. A public ``flush()``
 would put a persistence mechanism back in the service layer's vocabulary, which
