@@ -171,22 +171,23 @@ class FormAnnotationService:
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
 
-        applied_columns: list[str] = []
+        # Column list is purely updates-key-driven, so it can be built before
+        # any mutation happens -- which is what snapshot() requires.
+        applied_columns: list[str] = (
+            ["ImageInstanceID"] if "image_id" in updates else []
+        ) + [attr for key, attr in _FIELD_MAP.items() if key in updates]
+        before = AuditService.snapshot(annotation, *applied_columns)
+
         if "image_id" in updates:
             annotation.ImageInstanceID = self._resolve_image_instance_id(
                 updates["image_id"]
             )
-            applied_columns.append("ImageInstanceID")
         for key, attr in _FIELD_MAP.items():
             if key in updates:
                 setattr(annotation, attr, updates[key])
-                applied_columns.append(attr)
 
-        # Derive the scalar diff (true old/new per changed PascalCase column)
-        # while the mutations are still pending — before the repo flush()
-        # clears the attribute history.
-        changes = AuditService._diff_from_history(annotation, *applied_columns)
-        self.repository.flush()
+        changes = AuditService.diff(before, annotation)
+        self.repository.save(annotation)
         if self.audit is not None:
             self.audit.record(
                 action="UPDATE",
@@ -217,7 +218,7 @@ class FormAnnotationService:
             "creator_id": annotation.CreatorID,
         }
         annotation.Inactive = True
-        self.repository.flush()
+        self.repository.save(annotation)
         if self.audit is not None:
             self.audit.record(
                 action="DELETE",
@@ -244,7 +245,7 @@ class FormAnnotationService:
             raise NotFoundError("FormAnnotation not found")
 
         annotation.FormData = form_data
-        self.repository.flush()
+        self.repository.save(annotation)
         if self.audit is not None:
             # Pre-refactor log_simple carried no fields/changes (high-frequency
             # op, deliberately lightweight) — preserved as-is.
@@ -298,18 +299,18 @@ class FormAnnotationService:
                     },
                 )
         elif comment is not None:
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            # Derive the scalar diff while the mutation is still pending —
-            # before any repo/audit call flushes (a flush clears the pending
-            # history). FormAnnotationTagLink has a composite PK, so
-            # entity_id is null; fold the composite identity into changes
-            # (matches the INSERT branch above and untag's DELETE below), or
-            # the audit row is unidentifiable.
+            # FormAnnotationTagLink has a composite PK, so entity_id is null;
+            # fold the composite identity into changes (matches the INSERT
+            # branch above and untag's DELETE below), or the audit row is
+            # unidentifiable.
             changes = {
                 "tag_id": tag.TagID,
                 "form_annotation_id": annotation_id,
-                **AuditService._diff_from_history(link, "Comment"),
+                **AuditService.diff(before, link),
             }
+            self.repository.save_link(link)
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",
@@ -348,18 +349,18 @@ class FormAnnotationService:
             raise NotFoundError("Link not found")
 
         if comment is not None:
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            # Derive the scalar diff while the mutation is still pending —
-            # before any repo/audit call flushes (a flush clears the pending
-            # history). FormAnnotationTagLink has a composite PK, so
-            # entity_id is null; fold the composite identity into changes
-            # (matches tag's INSERT/UPDATE and untag's DELETE), or the audit
-            # row is unidentifiable.
+            # FormAnnotationTagLink has a composite PK, so entity_id is null;
+            # fold the composite identity into changes (matches tag's
+            # INSERT/UPDATE and untag's DELETE), or the audit row is
+            # unidentifiable.
             changes = {
                 "tag_id": tag_id,
                 "form_annotation_id": annotation_id,
-                **AuditService._diff_from_history(link, "Comment"),
+                **AuditService.diff(before, link),
             }
+            self.repository.save_link(link)
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",

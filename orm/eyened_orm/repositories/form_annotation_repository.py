@@ -105,11 +105,13 @@ class FormAnnotationRepository:
         self._session.add(annotation)
         self._session.flush()
 
-    def flush(self) -> None:
-        """Flush pending in-place FormAnnotation mutations (e.g. ``Inactive``,
-        ``FormData``) so integrity errors surface in-request and ``onupdate``
-        columns (``DateModified``) are re-fetched (via RETURNING or a postfetch
-        SELECT on next access) within the request transaction.
+    def save(self, annotation: FormAnnotation) -> None:
+        """Persist in-place mutations to ``annotation`` (e.g. ``Inactive``,
+        ``FormData``) within the request transaction, so the ``onupdate`` column
+        ``DateModified`` is re-fetched before the response is serialized.
+
+        ``annotation`` names what is being saved; the flush covers the whole
+        unit of work, deliberately not just this row.
         """
         self._session.flush()
 
@@ -131,6 +133,15 @@ class FormAnnotationRepository:
         self._session.add(link)
         self._session.flush()
         return link
+
+    def save_link(self, link: FormAnnotationTagLink) -> None:
+        """Persist in-place mutations to ``link`` (e.g. ``Comment``) within the
+        request transaction.
+
+        ``link`` names what is being saved; the flush covers the whole unit of
+        work, deliberately not just this row.
+        """
+        self._session.flush()
 
     def delete_link(self, link: FormAnnotationTagLink) -> None:
         """Delete a FormAnnotationTagLink and flush so integrity errors surface in-request."""
