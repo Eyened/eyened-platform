@@ -45,20 +45,17 @@ class SegmentationRepository:
         )
 
     def add(self, segmentation: Segmentation) -> None:
-        """Stage a Segmentation and flush so its PK/server defaults populate.
-
-        Also used to persist ``write_data``'s in-place mutation (the
-        pre-refactor code called ``session.add`` on the already-persistent
-        row there too); ``add`` on a tracked instance is a no-op beyond the
-        flush.
-        """
+        """Stage a new Segmentation and flush so its PK/server defaults populate."""
         self._session.add(segmentation)
         self._session.flush()
 
-    def flush(self) -> None:
-        """Flush pending in-place Segmentation mutations (e.g. ``Inactive``,
-        ``Threshold``, ``FeatureID``, ``ReferenceSegmentationID``) so
-        integrity errors surface in-request within the request transaction.
+    def save(self, segmentation: Segmentation) -> None:
+        """Persist in-place mutations to ``segmentation`` (e.g. ``Inactive``,
+        ``Threshold``, ``FeatureID``, ``ReferenceSegmentationID``) within the
+        request transaction.
+
+        ``segmentation`` names what is being saved; the flush covers the whole
+        unit of work, deliberately not just this row.
         """
         self._session.flush()
 
@@ -91,13 +88,11 @@ class ModelSegmentationRepository:
         """Return the model segmentation by id, or None if absent."""
         return self._session.get(ModelSegmentation, model_segmentation_id)
 
-    def add_item(self, item: ModelSegmentation) -> None:
-        """Stage a (fetched, in-place mutated) ModelSegmentation and flush.
+    def save(self, model_segmentation: ModelSegmentation) -> None:
+        """Persist in-place mutations to ``model_segmentation`` (e.g.
+        ``ZarrArrayIndex``) within the request transaction.
 
-        ``item`` is already persistent (fetched via ``get_by_id``); mirrors
-        the pre-refactor ``session.add(item)`` call on the same instance —
-        a no-op beyond the flush that persists the mutation (e.g.
-        ``ZarrArrayIndex``) and surfaces integrity errors in-request.
+        ``model_segmentation`` names what is being saved; the flush covers the
+        whole unit of work, deliberately not just this row.
         """
-        self._session.add(item)
         self._session.flush()

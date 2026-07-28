@@ -250,10 +250,7 @@ class SegmentationService:
             )
         except (IndexError, ValueError) as e:
             raise BadRequestError(str(e)) from e
-        # segmentation is already persistent (fetched via get_by_id above);
-        # flush() is the honest name for what's needed here -- add() on an
-        # already-tracked instance is a no-op beyond the flush it also does.
-        self.repository.flush()
+        self.repository.save(segmentation)
         if self.audit is not None:
             # Pre-refactor log_simple carried no fields/changes (high-frequency
             # op, deliberately lightweight) — preserved as-is.
@@ -288,7 +285,7 @@ class SegmentationService:
             "reference_segmentation_id": segmentation.ReferenceSegmentationID,
         }
         segmentation.Inactive = True
-        self.repository.flush()
+        self.repository.save(segmentation)
         if self.audit is not None:
             self.audit.record(
                 action="DELETE",
@@ -317,6 +314,9 @@ class SegmentationService:
         if segmentation is None:
             raise NotFoundError("Segmentation not found")
 
+        before = AuditService.snapshot(
+            segmentation, "ReferenceSegmentationID", "FeatureID", "Threshold"
+        )
         if reference_segmentation_id is not None:
             segmentation.ReferenceSegmentationID = reference_segmentation_id
         if feature_id is not None:
@@ -324,17 +324,12 @@ class SegmentationService:
         if threshold is not None:
             segmentation.Threshold = threshold
 
-        # Derive the scalar diff (true old/new per changed column) while the
-        # mutations are still pending — before the repo flush() clears the
-        # attribute history. Note: this fixes a pre-refactor quirk where
-        # reference_segmentation_id/feature_id were assigned twice, so their
-        # hand-built "old -> new" strings actually logged "new -> new";
-        # threshold was the only field that logged truthfully. AuditService.diff
-        # now reports true old/new for all three fields.
-        changes = AuditService._diff_from_history(
-            segmentation, "ReferenceSegmentationID", "FeatureID", "Threshold"
-        )
-        self.repository.flush()
+        # Note: this fixes a pre-refactor quirk where reference_segmentation_id
+        # /feature_id were assigned twice, so their hand-built "old -> new"
+        # strings actually logged "new -> new"; threshold was the only field
+        # that logged truthfully. snapshot/diff report true old/new for all three.
+        changes = AuditService.diff(before, segmentation)
+        self.repository.save(segmentation)
         if self.audit is not None:
             self.audit.record(
                 action="UPDATE",
@@ -487,7 +482,7 @@ class ModelSegmentationService:
             self.store.write(item, data, axis=axis, slice_index=scan_nr)
         except (IndexError, ValueError) as e:
             raise BadRequestError(str(e)) from e
-        self.repository.add_item(item)
+        self.repository.save(item)
         return item
 
 

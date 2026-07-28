@@ -308,46 +308,46 @@ def test_write_data_logs_update(session):
 
 
 class _OrderRecordingModelRepo:
-    """Fake ModelSegmentationRepository (no DB) that just returns a fixed
-    item and records when add_item() is called, into a list shared with the
-    fake store below — used only to pin call order."""
+    """Fake ModelSegmentationRepository (no DB) that returns a fixed item and
+    records the save() call — method name plus the entity it was handed — into
+    a list shared with the fake store below."""
 
-    def __init__(self, item, calls: list[str]) -> None:
+    def __init__(self, item, calls: list) -> None:
         self._item = item
         self._calls = calls
 
     def get_by_id(self, model_segmentation_id: int):
         return self._item
 
-    def add_item(self, item) -> None:
-        self._calls.append("add_item")
+    def save(self, model_segmentation) -> None:
+        self._calls.append(("save", model_segmentation))
 
 
 class _OrderRecordingStore:
     """Fake store that records into the same shared call-order list."""
 
-    def __init__(self, calls: list[str]) -> None:
+    def __init__(self, calls: list) -> None:
         self._calls = calls
 
     def write(self, item, data, *, axis=None, slice_index=None):
-        self._calls.append("store.write")
+        self._calls.append(("store.write", item))
 
 
 def test_model_write_data_store_write_precedes_repo_persist():
     """Pins the store-vs-DB order for the model item: store.write() must run
-    BEFORE self.repository.add_item() — unchanged from pre-refactor
+    BEFORE self.repository.save() — unchanged from pre-refactor
     (``self.store.write(...)`` then ``session.add(item)``). Uses fakes (no
     DB) since building a full ModelSegmentation FK graph adds no value here
     — only the call order is under test.
     """
-    calls: list[str] = []
+    calls: list = []
     item = object()
 
     ModelSegmentationService(
         _OrderRecordingModelRepo(item, calls), _OrderRecordingStore(calls)
     ).write_data(1, np.zeros((1, 4, 4), dtype=np.uint8))
 
-    assert calls == ["store.write", "add_item"]
+    assert calls == [("store.write", item), ("save", item)]
 
 
 def test_soft_delete_sets_inactive(session):
@@ -420,7 +420,7 @@ def test_patch_logs_true_diff(session):
     — the sanctioned removal of the pre-refactor double-assignment quirk,
     where reference_segmentation_id/feature_id were applied before the
     change-string was built, so they logged '<new> -> <new>' instead of the
-    true old value. AuditService.diff now reports true old/new for all three
+    true old value. AuditService.snapshot/diff now reports true old/new for all three
     fields."""
     actor = _actor(session)
     seg = _make_segmentation(session, "pd1")
