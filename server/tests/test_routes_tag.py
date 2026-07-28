@@ -16,7 +16,7 @@ def test_patch_tag_tag_type_persists_and_audits(client, session):
     This is the HTTP-level regression test for the enum-in-changes 500: the
     full DI stack (route -> TagService -> AuditService.record()) is what
     originally hit `TypeError: Object of type TagType is not JSON
-    serializable` on flush, because `history.deleted[0]` in AuditService.diff()
+    serializable` on flush, because the value AuditService.snapshot() captured
     is the raw TagType enum loaded from the DB, not a string. Discriminator:
     reverting the json-safe normalization in AuditService.record() makes this
     fail with a 500 (see fix-wave-1 report for the before/after run).

@@ -73,6 +73,7 @@ class TagService:
         if tag is None:
             raise NotFoundError(f"Tag {tag_id} not found")
 
+        before = AuditService.snapshot(tag, "TagName", "TagDescription", "TagType")
         if name is not None:
             tag.TagName = name
         if description is not None:
@@ -80,10 +81,8 @@ class TagService:
         if tag_type is not None:
             tag.TagType = tag_type
 
-        # Derive the scalar diff while the mutations are still pending —
-        # before the explicit flush() below clears the attribute history.
-        changes = AuditService._diff_from_history(tag, "TagName", "TagDescription", "TagType")
-        self.repository.flush()
+        changes = AuditService.diff(before, tag)
+        self.repository.save(tag)
 
         if self.audit is not None:
             self.audit.record(

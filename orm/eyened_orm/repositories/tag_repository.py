@@ -26,9 +26,11 @@ class TagRepository:
         """Return the tag with the given id, or None if absent."""
         return self._session.get(Tag, tag_id)
 
-    def flush(self) -> None:
-        """Flush pending in-place Tag mutations (e.g. ``TagName``, ``TagType``)
-        so integrity errors surface in-request within the request transaction.
+    def save(self, tag: Tag) -> None:
+        """Persist in-place mutations to ``tag`` within the request transaction.
+
+        ``tag`` names what is being saved; the flush covers the whole unit of
+        work, deliberately not just this row.
         """
         self._session.flush()
 
