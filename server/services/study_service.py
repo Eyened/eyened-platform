@@ -67,18 +67,17 @@ class StudyService:
                     },
                 )
         elif comment is not None:
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            # Derive the scalar diff while the mutation is still pending —
-            # before the explicit flush() below clears the history.
             # StudyTagLink has a composite PK, so entity_id is null; fold the
             # composite identity into changes (matches the INSERT branch above
             # and the DELETE below), or the audit row is unidentifiable.
             changes = {
                 "tag_id": tag.TagID,
                 "study_id": study_id,
-                **AuditService._diff_from_history(link, "Comment"),
+                **AuditService.diff(before, link),
             }
-            self.repository.flush()
+            self.repository.save_link(link)
             link.Tag = tag
             if self.audit is not None:
                 self.audit.record(
@@ -149,18 +148,17 @@ class StudyService:
             raise NotFoundError(f"Tag {tag_id} is not linked to study {study_id}")
 
         if comment is not None:
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            # Derive the scalar diff while the mutation is still pending —
-            # before the explicit flush() below clears the history.
             # StudyTagLink has a composite PK, so entity_id is null; fold the
             # composite identity into changes (matches tag_study's INSERT/UPDATE
             # and untag_study's DELETE), or the audit row is unidentifiable.
             changes = {
                 "tag_id": tag_id,
                 "study_id": study_id,
-                **AuditService._diff_from_history(link, "Comment"),
+                **AuditService.diff(before, link),
             }
-            self.repository.flush()
+            self.repository.save_link(link)
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",

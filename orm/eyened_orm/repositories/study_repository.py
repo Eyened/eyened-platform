@@ -28,9 +28,13 @@ class StudyRepository:
         """Return the StudyTagLink for (tag, study), or None if not linked."""
         return self._session.get(StudyTagLink, {"TagID": tag_id, "StudyID": study_id})
 
-    def flush(self) -> None:
-        """Flush pending in-place StudyTagLink mutations (e.g. ``Comment``) so
-        integrity errors surface in-request within the request transaction."""
+    def save_link(self, link: StudyTagLink) -> None:
+        """Persist in-place mutations to ``link`` (e.g. ``Comment``) within the
+        request transaction.
+
+        ``link`` names what is being saved; the flush covers the whole unit of
+        work, deliberately not just this row.
+        """
         self._session.flush()
 
     def add_link(
