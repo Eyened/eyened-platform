@@ -86,30 +86,60 @@ def test_disabled_service_records_nothing(session):
     assert session.info.get("_audit_events", []) == []
 
 
-def test_diff_maps_changed_scalar_to_old_new(session):
-    """diff() reports a changed column as {"old": …, "new": …} (called before flush)."""
-    from eyened_orm import Feature
+class _Entity:
+    """Plain stand-in: snapshot/diff use only getattr, so no ORM or session
+    is needed to test them."""
 
-    feature = Feature(FeatureName="old")
-    session.add(feature)
-    session.flush()  # baseline persisted state for the history comparison
+    def __init__(self, **fields) -> None:
+        self.__dict__.update(fields)
 
-    feature.FeatureName = "new"
-    assert AuditService._diff_from_history(feature, "FeatureName") == {
+
+def test_snapshot_captures_the_named_fields_as_plain_values():
+    """snapshot() reads the named attributes into a plain dict."""
+    entity = _Entity(FeatureName="old", Other="untouched")
+    assert AuditService.snapshot(entity, "FeatureName") == {"FeatureName": "old"}
+
+
+def test_diff_maps_changed_scalar_to_old_new():
+    """diff() reports a changed field as {"old": …, "new": …}."""
+    entity = _Entity(FeatureName="old")
+    before = AuditService.snapshot(entity, "FeatureName")
+    entity.FeatureName = "new"
+    assert AuditService.diff(before, entity) == {
         "FeatureName": {"old": "old", "new": "new"}
     }
 
 
-def test_diff_omits_fields_set_to_their_current_value(session):
+def test_diff_omits_fields_set_to_their_current_value():
     """A field reassigned its existing value is not reported as a change."""
+    entity = _Entity(FeatureName="stable")
+    before = AuditService.snapshot(entity, "FeatureName")
+    entity.FeatureName = "stable"
+    assert AuditService.diff(before, entity) == {}
+
+
+def test_diff_survives_a_flush_between_the_mutation_and_the_diff(session):
+    """The defect this replaces: a flush after the mutation must not erase the
+    change map.
+
+    ``repository.save()`` flushes, and ``AuditService.record()`` flushes again,
+    so under the old attribute-history mechanism this exact sequence returned
+    {} and the audit row recorded nothing -- silently. Design §1.
+    """
     from eyened_orm import Feature
 
-    feature = Feature(FeatureName="stable")
+    feature = Feature(FeatureName="old")
     session.add(feature)
     session.flush()
 
-    feature.FeatureName = "stable"
-    assert AuditService._diff_from_history(feature, "FeatureName") == {}
+    before = AuditService.snapshot(feature, "FeatureName")
+    feature.FeatureName = "new"
+    session.flush()  # stands in for repository.save()
+    AuditService(session).record(action="UPDATE", entity="Feature")  # flushes again
+
+    assert AuditService.diff(before, feature) == {
+        "FeatureName": {"old": "old", "new": "new"}
+    }
 
 
 def test_record_persists_enum_member_in_changes_as_its_value(session):

@@ -91,6 +91,26 @@ class AuditService:
         self._session.info.setdefault(_BUFFER_KEY, []).append(event_payload)
 
     @staticmethod
+    def snapshot(entity: object, *fields: str) -> dict[str, object]:
+        """Capture *fields*' current values before mutating ``entity``.
+
+        Pair with ``diff``. The result holds plain Python values, so no later
+        flush can affect it — unlike attribute history, which a flush clears.
+        """
+        return {field: getattr(entity, field) for field in fields}
+
+    @staticmethod
+    def diff(before: dict[str, object], entity: object) -> dict[str, dict[str, object]]:
+        """Return ``{field: {"old": …, "new": …}}`` for the snapshotted fields
+        whose value changed. Unchanged fields are omitted."""
+        changes: dict[str, dict[str, object]] = {}
+        for field, old in before.items():
+            new = getattr(entity, field)
+            if old != new:
+                changes[field] = {"old": old, "new": new}
+        return changes
+
+    @staticmethod
     def _diff_from_history(entity: object, *fields: str) -> dict:
         """Transitional: the pre-snapshot change map, kept only until every
         caller moves to ``snapshot``/``diff``. Do not add new callers.
