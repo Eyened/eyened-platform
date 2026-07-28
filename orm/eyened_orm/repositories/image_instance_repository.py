@@ -151,10 +151,13 @@ class ImageInstanceRepository:
             {"TagID": tag_id, "ImageInstanceID": image_instance_id},
         )
 
-    def flush(self) -> None:
-        """Flush pending in-place ImageInstanceTagLink mutations (e.g.
-        ``Comment``) so integrity errors surface in-request within the
-        request transaction."""
+    def save_link(self, link: ImageInstanceTagLink) -> None:
+        """Persist in-place mutations to ``link`` (e.g. ``Comment``) within the
+        request transaction.
+
+        ``link`` names what is being saved; the flush covers the whole unit of
+        work, deliberately not just this row.
+        """
         self._session.flush()
 
     def get_by_public_id(self, public_id: str) -> ImageInstance | None:

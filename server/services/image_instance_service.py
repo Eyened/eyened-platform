@@ -126,9 +126,8 @@ class ImageInstanceService:
                     },
                 )
         elif comment is not None:
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            # Derive the scalar diff while the mutation is still pending — before
-            # the explicit flush() below clears the pending history.
             # ImageInstanceTagLink has a composite PK, so entity_id is null;
             # fold the composite identity into changes (matches the INSERT
             # branch above and untag_instance's DELETE below), or the audit row
@@ -138,9 +137,9 @@ class ImageInstanceService:
             changes = {
                 "tag_id": tag.TagID,
                 "image_instance_id": public_id,
-                **AuditService._diff_from_history(link, "Comment"),
+                **AuditService.diff(before, link),
             }
-            self.repository.flush()
+            self.repository.save_link(link)
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",
@@ -179,9 +178,8 @@ class ImageInstanceService:
             raise NotFoundError("Link not found")
 
         if comment is not None:
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            # Derive the scalar diff while the mutation is still pending — before
-            # the explicit flush() below clears the pending history.
             # ImageInstanceTagLink has a composite PK, so entity_id is null;
             # fold the composite identity into changes (matches tag_instance's
             # INSERT/UPDATE and untag_instance's DELETE), or the audit row is
@@ -190,9 +188,9 @@ class ImageInstanceService:
             changes = {
                 "tag_id": tag_id,
                 "image_instance_id": instance.ImageInstanceID,
-                **AuditService._diff_from_history(link, "Comment"),
+                **AuditService.diff(before, link),
             }
-            self.repository.flush()
+            self.repository.save_link(link)
             if self.audit is not None:
                 self.audit.record(
                     action="UPDATE",
