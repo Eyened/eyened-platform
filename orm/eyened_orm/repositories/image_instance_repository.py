@@ -191,6 +191,6 @@ class ImageInstanceRepository:
         return link
 
     def delete_link(self, link: ImageInstanceTagLink) -> None:
-        """Delete an ImageInstanceTagLink and flush so integrity errors surface in-request."""
+        """Delete an ImageInstanceTagLink and flush within the request transaction."""
         self._session.delete(link)
         self._session.flush()

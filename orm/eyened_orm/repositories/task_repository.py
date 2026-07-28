@@ -26,7 +26,7 @@ class TaskRepository:
         self._session.flush()
 
     def delete(self, task: Task) -> None:
-        """Delete a task and flush so integrity errors surface in-request."""
+        """Delete a task and flush within the request transaction."""
         self._session.delete(task)
         self._session.flush()
 
@@ -111,7 +111,7 @@ class SubTaskRepository:
         self._session.flush()
 
     def delete(self, subtask: SubTask) -> None:
-        """Delete a subtask and flush so integrity errors surface in-request."""
+        """Delete a subtask and flush within the request transaction."""
         self._session.delete(subtask)
         self._session.flush()
 
@@ -129,7 +129,7 @@ class SubTaskRepository:
         return link
 
     def delete_link(self, link: SubTaskImageLink) -> None:
-        """Delete an image link and flush so integrity errors surface in-request."""
+        """Delete an image link and flush within the request transaction."""
         self._session.delete(link)
         self._session.flush()
 

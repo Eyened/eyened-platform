@@ -18,7 +18,7 @@ class TagRepository:
         self._session.flush()
 
     def delete(self, tag: Tag) -> None:
-        """Delete a tag and flush so integrity errors surface in-request."""
+        """Delete a tag and flush within the request transaction."""
         self._session.delete(tag)
         self._session.flush()
 
@@ -80,6 +80,6 @@ class TagRepository:
         return link
 
     def remove_star(self, link: CreatorTagLink) -> None:
-        """Delete a star link and flush so integrity errors surface in-request."""
+        """Delete a star link and flush within the request transaction."""
         self._session.delete(link)
         self._session.flush()

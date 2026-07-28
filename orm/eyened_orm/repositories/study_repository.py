@@ -49,6 +49,6 @@ class StudyRepository:
         return link
 
     def delete_link(self, link: StudyTagLink) -> None:
-        """Delete a StudyTagLink and flush so integrity errors surface in-request."""
+        """Delete a StudyTagLink and flush within the request transaction."""
         self._session.delete(link)
         self._session.flush()

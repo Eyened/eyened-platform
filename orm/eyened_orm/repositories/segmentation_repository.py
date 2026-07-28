@@ -73,7 +73,7 @@ class SegmentationRepository:
         return link
 
     def delete_link(self, link: SegmentationTagLink) -> None:
-        """Delete a SegmentationTagLink and flush so integrity errors surface in-request."""
+        """Delete a SegmentationTagLink and flush within the request transaction."""
         self._session.delete(link)
         self._session.flush()
 

@@ -144,6 +144,6 @@ class FormAnnotationRepository:
         self._session.flush()
 
     def delete_link(self, link: FormAnnotationTagLink) -> None:
-        """Delete a FormAnnotationTagLink and flush so integrity errors surface in-request."""
+        """Delete a FormAnnotationTagLink and flush within the request transaction."""
         self._session.delete(link)
         self._session.flush()

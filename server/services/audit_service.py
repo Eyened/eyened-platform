@@ -76,7 +76,7 @@ class AuditService:
             Changes=safe_changes,
         )
         self._session.add(row)
-        self._session.flush()  # surface integrity errors in-request; assign PK
+        self._session.flush()  # assign the AuditLog PK before buffering the event
         event_payload = {
             "ts": ts.isoformat(),
             "actor_id": actor_id,

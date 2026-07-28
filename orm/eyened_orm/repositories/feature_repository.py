@@ -19,7 +19,7 @@ class FeatureRepository:
         self._session.flush()
 
     def delete(self, feature: Feature) -> None:
-        """Delete a feature and flush so integrity errors surface in-request."""
+        """Delete a feature and flush within the request transaction."""
         self._session.delete(feature)
         self._session.flush()
 
