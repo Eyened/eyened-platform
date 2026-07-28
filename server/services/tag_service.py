@@ -51,7 +51,7 @@ class TagService:
                 changes={
                     "name": tag.TagName,
                     "description": tag.TagDescription,
-                    "tag_type": str(tag.TagType),
+                    "tag_type": tag.TagType,
                 },
             )
         return tag

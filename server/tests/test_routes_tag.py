@@ -9,6 +9,29 @@ def _make_tag(session, creator_id: int) -> Tag:
     return tag
 
 
+def test_post_tag_audits_the_enum_value_not_its_repr(client, session):
+    """POST /tags records tag_type as "Study", not "TagType.Study".
+
+    The INSERT payload passes the raw enum and lets AuditService normalize it,
+    exactly as the UPDATE and DELETE payloads do. A str() at the call site
+    would bypass that normalization and store the member's repr, leaving the
+    same field spelled two different ways across an entity's audit history.
+    """
+    # The client fixture's CurrentUser is creator_id=1; the tag's CreatorID FK
+    # needs that row to exist.
+    session.add(Creator(CreatorName="alice", IsHuman=True))
+    session.commit()
+
+    response = client.post(
+        "/tags",
+        json={"name": "T2", "tag_type": "Study", "description": "d"},
+    )
+
+    assert response.status_code == 200, response.text
+    row = session.query(AuditLog).filter_by(Entity="Tag", Action="INSERT").one()
+    assert row.Changes["tag_type"] == "Study"
+
+
 def test_patch_tag_tag_type_persists_and_audits(client, session):
     """PATCH /tags/{id} changing tag_type succeeds (200) and persists the new
     TagType, with one AuditLog row recording the enum values as strings.
