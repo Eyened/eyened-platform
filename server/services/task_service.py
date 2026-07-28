@@ -95,6 +95,9 @@ class TaskService:
         if task is None:
             raise NotFoundError(f"Task {task_id} not found")
 
+        before = AuditService.snapshot(
+            task, "TaskName", "Description", "ContactID", "TaskDefinitionID", "TaskState"
+        )
         if name is not None:
             task.TaskName = name
         if description is not None:
@@ -106,14 +109,8 @@ class TaskService:
         if task_state is not None:
             task.TaskState = task_state
 
-        # Derive the scalar diff while the mutations are still pending — before
-        # the explicit flush() below clears the pending attribute history.
-        # (Production runs with autoflush=False, so the get_with_relations()
-        # query below does NOT autoflush -- an explicit flush() is required.)
-        changes = AuditService._diff_from_history(
-            task, "TaskName", "Description", "ContactID", "TaskDefinitionID", "TaskState"
-        )
-        self.tasks.flush()
+        changes = AuditService.diff(before, task)
+        self.tasks.save(task)
 
         task = self.tasks.get_with_relations(task_id)
         counts = self.tasks.subtask_counts([task_id])[task_id]
@@ -260,17 +257,16 @@ class SubTaskService:
         if subtask is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
 
+        before = AuditService.snapshot(subtask, "Comments", "TaskState")
         if comments is not None:
             subtask.Comments = comments
         if task_state is not None:
             subtask.TaskState = task_state
 
-        # Derive the scalar diff while the mutations are still pending — before
-        # the explicit flush() below clears the pending attribute history
-        # (SubTask has no server-generated columns a caller reads, so no
-        # re-fetch is needed).
-        changes = AuditService._diff_from_history(subtask, "Comments", "TaskState")
-        self.subtasks.flush()
+        # SubTask has no server-generated columns a caller reads, so no
+        # re-fetch is needed after the save.
+        changes = AuditService.diff(before, subtask)
+        self.subtasks.save(subtask)
 
         if self.audit is not None:
             self.audit.record(
