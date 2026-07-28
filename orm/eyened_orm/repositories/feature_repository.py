@@ -27,6 +27,14 @@ class FeatureRepository:
         """Return the feature with the given id, or None if absent."""
         return self._session.get(Feature, feature_id)
 
+    def save(self, feature: Feature) -> None:
+        """Persist in-place mutations to ``feature`` within the request transaction.
+
+        ``feature`` names what is being saved; the flush covers the whole unit
+        of work, deliberately not just this row.
+        """
+        self._session.flush()
+
     def list_all(self) -> list[Feature]:
         """Return all features ordered by name (ascending)."""
         return list(
@@ -82,7 +90,7 @@ class FeatureRepository:
 
         Deletes existing parent->child links, then re-adds one link per id in
         order. Flushes so a following read in the same transaction sees the new
-        state; does not commit (the Service owns the transaction boundary).
+        state; does not commit — this runs within the request transaction.
         """
         self._session.execute(
             delete(FeatureFeatureLink).where(

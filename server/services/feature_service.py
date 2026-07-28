@@ -67,11 +67,11 @@ class FeatureService:
         if feature is None:
             raise NotFoundError(f"Feature {feature_id} not found")
 
+        before = AuditService.snapshot(feature, "FeatureName")
         if name is not None:
             feature.FeatureName = name
-        # Derive the scalar diff while the mutation is still pending — before
-        # replace_subfeatures() flushes (a flush clears the attribute history).
-        changes: dict = AuditService._diff_from_history(feature, "FeatureName")
+        changes: dict = AuditService.diff(before, feature)
+        self.repository.save(feature)
         if subfeature_ids is not None:
             current = self.repository.list_subfeature_ids(feature_id)
             # Link changes are not scalar attribute history — keep them explicit.
