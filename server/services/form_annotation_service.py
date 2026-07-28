@@ -185,7 +185,7 @@ class FormAnnotationService:
         # Derive the scalar diff (true old/new per changed PascalCase column)
         # while the mutations are still pending — before the repo flush()
         # clears the attribute history.
-        changes = AuditService.diff(annotation, *applied_columns)
+        changes = AuditService._diff_from_history(annotation, *applied_columns)
         self.repository.flush()
         if self.audit is not None:
             self.audit.record(
@@ -308,7 +308,7 @@ class FormAnnotationService:
             changes = {
                 "tag_id": tag.TagID,
                 "form_annotation_id": annotation_id,
-                **AuditService.diff(link, "Comment"),
+                **AuditService._diff_from_history(link, "Comment"),
             }
             if self.audit is not None:
                 self.audit.record(
@@ -358,7 +358,7 @@ class FormAnnotationService:
             changes = {
                 "tag_id": tag_id,
                 "form_annotation_id": annotation_id,
-                **AuditService.diff(link, "Comment"),
+                **AuditService._diff_from_history(link, "Comment"),
             }
             if self.audit is not None:
                 self.audit.record(

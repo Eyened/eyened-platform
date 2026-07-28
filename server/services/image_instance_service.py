@@ -138,7 +138,7 @@ class ImageInstanceService:
             changes = {
                 "tag_id": tag.TagID,
                 "image_instance_id": public_id,
-                **AuditService.diff(link, "Comment"),
+                **AuditService._diff_from_history(link, "Comment"),
             }
             self.repository.flush()
             if self.audit is not None:
@@ -190,7 +190,7 @@ class ImageInstanceService:
             changes = {
                 "tag_id": tag_id,
                 "image_instance_id": instance.ImageInstanceID,
-                **AuditService.diff(link, "Comment"),
+                **AuditService._diff_from_history(link, "Comment"),
             }
             self.repository.flush()
             if self.audit is not None:

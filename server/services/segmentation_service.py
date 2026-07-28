@@ -331,7 +331,7 @@ class SegmentationService:
         # hand-built "old -> new" strings actually logged "new -> new";
         # threshold was the only field that logged truthfully. AuditService.diff
         # now reports true old/new for all three fields.
-        changes = AuditService.diff(
+        changes = AuditService._diff_from_history(
             segmentation, "ReferenceSegmentationID", "FeatureID", "Threshold"
         )
         self.repository.flush()

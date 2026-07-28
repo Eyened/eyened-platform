@@ -110,7 +110,7 @@ class TaskService:
         # the explicit flush() below clears the pending attribute history.
         # (Production runs with autoflush=False, so the get_with_relations()
         # query below does NOT autoflush -- an explicit flush() is required.)
-        changes = AuditService.diff(
+        changes = AuditService._diff_from_history(
             task, "TaskName", "Description", "ContactID", "TaskDefinitionID", "TaskState"
         )
         self.tasks.flush()
@@ -269,7 +269,7 @@ class SubTaskService:
         # the explicit flush() below clears the pending attribute history
         # (SubTask has no server-generated columns a caller reads, so no
         # re-fetch is needed).
-        changes = AuditService.diff(subtask, "Comments", "TaskState")
+        changes = AuditService._diff_from_history(subtask, "Comments", "TaskState")
         self.subtasks.flush()
 
         if self.audit is not None:

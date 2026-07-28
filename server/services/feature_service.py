@@ -71,7 +71,7 @@ class FeatureService:
             feature.FeatureName = name
         # Derive the scalar diff while the mutation is still pending — before
         # replace_subfeatures() flushes (a flush clears the attribute history).
-        changes: dict = AuditService.diff(feature, "FeatureName")
+        changes: dict = AuditService._diff_from_history(feature, "FeatureName")
         if subfeature_ids is not None:
             current = self.repository.list_subfeature_ids(feature_id)
             # Link changes are not scalar attribute history — keep them explicit.

@@ -82,7 +82,7 @@ class TagService:
 
         # Derive the scalar diff while the mutations are still pending —
         # before the explicit flush() below clears the attribute history.
-        changes = AuditService.diff(tag, "TagName", "TagDescription", "TagType")
+        changes = AuditService._diff_from_history(tag, "TagName", "TagDescription", "TagType")
         self.repository.flush()
 
         if self.audit is not None:

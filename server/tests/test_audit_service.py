@@ -95,7 +95,7 @@ def test_diff_maps_changed_scalar_to_old_new(session):
     session.flush()  # baseline persisted state for the history comparison
 
     feature.FeatureName = "new"
-    assert AuditService.diff(feature, "FeatureName") == {
+    assert AuditService._diff_from_history(feature, "FeatureName") == {
         "FeatureName": {"old": "old", "new": "new"}
     }
 
@@ -109,7 +109,7 @@ def test_diff_omits_fields_set_to_their_current_value(session):
     session.flush()
 
     feature.FeatureName = "stable"
-    assert AuditService.diff(feature, "FeatureName") == {}
+    assert AuditService._diff_from_history(feature, "FeatureName") == {}
 
 
 def test_record_persists_enum_member_in_changes_as_its_value(session):

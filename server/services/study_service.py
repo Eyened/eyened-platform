@@ -76,7 +76,7 @@ class StudyService:
             changes = {
                 "tag_id": tag.TagID,
                 "study_id": study_id,
-                **AuditService.diff(link, "Comment"),
+                **AuditService._diff_from_history(link, "Comment"),
             }
             self.repository.flush()
             link.Tag = tag
@@ -158,7 +158,7 @@ class StudyService:
             changes = {
                 "tag_id": tag_id,
                 "study_id": study_id,
-                **AuditService.diff(link, "Comment"),
+                **AuditService._diff_from_history(link, "Comment"),
             }
             self.repository.flush()
             if self.audit is not None:

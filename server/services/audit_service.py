@@ -91,10 +91,12 @@ class AuditService:
         self._session.info.setdefault(_BUFFER_KEY, []).append(event_payload)
 
     @staticmethod
-    def diff(entity: object, *fields: str) -> dict:
-        """Derive a ``{field: {"old": …, "new": …}}`` change map from an entity's
-        still-pending scalar mutations, so services stop hand-building
-        ``"old -> new"`` strings.
+    def _diff_from_history(entity: object, *fields: str) -> dict:
+        """Transitional: the pre-snapshot change map, kept only until every
+        caller moves to ``snapshot``/``diff``. Do not add new callers.
+
+        Derive a ``{field: {"old": …, "new": …}}`` change map from an entity's
+        still-pending scalar mutations.
 
         Uses SQLAlchemy's attribute history (``get_history``), so it must be
         called *after* the in-place assignment(s) and *before* any ``flush()`` —
