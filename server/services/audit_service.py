@@ -8,7 +8,6 @@ from datetime import date, datetime, timezone
 from fastapi import Depends
 from sqlalchemy import event
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.attributes import get_history
 
 from eyened_orm import AuditLog
 
@@ -108,31 +107,6 @@ class AuditService:
             new = getattr(entity, field)
             if old != new:
                 changes[field] = {"old": old, "new": new}
-        return changes
-
-    @staticmethod
-    def _diff_from_history(entity: object, *fields: str) -> dict:
-        """Transitional: the pre-snapshot change map, kept only until every
-        caller moves to ``snapshot``/``diff``. Do not add new callers.
-
-        Derive a ``{field: {"old": …, "new": …}}`` change map from an entity's
-        still-pending scalar mutations.
-
-        Uses SQLAlchemy's attribute history (``get_history``), so it must be
-        called *after* the in-place assignment(s) and *before* any ``flush()`` —
-        a flush clears the pending history. Only scalar column attributes are
-        supported; link/relationship changes stay explicit at the call site.
-        Fields whose value did not actually change are omitted.
-        """
-        changes: dict[str, dict[str, object]] = {}
-        for field in fields:
-            history = get_history(entity, field)
-            if not history.has_changes():
-                continue
-            changes[field] = {
-                "old": history.deleted[0] if history.deleted else None,
-                "new": history.added[0] if history.added else None,
-            }
         return changes
 
 
