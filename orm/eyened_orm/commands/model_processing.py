@@ -111,20 +111,18 @@ def run_cfi_attribute_pipeline(
         if not image_ids:
             print("No failed images in scope")
             return
-    if overwrite:
-        filtered = image_ids
-        print(f"Processing {len(filtered)} images (overwrite)")
+    filtered = pipeline.filter_image_ids(
+        image_ids, upgrade=upgrade, failed=failed, overwrite=overwrite
+    )
+    if failed:
+        scope = "failed"
+    elif upgrade:
+        scope = "upgrade"
+    elif overwrite:
+        scope = "overwrite"
     else:
-        filtered = pipeline.filter_image_ids(
-            image_ids, upgrade=upgrade, failed=failed
-        )
-        if failed:
-            scope = "failed"
-        elif upgrade:
-            scope = "upgrade"
-        else:
-            scope = "default"
-        print(f"Processing {len(filtered)} images (after filtering, {scope})")
+        scope = "default"
+    print(f"Processing {len(filtered)} images (after filtering, {scope})")
     if not filtered:
         print("No images to process")
         return

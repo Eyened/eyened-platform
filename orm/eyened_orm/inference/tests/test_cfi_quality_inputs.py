@@ -79,6 +79,35 @@ def test_filter_image_ids_skips_images_without_cfi_roi(session):
     assert filtered == set()
 
 
+def test_filter_image_ids_overwrite_still_skips_missing_cfi_roi(session):
+    """Overwrite re-runs existing output but not images missing required inputs."""
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+
+    pipeline = CFI_Quality(session, device=torch.device("cpu"), n_workers=1)
+    filtered = pipeline.filter_image_ids(
+        [image.ImageInstanceID], overwrite=True
+    )
+
+    assert filtered == set()
+
+
+def test_filter_image_ids_overwrite_includes_existing_output(session):
+    """Overwrite includes images that already have output when inputs are ready."""
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    _seed_cfi_roi(session, image.ImageInstanceID)
+
+    pipeline = CFI_Quality(session, device=torch.device("cpu"), n_workers=1)
+    pipeline._save_result(image.ImageInstanceID, 3.5)
+    session.commit()
+
+    assert pipeline.filter_image_ids([image.ImageInstanceID]) == set()
+    assert pipeline.filter_image_ids(
+        [image.ImageInstanceID], overwrite=True
+    ) == {image.ImageInstanceID}
+
+
 def test_filter_image_ids_includes_image_with_cfi_roi(session):
     """Step 2: image with stored CFI_ROI passes generic input filter."""
     _proj, images = _import_images(session, count=1)

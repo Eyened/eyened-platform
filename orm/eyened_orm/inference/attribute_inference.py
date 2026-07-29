@@ -226,12 +226,13 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         *,
         upgrade: bool = False,
         failed: bool = False,
+        overwrite: bool = False,
     ) -> Set[int]:
         """Return image IDs that still need inference for this pipeline.
 
-        **Default** (``upgrade=False``, ``failed=False``): exclude images that
-        already have any ``AttributeValue`` row for this attribute from any
-        version of ``model_name`` (succeeded or failed).
+        **Default** (``upgrade=False``, ``failed=False``, ``overwrite=False``):
+        exclude images that already have any ``AttributeValue`` row for this
+        attribute from any version of ``model_name`` (succeeded or failed).
 
         **Upgrade** (``upgrade=True``): exclude only images that already have a
         row for the **current** pipeline version (``self.model.ModelID``).
@@ -242,12 +243,17 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         **succeeded** row for this model (any version). Failed rows are
         retried. Combine with a prior call to :meth:`failed_image_ids_in_scope`
         to limit the target set to failed images only.
+
+        **Overwrite** (``overwrite=True``): do not skip images based on existing
+        output; still skip images missing required inputs.
         """
         from sqlalchemy import select
 
         image_ids_set = set(image_ids)
 
-        if upgrade:
+        if overwrite:
+            pending = image_ids_set
+        elif upgrade:
             stmt = select(AttributeValue).where(
                 AttributeValue.AttributeID == self.attr_definition.AttributeID,
                 AttributeValue.ModelID == self.model.ModelID,
