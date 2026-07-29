@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("torch")
+import torch
+
 from eyened_orm import (
     AttributeDataType,
     AttributeDefinition,
@@ -11,7 +16,6 @@ from eyened_orm import (
 from eyened_orm.commands.test_targets import _import_images
 from eyened_orm.inference.cfi_odfd import CFI_ODFD
 from eyened_orm.inference.model_versions import huggingface_artifact_version
-import torch
 
 
 def test_attributes_model_description_synced_on_pipeline_init(session):

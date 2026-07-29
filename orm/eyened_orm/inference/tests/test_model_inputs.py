@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("torch")
+import torch
+
 from eyened_orm import (
     AttributeDataType,
     AttributeDefinition,
@@ -14,8 +19,6 @@ from eyened_orm.inference.model_inputs import (
     attribute_value_data,
     resolve_input_attribute_value,
 )
-import torch
-
 from eyened_orm.inference.cfi_odfd import CFI_ODFD
 
 

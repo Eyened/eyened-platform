@@ -11,7 +11,7 @@ from rtnls_fundusprep.cfi_bounds import CFIBounds
 def test_crop_fundus_from_roi_uses_stored_bounds():
     image = np.zeros((128, 128, 3), dtype=np.uint8)
     image[32:96, 32:96] = 200
-    bounds = CFIBounds.full_frame(image)
+    bounds = CFIBounds(center=(64, 64), radius=64, hw=(128, 128), image=image)
     roi_dict = bounds.to_dict_all()
 
     result = crop_fundus_from_roi(image, roi_dict, resize=64, apply_ce=False)

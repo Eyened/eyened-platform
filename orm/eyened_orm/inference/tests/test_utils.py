@@ -20,7 +20,8 @@ def test_as_uint8_rgb_from_grayscale():
 def test_crop_fundus_from_stored_roi():
     image = np.zeros((64, 64, 3), dtype=np.uint8)
     image[16:48, 16:48] = 180
-    roi_dict = CFIBounds.full_frame(image).to_dict_all()
+    bounds = CFIBounds(center=(32, 32), radius=32, hw=(64, 64), image=image)
+    roi_dict = bounds.to_dict_all()
     transform, tensor = crop_fundus_from_roi(image, roi_dict, resize=32, apply_ce=False)
     assert transform is not None
     assert tensor.shape == (32, 32, 3)

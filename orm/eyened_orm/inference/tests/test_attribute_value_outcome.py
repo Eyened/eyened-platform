@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import torch
+import pytest
 
 from eyened_orm import (
     AttributeDataType,
@@ -18,8 +18,6 @@ from eyened_orm.inference.attribute_value_outcome import (
     has_stored_value,
     is_available_input,
 )
-from eyened_orm.inference.cfi_odfd import CFI_ODFD
-from eyened_orm.inference.cfi_quality import CFI_Quality
 from eyened_orm.inference.cfi_roi import CFI_ROI
 
 
@@ -59,6 +57,9 @@ def test_failure_update_values_clears_all_columns():
 
 
 def test_filter_image_ids_skips_succeeded_and_failed_rows(session):
+    torch = pytest.importorskip("torch")
+    from eyened_orm.inference.cfi_odfd import CFI_ODFD
+
     _proj, images = _import_images(session, count=2)
     image_ok, image_failed = images
 
@@ -85,6 +86,9 @@ def test_filter_image_ids_includes_images_without_rows(session):
 
 
 def test_save_failure_does_not_erase_existing_value(session):
+    torch = pytest.importorskip("torch")
+    from eyened_orm.inference.cfi_odfd import CFI_ODFD
+
     _proj, images = _import_images(session, count=1)
     image = images[0]
 
@@ -107,6 +111,9 @@ def test_save_failure_does_not_erase_existing_value(session):
 
 
 def test_save_failure_persists_null_value_row(session):
+    torch = pytest.importorskip("torch")
+    from eyened_orm.inference.cfi_odfd import CFI_ODFD
+
     _proj, images = _import_images(session, count=1)
     image = images[0]
 
@@ -125,6 +132,9 @@ def test_save_failure_persists_null_value_row(session):
 
 
 def test_resolve_input_excludes_failed_cfi_roi(session):
+    torch = pytest.importorskip("torch")
+    from eyened_orm.inference.cfi_quality import CFI_Quality
+
     _proj, images = _import_images(session, count=1)
     image = images[0]
 
