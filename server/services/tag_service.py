@@ -156,6 +156,9 @@ class TagService:
         return None
 
 
-def get_tag_service(db: Session = Depends(get_db)) -> TagService:
+def get_tag_service(
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> TagService:
     """Default TagService wiring for FastAPI ``Depends()``."""
-    return TagService(TagRepository(db), audit=get_audit_service(db))
+    return TagService(TagRepository(db), audit=audit)

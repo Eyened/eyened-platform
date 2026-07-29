@@ -170,6 +170,9 @@ class StudyService:
         return link
 
 
-def get_study_service(db: Session = Depends(get_db)) -> StudyService:
+def get_study_service(
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> StudyService:
     """Default StudyService wiring for FastAPI ``Depends()``."""
-    return StudyService(StudyRepository(db), audit=get_audit_service(db))
+    return StudyService(StudyRepository(db), audit=audit)

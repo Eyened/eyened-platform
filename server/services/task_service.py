@@ -363,13 +363,17 @@ class SubTaskService:
         return self.subtasks.get_with_images(subtask_id)
 
 
-def get_task_service(db: Session = Depends(get_db)) -> TaskService:
+def get_task_service(
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> TaskService:
     """Default TaskService wiring for FastAPI ``Depends()``."""
-    return TaskService(
-        TaskRepository(db), SubTaskRepository(db), audit=get_audit_service(db)
-    )
+    return TaskService(TaskRepository(db), SubTaskRepository(db), audit=audit)
 
 
-def get_subtask_service(db: Session = Depends(get_db)) -> SubTaskService:
+def get_subtask_service(
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> SubTaskService:
     """Default SubTaskService wiring for FastAPI ``Depends()``."""
-    return SubTaskService(SubTaskRepository(db), audit=get_audit_service(db))
+    return SubTaskService(SubTaskRepository(db), audit=audit)

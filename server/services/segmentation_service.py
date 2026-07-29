@@ -492,6 +492,7 @@ class ModelSegmentationService:
 
 def get_segmentation_service(
     db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
 ) -> SegmentationService:
     """Default SegmentationService wiring for FastAPI ``Depends()``."""
     return SegmentationService(
@@ -499,7 +500,7 @@ def get_segmentation_service(
         ImageInstanceRepository(db),
         TagRepository(db),
         get_segmentation_data_store(),
-        audit=get_audit_service(db),
+        audit=audit,
     )
 
 

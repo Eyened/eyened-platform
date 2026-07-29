@@ -10,7 +10,7 @@ SEEDED_DATE_MODIFIED = datetime(2020, 1, 1)
 
 
 @pytest.fixture()
-def audit_disabled(client, monkeypatch):
+def audit_disabled(client, session):
     """Serve requests with the audit sink switched off (EYENED_DBLOG_ENABLED=false).
 
     AuditService.record() flushes the session to assign the AuditLog PK, and
@@ -19,24 +19,23 @@ def audit_disabled(client, monkeypatch):
     test of a write-back would pass whether or not the write-back exists.
     Turning the sink off removes that masking flush.
 
-    Patched at the name the service factory reads, not via
-    app.dependency_overrides: get_form_annotation_service calls
-    get_audit_service(db) as a plain function rather than declaring it as a
-    Depends(), so FastAPI never resolves it and an override on it is silently
-    inert. Every other service factory wires audit the same way. Settings are
-    frozen (DbLogSettings, config.py), so the env flag itself cannot be flipped
-    in-process either. This substitutes exactly what get_audit_service returns
-    when EYENED_DBLOG_ENABLED=false, leaving the real factory to wire the
-    repositories.
+    Substitutes exactly what get_audit_service returns when
+    EYENED_DBLOG_ENABLED=false (settings are frozen, so the env flag itself
+    cannot be flipped in-process), leaving the real factory to wire the
+    repositories. This works only because the service factories declare
+    ``audit: AuditService = Depends(get_audit_service)``: a factory that
+    called get_audit_service(db) as a plain function is never resolved by
+    FastAPI, so the override would be silently inert -- which is what the
+    AuditLog assertion at the end of the test exists to catch.
     """
-    from server.services import form_annotation_service
-    from server.services.audit_service import AuditService
+    from server.main import app_api
+    from server.services.audit_service import AuditService, get_audit_service
 
-    monkeypatch.setattr(
-        form_annotation_service,
-        "get_audit_service",
-        lambda db: AuditService(db, enabled=False),
+    app_api.dependency_overrides[get_audit_service] = lambda: AuditService(
+        session, enabled=False
     )
+    yield
+    app_api.dependency_overrides.pop(get_audit_service, None)
 
 
 def _make_annotation(session) -> FormAnnotation:

@@ -235,8 +235,9 @@ class ImageInstanceService:
 
 def get_image_instance_service(
     db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
 ) -> ImageInstanceService:
     """Default ImageInstanceService wiring for FastAPI ``Depends()``."""
     return ImageInstanceService(
-        ImageInstanceRepository(db), TagRepository(db), audit=get_audit_service(db)
+        ImageInstanceRepository(db), TagRepository(db), audit=audit
     )

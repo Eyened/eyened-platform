@@ -129,6 +129,9 @@ class FeatureService:
         return None
 
 
-def get_feature_service(db: Session = Depends(get_db)) -> FeatureService:
+def get_feature_service(
+    db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+) -> FeatureService:
     """Default FeatureService wiring for FastAPI ``Depends()``."""
-    return FeatureService(FeatureRepository(db), audit=get_audit_service(db))
+    return FeatureService(FeatureRepository(db), audit=audit)

@@ -405,11 +405,12 @@ class FormAnnotationService:
 
 def get_form_annotation_service(
     db: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
 ) -> FormAnnotationService:
     """Default FormAnnotationService wiring for FastAPI ``Depends()``."""
     return FormAnnotationService(
         FormAnnotationRepository(db),
         ImageInstanceRepository(db),
         TagRepository(db),
-        audit=get_audit_service(db),
+        audit=audit,
     )
