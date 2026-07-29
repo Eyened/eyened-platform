@@ -13,7 +13,6 @@ import type { Color } from "$lib/utils";
 import { EnfaceProjection } from "$lib/webgl/enfaceProjection";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
-import { SvelteMap } from "svelte/reactivity";
 
 export type VisibleEnfaceProjection = {
     segmentation: Segmentation;
@@ -26,9 +25,9 @@ export type VisibleEnfaceProjection = {
 };
 
 export class EnfaceProjectionManager {
-    private readonly projections = new SvelteMap<string, EnfaceProjection>();
-    private readonly attachedItems = new SvelteMap<string, SegmentationItem>();
-    mainViewerContext: MainViewerContext | undefined;
+    private readonly projections = new Map<string, EnfaceProjection>();
+    private readonly attachedItems = new Map<string, SegmentationItem>();
+    mainViewerContext: MainViewerContext | undefined = $state(undefined);
 
     constructor(readonly octImage: Image3D) {}
 

@@ -42,7 +42,7 @@
                     <Spinner />
                 </div>
             {:then images}
-                {#each images as image}
+                {#each images as image (image.image_id)}
                     <TopViewer {image} />
                 {/each}
             {/await}

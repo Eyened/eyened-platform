@@ -39,8 +39,6 @@
     let hasLocators = $derived(
         image.is2D && photoLocators && photoLocators.length,
     );
-    let removeLinesOverlay = () => {};
-    let removeProjectionOverlay = () => {};
     let hideLinesOverlay = $state(false);
 
     const projectionModeLabels: Record<EnfaceProjectionMode, string> = {
@@ -56,28 +54,24 @@
     };
 
     $effect(() => {
-        removeLinesOverlay();
         if (hasLocators && !hideLinesOverlay) {
-            removeLinesOverlay = viewerContext.addOverlay(
+            return viewerContext.addOverlay(
                 new OCTLinesOverlay(photoLocators),
             );
-        } else {
-            removeLinesOverlay();
         }
-        return removeLinesOverlay;
     });
 
     $effect(() => {
-        removeProjectionOverlay();
-        const manager = enfaceProjectionManager;
-        const mainViewerContext = manager?.mainViewerContext;
-        const mode = viewerContext.enfaceProjectionMode;
-        if (manager && mainViewerContext && mode !== "off") {
-            removeProjectionOverlay = viewerContext.addOverlay(
-                new EnfaceProjectionOverlay(manager, mainViewerContext),
+        const ctx = enfaceProjectionManager?.mainViewerContext;
+        if (
+            enfaceProjectionManager &&
+            ctx &&
+            viewerContext.enfaceProjectionMode !== "off"
+        ) {
+            return viewerContext.addOverlay(
+                new EnfaceProjectionOverlay(enfaceProjectionManager, ctx),
             );
         }
-        return removeProjectionOverlay;
     });
 
     function toggleLinesOverlay(e: MouseEvent) {
