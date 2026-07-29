@@ -142,6 +142,10 @@ class SegmentationService:
             self.store.write(segmentation, data)
         except ValueError as e:
             raise BadRequestError(str(e)) from e
+        # The store write sets ZarrArrayIndex (and can replace ScanIndices) on
+        # the entity after add()'s flush, so those mutations need their own
+        # write-back -- same shape as write_data() below.
+        self.repository.save(segmentation)
 
         if self.audit is not None:
             self.audit.record(

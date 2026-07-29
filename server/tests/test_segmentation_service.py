@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from sqlalchemy import text
 
 from eyened_orm.repositories.image_instance_repository import (
     ImageInstanceRepository,
@@ -146,6 +147,50 @@ def test_create_persists_and_writes(session):
 
     assert created.SegmentationID is not None
     assert created.ZarrArrayIndex == 0  # fake store assigned it
+
+
+def test_create_writes_back_the_store_assigned_zarr_index(session):
+    """create's post-store-write mutations reach the database.
+
+    store.write() sets ZarrArrayIndex (and can replace ScanIndices) *after*
+    repository.add() has already flushed the INSERT, so those mutations need
+    their own write-back. The sibling test above asserts on the returned
+    object, which cannot see this: the identity map hands back the same
+    instance whether or not anything was flushed. This reads the row back with
+    raw SQL, which bypasses the identity map and does not autoflush (the test
+    session matches production's autoflush=False).
+
+    Discriminator: dropping repository.save(segmentation) from create() makes
+    this fail with ZarrArrayIndex still NULL.
+    """
+    actor = _actor(session)
+    seg = _make_segmentation(session, "c-wb")
+    image_id = seg.ImageInstance.PublicID
+    session.commit()
+
+    created = _service(session, FakeSegmentationDataStore()).create(
+        image_id=image_id,
+        feature_id=seg.FeatureID,
+        subtask_id=None,
+        data_type=Datatype.R8UI,
+        data_representation=DataRepresentation.Binary,
+        depth=1,
+        height=4,
+        width=4,
+        sparse_axis=None,
+        image_projection_matrix=None,
+        scan_indices=None,
+        threshold=None,
+        reference_segmentation_id=None,
+        array=np.zeros((1, 4, 4), dtype=np.uint8),
+        actor=actor,
+    )
+
+    stored = session.execute(
+        text("SELECT ZarrArrayIndex FROM Segmentation WHERE SegmentationID = :id"),
+        {"id": created.SegmentationID},
+    ).scalar_one()
+    assert stored == 0  # the index the fake store assigned, as written to the row
 
 
 def test_create_empty_array_fills_zeros(session):
