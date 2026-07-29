@@ -1,4 +1,4 @@
-"""Tests for CFI model version migration, --upgrade filtering, and HF version pickup."""
+"""Tests for --upgrade filtering and HF version pickup."""
 
 from __future__ import annotations
 
@@ -12,10 +12,6 @@ from eyened_orm import (
 )
 from eyened_orm.commands.test_targets import _import_images
 from eyened_orm.inference.cfi_keypoints import CFIKeypoints
-from eyened_orm.inference.migrate_model_versions import (
-    migrate_attributes_model_version,
-    migrate_cfi_attributes_model_versions,
-)
 from eyened_orm.inference.model_inputs import select_attribute_value
 from eyened_orm.inference.model_versions import huggingface_pipeline_version
 
@@ -78,87 +74,6 @@ def _seed_cfi_roi(session, image_id: int, *, model_version: str = "1.0") -> None
         )
     )
     session.commit()
-
-
-def test_migrate_renames_legacy_version_in_place(session):
-    legacy_version = "july24"
-    target_version = huggingface_pipeline_version(*CFIKeypoints.HF_ARTIFACTS)
-
-    legacy_model = AttributesModel.get_or_create(
-        session,
-        match_by={"ModelName": "CFI_Keypoints", "Version": legacy_version},
-        update_values={"Description": "legacy"},
-    )
-    legacy_id = legacy_model.ModelID
-    session.commit()
-
-    stats = migrate_attributes_model_version(
-        session,
-        model_name="CFI_Keypoints",
-        target_version=target_version,
-    )
-    session.commit()
-
-    assert stats == "updated"
-    updated = AttributesModel.by_id(session, legacy_id)
-    assert updated is not None
-    assert updated.Version == target_version
-    assert (
-        AttributesModel.by_column(
-            session, ModelName="CFI_Keypoints", Version=legacy_version
-        )
-        is None
-    )
-
-
-def test_migrate_noop_when_target_version_already_exists(session):
-    legacy_version = "july24"
-    target_version = huggingface_pipeline_version(*CFIKeypoints.HF_ARTIFACTS)
-
-    AttributesModel.get_or_create(
-        session,
-        match_by={"ModelName": "CFI_Keypoints", "Version": legacy_version},
-        update_values={"Description": "legacy"},
-    )
-    AttributesModel.get_or_create(
-        session,
-        match_by={"ModelName": "CFI_Keypoints", "Version": target_version},
-        update_values={"Description": "canonical"},
-    )
-    session.commit()
-
-    status = migrate_attributes_model_version(
-        session,
-        model_name="CFI_Keypoints",
-        target_version=target_version,
-    )
-    session.commit()
-
-    assert status == "error"
-    assert (
-        AttributesModel.by_column(
-            session, ModelName="CFI_Keypoints", Version=legacy_version
-        )
-        is not None
-    )
-
-
-def test_migrate_is_idempotent(session):
-    target_version = huggingface_pipeline_version(*CFIKeypoints.HF_ARTIFACTS)
-    AttributesModel.get_or_create(
-        session,
-        match_by={"ModelName": "CFI_Keypoints", "Version": target_version},
-        update_values={"Description": "canonical"},
-    )
-    session.commit()
-
-    first = migrate_cfi_attributes_model_versions(session)
-    session.commit()
-    second = migrate_cfi_attributes_model_versions(session)
-    session.commit()
-
-    assert first["CFI_Keypoints"] == "skipped"
-    assert second["CFI_Keypoints"] == "skipped"
 
 
 def test_default_filter_includes_image_with_no_attribute_value(session):

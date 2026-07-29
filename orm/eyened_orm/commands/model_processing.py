@@ -385,26 +385,6 @@ def run_models(
     )
 
 
-@click.command(name="migrate-cfi-model-versions")
-def migrate_cfi_model_versions():
-    """Set legacy CFI AttributesModel.Version values to the current canonical id.
-
-    Idempotent: safe to run multiple times. Updates the existing row per ModelName
-    when the target version row does not already exist.
-    """
-    from eyened_orm.inference.migrate_model_versions import (
-        migrate_cfi_attributes_model_versions,
-    )
-
-    database = get_database()
-    with database.get_session() as session:
-        results = migrate_cfi_attributes_model_versions(session)
-        session.commit()
-
-    for model_name, status in results.items():
-        print(f"{model_name}: {status}")
-
-
 @click.command(name="run-segmentation")
 @click.option(
     "-m",
@@ -566,7 +546,6 @@ def run_registration(path, image_ids, project, patient, exclude, replace):
 model_commands = [
     run_cfi_models,
     run_models,
-    migrate_cfi_model_versions,
     run_etdrs_model,
     run_segmentation,
     run_registration,
