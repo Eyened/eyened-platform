@@ -15,6 +15,7 @@ import { CursorOverlay } from "./overlays/CursorOverlay";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
 import type {
     EventName,
+    EnfaceProjectionMode,
     Overlay,
     PanelName,
     RenderMode,
@@ -65,6 +66,7 @@ export class ViewerContext {
 
     hideOverlays: boolean = $state(false);
     renderMode: RenderMode = $state("Original");
+    enfaceProjectionMode: EnfaceProjectionMode = $state("off");
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
     cursorStyle: cursorStyle = $state("default");

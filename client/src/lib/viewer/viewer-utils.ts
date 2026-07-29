@@ -14,6 +14,8 @@ export type RenderMode =
     | "Green"
     | "Blue";
 
+export type EnfaceProjectionMode = "off" | "binary" | "heatmap";
+
 export type WindowLevel = { min: number; max: number };
 
 export type PanelName =

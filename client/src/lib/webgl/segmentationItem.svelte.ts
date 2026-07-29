@@ -8,7 +8,6 @@ import type { NPYArray } from "../utils/npy_loader";
 import type { AbstractImage } from "./abstractImage";
 import type { Mask, PaintSettings } from "./mask.svelte";
 import { SegmentationState } from "./segmentationState.svelte";
-import { TextureData } from "./texture";
 
 // manages the segmentation states (one per scan) for a single segmentation
 export class SegmentationItem {
@@ -24,6 +23,9 @@ export class SegmentationItem {
 
     // Reactive threshold state for immediate UI updates
     threshold: number = $state(0.5);
+
+    /** Called after a B-scan slice mask changes (draw, undo, redo, import). */
+    onSliceChanged?: (scanNr: number) => void;
 
     constructor(
         readonly image: AbstractImage,
@@ -204,7 +206,7 @@ export class SegmentationItem {
     async undo(scanNr: number) {
         const segmentationState = this.segmentationStates.get(scanNr);
         if (segmentationState) {
-            segmentationState.undo();
+            await segmentationState.undo();
         } else {
             console.warn(
                 "SegmentationItem.undo: segmentationState not found",
@@ -216,7 +218,7 @@ export class SegmentationItem {
     async redo(scanNr: number) {
         const segmentationState = this.segmentationStates.get(scanNr);
         if (segmentationState) {
-            segmentationState.redo();
+            await segmentationState.redo();
         } else {
             console.warn(
                 "SegmentationItem.redo: segmentationState not found",
@@ -225,98 +227,8 @@ export class SegmentationItem {
         }
     }
 
-    //TODO: finish this implementation
-    async createEnfaceMask(): Promise<TextureData> {
-        if (!this.image.is3D) {
-            throw new Error("createEnfaceMask can only be called on 3D images");
-        }
-
-        // Wait for segmentation data to load
-        if (this.ready) {
-            await this.ready;
-        }
-
-        const { webgl, width, height, depth } = this.image;
-        const { gl } = webgl;
-
-        // Get all slices that have segmentation data
-        const scanIndices =
-            this.segmentation.scan_indices ??
-            Array.from({ length: depth }, (_, i) => i);
-        const slicesWithData: number[] = [];
-
-        for (const scanNr of scanIndices) {
-            const state = this.segmentationStates.get(scanNr);
-            if (state) {
-                slicesWithData.push(scanNr);
-            }
-        }
-
-        if (slicesWithData.length === 0) {
-            throw new Error("No segmentation data found for any slices");
-        }
-
-        // Create output texture for accumulation (width × depth, R32F)
-        // Each horizontal line (y) corresponds to one slice (scanNr)
-        const outputTexture = new TextureData(gl, width, depth, "R32F");
-
-        // Initialize to zero
-        outputTexture.clearData();
-
-        // Process each slice - each writes to a different horizontal line in the output
-        for (let i = 0; i < slicesWithData.length; i++) {
-            const scanNr = slicesWithData[i];
-            const state = this.segmentationStates.get(scanNr)!;
-            const mask = state.mask;
-
-            // Get the mask texture - ensure it's synced to GPU
-            let maskTexture: WebGLTexture;
-            if ("textureData" in mask && (mask as any).textureData) {
-                // For AbstractDataMask (ProbabilityMask, MultiClassMask, etc.)
-                (mask as any).textureData.updateGPU();
-                maskTexture = (mask as any).textureData.texture;
-            } else if (
-                "texture" in mask &&
-                typeof (mask as any).texture !== "undefined"
-            ) {
-                // For BinaryMask which has a texture getter
-                maskTexture = (mask as any).texture;
-            } else {
-                throw new Error(
-                    `Cannot get texture from mask type: ${mask.constructor.name}`,
-                );
-            }
-
-            // Get bitmask for this mask
-            let maskBitmask = 1;
-            if ("bitmask" in mask) {
-                maskBitmask = (mask as any).bitmask;
-            }
-
-            // Create a render target that writes to the specific horizontal line (y = i)
-            // The shader will project the mask along height and write to this line
-            const lineRenderTarget = {
-                framebuffer: outputTexture.renderTarget.framebuffer,
-                width: width,
-                height: 1, // Single line height
-                left: 0,
-                bottom: i, // Offset to the correct line (y position)
-                attachments: outputTexture.renderTarget.attachments,
-            };
-
-            const uniforms = {
-                u_volume: this.image.texture, // 3D volume texture (may not be used)
-                u_mask: maskTexture,
-                u_mask_bitmask: maskBitmask,
-                height: height, // Height dimension to loop over
-            };
-
-            // Render this slice's projection to the specific line
-            webgl.shaders.enfaceProjectMask.pass(lineRenderTarget, uniforms);
-        }
-
-        // Return the R32F texture data
-        return outputTexture;
+    notifySliceChanged(scanNr: number): void {
+        this.onSliceChanged?.(scanNr);
     }
 
     dispose() {
