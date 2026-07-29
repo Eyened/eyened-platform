@@ -5,24 +5,25 @@ sidebar:
   order: 5
 ---
 
-Structured metadata on images, segmentations, patients, or studies — from AI models or manual entry.
-This can be used to store any kind of metadata on any entity in the database.
+Attributes are structured metadata on images, segmentations, patients, or studies — from AI models or manual entry.
+They can be used to store any kind of metadata on any entity in the database.
 Typical use cases:
 - Patient-level attributes (e.g. **[registration](/eyened-platform/orm/registration)** graphs from `run-registration`, metadata not stored on `Patient` columns)
-- Image-level attributes (e.g. image quality, metadata not stored on `ImageInstance` columns, **[PhotoLocators](/eyened-platform/orm/data_model/photo_locators)** for OCT-to-enface registration)
+- Image-level attributes (e.g. image quality, color fundus ROI, metadata not stored on `ImageInstance` columns, **[PhotoLocators](/eyened-platform/orm/data_model/photo_locators)** for OCT-to-enface registration)
 
 ## AttributeDefinition
-
+Defines what kind of metadata is being stored.
 `AttributeName` + `AttributeDataType` (String, Float, Int, JSON). 
 
 ## AttributeValue
 
-One value on exactly one entity (`ImageInstance`, `Segmentation`, `ModelSegmentation`, `Patient`, or `Study`):
-- Optional `Laterality`
-- Typed storage: `ValueFloat`, `ValueInt`, `ValueText`, or `ValueJSON`
-- Linked to `AttributeDefinition` and producing `Model`
-- Provenance via `InputValues` / `UsedByValues`
+One value on exactly one entity 
+- Define the entity via the (`ImageInstance`, `Segmentation`, `ModelSegmentation`, `Patient`, `Study`, and `Laterality` columns)
+- Linked to `AttributeDefinition` (via ForeignKey `AttributeID`) 
+- Typed storage (`ValueFloat`, `ValueInt`, `ValueText`, or `ValueJSON`) must match the `AttributeDataType` of the `AttributeDefinition`
+- ForeignKey `ModelID` is used to define the producing `AttributesModel` 
 
+Example:
 ```python
 from eyened_orm import AttributeValue
 
@@ -30,49 +31,75 @@ for attr_val in image.AttributeValues:
     print(attr_val.AttributeDefinition.AttributeName, attr_val.ValueFloat)
 ```
 
+## AttributesModel 
+Defines the model name, version, and description.
 
-## AttributesModel and ModelInput
-
-An **AttributesModel** declares required inputs (`ModelInput`) and output definitions, then writes `AttributeValue` rows. Run via **`eorm run-cfi-models`** — see **[Inference](/eyened-platform/orm/inference)**.
+## ModelInput
+Can be used to define required inputs for an `AttributesModel`.
 
 ## Reserved attribute names (platform-defined)
 
-Some `AttributeName` values are part of the platform contract: inference pipelines, the API, and the viewer read them by **exact name**. Do not rename these rows or reuse the names for unrelated metadata without updating every consumer listed below.
-
-Custom attributes for study-specific metadata should use different names (for example `study_arm`, `vessel_tortuosity`).
+Some `AttributeName` values are part of the platform contract: inference pipelines, the API, and the viewer read them by **exact name**. Do not rename these rows or reuse the names for unrelated metadata.
 
 ### CFI fundus attributes (`ImageInstance`)
 
-Produced by **`eorm run-cfi-models`**. Attribute name matches producing model name for each pipeline.
+Produced by `eorm run-cfi-models`. The `AttributeName` matches the producing `AttributesModel.ModelName`.
 
-| `AttributeName` | Type | CLI slug | Primary consumers |
-|-----------------|------|----------|-------------------|
-| `CFI_ROI` | JSON | `cfi-roi` | Dependent CFI models (`cfi-keypoints`, `cfi-odfd`, `cfi-quality`), thumbnail cropping, `ImageInstance.roi` / `cfi_roi`, API `cf_roi` |
-| `CFI_Keypoints` | JSON | `cfi-keypoints` | ETDRS / Measure panels (automatic grid via API `cf_keypoints`), `run-etdrs-model` input, `ImageInstance.keypoints` / `cfi_keypoints` |
-| `CFI_ODFD` | Float | `cfi-odfd` | `run-etdrs-model` input (µm/pixel scale), `ImageInstance.cfi_odfd` / `odfd` |
-| `CFI_Quality` | Float | `cfi-quality` | `ImageInstance.cfi_quality` / `quality`, API `cf_quality` |
+#### `CFI_ROI`
 
-The viewer does **not** read these names from `attrs` directly for CFI landmarks. The API exposes convenience fields `cf_roi`, `cf_keypoints`, and `cf_quality` on `ImageGET`, populated from legacy `ImageInstance` columns when present, otherwise from the attributes above via version-aware selection (same rules as `select_attribute_value`).
+- **Type:** JSON
+- **CLI slug:** `cfi-roi`
 
-There is **no** `CFI_ETDRS` attribute. ETDRS grid placement in the viewer uses **FormAnnotations** (schema `ETDRS-grid coordinates`) or the automatic preview from `cf_keypoints` (`CFI_Keypoints`). The `etdrs_field` shown in the browser and Info panel is the `ImageInstance.ETDRSField` **column** (`F1`–`F7`), not an attribute.
+Stores the bounds (ROI) of the color fundus image.
 
-### Patient registration (`Patient`)
+**Primary consumers:** Dependent CFI models (`cfi-keypoints`, `cfi-odfd`, `cfi-quality`), thumbnail cropping, used in the viewer for cropping and contrast enhancement.
 
-| `AttributeName` | Type | Produced by | Primary consumers |
-|-----------------|------|-------------|-------------------|
-| `Registration` | JSON (array of edges) | `eorm run-registration` | Viewer registration graph (`patient.attrs.Registration` via `collectPatientRegistrationSets`) |
+#### `CFI_Keypoints`
 
+- **Type:** JSON
+- **CLI slug:** `cfi-keypoints`
+
+Stores the fovea and optic disk locations.
+
+- **Primary consumers:** ETDRS / Measure panels (automatic grid via API `cf_keypoints`), `run-etdrs-model` input, `ImageInstance.keypoints` / `cfi_keypoints`
+
+#### `CFI_ODFD`
+
+- **Type:** Float
+- **CLI slug:** `cfi-odfd`
+
+Stores the optic disc to fovea distance in microns per pixel.
+
+- **Primary consumers:** `run-etdrs-model` input (µm/pixel scale), `ImageInstance.cfi_odfd` / `odfd`
+
+#### `CFI_Quality`
+
+- **Type:** Float
+- **CLI slug:** `cfi-quality`
+
+Stores the quality of the color fundus image.
+
+- **Primary consumers:** `ImageInstance.cfi_quality` / `quality`, API `cf_quality`
+
+
+
+- **Type:** JSON
+
+Stores the registration graph for each eye. 
 See **[Registration](/eyened-platform/orm/registration)** for JSON shape and how the viewer merges model output with manual FormAnnotations.
 
-### Segmentation ETDRS summaries (`ModelSegmentation`)
+**Primary consumers:** Viewer registration graph (`patient.attrs.Registration` via `collectPatientRegistrationSets`)
 
-| `AttributeName` | Type | Produced by | Primary consumers |
-|-----------------|------|-------------|-------------------|
-| `ETDRS area` | JSON | `eorm run-etdrs-model` | Downstream analysis / reporting on segmentation subfield counts; **not** read by the viewer client |
+#### Segmentation ETDRS summaries (`ModelSegmentation`)
 
-Inputs are `CFI_Keypoints` and `CFI_ODFD` (resolved automatically). See **[Inference — ETDRS](/eyened-platform/orm/inference#etdrs-summary-run-etdrs-model)**.
+- **Type:** JSON
+- **CLI slug:** `etdrs-area`
 
-### Other image attributes read by the client
+Stores the ETDRS area of the color fundus image.
+
+- **Primary consumers:** Downstream analysis / reporting on segmentation subfield counts; **not** read by the viewer client
+
+### PhotoLocators
 
 | `AttributeName` | Type | Produced by | Primary consumers |
 |-----------------|------|-------------|-------------------|
@@ -80,25 +107,32 @@ Inputs are `CFI_Keypoints` and `CFI_ODFD` (resolved automatically). See **[Infer
 
 Generic image attributes also appear in API `attrs` (flat, no producing model) and `model_attrs` (nested by `ModelName`). The viewer and search features only depend on the names above plus the legacy columns noted in the CFI table.
 
-### Legacy `ImageInstance` columns (not attributes)
+### Legacy `ImageInstance` columns 
 
-Older databases may still populate `CFROI`, `CFKeypoints`, and `CFQuality` columns. ORM accessors and API `cf_*` fields prefer these columns when set, then fall back to the matching `CFI_*` attributes. New inference should use `eorm run-cfi-models` so values live in `AttributeValue` rows with model provenance.
+Older databases may still populate `CFROI`, `CFKeypoints`, and `CFQuality` columns. 
+These are deprecated and will be removed in a future release.
+ORM accessors and API `cf_*` fields prefer these columns when set, then fall back to the matching `CFI_*` attributes. New inference should use `eorm run-cfi-models` so values live in `AttributeValue` rows with model provenance.
 
 Search still filters **Color Fundus Quality** against the `ImageInstance.CFQuality` column, not the `CFI_Quality` attribute directly.
 
 ## AttributeValueInput
 
-Links output values to input values for dependency tracking.
+Links output values to input values for dependency (provenance) tracking.
 
 ## Selecting which AttributeValue to use
 
-An image may have several `AttributeValue` rows for the same attribute (different model versions, retries, or legacy migrations). The platform uses one shared selector everywhere values are **read** — inference input resolution, ORM shorthand properties, and API payloads served to the client.
+An image may have several `AttributeValue` rows for the same attribute (different models or model versions). 
+The platform uses one shared selector everywhere values are **read** — inference input resolution, ORM shorthand properties, and API payloads served to the client.
 
 Implementation: `eyened_orm.inference.model_inputs.select_attribute_value`.
 
-### Returned row
+Among candidates matching all supplied filters, the row with the highest producing `ModelID` (newer `AttributesModel` registrations win). Returns nothing when no row qualifies.
 
-Among candidates matching all supplied filters, the row whose producing model has the **highest version** (`version_sort_key`). Returns nothing when no row qualifies.
+### Version ordering
+
+`AttributesModel.Version` is an **opaque provenance label** (package version or HuggingFace artifact id). Selection does **not** order by comparing those strings — lexicographic ordering is wrong for opaque labels (e.g. legacy `july24` sorts above a later `Eyened/vascx/...` id).
+
+Today, “newest” means the highest auto-increment `ModelID`. That is enough while new versions are always registered as new model rows. A dedicated ordinal may be added later if registration order is not reliable enough.
 
 ### Filters (combined with AND)
 
@@ -107,46 +141,21 @@ Among candidates matching all supplied filters, the row whose producing model ha
 | `attribute_name` | `AttributeDefinition.AttributeName` |
 | `producing_model_name` | `AttributesModel.ModelName` |
 | `producing_model_id` | `AttributesModel.ModelID` |
-| `min_version` | producing-model version ≥ threshold |
+| `min_version` | Optional floor: exact `AttributesModel.Version` string. Resolves that version to a `ModelID` and keeps only rows from that registration or newer. Omit or pass `None` for no floor. |
 
 Omit a filter to ignore it. At least one of `attribute_name`, `producing_model_name`, or `producing_model_id` must be set.
 
-### Availability
-
-By default, rows with all value columns `NULL` (failed inference) are **excluded**. Pass `require_available=False` only when inspecting failure state (for example `ImageInstance.roi` warning messages).
-
-### Version ordering
-
-`version_sort_key` compares producing-model versions:
-
-1. PEP 440 semver strings (package versions such as `1.1.0`)
-2. Opaque artifact ids (HuggingFace-derived strings such as `Eyened/vascx/odfd/odfd_march25`)
-
-Within each kind, a higher version wins. Semver and artifact ids are not mixed with each other.
-
-### Where the selector is used
-
-| Consumer | Typical filters |
-|----------|-----------------|
-| Inference pipelines | `ModelInputSpec` → `resolve_input_attribute_value` (attribute + model name + `min_version`) |
-| `ImageInstance.find_attribute_value` / `get_attribute_value` | Same function on `ImageInstance.AttributeValues` |
-| `ImageInstance.roi`, `keypoints`, `quality` | Explicit `attribute_name` and `producing_model_name` per CFI attribute |
-| `ImageInstance.attrs` | One row per `(producing_model_name, attribute_name)` group |
-| API `ImageInstanceGET.attrs` / `model_attrs` | Built from `ImageInstance.attrs` in the DTO converter |
+`min_version` is **not** semver or string ordering — it must match a `Version` column value exactly (e.g. `"1.1.0"`, `"july24"`, `"Eyened/vascx/odfd/odfd_march25"`). Which row wins among eligible candidates is always the highest `ModelID`.
 
 ### Examples
 
 ```python
-# Latest successful CFI_ROI (ORM shorthand and API attrs use the same rules)
-im.roi
-im.get_attribute_value(attribute_name="CFI_ROI", producing_model_name="CFI_ROI")
-
-# Full AttributeValue row (version, provenance)
-im.find_attribute_value(attribute_name="CFI_Keypoints", producing_model_name="CFI_Keypoints")
-
-# Pipeline input: highest CFI_ROI version >= 0.0.0 from model CFI_ROI
-from eyened_orm.inference.model_inputs import CFI_ROI_INPUT, resolve_input_attribute_value
-resolve_input_attribute_value(session, image_id=im.ImageInstanceID, spec=CFI_ROI_INPUT)
+im.get_attribute_value(attribute_name="CFI_Quality")
 ```
 
-See **[Inference](/eyened-platform/orm/inference)** for when models write new rows, version strings, and CLI skip/upgrade flags.
+or shorthand:
+
+```python
+im.cfi_quality
+```
+

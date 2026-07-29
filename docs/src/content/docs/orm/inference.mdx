@@ -13,32 +13,30 @@ Runs **AttributesModel** pipelines — CFI ROI, keypoints, quality scores, etc. 
 - Registers as a `Model` row (`ModelName` + `Version`)
 - Writes typed values to `AttributeValue`
 - Skips images that already have output from **any** version of that model (default)
-- Use `--upgrade` to add output for the current model version when only older versions exist (older rows kept)
+- Use `--upgrade` to add output for the current model version when only older versions exist (older rows kept; reads prefer the highest `ModelID`)
 - Use `--overwrite` to reprocess images that already have a row for the **current** version
 
+Examples:
 ```bash
 eorm run-cfi-models
-eorm run-cfi-models --project "My Study" --modality ColorFundus
+eorm run-cfi-models --project "My Study"
 eorm run-cfi-models --path ids.txt
 eorm run-cfi-models -m cfi-keypoints --upgrade
-eorm migrate-cfi-model-versions   # one-time: bump legacy Version strings in place
 ```
 
-With no targeting flags, processes all active images. Each model only runs on supported modalities (currently ColorFundus).
+With no targeting flags, processes all active images. 
 
 `run-models` is a deprecated alias for `run-cfi-models`.
 
 ### Model versions
 
-Version strings are derived automatically from installed packages or HuggingFace artifact paths — not hardcoded in Python. When the version changes, pipeline init creates a new `AttributesModel` row via `get_or_create`.
+Version strings are derived automatically from installed packages or HuggingFace artifact paths. When the version changes, pipeline init creates a new `AttributesModel`.
 
 | Model | Version source | Example |
 |-------|----------------|---------|
 | `CFI_ROI` | `retinalysis-fundusprep` package version | `1.1.0` |
 | `CFI_Keypoints` | sorted HF artifact paths joined with `+` | `Eyened/vascx/discedge/discedge_july24+Eyened/vascx/fovea/fovea_july24` |
 | `CFI_ODFD`, `CFI_Quality` | HF artifact path (`repo/subdir/stem`) | `Eyened/vascx/odfd/odfd_march25` |
-
-Run `eorm migrate-cfi-model-versions` once on existing databases to rename legacy version strings (for example `1.0`, `july24`) on the single row per `ModelName`. If a canonical row already exists, the migration is a no-op for that model.
 
 Attribute names `CFI_ROI`, `CFI_Keypoints`, `CFI_ODFD`, and `CFI_Quality` are platform-defined — see **[Attributes — reserved names](/eyened-platform/orm/data_model/attributes#reserved-attribute-names-platform-defined)** for API and client consumers.
 
@@ -47,7 +45,7 @@ Attribute names `CFI_ROI`, `CFI_Keypoints`, `CFI_ODFD`, and `CFI_Quality` are pl
 | Mode | When an image is processed |
 |------|----------------------------|
 | **Default** | No `AttributeValue` row exists for this model (any version) |
-| **`--upgrade`** | The **current** pipeline version has no row yet; older versions may already exist. New output is stored alongside older rows; reads prefer the newer version. |
+| **`--upgrade`** | The **current** pipeline version has no row yet; older versions may already exist. New output is stored alongside older rows; reads prefer the newest registration (`ModelID`). |
 | **`--failed`** | Within the selected target, only images with a **failed** row for this model (null value columns). Failed rows are retried; succeeded images are skipped. |
 | **`--overwrite`** | Always (replaces the current version's row only) |
 
@@ -76,7 +74,7 @@ Pairwise enface registration via `eorm run-registration`. Writes transforms to p
 
 Computes ETDRS subfield areas from segmentations and keypoint/attribute data — not directly from manual FormAnnotation coordinates unless also present in attributes.
 
-Keypoints (`CFI_Keypoints`) and ODFD (`CFI_ODFD`) inputs are resolved with the same `ModelInputSpec` / highest-version selection as CFI attribute pipelines (no manual `--keypoints-model-version` flags).
+Keypoints (`CFI_Keypoints`) and ODFD (`CFI_ODFD`) inputs are resolved with the same `ModelInputSpec` / highest-`ModelID` selection as CFI attribute pipelines (no manual `--keypoints-model-version` flags).
 
 ```bash
 eorm run-etdrs-model --project "My Study" -s <segmentation-model-id>

@@ -70,6 +70,38 @@ def test_select_attribute_value_picks_highest_version(session):
     assert selected.ValueJSON["center"] == [2, 2]
 
 
+def test_select_attribute_value_picks_highest_model_id_not_lexicographic_version(
+    session,
+):
+    """Legacy opaque labels like july24 must not beat a later-registered HF id."""
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+
+    seeded = _seed_cfi_roi_values(
+        session,
+        image.ImageInstanceID,
+        versions={
+            "july24": {"center": [1, 1], "radius": 1, "lines": {}},
+            "Eyened/vascx/odfd/odfd_march25": {
+                "center": [2, 2],
+                "radius": 2,
+                "lines": {},
+            },
+        },
+    )
+    session.refresh(image)
+
+    assert seeded["Eyened/vascx/odfd/odfd_march25"].ModelID > seeded["july24"].ModelID
+
+    selected = select_attribute_value(
+        image.AttributeValues, attribute_name="CFI_ROI"
+    )
+    assert selected is not None
+    assert selected.AttributeValueID == seeded[
+        "Eyened/vascx/odfd/odfd_march25"
+    ].AttributeValueID
+
+
 def test_select_attribute_value_respects_min_version(session):
     _proj, images = _import_images(session, count=1)
     image = images[0]

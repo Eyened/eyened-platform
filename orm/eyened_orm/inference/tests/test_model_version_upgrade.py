@@ -231,9 +231,7 @@ def test_upgrade_writes_new_version_alongside_old_without_overwriting(session):
     )
 
     pipeline = CFIKeypoints(session, device=torch.device("cpu"), n_workers=1)
-    from eyened_orm.inference.model_versions import version_sort_key
-
-    assert version_sort_key(pipeline.model_version) > version_sort_key(old_version)
+    assert pipeline.model.ModelID > old_av.ModelID
     assert pipeline.filter_image_ids([image.ImageInstanceID], upgrade=True) == {
         image.ImageInstanceID
     }
@@ -279,22 +277,20 @@ def test_newer_hf_pipeline_version_registers_and_wins_lookup(session, monkeypatc
 
     old_version = huggingface_pipeline_version(*old_artifacts)
     new_version = huggingface_pipeline_version(*new_artifacts)
-    from eyened_orm.inference.model_versions import version_sort_key
 
-    assert version_sort_key(new_version) > version_sort_key(old_version)
-
-    _seed_keypoints_value(
+    old_av = _seed_keypoints_value(
         session,
         image.ImageInstanceID,
         model_version=old_version,
         value_json={"fovea_xy": [1.0, 1.0], "disc_edge_xy": [2.0, 2.0]},
     )
-    _seed_keypoints_value(
+    new_av = _seed_keypoints_value(
         session,
         image.ImageInstanceID,
         model_version=new_version,
         value_json={"fovea_xy": [9.0, 9.0], "disc_edge_xy": [8.0, 8.0]},
     )
+    assert new_av.ModelID > old_av.ModelID
     session.refresh(image)
 
     pipeline = CFIKeypoints(session, device=torch.device("cpu"), n_workers=1)

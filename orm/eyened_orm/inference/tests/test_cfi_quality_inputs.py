@@ -48,11 +48,11 @@ def _seed_cfi_roi(
 
 
 def test_cfi_quality_declares_cfi_roi_dependency():
-    """Step 1: pipeline declares CFI_ROI with min version via ModelInputSpec."""
+    """Step 1: pipeline declares CFI_ROI via ModelInputSpec (any registered version)."""
     assert CFI_Quality.required_inputs == (CFI_ROI_INPUT,)
     assert CFI_ROI_INPUT.attribute_name == "CFI_ROI"
     assert CFI_ROI_INPUT.model_name == "CFI_ROI"
-    assert CFI_ROI_INPUT.min_version == "0.0.0"
+    assert CFI_ROI_INPUT.min_version is None
 
 
 def test_cfi_quality_registers_input_dependency_in_database(session):
@@ -122,7 +122,7 @@ def test_filter_image_ids_includes_image_with_cfi_roi(session):
 
 
 def test_filter_image_ids_rejects_cfi_roi_below_min_version(session):
-    """Step 2: version below an explicit min_version is not resolved as an input."""
+    """min_version must match AttributesModel.Version exactly; 0.9.0 != 1.0.0."""
     from eyened_orm.inference.model_inputs import resolve_input_attribute_value
 
     _proj, images = _import_images(session, count=1)
@@ -132,7 +132,9 @@ def test_filter_image_ids_rejects_cfi_roi_below_min_version(session):
     resolved = resolve_input_attribute_value(
         session,
         image_id=image.ImageInstanceID,
-        spec=ModelInputSpec("CFI_ROI", "CFI_ROI", "1.0.0"),
+        spec=ModelInputSpec(
+            "CFI_ROI", "CFI_ROI", min_version="1.0.0"
+        ),
     )
     assert resolved is None
 

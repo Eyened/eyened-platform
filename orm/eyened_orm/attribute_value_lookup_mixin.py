@@ -20,8 +20,12 @@ class AttributeValueLookupMixin:
         """Return the selected ``AttributeValue`` row for this object.
 
         Delegates to :func:`~eyened_orm.inference.model_inputs.select_attribute_value`
-        on ``self.AttributeValues``. See that function for filter and version
-        precedence rules. Failed rows (null value columns) are excluded.
+        on ``self.AttributeValues``.
+
+        ``min_version``, when set, must equal an ``AttributesModel.Version`` value
+        exactly (same string as stored in the database). Selection uses ``ModelID``
+        ordering, not string comparison on ``Version``. Failed rows (null value
+        columns) are excluded.
         """
         from eyened_orm.inference.model_inputs import select_attribute_value
 

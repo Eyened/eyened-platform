@@ -13,16 +13,10 @@ from eyened_orm.inference.model_inputs import (
     ModelInputSpec,
     attribute_value_data,
     resolve_input_attribute_value,
-    version_at_least,
 )
 import torch
 
 from eyened_orm.inference.cfi_odfd import CFI_ODFD
-
-
-def test_version_at_least_uses_semver_ordering():
-    assert version_at_least("1.0", "1.0")
-    assert not version_at_least("0.9", "1.0")
 
 
 def test_resolve_input_attribute_value_picks_matching_version(session):
