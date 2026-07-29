@@ -23,6 +23,7 @@ from eyened_orm.inference.model_inputs import (
 )
 from eyened_orm.inference.attribute_value_outcome import (
     failure_update_values,
+    has_stored_value,
     image_ids_with_failed_outcome,
     image_ids_with_recorded_outcome,
     image_ids_with_succeeded_outcome,
@@ -147,14 +148,22 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             self.session.add(av)
 
     def _save_failure(self, image_id: int) -> None:
-        """Record a failed inference attempt (null value columns, row retained)."""
+        """Record a failed inference attempt (null value columns, row retained).
+
+        Skips the write when a row already holds a value so a retry or batch
+        failure cannot erase a previously successful result.
+        """
+        match_by = {
+            "AttributeID": self.attr_definition.AttributeID,
+            "ModelID": self.model.ModelID,
+            "ImageInstanceID": image_id,
+        }
+        existing = AttributeValue.by_column(self.session, **match_by)
+        if existing is not None and has_stored_value(existing):
+            return
         AttributeValue.upsert(
             self.session,
-            match_by={
-                "AttributeID": self.attr_definition.AttributeID,
-                "ModelID": self.model.ModelID,
-                "ImageInstanceID": image_id,
-            },
+            match_by=match_by,
             update_values=failure_update_values(),
         )
 

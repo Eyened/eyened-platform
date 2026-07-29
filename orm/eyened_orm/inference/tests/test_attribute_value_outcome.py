@@ -84,6 +84,28 @@ def test_filter_image_ids_includes_images_without_rows(session):
     assert filtered == {image.ImageInstanceID}
 
 
+def test_save_failure_does_not_erase_existing_value(session):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+
+    pipeline = CFI_ODFD(session, device=torch.device("cpu"), n_workers=1)
+    pipeline._save_result(image.ImageInstanceID, 1.0)
+    session.flush()
+
+    pipeline._save_failure(image.ImageInstanceID)
+    session.flush()
+
+    av = AttributeValue.by_column(
+        session,
+        ImageInstanceID=image.ImageInstanceID,
+        AttributeID=pipeline.attr_definition.AttributeID,
+        ModelID=pipeline.model.ModelID,
+    )
+    assert av is not None
+    assert av.ValueFloat == 1.0
+    assert attribute_value_outcome(av) == AttributeValueOutcome.SUCCEEDED
+
+
 def test_save_failure_persists_null_value_row(session):
     _proj, images = _import_images(session, count=1)
     image = images[0]
