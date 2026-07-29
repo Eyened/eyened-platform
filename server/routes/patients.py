@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from ..db import get_db
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_instances import PatientDetailGET
 from ..services.patient_service import PatientService, get_patient_service
@@ -14,11 +12,10 @@ router = APIRouter()
 async def get_patient(
     patient_id: int,
     include_attributes: bool = True,
-    db: Session = Depends(get_db),
     service: PatientService = Depends(get_patient_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    patient = service.get_patient(db, patient_id, include_attributes)
+    patient = service.get_patient(patient_id, include_attributes)
     return DTOConverter.patient_to_detail_get(
         patient, include_attributes=include_attributes
     )

@@ -11,9 +11,7 @@ from typing import Annotated, List, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
-from ..db import get_db
 from ..dtos import ImageGET, StudyGET
 from ..dtos.dto_converter import DTOConverter
 from ..services.search import (
@@ -102,11 +100,10 @@ class StudySearchResponse(BaseModel):
 )
 async def search_instances(
     query: SearchQuery,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
 ):
-    result = service.search_instances(db, **query.model_dump())
+    result = service.search_instances(**query.model_dump())
     return {
         "instances": [
             DTOConverter.image_instance_to_get(i, with_tag_metadata=True)
@@ -131,11 +128,10 @@ async def search_instances(
 )
 async def search_studies(
     query: StudySearchQuery,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
 ):
-    result = service.search_studies(db, **query.model_dump())
+    result = service.search_studies(**query.model_dump())
     return {
         "studies": [
             DTOConverter.study_to_get(s, include_series=True, with_tag_metadata=True)
@@ -155,19 +151,17 @@ async def search_studies(
 
 @router.get("/instances/search/signature", response_model=list[SignatureField])
 async def instances_signature(
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
 ):
     """Return signature metadata for instance search fields."""
-    return service.instance_signature(db)
+    return service.instance_signature()
 
 
 @router.get("/studies/search/signature", response_model=list[SignatureField])
 async def studies_signature(
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
 ):
     """Return signature metadata for study search fields."""
-    return service.study_signature(db)
+    return service.study_signature()
