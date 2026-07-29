@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from eyened_orm import FormAnnotation, FormAnnotationTagLink
@@ -14,8 +15,9 @@ from eyened_orm.repositories.image_instance_repository import (
 )
 from eyened_orm.repositories.tag_repository import TagRepository
 
-from ..utils.db_logging import DatabaseModificationLogger, get_db_logger
+from ..db import get_db
 from .acting_user import ActingUser
+from .audit_service import AuditService, get_audit_service
 from .exceptions import BadRequestError, NotFoundError
 
 
@@ -38,16 +40,14 @@ class FormAnnotationService:
         repository: FormAnnotationRepository,
         image_repository: ImageInstanceRepository,
         tag_repository: TagRepository,
-        logger: DatabaseModificationLogger | None = None,
+        audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
         self.images = image_repository
         self.tags = tag_repository
-        self.logger = logger
+        self.audit = audit
 
-    def _resolve_image_instance_id(
-        self, session: Session, image_id: str | None
-    ) -> int | None:
+    def _resolve_image_instance_id(self, image_id: str | None) -> int | None:
         """Map a PublicID to its ImageInstanceID (None passes through).
 
         Raises:
@@ -55,14 +55,13 @@ class FormAnnotationService:
         """
         if image_id is None:
             return None
-        instance = self.images.get_by_public_id(session, image_id)
+        instance = self.images.get_by_public_id(image_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
         return instance.ImageInstanceID
 
     def list_annotations(
         self,
-        session: Session,
         *,
         patient_id: int | None,
         study_id: int | None,
@@ -75,9 +74,8 @@ class FormAnnotationService:
         Raises:
             NotFoundError: If image_id is given but resolves to no instance.
         """
-        image_instance_id = self._resolve_image_instance_id(session, image_id)
+        image_instance_id = self._resolve_image_instance_id(image_id)
         return self.repository.list_active(
-            session,
             patient_id=patient_id,
             study_id=study_id,
             image_instance_id=image_instance_id,
@@ -85,33 +83,30 @@ class FormAnnotationService:
             sub_task_id=sub_task_id,
         )
 
-    def get_annotation(
-        self, session: Session, annotation_id: int
-    ) -> FormAnnotation:
+    def get_annotation(self, annotation_id: int) -> FormAnnotation:
         """Return an annotation by id (with tag links loaded).
 
         Raises:
             NotFoundError: If the annotation does not exist.
         """
-        item = self.repository.get_with_tag_links(session, annotation_id)
+        item = self.repository.get_with_tag_links(annotation_id)
         if item is None:
             raise NotFoundError("FormAnnotation not found")
         return item
 
-    def get_value(self, session: Session, annotation_id: int) -> Any:
+    def get_value(self, annotation_id: int) -> Any:
         """Return an annotation's raw FormData payload.
 
         Raises:
             NotFoundError: If the annotation does not exist.
         """
-        item = self.repository.get_by_id(session, annotation_id)
+        item = self.repository.get_by_id(annotation_id)
         if item is None:
             raise NotFoundError("FormAnnotation not found")
         return item.FormData
 
     def create(
         self,
-        session: Session,
         *,
         form_schema_id: int,
         patient_id: int,
@@ -128,7 +123,7 @@ class FormAnnotationService:
         Raises:
             NotFoundError: If image_id is given but resolves to no instance.
         """
-        image_instance_id = self._resolve_image_instance_id(session, image_id)
+        image_instance_id = self._resolve_image_instance_id(image_id)
         annotation = FormAnnotation(
             FormSchemaID=form_schema_id,
             PatientID=patient_id,
@@ -140,17 +135,14 @@ class FormAnnotationService:
             FormData=form_data,
             FormAnnotationReferenceID=form_annotation_reference_id,
         )
-        session.add(annotation)
-        session.commit()
-        session.refresh(annotation)
-        if self.logger is not None:
-            self.logger.log_insert(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint="POST /api/form-annotations",
+        self.repository.add(annotation)
+        if self.audit is not None:
+            self.audit.record(
+                action="INSERT",
                 entity="FormAnnotation",
+                actor=actor,
                 entity_id=annotation.FormAnnotationID,
-                fields={
+                changes={
                     "form_schema_id": annotation.FormSchemaID,
                     "patient_id": annotation.PatientID,
                     "study_id": annotation.StudyID,
@@ -162,7 +154,6 @@ class FormAnnotationService:
 
     def update(
         self,
-        session: Session,
         annotation_id: int,
         updates: dict[str, Any],
         actor: ActingUser,
@@ -176,48 +167,44 @@ class FormAnnotationService:
         Raises:
             NotFoundError: If the annotation, or a given image_id, is unknown.
         """
-        annotation = self.repository.get_by_id(session, annotation_id)
+        annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
 
+        # Column list is purely updates-key-driven, so it can be built before
+        # any mutation happens -- which is what snapshot() requires.
+        applied_columns: list[str] = (
+            ["ImageInstanceID"] if "image_id" in updates else []
+        ) + [attr for key, attr in _FIELD_MAP.items() if key in updates]
+        before = AuditService.snapshot(annotation, *applied_columns)
+
         if "image_id" in updates:
             annotation.ImageInstanceID = self._resolve_image_instance_id(
-                session, updates["image_id"]
+                updates["image_id"]
             )
         for key, attr in _FIELD_MAP.items():
             if key in updates:
                 setattr(annotation, attr, updates[key])
 
-        session.commit()
-        session.refresh(annotation)
-        if self.logger is not None:
-            # Decision #3: preserve the pre-refactor audit formatting quirk —
-            # snake_case getattr on the ORM object always yields None, so every
-            # logged change reads "None -> <new>". Behavior-preserving on
-            # purpose; not an API response. A reviewer may fix separately.
-            changes = {
-                key: f"{getattr(annotation, key, None)} -> {value}"
-                for key, value in updates.items()
-            }
-            self.logger.log_update(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"PATCH /api/form-annotations/{annotation_id}",
+        changes = AuditService.diff(before, annotation)
+        self.repository.save(annotation)
+        if self.audit is not None:
+            self.audit.record(
+                action="UPDATE",
                 entity="FormAnnotation",
-                entity_id=annotation_id,
+                actor=actor,
+                entity_id=annotation.FormAnnotationID,
                 changes=changes if changes else None,
             )
         return annotation
 
-    def soft_delete(
-        self, session: Session, annotation_id: int, actor: ActingUser
-    ) -> None:
+    def soft_delete(self, annotation_id: int, actor: ActingUser) -> None:
         """Soft-delete an annotation (sets Inactive; row is kept).
 
         Raises:
             NotFoundError: If the annotation does not exist.
         """
-        annotation = self.repository.get_by_id(session, annotation_id)
+        annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
 
@@ -231,21 +218,19 @@ class FormAnnotationService:
             "creator_id": annotation.CreatorID,
         }
         annotation.Inactive = True
-        session.commit()
-        if self.logger is not None:
-            self.logger.log_delete(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"DELETE /api/form-annotations/{annotation_id}",
+        self.repository.save(annotation)
+        if self.audit is not None:
+            self.audit.record(
+                action="DELETE",
                 entity="FormAnnotation",
+                actor=actor,
                 entity_id=annotation_id,
-                deleted_data=deleted_data,
+                changes=deleted_data,
             )
         return None
 
     def set_value(
         self,
-        session: Session,
         annotation_id: int,
         form_data: Any,
         actor: ActingUser,
@@ -255,26 +240,25 @@ class FormAnnotationService:
         Raises:
             NotFoundError: If the annotation does not exist.
         """
-        annotation = self.repository.get_by_id(session, annotation_id)
+        annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
 
         annotation.FormData = form_data
-        session.commit()
-        if self.logger is not None:
-            self.logger.log_simple(
-                user=actor.username,
-                user_id=actor.id,
-                endpoint=f"PUT /api/form-annotations/{annotation_id}/value",
-                operation="UPDATE",
+        self.repository.save(annotation)
+        if self.audit is not None:
+            # Pre-refactor log_simple carried no fields/changes (high-frequency
+            # op, deliberately lightweight) — preserved as-is.
+            self.audit.record(
+                action="UPDATE",
                 entity="FormAnnotation",
+                actor=actor,
                 entity_id=annotation_id,
             )
         return None
 
     def tag(
         self,
-        session: Session,
         annotation_id: int,
         tag_id: int,
         comment: str | None,
@@ -286,54 +270,53 @@ class FormAnnotationService:
             NotFoundError: If the annotation or the tag does not exist.
             BadRequestError: If the tag is not a FormAnnotation-type tag.
         """
-        annotation = self.repository.get_by_id(session, annotation_id)
+        annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
-        tag = self.tags.get_by_id(session, tag_id)
+        tag = self.tags.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.FormAnnotation:
             raise BadRequestError("Tag type must be FormAnnotation")
 
-        link = self.repository.get_tag_link(session, tag.TagID, annotation_id)
+        link = self.repository.get_tag_link(tag.TagID, annotation_id)
         if link is None:
-            link = FormAnnotationTagLink(
-                TagID=tag.TagID,
-                FormAnnotationID=annotation_id,
-                CreatorID=actor.id,
-                Comment=comment,
+            link = self.repository.add_link(
+                tag_id=tag.TagID,
+                form_annotation_id=annotation_id,
+                creator_id=actor.id,
+                comment=comment,
             )
-            session.add(link)
-            session.commit()
-            session.refresh(link)
-            if self.logger is not None:
-                self.logger.log_insert(
-                    user=actor.username,
-                    user_id=actor.id,
-                    endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
+            if self.audit is not None:
+                self.audit.record(
+                    action="INSERT",
                     entity="FormAnnotationTagLink",
-                    fields={
+                    actor=actor,
+                    changes={
                         "tag_id": tag.TagID,
                         "form_annotation_id": annotation_id,
                         "comment": comment,
                     },
                 )
         elif comment is not None:
-            old_comment = link.Comment
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            session.commit()
-            session.refresh(link)
-            if self.logger is not None:
-                self.logger.log_update(
-                    user=actor.username,
-                    user_id=actor.id,
-                    endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
+            # FormAnnotationTagLink has a composite PK, so entity_id is null;
+            # fold the composite identity into changes (matches the INSERT
+            # branch above and untag's DELETE below), or the audit row is
+            # unidentifiable.
+            changes = {
+                "tag_id": tag.TagID,
+                "form_annotation_id": annotation_id,
+                **AuditService.diff(before, link),
+            }
+            self.repository.save_link(link)
+            if self.audit is not None:
+                self.audit.record(
+                    action="UPDATE",
                     entity="FormAnnotationTagLink",
-                    fields={
-                        "tag_id": tag.TagID,
-                        "form_annotation_id": annotation_id,
-                    },
-                    changes={"comment": f"{old_comment} -> {comment}"},
+                    actor=actor,
+                    changes=changes,
                 )
 
         link.Tag = tag  # avoid a Tag lazy-load at DTO time
@@ -341,7 +324,6 @@ class FormAnnotationService:
 
     def patch_tag(
         self,
-        session: Session,
         annotation_id: int,
         tag_id: int,
         comment: str | None,
@@ -353,56 +335,56 @@ class FormAnnotationService:
             NotFoundError: If the annotation, tag, or link does not exist.
             BadRequestError: If the tag is not a FormAnnotation-type tag.
         """
-        annotation = self.repository.get_by_id(session, annotation_id)
+        annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
-        tag = self.tags.get_by_id(session, tag_id)
+        tag = self.tags.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.FormAnnotation:
             raise BadRequestError("Tag type must be FormAnnotation")
 
-        link = self.repository.get_tag_link(session, tag_id, annotation_id)
+        link = self.repository.get_tag_link(tag_id, annotation_id)
         if link is None:
             raise NotFoundError("Link not found")
 
         if comment is not None:
-            old_comment = link.Comment
+            before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
-            session.commit()
-            session.refresh(link)
-            if self.logger is not None:
-                self.logger.log_update(
-                    user=actor.username,
-                    user_id=actor.id,
-                    endpoint=(
-                        f"PATCH /api/form-annotations/{annotation_id}"
-                        f"/tags/{tag_id}"
-                    ),
+            # FormAnnotationTagLink has a composite PK, so entity_id is null;
+            # fold the composite identity into changes (matches tag's
+            # INSERT/UPDATE and untag's DELETE), or the audit row is
+            # unidentifiable.
+            changes = {
+                "tag_id": tag_id,
+                "form_annotation_id": annotation_id,
+                **AuditService.diff(before, link),
+            }
+            self.repository.save_link(link)
+            if self.audit is not None:
+                self.audit.record(
+                    action="UPDATE",
                     entity="FormAnnotationTagLink",
-                    fields={
-                        "tag_id": tag_id,
-                        "form_annotation_id": annotation_id,
-                    },
-                    changes={"comment": f"{old_comment} -> {comment}"},
+                    actor=actor,
+                    changes=changes,
                 )
 
         link.Tag = tag
         return link
 
     def untag(
-        self, session: Session, annotation_id: int, tag_id: int, actor: ActingUser
+        self, annotation_id: int, tag_id: int, actor: ActingUser
     ) -> None:
         """Remove a Tag from an annotation (idempotent; no error if not linked).
 
         Raises:
             NotFoundError: If the annotation does not exist.
         """
-        annotation = self.repository.get_by_id(session, annotation_id)
+        annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
 
-        link = self.repository.get_tag_link(session, tag_id, annotation_id)
+        link = self.repository.get_tag_link(tag_id, annotation_id)
         if link is not None:
             deleted_data = {
                 "tag_id": tag_id,
@@ -410,28 +392,24 @@ class FormAnnotationService:
                 "comment": link.Comment,
                 "creator_id": link.CreatorID,
             }
-            session.delete(link)
-            session.commit()
-            if self.logger is not None:
-                self.logger.log_delete(
-                    user=actor.username,
-                    user_id=actor.id,
-                    endpoint=(
-                        f"DELETE /api/form-annotations/{annotation_id}"
-                        f"/tags/{tag_id}"
-                    ),
+            self.repository.delete_link(link)
+            if self.audit is not None:
+                self.audit.record(
+                    action="DELETE",
                     entity="FormAnnotationTagLink",
-                    fields={"tag_id": tag_id, "form_annotation_id": annotation_id},
-                    deleted_data=deleted_data,
+                    actor=actor,
+                    changes=deleted_data,
                 )
         return None
 
 
-def get_form_annotation_service() -> FormAnnotationService:
+def get_form_annotation_service(
+    db: Session = Depends(get_db),
+) -> FormAnnotationService:
     """Default FormAnnotationService wiring for FastAPI ``Depends()``."""
     return FormAnnotationService(
-        FormAnnotationRepository(),
-        ImageInstanceRepository(),
-        TagRepository(),
-        logger=get_db_logger(),
+        FormAnnotationRepository(db),
+        ImageInstanceRepository(db),
+        TagRepository(db),
+        audit=get_audit_service(db),
     )

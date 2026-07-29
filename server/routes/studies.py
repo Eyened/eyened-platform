@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends, Response
-from sqlalchemy.orm import Session
 
-from ..db import get_db
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
 from ..services.acting_user import ActingUser
@@ -15,13 +13,11 @@ router = APIRouter()
 async def tag_study(
     study_id: int,
     body: ObjectTagPOST,
-    db: Session = Depends(get_db),
     service: StudyService = Depends(get_study_service),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> TagMeta:
     """Attach a Tag to a Study by tag ID (idempotent)."""
     link = service.tag_study(
-        db,
         study_id,
         body.tag_id,
         body.comment,
@@ -34,13 +30,11 @@ async def tag_study(
 async def untag_study(
     study_id: int,
     tag_id: int,
-    db: Session = Depends(get_db),
     service: StudyService = Depends(get_study_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Remove a Tag from a Study (idempotent)."""
     service.untag_study(
-        db,
         study_id,
         tag_id,
         ActingUser(id=current_user.id, username=current_user.username),
@@ -53,13 +47,11 @@ async def patch_study_tag(
     study_id: int,
     tag_id: int,
     body: ObjectTagPATCH,
-    db: Session = Depends(get_db),
     service: StudyService = Depends(get_study_service),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> TagMeta:
     """Update comment on an existing Study tag link."""
     link = service.patch_study_tag(
-        db,
         study_id,
         tag_id,
         body.comment,

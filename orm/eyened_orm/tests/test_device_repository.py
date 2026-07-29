@@ -13,7 +13,7 @@ def test_list_all_orders_by_manufacturer_then_model(session):
     )
     session.flush()
 
-    result = DeviceRepository().list_all(session)
+    result = DeviceRepository(session).list_all()
 
     names = [(d.Manufacturer, d.ManufacturerModelName) for d in result]
     assert names == [

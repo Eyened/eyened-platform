@@ -17,33 +17,52 @@ _TASK_RELATIONS = (
 class TaskRepository:
     """Data access for Task rows and their subtask counts."""
 
-    def get_by_id(self, session: Session, task_id: int) -> Task | None:
-        """Return the task with the given id, or None if absent."""
-        return session.get(Task, task_id)
+    def __init__(self, session: Session) -> None:
+        self._session = session
 
-    def get_with_relations(self, session: Session, task_id: int) -> Task | None:
+    def add(self, task: Task) -> None:
+        """Stage a new task and flush so its PK is assigned."""
+        self._session.add(task)
+        self._session.flush()
+
+    def delete(self, task: Task) -> None:
+        """Delete a task and flush within the request transaction."""
+        self._session.delete(task)
+        self._session.flush()
+
+    def get_by_id(self, task_id: int) -> Task | None:
+        """Return the task with the given id, or None if absent."""
+        return self._session.get(Task, task_id)
+
+    def save(self, task: Task) -> None:
+        """Persist in-place mutations to ``task`` within the request transaction.
+
+        ``task`` names what is being saved; the flush covers the whole unit of
+        work, deliberately not just this row.
+        """
+        self._session.flush()
+
+    def get_with_relations(self, task_id: int) -> Task | None:
         """Return the task with Creator + TaskDefinition eager-loaded, or None."""
         return (
-            session.execute(
+            self._session.execute(
                 select(Task).options(*_TASK_RELATIONS).where(Task.TaskID == task_id)
             )
             .scalars()
             .first()
         )
 
-    def list_all(self, session: Session) -> list[Task]:
+    def list_all(self) -> list[Task]:
         """Return all tasks (TaskID order) with Creator + TaskDefinition loaded."""
         return list(
-            session.execute(
+            self._session.execute(
                 select(Task).options(*_TASK_RELATIONS).order_by(Task.TaskID)
             )
             .scalars()
             .all()
         )
 
-    def subtask_counts(
-        self, session: Session, task_ids: list[int]
-    ) -> dict[int, tuple[int, int]]:
+    def subtask_counts(self, task_ids: list[int]) -> dict[int, tuple[int, int]]:
         """Return {task_id: (num_subtasks, num_ready)} for the given task ids.
 
         One grouped aggregate over ``SubTask`` (mirrors the route's former
@@ -52,7 +71,7 @@ class TaskRepository:
         """
         if not task_ids:
             return {}
-        rows = session.execute(
+        rows = self._session.execute(
             select(
                 SubTask.TaskID,
                 func.count().label("num"),
@@ -81,12 +100,43 @@ _SUBTASK_IMAGE_LOADER = (
 
 
 class SubTaskRepository:
-    """Data access for a task's SubTask rows (reads used by task.py)."""
+    """Data access for a task's SubTask rows and their image links."""
 
-    def all_ids_for_task(self, session: Session, task_id: int) -> list[int]:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, subtask: SubTask) -> None:
+        """Stage a new subtask and flush so its PK is assigned."""
+        self._session.add(subtask)
+        self._session.flush()
+
+    def delete(self, subtask: SubTask) -> None:
+        """Delete a subtask and flush within the request transaction."""
+        self._session.delete(subtask)
+        self._session.flush()
+
+    def add_link(
+        self, subtask_id: int, image_instance_id: int, image_index: int
+    ) -> SubTaskImageLink:
+        """Create a SubTask<->ImageInstance link and flush so its row is written."""
+        link = SubTaskImageLink(
+            SubTaskID=subtask_id,
+            ImageInstanceID=image_instance_id,
+            ImageIndex=image_index,
+        )
+        self._session.add(link)
+        self._session.flush()
+        return link
+
+    def delete_link(self, link: SubTaskImageLink) -> None:
+        """Delete an image link and flush within the request transaction."""
+        self._session.delete(link)
+        self._session.flush()
+
+    def all_ids_for_task(self, task_id: int) -> list[int]:
         """Return the task's SubTaskIDs ordered ascending (backs absolute index)."""
         return list(
-            session.execute(
+            self._session.execute(
                 select(SubTask.SubTaskID)
                 .where(SubTask.TaskID == task_id)
                 .order_by(SubTask.SubTaskID)
@@ -97,7 +147,6 @@ class SubTaskRepository:
 
     def count_for_task(
         self,
-        session: Session,
         task_id: int,
         *,
         status: SubTaskState | None = None,
@@ -108,11 +157,10 @@ class SubTaskRepository:
         )
         if status is not None:
             stmt = stmt.where(SubTask.TaskState == status)
-        return session.scalar(stmt) or 0
+        return self._session.scalar(stmt) or 0
 
     def list_for_task(
         self,
-        session: Session,
         task_id: int,
         *,
         status: SubTaskState | None = None,
@@ -131,17 +179,25 @@ class SubTaskRepository:
         if with_images:
             stmt = stmt.options(_SUBTASK_IMAGE_LOADER)
         return list(
-            session.execute(stmt.limit(limit).offset(offset)).scalars().all()
+            self._session.execute(stmt.limit(limit).offset(offset)).scalars().all()
         )
 
-    def get_by_id(self, session: Session, subtask_id: int) -> SubTask | None:
+    def get_by_id(self, subtask_id: int) -> SubTask | None:
         """Return the subtask with the given id, or None if absent."""
-        return session.get(SubTask, subtask_id)
+        return self._session.get(SubTask, subtask_id)
 
-    def get_with_images(self, session: Session, subtask_id: int) -> SubTask | None:
+    def save(self, subtask: SubTask) -> None:
+        """Persist in-place mutations to ``subtask`` within the request transaction.
+
+        ``subtask`` names what is being saved; the flush covers the whole unit
+        of work, deliberately not just this row.
+        """
+        self._session.flush()
+
+    def get_with_images(self, subtask_id: int) -> SubTask | None:
         """Return the subtask with its image links eager-loaded, or None."""
         return (
-            session.execute(
+            self._session.execute(
                 select(SubTask)
                 .options(_SUBTASK_IMAGE_LOADER)
                 .where(SubTask.SubTaskID == subtask_id)
@@ -150,19 +206,17 @@ class SubTaskRepository:
             .first()
         )
 
-    def resolve_image_instance_id(
-        self, session: Session, public_id: str
-    ) -> int | None:
+    def resolve_image_instance_id(self, public_id: str) -> int | None:
         """Return the ImageInstanceID for a PublicID, or None if no image matches."""
-        return session.scalar(
+        return self._session.scalar(
             select(ImageInstance.ImageInstanceID).where(
                 ImageInstance.PublicID == public_id
             )
         )
 
-    def next_image_index(self, session: Session, subtask_id: int) -> int:
+    def next_image_index(self, subtask_id: int) -> int:
         """Return the next ImageIndex for the subtask (max+1, or 0 if it has none)."""
-        current_max = session.scalar(
+        current_max = self._session.scalar(
             select(func.max(SubTaskImageLink.ImageIndex)).where(
                 SubTaskImageLink.SubTaskID == subtask_id
             )
@@ -170,10 +224,10 @@ class SubTaskRepository:
         return 0 if current_max is None else current_max + 1
 
     def get_image_link(
-        self, session: Session, subtask_id: int, image_instance_id: int
+        self, subtask_id: int, image_instance_id: int
     ) -> SubTaskImageLink | None:
         """Return the link for (subtask_id, image_instance_id), or None if absent."""
-        return session.get(
+        return self._session.get(
             SubTaskImageLink,
             {"SubTaskID": subtask_id, "ImageInstanceID": image_instance_id},
         )

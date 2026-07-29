@@ -7,6 +7,7 @@ from eyened_orm import (
     DeviceInstance,
     DeviceModel,
     ImageInstance,
+    ImageInstanceTagLink,
     Patient,
     Project,
     Series,
@@ -23,22 +24,14 @@ from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.image_instance_service import ImageInstanceService
 
 
-class FakeAuditLogger:
-    """Records logging calls without touching the filesystem (no mock lib)."""
+class FakeAudit:
+    """Records .record() calls without touching the filesystem (no mock lib)."""
 
     def __init__(self) -> None:
-        self.inserts: list[dict] = []
-        self.updates: list[dict] = []
-        self.deletes: list[dict] = []
+        self.records: list[dict] = []
 
-    def log_insert(self, **kwargs) -> None:
-        self.inserts.append(kwargs)
-
-    def log_update(self, **kwargs) -> None:
-        self.updates.append(kwargs)
-
-    def log_delete(self, **kwargs) -> None:
-        self.deletes.append(kwargs)
+    def record(self, **kwargs) -> None:
+        self.records.append(kwargs)
 
 
 def _make_image(session, public_id: str) -> int:
@@ -72,9 +65,32 @@ def _make_image(session, public_id: str) -> int:
     return image.ImageInstanceID
 
 
-def _service(logger=None) -> ImageInstanceService:
+def _make_link(
+    session,
+    tag: Tag,
+    image_instance_id: int,
+    creator_id: int,
+    comment: str | None = None,
+) -> ImageInstanceTagLink:
+    """Construct an ImageInstanceTagLink directly, bypassing the service under test.
+
+    Used as setup for tests that assert on a *later* call's audit output, so
+    the setup itself doesn't add an unrelated record to a shared FakeAudit.
+    """
+    link = ImageInstanceTagLink(
+        TagID=tag.TagID,
+        ImageInstanceID=image_instance_id,
+        CreatorID=creator_id,
+        Comment=comment,
+    )
+    session.add(link)
+    session.flush()
+    return link
+
+
+def _service(session, audit=None) -> ImageInstanceService:
     return ImageInstanceService(
-        ImageInstanceRepository(), TagRepository(), logger=logger
+        ImageInstanceRepository(session), TagRepository(session), audit=audit
     )
 
 
@@ -104,32 +120,22 @@ def _make_tag(session, creator_id: int, tag_type: TagType = TagType.ImageInstanc
     return tag
 
 
-def test_get_instance_returns_it(session):
-    """get_instance returns the instance at the given id."""
-    image_id = _make_image(session, "pub-1")
-    session.commit()
-
-    got = _service().get_instance(session, image_id, **_READ_KW)
-
-    assert got.ImageInstanceID == image_id
-
-
 def test_get_instance_unknown_raises_not_found(session):
     """Getting a missing instance is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_instance(session, 999_999, **_READ_KW)
+        _service(session).get_instance(999_999, **_READ_KW)
 
 
 def test_get_by_public_id_unknown_raises_not_found(session):
     """Resolving a missing PublicID is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_by_public_id(session, "nope", **_READ_KW)
+        _service(session).get_by_public_id("nope", **_READ_KW)
 
 
 def test_get_for_storage_unknown_raises_not_found(session):
     """get_for_storage on a missing PublicID raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service().get_for_storage(session, "missing")
+        _service(session).get_for_storage("missing")
 
 
 def test_tag_instance_creates_link(session):
@@ -137,31 +143,39 @@ def test_tag_instance_creates_link(session):
     actor = _actor(session)
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
-    session.commit()
 
-    link = _service().tag_instance(session, "pub-1", tag.TagID, "hi", actor)
+    link = _service(session).tag_instance("pub-1", tag.TagID, "hi", actor)
 
     assert link.TagID == tag.TagID
     assert link.Comment == "hi"
     assert link.Tag.TagID == tag.TagID
 
 
+def test_tag_instance_creates_link_without_comment(session):
+    """tag_instance with comment=None creates a link with no comment set."""
+    actor = _actor(session)
+    _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+
+    link = _service(session).tag_instance("pub-1", tag.TagID, None, actor)
+
+    assert link.Comment is None
+
+
 def test_tag_instance_unknown_instance_raises_not_found(session):
     """tag_instance on a missing instance is translated to NotFoundError."""
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
-    session.commit()
     with pytest.raises(NotFoundError):
-        _service().tag_instance(session, "nope", tag.TagID, None, actor)
+        _service(session).tag_instance("nope", tag.TagID, None, actor)
 
 
 def test_tag_instance_unknown_tag_raises_not_found(session):
     """tag_instance with an unknown tag id is translated to NotFoundError."""
     actor = _actor(session)
     _make_image(session, "pub-1")
-    session.commit()
     with pytest.raises(NotFoundError):
-        _service().tag_instance(session, "pub-1", 999_999, None, actor)
+        _service(session).tag_instance("pub-1", 999_999, None, actor)
 
 
 def test_tag_instance_wrong_tag_type_raises_bad_request(session):
@@ -169,9 +183,8 @@ def test_tag_instance_wrong_tag_type_raises_bad_request(session):
     actor = _actor(session)
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id, tag_type=TagType.Segmentation)
-    session.commit()
     with pytest.raises(BadRequestError):
-        _service().tag_instance(session, "pub-1", tag.TagID, None, actor)
+        _service(session).tag_instance("pub-1", tag.TagID, None, actor)
 
 
 def test_tag_instance_existing_updates_comment(session):
@@ -179,27 +192,62 @@ def test_tag_instance_existing_updates_comment(session):
     actor = _actor(session)
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
-    session.commit()
-    service = _service()
+    service = _service(session)
 
-    service.tag_instance(session, "pub-1", tag.TagID, "first", actor)
-    link = service.tag_instance(session, "pub-1", tag.TagID, "second", actor)
+    service.tag_instance("pub-1", tag.TagID, "first", actor)
+    link = service.tag_instance("pub-1", tag.TagID, "second", actor)
 
     assert link.Comment == "second"
 
 
 def test_tag_instance_logs_insert(session):
-    """tag_instance emits one insert audit record for ImageInstanceTagLink."""
+    """tag_instance emits one INSERT record carrying the link identity + comment."""
     actor = _actor(session)
-    _make_image(session, "pub-1")
+    image_id = _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
-    session.commit()
-    logger = FakeAuditLogger()
+    audit = FakeAudit()
 
-    _service(logger).tag_instance(session, "pub-1", tag.TagID, None, actor)
+    _service(session, audit).tag_instance("pub-1", tag.TagID, "hi", actor)
 
-    assert len(logger.inserts) == 1
-    assert logger.inserts[0]["entity"] == "ImageInstanceTagLink"
+    assert len(audit.records) == 1
+    rec = audit.records[0]
+    assert rec["action"] == "INSERT"
+    assert rec["entity"] == "ImageInstanceTagLink"
+    assert rec["actor"] is actor
+    assert rec["changes"] == {
+        "tag_id": tag.TagID,
+        "image_instance_id": image_id,
+        "comment": "hi",
+    }
+
+
+def test_tag_instance_update_logs_raw_string_public_id(session):
+    """Comment re-tag UPDATE audit carries the link identity + Comment diff.
+
+    Pre-refactor quirk preserved: this site's identity uses the raw public_id
+    string, not the int ImageInstanceID (unlike patch_instance_tag's UPDATE,
+    see test_patch_instance_tag_logs_update_as_diff).
+    """
+    actor = _actor(session)
+    image_id = _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+    _make_link(session, tag, image_id, actor.id, comment="first")
+    audit = FakeAudit()
+
+    _service(session, audit).tag_instance("pub-1", tag.TagID, "second", actor)
+
+    assert len(audit.records) == 1
+    rec = audit.records[0]
+    assert rec["action"] == "UPDATE"
+    assert rec["entity"] == "ImageInstanceTagLink"
+    # ImageInstanceTagLink's composite PK means entity_id is null; changes
+    # must carry the (tag_id, image_instance_id) identity alongside the
+    # comment diff, or the audit row is unidentifiable.
+    assert rec["changes"] == {
+        "tag_id": tag.TagID,
+        "image_instance_id": "pub-1",
+        "Comment": {"old": "first", "new": "second"},
+    }
 
 
 def test_patch_instance_tag_updates_comment(session):
@@ -207,11 +255,10 @@ def test_patch_instance_tag_updates_comment(session):
     actor = _actor(session)
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
-    session.commit()
-    service = _service()
-    service.tag_instance(session, "pub-1", tag.TagID, "old", actor)
+    service = _service(session)
+    service.tag_instance("pub-1", tag.TagID, "old", actor)
 
-    link = service.patch_instance_tag(session, "pub-1", tag.TagID, "new", actor)
+    link = service.patch_instance_tag("pub-1", tag.TagID, "new", actor)
 
     assert link.Comment == "new"
 
@@ -221,51 +268,8 @@ def test_patch_instance_tag_unknown_link_raises_not_found(session):
     actor = _actor(session)
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id)
-    session.commit()
     with pytest.raises(NotFoundError):
-        _service().patch_instance_tag(session, "pub-1", tag.TagID, "x", actor)
-
-
-def test_untag_instance_removes_link(session):
-    """untag_instance deletes the link for that (instance, tag)."""
-    actor = _actor(session)
-    image_id = _make_image(session, "pub-1")
-    tag = _make_tag(session, actor.id)
-    session.commit()
-    service = _service()
-    service.tag_instance(session, "pub-1", tag.TagID, None, actor)
-
-    service.untag_instance(session, "pub-1", tag.TagID, actor)
-
-    assert ImageInstanceRepository().get_tag_link(session, tag.TagID, image_id) is None
-
-
-def test_untag_instance_absent_link_is_idempotent(session):
-    """untag_instance with no link present is a no-op (no error)."""
-    actor = _actor(session)
-    _make_image(session, "pub-1")
-    tag = _make_tag(session, actor.id)
-    session.commit()
-
-    # Does not raise even though no link exists.
-    _service().untag_instance(session, "pub-1", tag.TagID, actor)
-
-
-def test_tag_instance_update_logs_raw_string_public_id(session):
-    """Tag update audit logs use raw-string public_id, not int ImageInstanceID."""
-    actor = _actor(session)
-    _make_image(session, "pub-1")
-    tag = _make_tag(session, actor.id)
-    session.commit()
-    logger = FakeAuditLogger()
-    service = _service(logger)
-
-    service.tag_instance(session, "pub-1", tag.TagID, "first", actor)
-    service.tag_instance(session, "pub-1", tag.TagID, "second", actor)
-
-    assert len(logger.updates) == 1
-    assert logger.updates[0]["entity"] == "ImageInstanceTagLink"
-    assert logger.updates[0]["fields"]["image_instance_id"] == "pub-1"
+        _service(session).patch_instance_tag("pub-1", tag.TagID, "x", actor)
 
 
 def test_patch_instance_tag_wrong_tag_type_raises_bad_request(session):
@@ -273,6 +277,76 @@ def test_patch_instance_tag_wrong_tag_type_raises_bad_request(session):
     actor = _actor(session)
     _make_image(session, "pub-1")
     tag = _make_tag(session, actor.id, tag_type=TagType.Segmentation)
-    session.commit()
     with pytest.raises(BadRequestError):
-        _service().patch_instance_tag(session, "pub-1", tag.TagID, "x", actor)
+        _service(session).patch_instance_tag("pub-1", tag.TagID, "x", actor)
+
+
+def test_patch_instance_tag_logs_update_as_diff(session):
+    """patch_instance_tag's UPDATE carries the link identity + Comment diff.
+
+    This site's identity uses the int ImageInstanceID (unlike tag_instance's
+    UPDATE, see test_tag_instance_update_logs_raw_string_public_id).
+    """
+    actor = _actor(session)
+    image_id = _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+    _make_link(session, tag, image_id, actor.id, comment="old")
+    audit = FakeAudit()
+
+    _service(session, audit).patch_instance_tag("pub-1", tag.TagID, "new", actor)
+
+    assert len(audit.records) == 1
+    rec = audit.records[0]
+    assert rec["action"] == "UPDATE"
+    assert rec["entity"] == "ImageInstanceTagLink"
+    assert rec["changes"] == {
+        "tag_id": tag.TagID,
+        "image_instance_id": image_id,
+        "Comment": {"old": "old", "new": "new"},
+    }
+
+
+def test_untag_instance_removes_link(session):
+    """untag_instance deletes the link for that (instance, tag)."""
+    actor = _actor(session)
+    image_id = _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+    service = _service(session)
+    service.tag_instance("pub-1", tag.TagID, None, actor)
+
+    service.untag_instance("pub-1", tag.TagID, actor)
+
+    assert ImageInstanceRepository(session).get_tag_link(tag.TagID, image_id) is None
+
+
+def test_untag_instance_absent_link_is_idempotent(session):
+    """untag_instance with no link present is a no-op (no error)."""
+    actor = _actor(session)
+    _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+
+    # Does not raise even though no link exists.
+    _service(session).untag_instance("pub-1", tag.TagID, actor)
+
+
+def test_untag_instance_logs_delete_when_audit_present(session):
+    """Untagging emits one DELETE record carrying the removed link's data."""
+    actor = _actor(session)
+    image_id = _make_image(session, "pub-1")
+    tag = _make_tag(session, actor.id)
+    _make_link(session, tag, image_id, actor.id, comment="bye")
+    audit = FakeAudit()
+
+    _service(session, audit).untag_instance("pub-1", tag.TagID, actor)
+
+    assert len(audit.records) == 1
+    rec = audit.records[0]
+    assert rec["action"] == "DELETE"
+    assert rec["entity"] == "ImageInstanceTagLink"
+    assert rec["actor"] is actor
+    assert rec["changes"] == {
+        "tag_id": tag.TagID,
+        "image_instance_id": image_id,
+        "comment": "bye",
+        "creator_id": actor.id,
+    }

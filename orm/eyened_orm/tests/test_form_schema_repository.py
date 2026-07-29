@@ -13,7 +13,7 @@ def test_list_all_orders_by_schema_name(session):
     )
     session.flush()
 
-    result = FormSchemaRepository().list_all(session)
+    result = FormSchemaRepository(session).list_all()
 
     assert [s.SchemaName for s in result] == ["Alpha", "Mu", "Zeta"]
 
@@ -24,7 +24,7 @@ def test_get_by_id_returns_the_schema(session):
     session.add(schema)
     session.flush()
 
-    result = FormSchemaRepository().get_by_id(session, schema.FormSchemaID)
+    result = FormSchemaRepository(session).get_by_id(schema.FormSchemaID)
 
     assert result is not None
     assert result.SchemaName == "Alpha"
@@ -32,4 +32,4 @@ def test_get_by_id_returns_the_schema(session):
 
 def test_get_by_id_unknown_id_returns_none(session):
     """An unknown id returns None — the repository never raises for "not found"."""
-    assert FormSchemaRepository().get_by_id(session, 999_999) is None
+    assert FormSchemaRepository(session).get_by_id(999_999) is None
