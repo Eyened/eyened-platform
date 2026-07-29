@@ -43,7 +43,7 @@ def test_list_all_orders_by_id_with_relations(session):
     _make_task(session, td.TaskDefinitionID, creator.CreatorID, "A")
     _make_task(session, td.TaskDefinitionID, creator.CreatorID, "B")
 
-    tasks = TaskRepository().list_all(session)
+    tasks = TaskRepository(session).list_all()
 
     assert [t.TaskName for t in tasks] == ["A", "B"]
     # Eager-loaded: reading these needs no extra lazy query.
@@ -57,7 +57,7 @@ def test_get_with_relations_eager_loads_creator_and_definition(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
 
-    loaded = TaskRepository().get_with_relations(session, task.TaskID)
+    loaded = TaskRepository(session).get_with_relations(task.TaskID)
 
     assert loaded is not None
     assert loaded.Creator.CreatorName == "tester"
@@ -73,7 +73,7 @@ def test_subtask_counts_totals_and_ready(session):
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
 
-    counts = TaskRepository().subtask_counts(session, [task.TaskID])
+    counts = TaskRepository(session).subtask_counts([task.TaskID])
 
     assert counts[task.TaskID] == (3, 2)
 
@@ -84,7 +84,7 @@ def test_subtask_counts_fills_zero_for_task_without_subtasks(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
 
-    counts = TaskRepository().subtask_counts(session, [task.TaskID])
+    counts = TaskRepository(session).subtask_counts([task.TaskID])
 
     assert counts == {task.TaskID: (0, 0)}
 
@@ -145,7 +145,7 @@ def test_all_ids_for_task_ordered(session):
     a = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     b = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
 
-    ids = SubTaskRepository().all_ids_for_task(session, task.TaskID)
+    ids = SubTaskRepository(session).all_ids_for_task(task.TaskID)
 
     assert ids == [a.SubTaskID, b.SubTaskID]
 
@@ -158,10 +158,10 @@ def test_count_for_task_with_and_without_status(session):
     _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
-    repo = SubTaskRepository()
+    repo = SubTaskRepository(session)
 
-    assert repo.count_for_task(session, task.TaskID) == 3
-    assert repo.count_for_task(session, task.TaskID, status=SubTaskState.Ready) == 2
+    assert repo.count_for_task(task.TaskID) == 3
+    assert repo.count_for_task(task.TaskID, status=SubTaskState.Ready) == 2
 
 
 def test_list_for_task_paginates_in_id_order(session):
@@ -173,9 +173,7 @@ def test_list_for_task_paginates_in_id_order(session):
         _make_subtask(session, task.TaskID, SubTaskState.NotStarted) for _ in range(5)
     ]
 
-    rows = SubTaskRepository().list_for_task(
-        session, task.TaskID, limit=2, offset=1
-    )
+    rows = SubTaskRepository(session).list_for_task(task.TaskID, limit=2, offset=1)
 
     assert [r.SubTaskID for r in rows] == [made[1].SubTaskID, made[2].SubTaskID]
 
@@ -188,8 +186,8 @@ def test_list_for_task_filters_by_status(session):
     _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     ready = _make_subtask(session, task.TaskID, SubTaskState.Ready)
 
-    rows = SubTaskRepository().list_for_task(
-        session, task.TaskID, status=SubTaskState.Ready, limit=10, offset=0
+    rows = SubTaskRepository(session).list_for_task(
+        task.TaskID, status=SubTaskState.Ready, limit=10, offset=0
     )
 
     assert [r.SubTaskID for r in rows] == [ready.SubTaskID]
@@ -211,11 +209,61 @@ def test_list_for_task_with_images_loads_links(session):
     )
     session.flush()
 
-    rows = SubTaskRepository().list_for_task(
-        session, task.TaskID, limit=10, offset=0, with_images=True
+    rows = SubTaskRepository(session).list_for_task(
+        task.TaskID, limit=10, offset=0, with_images=True
     )
 
     assert len(rows) == 1
     assert [link.ImageInstance.PublicID for link in rows[0].SubTaskImageLinks] == [
         "pub-1"
     ]
+
+
+def test_get_with_images_loads_link_chain(session):
+    """get_with_images returns the subtask with its image links eager-loaded."""
+    creator = _creator(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    image_id = _make_image(session, "pub-1")
+    from eyened_orm import SubTaskImageLink
+
+    session.add(
+        SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0)
+    )
+    session.flush()
+
+    loaded = SubTaskRepository(session).get_with_images(st.SubTaskID)
+
+    assert loaded is not None
+    assert [link.ImageInstance.PublicID for link in loaded.SubTaskImageLinks] == ["pub-1"]
+
+
+def test_resolve_image_instance_id_found_and_missing(session):
+    """resolve_image_instance_id maps a PublicID to its int id, or None if absent."""
+    image_id = _make_image(session, "pub-42")
+    repo = SubTaskRepository(session)
+
+    assert repo.resolve_image_instance_id("pub-42") == image_id
+    assert repo.resolve_image_instance_id("nope") is None
+
+
+def test_next_image_index_starts_at_zero_then_increments(session):
+    """next_image_index is 0 for a subtask with no links, else max(ImageIndex)+1."""
+    creator = _creator(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    image_id = _make_image(session, "pub-1")
+    repo = SubTaskRepository(session)
+
+    assert repo.next_image_index(st.SubTaskID) == 0
+
+    from eyened_orm import SubTaskImageLink
+
+    session.add(
+        SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=3)
+    )
+    session.flush()
+
+    assert repo.next_image_index(st.SubTaskID) == 4

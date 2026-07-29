@@ -8,7 +8,7 @@
     import { duplicate, types } from "./duplicate_utils";
     import type { Segmentation } from "./segmentationContext.svelte";
     import { Button } from "$lib/components/ui/button/index.js";
-	import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 
     interface Props {
         segmentation: Segmentation;
@@ -40,7 +40,7 @@
             type,
             segmentationItem.threshold ?? segmentation.threshold ?? 0.5, //original threshold
             0.5, //new threshold
-            taskContext
+            taskContext,
         );
     }
 </script>

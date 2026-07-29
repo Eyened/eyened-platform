@@ -5,24 +5,23 @@
     import Dialogue from "$lib/Dialogue.svelte";
     import Popup from "$lib/Popup.svelte";
     import { setContext } from "svelte";
-    import '../app.css';
-    
+    import "../app.css";
+
     let { children }: { children: any } = $props();
-    
+
     function closePopup() {
         globalContext.popupComponent = null;
     }
-    
+
     function closeDialogue() {
         globalContext.dialogue = null;
     }
-    
+
     const globalContext = new GlobalContext();
-    
+
     setContext("globalContext", globalContext);
-    
-    
-    const init = globalContext.init(page.url.pathname)
+
+    const init = globalContext.init(page.url.pathname);
 </script>
 
 {#if globalContext.popupComponent}

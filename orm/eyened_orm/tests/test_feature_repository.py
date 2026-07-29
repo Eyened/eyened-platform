@@ -14,7 +14,7 @@ def test_list_all_orders_by_name(session):
     _feat(session, "Zeta")
     _feat(session, "Alpha")
     _feat(session, "Mu")
-    names = [f.FeatureName for f in FeatureRepository().list_all(session)]
+    names = [f.FeatureName for f in FeatureRepository(session).list_all()]
     assert names == ["Alpha", "Mu", "Zeta"]
 
 
@@ -23,11 +23,11 @@ def test_replace_subfeatures_sets_ordered_children(session):
     parent = _feat(session, "parent")
     a = _feat(session, "a")
     b = _feat(session, "b")
-    repo = FeatureRepository()
+    repo = FeatureRepository(session)
 
-    repo.replace_subfeatures(session, parent.FeatureID, [b.FeatureID, a.FeatureID])
+    repo.replace_subfeatures(parent.FeatureID, [b.FeatureID, a.FeatureID])
 
-    assert repo.list_subfeature_ids(session, parent.FeatureID) == [b.FeatureID, a.FeatureID]
+    assert repo.list_subfeature_ids(parent.FeatureID) == [b.FeatureID, a.FeatureID]
 
 
 def test_replace_subfeatures_overwrites_previous(session):
@@ -35,30 +35,30 @@ def test_replace_subfeatures_overwrites_previous(session):
     parent = _feat(session, "parent")
     a = _feat(session, "a")
     b = _feat(session, "b")
-    repo = FeatureRepository()
-    repo.replace_subfeatures(session, parent.FeatureID, [a.FeatureID])
+    repo = FeatureRepository(session)
+    repo.replace_subfeatures(parent.FeatureID, [a.FeatureID])
 
-    repo.replace_subfeatures(session, parent.FeatureID, [b.FeatureID])
+    repo.replace_subfeatures(parent.FeatureID, [b.FeatureID])
 
-    assert repo.list_subfeature_ids(session, parent.FeatureID) == [b.FeatureID]
+    assert repo.list_subfeature_ids(parent.FeatureID) == [b.FeatureID]
 
 
 def test_parent_names_of_child_lists_parents(session):
     """parent_names_of_child returns the names of features linking to this child."""
     parent = _feat(session, "parent")
     child = _feat(session, "child")
-    FeatureRepository().replace_subfeatures(session, parent.FeatureID, [child.FeatureID])
+    FeatureRepository(session).replace_subfeatures(parent.FeatureID, [child.FeatureID])
 
-    assert FeatureRepository().parent_names_of_child(session, child.FeatureID) == ["parent"]
+    assert FeatureRepository(session).parent_names_of_child(child.FeatureID) == ["parent"]
 
 
 def test_count_segmentations_zero_when_none(session):
     """count_segmentations returns 0 for a feature with no linked segmentations."""
     f = _feat(session, "lonely")
-    assert FeatureRepository().count_segmentations(session, f.FeatureID) == 0
+    assert FeatureRepository(session).count_segmentations(f.FeatureID) == 0
 
 
 def test_segmentation_counts_empty_when_no_segmentations(session):
     """segmentation_counts returns an empty mapping when no segmentations exist."""
     _feat(session, "x")
-    assert FeatureRepository().segmentation_counts(session) == {}
+    assert FeatureRepository(session).segmentation_counts() == {}

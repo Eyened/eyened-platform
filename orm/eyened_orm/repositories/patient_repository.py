@@ -8,9 +8,11 @@ from eyened_orm import AttributeValue, Patient
 class PatientRepository:
     """Data access for Patient rows."""
 
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
     def get_with_attributes(
         self,
-        session: Session,
         patient_id: int,
         include_attributes: bool = True,
     ) -> Patient | None:
@@ -29,4 +31,4 @@ class PatientRepository:
                     AttributeValue.ProducingModel
                 )
             )
-        return session.get(Patient, patient_id, options=tuple(opts))
+        return self._session.get(Patient, patient_id, options=tuple(opts))

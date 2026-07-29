@@ -9,11 +9,32 @@ from eyened_orm import Creator, CreatorTagLink, Tag
 class TagRepository:
     """Data access for Tag rows and their per-user 'star' links."""
 
-    def get_by_id(self, session: Session, tag_id: int) -> Tag | None:
-        """Return the tag with the given id, or None if absent."""
-        return session.get(Tag, tag_id)
+    def __init__(self, session: Session) -> None:
+        self._session = session
 
-    def list_all(self, session: Session) -> list[Tag]:
+    def add(self, tag: Tag) -> None:
+        """Stage a new tag and flush so its PK is assigned."""
+        self._session.add(tag)
+        self._session.flush()
+
+    def delete(self, tag: Tag) -> None:
+        """Delete a tag and flush within the request transaction."""
+        self._session.delete(tag)
+        self._session.flush()
+
+    def get_by_id(self, tag_id: int) -> Tag | None:
+        """Return the tag with the given id, or None if absent."""
+        return self._session.get(Tag, tag_id)
+
+    def save(self, tag: Tag) -> None:
+        """Persist in-place mutations to ``tag`` within the request transaction.
+
+        ``tag`` names what is being saved; the flush covers the whole unit of
+        work, deliberately not just this row.
+        """
+        self._session.flush()
+
+    def list_all(self) -> list[Tag]:
         """Return all tags, loading only what TagGET needs.
 
         Tag has six ``lazy="selectin"`` link collections; TagGET only needs the
@@ -41,12 +62,24 @@ class TagRepository:
                 Creator.CreatorID, Creator.CreatorName
             ),
         )
-        return list(session.scalars(stmt).all())
+        return list(self._session.scalars(stmt).all())
 
     def get_star_link(
-        self, session: Session, tag_id: int, creator_id: int
+        self, tag_id: int, creator_id: int
     ) -> CreatorTagLink | None:
         """Return the star link for (tag, creator), or None if not starred."""
-        return session.get(
+        return self._session.get(
             CreatorTagLink, {"TagID": tag_id, "CreatorID": creator_id}
         )
+
+    def add_star(self, tag_id: int, creator_id: int) -> CreatorTagLink:
+        """Create a star link (tag, creator) and flush so its row is written."""
+        link = CreatorTagLink(TagID=tag_id, CreatorID=creator_id)
+        self._session.add(link)
+        self._session.flush()
+        return link
+
+    def remove_star(self, link: CreatorTagLink) -> None:
+        """Delete a star link and flush within the request transaction."""
+        self._session.delete(link)
+        self._session.flush()

@@ -1,85 +1,36 @@
 from typing import List, Optional
 
-from eyened_orm import (
-    FormAnnotation,
-    FormAnnotationTagLink,
-    ImageInstance,
-    ImageInstanceTagLink,
-    Study,
-    StudyTagLink,
-    Tag,
-)
-from eyened_orm.tag import TagType
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from fastapi import APIRouter, Depends, Request, Response
 
-from ..db import get_db
-from ..utils.db_logging import get_db_logger
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
-from ..dtos.dtos_main import FormAnnotationGET, FormAnnotationPATCH, FormAnnotationPUT
+from ..dtos.dtos_main import (
+    FormAnnotationGET,
+    FormAnnotationPATCH,
+    FormAnnotationPUT,
+)
+from ..services.acting_user import ActingUser
+from ..services.form_annotation_service import (
+    FormAnnotationService,
+    get_form_annotation_service,
+)
 from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
 
 
-def _resolve_image_instance_id(db: Session, image_id: Optional[str]) -> Optional[int]:
-    if image_id is None:
-        return None
-    item = (
-        db.query(ImageInstance)
-        .filter(ImageInstance.PublicID == image_id)
-        .first()
-    )
-    if item:
-        return item.ImageInstanceID
-    raise HTTPException(status_code=404, detail="ImageInstance not found")
-
 @router.post("/form-annotations", response_model=FormAnnotationGET)
 async def create_form_annotation(
     annotation: FormAnnotationPUT,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    # Map DTO snake_case to ORM PascalCase fields
-    payload = annotation.dict()
-    image_instance_id = _resolve_image_instance_id(db, payload.get("image_id"))
-    new_annotation = FormAnnotation(
-        FormSchemaID=payload.get("form_schema_id"),
-        PatientID=payload.get("patient_id"),
-        StudyID=payload.get("study_id"),
-        ImageInstanceID=image_instance_id,
-        Laterality=payload.get("laterality"),
-        CreatorID=current_user.id,
-        SubTaskID=payload.get("sub_task_id"),
-        FormData=payload.get("form_data"),
-        FormAnnotationReferenceID=payload.get("form_annotation_reference_id"),
+    """Create a form annotation."""
+    item = service.create(
+        actor=ActingUser(id=current_user.id, username=current_user.username),
+        **annotation.dict(),
     )
-
-    db.add(new_annotation)
-    db.commit()
-    db.refresh(new_annotation)
-    
-    # Log form annotation creation
-    logger = get_db_logger()
-    if logger:
-        logger.log_insert(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint="POST /api/form-annotations",
-            entity="FormAnnotation",
-            entity_id=new_annotation.FormAnnotationID,
-            fields={
-                "form_schema_id": new_annotation.FormSchemaID,
-                "patient_id": new_annotation.PatientID,
-                "study_id": new_annotation.StudyID,
-                "image_instance_id": new_annotation.ImageInstanceID,
-                "sub_task_id": new_annotation.SubTaskID,
-            },
-        )
-    
-    return DTOConverter.form_annotation_to_get(new_annotation)
+    return DTOConverter.form_annotation_to_get(item)
 
 
 @router.get("/form-annotations", response_model=List[FormAnnotationGET])
@@ -89,205 +40,85 @@ async def get_form_annotations(
     image_id: Optional[str] = None,
     form_schema_id: Optional[int] = None,
     sub_task_id: Optional[int] = None,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    query = (
-        select(FormAnnotation)
-        .filter(~FormAnnotation.Inactive)
-        .options(
-            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
-                FormAnnotationTagLink.Tag
-            ),
-            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
-                FormAnnotationTagLink.Creator
-            ),
-            selectinload(FormAnnotation.Study)
-            .selectinload(Study.StudyTagLinks)
-            .selectinload(StudyTagLink.Tag),
-            selectinload(FormAnnotation.Study)
-            .selectinload(Study.StudyTagLinks)
-            .selectinload(StudyTagLink.Creator),
-            selectinload(FormAnnotation.ImageInstance)
-            .selectinload(ImageInstance.ImageInstanceTagLinks)
-            .selectinload(ImageInstanceTagLink.Tag),
-            selectinload(FormAnnotation.ImageInstance)
-            .selectinload(ImageInstance.ImageInstanceTagLinks)
-            .selectinload(ImageInstanceTagLink.Creator),
-        )
+    """List active form annotations, optionally filtered."""
+    rows = service.list_annotations(
+        patient_id=patient_id,
+        study_id=study_id,
+        image_id=image_id,
+        form_schema_id=form_schema_id,
+        sub_task_id=sub_task_id,
     )
-
-    if patient_id is not None:
-        query = query.filter(FormAnnotation.PatientID == patient_id)
-    if study_id is not None:
-        query = query.filter(FormAnnotation.StudyID == study_id)
-    if image_id is not None:
-        resolved_id = _resolve_image_instance_id(db, image_id)
-        query = query.filter(FormAnnotation.ImageInstanceID == resolved_id)
-    if form_schema_id is not None:
-        query = query.filter(FormAnnotation.FormSchemaID == form_schema_id)
-    if sub_task_id is not None:
-        query = query.filter(FormAnnotation.SubTaskID == sub_task_id)
-
-    orm_rows = db.scalars(query).all()
-    return [DTOConverter.form_annotation_to_get(row) for row in orm_rows]
+    return [DTOConverter.form_annotation_to_get(row) for row in rows]
 
 
 @router.get("/form-annotations/{annotation_id}", response_model=FormAnnotationGET)
 async def get_form_annotation(
     annotation_id: int,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    annotation = db.get(
-        FormAnnotation,
-        annotation_id,
-        options=(
-            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
-                FormAnnotationTagLink.Tag
-            ),
-            selectinload(FormAnnotation.FormAnnotationTagLinks).selectinload(
-                FormAnnotationTagLink.Creator
-            ),
-        ),
-    )
-    if annotation is None:
-        raise HTTPException(status_code=404, detail="FormAnnotation not found")
-    return DTOConverter.form_annotation_to_get(annotation)
+    """Get a single form annotation by id."""
+    item = service.get_annotation(annotation_id)
+    return DTOConverter.form_annotation_to_get(item)
 
 
 @router.patch("/form-annotations/{annotation_id}", response_model=FormAnnotationGET)
 async def update_form_annotation(
     annotation_id: int,
     annotation: FormAnnotationPATCH,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    existing_annotation = db.get(FormAnnotation, annotation_id)
-    if existing_annotation is None:
-        raise HTTPException(status_code=404, detail="FormAnnotation not found")
-
-    payload = annotation.dict(exclude_unset=True)
-
-    if "form_schema_id" in payload:
-        existing_annotation.FormSchemaID = payload["form_schema_id"]
-    if "patient_id" in payload:
-        existing_annotation.PatientID = payload["patient_id"]
-    if "study_id" in payload:
-        existing_annotation.StudyID = payload["study_id"]
-    if "image_id" in payload:
-        existing_annotation.ImageInstanceID = _resolve_image_instance_id(
-            db, payload["image_id"]
-        )
-    if "laterality" in payload:
-        existing_annotation.Laterality = payload["laterality"]
-    if "sub_task_id" in payload:
-        existing_annotation.SubTaskID = payload["sub_task_id"]
-    if "form_data" in payload:
-        existing_annotation.FormData = payload["form_data"]
-    if "form_annotation_reference_id" in payload:
-        existing_annotation.FormAnnotationReferenceID = payload[
-            "form_annotation_reference_id"
-        ]
-
-    db.commit()
-    db.refresh(existing_annotation)
-    
-    # Log form annotation update
-    logger = get_db_logger()
-    if logger:
-        changes = {k: f"{getattr(existing_annotation, k, None)} -> {v}" for k, v in payload.items()}
-        logger.log_update(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint=f"PATCH /api/form-annotations/{annotation_id}",
-            entity="FormAnnotation",
-            entity_id=annotation_id,
-            changes=changes if changes else None,
-        )
-    
-    return DTOConverter.form_annotation_to_get(existing_annotation)
+    """Partially update a form annotation."""
+    item = service.update(
+        annotation_id,
+        annotation.dict(exclude_unset=True),
+        ActingUser(id=current_user.id, username=current_user.username),
+    )
+    return DTOConverter.form_annotation_to_get(item)
 
 
 @router.delete("/form-annotations/{annotation_id}", status_code=204)
 async def delete_form_annotation(
     annotation_id: int,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    annotation = db.get(FormAnnotation, annotation_id)
-    if annotation is None:
-        raise HTTPException(status_code=404, detail="FormAnnotation not found")
-
-    # Save annotation data for logging before soft delete
-    deleted_data = {
-        "form_schema_id": annotation.FormSchemaID,
-        "patient_id": annotation.PatientID,
-        "study_id": annotation.StudyID,
-        "image_instance_id": annotation.ImageInstanceID,
-        "sub_task_id": annotation.SubTaskID,
-        "laterality": annotation.Laterality,
-        "creator_id": annotation.CreatorID,
-    }
-    
-    annotation.Inactive = True
-    db.commit()
-    
-    # Log form annotation deletion (soft delete)
-    logger = get_db_logger()
-    if logger:
-        logger.log_delete(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint=f"DELETE /api/form-annotations/{annotation_id}",
-            entity="FormAnnotation",
-            entity_id=annotation_id,
-            deleted_data=deleted_data,
-        )
-    
+    """Soft-delete a form annotation."""
+    service.soft_delete(
+        annotation_id,
+        ActingUser(id=current_user.id, username=current_user.username),
+    )
     return Response(status_code=204)
 
 
 @router.get("/form-annotations/{form_annotation_id}/value")
 async def get_form_annotation_value(
     form_annotation_id: int,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    annotation = db.get(FormAnnotation, form_annotation_id)
-    if annotation is None:
-        raise HTTPException(status_code=404, detail="FormAnnotation not found")
-
-    return annotation.FormData
+    """Get a form annotation's raw FormData payload."""
+    return service.get_value(form_annotation_id)
 
 
 @router.put("/form-annotations/{form_annotation_id}/value", status_code=204)
 async def update_form_annotation_value(
     form_annotation_id: int,
     request: Request,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    annotation = db.get(FormAnnotation, form_annotation_id)
-    if annotation is None:
-        raise HTTPException(status_code=404, detail="FormAnnotation not found")
-
+    """Overwrite a form annotation's FormData payload."""
     form_data = await request.json()
-    annotation.FormData = form_data
-    db.commit()
-    
-    # Log form annotation value update (simple one-line format for high-frequency operations)
-    logger = get_db_logger()
-    if logger:
-        logger.log_simple(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint=f"PUT /api/form-annotations/{form_annotation_id}/value",
-            operation="UPDATE",
-            entity="FormAnnotation",
-            entity_id=form_annotation_id,
-        )
-    
+    service.set_value(
+        form_annotation_id,
+        form_data,
+        ActingUser(id=current_user.id, username=current_user.username),
+    )
     return Response(status_code=204)
 
 
@@ -295,66 +126,16 @@ async def update_form_annotation_value(
 async def tag_form_annotation(
     annotation_id: int,
     body: ObjectTagPOST,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> TagMeta:
     """Attach a Tag to a FormAnnotation by tag ID (idempotent)."""
-    ann = db.get(FormAnnotation, annotation_id)
-    if not ann:
-        raise HTTPException(404, "FormAnnotation not found")
-    tag = db.get(Tag, body.tag_id)
-    if not tag:
-        raise HTTPException(404, "Tag not found")
-    if tag.TagType != TagType.FormAnnotation:
-        raise HTTPException(400, "Tag type must be FormAnnotation")
-
-    link = db.get(
-        FormAnnotationTagLink, {"TagID": tag.TagID, "FormAnnotationID": annotation_id}
+    link = service.tag(
+        annotation_id,
+        body.tag_id,
+        body.comment,
+        ActingUser(id=current_user.id, username=current_user.username),
     )
-    if not link:
-        link = FormAnnotationTagLink(
-            TagID=tag.TagID,
-            FormAnnotationID=annotation_id,
-            CreatorID=current_user.id,
-            Comment=body.comment,
-        )
-        db.add(link)
-        db.commit()
-        db.refresh(link)
-        link.Tag = tag
-        
-        # Log tag link creation
-        logger = get_db_logger()
-        if logger:
-            logger.log_insert(
-                user=current_user.username,
-                user_id=current_user.id,
-                endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
-                entity="FormAnnotationTagLink",
-                fields={
-                    "tag_id": tag.TagID,
-                    "form_annotation_id": annotation_id,
-                    "comment": body.comment,
-                },
-            )
-    else:
-        if body.comment is not None:
-            link.Comment = body.comment
-            db.commit()
-            db.refresh(link)
-            
-            # Log tag link update
-            logger = get_db_logger()
-            if logger:
-                logger.log_update(
-                    user=current_user.username,
-                    user_id=current_user.id,
-                    endpoint=f"POST /api/form-annotations/{annotation_id}/tags",
-                    entity="FormAnnotationTagLink",
-                    fields={"tag_id": tag.TagID, "form_annotation_id": annotation_id},
-                    changes={"comment": f"{link.Comment} -> {body.comment}"},
-                )
-
     return DTOConverter.link_to_tag_metadata(link)
 
 
@@ -362,84 +143,33 @@ async def tag_form_annotation(
 async def untag_form_annotation(
     annotation_id: int,
     tag_id: int,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Remove a Tag from a FormAnnotation (idempotent)."""
-    ann = db.get(FormAnnotation, annotation_id)
-    if not ann:
-        raise HTTPException(404, "FormAnnotation not found")
-    link = db.get(
-        FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id}
+    service.untag(
+        annotation_id,
+        tag_id,
+        ActingUser(id=current_user.id, username=current_user.username),
     )
-    if link:
-        # Save link data for logging before deletion
-        deleted_data = {
-            "tag_id": tag_id,
-            "form_annotation_id": annotation_id,
-            "comment": link.Comment,
-            "creator_id": link.CreatorID,
-        }
-        
-        db.delete(link)
-        db.commit()
-        
-        # Log tag link deletion
-        logger = get_db_logger()
-        if logger:
-            logger.log_delete(
-                user=current_user.username,
-                user_id=current_user.id,
-                endpoint=f"DELETE /api/form-annotations/{annotation_id}/tags/{tag_id}",
-                entity="FormAnnotationTagLink",
-                fields={"tag_id": tag_id, "form_annotation_id": annotation_id},
-                deleted_data=deleted_data,
-            )
-    
     return Response(status_code=204)
 
 
-@router.patch("/form-annotations/{annotation_id}/tags/{tag_id}", response_model=TagMeta)
+@router.patch(
+    "/form-annotations/{annotation_id}/tags/{tag_id}", response_model=TagMeta
+)
 async def patch_form_annotation_tag(
     annotation_id: int,
     tag_id: int,
     body: ObjectTagPATCH,
-    db: Session = Depends(get_db),
+    service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> TagMeta:
     """Update comment on an existing FormAnnotation tag link."""
-    ann = db.get(FormAnnotation, annotation_id)
-    if not ann:
-        raise HTTPException(404, "FormAnnotation not found")
-    tag = db.get(Tag, tag_id)
-    if not tag:
-        raise HTTPException(404, "Tag not found")
-    if tag.TagType != TagType.FormAnnotation:
-        raise HTTPException(400, "Tag type must be FormAnnotation")
-
-    link = db.get(
-        FormAnnotationTagLink, {"TagID": tag_id, "FormAnnotationID": annotation_id}
+    link = service.patch_tag(
+        annotation_id,
+        tag_id,
+        body.comment,
+        ActingUser(id=current_user.id, username=current_user.username),
     )
-    if not link:
-        raise HTTPException(404, "Link not found")
-
-    if body.comment is not None:
-        old_comment = link.Comment
-        link.Comment = body.comment
-        db.commit()
-        db.refresh(link)
-        
-        # Log tag link update
-        logger = get_db_logger()
-        if logger:
-            logger.log_update(
-                user=current_user.username,
-                user_id=current_user.id,
-                endpoint=f"PATCH /api/form-annotations/{annotation_id}/tags/{tag_id}",
-                entity="FormAnnotationTagLink",
-                fields={"tag_id": tag_id, "form_annotation_id": annotation_id},
-                changes={"comment": f"{old_comment} -> {body.comment}"},
-            )
-    
-    link.Tag = tag
     return DTOConverter.link_to_tag_metadata(link)

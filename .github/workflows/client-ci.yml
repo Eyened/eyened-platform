@@ -1,10 +1,19 @@
 name: Client CI
 on:
+  push:
+    branches: [main, development]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-ci.yml'
   pull_request:
     branches: [main, development]
     paths:
       - 'client/**'
       - '.github/workflows/client-ci.yml'
+
+concurrency:
+  group: client-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:
@@ -14,13 +23,14 @@ jobs:
   client:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: client/.nvmrc   # node 24
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
-      - run: npm run verify:runes # export-let guard   (Phase 1)
-      - run: npm run test         # vitest run          (Phase 1)
-      - run: npm run build        # vite build          (Phase 1)
+      - run: npm run verify:runes # export-let guard (grep, instant)
+      - run: npm run lint         # eslint . && prettier --check . (+ suppressions ratchet)
+      - run: npm run test         # vitest run
+      - run: npm run build        # vite build (most expensive — last)
