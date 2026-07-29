@@ -151,16 +151,15 @@ def _eligible_attribute_values(
     eligible: list[AttributeValue] = []
     for av in candidates_list:
         producing_model = av.ProducingModel
+        if producing_model is None or av.ModelID is None:
+            continue
 
         if producing_model_id is not None:
-            if producing_model is None or producing_model.ModelID != producing_model_id:
+            if producing_model.ModelID != producing_model_id:
                 continue
 
         if producing_model_name is not None:
-            if (
-                producing_model is None
-                or producing_model.ModelName != producing_model_name
-            ):
+            if producing_model.ModelName != producing_model_name:
                 continue
 
         if attribute_name is not None:
@@ -170,9 +169,8 @@ def _eligible_attribute_values(
         if require_available and not is_available_input(av):
             continue
 
-        if min_model_id is not None:
-            if av.ModelID is None or av.ModelID < min_model_id:
-                continue
+        if min_model_id is not None and av.ModelID < min_model_id:
+            continue
 
         eligible.append(av)
 

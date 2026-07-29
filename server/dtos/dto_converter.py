@@ -4,10 +4,12 @@ Converts ORM objects (eyened_orm) into Pydantic GET DTOs defined in server/dtos.
 """
 
 from datetime import datetime
+import logging
 from typing import TYPE_CHECKING, List, Optional
 
 from eyened_orm import Model, SubTaskState
 from sqlalchemy.orm import Session, object_session
+from sqlalchemy.orm.exc import DetachedInstanceError
 
 from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
 from .dtos_instances import (
@@ -34,6 +36,8 @@ from .dtos_main import (
     SegmentationGET,
 )
 from .dtos_tasks import SubTaskGET, SubTaskWithImagesGET, TaskDefinitionGET, TaskGET
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -323,8 +327,19 @@ class DTOConverter:
         # attrs / model_attrs: highest-version available row per attribute (see ImageInstance.attrs)
         try:
             dto.attrs, dto.model_attrs = image_instance.attrs
+        except DetachedInstanceError:
+            logger.warning(
+                "ImageInstance %s attrs unavailable (detached session); returning empty",
+                getattr(image_instance, "ImageInstanceID", "?"),
+                exc_info=True,
+            )
+            dto.model_attrs = {}
+            dto.attrs = {}
         except Exception:
-            # Fail-safe: leave attributes empty if relationships not loaded
+            logger.exception(
+                "Failed to build attrs for ImageInstance %s; returning empty",
+                getattr(image_instance, "ImageInstanceID", "?"),
+            )
             dto.model_attrs = {}
             dto.attrs = {}
 

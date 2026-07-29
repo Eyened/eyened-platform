@@ -102,6 +102,38 @@ def test_select_attribute_value_picks_highest_model_id_not_lexicographic_version
     ].AttributeValueID
 
 
+def test_select_attribute_value_skips_rows_without_producing_model(session):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+
+    seeded = _seed_cfi_roi_values(
+        session,
+        image.ImageInstanceID,
+        versions={"1.0": {"center": [1, 1], "radius": 1, "lines": {}}},
+    )
+    session.refresh(image)
+
+    roi_attr = AttributeDefinition.by_column(
+        session, AttributeName="CFI_ROI", AttributeDataType=AttributeDataType.JSON
+    )
+    session.add(
+        AttributeValue(
+            AttributeID=roi_attr.AttributeID,
+            ModelID=None,
+            ImageInstanceID=image.ImageInstanceID,
+            ValueJSON={"center": [9, 9], "radius": 9, "lines": {}},
+        )
+    )
+    session.commit()
+    session.refresh(image)
+
+    selected = select_attribute_value(
+        image.AttributeValues, attribute_name="CFI_ROI"
+    )
+    assert selected is not None
+    assert selected.AttributeValueID == seeded["1.0"].AttributeValueID
+
+
 def test_select_attribute_value_respects_min_version(session):
     _proj, images = _import_images(session, count=1)
     image = images[0]
