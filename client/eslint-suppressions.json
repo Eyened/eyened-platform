@@ -280,7 +280,7 @@
   },
   "src/lib/viewer-window/TopRowImages.svelte": {
     "svelte/require-each-key": {
-      "count": 2
+      "count": 1
     }
   },
   "src/lib/viewer-window/ViewerWindow.svelte": {

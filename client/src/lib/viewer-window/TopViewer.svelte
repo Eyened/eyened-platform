@@ -55,9 +55,7 @@
 
     $effect(() => {
         if (hasLocators && !hideLinesOverlay) {
-            return viewerContext.addOverlay(
-                new OCTLinesOverlay(photoLocators),
-            );
+            return viewerContext.addOverlay(new OCTLinesOverlay(photoLocators));
         }
     });
 

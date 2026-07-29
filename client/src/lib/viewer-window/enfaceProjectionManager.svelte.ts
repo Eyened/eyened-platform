@@ -25,7 +25,11 @@ export type VisibleEnfaceProjection = {
 };
 
 export class EnfaceProjectionManager {
+    // Imperative caches only (RAF repaint / slice callbacks) — not read from
+    // $effect/$derived, so SvelteMap would add proxy cost with no benefit.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- see above
     private readonly projections = new Map<string, EnfaceProjection>();
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- see above
     private readonly attachedItems = new Map<string, SegmentationItem>();
     mainViewerContext: MainViewerContext | undefined = $state(undefined);
 
