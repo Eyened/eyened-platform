@@ -1,4 +1,4 @@
-from eyened_orm import Creator, SystemRole
+from eyened_orm import Creator, SystemRole, is_system_admin
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
@@ -59,3 +59,45 @@ def create_user(
     session.flush()
 
     return new_user
+
+
+def ensure_admin(
+    session: Session, username: str, password: str | None
+) -> Creator:
+    """Idempotent create-or-promote of a ``system_admin`` -- the real ``init_admin``.
+
+    Bootstrap must precede enforcement: granting a role needs an existing admin,
+    so >=1 system_admin is seeded out-of-band here. A
+    single admin suffices -- an admin is a data superuser, so it can grant everyone
+    else and the platform cannot brick.
+
+    Three cases, in order:
+
+    - **absent** -> create with ``Role = system_admin``
+    - **present but not an admin** -> promote in place (Role=NULL is the state of
+      every production row pre-cutover)
+    - **present, deactivated** -> reactivate, so this stays the recovery path for a
+      deployment whose only admin was deactivated
+
+    An account that is already an active admin is returned untouched -- in
+    particular the password is **not** reset, so re-running the bootstrap can never
+    lock the real admin out.
+
+    Flushes only; the caller owns the commit (``eorm init-admin`` commits
+    explicitly, and under the API ``get_db`` commits at the request boundary).
+    """
+    from eyened_orm.repositories.creator_repository import CreatorRepository
+
+    repository = CreatorRepository(session)
+    creator = repository.get_by_name(username)
+    if creator is None:
+        return create_user(
+            session, username, password, role=SystemRole.system_admin
+        )
+
+    if not is_system_admin(creator):
+        creator.Role = SystemRole.system_admin
+    if creator.Inactive:
+        creator.Inactive = False
+    repository.add(creator)
+    return creator
