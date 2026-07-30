@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import json
 import logging
+import math
 from datetime import date, datetime, timezone
 
 from fastapi import Depends
@@ -16,6 +17,29 @@ from .acting_user import ActingUser
 
 _AUDIT_LOGGER = logging.getLogger("eyened.audit")
 _BUFFER_KEY = "_audit_events"
+# {id(SessionTransaction): buffer length when that SAVEPOINT opened}
+_MARK_KEY = "_audit_savepoint_marks"
+
+
+def _finite(o: object) -> object:
+    """Replace non-finite floats with their names, recursing into the containers
+    ``diff()`` can produce.
+
+    ``json.dumps`` serializes floats itself, so ``default=_json_safe`` is never
+    consulted for them: ``NaN``/``Infinity``/``-Infinity`` would be emitted as
+    those non-standard JSON literals, and ``json.loads`` accepts them straight
+    back, so the normalization round-trip does not catch them. MySQL's JSON
+    column validates its input and rejects them, which turns an audited write of
+    a nullable float (``Segmentation.Threshold``) into a 500. SQLite stores JSON
+    as TEXT and accepts anything, so no test on the sqlite fixture can see this.
+    """
+    if isinstance(o, float) and not math.isfinite(o):
+        return str(o)  # 'nan' / 'inf' / '-inf'
+    if isinstance(o, dict):
+        return {k: _finite(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_finite(v) for v in o]
+    return o
 
 
 def _json_safe(o: object) -> object:
@@ -60,8 +84,14 @@ class AuditService:
         # same JSON-safe data. Round-tripping through json.dumps/loads (rather
         # than a shallow per-value map) also covers enums/datetimes nested inside
         # dicts or lists, which diff()'s {"old": ..., "new": ...} shape can produce.
+        # allow_nan=False is the strictness MySQL's JSON validator applies; with
+        # _finite() ahead of it nothing should trip it, so it stands as a loud
+        # guard rather than a silent pass-through if a new container shape slips
+        # a non-finite float past _finite.
         safe_changes = (
-            json.loads(json.dumps(changes, default=_json_safe))
+            json.loads(
+                json.dumps(_finite(changes), default=_json_safe, allow_nan=False)
+            )
             if changes is not None
             else None
         )
@@ -111,19 +141,57 @@ class AuditService:
 
 
 def _drain(session: Session) -> None:
+    session.info.pop(_MARK_KEY, None)
     for payload in session.info.pop(_BUFFER_KEY, []):
         _AUDIT_LOGGER.info(json.dumps(payload, default=str))
 
 
-def _clear(session: Session) -> None:
-    session.info.pop(_BUFFER_KEY, None)
+def _mark_savepoint(session: Session, transaction) -> None:
+    """Record how many events were already buffered when a SAVEPOINT opened, so
+    its rollback can drop the events staged inside it and only those."""
+    if transaction.nested:
+        session.info.setdefault(_MARK_KEY, {})[id(transaction)] = len(
+            session.info.get(_BUFFER_KEY, [])
+        )
+
+
+def _rollback(session: Session, previous_transaction) -> None:
+    """Discard the buffered events the rolled-back scope staged, and only those.
+
+    ``record()`` buffers an event and flushes its AuditLog row together, so
+    buffer position and row staging move in lockstep: truncating to the mark
+    taken when the SAVEPOINT opened drops exactly the events whose rows the
+    savepoint rollback discards, and keeps the earlier ones — whose rows are
+    still staged and still commit.
+
+    Clearing the whole buffer here instead (the previous behaviour) silently
+    lost events that the AuditLog table went on to keep, so the two sinks
+    disagreed. ``prev.nested`` is the discriminator, not
+    ``session.in_nested_transaction()`` — that reads False for a single-level
+    savepoint rollback and True for the inner one of two, so it cannot tell the
+    two cases apart.
+
+    ``after_soft_rollback`` fires for every rollback, real or nested, so it
+    subsumes ``after_rollback`` and this is the only listener that clears.
+    """
+    if not previous_transaction.nested:
+        session.info.pop(_BUFFER_KEY, None)
+        session.info.pop(_MARK_KEY, None)
+        return
+    # Marks are cleaned up here and at drain time rather than in
+    # after_transaction_end, which fires *before* this for a nested rollback and
+    # would take the mark away before it could be read.
+    mark = session.info.get(_MARK_KEY, {}).pop(id(previous_transaction), 0)
+    buffer = session.info.get(_BUFFER_KEY)
+    if buffer is not None:
+        del buffer[mark:]
 
 
 # Register once at import. Listening on the base Session class covers both the
 # production EyenedSession subclass and the plain Session used in tests.
 event.listen(Session, "after_commit", _drain)
-event.listen(Session, "after_rollback", _clear)
-event.listen(Session, "after_soft_rollback", lambda s, prev: _clear(s))
+event.listen(Session, "after_transaction_create", _mark_savepoint)
+event.listen(Session, "after_soft_rollback", _rollback)
 
 
 def get_audit_service(db: Session = Depends(get_db)) -> AuditService:

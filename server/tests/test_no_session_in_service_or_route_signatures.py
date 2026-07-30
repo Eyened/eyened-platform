@@ -31,11 +31,15 @@ Exemptions, and what would remove them:
   it. Human decision: that module is slated for deprecation and will not be
   converted. It legitimately holds a Session for ``ImportRun.apply()`` and for
   the explicit ``session.rollback()`` on its caught-failure path.
-- audit_service.py's ``_drain``/``_clear`` are SQLAlchemy ``after_commit`` /
-  ``after_rollback`` event-listener callbacks; SQLAlchemy dictates their
-  ``(session)`` signature. They are part of the already-declared AuditService
-  audit-sink exception: an earlier ``_ALLOWED`` named only
-  ``AuditService.__init__``, which was a clerical gap, not a design decision.
+- audit_service.py's ``_drain``/``_mark_savepoint``/``_rollback`` are SQLAlchemy
+  ``after_commit`` / ``after_transaction_create`` / ``after_soft_rollback``
+  event-listener callbacks; SQLAlchemy dictates their ``(session, ...)``
+  signature. They are part of the already-declared AuditService audit-sink
+  exception: an earlier ``_ALLOWED`` named only ``AuditService.__init__``, which
+  was a clerical gap, not a design decision. (``_rollback`` replaced a ``_clear``
+  registered on both ``after_rollback`` and ``after_soft_rollback``; the latter
+  fires for every rollback, nested or not, so it subsumes the former and the
+  ``after_rollback`` registration is gone.)
 - Five auth.py functions (``get_current_user``, ``check_login``,
   ``check_oidc_login``, ``CurrentUser.get_creator``, ``creator_to_response``)
   are auth resolvers that legitimately read/write ``Creator`` directly ahead
@@ -95,7 +99,8 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     ("services/audit_service.py", "__init__"): "AuditService.__init__ -- audit sink owns its session",
     # R2: SQLAlchemy event-listener callbacks; signature is SQLAlchemy-mandated.
     ("services/audit_service.py", "_drain"): "after_commit listener callback (SQLAlchemy-mandated signature)",
-    ("services/audit_service.py", "_clear"): "after_rollback/after_soft_rollback listener callback (SQLAlchemy-mandated signature)",
+    ("services/audit_service.py", "_mark_savepoint"): "after_transaction_create listener callback (SQLAlchemy-mandated signature)",
+    ("services/audit_service.py", "_rollback"): "after_soft_rollback listener callback (SQLAlchemy-mandated signature)",
     # R3: forwarding-only route handlers (see module docstring).
     ("routes/auth.py", "login"): "forwards session to check_login/creator_to_response only",
     ("routes/auth.py", "get_token"): "forwards session to check_login/creator_to_response only",
