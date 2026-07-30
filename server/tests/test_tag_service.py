@@ -1,11 +1,14 @@
+from datetime import date
+
 import pytest
 
-from eyened_orm import Creator, Tag
-from eyened_orm.tag import TagType
+from eyened_orm import Creator, CreatorTagLink, Tag
+from eyened_orm.tag import StudyTagLink, TagType
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.utils.factories import make_patient, make_project, make_study
 
 from server.services.acting_user import ActingUser
-from server.services.exceptions import NotFoundError
+from server.services.exceptions import ConflictError, NotFoundError
 from server.services.tag_service import TagService
 
 
@@ -206,3 +209,59 @@ def test_unstar_tag_logs_delete(session):
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
     assert audit.records[0]["entity"] == "CreatorTagLink"
+
+
+def test_delete_tag_in_use_raises_conflict(session):
+    """A tag still applied to a study is refused with ConflictError (-> 409)."""
+    actor = _actor(session)
+    tag = _make_tag(session, actor.id)
+    project = make_project(session, "P1")
+    patient = make_patient(session, project, "pat-1")
+    study = make_study(session, patient, date(2020, 1, 1))
+    session.add(
+        StudyTagLink(TagID=tag.TagID, StudyID=study.StudyID, CreatorID=actor.id)
+    )
+    session.flush()
+
+    with pytest.raises(ConflictError) as excinfo:
+        _service(session).delete_tag(tag.TagID, actor)
+
+    assert excinfo.value.detail["code"] == "TAG_IN_USE"
+    # _make_tag names it "T1"; the message must name the tag so the UI can say
+    # which one. Read the literal, not tag.TagName -- the failed flush left the
+    # Session needing a rollback.
+    assert "T1" in excinfo.value.detail["message"]
+    session.rollback()
+
+
+def test_delete_tag_in_use_emits_no_audit_record(session):
+    """A refused delete records nothing -- the audit trail must not claim a
+    deletion that the database rejected."""
+    actor = _actor(session)
+    tag = _make_tag(session, actor.id)
+    project = make_project(session, "P1")
+    patient = make_patient(session, project, "pat-1")
+    study = make_study(session, patient, date(2020, 1, 1))
+    session.add(
+        StudyTagLink(TagID=tag.TagID, StudyID=study.StudyID, CreatorID=actor.id)
+    )
+    session.flush()
+    audit = FakeAudit()
+
+    with pytest.raises(ConflictError):
+        _service(session, audit).delete_tag(tag.TagID, actor)
+
+    assert audit.records == []
+    session.rollback()
+
+
+def test_delete_starred_tag_succeeds(session):
+    """A star does not block a delete (CreatorTag still cascades)."""
+    actor = _actor(session)
+    tag = _make_tag(session, actor.id)
+    session.add(CreatorTagLink(TagID=tag.TagID, CreatorID=actor.id))
+    session.flush()
+
+    _service(session).delete_tag(tag.TagID, actor)
+
+    assert TagRepository(session).get_by_id(tag.TagID) is None

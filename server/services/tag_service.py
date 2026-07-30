@@ -4,12 +4,13 @@ from eyened_orm import Tag
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.tag_repository import TagRepository
 from fastapi import Depends
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
-from .exceptions import NotFoundError
+from .exceptions import ConflictError, NotFoundError
 
 
 class TagService:
@@ -95,21 +96,39 @@ class TagService:
         return tag
 
     def delete_tag(self, tag_id: int, actor: ActingUser) -> None:
-        """Delete a tag.
+        """Delete a tag, unless rows still have it applied.
 
         Raises:
             NotFoundError: If the tag does not exist.
+            ConflictError: If any study/image/annotation/segmentation/form
+                annotation still references it (``TAG_IN_USE``). Stars do not
+                block a delete -- ``CreatorTag`` still cascades.
         """
         tag = self.repository.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError(f"Tag {tag_id} not found")
 
+        # Read before the delete: a failed flush leaves the Session needing a
+        # rollback, so the 409 message must not depend on touching `tag` again.
+        tag_name = tag.TagName
         deleted_data = {
-            "name": tag.TagName,
+            "name": tag_name,
             "description": tag.TagDescription,
             "tag_type": tag.TagType,
         }
-        self.repository.delete(tag)
+        try:
+            self.repository.delete(tag)
+        except IntegrityError as exc:
+            raise ConflictError(
+                {
+                    "code": "TAG_IN_USE",
+                    "message": (
+                        f"Cannot delete tag '{tag_name}' because it is still "
+                        f"applied to one or more records. Remove those "
+                        f"applications first."
+                    ),
+                }
+            ) from exc
         if self.audit is not None:
             self.audit.record(
                 action="DELETE",
