@@ -23,6 +23,7 @@ The following commands are available:
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
 - load-dump: Load a database dump file, replacing the entire database.
+- init-admin: Create or promote a system_admin (idempotent); run before enabling RBAC enforcement.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -169,6 +170,33 @@ def create_user(username: str, password: str, is_human: bool, description: str |
             print(f"User created successfully")
         except ValueError as e:
             print(f"Error creating user: {e}")
+
+
+@eorm.command()
+@click.option("--username", type=str, prompt=True)
+@click.option(
+    "--password",
+    type=str,
+    prompt=True,
+    hide_input=True,
+    confirmation_prompt=True,
+)
+def init_admin(username: str, password: str):
+    """Create or promote a system_admin (idempotent).
+
+    Bootstrap must run before RBAC enforcement is switched on: granting a role
+    requires an existing admin, so the first one is seeded here. Safe
+    to re-run -- an account that is already an active admin is left untouched,
+    password included.
+    """
+
+    from eyened_orm.utils.db_users import ensure_admin
+
+    database = get_database()
+    with database.get_session() as session:
+        admin = ensure_admin(session, username, password)
+        session.commit()
+        print(f"System admin ready: {admin.CreatorName} (CreatorID={admin.CreatorID})")
 
 
 @eorm.command()
