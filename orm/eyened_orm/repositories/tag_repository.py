@@ -23,8 +23,30 @@ class TagRepository:
         self._session.flush()
 
     def get_by_id(self, tag_id: int) -> Tag | None:
-        """Return the tag with the given id, or None if absent."""
-        return self._session.get(Tag, tag_id)
+        """Return the tag with the given id, or None if absent.
+
+        The six link collections are ``noload``-ed deliberately. ``Tag`` maps
+        them ``lazy="selectin"``, so a plain ``session.get()`` loads all six;
+        the ORM's dependency processor then reacts to a later ``delete()`` by
+        trying to blank out the loaded children's ``TagID`` -- a primary-key
+        column -- and raises ``AssertionError`` before any SQL is emitted.
+        Leaving them unloaded lets the foreign keys decide instead: RESTRICT on
+        the five annotation links, CASCADE on ``CreatorTag``. No caller needs
+        them (``TagGET`` is scalar columns plus ``Creator``, which stays
+        loaded), and it also saves six SELECTs per call.
+        """
+        return self._session.get(
+            Tag,
+            tag_id,
+            options=[
+                noload(Tag.CreatorTagLinks),
+                noload(Tag.StudyTagLinks),
+                noload(Tag.ImageInstanceTagLinks),
+                noload(Tag.AnnotationTagLinks),
+                noload(Tag.SegmentationTagLinks),
+                noload(Tag.FormAnnotationTagLinks),
+            ],
+        )
 
     def save(self, tag: Tag) -> None:
         """Persist in-place mutations to ``tag`` within the request transaction.

@@ -29,6 +29,9 @@ class CreatorTagLink(Base):
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
     TagID: Mapped[int] = mapped_column(
+        # Deliberately CASCADE, unlike the five annotation links: a star is a
+        # personal preference, not annotation data, so it must never *block* a
+        # tag delete -- it just goes with it (spec §3.2.1).
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
     )
     CreatorID: Mapped[int] = mapped_column(
@@ -111,7 +114,10 @@ class StudyTagLink(Base):
         Index("ix_StudyTag_Study_Tag", "StudyID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
+        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
+        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
+        # precedent, so every path is covered, not just the HTTP API.
+        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
     )
     StudyID: Mapped[int] = mapped_column(
         ForeignKey("Study.StudyID", ondelete="CASCADE"), primary_key=True
@@ -141,7 +147,10 @@ class ImageInstanceTagLink(Base):
         Index("ix_ImageInstanceTag_Image_Tag", "ImageInstanceID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
+        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
+        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
+        # precedent, so every path is covered, not just the HTTP API.
+        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
     )
     ImageInstanceID: Mapped[int] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"),
@@ -173,7 +182,10 @@ class AnnotationTagLink(Base):
         Index("ix_AnnotationTag_Annotation_Tag", "AnnotationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
+        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
+        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
+        # precedent, so every path is covered, not just the HTTP API.
+        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
     )
     AnnotationID: Mapped[int] = mapped_column(
         ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True
@@ -199,7 +211,10 @@ class SegmentationTagLink(Base):
         Index("ix_SegmentationTag_Segmentation_Tag", "SegmentationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
+        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
+        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
+        # precedent, so every path is covered, not just the HTTP API.
+        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
     )
     SegmentationID: Mapped[int] = mapped_column(
         ForeignKey("Segmentation.SegmentationID", ondelete="CASCADE"), primary_key=True
@@ -233,7 +248,10 @@ class FormAnnotationTagLink(Base):
         ),
     )
     TagID: Mapped[int] = mapped_column(
-        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
+        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
+        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
+        # precedent, so every path is covered, not just the HTTP API.
+        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
     )
     FormAnnotationID: Mapped[int] = mapped_column(
         ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"),
