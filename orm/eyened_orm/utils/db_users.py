@@ -1,4 +1,4 @@
-from eyened_orm import Creator
+from eyened_orm import Creator, SystemRole
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
@@ -25,11 +25,16 @@ def create_user(
     is_human: bool = True,
     description: str | None = None,
     employee_identifier: str | None = None,
+    role: SystemRole | None = None,
 ) -> Creator:
     """
     Create a new user with the given credentials.
 
     If the password is None, a disabled password is generated.
+
+    ``role`` defaults to None so the unauthenticated paths that call this
+    (``/auth/register``, OIDC auto-provision) keep landing at ``Role = NULL``:
+    they cannot set a system role, so neither is an escalation path.
 
     Flushes so the new user's PK is assigned; the caller owns the commit.
     """
@@ -48,6 +53,7 @@ def create_user(
         IsHuman=is_human,
         Description=description,
         EmployeeIdentifier=employee_identifier,
+        Role=role,
     )
     session.add(new_user)
     session.flush()
