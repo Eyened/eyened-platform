@@ -1,5 +1,8 @@
+from datetime import date
+
 from eyened_orm import AuditLog, Creator, Tag
-from eyened_orm.tag import TagType
+from eyened_orm.tag import StudyTagLink, TagType
+from eyened_orm.utils.factories import make_patient, make_project, make_study
 
 
 def _make_tag(session, creator_id: int) -> Tag:
@@ -62,3 +65,54 @@ def test_patch_tag_tag_type_persists_and_audits(client, session):
     assert audit_rows[0].Changes == {
         "TagType": {"old": "Study", "new": "ImageInstance"}
     }
+
+
+def test_delete_tag_still_applied_returns_409(client, session):
+    """DELETE /tags/{id} on an applied tag returns 409 with a structured code.
+
+    The full stack test: the FK raises IntegrityError, TagService maps it to
+    ConflictError, and the single ServiceError handler assigns the status --
+    no per-route wiring (spec §3.3.1).
+    """
+    creator = Creator(CreatorName="alice", IsHuman=True)
+    session.add(creator)
+    session.commit()
+    tag = _make_tag(session, creator.CreatorID)
+    project = make_project(session, "P1")
+    patient = make_patient(session, project, "pat-1")
+    study = make_study(session, patient, date(2020, 1, 1))
+    session.add(
+        StudyTagLink(
+            TagID=tag.TagID, StudyID=study.StudyID, CreatorID=creator.CreatorID
+        )
+    )
+    session.commit()
+    tag_id = tag.TagID
+    # The client fixture binds the request to *this* Session
+    # (server/tests/conftest.py), so without expunging, the handler's
+    # session.get() is an identity-map hit with the link collections unloaded --
+    # and this test would then pass with or without Task 1's noload, i.e. prove
+    # only half of what it claims. Expunging gives the request the fresh-Session
+    # semantics it has in production.
+    session.expunge_all()
+
+    response = client.delete(f"/tags/{tag_id}")
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "TAG_IN_USE"
+    # The tag and its link survived the refused delete.
+    assert session.get(Tag, tag_id) is not None
+    assert session.query(StudyTagLink).count() == 1
+
+
+def test_delete_unapplied_tag_returns_204(client, session):
+    """DELETE /tags/{id} still succeeds for a tag nobody has applied."""
+    creator = Creator(CreatorName="alice", IsHuman=True)
+    session.add(creator)
+    session.commit()
+    tag = _make_tag(session, creator.CreatorID)
+
+    response = client.delete(f"/tags/{tag.TagID}")
+
+    assert response.status_code == 204, response.text
+    assert session.get(Tag, tag.TagID) is None

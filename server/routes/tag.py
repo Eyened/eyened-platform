@@ -58,7 +58,7 @@ async def delete_tag(
     service: TagService = Depends(get_tag_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Delete a tag."""
+    """Delete a tag (409 if it is still applied to any record)."""
     service.delete_tag(
         tag_id,
         ActingUser(id=current_user.id, username=current_user.username),
