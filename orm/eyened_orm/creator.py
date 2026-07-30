@@ -50,6 +50,12 @@ class Creator(Base):
     Description: Mapped[Optional[str]] = mapped_column(String(1000))
     Role: Mapped[Optional[int]]
 
+    # Deactivation, not deletion: ~99k FK rows make a hard delete impossible. A
+    # deactivated creator cannot authenticate but keeps their authored work
+    # attributed and their memberships retained-but-inert, so reactivation
+    # restores prior access in one click.
+    Inactive: Mapped[bool] = mapped_column(default=False)
+
     # Authentication (private)
     Password: Mapped[Optional[bytes]] = mapped_column(BINARY(32), info={"private": True})
     PasswordHash: Mapped[Optional[str]] = mapped_column(String(255), info={"private": True})
