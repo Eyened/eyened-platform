@@ -40,6 +40,10 @@ class ProjectMember(Base):
         # Duplicates the clustered PK's leading prefix, so InnoDB does not need it
         # for the FK. Declared anyway for house consistency (cf. StudyTag's TagID).
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
+        # NOT redundant: ProjectID is the PK's *trailing* column, not a prefix, so
+        # InnoDB has no other index to satisfy the FK with. This one is required --
+        # dropping it while the FK exists fails with errno 1553 (see the
+        # migration's downgrade()).
         ForeignKeyIndex(__tablename__, "Project", "ProjectID"),
     )
 

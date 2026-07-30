@@ -47,7 +47,8 @@ def test_init_admin_is_idempotent(session, monkeypatch):
     monkeypatch.setattr(cli, "get_database", lambda *a, **k: _SessionBoundDatabase(session))
 
     runner = CliRunner()
-    runner.invoke(cli.eorm, ["init-admin"], input="admin\nsecret\nsecret\n")
+    first = runner.invoke(cli.eorm, ["init-admin"], input="admin\nsecret\nsecret\n")
+    assert first.exit_code == 0, first.output
     result = runner.invoke(cli.eorm, ["init-admin"], input="admin\nsecret\nsecret\n")
 
     assert result.exit_code == 0, result.output

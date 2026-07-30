@@ -79,7 +79,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("Creator", "Inactive")
-    op.drop_index("fk_ProjectMember_Project1_idx", table_name="ProjectMember")
-    op.drop_index("fk_ProjectMember_Creator1_idx", table_name="ProjectMember")
+    # No explicit drop_index calls here (contrast 2026_07_24-add_audit_log.py,
+    # whose downgrade drops its own indexes before its table): DROP TABLE already
+    # removes a table's own indexes and constraints. That shape is NOT safe to
+    # copy back onto ProjectMember -- fk_ProjectMember_Project1_idx backs the
+    # ProjectID FK (its leading column), and InnoDB refuses to drop an index
+    # while the FK it backs still exists (errno 1553). AuditLog's downgrade gets
+    # away with dropping indexes explicitly only because AuditLog has no FKs.
     op.drop_table("ProjectMember")
+    op.drop_column("Creator", "Inactive")

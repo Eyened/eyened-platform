@@ -104,7 +104,10 @@ async def lifespan(app: FastAPI):
     if settings.public_auth_disabled:
         print(
             "WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed "
-            f"and every request runs as system_admin '{settings.admin_username}'"
+            f"and every request runs as system_admin '{settings.admin_username}'. "
+            "That account is created, promoted, or reactivated in the database "
+            "(not just for the current request), and the system_admin grant "
+            "persists after this flag is turned back off."
         )
 
     # before startup

@@ -23,13 +23,19 @@ def test_is_system_admin_only_for_the_admin_role(session, role, expected):
 
 def test_deactivation_does_not_yet_hide_a_creator_from_the_search_facet(session):
     """Characterization: adding the column does NOT make deactivated users
-    disappear from the creator search facet. The facet is built with
-    `Creator.query_column` (server/services/search/search_service.py:213,285),
-    which routes through `Base.select` (base.py:431) -- and only `Base.query`
-    (base.py:315) carries the automatic `~Inactive` filter (base.py:351).
-    Filtering the facet is one explicit `where=` clause and belongs in P4, which
-    rewrites exactly those two call sites for scoped facets. This pins today's
-    truth so P4's change lands as a visible diff rather than a silent one."""
+    disappear from the creator search facet. The instance-signature facet's
+    creator names are enumerated via `Creator.query_column`, reached from the
+    one call site at `server/services/search/search_service.py:208-211`
+    (already passing a `where=`), which routes through `Base.select`
+    (base.py:431) -- and only `Base.query` (base.py:315) carries the automatic
+    `~Inactive` filter (base.py:351). A second, independent path is also
+    unfiltered on `Creator`: `SearchRepository.active_form_creator_names()`
+    (`orm/eyened_orm/repositories/search/repository.py:138-147`) hand-writes
+    its own query, filtered on `~FormAnnotation.Inactive` but not
+    `Creator.Inactive`, feeding the "Form Creator Name" facet. Filtering both
+    is P4's work: amending the existing `where=` on the first site, and adding
+    a new `~Creator.Inactive` clause to the second. This pins today's truth so
+    P4's change lands as a visible diff rather than a silent one."""
     make_creator(session, "present")
     gone = make_creator(session, "departed")
     gone.Inactive = True

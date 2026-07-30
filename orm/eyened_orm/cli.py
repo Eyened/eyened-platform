@@ -187,7 +187,10 @@ def init_admin(username: str, password: str):
     Bootstrap must run before RBAC enforcement is switched on: granting a role
     requires an existing admin, so the first one is seeded here. Safe
     to re-run -- an account that is already an active admin is left untouched,
-    password included.
+    password included. More generally: the password just typed is used only to
+    create a brand-new account -- an account that already existed (promoted
+    from a plain user, or reactivated from deactivated) keeps its existing
+    password unchanged.
     """
 
     from eyened_orm.utils.db_users import ensure_admin
@@ -196,7 +199,10 @@ def init_admin(username: str, password: str):
     with database.get_session() as session:
         admin = ensure_admin(session, username, password)
         session.commit()
-        print(f"System admin ready: {admin.CreatorName} (CreatorID={admin.CreatorID})")
+        print(
+            f"System admin ready: {admin.CreatorName} (CreatorID={admin.CreatorID}). "
+            "If this account already existed, its password was left unchanged."
+        )
 
 
 @eorm.command()

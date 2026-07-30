@@ -130,8 +130,11 @@ class Settings(BaseSettings):
     # `eorm init-admin`'s documented default. admin_password is Optional: with no
     # password set the bootstrapped account has password login disabled, which is
     # correct for a bypass that never posts credentials. Set it only if something
-    # must actually log in as the admin over HTTP -- notably the importer, which
-    # posts admin_username/admin_password to /api/auth/login.
+    # must actually log in as the admin over HTTP. Note: the importer
+    # (ImageImporter, orm/eyened_orm/importer/image_importer.py) takes
+    # admin_username/admin_password as separate dataclass constructor arguments,
+    # sourced from EYENED_API_USERNAME/EYENED_API_PASSWORD (see
+    # notebooks/import_api.ipynb) -- it never reads this setting.
     admin_username: str = "admin"
     admin_password: SecretStr | None = None
     auth_password_enabled: bool = True
