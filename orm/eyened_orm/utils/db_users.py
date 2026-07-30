@@ -30,6 +30,8 @@ def create_user(
     Create a new user with the given credentials.
 
     If the password is None, a disabled password is generated.
+
+    Flushes so the new user's PK is assigned; the caller owns the commit.
     """
     # Check if username already exists
     existing_user = (
@@ -48,7 +50,6 @@ def create_user(
         EmployeeIdentifier=employee_identifier,
     )
     session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
+    session.flush()
 
     return new_user

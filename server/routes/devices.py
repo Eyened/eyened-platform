@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from ..db import get_db
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_main import DeviceModelGET
 from ..services.device_service import DeviceService, get_device_service
@@ -12,10 +10,9 @@ router = APIRouter()
 
 @router.get("/devices", response_model=list[DeviceModelGET])
 async def list_devices(
-    db: Session = Depends(get_db),
     service: DeviceService = Depends(get_device_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Return all device models."""
-    rows = service.list_devices(db)
+    rows = service.list_devices()
     return [DTOConverter.device_model_to_get(r) for r in rows]

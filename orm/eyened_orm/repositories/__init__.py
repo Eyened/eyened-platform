@@ -1,3 +1,4 @@
+from .creator_repository import CreatorRepository
 from .device_repository import DeviceRepository
 from .feature_repository import FeatureRepository
 from .form_annotation_repository import FormAnnotationRepository
@@ -13,6 +14,7 @@ from .tag_repository import TagRepository
 from .task_repository import SubTaskRepository, TaskRepository
 
 __all__ = [
+    "CreatorRepository",
     "DeviceRepository",
     "PatientRepository",
     "FormAnnotationRepository",

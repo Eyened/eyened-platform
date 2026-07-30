@@ -76,8 +76,8 @@ def test_each_exists_branch_has_an_empty_case(client, data, variable, value):
 def test_conditions_are_and_ed_together(client, data):
     """Multiple conditions AND globally (today's semantics): the result is their intersection.
 
-    NOTE: the plan asserted OR here; verified against the code it is AND
-    (`_build_instance_select` combines every group with `and_(*and_predicates)`).
+    Verified against the code: `_build_instance_select` combines every group
+    with `and_(*and_predicates)`.
     """
     # Alpha images are a1,a2; feat-x is on a1 only. AND narrows to a1 (OR would give a1,a2).
     narrowed = _search(
@@ -174,8 +174,7 @@ def test_unknown_order_by_is_rejected_by_pydantic(client, data):
 def test_unknown_attribute_field_is_rejected(client, data):
     """An unresolvable attribute 400s rather than silently returning every row.
 
-    Behavior change (was: filter dropped, full result set returned). See
-    docs/superpowers/plans/2026-07-14-search-refactor.md Task 12.
+    Behavior change (was: filter dropped, full result set returned).
     """
     resp = client.post(
         "/instances/search",
