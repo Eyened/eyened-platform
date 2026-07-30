@@ -1,3 +1,4 @@
+import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional, Set
 
@@ -8,6 +9,27 @@ from .base import Base
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, FormAnnotation, SubTask, Segmentation, Tag, CreatorTagLink, Task
+
+
+class SystemRole(enum.IntEnum):
+    """Global system role, stored in the pre-existing ``Creator.Role`` integer column.
+
+    ``system_admin`` is a **data superuser**: it administers users, project access
+    and project metadata *and* has full data access to every project. The control
+    on it is attribution and audit, not denial.
+
+    P2 deliberately keeps ``Creator.Role`` an untyped ``Optional[int]`` -- converting
+    it to a ``SAEnum`` column with a ``NOT NULL`` default is enforcement-phase work,
+    and these integer values are forward-compatible with it.
+    """
+
+    user = 0
+    system_admin = 1
+
+
+def is_system_admin(creator: "Creator") -> bool:
+    """True only for an explicit system_admin. NULL (every row pre-cutover) -> False."""
+    return creator.Role == SystemRole.system_admin
 
 
 class Creator(Base):
