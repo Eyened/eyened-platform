@@ -53,7 +53,14 @@ def create_user(
         IsHuman=is_human,
         Description=description,
         EmployeeIdentifier=employee_identifier,
-        Role=role,
+        # Coerce explicitly: Creator.Role is an untyped Integer with no bind
+        # processor, so pymysql's encoders dict (keyed on exact type) misses an
+        # IntEnum and falls through to the string encoder. MySQL coerces the
+        # resulting quoted string back to an int for this column, but only
+        # because Python 3.11+ made IntEnum.__str__ return the number -- on
+        # <=3.10 the same call yields e.g. "SystemRole.system_admin" and the
+        # INSERT fails under STRICT mode.
+        Role=int(role) if role is not None else None,
     )
     session.add(new_user)
     session.flush()
@@ -81,10 +88,22 @@ def ensure_admin(
 
     An account that is already an active admin is returned untouched -- in
     particular the password is **not** reset, so re-running the bootstrap can never
-    lock the real admin out.
+    lock the real admin out. More generally: the ``password`` argument is used
+    **only** when creating a brand-new account -- the promote and reactivate
+    branches below discard it just as much as the already-admin case does.
 
     Flushes only; the caller owns the commit (``eorm init-admin`` commits
     explicitly, and under the API ``get_db`` commits at the request boundary).
+
+    Note: two concurrent first requests on a cold DB can both see
+    ``get_by_name -> None`` and both attempt the create branch below; the second
+    then fails its INSERT on the unique ``CreatorName`` constraint (IntegrityError
+    -> 500). This is dev-only (the only caller that can race is the
+    ``public_auth_disabled`` bypass), fails closed, and self-heals on retry once
+    the first request's row is visible. Left unhandled deliberately: the obvious
+    ``except IntegrityError: session.rollback()`` would discard the rest of the
+    request's transaction, which is a bigger behavior change than this bootstrap
+    helper should make unilaterally.
     """
     from eyened_orm.repositories.creator_repository import CreatorRepository
 
@@ -96,7 +115,9 @@ def ensure_admin(
         )
 
     if not is_system_admin(creator):
-        creator.Role = SystemRole.system_admin
+        # int(): see the matching comment on create_user's Role= -- same untyped
+        # Integer column, same pymysql encoder gap.
+        creator.Role = int(SystemRole.system_admin)
     if creator.Inactive:
         creator.Inactive = False
     repository.add(creator)

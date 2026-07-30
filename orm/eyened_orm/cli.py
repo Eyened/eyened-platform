@@ -173,7 +173,7 @@ def create_user(username: str, password: str, is_human: bool, description: str |
 
 
 @eorm.command()
-@click.option("--username", type=str, prompt=True)
+@click.option("--username", type=str, prompt=True, envvar="EYENED_API_ADMIN_USERNAME")
 @click.option(
     "--password",
     type=str,
@@ -190,19 +190,31 @@ def init_admin(username: str, password: str):
     password included. More generally: the password just typed is used only to
     create a brand-new account -- an account that already existed (promoted
     from a plain user, or reactivated from deactivated) keeps its existing
-    password unchanged.
+    password unchanged. The promote case is reported distinctly from the create
+    case (see below), precisely because that password-preservation is easy to
+    miss when the command's output reads the same either way.
     """
 
+    from eyened_orm.repositories.creator_repository import CreatorRepository
     from eyened_orm.utils.db_users import ensure_admin
 
     database = get_database()
     with database.get_session() as session:
+        pre_existing = CreatorRepository(session).get_by_name(username) is not None
         admin = ensure_admin(session, username, password)
         session.commit()
-        print(
-            f"System admin ready: {admin.CreatorName} (CreatorID={admin.CreatorID}). "
-            "If this account already existed, its password was left unchanged."
-        )
+        if pre_existing:
+            print(
+                f"Promoted PRE-EXISTING account '{admin.CreatorName}' "
+                f"(CreatorID={admin.CreatorID}, created {admin.DateInserted.date()}) "
+                "to system_admin. Its password was NOT changed -- verify this is "
+                "an account you expect."
+            )
+        else:
+            print(
+                f"Created system admin '{admin.CreatorName}' "
+                f"(CreatorID={admin.CreatorID})."
+            )
 
 
 @eorm.command()

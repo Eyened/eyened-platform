@@ -55,6 +55,7 @@ def client(session, monkeypatch):
     """
     # Imported lazily: pytest_configure above must set the DB env vars first.
     import server.db as server_db
+    from eyened_orm import SystemRole
     from server.main import app_api
     from server.routes.auth import CurrentUser, get_current_user
 
@@ -64,8 +65,10 @@ def client(session, monkeypatch):
 
     # A CurrentUser with no backing Creator row: search never calls get_creator(),
     # and seeding one would pollute /instances/search/signature's creator list.
+    # role is SystemRole.system_admin (an int), not the string "admin" --
+    # CurrentUser.role is typed int | None.
     app_api.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        creator_id=1, username="tester", role="admin"
+        creator_id=1, username="tester", role=SystemRole.system_admin
     )
     with TestClient(app_api) as c:
         yield c

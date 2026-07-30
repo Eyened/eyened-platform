@@ -278,3 +278,18 @@ async def test_dev_bypass_works_with_no_admin_password_configured(
 
     admin = session.query(Creator).filter_by(CreatorName="dev-admin").one()
     assert admin.PasswordHash is not None  # disabled, not absent
+
+
+def test_register_never_grants_a_system_role(client, session):
+    """POST /auth/register is unauthenticated and takes no role field -- pins
+    that the resulting Creator lands at Role=None, so a future change that
+    starts passing a role through create_user at this call site would fail
+    this test rather than slip by as a silent escalation path."""
+    response = client.post(
+        "/auth/register",
+        json={"username": "self-registered", "password": "some-password"},
+    )
+    assert response.status_code == 200, response.text
+
+    created = session.query(Creator).filter_by(CreatorName="self-registered").one()
+    assert created.Role is None

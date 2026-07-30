@@ -58,9 +58,9 @@ def upgrade() -> None:
     op.create_index("fk_ProjectMember_Project1_idx", "ProjectMember", ["ProjectID"])
 
     # Two statements, not one: the model carries only a Python-side default
-    # (matching Annotation/Segmentation/FormAnnotation, whose server defaults
-    # 2025_10_23-2 deliberately set to None), so a lingering server default here
-    # would be permanent drift against Base.metadata. Adding it *with* a default
+    # (matching Annotation/ImageInstance, whose server defaults 2025_10_23-2
+    # deliberately set to None), so a lingering server default here would be
+    # permanent drift against Base.metadata. Adding it *with* a default
     # first makes the backfill of the existing rows explicit rather than relying
     # on MySQL's implicit default for a NOT NULL column.
     op.add_column(
