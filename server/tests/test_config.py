@@ -100,3 +100,22 @@ def test_oidc_missing_required_metadata(metadata_key):
 
     with pytest.raises(ValueError, match=f"OIDC metadata URL response is missing required key '{metadata_key}'"):
         validate_oidc_metadata(response_data)
+
+
+def test_admin_settings_have_dev_friendly_defaults():
+    """auth.py has read both of these since before they existed; with
+    extra="forbid" their absence made public_auth_disabled=true an AttributeError."""
+    settings = Settings()
+    assert settings.admin_username == "admin"
+    assert settings.admin_password is None
+
+
+def test_admin_settings_come_from_the_env(monkeypatch):
+    monkeypatch.setenv("EYENED_API_ADMIN_USERNAME", "dev-admin")
+    monkeypatch.setenv("EYENED_API_ADMIN_PASSWORD", "s3cret")
+
+    settings = Settings()
+    assert settings.admin_username == "dev-admin"
+    assert settings.admin_password.get_secret_value() == "s3cret"
+    # SecretStr, so the password cannot leak into a log line or an error message.
+    assert "s3cret" not in repr(settings.admin_password)

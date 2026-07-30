@@ -126,6 +126,14 @@ class Settings(BaseSettings):
     )
     debug: bool = False
     public_auth_disabled: bool = False
+    # Read by the public_auth_disabled dev bypass (routes/auth.py) and by
+    # `eorm init-admin`'s documented default. admin_password is Optional: with no
+    # password set the bootstrapped account has password login disabled, which is
+    # correct for a bypass that never posts credentials. Set it only if something
+    # must actually log in as the admin over HTTP -- notably the importer, which
+    # posts admin_username/admin_password to /api/auth/login.
+    admin_username: str = "admin"
+    admin_password: SecretStr | None = None
     auth_password_enabled: bool = True
     auth_oidc_enabled: bool = False
     secret_key: SecretStr = ""
