@@ -2,3 +2,7 @@
 pytest==8.*
 # Required by fastapi.testclient.TestClient (route-level tests).
 httpx==0.28.*
+# Provides the pytest plugin behind @pytest.mark.anyio (async dependency tests).
+# Resolves transitively via starlette/httpx today; declared because the suite
+# uses it directly. `4.*` sits inside starlette's own `anyio<5,>=3.6.2`.
+anyio==4.*

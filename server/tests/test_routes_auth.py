@@ -1,6 +1,8 @@
 from hashlib import pbkdf2_hmac
 from types import SimpleNamespace
 
+import pytest
+
 from eyened_orm import AuditLog, Creator
 from eyened_orm.utils.db_users import hash_password
 
@@ -186,3 +188,93 @@ def test_check_oidc_login_migrates_non_subject_identifier_but_does_not_commit(se
     session.rollback()  # get_db does this in production on a later exception
     reloaded = session.get(Creator, creator_id)
     assert reloaded.EmployeeIdentifier == "oidc:email:old@example.com"
+
+
+def _dev_bypass_settings(monkeypatch, **overrides):
+    """Swap the module-level `settings` for a fresh instance.
+
+    Settings is frozen=True, so assigning to a field raises ValidationError;
+    rebinding the module attribute is the way to vary config in a test. auth.py
+    holds `settings` as a module global (`from ..config import ... settings`), so
+    this is the name its handlers actually read.
+    """
+    import server.routes.auth as auth_module
+    from server.config import Settings
+
+    monkeypatch.setattr(
+        auth_module,
+        "settings",
+        Settings(public_auth_disabled=True, **overrides),
+    )
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_resolves_a_real_system_admin(session, monkeypatch):
+    """Local dev must work with no extra seeding -- and the account the bypass
+    resolves is only a superuser if its Role is system_admin."""
+    from eyened_orm import Creator, is_system_admin
+    from server.routes.auth import get_current_user
+
+    _dev_bypass_settings(monkeypatch, admin_username="dev-admin")
+
+    current = await get_current_user(session=session)
+
+    assert current.username == "dev-admin"
+    admin = session.query(Creator).filter_by(CreatorName="dev-admin").one()
+    assert is_system_admin(admin) is True
+    assert admin.Inactive is False
+    assert current.id == admin.CreatorID
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_promotes_an_existing_non_admin(session, monkeypatch):
+    """The pre-existing bug: the old branch auto-created (or found) a Role=NULL
+    account, which after P4 would see no data at all."""
+    from eyened_orm import is_system_admin
+    from eyened_orm.utils.db_users import create_user
+    from server.routes.auth import get_current_user
+
+    existing = create_user(session, "dev-admin", "pw")
+    assert existing.Role is None
+    session.commit()
+
+    _dev_bypass_settings(monkeypatch, admin_username="dev-admin")
+    await get_current_user(session=session)
+
+    assert is_system_admin(existing) is True
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_creates_no_duplicate_on_a_second_request(
+    session, monkeypatch
+):
+    from eyened_orm import Creator
+    from server.routes.auth import get_current_user
+
+    _dev_bypass_settings(monkeypatch, admin_username="dev-admin")
+
+    await get_current_user(session=session)
+    await get_current_user(session=session)
+
+    assert session.query(Creator).filter_by(CreatorName="dev-admin").count() == 1
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_works_with_no_admin_password_configured(
+    session, monkeypatch
+):
+    """admin_password defaults to None, so an unconditional .get_secret_value()
+    would AttributeError -- reintroducing the very failure this task removes. A
+    None password means password login is disabled, which is correct for a bypass
+    that never posts credentials."""
+    import server.routes.auth as auth_module
+    from eyened_orm import Creator
+    from server.routes.auth import get_current_user
+
+    _dev_bypass_settings(monkeypatch, admin_username="dev-admin")
+    assert auth_module.settings.admin_password is None  # the default this guards
+
+    await get_current_user(session=session)
+
+    admin = session.query(Creator).filter_by(CreatorName="dev-admin").one()
+    assert admin.PasswordHash is not None  # disabled, not absent

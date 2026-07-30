@@ -14,7 +14,7 @@ from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.repositories.creator_repository import CreatorRepository
-from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
+from eyened_orm.utils.db_users import create_user, disable_password, ensure_admin, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
 
@@ -72,7 +72,7 @@ class RefreshTokenRequest(BaseModel):
 
 
 class CurrentUser:
-    def __init__(self, creator_id: int, username: str, role: str | None = None):
+    def __init__(self, creator_id: int, username: str, role: int | None = None):
         self.id = creator_id
         self.username = username
         self.role = role
@@ -201,16 +201,17 @@ async def get_current_user(
     """Get the current authenticated user from either Authorization header or cookies."""
     # Bypass authentication if disabled (development mode)
     if settings.public_auth_disabled:
-        creator = (
-            session.query(Creator)
-            .where(Creator.CreatorName == settings.admin_username)
-            .first()
+        # Dev bypass: every request resolves the configured admin account.
+        # `ensure_admin` -- not a bare lookup -- because that account is only a
+        # superuser if its Role is system_admin, and the old branch auto-created
+        # a Role=NULL non-admin that would see nothing once enforcement lands.
+        # Idempotent, and it flushes only: get_db commits at the request boundary.
+        admin_password = (
+            settings.admin_password.get_secret_value()
+            if settings.admin_password is not None
+            else None
         )
-        if not creator:
-            # Should not happen if init_admin ran; ensure dev usability
-            creator = create_user(
-                session, settings.admin_username, settings.admin_password
-            )
+        creator = ensure_admin(session, settings.admin_username, admin_password)
         return CurrentUser(
             creator_id=creator.CreatorID,
             username=creator.CreatorName,

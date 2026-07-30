@@ -102,7 +102,10 @@ async def lifespan(app: FastAPI):
     print(settings)
 
     if settings.public_auth_disabled:
-        print("WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed")
+        print(
+            "WARNING: PUBLIC_AUTH_DISABLED is enabled; authentication is bypassed "
+            f"and every request runs as system_admin '{settings.admin_username}'"
+        )
 
     # before startup
     logging.basicConfig()

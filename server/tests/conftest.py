@@ -74,6 +74,17 @@ def client(session, monkeypatch):
     app_api.dependency_overrides.pop(get_current_user, None)
 
 
+@pytest.fixture
+def anyio_backend():
+    """Drive `@pytest.mark.anyio` tests on asyncio only.
+
+    anyio's pytest plugin ships with anyio itself and is auto-registered, but it
+    only drives tests that carry the marker -- which is why a bare
+    `async def test_...` errors out instead of running.
+    """
+    return "asyncio"
+
+
 @pytest.fixture()
 def signed_jwts(monkeypatch):
     """Give JWT issuance/verification a usable HMAC key.
