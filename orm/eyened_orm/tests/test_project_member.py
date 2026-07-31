@@ -87,3 +87,48 @@ def test_deleting_a_creator_with_a_grant_is_refused(session):
     with pytest.raises(IntegrityError):
         session.commit()
     session.rollback()
+
+
+def test_a_creator_holds_independent_roles_in_two_projects(session):
+    """The PK is composite -- (CreatorID, ProjectID), not CreatorID alone.
+
+    test_one_role_per_creator_per_project inserts its duplicate against the
+    *same* project, so it cannot tell "one role per (creator, project)" apart
+    from "one row per creator, ever": dropping primary_key=True from ProjectID
+    leaves it green. This is the test that fails, and it pins exactly the
+    capability P4's AccessScope.roles mapping is built on -- one actor, several
+    projects, a different role in each.
+    """
+    creator = make_creator(session, "multi")
+    a = make_project(session, "A")
+    b = make_project(session, "B")
+    _grant(session, creator, a, ProjectRole.grader)
+    _grant(session, creator, b, ProjectRole.read_only)
+    session.commit()
+    # Capture before expunging: expire_on_commit=True means reading these off a
+    # detached instance raises DetachedInstanceError instead of failing usefully.
+    a_id, b_id = a.ProjectID, b.ProjectID
+    session.expunge_all()
+
+    roles = {m.ProjectID: m.Role for m in session.scalars(select(ProjectMember)).all()}
+
+    assert roles == {a_id: ProjectRole.grader, b_id: ProjectRole.read_only}
+
+
+def test_granting_access_must_assign_a_role(session):
+    """'Granting access assigns a project role' is v0.2 acceptance criterion 2,
+    made structural as a NOT NULL column rather than an API validation.
+
+    Without it a membership row could exist with Role IS NULL, which
+    effective_role() would read as access-with-no-privileges -- a state the
+    role hierarchy has no meaning for.
+    """
+    creator = make_creator(session, "roleless")
+    project = make_project(session, "P1")
+
+    session.add(
+        ProjectMember(CreatorID=creator.CreatorID, ProjectID=project.ProjectID)
+    )
+    with pytest.raises(IntegrityError):
+        session.flush()
+    session.rollback()
