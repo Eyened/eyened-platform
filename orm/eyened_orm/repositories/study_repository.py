@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, noload
 
 from eyened_orm import Study, StudyTagLink, Tag
+from eyened_orm.tag import TAG_LINK_COLLECTIONS
 
 
 class StudyRepository:
@@ -19,10 +20,25 @@ class StudyRepository:
         """Return the tag with the given id, or None if absent.
 
         Kept here (rather than depending on a future TagRepository) so this
-        module migrates independently; ``studies`` only needs to read a Tag to
-        validate its ``TagType`` before linking.
+        module migrates independently. ``studies`` reads ``TagType`` to validate
+        the link (``study_service.py:46``) and then assigns the instance into
+        ``StudyTagLink.Tag`` (``:57``) -- which is why this returns the mapped
+        object rather than the single column. A ``select(Tag.TagType)`` would be
+        cheaper still and would leave nothing in the identity map at all, but it
+        would break that assignment.
+
+        The link collections are ``noload``-ed for the same reason
+        ``TagRepository.get_by_id`` does it: ``Tag`` maps them
+        ``lazy="selectin"``, so a plain ``session.get()`` loads all six -- on
+        the dev database that is up to 76k rows to read one column. It also
+        keeps a loaded collection out of the Session, which is what would
+        otherwise let the ORM pre-empt the delete-time foreign keys (§3.2.1).
         """
-        return self._session.get(Tag, tag_id)
+        return self._session.get(
+            Tag,
+            tag_id,
+            options=[noload(attribute) for attribute in TAG_LINK_COLLECTIONS],
+        )
 
     def get_link(self, tag_id: int, study_id: int) -> StudyTagLink | None:
         """Return the StudyTagLink for (tag, study), or None if not linked."""
