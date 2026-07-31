@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, load_only, noload, selectinload
 
 from eyened_orm import Creator, CreatorTagLink, Tag
+from eyened_orm.tag import TAG_LINK_COLLECTIONS
 
 
 class TagRepository:
@@ -38,14 +39,7 @@ class TagRepository:
         return self._session.get(
             Tag,
             tag_id,
-            options=[
-                noload(Tag.CreatorTagLinks),
-                noload(Tag.StudyTagLinks),
-                noload(Tag.ImageInstanceTagLinks),
-                noload(Tag.AnnotationTagLinks),
-                noload(Tag.SegmentationTagLinks),
-                noload(Tag.FormAnnotationTagLinks),
-            ],
+            options=[noload(attribute) for attribute in TAG_LINK_COLLECTIONS],
         )
 
     def save(self, tag: Tag) -> None:
@@ -74,12 +68,7 @@ class TagRepository:
                 Tag.CreatorID,
                 Tag.DateInserted,
             ),
-            noload(Tag.CreatorTagLinks),
-            noload(Tag.StudyTagLinks),
-            noload(Tag.ImageInstanceTagLinks),
-            noload(Tag.AnnotationTagLinks),
-            noload(Tag.SegmentationTagLinks),
-            noload(Tag.FormAnnotationTagLinks),
+            *[noload(attribute) for attribute in TAG_LINK_COLLECTIONS],
             selectinload(Tag.Creator).load_only(
                 Creator.CreatorID, Creator.CreatorName
             ),

@@ -272,3 +272,31 @@ class FormAnnotationTagLink(Base):
     Creator: Mapped["Creator"] = relationship(
         "eyened_orm.creator.Creator", lazy="selectin"
     )
+
+
+#: Every ``Tag`` relationship whose target's primary key contains ``TagID``.
+#:
+#: Loading one of these makes the ORM's dependency processor try to blank out a
+#: primary-key column when the tag is deleted, raising ``AssertionError`` before
+#: any SQL is emitted -- which pre-empts the foreign keys and turns the intended
+#: 409 into a 500 (spec §3.2.1). Every read that may precede a delete must
+#: ``noload`` all of them; each one only protects its own collection.
+#:
+#: ``Tag.Creator`` is deliberately absent: its primary key is ``CreatorID``, it
+#: is not a link collection, and ``DTOConverter.tag_to_get`` reads it.
+#:
+#: Bare attributes, deliberately -- **not** pre-built ``noload()`` options. Class
+#: attribute access does not configure mappers, but constructing a loader option
+#: does, and ``eyened_orm/__init__.py`` imports ``.tag`` at ``:13`` while
+#: ``.segmentation`` (which ``SegmentationTagLink.Segmentation`` targets by
+#: string) only arrives at ``:15``. A ``TAG_LINK_NOLOADS = (noload(...), ...)``
+#: "optimisation" therefore raises ``InvalidRequestError`` at import time and
+#: breaks the whole package. Verified empirically 2026-07-31.
+TAG_LINK_COLLECTIONS = (
+    Tag.CreatorTagLinks,
+    Tag.StudyTagLinks,
+    Tag.ImageInstanceTagLinks,
+    Tag.AnnotationTagLinks,
+    Tag.SegmentationTagLinks,
+    Tag.FormAnnotationTagLinks,
+)
