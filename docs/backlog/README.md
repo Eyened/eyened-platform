@@ -20,3 +20,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Auth service-layer conversion — last unconverted domain](2026-07-27-auth-service-layer-conversion.md)
 - [`AuditService.snapshot` holds references, not copies](2026-07-28-audit-snapshot-shallow-values.md)
 - [Migration drift has no CI gate — no baseline revision exists](2026-07-30-migration-drift-ci-gate.md)
+- [Relationship loading has three inconsistent treatments — `Tag` wants the mapper-level one](2026-07-31-relationship-loading-strategy.md)
