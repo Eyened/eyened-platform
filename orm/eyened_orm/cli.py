@@ -185,35 +185,78 @@ def init_admin(username: str, password: str):
     """Create or promote a system_admin (idempotent).
 
     Bootstrap must run before RBAC enforcement is switched on: granting a role
-    requires an existing admin, so the first one is seeded here. Safe
-    to re-run -- an account that is already an active admin is left untouched,
-    password included. More generally: the password just typed is used only to
-    create a brand-new account -- an account that already existed (promoted
-    from a plain user, or reactivated from deactivated) keeps its existing
-    password unchanged. The promote case is reported distinctly from the create
-    case (see below), precisely because that password-preservation is easy to
-    miss when the command's output reads the same either way.
+    requires an existing admin, so the first one is seeded here.
+
+    Safe to re-run -- an account that is already an active admin is left
+    untouched, password included, and reports so without prompting. The
+    password just typed is used ONLY to create a brand-new account: promoting
+    a pre-existing account or reactivating a deactivated one keeps that
+    account's existing password, which is why the promote case asks for
+    confirmation before it commits.
     """
 
+    from eyened_orm import is_system_admin
     from eyened_orm.repositories.creator_repository import CreatorRepository
-    from eyened_orm.utils.db_users import ensure_admin
+    from eyened_orm.utils.db_users import BootstrapOutcome, ensure_admin
 
     database = get_database()
     with database.get_session() as session:
-        pre_existing = CreatorRepository(session).get_by_name(username) is not None
-        admin, outcome = ensure_admin(session, username, password, reactivate=True)
-        session.commit()
-        if pre_existing:
-            print(
-                f"Promoted PRE-EXISTING account '{admin.CreatorName}' "
-                f"(CreatorID={admin.CreatorID}, created {admin.DateInserted.date()}) "
-                "to system_admin. Its password was NOT changed -- verify this is "
-                "an account you expect."
+        # Confirm BEFORE anything is written, and only for a genuine promote.
+        # This is the one case a human must approve: the account already
+        # existed, it keeps its existing password, and /auth/register is
+        # unauthenticated -- so the row may have been placed there by someone
+        # else, who would still be able to log in as the admin afterwards.
+        # Bootstrap never demotes (§3.7), so a wrong promote is undoable only by
+        # hand-written SQL.
+        #
+        # Deliberately ahead of ensure_admin, not between it and the commit:
+        # ensure_admin's promote branch flushes, so prompting after it would
+        # block on human input while an UPDATE Creator SET Role=1 holds an
+        # exclusive InnoDB row lock and the connection sits idle in
+        # transaction. Exceeding MySQL's wait_timeout would then fail the
+        # commit AFTER the operator answered "y" (pool_pre_ping validates on
+        # checkout, not mid-use), which is a confusing way to lose a bootstrap.
+        #
+        # `existing is not None and not is_system_admin(existing)` is exactly
+        # ensure_admin's `promoted` predicate -- NOT the existence test that
+        # 033b6ee got wrong, which fired on the benign re-run too.
+        existing = CreatorRepository(session).get_by_name(username)
+        if existing is not None and not is_system_admin(existing):
+            click.confirm(
+                f"\n'{existing.CreatorName}' is a PRE-EXISTING account "
+                f"(CreatorID={existing.CreatorID}, created "
+                f"{existing.DateInserted.date()}) and is not currently a system "
+                f"admin.\nPromoting it grants full data access to every "
+                f"project. Its EXISTING password is kept -- the password you "
+                f"just typed is discarded.\nPromote this account?",
+                abort=True,
             )
-        else:
+
+        admin, outcome = ensure_admin(
+            session, username, password, reactivate=True
+        )
+        session.commit()
+
+        if outcome is BootstrapOutcome.created:
             print(
                 f"Created system admin '{admin.CreatorName}' "
                 f"(CreatorID={admin.CreatorID})."
+            )
+        elif outcome is BootstrapOutcome.promoted:
+            print(
+                f"Promoted PRE-EXISTING account '{admin.CreatorName}' "
+                f"(CreatorID={admin.CreatorID}) to system_admin. Its password "
+                f"was NOT changed."
+            )
+        elif outcome is BootstrapOutcome.reactivated:
+            print(
+                f"Reactivated system admin '{admin.CreatorName}' "
+                f"(CreatorID={admin.CreatorID}). Its password was NOT changed."
+            )
+        else:
+            print(
+                f"'{admin.CreatorName}' (CreatorID={admin.CreatorID}) is "
+                f"already a system admin; nothing changed."
             )
 
 
