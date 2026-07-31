@@ -195,6 +195,11 @@ def init_admin(username: str, password: str):
     confirmation before it commits.
     """
 
+    # Echo it: --username carries envvar=EYENED_API_ADMIN_USERNAME, so a shell
+    # that sourced the server's .env supplies the name and click skips the
+    # prompt entirely. The operator must still see which account this is about.
+    click.echo(f"Bootstrapping system admin account: '{username}'")
+
     from eyened_orm import is_system_admin
     from eyened_orm.repositories.creator_repository import CreatorRepository
     from eyened_orm.utils.db_users import BootstrapOutcome, ensure_admin

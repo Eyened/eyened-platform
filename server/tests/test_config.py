@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 import server.config as config
 from server.config import OIDCSettings, Settings, get_oidc_metadata, validate_oidc_metadata
@@ -119,3 +120,13 @@ def test_admin_settings_come_from_the_env(monkeypatch):
     assert settings.admin_password.get_secret_value() == "s3cret"
     # SecretStr, so the password cannot leak into a log line or an error message.
     assert "s3cret" not in repr(settings.admin_password)
+
+
+def test_admin_username_rejects_the_empty_string(monkeypatch):
+    """`EYENED_API_ADMIN_USERNAME=` -- present but empty, the style the
+    neighbouring keys in dev/sample.env use -- previously yielded "" and the dev
+    bypass then created a system_admin with an empty name."""
+    monkeypatch.setenv("EYENED_API_ADMIN_USERNAME", "")
+
+    with pytest.raises(ValidationError):
+        Settings()

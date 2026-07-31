@@ -135,7 +135,7 @@ class Settings(BaseSettings):
     # admin_username/admin_password as separate dataclass constructor arguments,
     # sourced from EYENED_API_USERNAME/EYENED_API_PASSWORD (see
     # notebooks/import_api.ipynb) -- it never reads this setting.
-    admin_username: str = "admin"
+    admin_username: str = Field(default="admin", min_length=1)
     admin_password: SecretStr | None = None
     auth_password_enabled: bool = True
     auth_oidc_enabled: bool = False

@@ -318,3 +318,23 @@ async def test_dev_bypass_does_not_reactivate_a_deactivated_admin(
 
     admin = session.query(Creator).filter_by(CreatorName="dev-admin").one()
     assert admin.Inactive is True
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_uses_a_configured_admin_password(session, monkeypatch):
+    """The configured-password branch: admin_password is a SecretStr, so it must
+    be unwrapped before it reaches hash_password. Passing the wrapper through
+    raises TypeError -- every request 500s -- and all the other bypass tests
+    leave admin_password=None, so nothing else exercises this line."""
+    from eyened_orm import Creator
+    from eyened_orm.utils.db_users import verify_password
+    from server.routes.auth import get_current_user
+
+    _dev_bypass_settings(
+        monkeypatch, admin_username="dev-admin", admin_password="s3cret"
+    )
+
+    await get_current_user(session=session)
+
+    admin = session.query(Creator).filter_by(CreatorName="dev-admin").one()
+    assert verify_password("s3cret", admin.PasswordHash) is True
