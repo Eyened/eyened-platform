@@ -14,7 +14,7 @@ from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.repositories.creator_repository import CreatorRepository
-from eyened_orm.utils.db_users import create_user, disable_password, ensure_admin, verify_password, hash_password
+from eyened_orm.utils.db_users import BootstrapOutcome, create_user, disable_password, ensure_admin, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
 
@@ -214,9 +214,20 @@ async def get_current_user(
             if settings.admin_password is not None
             else None
         )
-        creator, _outcome = ensure_admin(
+        creator, outcome = ensure_admin(
             session, settings.admin_username, admin_password
         )
+        # The bypass runs unattended on every request, so this line is the only
+        # record that a superuser grant happened. `unchanged` stays silent --
+        # otherwise every request logs and the signal is worthless.
+        if outcome is not BootstrapOutcome.unchanged:
+            logger.warning(
+                "Dev bypass %s system admin '%s' (CreatorID=%s); any existing "
+                "password was kept",
+                outcome.value,
+                creator.CreatorName,
+                creator.CreatorID,
+            )
         return CurrentUser(
             creator_id=creator.CreatorID,
             username=creator.CreatorName,

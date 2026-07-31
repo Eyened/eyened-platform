@@ -338,3 +338,59 @@ async def test_dev_bypass_uses_a_configured_admin_password(session, monkeypatch)
 
     admin = session.query(Creator).filter_by(CreatorName="dev-admin").one()
     assert verify_password("s3cret", admin.PasswordHash) is True
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_logs_the_grant_of_system_admin(
+    session, monkeypatch, caplog
+):
+    """The most privileged write in the codebase must leave a trace. Under the
+    dev bypass there is no operator watching a terminal -- unlike `eorm
+    init-admin`, which prints -- so this log line is the only record that a
+    superuser grant happened, to whom, and when."""
+    import logging
+
+    from eyened_orm.utils.db_users import create_user
+    from server.routes.auth import get_current_user
+
+    create_user(session, "dev-admin", "pw")
+    session.commit()
+    _dev_bypass_settings(monkeypatch, admin_username="dev-admin")
+
+    with caplog.at_level(logging.WARNING, logger="server.routes.auth"):
+        await get_current_user(session=session)
+
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "server.routes.auth"
+    ]
+    # "'dev-admin'" quoted, matching the template: an unquoted "admin" would
+    # also match the literal "system_admin" in the message and prove nothing.
+    assert any(
+        "promoted" in message and "'dev-admin'" in message for message in messages
+    )
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_logs_nothing_when_the_admin_is_unchanged(
+    session, monkeypatch, caplog
+):
+    """A no-op re-run must stay quiet, or the signal is worthless -- and the
+    bypass re-runs on every single request."""
+    import logging
+
+    from server.routes.auth import get_current_user
+
+    _dev_bypass_settings(monkeypatch, admin_username="dev-admin")
+    await get_current_user(session=session)  # first request: creates, and logs
+    # caplog accumulates for the whole test, not just inside at_level() -- so
+    # without this the create above lands in the assertion below.
+    caplog.clear()
+
+    with caplog.at_level(logging.WARNING, logger="server.routes.auth"):
+        await get_current_user(session=session)  # second request: unchanged
+
+    assert [
+        record for record in caplog.records if record.name == "server.routes.auth"
+    ] == []
