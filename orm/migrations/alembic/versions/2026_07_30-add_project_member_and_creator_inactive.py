@@ -86,5 +86,11 @@ def downgrade() -> None:
     # ProjectID FK (its leading column), and InnoDB refuses to drop an index
     # while the FK it backs still exists (errno 1553). AuditLog's downgrade gets
     # away with dropping indexes explicitly only because AuditLog has no FKs.
-    op.drop_table("ProjectMember")
+    # Order matters: drop_column first. MySQL DDL auto-commits per statement and
+    # Alembic stamps alembic_version only after this function returns, so a
+    # failure between the two (a metadata-lock timeout on the live Creator table
+    # is the realistic one) must not have already destroyed the grants. This
+    # order also makes downgrade() the exact statement-order inverse of
+    # upgrade(), which adds ProjectMember first and Creator.Inactive second.
     op.drop_column("Creator", "Inactive")
+    op.drop_table("ProjectMember")
