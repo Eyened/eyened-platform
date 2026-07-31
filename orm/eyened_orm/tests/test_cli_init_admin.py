@@ -82,6 +82,13 @@ def test_init_admin_confirms_before_promoting_a_pre_existing_account(
 
     assert result.exit_code == 0, result.output
     assert "PRE-EXISTING" in result.output
+    # "PRE-EXISTING" alone also appears in the post-commit "Promoted
+    # PRE-EXISTING account ..." report line, so it cannot distinguish
+    # "the confirmation prompt was shown" from "no prompt, just the report".
+    # "Promote this account?" is the prompt's closing question and appears
+    # nowhere in any of the four outcome report lines -- asserting it pins
+    # that click.confirm actually ran.
+    assert "Promote this account?" in result.output
     admin = session.query(Creator).filter_by(CreatorName="admin").one()
     assert is_system_admin(admin) is True
 
