@@ -293,3 +293,28 @@ def test_register_never_grants_a_system_role(client, session):
 
     created = session.query(Creator).filter_by(CreatorName="self-registered").one()
     assert created.Role is None
+
+
+@pytest.mark.anyio
+async def test_dev_bypass_does_not_reactivate_a_deactivated_admin(
+    session, monkeypatch
+):
+    """The bypass must not undo a deliberate deactivation. It calls ensure_admin
+    on every request; unconditional reactivation would make deactivating a
+    compromised admin a permanent no-op on any host with the flag left on --
+    and the reactivation would outlive the flag being turned back off."""
+    from eyened_orm import Creator, SystemRole
+    from eyened_orm.utils.db_users import create_user
+    from server.routes.auth import get_current_user
+
+    existing = create_user(
+        session, "dev-admin", "pw", role=SystemRole.system_admin
+    )
+    existing.Inactive = True
+    session.commit()
+
+    _dev_bypass_settings(monkeypatch, admin_username="dev-admin")
+    await get_current_user(session=session)
+
+    admin = session.query(Creator).filter_by(CreatorName="dev-admin").one()
+    assert admin.Inactive is True

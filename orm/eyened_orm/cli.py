@@ -201,7 +201,7 @@ def init_admin(username: str, password: str):
     database = get_database()
     with database.get_session() as session:
         pre_existing = CreatorRepository(session).get_by_name(username) is not None
-        admin = ensure_admin(session, username, password)
+        admin, outcome = ensure_admin(session, username, password, reactivate=True)
         session.commit()
         if pre_existing:
             print(

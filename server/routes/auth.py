@@ -206,12 +206,17 @@ async def get_current_user(
         # superuser if its Role is system_admin, and the old branch auto-created
         # a Role=NULL non-admin that would see nothing once enforcement lands.
         # Idempotent, and it flushes only: get_db commits at the request boundary.
+        # Reactivation is NOT requested here (reactivate defaults to False):
+        # this runs on every request, so clearing Inactive would permanently
+        # undo a deliberate deactivation and outlive the flag being turned off.
         admin_password = (
             settings.admin_password.get_secret_value()
             if settings.admin_password is not None
             else None
         )
-        creator = ensure_admin(session, settings.admin_username, admin_password)
+        creator, _outcome = ensure_admin(
+            session, settings.admin_username, admin_password
+        )
         return CurrentUser(
             creator_id=creator.CreatorID,
             username=creator.CreatorName,
