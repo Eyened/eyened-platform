@@ -150,8 +150,9 @@ def test_ensure_admin_does_not_commit_on_the_promote_branch(session):
     mid-request commit is what get_db exists to prevent."""
     create_user(session, "admin", "pw")
 
-    ensure_admin(session, "admin", "pw")
+    _, outcome = ensure_admin(session, "admin", "pw")
 
+    assert outcome is BootstrapOutcome.promoted
     assert session.in_transaction()
     session.rollback()
     assert session.query(Creator).filter_by(CreatorName="admin").count() == 0
@@ -172,3 +173,20 @@ def test_ensure_admin_leaves_a_deactivated_admin_alone_by_default(session):
 
     assert admin.Inactive is True
     assert outcome is BootstrapOutcome.unchanged
+
+
+def test_ensure_admin_promotes_a_deactivated_non_admin_without_reactivating(session):
+    """The promote branch returns early, so a non-admin account that also
+    happens to be deactivated is promoted but stays Inactive. That is
+    deliberate: promotion is the security-significant fact, and clearing
+    Inactive here would be reactivating a *non*-admin, which no requirement
+    asks for and which only the reactivate branch (an existing admin, and
+    only with reactivate=True) is allowed to do."""
+    existing = create_user(session, "admin", "pw")
+    existing.Inactive = True
+    session.flush()
+
+    admin, outcome = ensure_admin(session, "admin", "pw")
+
+    assert outcome is BootstrapOutcome.promoted
+    assert admin.Inactive is True

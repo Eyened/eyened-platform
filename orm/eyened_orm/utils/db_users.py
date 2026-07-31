@@ -104,7 +104,10 @@ def ensure_admin(
 
     - **absent** -> create with ``Role = system_admin`` (``created``)
     - **present but not an admin** -> promote in place (``promoted``).
-      ``Role = NULL`` is the state of every production row pre-cutover.
+      ``Role = NULL`` is the state of every production row pre-cutover. A
+      deactivated non-admin is promoted without clearing ``Inactive``:
+      promotion is the security-significant fact here, and reactivating a
+      *non*-admin is not something any caller asked for.
     - **present, deactivated admin, and ``reactivate=True``** -> clear
       ``Inactive`` (``reactivated``)
     - **otherwise** -> return untouched (``unchanged``)
