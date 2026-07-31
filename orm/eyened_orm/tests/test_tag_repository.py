@@ -187,3 +187,43 @@ def test_only_the_annotation_link_fks_restrict_tag_deletes():
         "FormAnnotationTag": "RESTRICT",
         "CreatorTag": "CASCADE",
     }
+
+
+def test_every_tag_link_collection_is_noloaded():
+    """TAG_LINK_COLLECTIONS covers every relationship the delete path must not load.
+
+    A Tag relationship whose *target's* primary key contains TagID is a link
+    collection: loading it makes the ORM's dependency processor try to blank a
+    primary-key column when the tag is deleted, raising AssertionError before
+    the foreign key can speak (spec §3.2.1). Tag.Creator is correctly excluded
+    -- its PK is CreatorID.
+
+    Deriving the requirement from the mapper rather than only restating six
+    names means a seventh link table turns this test red the day it is added,
+    rather than slipping through uncovered. It also closes a gap no behavioural
+    test here could: each noload only prevents the assertion for *its own*
+    collection, and only StudyTag and CreatorTag have a test that applies a
+    link, so four of the six could be deleted with the suite green.
+    """
+    from sqlalchemy import inspect as sa_inspect
+
+    from eyened_orm.tag import TAG_LINK_COLLECTIONS
+
+    required = {
+        relationship.key
+        for relationship in sa_inspect(Tag).relationships
+        if any(column.name == "TagID" for column in relationship.mapper.primary_key)
+    }
+    assert required == {
+        "CreatorTagLinks",
+        "StudyTagLinks",
+        "ImageInstanceTagLinks",
+        "AnnotationTagLinks",
+        "SegmentationTagLinks",
+        "FormAnnotationTagLinks",
+    }, (
+        "Tag's set of link collections changed -- update BOTH "
+        "TAG_LINK_COLLECTIONS in eyened_orm/tag.py AND this literal"
+    )
+
+    assert {attribute.key for attribute in TAG_LINK_COLLECTIONS} == required
