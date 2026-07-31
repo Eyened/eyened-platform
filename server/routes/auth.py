@@ -209,6 +209,9 @@ async def get_current_user(
         # Reactivation is NOT requested here (reactivate defaults to False):
         # this runs on every request, so clearing Inactive would permanently
         # undo a deliberate deactivation and outlive the flag being turned off.
+        # That only stops the bypass from *writing* Inactive away; it still
+        # returns a CurrentUser for a deactivated admin on every request,
+        # because refusing one requires the enforcement that lands in P4.
         admin_password = (
             settings.admin_password.get_secret_value()
             if settings.admin_password is not None
@@ -221,12 +224,26 @@ async def get_current_user(
         # record that a superuser grant happened. `unchanged` stays silent --
         # otherwise every request logs and the signal is worthless.
         if outcome is not BootstrapOutcome.unchanged:
+            # The password clause has to follow the outcome: `promoted` and
+            # `reactivated` keep whatever credential the account already had,
+            # but `created` gives a brand-new superuser a fresh one -- from
+            # configuration, or a disabled hash when admin_password is unset. A
+            # flat "any existing password was kept" would be false exactly in
+            # the case that matters most.
+            if outcome is BootstrapOutcome.created:
+                password_note = (
+                    "password set from configuration"
+                    if admin_password is not None
+                    else "password login disabled (no admin_password set)"
+                )
+            else:
+                password_note = "existing password kept"
             logger.warning(
-                "Dev bypass %s system admin '%s' (CreatorID=%s); any existing "
-                "password was kept",
+                "Dev bypass %s system admin '%s' (CreatorID=%s); %s",
                 outcome.value,
                 creator.CreatorName,
                 creator.CreatorID,
+                password_note,
             )
         return CurrentUser(
             creator_id=creator.CreatorID,

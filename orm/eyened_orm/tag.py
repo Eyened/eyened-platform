@@ -292,6 +292,16 @@ class FormAnnotationTagLink(Base):
 #: string) only arrives at ``:15``. A ``TAG_LINK_NOLOADS = (noload(...), ...)``
 #: "optimisation" therefore raises ``InvalidRequestError`` at import time and
 #: breaks the whole package. Verified empirically 2026-07-31.
+#:
+#: **This is a per-load guard, not a mapper-level one.** ``noload`` is a loader
+#: option, and ``session.get()`` silently ignores its ``options`` on an
+#: identity-map hit -- so the three call sites protect a *fresh* load only. A
+#: ``Tag`` already in the Session, loaded earlier in the same request by
+#: anything that did not pass these options, still carries its six collections
+#: and still trips the assertion. The real fix -- mapper-level ``lazy="noload"``
+#: on the six relationships below, which no call site can forget -- is
+#: deliberately deferred, so treat every new read that may precede a delete as
+#: needing this guard rather than assuming the hazard is closed.
 TAG_LINK_COLLECTIONS = (
     Tag.CreatorTagLinks,
     Tag.StudyTagLinks,

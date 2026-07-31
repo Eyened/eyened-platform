@@ -130,11 +130,14 @@ def ensure_admin(
     Flushes only; the caller owns the commit (``eorm init-admin`` commits
     explicitly, and under the API the commit happens at the request boundary).
 
-    Note: two concurrent first requests on a cold database can both see
+    Note: two concurrent first callers on a cold database can both see
     ``get_by_name -> None`` and both attempt the create branch; the second then
     fails its INSERT on the unique ``CreatorName`` constraint (IntegrityError
-    -> 500). Only reachable via the dev bypass, fails closed, and self-heals on
-    retry once the first request's row is visible. Left unhandled deliberately:
+    -> a 500 under the dev bypass, a traceback under ``eorm init-admin``). Not
+    a dev-bypass-only hazard -- two concurrent bootstrap runs race identically;
+    the bypass merely makes it easy to hit, since it runs on every request.
+    Fails closed either way, and self-heals on retry once the first writer's
+    row is visible. Left unhandled deliberately:
     the obvious ``except IntegrityError: session.rollback()`` would discard the
     rest of the request's transaction, which is a bigger behaviour change than
     this bootstrap helper should make unilaterally.

@@ -89,7 +89,12 @@ def downgrade() -> None:
     # Order matters: drop_column first. MySQL DDL auto-commits per statement and
     # Alembic stamps alembic_version only after this function returns, so a
     # failure between the two (a metadata-lock timeout on the live Creator table
-    # is the realistic one) must not have already destroyed the grants. This
+    # is the realistic one) must not have already destroyed the grants. Both
+    # statements lose data -- dropping Creator.Inactive forgets which creators
+    # were deactivated -- so this is a choice between two losses, not a way to
+    # avoid one: the membership grants are irrecoverable access-review state,
+    # while Inactive is a not-yet-enforced boolean that is far cheaper to
+    # reconstruct. Order by which loss hurts more, and it does not flip. This
     # order also makes downgrade() the exact statement-order inverse of
     # upgrade(), which adds ProjectMember first and Creator.Inactive second.
     op.drop_column("Creator", "Inactive")

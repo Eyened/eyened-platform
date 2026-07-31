@@ -189,8 +189,11 @@ def test_only_the_annotation_link_fks_restrict_tag_deletes():
     }
 
 
-def test_every_tag_link_collection_is_noloaded():
-    """TAG_LINK_COLLECTIONS covers every relationship the delete path must not load.
+def test_tag_link_collections_covers_every_link_relationship():
+    """TAG_LINK_COLLECTIONS lists every relationship the delete path must not load.
+
+    Membership only -- this says nothing about whether any call site actually
+    noloads them.
 
     A Tag relationship whose *target's* primary key contains TagID is a link
     collection: loading it makes the ORM's dependency processor try to blank a

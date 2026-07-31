@@ -217,10 +217,15 @@ def init_admin(username: str, password: str):
         # Deliberately ahead of ensure_admin, not between it and the commit:
         # ensure_admin's promote branch flushes, so prompting after it would
         # block on human input while an UPDATE Creator SET Role=1 holds an
-        # exclusive InnoDB row lock and the connection sits idle in
-        # transaction. Exceeding MySQL's wait_timeout would then fail the
-        # commit AFTER the operator answered "y" (pool_pre_ping validates on
-        # checkout, not mid-use), which is a confusing way to lose a bootstrap.
+        # EXCLUSIVE InnoDB row lock on the admin's row -- every other writer of
+        # that row waits for as long as the operator is away from the terminal.
+        # (Being "idle in transaction" is not the distinguishing factor: the
+        # pre-state probe below opens a read transaction across the prompt
+        # either way. Holding a write lock across it is.) And exceeding MySQL's
+        # wait_timeout would fail the commit AFTER the operator already
+        # answered "y" (pool_pre_ping validates on checkout, not mid-use),
+        # losing a bootstrap the human had approved -- whereas aborting this
+        # way, before anything is written, loses nothing.
         #
         # `existing is not None and not is_system_admin(existing)` is exactly
         # ensure_admin's `promoted` predicate -- NOT the existence test that
@@ -237,6 +242,10 @@ def init_admin(username: str, password: str):
                 abort=True,
             )
 
+        # reactivate=True, unlike the dev bypass's default False: a human
+        # running the recovery command by hand IS the consent, and this is the
+        # only command that can rescue a deployment whose sole admin was
+        # deactivated.
         admin, outcome = ensure_admin(
             session, username, password, reactivate=True
         )
@@ -248,20 +257,44 @@ def init_admin(username: str, password: str):
                 f"(CreatorID={admin.CreatorID})."
             )
         elif outcome is BootstrapOutcome.promoted:
-            print(
+            report = (
                 f"Promoted PRE-EXISTING account '{admin.CreatorName}' "
                 f"(CreatorID={admin.CreatorID}) to system_admin. Its password "
                 f"was NOT changed."
             )
+            # The promote branch returns before the reactivate branch, so an
+            # account that was both a non-admin AND deactivated is promoted
+            # with Inactive still set. Deliberate -- but reporting only the
+            # promotion would be reporting success while leaving an admin who
+            # cannot log in once deactivation is enforced, from the one command
+            # that exists to recover a deployment. Name the remaining step.
+            if admin.Inactive:
+                report += (
+                    " It is still DEACTIVATED and will not be able to log in "
+                    "once deactivation is enforced -- re-run this command to "
+                    "reactivate it (it is a system admin now, so that run "
+                    "needs no confirmation)."
+                )
+            print(report)
         elif outcome is BootstrapOutcome.reactivated:
             print(
                 f"Reactivated system admin '{admin.CreatorName}' "
                 f"(CreatorID={admin.CreatorID}). Its password was NOT changed."
             )
-        else:
+        elif outcome is BootstrapOutcome.unchanged:
             print(
                 f"'{admin.CreatorName}' (CreatorID={admin.CreatorID}) is "
                 f"already a system admin; nothing changed."
+            )
+        else:
+            # A fifth BootstrapOutcome must not fall through to "nothing
+            # changed": the commit above has already happened, so that line
+            # would report an outcome that did not occur -- the exact defect
+            # this dispatch was rewritten to remove. Fail loudly instead.
+            raise click.ClickException(
+                f"Unhandled bootstrap outcome {outcome!r} for "
+                f"'{admin.CreatorName}' (CreatorID={admin.CreatorID}). The "
+                f"change was already committed; inspect the account by hand."
             )
 
 

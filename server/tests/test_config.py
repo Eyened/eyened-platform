@@ -128,5 +128,7 @@ def test_admin_username_rejects_the_empty_string(monkeypatch):
     bypass then created a system_admin with an empty name."""
     monkeypatch.setenv("EYENED_API_ADMIN_USERNAME", "")
 
-    with pytest.raises(ValidationError):
+    # match= pins the field: without it this passes the day any *other* field
+    # becomes required, asserting nothing about admin_username.
+    with pytest.raises(ValidationError, match="admin_username"):
         Settings()

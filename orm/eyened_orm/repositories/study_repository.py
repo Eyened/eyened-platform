@@ -31,8 +31,12 @@ class StudyRepository:
         ``TagRepository.get_by_id`` does it: ``Tag`` maps them
         ``lazy="selectin"``, so a plain ``session.get()`` loads all six -- on
         the dev database that is up to 76k rows to read one column. It also
-        keeps a loaded collection out of the Session, which is what would
-        otherwise let the ORM pre-empt the delete-time foreign keys (§3.2.1).
+        keeps *this* load from putting a loaded collection into the Session,
+        which is what would otherwise let the ORM pre-empt the delete-time
+        foreign keys (§3.2.1). Per-load only: ``session.get()`` ignores these
+        options on an identity-map hit, so a ``Tag`` already in the Session
+        with its collections loaded is unaffected (see
+        ``TAG_LINK_COLLECTIONS``).
         """
         return self._session.get(
             Tag,
