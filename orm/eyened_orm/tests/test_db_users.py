@@ -78,3 +78,27 @@ def test_ensure_admin_does_not_commit(session):
     assert session.in_transaction()
     session.rollback()
     assert session.query(Creator).filter_by(CreatorName="admin").count() == 0
+
+
+def test_create_user_writes_role_as_a_plain_int(session):
+    """Creator.Role is an untyped Integer with no bind processor, and IntEnum is
+    absent from pymysql's exact-type encoders -- so an un-coerced member falls
+    through to the *string* encoder and the driver sends '1' rather than 1.
+
+    `type(...) is int` is the only assertion that can see this. `==` is True for
+    both forms, and isinstance() passes because IntEnum subclasses int. SQLite
+    accepts int subclasses natively, so no behavioural test can catch it either:
+    this is the whole guard for a MySQL-only failure mode.
+    """
+    user = create_user(session, "boss", "pw", role=SystemRole.system_admin)
+
+    assert type(user.Role) is int
+
+
+def test_ensure_admin_promotes_with_a_plain_int(session):
+    """The same coercion on the promote branch, which is a second write site."""
+    create_user(session, "admin", "pw")
+
+    admin = ensure_admin(session, "admin", "pw")
+
+    assert type(admin.Role) is int
