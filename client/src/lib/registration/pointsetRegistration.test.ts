@@ -40,6 +40,36 @@ describe("toEnfaceRegistrationPoints", () => {
             ],
         });
     });
+
+    it("classifies mixed volume + enface-proj points per-item onto *_proj", () => {
+        // Shared PublicID: B-scan volume and its *_proj viewer write into one list.
+        const pts = [
+            { x: 10, y: 999, index: 3 },
+            { x: 20, y: 7.5, index: null },
+            null,
+            { x: 30, y: 888, index: 11 },
+        ];
+        expect(toEnfaceRegistrationPoints("oct", pts)).toEqual({
+            nodeId: "oct_proj",
+            points: [
+                { x: 10, y: 3.5 },
+                { x: 20, y: 7.5 },
+                null,
+                { x: 30, y: 11.5 },
+            ],
+        });
+    });
+
+    it("nulls plain-2D points mixed into an OCT/proj list (no garbage affine)", () => {
+        const pts = [
+            { x: 10, y: 100, index: 3 },
+            { x: 50, y: 60 }, // plain fundus pixels — incompatible with *_proj
+        ];
+        expect(toEnfaceRegistrationPoints("oct", pts)).toEqual({
+            nodeId: "oct_proj",
+            points: [{ x: 10, y: 3.5 }, null],
+        });
+    });
 });
 
 describe("getPointsetRegistrations", () => {
