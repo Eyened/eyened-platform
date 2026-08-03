@@ -133,6 +133,7 @@
             color: session.color,
             cardinality: analysis.cardinality,
             sparse: analysis.sparse,
+            coordinateSpace: analysis.coordinateSpace,
             enumExtras: analysis.enumExtras,
             onChange: (points) => {
                 session.setPoints(publicId(), points);

@@ -9,6 +9,11 @@ How it behaves depends only on the **JSON Schema shape** of that field:
 - an array → list of points  
 - array items that allow `null` → deleted points leave a hole (e.g. for matching landmarks across images)
 
+**Coordinate space** is also derived from shape:
+
+- If the point object does **not** declare `index` → **2D / enface only** (fundus, `*_proj`). Placement on an OCT B-scan volume is rejected.
+- If it declares optional `index` (`number` or `null`) → OCT volumes (slice index), enface projections (`index: null`), and plain 2D are all allowed.
+
 Use **`title`** for the fixed name shown on the image (e.g. `"Fovea"`). Optional properties on each point (enums, short strings) can show instead when set. Prefer a short `title`; put longer help text in `description`.
 
 Activate the tool from the form field, then click the image to place. Right-click a point to remove it. For enum properties, press **C** while hovering a point to cycle values.
@@ -183,7 +188,7 @@ Same as a normal list, but scoped to the image you are viewing.
 
 ## 6. Matched landmarks across images (holes allowed)
 
-Use this when point *i* on one image is the same landmark as point *i* on another. Allow `null` in the list so deleting a mid-list point keeps later indices aligned.
+Use this when point *i* on one image is the same landmark as point *i* on another. Allow `null` in the list so deleting a mid-list point keeps later indices aligned. Declare optional `index` so the same annotation can cover fundus, OCT B-scans, and enface `*_proj` images (built-in Pointset registration).
 
 ```json
 {
@@ -199,7 +204,7 @@ Use this when point *i* on one image is the same landmark as point *i* on anothe
           "properties": {
             "x": { "type": "number" },
             "y": { "type": "number" },
-            "index": { "type": "integer" }
+            "index": { "type": ["number", "null"] }
           },
           "required": ["x", "y"]
         },
@@ -218,8 +223,8 @@ Saved value:
     { "x": 1470.6, "y": 239.8, "index": 0 },
     { "x": 1972.4, "y": 681.9, "index": 0 }
   ],
-  "f7da0s88": [
-    { "x": 900.4, "y": 358.2, "index": 0 },
+  "f7da0s88_proj": [
+    { "x": 900.4, "y": 358.2, "index": null },
     null
   ]
 }

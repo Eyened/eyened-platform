@@ -82,6 +82,7 @@
                     properties: {
                         x: { type: "number" },
                         y: { type: "number" },
+                        index: { type: ["number", "null"] },
                     },
                     required: ["x", "y"],
                 },
@@ -98,12 +99,17 @@
             "x-eyened-widget": "keypoint",
         });
 
-        return (
+        const analyzed =
             analyzePointSchema(withMarker(fromApi)) ??
             analyzePointSchema(
                 withMarker({ additionalProperties: REGISTRATION_POINTS }),
-            )
-        );
+            );
+        // Registration stores landmarks on fundus, OCT volumes, and enface
+        // `*_proj`. Older seeded schemas omitted `index`; still treat as oct.
+        if (analyzed && analyzed.coordinateSpace === "enface2d") {
+            return { ...analyzed, coordinateSpace: "oct" as const };
+        }
+        return analyzed;
     }
 
     async function create() {
@@ -164,6 +170,7 @@
             color: pointMarker.color,
             cardinality: analysis.cardinality,
             sparse: analysis.sparse,
+            coordinateSpace: analysis.coordinateSpace,
             onChange: (points) => {
                 const existing =
                     formAnnotations.get(annotationId) ?? formAnnotation;

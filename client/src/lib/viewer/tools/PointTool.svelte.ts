@@ -9,12 +9,15 @@ import {
 import type {
     ImagePoint,
     PointCardinality,
+    PointCoordinateSpace,
     PointList,
 } from "$lib/forms/pointSchema";
+import { canPlaceOnViewer } from "$lib/forms/pointSchema";
 import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
+import { toast } from "svelte-sonner";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
@@ -32,6 +35,11 @@ export type PointToolOptions = {
      * Ignored when `placementIndex` is set (fixed-slot / ETDRS mode).
      */
     sparse?: boolean;
+    /**
+     * When set, gates placement and index injection.
+     * Omit for legacy callers (allow all viewers; inject index on 3D / `_proj`).
+     */
+    coordinateSpace?: PointCoordinateSpace;
     slotLabels?: readonly string[];
     /** Keyboard shortcut → place into that index (also sets placementIndex). */
     slotKeys?: readonly { index: number; key: string }[];
@@ -76,6 +84,7 @@ export class PointTool implements Overlay {
     private readonly color: string;
     private readonly cardinality: PointCardinality;
     private readonly sparse: boolean;
+    private readonly coordinateSpace: PointCoordinateSpace | undefined;
     private readonly slotLabels: readonly string[] | undefined;
     private readonly slotKeys:
         | readonly { index: number; key: string }[]
@@ -94,6 +103,7 @@ export class PointTool implements Overlay {
         this.name = options.label || "Point";
         this.cardinality = options.cardinality ?? "list";
         this.sparse = options.sparse ?? false;
+        this.coordinateSpace = options.coordinateSpace;
         this.slotLabels = options.slotLabels;
         this.slotKeys = options.slotKeys;
         this.enumExtras = options.enumExtras ?? [];
@@ -119,6 +129,16 @@ export class PointTool implements Overlay {
         slot?: number,
     ) {
         if (!this.canEdit) return;
+        if (this.coordinateSpace) {
+            const gate = canPlaceOnViewer(
+                this.coordinateSpace,
+                viewerContext.image,
+            );
+            if (!gate.ok) {
+                toast.warning(gate.message);
+                return;
+            }
+        }
         const position = viewerContext.viewerToImageCoordinates(cursor);
         const before = this.points;
         const targetSlot = slot ?? this.placementIndex;
@@ -157,6 +177,8 @@ export class PointTool implements Overlay {
     private placeIndexOptions(
         viewerContext: ViewerContext,
     ): { index: number | null } | undefined {
+        // enface2d fields never store index (even if somehow on a volume).
+        if (this.coordinateSpace === "enface2d") return undefined;
         const { image } = viewerContext;
         if (image.is3D) return { index: viewerContext.index };
         if (image.image_id.endsWith("_proj")) return { index: null };

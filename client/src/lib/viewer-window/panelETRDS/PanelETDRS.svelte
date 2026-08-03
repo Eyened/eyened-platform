@@ -161,6 +161,8 @@
             color: "rgba(0, 255, 0, 1)",
             cardinality: "list",
             sparse: true,
+            // Fovea / disc edge are enface 2D landmarks (no B-scan index).
+            coordinateSpace: "enface2d",
             slotLabels: ["Fovea", "Disc edge"],
             slotKeys: [
                 { index: 0, key: "f" },

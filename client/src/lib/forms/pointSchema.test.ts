@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     analyzePointSchema,
+    canPlaceOnViewer,
     getPointsForImage,
     isPointWidget,
     setPointsForImage,
@@ -39,6 +40,7 @@ describe("analyzePointSchema", () => {
             cardinality: "single",
             addressing: "bare",
             sparse: false,
+            coordinateSpace: "enface2d",
         });
         expect(a!.enumExtras).toEqual([
             { key: "severity", values: ["mild", "severe"] },
@@ -55,6 +57,7 @@ describe("analyzePointSchema", () => {
             cardinality: "list",
             addressing: "bare",
             sparse: false,
+            coordinateSpace: "enface2d",
         });
     });
 
@@ -71,6 +74,7 @@ describe("analyzePointSchema", () => {
             cardinality: "list",
             addressing: "byImage",
             sparse: false,
+            coordinateSpace: "enface2d",
         });
     });
 
@@ -89,6 +93,7 @@ describe("analyzePointSchema", () => {
             cardinality: "list",
             addressing: "byImage",
             sparse: true,
+            coordinateSpace: "enface2d",
         });
     });
 
@@ -116,6 +121,55 @@ describe("analyzePointSchema", () => {
             cardinality: "single",
             addressing: "byImage",
             sparse: false,
+            coordinateSpace: "enface2d",
+        });
+    });
+
+    it("declaring index → oct coordinate space", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            properties: {
+                x: { type: "number" },
+                y: { type: "number" },
+                index: { type: ["number", "null"] },
+            },
+            required: ["x", "y"],
+        });
+        expect(a).toMatchObject({
+            cardinality: "single",
+            addressing: "bare",
+            coordinateSpace: "oct",
+        });
+    });
+
+    it("registration-shaped sparse list with index → oct", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            additionalProperties: {
+                type: "array",
+                items: {
+                    oneOf: [
+                        {
+                            type: "object",
+                            properties: {
+                                x: { type: "number" },
+                                y: { type: "number" },
+                                index: { type: ["number", "null"] },
+                            },
+                            required: ["x", "y"],
+                        },
+                        { type: "null" },
+                    ],
+                },
+            },
+        });
+        expect(a).toMatchObject({
+            cardinality: "list",
+            addressing: "byImage",
+            sparse: true,
+            coordinateSpace: "oct",
         });
     });
 
@@ -126,6 +180,23 @@ describe("analyzePointSchema", () => {
                 type: "string",
             }),
         ).toBeNull();
+    });
+});
+
+describe("canPlaceOnViewer", () => {
+    it("rejects OCT volumes for enface2d", () => {
+        const r = canPlaceOnViewer("enface2d", { is3D: true });
+        expect(r.ok).toBe(false);
+        if (!r.ok) expect(r.message).toMatch(/2D-only/);
+    });
+
+    it("allows 2D / enface for enface2d", () => {
+        expect(canPlaceOnViewer("enface2d", { is3D: false }).ok).toBe(true);
+    });
+
+    it("allows OCT volumes for oct", () => {
+        expect(canPlaceOnViewer("oct", { is3D: true }).ok).toBe(true);
+        expect(canPlaceOnViewer("oct", { is3D: false }).ok).toBe(true);
     });
 });
 

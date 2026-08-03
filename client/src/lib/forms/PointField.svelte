@@ -6,12 +6,14 @@
     } from "$lib/config/clientDefaults";
     import { formAnnotations } from "$lib/data";
     import PointImageGroup from "$lib/forms/PointImageGroup.svelte";
+    import PointRowEditor from "$lib/forms/PointRowEditor.svelte";
     import {
         pointArming,
         FormPointSession,
     } from "$lib/forms/pointArming.svelte";
     import {
         analyzePointSchema,
+        canPlaceOnViewer,
         getPointsForImage,
         isPointWidget,
         setPointsForImage,
@@ -120,8 +122,9 @@
         }));
     });
 
-    /** Show i only when this point carries an OCT index (number or explicit null). */
+    /** Show i only for oct-space fields that carry an OCT index (number or null). */
     function indexApplicable(pt: ImagePoint): boolean {
+        if (analysis?.coordinateSpace === "enface2d") return false;
         return "index" in pt;
     }
 
@@ -192,9 +195,22 @@
     }
 
     const canActivate = $derived(!!(canEdit && analysis && seedViewerContext));
+    const placeGate = $derived.by(() => {
+        if (!analysis || !seedViewerContext) return { ok: true as const };
+        return canPlaceOnViewer(
+            analysis.coordinateSpace,
+            seedViewerContext.image,
+        );
+    });
+    const activateDisabled = $derived(!canActivate || !placeGate.ok);
 
     function toggleActivate() {
         if (!analysis || !seedViewerContext) return;
+        const gate = canPlaceOnViewer(
+            analysis.coordinateSpace,
+            seedViewerContext.image,
+        );
+        if (!gate.ok) return;
         pointArming.arm(
             new FormPointSession({
                 key: armKey,
@@ -336,11 +352,15 @@
                 <Button
                     variant={armed ? "default" : "outline"}
                     size="sm"
-                    disabled={!canActivate}
+                    disabled={activateDisabled}
+                    title={!placeGate.ok ? placeGate.message : undefined}
                     onclick={toggleActivate}
                 >
                     {armed ? "Deactivate tool" : "Activate tool"}
                 </Button>
+                {#if !placeGate.ok}
+                    <span class="warn">{placeGate.message}</span>
+                {/if}
             {:else}
                 <span class="hint">No viewer — tool unavailable</span>
             {/if}
@@ -366,12 +386,47 @@
         </div>
 
         {#if imageGroups.length === 0}
-            <div class="empty">no points</div>
+            <div class="empty">
+                {analysis.cardinality === "single" ? "no point" : "no points"}
+            </div>
+        {:else if analysis.cardinality === "single" && analysis.addressing === "bare"}
+            {@const row = imageGroups[0]!.rows[0]!}
+            <div class="single-point">
+                <button
+                    type="button"
+                    class="coord-chip"
+                    class:expanded={expandedKey === rowKey(row)}
+                    title={canEdit
+                        ? "Click to edit labels / coordinates"
+                        : formatCoord(row.pt) + extraPreview(row.pt)}
+                    onclick={() => toggleExpand(row)}
+                >
+                    {formatCoord(row.pt)}{#if extraPreview(row.pt)}<span
+                            class="extra-preview">{extraPreview(row.pt)}</span
+                        >{/if}
+                </button>
+                {#if expandedKey === rowKey(row)}
+                    <PointRowEditor
+                        {row}
+                        {canEdit}
+                        {hasExtras}
+                        enumExtras={analysis.enumExtras}
+                        {stringExtraKeys}
+                        {indexApplicable}
+                        coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
+                        onUpdateCoord={updatePointCoord}
+                        onUpdateExtra={updatePointExtra}
+                        onRemove={() => removePoint(row.publicId, row.index)}
+                        onCollapse={() => (expandedKey = null)}
+                    />
+                {/if}
+            </div>
         {:else}
             {#each imageGroups as group (group.publicId)}
                 <PointImageGroup
                     {group}
                     addressing={analysis.addressing}
+                    cardinality={analysis.cardinality}
                     {expandedKey}
                     {canEdit}
                     {hasExtras}
@@ -430,5 +485,36 @@
         font-family: monospace;
         opacity: 0.7;
         color: inherit;
+    }
+    .single-point {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35em;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+    .coord-chip {
+        appearance: none;
+        align-self: flex-start;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 0.35em;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+        padding: 0.05em 0.3em;
+        margin: 0;
+    }
+    .coord-chip:hover {
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        border-color: color-mix(in srgb, currentColor 35%, transparent);
+    }
+    .coord-chip.expanded {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+    .extra-preview {
+        opacity: 0.65;
+        font-size: 0.9em;
     }
 </style>

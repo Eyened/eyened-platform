@@ -15,6 +15,12 @@ export type ImagePoint = {
 export type PointCardinality = "single" | "list";
 /** Where the tool reads/writes relative to the field value. */
 export type PointAddressing = "bare" | "byImage";
+/**
+ * Derived from whether the point object schema declares an `index` property.
+ * - `enface2d`: plain {x,y} — fundus / enface / `*_proj` only (not OCT B-scan volumes).
+ * - `oct`: may carry `index` (B-scan) or `index: null` (`*_proj`); also ok on plain 2D.
+ */
+export type PointCoordinateSpace = "enface2d" | "oct";
 export type PointList = (ImagePoint | null)[];
 
 export type PointSchemaAnalysis = {
@@ -25,7 +31,23 @@ export type PointSchemaAnalysis = {
     /** List items may be null — mid-delete leaves holes; empty click fills first null. */
     sparse: boolean;
     enumExtras: { key: string; values: readonly string[] }[];
+    coordinateSpace: PointCoordinateSpace;
 };
+
+/** Whether the current viewer image is compatible with this field's coordinate space. */
+export function canPlaceOnViewer(
+    coordinateSpace: PointCoordinateSpace,
+    image: { is3D: boolean },
+): { ok: true } | { ok: false; message: string } {
+    if (coordinateSpace === "enface2d" && image.is3D) {
+        return {
+            ok: false,
+            message:
+                "This point field is 2D-only — switch to a fundus or enface image (not an OCT B-scan volume).",
+        };
+    }
+    return { ok: true };
+}
 
 export function isPointWidget(schema: JSONSchema): boolean {
     return schema["x-eyened-widget"] === EYENED_KEYPOINT_WIDGET;
@@ -134,12 +156,18 @@ export function analyzePointSchema(
 
     if (!pointObjectSchema) return null;
 
+    const coordinateSpace: PointCoordinateSpace =
+        pointObjectSchema.properties?.index !== undefined
+            ? "oct"
+            : "enface2d";
+
     return {
         cardinality,
         addressing,
         pointObjectSchema,
         sparse,
         enumExtras: enumExtrasFromPointSchema(pointObjectSchema),
+        coordinateSpace,
     };
 }
 

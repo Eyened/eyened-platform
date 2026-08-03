@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "description": "Per-image point sets for pairwise registration. Keys are image IDs; values are arrays of {x, y} landmarks (null = landmark missing on that image).",
+  "description": "Per-image point sets for pairwise registration. Keys are image IDs (including enface `*_proj`); values are arrays of landmarks. Optional `index` is the OCT B-scan slice (number), explicit null on enface projections, and omitted on plain 2D fundus.",
   "x-eyened-widget": "keypoint",
   "additionalProperties": {
     "type": "array",
@@ -11,9 +11,14 @@
           "type": "object",
           "properties": {
             "x": { "type": "number" },
-            "y": { "type": "number" }
+            "y": { "type": "number" },
+            "index": {
+              "type": ["number", "null"],
+              "description": "B-scan slice on OCT volumes; null on enface *_proj; omit on plain 2D"
+            }
           },
-          "required": ["x", "y"]
+          "required": ["x", "y"],
+          "additionalProperties": false
         },
         { "type": "null" }
       ]

@@ -169,6 +169,26 @@ function validate(
         }
     }
 
+    // additionalProperties: false rejects undeclared keys (e.g. stray `index`
+    // on a 2D-only point object).
+    if (
+        schema.additionalProperties === false &&
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+    ) {
+        const allowed = new Set(Object.keys(schema.properties ?? {}));
+        for (const key of Object.keys(value as Record<string, unknown>)) {
+            if (!allowed.has(key)) {
+                errors.push({
+                    path: `${path}.${key}`,
+                    type: "additionalProperties",
+                    message: `${path || "value"}.${key}: Unexpected property`,
+                });
+            }
+        }
+    }
+
     // Array validation (recursive)
     if (schema.items && Array.isArray(value)) {
         for (const [i, item] of value.entries()) {

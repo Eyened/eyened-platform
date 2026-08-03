@@ -2,6 +2,7 @@
     import type {
         ImagePoint,
         PointAddressing,
+        PointCardinality,
     } from "$lib/forms/pointSchema";
     import PointRowEditor, {
         type PointRow,
@@ -10,6 +11,7 @@
     interface Props {
         group: { publicId: string; rows: PointRow[] };
         addressing: PointAddressing;
+        cardinality?: PointCardinality;
         expandedKey: string | null;
         canEdit: boolean;
         hasExtras: boolean;
@@ -39,6 +41,7 @@
     let {
         group,
         addressing,
+        cardinality = "list",
         expandedKey,
         canEdit,
         hasExtras,
@@ -64,8 +67,10 @@
             >
             <span class="sep">:</span>
         {/if}
-        <span class="count">{group.rows.length} pts</span>
-        <span class="paren">(</span>
+        {#if cardinality === "list"}
+            <span class="count">{group.rows.length} pts</span>
+            <span class="paren">(</span>
+        {/if}
         {#each group.rows as row, i (rowKey(row))}
             {#if i > 0}<span class="comma">, </span>{/if}
             <button
@@ -82,7 +87,9 @@
                     >{/if}
             </button>
         {/each}
-        <span class="paren">)</span>
+        {#if cardinality === "list"}
+            <span class="paren">)</span>
+        {/if}
     </div>
 
     {#each group.rows as row (rowKey(row))}

@@ -71,27 +71,28 @@
         status = "loaded";
     });
 
-    async function onchange(next?: unknown) {
+    async function onchange(next: unknown) {
         if (!canEdit) return;
-        if (next !== undefined) {
-            value = next;
-        }
-        if (value) {
-            // Clear existing timeout
-            if (saveTimeout) {
-                clearTimeout(saveTimeout);
-            }
+        // Always apply `next`, including undefined/null/''/0/false. Callers use
+        // undefined to omit/clear (PointField Remove, bare-single Clear, SchemaForm
+        // trash). Treating undefined as "no change" left stale value in state and
+        // the truthy save guard then wrote the old points back as a "successful" save.
+        value = next;
 
-            // Show "saving" status immediately for user feedback
-            status = "saving";
-
-            // Debounce: wait 500ms after last keystroke before saving
-            saveTimeout = setTimeout(async () => {
-                await setFormAnnotationValue(form.id, value);
-                status = "synced";
-                saveTimeout = null;
-            }, 500);
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
         }
+
+        // Show "saving" status immediately for user feedback
+        status = "saving";
+
+        // Debounce: wait 500ms after last keystroke before saving.
+        // JSON body cannot be undefined — persist null for an omitted root value.
+        saveTimeout = setTimeout(async () => {
+            await setFormAnnotationValue(form.id, value ?? null);
+            status = "synced";
+            saveTimeout = null;
+        }, 500);
     }
 
     function readLocalStorageBoolean(key: string, defaultValue: boolean) {
@@ -186,7 +187,7 @@
         </label>
     </div>
     <div class="main">
-        {#if value}
+        {#if status !== "loading"}
             <SchemaForm
                 {schema}
                 {value}

@@ -77,6 +77,7 @@ export function createMultiFieldAdapter(args: {
         sparse: true,
         pointObjectSchema: { ...MULTI_FIELD_POINT_SCHEMA },
         enumExtras: [],
+        coordinateSpace: "enface2d",
     };
     return {
         analysis,
