@@ -150,6 +150,22 @@ def make_image(
     return img
 
 
+def make_image_in_project(session, project, public_id: str) -> ImageInstance:
+    """One image, four joins deep, in ``project``.
+
+    ``Patient.ProjectID`` is the schema's only project anchor, so "an image in
+    project X" is always this whole chain. Every derived name keys off
+    ``public_id`` so two calls in one project never collide on
+    ``Patient.PatientIdentifier`` or ``StorageBackend.Key``.
+    """
+    patient = make_patient(session, project, f"pat-{public_id}")
+    study = make_study(session, patient, date(2024, 1, 1))
+    series = make_series(session, study)
+    device = make_device(session, f"dev-{public_id}")
+    backend = make_storage_backend(session, f"backend-{public_id}")
+    return make_image(session, series, device, backend, public_id)
+
+
 def make_feature(session, name: str) -> Feature:
     f = Feature(FeatureName=name)
     session.add(f)
