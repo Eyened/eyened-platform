@@ -50,6 +50,7 @@ TASK = Entity(
         "TaskName": "task_name",
         "Description": "task_description",
         "TaskState": "task_state",
+        "ProjectID": "task_project_id",
     },
 )
 

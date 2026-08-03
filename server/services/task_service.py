@@ -31,14 +31,18 @@ class TaskService:
         description: str | None,
         contact_id: int | None,
         task_definition_id: int,
+        project_id: int,
         actor: ActingUser,
     ) -> Task:
         """Create a task owned by the acting user (TaskState.NotStarted)."""
+        # Task 3 adds the project guard here and extends this docstring with a
+        # `Raises:` section, matching get_task/update_task/delete_task below.
         task = Task(
             TaskName=name,
             Description=description,
             ContactID=contact_id,
             TaskDefinitionID=task_definition_id,
+            ProjectID=project_id,
             CreatorID=actor.id,
             TaskState=TaskState.NotStarted,
         )
@@ -55,6 +59,7 @@ class TaskService:
                     "description": task.Description,
                     "contact_id": task.ContactID,
                     "task_definition_id": task.TaskDefinitionID,
+                    "project_id": task.ProjectID,
                 },
             )
         return task

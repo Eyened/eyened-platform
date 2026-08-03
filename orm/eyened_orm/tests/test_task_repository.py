@@ -1,4 +1,7 @@
-from eyened_orm import Creator, SubTask, Task, TaskDefinition
+from sqlalchemy import select
+
+from eyened_orm import Creator, Project, SubTask, Task, TaskDefinition
+from eyened_orm.project import ExternalEnum
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import TaskRepository, SubTaskRepository
 
@@ -17,12 +20,27 @@ def _task_def(session, name: str = "td") -> TaskDefinition:
     return td
 
 
+def _project_for(session, name: str) -> Project:
+    """One project per task name -- derived from the name, never a counter, so
+    it is stable under `pytest -k` selection. Re-used if it already exists."""
+    existing = session.scalar(
+        select(Project).where(Project.ProjectName == f"proj-{name}")
+    )
+    if existing is not None:
+        return existing
+    project = Project(ProjectName=f"proj-{name}", External=ExternalEnum.N)
+    session.add(project)
+    session.flush()
+    return project
+
+
 def _make_task(session, td_id: int, creator_id: int, name: str = "T") -> Task:
     task = Task(
         TaskName=name,
         TaskDefinitionID=td_id,
         CreatorID=creator_id,
         TaskState=TaskState.NotStarted,
+        ProjectID=_project_for(session, name).ProjectID,
     )
     session.add(task)
     session.flush()

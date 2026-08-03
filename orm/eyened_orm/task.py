@@ -64,6 +64,9 @@ class Task(Base):
     __table_args__ = (
         Index("fk_Task_TaskDefinition1_idx", "TaskDefinitionID"),
         Index("ix_Task_Creator_TaskDefinition", "CreatorID", "TaskDefinitionID"),
+        # Same name ForeignKeyIndex() would generate; spelled out to match this
+        # file's existing style.
+        Index("fk_Task_Project1_idx", "ProjectID"),
     )
     _name_column: ClassVar[str | None] = "TaskName"
 
@@ -74,6 +77,13 @@ class Task(Base):
     ContactID: Mapped[Optional[int]] = mapped_column(ForeignKey("Contact.ContactID"))
     TaskDefinitionID: Mapped[int] = mapped_column(
         ForeignKey("TaskDefinition.TaskDefinitionID")
+    )
+    # NOT NULL in the model, not only in the migration: create_all builds fresh
+    # deployments and every test schema, neither of which replays a revision.
+    # CASCADE matches Patient.ProjectID and ProjectMember.ProjectID -- RESTRICT
+    # would block deleting any project that ever held a task.
+    ProjectID: Mapped[int] = mapped_column(
+        ForeignKey("Project.ProjectID", ondelete="CASCADE")
     )
     # TaskStateID: Mapped[Optional[int]] = mapped_column(ForeignKey("TaskState.TaskStateID"))
 
@@ -97,6 +107,29 @@ class Task(Base):
         passive_deletes=True,
     )
 
+    @staticmethod
+    def _project_ids_for_images(session: Session, image_ids: list[int]) -> set[int]:
+        """Return the distinct projects the given images belong to (four joins up).
+
+        Inactive images are counted deliberately: skipping them could make a task
+        look like it has no image evidence at all.
+        """
+        from eyened_orm import ImageInstance, Patient, Series, Study
+
+        if not image_ids:
+            return set()
+        return set(
+            session.scalars(
+                select(Patient.ProjectID)
+                .select_from(ImageInstance)
+                .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+                .join(Study, Study.StudyID == Series.StudyID)
+                .join(Patient, Patient.PatientID == Study.PatientID)
+                .where(ImageInstance.ImageInstanceID.in_(image_ids))
+                .distinct()
+            )
+        )
+
     @classmethod
     def create_from_imagesets(
         cls: type["Task"],
@@ -105,7 +138,40 @@ class Task(Base):
         task_name: str,
         imagesets: Iterable[Iterable[int | ImageInstance]],
         creator_name: str | None = None,
+        project_id: int | None = None,
     ) -> "Task":
+        """Build an unsaved Task whose project is derived from its images.
+
+        ``project_id`` is a fallback for the imageset-less case, not an override:
+        when the images resolve to a project, that project wins.
+
+        Raises:
+            ValueError: If the images span more than one project, or if they
+                resolve to none and no ``project_id`` was given.
+        """
+        from eyened_orm import ImageInstance
+
+        # Materialize first: `imagesets` may be a generator, and it is read twice.
+        imagesets = [list(imset) for imset in imagesets]
+        image_ids = [
+            image.ImageInstanceID if isinstance(image, ImageInstance) else image
+            for imset in imagesets
+            for image in imset
+        ]
+
+        found = cls._project_ids_for_images(session, image_ids)
+        if len(found) > 1:
+            raise ValueError(
+                f"Task {task_name!r} spans multiple projects "
+                f"({sorted(found)}); a task is linked to exactly one project."
+            )
+        if found:
+            project_id = found.pop()
+        elif project_id is None:
+            raise ValueError(
+                f"Cannot derive a project for task {task_name!r}: its images "
+                f"resolve to no project. Pass project_id explicitly."
+            )
 
         subtasks = [SubTask.create_from_images(imset) for imset in imagesets]
 
@@ -125,6 +191,7 @@ class Task(Base):
             TaskState=TaskState.NotStarted,
             SubTasks=subtasks,
             Creator=creator,
+            ProjectID=project_id,
         )
 
     def get_form_annotations(self, schema_id: Optional[int] = None) -> List["FormAnnotation"]:

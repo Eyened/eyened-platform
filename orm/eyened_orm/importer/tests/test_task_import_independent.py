@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from eyened_orm import ImageInstance, SubTask, SubTaskImageLink, Task
+from eyened_orm import ImageInstance, Project, SubTask, SubTaskImageLink, Task
 from eyened_orm.importer.importer import plan_image_import, plan_import
 from eyened_orm.importer.importer_dtos import ImportRow, ImportTaskRow, expand_task_import_rows
 from eyened_orm.importer.importer_mappings_tasks import TASK_ENTITY_SPECS
@@ -14,6 +14,12 @@ from eyened_orm.importer.importer_mappings_tasks import TASK_ENTITY_SPECS
 
 def _count(session, model) -> int:
     return session.scalar(select(func.count()).select_from(model))
+
+
+def _project_id(session, name: str) -> int:
+    """The id of the project the image import just created -- Task.ProjectID is
+    NOT NULL, so every task row here has to name the project of its images."""
+    return session.scalar(select(Project.ProjectID).where(Project.ProjectName == name))
 
 
 def test_image_then_task_import_creates_tasks_subtasks_and_links(session):
@@ -58,6 +64,7 @@ def test_image_then_task_import_creates_tasks_subtasks_and_links(session):
             task_definition_name="td-mini",
             task_name="t-mini",
             creator_name="creator-mini",
+            task_project_id=_project_id(session, "ti-proj"),
         ),
         [[i0, i1], [i2]],
     )
@@ -115,6 +122,9 @@ def test_subtask_image_link_rejects_unknown_image_instance_id(session):
         task_definition_name="td-fk",
         task_name="t-fk",
         creator_name="c-fk",
+        # A real project, so the IntegrityError below can only come from the link
+        # FK this test is named for -- never from Task.ProjectID being NULL.
+        task_project_id=_project_id(session, "ti-fk-proj"),
         subtask_anonymous_identity=1,
         image_instance_id=bad_id,
         subtask_image_index=0,
@@ -168,6 +178,7 @@ def test_append_subtask_image_link_with_existing_task_and_subtask_ids(session):
                 task_definition_name="td-st",
                 task_name="t-st",
                 creator_name="c-st",
+                task_project_id=_project_id(session, "ti-st-proj"),
             ),
             [[i0]],
         ),
@@ -200,3 +211,56 @@ def test_append_subtask_image_link_with_existing_task_and_subtask_ids(session):
     assert len(links) == 2
     assert {link.ImageInstanceID for link in links} == {i0, i1}
     assert all(link.SubTaskID == st.SubTaskID for link in links)
+
+
+def test_task_import_carries_the_project(session):
+    """``task_project_id`` is a plain field on the TASK entity, not a lookup key:
+    the importer writes it to ``Task.ProjectID`` verbatim. Anchoring to a project
+    other than the linked image's proves it is carried, never derived."""
+    from eyened_orm.utils.factories import make_project
+
+    defaults = {
+        "project_external": "Y",
+        "manufacturer": "tm",
+        "manufacturer_model_name": "tmm",
+        "device_description": "td",
+        "dataset_identifier": "",
+        "storage_backend_kind": "local",
+    }
+    plan_image_import(
+        session,
+        [
+            ImportRow(
+                project_name="ti-carry-proj",
+                patient_identifier="ti-carry-pat",
+                study_date=date(2026, 8, 1),
+                series_instance_uid="ti-carry-ser",
+                storage_backend_key="ti-carry-sb",
+                object_key="ti-carry-0.png",
+                modality="ColorFundus",
+                laterality="L",
+            )
+        ],
+        defaults=defaults,
+    ).apply()
+    project = make_project(session, "P-import")
+    session.commit()
+
+    i0 = session.scalar(
+        select(ImageInstance.ImageInstanceID).order_by(ImageInstance.ImageInstanceID)
+    )
+
+    task_rows = expand_task_import_rows(
+        ImportTaskRow(
+            task_definition_name="td-proj",
+            task_name="t-proj",
+            task_project_id=project.ProjectID,
+        ),
+        [[i0]],
+    )
+    plan_import(session, task_rows, entity_specs=TASK_ENTITY_SPECS).apply()
+    session.commit()
+
+    task = session.scalar(select(Task).where(Task.TaskName == "t-proj"))
+    assert task is not None
+    assert task.ProjectID == project.ProjectID

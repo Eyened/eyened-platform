@@ -639,6 +639,7 @@ class DTOConverter:
             description=task.Description,
             contact_id=task.ContactID,
             task_definition_id=task.TaskDefinitionID,
+            project_id=task.ProjectID,
             date_inserted=task.DateInserted,
             num_tasks=num_tasks,
             num_tasks_ready=num_tasks_ready,

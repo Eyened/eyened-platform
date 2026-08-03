@@ -304,6 +304,10 @@ class ImportTaskRow(ContactImportFields, BaseModel):
     task_id: Optional[int] = None
     task_name: Optional[str] = None
     task_description: Optional[str] = None
+    task_project_id: Optional[int] = Field(
+        None,
+        description="Task.ProjectID -- a plain FK field, not part of the TASK lookup",
+    )
     task_state: TaskState = Field(
         default=TaskState.NotStarted,
         description="ORM Task.TaskState (Python enum; not a separate FK column)",

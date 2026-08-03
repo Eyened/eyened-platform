@@ -35,6 +35,7 @@ class TaskBase(BaseModel):
     description: Optional[str] = None
     contact_id: Optional[int] = None
     task_definition_id: int
+    project_id: int
 
 class TaskPUT(TaskBase):
     pass

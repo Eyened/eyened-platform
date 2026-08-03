@@ -6,7 +6,7 @@ from datetime import date
 
 from sqlalchemy import func, select
 
-from eyened_orm import ImageInstance, SubTask, SubTaskImageLink, Task
+from eyened_orm import ImageInstance, Project, SubTask, SubTaskImageLink, Task
 from eyened_orm.importer.importer import plan_image_import, plan_import
 from eyened_orm.importer.importer_dtos import ImportRow, ImportTaskRow, expand_task_import_rows
 from eyened_orm.importer.importer_mappings_tasks import TASK_ENTITY_SPECS
@@ -88,6 +88,10 @@ def test_expanded_overlapping_subtasks_import_six_links(session):
             task_definition_name="td-ex",
             task_name="t-ex",
             creator_name="creator-ex",
+            # Task.ProjectID is NOT NULL: the task names the project of its images.
+            task_project_id=session.scalar(
+                select(Project.ProjectID).where(Project.ProjectName == "ex-proj")
+            ),
         ),
         [[i0, i1, i2], [i0, i3, i4]],
     )
