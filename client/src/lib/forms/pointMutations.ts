@@ -24,7 +24,14 @@ export function placePoint(
     if (cardinality === "single") {
         const prev = points.find((p) => p != null);
         // Keep non-spatial extras (note, severity, …) when replacing the one point.
-        return [prev ? { ...prev, ...next } : next];
+        const merged: ImagePoint = prev ? { ...prev, ...next } : next;
+        // Plain 2D omits index options — drop a stale volume index so the
+        // marker stays visible (visibleOnSlice rejects numeric index on 2D).
+        if (!options || !("index" in options)) {
+            const { index: _drop, ...rest } = merged;
+            return [rest];
+        }
+        return [merged];
     }
 
     const copy = [...points];
