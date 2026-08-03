@@ -16,11 +16,12 @@ export type PointCardinality = "single" | "list";
 /** Where the tool reads/writes relative to the field value. */
 export type PointAddressing = "bare" | "byImage";
 /**
- * Derived from whether the point object schema declares an `index` property.
- * - `enface2d`: plain {x,y} — fundus / enface / `*_proj` only (not OCT B-scan volumes).
- * - `oct`: may carry `index` (B-scan) or `index: null` (`*_proj`); also ok on plain 2D.
+ * Derived from how the point object schema declares `index`:
+ * - `enface2d`: no `index` — fundus / enface only (not OCT B-scan volumes).
+ * - `volume`: numeric `index` only (no null) — OCT B-scan volumes only.
+ * - `oct`: `index` allows null — volumes, `*_proj`, and plain 2D.
  */
-export type PointCoordinateSpace = "enface2d" | "oct";
+export type PointCoordinateSpace = "enface2d" | "volume" | "oct";
 export type PointList = (ImagePoint | null)[];
 
 export type PointSchemaAnalysis = {
@@ -44,6 +45,13 @@ export function canPlaceOnViewer(
             ok: false,
             message:
                 "This point field is 2D-only — switch to a fundus or enface image (not an OCT B-scan volume).",
+        };
+    }
+    if (coordinateSpace === "volume" && !image.is3D) {
+        return {
+            ok: false,
+            message:
+                "This point field requires an OCT B-scan volume (numeric index is required) — switch to a volume viewer.",
         };
     }
     return { ok: true };
@@ -110,6 +118,28 @@ function enumExtrasFromPointSchema(
     return extras;
 }
 
+/** True if a property schema can validate JSON `null`. */
+function schemaAllowsNull(prop: JSONSchema): boolean {
+    if (schemaType(prop) === "null") return true;
+    if (Array.isArray(prop.type) && prop.type.includes("null")) return true;
+    const alts = prop.oneOf ?? prop.anyOf;
+    return !!alts?.some((option) => schemaType(option) === "null");
+}
+
+/**
+ * - no `index` → enface2d
+ * - `index` allows null (number|null) → oct (volumes, *_proj, and plain 2D)
+ * - `index` is number-only → volume (OCT B-scan only), whether or not required
+ */
+function coordinateSpaceFromPointSchema(
+    pointObjectSchema: JSONSchema,
+): PointCoordinateSpace {
+    const indexProp = pointObjectSchema.properties?.index;
+    if (!indexProp) return "enface2d";
+    if (schemaAllowsNull(indexProp)) return "oct";
+    return "volume";
+}
+
 /**
  * Classify a keypoint-widget field schema from shape alone.
  * Returns null if the widget marker is present but the shape is not point-like.
@@ -156,16 +186,13 @@ export function analyzePointSchema(
 
     if (!pointObjectSchema) return null;
 
-    const coordinateSpace: PointCoordinateSpace =
-        pointObjectSchema.properties?.index !== undefined ? "oct" : "enface2d";
-
     return {
         cardinality,
         addressing,
         pointObjectSchema,
         sparse,
         enumExtras: enumExtrasFromPointSchema(pointObjectSchema),
-        coordinateSpace,
+        coordinateSpace: coordinateSpaceFromPointSchema(pointObjectSchema),
     };
 }
 

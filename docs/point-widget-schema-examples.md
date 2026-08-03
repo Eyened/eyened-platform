@@ -9,10 +9,13 @@ How it behaves depends only on the **JSON Schema shape** of that field:
 - an array → list of points  
 - array items that allow `null` → deleted points leave a hole (e.g. for matching landmarks across images)
 
-**Coordinate space** is also derived from shape:
+**Coordinate space** is also derived from how `index` is declared on the point object:
 
-- If the point object does **not** declare `index` → **2D / enface only** (fundus, `*_proj`). Placement on an OCT B-scan volume is rejected.
-- If it declares optional `index` (`number` or `null`) → OCT volumes (slice index), enface projections (`index: null`), and plain 2D are all allowed.
+- **No `index`** → **2D / enface only**. Placement on an OCT B-scan volume is rejected (toast).
+- **Numeric `index` only** (`"type": "number"`, no null) → **OCT volume only**. Placement on plain 2D / enface is rejected (toast). Prefer listing `index` in `required`.
+- **`index` allows null** (`"type": ["number", "null"]`) → **both**: volumes (slice index), enface projections (`index: null`), and plain 2D (omit `index`).
+
+Incompatible placements toast from the viewer tool; the form Activate control is not blocked by the seed viewer.
 
 Use **`title`** for the fixed name shown on the image (e.g. `"Fovea"`). Optional properties on each point (enums, short strings) can show instead when set. Prefer a short `title`; put longer help text in `description`.
 

@@ -36,8 +36,11 @@ export type PointToolOptions = {
      */
     sparse?: boolean;
     /**
-     * When set, gates placement and index injection.
+     * When set, gates placement and index injection from schema shape.
      * Omit for legacy callers (allow all viewers; inject index on 3D / `_proj`).
+     * - enface2d: reject volumes; never write index
+     * - volume: reject non-volumes; always write numeric index
+     * - oct: allow all; index number / null / omit by viewer kind
      */
     coordinateSpace?: PointCoordinateSpace;
     slotLabels?: readonly string[];
@@ -177,10 +180,12 @@ export class PointTool implements Overlay {
     private placeIndexOptions(
         viewerContext: ViewerContext,
     ): { index: number | null } | undefined {
-        // enface2d fields never store index (even if somehow on a volume).
+        // enface2d: never store index. volume: always a B-scan index (gated).
         if (this.coordinateSpace === "enface2d") return undefined;
         const { image } = viewerContext;
         if (image.is3D) return { index: viewerContext.index };
+        if (this.coordinateSpace === "volume") return undefined;
+        // oct (both): null on enface *_proj; omit on plain 2D.
         if (image.image_id.endsWith("_proj")) return { index: null };
         return undefined;
     }

@@ -125,7 +125,7 @@ describe("analyzePointSchema", () => {
         });
     });
 
-    it("declaring index → oct coordinate space", () => {
+    it("declaring index number|null → oct (both)", () => {
         const a = analyzePointSchema({
             "x-eyened-widget": "keypoint",
             type: "object",
@@ -141,6 +141,38 @@ describe("analyzePointSchema", () => {
             addressing: "bare",
             coordinateSpace: "oct",
         });
+    });
+
+    it("numeric index without null → volume-only (even if optional)", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            properties: {
+                x: { type: "number" },
+                y: { type: "number" },
+                index: { type: "number" },
+            },
+            required: ["x", "y"],
+        });
+        expect(a).toMatchObject({
+            cardinality: "single",
+            addressing: "bare",
+            coordinateSpace: "volume",
+        });
+    });
+
+    it("required numeric index → volume-only", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            properties: {
+                x: { type: "number" },
+                y: { type: "number" },
+                index: { type: "number" },
+            },
+            required: ["x", "y", "index"],
+        });
+        expect(a).toMatchObject({ coordinateSpace: "volume" });
     });
 
     it("registration-shaped sparse list with index → oct", () => {
@@ -194,9 +226,19 @@ describe("canPlaceOnViewer", () => {
         expect(canPlaceOnViewer("enface2d", { is3D: false }).ok).toBe(true);
     });
 
-    it("allows OCT volumes for oct", () => {
+    it("allows OCT volumes and 2D for oct (both)", () => {
         expect(canPlaceOnViewer("oct", { is3D: true }).ok).toBe(true);
         expect(canPlaceOnViewer("oct", { is3D: false }).ok).toBe(true);
+    });
+
+    it("rejects non-volumes for volume-only", () => {
+        const r = canPlaceOnViewer("volume", { is3D: false });
+        expect(r.ok).toBe(false);
+        if (!r.ok) expect(r.message).toMatch(/OCT B-scan volume/);
+    });
+
+    it("allows OCT volumes for volume-only", () => {
+        expect(canPlaceOnViewer("volume", { is3D: true }).ok).toBe(true);
     });
 });
 

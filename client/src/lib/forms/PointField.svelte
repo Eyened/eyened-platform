@@ -13,7 +13,6 @@
     } from "$lib/forms/pointArming.svelte";
     import {
         analyzePointSchema,
-        canPlaceOnViewer,
         getPointsForImage,
         isPointWidget,
         setPointsForImage,
@@ -195,22 +194,9 @@
     }
 
     const canActivate = $derived(!!(canEdit && analysis && seedViewerContext));
-    const placeGate = $derived.by(() => {
-        if (!analysis || !seedViewerContext) return { ok: true as const };
-        return canPlaceOnViewer(
-            analysis.coordinateSpace,
-            seedViewerContext.image,
-        );
-    });
-    const activateDisabled = $derived(!canActivate || !placeGate.ok);
 
     function toggleActivate() {
         if (!analysis || !seedViewerContext) return;
-        const gate = canPlaceOnViewer(
-            analysis.coordinateSpace,
-            seedViewerContext.image,
-        );
-        if (!gate.ok) return;
         pointArming.arm(
             new FormPointSession({
                 key: armKey,
@@ -352,15 +338,11 @@
                 <Button
                     variant={armed ? "default" : "outline"}
                     size="sm"
-                    disabled={activateDisabled}
-                    title={!placeGate.ok ? placeGate.message : undefined}
+                    disabled={!canActivate}
                     onclick={toggleActivate}
                 >
                     {armed ? "Deactivate tool" : "Activate tool"}
                 </Button>
-                {#if !placeGate.ok}
-                    <span class="warn">{placeGate.message}</span>
-                {/if}
             {:else}
                 <span class="hint">No viewer — tool unavailable</span>
             {/if}
