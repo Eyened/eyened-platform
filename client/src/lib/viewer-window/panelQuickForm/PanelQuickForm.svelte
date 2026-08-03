@@ -107,7 +107,7 @@
     {:else}
         <p class="schema">Schema: {schema.name}</p>
         <p class="scope">Scope: {entityScope}</p>
-        <p class="status {statusLabel.toLowerCase()}" >Status: {statusLabel}</p>
+        <p class="status {statusLabel.toLowerCase()}">Status: {statusLabel}</p>
     {/if}
 
     <button onclick={onGradeClick} disabled={gradeDisabled}>

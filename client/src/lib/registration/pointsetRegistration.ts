@@ -24,9 +24,7 @@ export type PointsetLandmark =
  */
 type LandmarkKind = "plain" | "proj" | "volume";
 
-function landmarkKind(
-    p: Position2D & { index?: number | null },
-): LandmarkKind {
+function landmarkKind(p: Position2D & { index?: number | null }): LandmarkKind {
     if (typeof p.index === "number") return "volume";
     if ("index" in p && p.index === null) return "proj";
     return "plain";

@@ -157,9 +157,7 @@ export function analyzePointSchema(
     if (!pointObjectSchema) return null;
 
     const coordinateSpace: PointCoordinateSpace =
-        pointObjectSchema.properties?.index !== undefined
-            ? "oct"
-            : "enface2d";
+        pointObjectSchema.properties?.index !== undefined ? "oct" : "enface2d";
 
     return {
         cardinality,
