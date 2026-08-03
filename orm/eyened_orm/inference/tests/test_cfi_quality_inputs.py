@@ -13,6 +13,7 @@ from eyened_orm import (
     AttributeDefinition,
     AttributeValue,
     AttributesModel,
+    ImageInstance,
 )
 from eyened_orm.commands.test_targets import _import_images
 from eyened_orm.inference.cfi_quality import CFI_Quality
@@ -159,11 +160,44 @@ def test_input_data_passed_in_worker_payload(session, monkeypatch):
     fake_rgb = np.zeros((8, 8, 3), dtype=np.uint8)
     monkeypatch.setattr(pipeline, "_load_image_rgb", lambda _img: fake_rgb)
 
-    items = pipeline._build_preprocess_items([image])
+    items = list(pipeline._iter_work_items([image.ImageInstanceID]))
     _, inference_item = items[0]
     assert inference_item is not None
     assert inference_item.input_values == input_data
     assert inference_item.image_rgb is fake_rgb
+
+
+def test_iter_work_items_loads_one_image_at_a_time(session, monkeypatch):
+    """Pixels are decoded per id; no bulk ImageInstance.by_ids up front."""
+    _proj, images = _import_images(session, count=3)
+    image_ids = [im.ImageInstanceID for im in images]
+    for image_id in image_ids:
+        _seed_cfi_roi(session, image_id)
+
+    pipeline = CFI_Quality(session, device=torch.device("cpu"), n_workers=1)
+    pipeline._ensure_inputs_resolved(image_ids)
+
+    load_calls: list[int] = []
+
+    def fake_load(img):
+        load_calls.append(img.ImageInstanceID)
+        return np.zeros((4, 4, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(pipeline, "_load_image_rgb", fake_load)
+
+    def _forbid_bulk_by_ids(cls, *_args, **_kwargs):
+        raise AssertionError("work items must not bulk-load via by_ids")
+
+    monkeypatch.setattr(ImageInstance, "by_ids", classmethod(_forbid_bulk_by_ids))
+
+    seen: list[int] = []
+    for image_id, item in pipeline._iter_work_items(image_ids):
+        assert item is not None
+        assert item.image_rgb is not None
+        seen.append(image_id)
+        assert load_calls == seen
+
+    assert seen == image_ids
 
 
 def test_save_result_links_cfi_roi_provenance(session):

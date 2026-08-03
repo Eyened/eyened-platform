@@ -323,6 +323,8 @@ def run_for_image_ids(
     overwrite: bool = False,
 ) -> None:
     """Entry point for CLI and RQ worker (``cfi-amd`` queue)."""
+    from eyened_orm.commands.targets import iter_image_id_chunks
+
     image_ids = set(image_ids)
     processor = CFI_AMD(
         session,
@@ -330,18 +332,28 @@ def run_for_image_ids(
         n_workers=n_workers,
         batch_size=batch_size,
     )
-    if overwrite:
-        filtered = image_ids
-        print(f"Processing {len(filtered)} images (overwrite)")
-    else:
-        filtered = processor.filter_image_ids(image_ids)
-        print(f"Processing {len(filtered)} images (after filtering existing)")
-    if not filtered:
+    total_processed = 0
+    chunks = list(iter_image_id_chunks(image_ids))
+    for chunk_idx, chunk in enumerate(chunks, start=1):
+        if overwrite:
+            filtered = chunk
+        else:
+            filtered = processor.filter_image_ids(chunk)
+        if not filtered:
+            continue
+        print(
+            f"Processing {len(filtered)} images "
+            f"(chunk {chunk_idx}/{len(chunks)}"
+            f"{', overwrite' if overwrite else ', after filtering existing'})"
+        )
+        processor.run(filtered)
+        session.commit()
+        total_processed += len(filtered)
+
+    if total_processed == 0:
         print("No images to process")
         return
-    processor.run(filtered)
-    session.commit()
-    print(f"Completed processing {len(filtered)} images")
+    print(f"Completed processing {total_processed} images")
 
 
 def predict_image(

@@ -53,20 +53,26 @@ class MultiProcessInference(Generic[InT, PrepT, BatchOutT, OutT]):
         """Initialize MultiProcessInference.
         
         Args:
-            items: Iterable of (image_id, input_item) tuples
+            items: Iterable of (image_id, input_item) tuples. May be a lazy
+                generator; items are pulled by a feeder thread into a bounded
+                work queue (back-pressure when the iterable is expensive).
             pipeline: BaseInferencePipeline object implementing pipeline stages
             n_workers: Number of preprocessing worker processes
             batch_size: Batch size for batch processing
-            queue_max_size: Maximum size of preprocessing queue
+            queue_max_size: Maximum size of the prep queue (defaults to batch_size).
+                The work queue is sized to ``max(queue_max_size, n_workers) * 2``.
         """
         self.items = items
         self.pipeline = pipeline
         self.n_workers = n_workers
         self.batch_size = batch_size
-        self.queue_max_size = queue_max_size or batch_size
+        # Bound both queues so producers back-pressure: callers can stream
+        # heavy payloads (e.g. decoded images) without retaining the full set.
+        self.queue_max_size = queue_max_size or max(batch_size, 1)
+        self._work_q_maxsize = max(self.queue_max_size, n_workers) * 2
         self._ctx = mp.get_context()
 
-        self._work_q = self._ctx.Queue()
+        self._work_q = self._ctx.Queue(maxsize=self._work_q_maxsize)
         self._prep_q = self._ctx.Queue(maxsize=self.queue_max_size)
 
         self._workers: List[mp.Process] = []

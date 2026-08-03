@@ -166,6 +166,42 @@ def test_resolve_image_target_default_with_modality(session):
     assert target.image_ids == {cfi.ImageInstanceID}
 
 
+def test_resolve_image_target_explicit_ids_apply_modality(session):
+    _proj, images = _import_images(session)
+    spec = TargetSpec(
+        image_ids=[str(im.ImageInstanceID) for im in images],
+        modality="ColorFundus",
+    )
+    target = resolve_image_target(session, spec)
+    cfi = next(im for im in images if im.Modality.name == "ColorFundus")
+    assert target.image_ids == {cfi.ImageInstanceID}
+    assert "modality ColorFundus" in target.summary
+
+
+def test_filter_image_ids_by_modalities_sql(session):
+    from eyened_orm import Modality
+    from eyened_orm.commands.targets import filter_image_ids_by_modalities
+
+    _proj, images = _import_images(session)
+    ids = {im.ImageInstanceID for im in images}
+    cfi = next(im for im in images if im.Modality.name == "ColorFundus")
+    oct_im = next(im for im in images if im.Modality.name == "OCT")
+
+    assert filter_image_ids_by_modalities(
+        session, ids, (Modality.ColorFundus,)
+    ) == {cfi.ImageInstanceID}
+    assert filter_image_ids_by_modalities(
+        session, ids, (Modality.OCT,)
+    ) == {oct_im.ImageInstanceID}
+
+
+def test_iter_image_id_chunks():
+    from eyened_orm.commands.targets import iter_image_id_chunks
+
+    chunks = list(iter_image_id_chunks(range(25), chunk_size=10))
+    assert chunks == [{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, {10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, {20, 21, 22, 23, 24}]
+
+
 def test_resolve_image_target_requires_target_without_allow_default(session):
     with pytest.raises(click.UsageError, match="Provide a target"):
         resolve_image_target(session, TargetSpec())

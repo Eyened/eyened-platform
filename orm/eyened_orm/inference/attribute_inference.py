@@ -37,7 +37,11 @@ from eyened_orm.inference.multi_process_inference import (
 
 @dataclass(frozen=True)
 class InferenceItem:
-    """Picklable worker payload: decoded pixels and optional resolved input data."""
+    """Picklable worker payload: decoded pixels and optional resolved input data.
+
+    Built one image at a time by :meth:`AttributeInferencePipeline._iter_work_items`
+    so the parent never retains a full-run list of pixel arrays.
+    """
 
     image_rgb: np.ndarray | None
     input_values: dict[str, Any] | None = None
@@ -311,44 +315,61 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             f"{type(self).__name__} must implement _load_image_rgb"
         )
 
-    def _build_preprocess_items(
-        self, images: list[ImageInstance]
-    ) -> list[tuple[int, InferenceItem | None]]:
-        items: list[tuple[int, InferenceItem | None]] = []
-        for img in images:
+    def _load_inference_item(
+        self, load_session, image_id: int
+    ) -> InferenceItem | None:
+        """Load one image into an ``InferenceItem`` using ``load_session``.
+
+        The ORM instance is expunged after decode so the session identity map
+        does not retain images (or their pixel buffers) across the run.
+        """
+        try:
+            image = load_session.get(ImageInstance, image_id)
+            if image is None:
+                print(f"Image {image_id} not found")
+                return None
+            item = InferenceItem(
+                image_rgb=self._load_image_rgb(image),
+                input_values=self._input_data_for_image(image_id),
+            )
+            load_session.expunge(image)
+            return item
+        except Exception as exc:
+            print(f"Failed to load image {image_id}: {exc}")
             try:
-                image_rgb = self._load_image_rgb(img)
-                items.append(
-                    (
-                        img.ImageInstanceID,
-                        InferenceItem(
-                            image_rgb=image_rgb,
-                            input_values=self._input_data_for_image(
-                                img.ImageInstanceID
-                            ),
-                        ),
-                    )
-                )
-            except Exception as exc:
-                print(f"Failed to load image {img.ImageInstanceID}: {exc}")
-                items.append((img.ImageInstanceID, None))
-        return items
+                load_session.rollback()
+            except Exception:
+                pass
+            return None
+
+    def _iter_work_items(
+        self, image_ids: Iterable[int]
+    ) -> Iterator[tuple[int, InferenceItem | None]]:
+        """Yield ``(image_id, item)`` one at a time without a bulk ``by_ids``.
+
+        Uses a dedicated session so this can run in the MPI feeder thread
+        without sharing the parent write session. Decoded arrays live only
+        until ``MultiProcessInference``'s bounded work queue accepts them.
+        """
+        from sqlalchemy.orm import sessionmaker
+
+        SessionLocal = sessionmaker(bind=self.session.get_bind())
+        with SessionLocal() as load_session:
+            for image_id in image_ids:
+                yield image_id, self._load_inference_item(load_session, image_id)
 
     def process(self, image_ids: Iterable[int]) -> Iterator[Tuple[int, Any]]:
         """Process images and yield (image_id, result) tuples."""
         self._ensure_models_loaded()
 
-        image_ids_set = set(image_ids)
-        if not image_ids_set:
+        image_ids_list = list(dict.fromkeys(image_ids))
+        if not image_ids_list:
             return
 
-        self._ensure_inputs_resolved(image_ids_set)
-
-        images = ImageInstance.by_ids(self.session, image_ids_set)
-        items = self._build_preprocess_items(images)
+        self._ensure_inputs_resolved(image_ids_list)
 
         mpi = MultiProcessInference(
-            items,
+            self._iter_work_items(image_ids_list),
             pipeline=self,
             n_workers=self.n_workers,
             batch_size=getattr(self, "batch_size", 1),

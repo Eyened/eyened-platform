@@ -80,7 +80,10 @@ def test_run_cfi_models_default_targets_all_images(
     assert [call["slug"] for call in pipeline_calls] == list(
         CFI_ATTRIBUTE_MODEL_SLUGS
     )
-    expected_ids = {im.ImageInstanceID for im in images}
+    # Default target is ColorFundus only (not every modality in the DB).
+    expected_ids = {
+        im.ImageInstanceID for im in images if im.Modality.name == "ColorFundus"
+    }
     for call in pipeline_calls:
         assert call["image_ids"] == expected_ids
         assert call["overwrite"] is False

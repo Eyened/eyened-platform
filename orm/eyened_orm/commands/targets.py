@@ -6,7 +6,7 @@ sets or patient lists for job runners.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -47,6 +47,21 @@ class ImageTarget:
 class PatientTarget:
     patients: list[Patient]
     summary: str
+
+
+# Bound large ID-set SQL filters and pipeline runs.
+PIPELINE_IMAGE_CHUNK_SIZE = 10_000
+
+
+def iter_image_id_chunks(
+    image_ids: Iterable[int],
+    *,
+    chunk_size: int = PIPELINE_IMAGE_CHUNK_SIZE,
+) -> Iterable[set[int]]:
+    """Yield stable sorted chunks of image IDs."""
+    ordered = sorted(set(image_ids))
+    for start in range(0, len(ordered), chunk_size):
+        yield set(ordered[start : start + chunk_size])
 
 
 def _parse_comma_tokens(value: str | None) -> list[str]:
@@ -120,19 +135,67 @@ def load_ids_from_file(session: Session, path: str) -> set[int]:
     return ids
 
 
-def _modality_where(modality: str | None):
-    if modality is None:
-        return None
-    from eyened_orm import ImageInstance, Modality
+def _parse_modality(modality: str):
+    from eyened_orm import Modality
 
     try:
-        mod = Modality[modality]
+        return Modality[modality]
     except KeyError as exc:
         valid = ", ".join(m.name for m in Modality)
         raise click.UsageError(
             f"Unknown modality {modality!r}; expected one of: {valid}"
         ) from exc
-    return ImageInstance.Modality == mod
+
+
+def _modality_where(modality: str | None):
+    if modality is None:
+        return None
+    from eyened_orm import ImageInstance
+
+    return ImageInstance.Modality == _parse_modality(modality)
+
+
+def filter_image_ids_by_modalities(
+    session: Session,
+    image_ids: Iterable[int],
+    modalities,
+    *,
+    chunk_size: int = PIPELINE_IMAGE_CHUNK_SIZE,
+) -> set[int]:
+    """Keep IDs whose ``ImageInstance.Modality`` is in ``modalities`` (SQL-only).
+
+    Queries in chunks so large ID sets never build a single huge ``IN (...)``.
+    """
+    from eyened_orm import ImageInstance, Modality
+    from sqlalchemy import select
+
+    ids = set(image_ids)
+    if not ids:
+        return ids
+    if modalities is None:
+        return ids
+    modality_list = list(modalities)
+    if not modality_list:
+        return ids
+    normalized: list[Modality] = []
+    for mod in modality_list:
+        if isinstance(mod, Modality):
+            normalized.append(mod)
+        elif isinstance(mod, str):
+            normalized.append(_parse_modality(mod))
+        else:
+            normalized.append(Modality(mod))
+
+    kept: set[int] = set()
+    ordered = sorted(ids)
+    for start in range(0, len(ordered), chunk_size):
+        chunk = ordered[start : start + chunk_size]
+        stmt = select(ImageInstance.ImageInstanceID).where(
+            ImageInstance.ImageInstanceID.in_(chunk),
+            ImageInstance.Modality.in_(normalized),
+        )
+        kept.update(session.scalars(stmt).all())
+    return kept
 
 
 def _validate_image_spec(spec: TargetSpec, *, allow_default: bool = False) -> None:
@@ -180,16 +243,23 @@ def _resolve_all_image_ids(
 def resolve_image_target(
     session: Session, spec: TargetSpec, *, allow_default: bool = False
 ) -> ImageTarget:
-    """Resolve a :class:`TargetSpec` to a set of ``ImageInstanceID`` values."""
+    """Resolve a :class:`TargetSpec` to a set of ``ImageInstanceID`` values.
+
+    When ``spec.modality`` is set it is applied in SQL for project / patient /
+    default-all paths. Explicit ``--image-ids`` / ``--path`` lists are narrowed
+    afterward with :func:`filter_image_ids_by_modalities`.
+    """
     _validate_image_spec(spec, allow_default=allow_default)
     where = _modality_where(spec.modality)
     image_ids: set[int] = set()
     summary_parts: list[str] = []
+    from_explicit = False
 
     if spec.image_ids_file:
         from_file = load_ids_from_file(session, spec.image_ids_file)
         image_ids |= from_file
         summary_parts.append(f"{len(from_file)} from {spec.image_ids_file}")
+        from_explicit = True
 
     if spec.image_ids:
         from_inline = {
@@ -197,6 +267,7 @@ def resolve_image_target(
         }
         image_ids |= from_inline
         summary_parts.append(f"{len(from_inline)} from --image-ids")
+        from_explicit = True
 
     if not image_ids:
         if spec.patient:
@@ -228,6 +299,15 @@ def resolve_image_target(
             )
             mod_note = f" ({spec.modality})" if spec.modality else ""
             summary_parts.append(f"all {len(image_ids)} images{mod_note}")
+
+    if from_explicit and spec.modality and image_ids:
+        before = len(image_ids)
+        image_ids = filter_image_ids_by_modalities(
+            session, image_ids, (_parse_modality(spec.modality),)
+        )
+        summary_parts.append(
+            f"modality {spec.modality}: kept {len(image_ids)}/{before}"
+        )
 
     if spec.exclude:
         exclude_ids = {resolve_identifier(session, token) for token in spec.exclude}
@@ -376,7 +456,10 @@ def image_target_options(*, require_one: bool = True) -> Callable:
             "--modality",
             type=_modality_click_type(),
             default=None,
-            help="Filter by modality (also applies when targeting all images)",
+            help=(
+                "Filter by modality (applied in SQL). "
+                "run-cfi-models defaults to ColorFundus when omitted."
+            ),
         )(f)
         f = click.option(
             "--include-inactive",

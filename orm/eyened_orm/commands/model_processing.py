@@ -4,12 +4,15 @@ from collections.abc import Iterable
 
 import click
 
-from eyened_orm import ImageInstance
+from eyened_orm import Modality
 from eyened_orm.inference.etdrs_summary import run_etdrs_model
 
 from .shared import get_database
 from .targets import (
+    PIPELINE_IMAGE_CHUNK_SIZE,
+    filter_image_ids_by_modalities,
     image_target_options,
+    iter_image_id_chunks,
     patient_target_options,
     resolve_exclude_ids,
     resolve_image_target,
@@ -44,6 +47,11 @@ SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = (
     *OCT_SEGMENTATION_MODEL_SLUGS,
 )
 
+SEGMENTATION_SLUG_MODALITIES: dict[str, tuple[Modality, ...]] = {
+    "cfi-amd": (Modality.ColorFundus,),
+    "layer-segmentation": (Modality.OCT,),
+}
+
 
 def _cfi_pipeline_class(model_name: str):
 
@@ -67,16 +75,17 @@ def _cfi_pipeline_class(model_name: str):
 
 
 def _filter_supported_modalities(
-    session, image_ids: Iterable[int], model_class: type
+    session, image_ids: Iterable[int], modalities: tuple[Modality, ...]
 ) -> set[int]:
-    """Keep only images whose modality is supported by the pipeline."""
-    supported = model_class.supported_modalities
-    if not supported:
+    """Keep only images whose modality is in ``modalities`` (SQL, chunked)."""
+    if not modalities:
         return set(image_ids)
-    images = ImageInstance.by_ids(session, set(image_ids))
-    return {
-        im.ImageInstanceID for im in images if im.Modality in supported
-    }
+    return filter_image_ids_by_modalities(
+        session,
+        image_ids,
+        modalities,
+        chunk_size=PIPELINE_IMAGE_CHUNK_SIZE,
+    )
 
 
 def run_cfi_attribute_pipeline(
@@ -94,26 +103,20 @@ def run_cfi_attribute_pipeline(
 ) -> None:
     """Run a single CFI attribute pipeline (one slug). RQ jobs call this once per job."""
     model_class = _cfi_pipeline_class(model_slug)
-    image_ids = _filter_supported_modalities(session, image_ids, model_class)
+    image_ids = _filter_supported_modalities(
+        session, image_ids, model_class.supported_modalities
+    )
     if not image_ids:
         print(f"No images with supported modalities for {model_slug}")
         return
-    print(f"Running {model_slug}")
+    print(f"Running {model_slug} ({len(image_ids)} candidate images)")
     pipeline = model_class(
         session,
         device=device,
         n_workers=n_workers,
         batch_size=batch_size,
     )
-    if failed:
-        image_ids = pipeline.failed_image_ids_in_scope(image_ids)
-        print(f"Scoped to {len(image_ids)} images with failed {model_slug} output")
-        if not image_ids:
-            print("No failed images in scope")
-            return
-    filtered = pipeline.filter_image_ids(
-        image_ids, upgrade=upgrade, failed=failed, overwrite=overwrite
-    )
+
     if failed:
         scope = "failed"
     elif upgrade:
@@ -122,13 +125,35 @@ def run_cfi_attribute_pipeline(
         scope = "overwrite"
     else:
         scope = "default"
-    print(f"Processing {len(filtered)} images (after filtering, {scope})")
-    if not filtered:
-        print("No images to process")
+
+    total_processed = 0
+    chunks = list(iter_image_id_chunks(image_ids))
+    for chunk_idx, chunk in enumerate(chunks, start=1):
+        chunk_ids = chunk
+        if failed:
+            chunk_ids = pipeline.failed_image_ids_in_scope(chunk_ids)
+            if not chunk_ids:
+                continue
+        filtered = pipeline.filter_image_ids(
+            chunk_ids, upgrade=upgrade, failed=failed, overwrite=overwrite
+        )
+        if not filtered:
+            continue
+        print(
+            f"Processing {len(filtered)} images "
+            f"(chunk {chunk_idx}/{len(chunks)}, {scope})"
+        )
+        pipeline.run(filtered, commit_interval=commit_interval)
+        session.commit()
+        total_processed += len(filtered)
+
+    if total_processed == 0:
+        if failed:
+            print("No failed images in scope")
+        else:
+            print("No images to process")
         return
-    pipeline.run(filtered, commit_interval=commit_interval)
-    session.commit()
-    print(f"Completed processing {len(filtered)} images")
+    print(f"Completed processing {total_processed} images")
 
 
 def _run_cfi_models_impl(
@@ -148,6 +173,11 @@ def _run_cfi_models_impl(
     failed,
     commit_interval,
 ):
+    # CFI attribute models only support ColorFundus; default the target filter
+    # so "all images" does not pull every modality into Python first.
+    if modality is None:
+        modality = Modality.ColorFundus.name
+
     spec = target_spec_from_cli(
         path=path,
         image_ids=image_ids,
@@ -261,9 +291,9 @@ def run_cfi_models(
 ):
     """Run CFI attribute inference models on images.
 
-    With no targeting flags, processes all active images in the database.
+    With no targeting flags, processes all active ColorFundus images.
     Narrow scope with --path, --image-ids, --project, and/or --patient.
-    Each model only runs on images with a supported modality (currently ColorFundus).
+    Override the default modality with --modality if needed.
 
     Supported models:
     - cfi-roi: CFI ROI detection (no device/batch-size needed)
@@ -438,7 +468,7 @@ def run_segmentation(
     """Run segmentation inference models on a set of images.
 
     Supported models:
-    - cfi-amd: CFI AMD segmentation (drusen, RPD, hyperpigmentation, RPE degeneration)
+    - cfi-amd: CFI AMD segmentation (ColorFundus)
     - layer-segmentation: OCT retinal layer segmentation (nnU-Net)
     """
     spec = target_spec_from_cli(
@@ -460,13 +490,26 @@ def run_segmentation(
 
         slugs = [model] if model is not None else SEGMENTATION_MODEL_SLUGS
         for slug in slugs:
+            modalities = SEGMENTATION_SLUG_MODALITIES[slug]
+            slug_ids = _filter_supported_modalities(
+                session, target.image_ids, modalities
+            )
+            if not slug_ids:
+                print(
+                    f"No images with supported modalities for {slug} "
+                    f"({', '.join(m.name for m in modalities)})"
+                )
+                continue
+            print(
+                f"Running {slug} on {len(slug_ids)} "
+                f"{'/'.join(m.name for m in modalities)} images"
+            )
             if slug == "cfi-amd":
                 from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
 
-                print(f"Running {slug}")
                 run_for_image_ids(
                     session,
-                    target.image_ids,
+                    slug_ids,
                     device=device_obj,
                     batch_size=batch_size,
                     n_workers=n_workers,
@@ -475,10 +518,9 @@ def run_segmentation(
             elif slug == "layer-segmentation":
                 from eyened_orm.inference.layer_segmentation import run_for_image_ids
 
-                print(f"Running {slug}")
                 run_for_image_ids(
                     session,
-                    target.image_ids,
+                    slug_ids,
                     device=device_obj,
                     overwrite=not skip_existing,
                 )
