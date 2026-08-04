@@ -549,7 +549,9 @@ def grant_task_access(
     from eyened_orm.project_member import ProjectRole
     from eyened_orm.repositories.creator_repository import CreatorRepository
     from eyened_orm.utils.db_users import MembershipOutcome, ensure_membership
-    from eyened_orm.utils.task_projects import anchor_task, project_breakdown
+    from eyened_orm.utils.task_projects import (
+        SENTINEL_DESCRIPTION, anchor_task, project_breakdown,
+    )
 
     if park and anchor_project_id is not None:
         raise click.ClickException(
@@ -599,7 +601,16 @@ def grant_task_access(
         # may ever hold a ProjectMember row in. --park always resolves here; an
         # operator can also reach it by passing its numeric id straight to
         # --anchor, so this is keyed on the RESOLVED project, not on --park.
-        is_sentinel = target.ProjectName == sentinel_name
+        # Two independent arms, both required: --sentinel-name is operator-
+        # supplied, so an operator who reaches the sentinel by id while
+        # forgetting to pass the (non-default) --sentinel-name would make the
+        # name check alone say False. The description arm, stamped by
+        # ensure_sentinel and untouched by that flag, still catches it. The
+        # name arm stays too, for a sentinel an admin has since re-described.
+        is_sentinel = (
+            target.ProjectName == sentinel_name
+            or target.Description == SENTINEL_DESCRIPTION
+        )
         grants_membership = creator is not None and not is_sentinel
 
         existing = None

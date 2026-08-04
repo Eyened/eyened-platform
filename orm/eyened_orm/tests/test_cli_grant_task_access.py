@@ -1,4 +1,4 @@
-"""grant-task-access: one UPDATE Task, one ProjectMember, both behind one prompt."""
+"""grant-task-access: one AuditLog row per write actually made, both behind one prompt."""
 from contextlib import contextmanager
 
 from click.testing import CliRunner
@@ -304,6 +304,41 @@ def test_grant_task_access_refuses_membership_when_anchor_resolves_to_the_sentin
         cli.eorm,
         ["grant-task-access", str(task.TaskID), "--user", "anna",
          "--role", "grader", "--anchor", str(sentinel_id), "--force"],
+        input="y\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    session.rollback()
+    assert session.get(Task, task.TaskID).ProjectID == sentinel_id
+    assert session.scalar(
+        select(func.count()).select_from(ProjectMember)
+        .where(ProjectMember.CreatorID == anna.CreatorID)
+    ) == 0
+
+
+def test_grant_task_access_refuses_membership_when_sentinel_name_flag_is_wrong(
+    session, monkeypatch
+):
+    """The --sentinel-name flag is operator-supplied and easy to forget or
+    mistype. Minting the sentinel under one name, then reaching it by id while
+    passing a DIFFERENT --sentinel-name, must still refuse the membership
+    grant -- the name-only check would say False here and let the grant
+    through, which is exactly the hole this test pins shut.
+    """
+    import eyened_orm.cli as cli
+    from eyened_orm.utils.task_projects import ensure_sentinel
+
+    monkeypatch.setattr(cli, "get_database", lambda *a, **k: _SessionBoundDatabase(session))
+    task, _rs1, _rs2 = _spanning_task(session)
+    sentinel_id, _ = ensure_sentinel(session, "_parked")
+    anna = make_creator(session, "anna")
+    session.commit()
+
+    result = CliRunner().invoke(
+        cli.eorm,
+        ["grant-task-access", str(task.TaskID), "--user", "anna",
+         "--role", "grader", "--anchor", str(sentinel_id), "--force",
+         "--sentinel-name", "_not_the_actual_sentinel_name"],
         input="y\n",
     )
 
