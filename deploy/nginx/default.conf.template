@@ -11,7 +11,19 @@ server {
 
     # API
     location /api/ {
-        proxy_pass http://server:8000;
+        # A variable-built proxy_pass target is what makes the `resolver`
+        # directive above actually engage: nginx resolves it lazily, per
+        # request, instead of once at config-load time. A literal
+        # `proxy_pass http://server:8000;` would be resolved once at
+        # startup and cached for the life of the process, so recreating
+        # the server container (a plain backend-only redeploy) hands it a
+        # new IP that nginx never learns about, and every /api/ request
+        # 502s until nginx is bounced with nothing in the logs naming the
+        # cause. Do not collapse this back to a literal hostname. No URI
+        # path is appended to $api_upstream, so the request URI is passed
+        # through unchanged, identically to the literal form.
+        set $api_upstream server;
+        proxy_pass http://$api_upstream:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
