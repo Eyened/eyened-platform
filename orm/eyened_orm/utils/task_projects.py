@@ -172,6 +172,106 @@ def apply_backfill(
     )
 
 
+@dataclass(frozen=True)
+class ProjectUsage:
+    """One project a task's images live in, with how much of the task is there."""
+
+    project_id: int
+    project_name: str
+    subtasks: int
+    links: int
+    member: bool | None = None   # None when no user was named
+
+
+@dataclass(frozen=True)
+class TaskBreakdown:
+    """Where a task's data lives, and where its anchor points."""
+
+    task_id: int
+    task_name: str
+    anchor_project_id: int | None
+    anchor_project_name: str | None
+    parked: bool
+    usage: list[ProjectUsage]
+
+
+def project_breakdown(
+    session: Session,
+    task_id: int,
+    *,
+    sentinel_name: str,
+    for_creator_id: int | None = None,
+) -> TaskBreakdown:
+    """Report the projects a task's images belong to. Read-only.
+
+    ``parked`` is derived from the caller-supplied ``sentinel_name``, never from
+    a constant this module owns.
+
+    Raises:
+        ValueError: If the task does not exist.
+    """
+    from eyened_orm import Project, ProjectMember, Task
+
+    task = session.get(Task, task_id)
+    if task is None:
+        raise ValueError(f"Task {task_id} not found")
+
+    anchor_name = None
+    if task.ProjectID is not None:
+        anchor = session.get(Project, task.ProjectID)
+        anchor_name = anchor.ProjectName if anchor is not None else None
+
+    member_of: set[int] = set()
+    if for_creator_id is not None:
+        member_of = set(
+            session.scalars(
+                select(ProjectMember.ProjectID).where(
+                    ProjectMember.CreatorID == for_creator_id
+                )
+            )
+        )
+
+    # WHERE, not HAVING: filtering before the group-by lets the planner use the
+    # index on SubTask.TaskID instead of aggregating every task in the table
+    # before discarding all but one row -- confirmed equivalent and cheaper by
+    # running both against real seeded data.
+    rows = session.execute(
+        task_project_usage_rows().where(_subtask.c.TaskID == task_id)
+    ).all()
+    names = dict(
+        session.execute(
+            select(Project.ProjectID, Project.ProjectName).where(
+                Project.ProjectID.in_([int(r.project_id) for r in rows] or [0])
+            )
+        ).all()
+    )
+
+    usage = sorted(
+        (
+            ProjectUsage(
+                project_id=int(r.project_id),
+                project_name=names.get(int(r.project_id), "?"),
+                subtasks=int(r.subtasks),
+                links=int(r.links),
+                member=(int(r.project_id) in member_of)
+                if for_creator_id is not None
+                else None,
+            )
+            for r in rows
+        ),
+        key=lambda u: -u.subtasks,
+    )
+
+    return TaskBreakdown(
+        task_id=task_id,
+        task_name=task.TaskName,
+        anchor_project_id=task.ProjectID,
+        anchor_project_name=anchor_name,
+        parked=anchor_name == sentinel_name,
+        usage=usage,
+    )
+
+
 def ensure_sentinel(session: Session, sentinel_name: str) -> tuple[int, bool]:
     """Return (project_id, created). Minted only when something needs parking.
 

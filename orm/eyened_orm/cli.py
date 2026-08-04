@@ -25,6 +25,7 @@ The following commands are available:
 - load-dump: Load a database dump file, replacing the entire database.
 - init-admin: Create or promote a system_admin (idempotent); run before enabling RBAC enforcement.
 - backfill-task-projects: Anchor each task to the project its images prove; park the rest.
+- task-projects: Show which projects a task's images belong to (read-only).
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -351,6 +352,56 @@ def backfill_task_projects(dry_run: bool, yes: bool, sentinel_name: str):
                 f"(ProjectID={report.sentinel_project_id}). It has no members by "
                 f"design; deleting it would delete the tasks it holds."
             )
+
+
+@eorm.command("task-projects")
+@click.argument("taskid", type=int)
+@click.option("--for", "for_username", type=str, default=None,
+              help="Mark which of these projects the named user already belongs to")
+@click.option("--sentinel-name", default="_unresolved_legacy_tasks", show_default=True)
+def task_projects(taskid: int, for_username: str | None, sentinel_name: str):
+    """Show which projects a task's images belong to. Read-only."""
+    from eyened_orm.repositories.creator_repository import CreatorRepository
+    from eyened_orm.utils.task_projects import project_breakdown
+
+    database = get_database()
+    with database.get_session() as session:
+        creator_id = None
+        if for_username is not None:
+            # Validate BEFORE the breakdown prints: unvalidated, a typo marks
+            # every project MISSING, which is indistinguishable from a user with
+            # no access at all -- and that skews the anchor choice.
+            creator = CreatorRepository(session).get_by_name(for_username)
+            if creator is None:
+                raise click.ClickException(f"No such user: {for_username!r}")
+            creator_id = creator.CreatorID
+
+        try:
+            report = project_breakdown(
+                session, taskid, sentinel_name=sentinel_name, for_creator_id=creator_id
+            )
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+        parked = "  (PARKED)" if report.parked else ""
+        click.echo(
+            f"Task {report.task_id} {report.task_name!r}  --  "
+            f"{report.anchor_project_name}{parked}"
+        )
+        for usage in report.usage:
+            marker = ""
+            if usage.member is not None:
+                marker = (
+                    f"   {for_username}: member"
+                    if usage.member
+                    else f"   {for_username}: MISSING"
+                )
+            click.echo(
+                f"  {usage.project_id:>4}  {usage.project_name:<24} "
+                f"{usage.subtasks:>6} subtasks {usage.links:>6} links{marker}"
+            )
+        if not report.usage:
+            click.echo("  (no image evidence)")
 
 
 @eorm.command()
