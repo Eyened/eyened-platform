@@ -11,17 +11,20 @@ server {
 
     # API
     location /api/ {
-        # A variable-built proxy_pass target is what makes the `resolver`
-        # directive above actually engage: nginx resolves it lazily, per
-        # request, instead of once at config-load time. A literal
-        # `proxy_pass http://server:8000;` would be resolved once at
-        # startup and cached for the life of the process, so recreating
-        # the server container (a plain backend-only redeploy) hands it a
-        # new IP that nginx never learns about, and every /api/ request
-        # 502s until nginx is bounced with nothing in the logs naming the
-        # cause. Do not collapse this back to a literal hostname. No URI
-        # path is appended to $api_upstream, so the request URI is passed
-        # through unchanged, identically to the literal form.
+        # The upstream host is built from a variable so the `resolver`
+        # directive above actually takes effect: nginx re-resolves it
+        # lazily, on every request, instead of once at config-load time.
+        # This location used to proxy straight to a bare hostname on this
+        # port; nginx resolves a bare hostname once, at startup, and
+        # caches that IP for the life of the process. That meant
+        # recreating the server container (a plain backend-only
+        # redeploy) handed it a new IP nginx never learned about, so
+        # every /api/ request would 502 until nginx was bounced, with
+        # nothing in the logs naming the cause. Do not collapse this
+        # back to a bare hostname — that silently reintroduces the same
+        # stale-IP failure mode. No URI path is appended to
+        # $api_upstream, so the request URI passes through unchanged,
+        # exactly as it did before this indirection existed.
         set $api_upstream server;
         proxy_pass http://$api_upstream:8000;
         proxy_set_header Host $host;
