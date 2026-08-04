@@ -7,7 +7,17 @@ server {
     gzip_types text/plain application/json application/octet-stream;
     gzip_vary on;
     gunzip on;
-    access_log off;
+
+    # Access logging is deliberately ON. This is the only component that sees
+    # SPA, thumbnail and image-data requests: the API writes its own gunicorn
+    # access log, which covers /api/ and nothing else, so with logging off here
+    # the entire file-serving path — the bulk of the bytes this platform moves —
+    # is invisible. It also matters because the upstream indirection below turns
+    # a wrong or recreated upstream into a runtime 502 rather than a startup
+    # error, and an unlogged 502 storm leaves no trace at the edge at all.
+    # /var/log/nginx/access.log is a symlink to stdout in the base image, so
+    # this goes to the container log and is rotated by the log driver.
+    access_log /var/log/nginx/access.log main;
 
     # API
     location /api/ {

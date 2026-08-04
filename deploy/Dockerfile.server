@@ -4,11 +4,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcb1 libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Set as an environment variable rather than passing --no-cache-dir on each
+# install: PEP 517 build isolation spawns a *nested* pip to install the build
+# requirements, and that subprocess does not inherit command-line flags. With
+# the flags alone, that nested pip still left ~1.3 MB of http cache behind.
+ENV PIP_NO_CACHE_DIR=1
+
 COPY orm /app/orm
 RUN pip install -e /app/orm
 
 COPY server /app/server
-RUN pip install --no-cache-dir -r /app/server/requirements.txt
+RUN pip install -r /app/server/requirements.txt
 
 EXPOSE 8000
 

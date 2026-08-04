@@ -1,5 +1,7 @@
 .git
 .github
+.claude
+.superpowers
 **/.venv
 **/node_modules
 **/__pycache__
@@ -8,8 +10,7 @@
 **/.ipynb_checkpoints
 client/.svelte-kit
 client/build
-docs/dist
-docs/.astro
+docs
 graphify-out
 notebooks
 worker
