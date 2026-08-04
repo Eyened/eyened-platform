@@ -34,9 +34,15 @@ class TaskService:
         project_id: int,
         actor: ActingUser,
     ) -> Task:
-        """Create a task owned by the acting user (TaskState.NotStarted)."""
-        # Task 3 adds the project guard here and extends this docstring with a
-        # `Raises:` section, matching get_task/update_task/delete_task below.
+        """Create a task owned by the acting user (TaskState.NotStarted).
+
+        Raises:
+            NotFoundError: If the project does not exist.
+        """
+        # Accepted residue: a project deleted between this check and the flush
+        # still yields a 500. The check buys the ordinary typo case a 404.
+        if not self.tasks.project_exists(project_id):
+            raise NotFoundError(f"Project {project_id} not found")
         task = Task(
             TaskName=name,
             Description=description,

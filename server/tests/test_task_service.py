@@ -301,3 +301,26 @@ def test_get_task_subtask_out_of_range_raises_not_found(session):
         _service(session).get_task_subtask(
             task.TaskID, 5, with_images=False, with_next=False
         )
+
+
+def test_create_task_with_an_unknown_project_is_a_404(session):
+    """Follows add_image's precedent: a named-but-absent parent is NotFound."""
+    actor = _actor(session)
+    td = _task_def(session)
+
+    with pytest.raises(NotFoundError) as exc:
+        _service(session).create_task("New", None, None, td.TaskDefinitionID, 9999, actor)
+
+    assert "9999" in str(exc.value)
+
+
+def test_task_put_requires_a_project_and_patch_has_no_counterpart(session):
+    """project_id is required on create; TaskPATCH deliberately cannot re-home a
+    task, because that would strand every image link its subtasks hold."""
+    import pydantic
+    from server.dtos.dtos_tasks import TaskPATCH, TaskPUT
+
+    with pytest.raises(pydantic.ValidationError):
+        TaskPUT(name="x", task_definition_id=1)
+
+    assert "project_id" not in TaskPATCH.model_fields

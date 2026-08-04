@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
+from eyened_orm import ImageInstance, ImageStorage, Project, SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState
 
 # Load task metadata without eager-loading every SubTask row (mirrors the
@@ -33,6 +33,15 @@ class TaskRepository:
     def get_by_id(self, task_id: int) -> Task | None:
         """Return the task with the given id, or None if absent."""
         return self._session.get(Task, task_id)
+
+    def project_exists(self, project_id: int) -> bool:
+        """Return True if a Project row with this id exists."""
+        return (
+            self._session.scalar(
+                select(Project.ProjectID).where(Project.ProjectID == project_id)
+            )
+            is not None
+        )
 
     def save(self, task: Task) -> None:
         """Persist in-place mutations to ``task`` within the request transaction.
