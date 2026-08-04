@@ -17,4 +17,5 @@ dev
 docker
 database
 deploy
+!deploy/entrypoint-client.sh
 *.zip

@@ -1,0 +1,14 @@
+# Production fileserver: builds the client and serves it directly.
+#
+# client/svelte.config.js uses @sveltejs/adapter-static, so `npm run build`
+# produces a static SPA in build/. Serving it from the nginx that already
+# fronts the stack removes a Node process, a container and a proxy hop that
+# the old docker/ stack carried. The artifact lives in the image, so rolling
+# back to a previous tag rolls back the frontend with it.
+FROM node:24-slim AS build
+COPY client /app/client
+WORKDIR /app/client
+RUN npm install && npm run build
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/client/build /usr/share/nginx/html

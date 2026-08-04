@@ -1,0 +1,26 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxcb1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY orm /app/orm
+RUN pip install -e /app/orm
+
+COPY server /app/server
+RUN pip install --no-cache-dir -r /app/server/requirements.txt
+
+EXPOSE 8000
+
+WORKDIR /app
+
+# One image, two run commands. This default is the production one; the dev
+# compose layer replaces it with `uvicorn --reload` over bind-mounted sources.
+# Shell form so ${WORKERS} is expanded at runtime.
+CMD gunicorn server.main:app \
+    --workers ${WORKERS:-4} \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:8000 \
+    --log-level ${LOG_LEVEL:-info} \
+    --access-logfile - \
+    --error-logfile -

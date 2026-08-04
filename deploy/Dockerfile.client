@@ -1,0 +1,13 @@
+# Development frontend: vite dev server with hot reload over a bind-mounted
+# source tree. Production does not use this image at all — the built SPA is
+# baked into the fileserver image instead (Dockerfile.fileserver).
+FROM node:24-slim
+COPY client /app/client
+WORKDIR /app/client
+RUN npm install
+
+COPY deploy/entrypoint-client.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 5173
+ENTRYPOINT ["/entrypoint.sh"]
