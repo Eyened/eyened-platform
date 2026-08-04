@@ -295,3 +295,46 @@ def ensure_sentinel(session: Session, sentinel_name: str) -> tuple[int, bool]:
     session.add(sentinel)
     session.flush()
     return sentinel.ProjectID, True
+
+
+def anchor_task(
+    session: Session, task_id: int, project_id: int, *, force: bool = False
+) -> int | None:
+    """Point a task at ``project_id``. Returns the previous anchor.
+
+    Refuses a project the task's images do not use, unless ``force``: anchoring
+    moves no images, so a project with no evidence makes every subtask render as
+    nothing but placeholders.
+
+    Flushes, never commits.
+
+    Raises:
+        ValueError: If the task or project is absent, or the project is unused
+            and ``force`` is False.
+    """
+    from eyened_orm import Project, Task
+
+    task = session.get(Task, task_id)
+    if task is None:
+        raise ValueError(f"Task {task_id} not found")
+    if session.get(Project, project_id) is None:
+        raise ValueError(f"Project {project_id} not found")
+
+    if not force:
+        used = {
+            int(row.project_id)
+            for row in session.execute(
+                task_project_usage_rows().where(_subtask.c.TaskID == task_id)
+            )
+        }
+        if used and project_id not in used:
+            # Describe the capability, not a CLI flag: P6's router calls this too.
+            raise ValueError(
+                f"Task {task_id}'s images are in project(s) {sorted(used)}, not "
+                f"{project_id}. Anchoring there requires overriding this check."
+            )
+
+    previous = task.ProjectID
+    task.ProjectID = project_id
+    session.flush()
+    return previous

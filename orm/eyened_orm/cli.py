@@ -26,6 +26,7 @@ The following commands are available:
 - init-admin: Create or promote a system_admin (idempotent); run before enabling RBAC enforcement.
 - backfill-task-projects: Anchor each task to the project its images prove; park the rest.
 - task-projects: Show which projects a task's images belong to (read-only).
+- grant-task-access: Anchor a task and grant one user membership in the anchor project.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -402,6 +403,239 @@ def task_projects(taskid: int, for_username: str | None, sentinel_name: str):
             )
         if not report.usage:
             click.echo("  (no image evidence)")
+
+
+def _grant_target(session, *, taskid: int, park: bool, anchor_project_id: int | None,
+                  sentinel_name: str):
+    """Return the Project this grant will anchor ``taskid`` to."""
+    from eyened_orm import Project
+    from eyened_orm.utils.task_projects import ensure_sentinel
+
+    if park:
+        target_id, _ = ensure_sentinel(session, sentinel_name)
+    else:
+        target_id = anchor_project_id
+    target = session.get(Project, target_id)
+    if target is None:
+        raise click.ClickException(f"Project {target_id} not found")
+    return target
+
+
+def _echo_grant_preview(report, target, username: str, role: str, existing) -> None:
+    """Print the anchor (or the move), the one membership, and what is NOT granted.
+
+    The projects the task also spans are **named, not granted, and marked where
+    the user is already a member** -- visibility is the union of a caller's
+    memberships, so "not granted" does not mean "cannot see".
+    """
+    click.echo(f"Task {report.task_id} {report.task_name!r}")
+    if target.ProjectID == report.anchor_project_id:
+        click.echo(
+            f"  anchor: {report.anchor_project_name} "
+            f"({report.anchor_project_id})  -- unchanged"
+        )
+    else:
+        # Rendered as a move, never as a bare destination.
+        click.echo(
+            f"  anchor: {report.anchor_project_name} ({report.anchor_project_id})"
+            f" -> {target.ProjectName} ({target.ProjectID})"
+        )
+
+    if existing is None:
+        click.echo(f"  grant:  {username} -> {target.ProjectName} {role}")
+    elif existing.Role.name != role:
+        click.echo(
+            f"  grant:  {username}: {target.ProjectName} "
+            f"{existing.Role.name} -> {role}"
+        )
+    else:
+        click.echo(f"  grant:  {username} already {role} in {target.ProjectName}")
+
+    others = [u for u in report.usage if u.project_id != target.ProjectID]
+    if others:
+        click.echo("  NOT granted (the task also spans):")
+        for usage in others:
+            mark = " -- already a member" if usage.member else ""
+            click.echo(
+                f"    {usage.project_id:>4}  {usage.project_name} "
+                f"({usage.subtasks} subtasks){mark}"
+            )
+
+
+def _audit(session, *, action: str, entity: str, entity_id: str,
+           project_id: int, changes: dict) -> None:
+    """Append one trusted-path AuditLog row for a write this command just made.
+
+    Built here rather than inside ``anchor_task``/``ensure_membership``: P6's
+    router calls both of those through the request-scoped ``AuditService``, which
+    attributes the row to a real actor. An audit write buried in the helpers
+    would give the HTTP path two rows for one action, one falsely trusted-path.
+
+    ``changes`` must already hold JSON-native values -- ``AuditService.record``
+    normalizes enums and datetimes on the way in, and this construction does not.
+    Pass ``ProjectRole.name``, never the member.
+    """
+    from eyened_orm import AuditLog
+
+    session.add(
+        AuditLog(
+            ActorID=None,  # the CLI sits outside RBAC; there is no actor to name
+            TrustedPath="cli:grant-task-access",
+            Action=action,
+            Entity=entity,
+            EntityID=entity_id,
+            ProjectID=project_id,
+            Changes=changes,
+        )
+    )
+
+
+@eorm.command("grant-task-access")
+@click.argument("taskid", type=int)
+@click.option("--user", "username", type=str, required=True)
+@click.option(
+    "--role",
+    # Spelled out rather than derived from the enum so the CLI surface does not
+    # silently change when ProjectRole gains a member. Tracks ProjectRole.
+    type=click.Choice(["read_only", "grader", "project_admin"]),
+    required=True,
+)
+@click.option("--anchor", "anchor_project_id", type=int, default=None,
+              help="Project to anchor the task to (required unless --park)")
+@click.option("--park", is_flag=True, default=False,
+              help="Return the task to the sentinel instead of anchoring it")
+@click.option("--force", is_flag=True, default=False,
+              help="Anchor to a project the task's images do not use")
+@click.option("--sentinel-name", default="_unresolved_legacy_tasks", show_default=True)
+def grant_task_access(
+    taskid: int,
+    username: str,
+    role: str,
+    anchor_project_id: int | None,
+    park: bool,
+    force: bool,
+    sentinel_name: str,
+):
+    """Anchor a task and grant one user membership in the anchor project only.
+
+    Exactly two rows: one UPDATE Task, one ProjectMember.
+
+    The two halves are independent and do different things. Task.ProjectID
+    controls who can FIND the task; ProjectMember controls who can SEE the images
+    inside it. Visibility is the union of the user's memberships, so this grants
+    nothing beyond the anchor -- a user who already belongs to another project the
+    task spans keeps seeing those images, and one who does not sees placeholders.
+
+    This is a trusted path: the CLI sits outside RBAC enforcement, so the command
+    adds validation, not power. Printing is what the operator sees; the AuditLog
+    row is the record. One AuditLog row per write actually made, ActorID NULL and
+    TrustedPath set, committed with the write it describes.
+    """
+    from eyened_orm.project_member import ProjectRole
+    from eyened_orm.repositories.creator_repository import CreatorRepository
+    from eyened_orm.utils.db_users import MembershipOutcome, ensure_membership
+    from eyened_orm.utils.task_projects import anchor_task, project_breakdown
+
+    if park and anchor_project_id is not None:
+        raise click.ClickException(
+            "--park and --anchor name opposite destinations; pass one."
+        )
+    if not park and anchor_project_id is None:
+        raise click.ClickException(
+            "Missing option '--anchor' (or '--park'). The tool never chooses a "
+            "project: run `eorm task-projects` to see the candidates."
+        )
+
+    project_role = ProjectRole[role]
+    database = get_database()
+
+    with database.get_session() as session:
+        from eyened_orm import ProjectMember
+
+        creator = CreatorRepository(session).get_by_name(username)
+        if creator is None:
+            raise click.ClickException(f"No such user: {username!r}")
+
+        try:
+            report = project_breakdown(
+                session, taskid, sentinel_name=sentinel_name,
+                for_creator_id=creator.CreatorID,
+            )
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+        target = _grant_target(
+            session, taskid=taskid, park=park,
+            anchor_project_id=anchor_project_id, sentinel_name=sentinel_name,
+        )
+        existing = session.get(
+            ProjectMember,
+            {"CreatorID": creator.CreatorID, "ProjectID": target.ProjectID},
+        )
+
+        # Resolve -> show -> confirm -> write -> commit. Never prompt between a
+        # write and its commit: that would hold an exclusive row lock across
+        # human input, and exceeding wait_timeout fails a commit the operator
+        # already approved.
+        _echo_grant_preview(report, target, username, role, existing)
+
+        anchor_unchanged = target.ProjectID == report.anchor_project_id
+        membership_unchanged = existing is not None and existing.Role is project_role
+        if anchor_unchanged and membership_unchanged:
+            click.echo("Nothing changed.")
+            return
+
+        # Read the old role NOW: `existing` is the very row ensure_membership is
+        # about to mutate, so after that call it reports the *new* role and the
+        # audit diff would claim the change never happened.
+        previous_role = None if existing is None else existing.Role.name
+
+        click.confirm("Apply?", abort=True)
+
+        if not anchor_unchanged:
+            try:
+                previous_anchor = anchor_task(
+                    session, taskid, target.ProjectID, force=force
+                )
+            except ValueError as exc:
+                raise click.ClickException(
+                    f"{exc} Pass --force to anchor there anyway."
+                ) from exc
+            _audit(
+                session,
+                action="UPDATE",
+                entity="Task",
+                entity_id=str(taskid),
+                project_id=target.ProjectID,
+                changes={
+                    "ProjectID": {"old": previous_anchor, "new": target.ProjectID}
+                },
+            )
+
+        _, outcome = ensure_membership(
+            session,
+            creator_id=creator.CreatorID,
+            project_id=target.ProjectID,
+            role=project_role,
+        )
+        if outcome is not MembershipOutcome.unchanged:
+            _audit(
+                session,
+                action=(
+                    "INSERT" if outcome is MembershipOutcome.created else "UPDATE"
+                ),
+                entity="ProjectMember",
+                # The PK is (CreatorID, ProjectID); EntityID is one String column.
+                entity_id=f"{creator.CreatorID}:{target.ProjectID}",
+                project_id=target.ProjectID,
+                changes={"Role": {"old": previous_role, "new": project_role.name}},
+            )
+        session.commit()
+
+        click.echo(
+            f"Anchored task {taskid} to {target.ProjectName} "
+            f"({target.ProjectID}); membership {outcome.value}."
+        )
 
 
 @eorm.command()
