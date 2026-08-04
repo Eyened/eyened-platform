@@ -1,4 +1,3 @@
-docker/.env
 *.env
 *.zip
 *.pyc
@@ -8,7 +7,6 @@ extensions.ts
 client/src/lib/extensions.ts
 storage/**/*
 images/**/*
-dev/docker-compose.yml
 cookies.txt
 .vscode/settings.json
 client/package-lock.json
@@ -33,3 +31,12 @@ graphify-out/
 .superpowers/
 CLAUDE.md
 docs/superpowers/
+
+# deploy/ — secrets and generated artifacts
+deploy/.env
+deploy/.env.*
+!deploy/.env.example
+deploy/storage-mounts.conf
+deploy/compose.storage.yaml
+deploy/nginx/storage.d/*.conf
+deploy/snapshots/
