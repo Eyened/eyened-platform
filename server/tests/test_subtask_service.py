@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from eyened_orm import Creator, Project, SubTask, Task, TaskDefinition
+from eyened_orm import Creator, Project, SubTask, SubTaskImageLink, Task, TaskDefinition
 from eyened_orm.project import ExternalEnum
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository
@@ -200,11 +200,14 @@ def _make_image(session, public_id: str) -> int:
 
 def test_add_image_appends_link_at_next_index(session):
     """add_image links the image to the subtask at the next ImageIndex."""
+    from eyened_orm.utils.factories import make_image_in_project
+
     actor = _actor(session)
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
-    _make_image(session, "pub-1")
+    project = session.get(Project, task.ProjectID)
+    make_image_in_project(session, project, "pub-1")
 
     updated = _service(session).add_image(st.SubTaskID, "pub-1", actor)
 
@@ -214,12 +217,15 @@ def test_add_image_appends_link_at_next_index(session):
 
 def test_add_image_second_image_gets_next_index(session):
     """A second add_image lands at ImageIndex 1, keeping insertion order."""
+    from eyened_orm.utils.factories import make_image_in_project
+
     actor = _actor(session)
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
-    _make_image(session, "pub-1")
-    _make_image(session, "pub-2")
+    project = session.get(Project, task.ProjectID)
+    make_image_in_project(session, project, "pub-1")
+    make_image_in_project(session, project, "pub-2")
     service = _service(session)
 
     service.add_image(st.SubTaskID, "pub-1", actor)
@@ -254,11 +260,14 @@ def test_add_image_unknown_image_raises_not_found(session):
 
 def test_add_image_logs_insert(session):
     """add_image emits one INSERT audit record for the SubTaskImageLink entity."""
+    from eyened_orm.utils.factories import make_image_in_project
+
     actor = _actor(session)
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
-    _make_image(session, "pub-1")
+    project = session.get(Project, task.ProjectID)
+    make_image_in_project(session, project, "pub-1")
     audit = FakeAudit()
 
     _service(session, audit).add_image(st.SubTaskID, "pub-1", actor)
@@ -270,11 +279,14 @@ def test_add_image_logs_insert(session):
 
 def test_remove_image_deletes_the_link(session):
     """remove_image deletes the link for that image, leaving the subtask empty."""
+    from eyened_orm.utils.factories import make_image_in_project
+
     actor = _actor(session)
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
-    _make_image(session, "pub-1")
+    project = session.get(Project, task.ProjectID)
+    make_image_in_project(session, project, "pub-1")
     service = _service(session)
     service.add_image(st.SubTaskID, "pub-1", actor)
     # Cross the request boundary a real second HTTP call would get for free
@@ -309,11 +321,14 @@ def test_remove_image_unlinked_image_raises_not_found(session):
 
 def test_remove_image_logs_delete(session):
     """remove_image emits one DELETE audit record for the SubTaskImageLink entity."""
+    from eyened_orm.utils.factories import make_image_in_project
+
     actor = _actor(session)
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
-    _make_image(session, "pub-1")
+    project = session.get(Project, task.ProjectID)
+    make_image_in_project(session, project, "pub-1")
     service = _service(session)
     service.add_image(st.SubTaskID, "pub-1", actor)
     audit = FakeAudit()
@@ -324,3 +339,64 @@ def test_remove_image_logs_delete(session):
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
     assert audit.records[0]["entity"] == "SubTaskImageLink"
+
+
+def test_add_image_refuses_an_image_from_another_project(session):
+    """The invariant is a data rule, enforced for every caller regardless of role."""
+    from server.services.exceptions import BadRequestError
+    from eyened_orm.utils.factories import make_image_in_project, make_project
+
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id, "anchored")
+    subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
+    session.add(subtask)
+    session.flush()
+
+    other = make_project(session, "P-foreign")
+    foreign = make_image_in_project(session, other, "foreign-1")
+
+    with pytest.raises(BadRequestError) as exc:
+        _service(session).add_image(subtask.SubTaskID, foreign.PublicID, actor)
+
+    # Both projects named: the operator has to know which side to fix.
+    assert str(task.ProjectID) in str(exc.value)
+    assert str(other.ProjectID) in str(exc.value)
+
+
+def test_add_image_compares_against_the_task_not_its_sibling_links(session):
+    """The subtask's existing links are irrelevant -- the task's anchor decides.
+
+    A subtask holding a grandfathered cross-project link must still accept an
+    image from its own task's project.
+    """
+    from eyened_orm.utils.factories import make_image_in_project, make_project
+
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id, "sibling")
+    subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
+    session.add(subtask)
+    session.flush()
+
+    # A pre-existing link into some *other* project, written directly (the API
+    # path being tested is what now refuses to create one).
+    other = make_project(session, "P-legacy")
+    legacy = make_image_in_project(session, other, "legacy-1")
+    session.add(
+        SubTaskImageLink(
+            SubTaskID=subtask.SubTaskID,
+            ImageInstanceID=legacy.ImageInstanceID,
+            ImageIndex=0,
+        )
+    )
+    session.flush()
+
+    own_project = session.get(Project, task.ProjectID)
+    ours = make_image_in_project(session, own_project, "ours-1")
+
+    result = _service(session).add_image(subtask.SubTaskID, ours.PublicID, actor)
+
+    assert ours.ImageInstanceID in {
+        link.ImageInstanceID for link in result.SubTaskImageLinks
+    }

@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import ImageInstance, ImageStorage, Project, SubTask, SubTaskImageLink, Task
+from eyened_orm import ImageInstance, ImageStorage, Patient, Project, Series, Study, SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState
 
 # Load task metadata without eager-loading every SubTask row (mirrors the
@@ -239,4 +239,27 @@ class SubTaskRepository:
         return self._session.get(
             SubTaskImageLink,
             {"SubTaskID": subtask_id, "ImageInstanceID": image_instance_id},
+        )
+
+    def project_id_for_subtask(self, subtask_id: int) -> int | None:
+        """Return the project anchoring this subtask's task, or None if absent."""
+        return self._session.scalar(
+            select(Task.ProjectID)
+            .select_from(SubTask)
+            .join(Task, Task.TaskID == SubTask.TaskID)
+            .where(SubTask.SubTaskID == subtask_id)
+        )
+
+    def project_id_for_image(self, image_instance_id: int) -> int | None:
+        """Return the project this image belongs to, four joins up, or None.
+
+        ``Patient.ProjectID`` is the schema's only project anchor.
+        """
+        return self._session.scalar(
+            select(Patient.ProjectID)
+            .select_from(ImageInstance)
+            .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+            .join(Study, Study.StudyID == Series.StudyID)
+            .join(Patient, Patient.PatientID == Study.PatientID)
+            .where(ImageInstance.ImageInstanceID == image_instance_id)
         )

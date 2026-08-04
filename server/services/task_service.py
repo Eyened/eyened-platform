@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
-from .exceptions import NotFoundError
+from .exceptions import BadRequestError, NotFoundError
 
 
 class TaskService:
@@ -329,6 +329,22 @@ class SubTaskService:
         image_instance_id = self.subtasks.resolve_image_instance_id(image_public_id)
         if image_instance_id is None:
             raise NotFoundError("ImageInstance not found")
+
+        # A data invariant, not authorization: it holds for every caller and every
+        # role. Enforced in the service because repositories live in the ORM
+        # package and cannot import this exception hierarchy.
+        subtask_project = self.subtasks.project_id_for_subtask(subtask_id)
+        image_project = self.subtasks.project_id_for_image(image_instance_id)
+        if subtask_project != image_project:
+            # NOTE: once images are project-scoped, an image the caller cannot
+            # read must 404 rather than reach this branch -- naming its project
+            # here would confirm the row exists and disclose where it lives.
+            raise BadRequestError(
+                f"Image belongs to project {image_project}, but subtask "
+                f"{subtask_id} is in a task anchored to project "
+                f"{subtask_project}. Every image in a task must belong to the "
+                f"task's project."
+            )
 
         self.subtasks.add_link(
             subtask_id, image_instance_id, self.subtasks.next_image_index(subtask_id)
