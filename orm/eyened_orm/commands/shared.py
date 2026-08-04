@@ -5,7 +5,6 @@ import string
 
 import click
 from sqlalchemy import inspect
-from sqlalchemy.exc import SQLAlchemyError
 
 from eyened_orm import Database
 
@@ -16,10 +15,17 @@ def _has_tables(database: Database) -> bool:
 
     An unreadable schema is not evidence of an empty one, so a failed
     inspection reports True and the caller falls back to prompting.
+
+    Deliberately broad: caught as plain `Exception`, not `SQLAlchemyError`.
+    A driver-level or otherwise-unwrapped error is just as undiagnosable as
+    a SQLAlchemy one, and an undiagnosable database must be treated as
+    populated -- the contract is "failing inspection falls back to
+    prompting", not "failing inspection *in a way SQLAlchemy recognizes*
+    falls back to prompting". Do not narrow this back to SQLAlchemyError.
     """
     try:
         return bool(inspect(database.engine).get_table_names())
-    except SQLAlchemyError as exc:
+    except Exception as exc:
         print(f"Could not inspect the target database ({exc}).")
         return True
 

@@ -61,7 +61,7 @@ def test_populated_database_accepts_the_printed_code(monkeypatch, engine):
     assert shared.get_database(confirmation=True).engine is engine
 
 
-def test_uninspectable_database_falls_back_to_prompting(monkeypatch, empty_engine):
+def test_uninspectable_database_falls_back_to_prompting(monkeypatch, empty_engine, capsys):
     """An unreadable schema is not evidence of an empty one: fail safe, prompt."""
 
     def boom(_engine):
@@ -73,3 +73,25 @@ def test_uninspectable_database_falls_back_to_prompting(monkeypatch, empty_engin
 
     with pytest.raises(click.ClickException):
         shared.get_database(confirmation=True)
+
+    assert "Could not inspect the target database" in capsys.readouterr().out
+
+
+def test_non_sqlalchemy_inspection_failure_also_falls_back_to_prompting(
+    monkeypatch, empty_engine, capsys
+):
+    """The fail-safe is not scoped to SQLAlchemyError: any inspection failure
+    (driver-level, programming error, whatever) must still fall back to
+    prompting rather than propagating and crashing the command."""
+
+    def boom(_engine):
+        raise RuntimeError("driver segfaulted")
+
+    monkeypatch.setattr(shared, "Database", lambda: _FakeDatabase(empty_engine))
+    monkeypatch.setattr(shared, "inspect", boom)
+    monkeypatch.setattr(shared.click, "prompt", lambda *a, **k: "NOPE")
+
+    with pytest.raises(click.ClickException):
+        shared.get_database(confirmation=True)
+
+    assert "Could not inspect the target database" in capsys.readouterr().out
