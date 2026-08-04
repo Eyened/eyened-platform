@@ -405,9 +405,9 @@ def task_projects(taskid: int, for_username: str | None, sentinel_name: str):
             click.echo("  (no image evidence)")
 
 
-def _grant_target(session, *, taskid: int, park: bool, anchor_project_id: int | None,
+def _grant_target(session, *, park: bool, anchor_project_id: int | None,
                   sentinel_name: str):
-    """Return the Project this grant will anchor ``taskid`` to."""
+    """Return the Project this grant will anchor the task to."""
     from eyened_orm import Project
     from eyened_orm.utils.task_projects import ensure_sentinel
 
@@ -421,8 +421,12 @@ def _grant_target(session, *, taskid: int, park: bool, anchor_project_id: int | 
     return target
 
 
-def _echo_grant_preview(report, target, username: str, role: str, existing) -> None:
-    """Print the anchor (or the move), the one membership, and what is NOT granted.
+def _echo_grant_preview(
+    report, target, username: str | None, role: str | None, existing,
+    is_sentinel: bool,
+) -> None:
+    """Print the anchor (or the move), the one membership (if any), and what is
+    NOT granted.
 
     The projects the task also spans are **named, not granted, and marked where
     the user is already a member** -- visibility is the union of a caller's
@@ -441,7 +445,11 @@ def _echo_grant_preview(report, target, username: str, role: str, existing) -> N
             f" -> {target.ProjectName} ({target.ProjectID})"
         )
 
-    if existing is None:
+    if is_sentinel:
+        click.echo(
+            f"  grant:  none -- {target.ProjectName} has NO MEMBERS by design"
+        )
+    elif existing is None:
         click.echo(f"  grant:  {username} -> {target.ProjectName} {role}")
     elif existing.Role.name != role:
         click.echo(
@@ -492,13 +500,16 @@ def _audit(session, *, action: str, entity: str, entity_id: str,
 
 @eorm.command("grant-task-access")
 @click.argument("taskid", type=int)
-@click.option("--user", "username", type=str, required=True)
+@click.option("--user", "username", type=str, default=None, required=False,
+              help="User to grant membership to (required unless --park)")
 @click.option(
     "--role",
     # Spelled out rather than derived from the enum so the CLI surface does not
     # silently change when ProjectRole gains a member. Tracks ProjectRole.
     type=click.Choice(["read_only", "grader", "project_admin"]),
-    required=True,
+    default=None,
+    required=False,
+    help="Role to grant (required unless --park)",
 )
 @click.option("--anchor", "anchor_project_id", type=int, default=None,
               help="Project to anchor the task to (required unless --park)")
@@ -509,27 +520,31 @@ def _audit(session, *, action: str, entity: str, entity_id: str,
 @click.option("--sentinel-name", default="_unresolved_legacy_tasks", show_default=True)
 def grant_task_access(
     taskid: int,
-    username: str,
-    role: str,
+    username: str | None,
+    role: str | None,
     anchor_project_id: int | None,
     park: bool,
     force: bool,
     sentinel_name: str,
 ):
-    """Anchor a task and grant one user membership in the anchor project only.
+    """Anchor a task and, unless --park, grant one user membership in the anchor.
 
-    Exactly two rows: one UPDATE Task, one ProjectMember.
+    One AuditLog row per write actually made -- there is no fixed row count.
+    A grant that changes nothing writes no rows at all. --park writes only the
+    Task UPDATE: the sentinel is a write-only holding pen that NO ONE may ever
+    hold a ProjectMember row in, so --park never accepts --user/--role and
+    never writes one, however the destination was named.
 
     The two halves are independent and do different things. Task.ProjectID
     controls who can FIND the task; ProjectMember controls who can SEE the images
-    inside it. Visibility is the union of the user's memberships, so this grants
+    inside it. Visibility is the union of the user's memberships, so a grant adds
     nothing beyond the anchor -- a user who already belongs to another project the
     task spans keeps seeing those images, and one who does not sees placeholders.
 
     This is a trusted path: the CLI sits outside RBAC enforcement, so the command
     adds validation, not power. Printing is what the operator sees; the AuditLog
-    row is the record. One AuditLog row per write actually made, ActorID NULL and
-    TrustedPath set, committed with the write it describes.
+    row is the record. Each row is written after the confirm, in the same
+    transaction as the write it describes, ActorID NULL and TrustedPath set.
     """
     from eyened_orm.project_member import ProjectRole
     from eyened_orm.repositories.creator_repository import CreatorRepository
@@ -545,42 +560,66 @@ def grant_task_access(
             "Missing option '--anchor' (or '--park'). The tool never chooses a "
             "project: run `eorm task-projects` to see the candidates."
         )
+    if park and (username is not None or role is not None):
+        raise click.ClickException(
+            "--park never grants membership -- the sentinel has NO MEMBERS by "
+            "design; drop --user/--role."
+        )
+    if not park and (username is None or role is None):
+        raise click.ClickException(
+            "Missing option '--user' and '--role' (required unless --park)."
+        )
 
-    project_role = ProjectRole[role]
+    project_role = ProjectRole[role] if role is not None else None
     database = get_database()
 
     with database.get_session() as session:
         from eyened_orm import ProjectMember
 
-        creator = CreatorRepository(session).get_by_name(username)
-        if creator is None:
-            raise click.ClickException(f"No such user: {username!r}")
+        creator = None
+        if username is not None:
+            creator = CreatorRepository(session).get_by_name(username)
+            if creator is None:
+                raise click.ClickException(f"No such user: {username!r}")
 
         try:
             report = project_breakdown(
                 session, taskid, sentinel_name=sentinel_name,
-                for_creator_id=creator.CreatorID,
+                for_creator_id=creator.CreatorID if creator is not None else None,
             )
         except ValueError as exc:
             raise click.ClickException(str(exc)) from exc
 
         target = _grant_target(
-            session, taskid=taskid, park=park,
+            session, park=park,
             anchor_project_id=anchor_project_id, sentinel_name=sentinel_name,
         )
-        existing = session.get(
-            ProjectMember,
-            {"CreatorID": creator.CreatorID, "ProjectID": target.ProjectID},
-        )
+
+        # Defense in depth: the sentinel is a write-only holding pen that NO ONE
+        # may ever hold a ProjectMember row in. --park always resolves here; an
+        # operator can also reach it by passing its numeric id straight to
+        # --anchor, so this is keyed on the RESOLVED project, not on --park.
+        is_sentinel = target.ProjectName == sentinel_name
+        grants_membership = creator is not None and not is_sentinel
+
+        existing = None
+        if grants_membership:
+            existing = session.get(
+                ProjectMember,
+                {"CreatorID": creator.CreatorID, "ProjectID": target.ProjectID},
+            )
 
         # Resolve -> show -> confirm -> write -> commit. Never prompt between a
         # write and its commit: that would hold an exclusive row lock across
         # human input, and exceeding wait_timeout fails a commit the operator
         # already approved.
-        _echo_grant_preview(report, target, username, role, existing)
+        _echo_grant_preview(report, target, username, role, existing, is_sentinel)
 
         anchor_unchanged = target.ProjectID == report.anchor_project_id
-        membership_unchanged = existing is not None and existing.Role is project_role
+        membership_unchanged = (
+            not grants_membership
+            or (existing is not None and existing.Role is project_role)
+        )
         if anchor_unchanged and membership_unchanged:
             click.echo("Nothing changed.")
             return
@@ -594,8 +633,12 @@ def grant_task_access(
 
         if not anchor_unchanged:
             try:
+                # --park always forces: the sentinel is definitionally
+                # evidence-free (it holds no images), so the "images don't use
+                # this project" check anchor_task performs can never pass for
+                # it. The check itself stays intact for every real destination.
                 previous_anchor = anchor_task(
-                    session, taskid, target.ProjectID, force=force
+                    session, taskid, target.ProjectID, force=force or park
                 )
             except ValueError as exc:
                 raise click.ClickException(
@@ -612,30 +655,41 @@ def grant_task_access(
                 },
             )
 
-        _, outcome = ensure_membership(
-            session,
-            creator_id=creator.CreatorID,
-            project_id=target.ProjectID,
-            role=project_role,
-        )
-        if outcome is not MembershipOutcome.unchanged:
-            _audit(
+        outcome = None
+        if grants_membership:
+            _, outcome = ensure_membership(
                 session,
-                action=(
-                    "INSERT" if outcome is MembershipOutcome.created else "UPDATE"
-                ),
-                entity="ProjectMember",
-                # The PK is (CreatorID, ProjectID); EntityID is one String column.
-                entity_id=f"{creator.CreatorID}:{target.ProjectID}",
+                creator_id=creator.CreatorID,
                 project_id=target.ProjectID,
-                changes={"Role": {"old": previous_role, "new": project_role.name}},
+                role=project_role,
             )
+            if outcome is not MembershipOutcome.unchanged:
+                _audit(
+                    session,
+                    action=(
+                        "INSERT" if outcome is MembershipOutcome.created else "UPDATE"
+                    ),
+                    entity="ProjectMember",
+                    # The PK is (CreatorID, ProjectID); EntityID is one String column.
+                    entity_id=f"{creator.CreatorID}:{target.ProjectID}",
+                    project_id=target.ProjectID,
+                    changes={
+                        "Role": {"old": previous_role, "new": project_role.name}
+                    },
+                )
         session.commit()
 
-        click.echo(
-            f"Anchored task {taskid} to {target.ProjectName} "
-            f"({target.ProjectID}); membership {outcome.value}."
-        )
+        if grants_membership:
+            click.echo(
+                f"Anchored task {taskid} to {target.ProjectName} "
+                f"({target.ProjectID}); membership {outcome.value}."
+            )
+        else:
+            click.echo(
+                f"Anchored task {taskid} to {target.ProjectName} "
+                f"({target.ProjectID}); no membership granted "
+                f"({target.ProjectName} has NO MEMBERS by design)."
+            )
 
 
 @eorm.command()

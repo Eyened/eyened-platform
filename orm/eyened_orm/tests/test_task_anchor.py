@@ -69,5 +69,9 @@ def test_anchor_task_refuses_a_project_the_images_do_not_use(session):
     with pytest.raises(ValueError) as exc:
         anchor_task(session, task.TaskID, unrelated.ProjectID)
 
-    assert str(home.ProjectID) in str(exc.value)
+    # Not `str(home.ProjectID) in str(exc.value)`: with home=1 and task_id=1 the
+    # message contains "1" regardless of which project is named, so that
+    # assertion can't distinguish the right answer from the task id. Assert on
+    # the rendered list instead.
+    assert f"project(s) [{home.ProjectID}]" in str(exc.value)
     assert session.get(Task, task.TaskID).ProjectID == home.ProjectID
