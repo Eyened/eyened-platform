@@ -80,9 +80,25 @@ class SubTaskGET(SubTaskBase):
     next_task: Optional["SubTaskGET"] = None
 
 
+class SubTaskImageSlotGET(BaseModel):
+    """One of a subtask's image links: the image, or a marker that it was withheld.
+
+    A slot exists iff a link exists, and ``image is None`` means only "withheld
+    from this caller". ``SubTaskImageLink.ImageInstanceID`` is a NOT NULL FK with
+    ``ondelete="CASCADE"`` and the loader applies no ``Inactive`` filter, so a
+    link cannot resolve to a missing row for any other reason.
+
+    Numeric gaps in ``image_index`` carry no meaning -- an ordinary image removal
+    produces them.
+    """
+
+    image_index: int
+    image: Optional[ImageGET] = None
+
+
 class SubTaskWithImagesGET(SubTaskGET):
-    """SubTask with associated images included."""
-    images: List[ImageGET]
+    """SubTask with one slot per image link, in the links' own order."""
+    images: List[SubTaskImageSlotGET]
 
 
 class SubTasksResponse(BaseModel):

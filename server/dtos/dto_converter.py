@@ -33,7 +33,7 @@ from .dtos_main import (
     ModelSegmentationGET,
     SegmentationGET,
 )
-from .dtos_tasks import SubTaskGET, SubTaskWithImagesGET, TaskDefinitionGET, TaskGET
+from .dtos_tasks import SubTaskGET, SubTaskImageSlotGET, SubTaskWithImagesGET, TaskDefinitionGET, TaskGET
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -665,11 +665,22 @@ class DTOConverter:
 
     @staticmethod
     def subtask_with_images_to_get(subtask: "SubTaskORM") -> SubTaskWithImagesGET:
-        """Convert SubTask ORM object to SubTaskWithImagesGET, including images."""
-        images = [
-            DTOConverter.image_instance_to_get(link.ImageInstance)
+        """Convert a SubTask to SubTaskWithImagesGET: one slot per image link.
+
+        Unresolved links become a slot with ``image=None`` rather than being
+        dropped, so a withheld image leaves a visible gap. Link order is
+        preserved (the loader orders by ImageIndex).
+        """
+        slots = [
+            SubTaskImageSlotGET(
+                image_index=link.ImageIndex,
+                image=(
+                    DTOConverter.image_instance_to_get(link.ImageInstance)
+                    if getattr(link, "ImageInstance", None)
+                    else None
+                ),
+            )
             for link in (getattr(subtask, "SubTaskImageLinks", None) or [])
-            if getattr(link, "ImageInstance", None)
         ]
         return SubTaskWithImagesGET(
             id=subtask.SubTaskID,
@@ -677,5 +688,5 @@ class DTOConverter:
             task_state=subtask.TaskState,
             creator_id=subtask.CreatorID,
             comments=subtask.Comments,
-            images=images,
+            images=slots,
         )
