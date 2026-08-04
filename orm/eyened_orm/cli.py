@@ -24,6 +24,7 @@ The following commands are available:
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
 - load-dump: Load a database dump file, replacing the entire database.
 - init-admin: Create or promote a system_admin (idempotent); run before enabling RBAC enforcement.
+- backfill-task-projects: Anchor each task to the project its images prove; park the rest.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -295,6 +296,60 @@ def init_admin(username: str, password: str):
                 f"Unhandled bootstrap outcome {outcome!r} for "
                 f"'{admin.CreatorName}' (CreatorID={admin.CreatorID}). The "
                 f"change was already committed; inspect the account by hand."
+            )
+
+
+@eorm.command("backfill-task-projects")
+@click.option("--dry-run", is_flag=True, default=False, help="Report and write nothing")
+@click.option("--yes", is_flag=True, default=False, help="Skip the confirmation prompt")
+@click.option(
+    "--sentinel-name",
+    # The ONE place this name may be spelled. No runtime code resolves the
+    # sentinel -- not by name, id or settings -- which is why apply_backfill
+    # takes it as a parameter rather than importing a constant.
+    default="_unresolved_legacy_tasks",
+    show_default=True,
+    help="Project that holds tasks whose anchor cannot be determined",
+)
+def backfill_task_projects(dry_run: bool, yes: bool, sentinel_name: str):
+    """Anchor each task to the project its images prove; park the rest.
+
+    An existing-deployment tool: fresh deployments build Task.ProjectID NOT NULL
+    directly and never run this. Run it between the two Task.ProjectID
+    revisions -- the column must exist and must not be NOT NULL yet.
+    """
+    from eyened_orm.utils.task_projects import apply_backfill, plan_backfill
+
+    database = get_database()
+    with database.get_session() as session:
+        plan = plan_backfill(session)
+
+        click.echo(f"Anchorable (one provable project): {len(plan.anchored)}")
+        click.echo(f"To park (ambiguous or no image evidence): {len(plan.to_park)}")
+        if plan.to_park:
+            click.echo(f"  task ids: {plan.to_park}")
+            click.echo(f"  sentinel project: '{sentinel_name}'")
+
+        if not plan.anchored and not plan.to_park:
+            click.echo("Nothing to do -- every task already has a project.")
+            return
+
+        if dry_run:
+            click.echo("--dry-run: nothing written.")
+            return
+
+        if not yes:
+            click.confirm("Apply?", abort=True)
+
+        report = apply_backfill(session, plan, sentinel_name=sentinel_name)
+        session.commit()
+
+        click.echo(f"Anchored {report.anchored} task(s); parked {report.parked}.")
+        if report.sentinel_created:
+            click.echo(
+                f"Created sentinel project '{sentinel_name}' "
+                f"(ProjectID={report.sentinel_project_id}). It has no members by "
+                f"design; deleting it would delete the tasks it holds."
             )
 
 
