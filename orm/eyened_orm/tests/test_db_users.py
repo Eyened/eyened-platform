@@ -190,3 +190,64 @@ def test_ensure_admin_promotes_a_deactivated_non_admin_without_reactivating(sess
 
     assert outcome is BootstrapOutcome.promoted
     assert admin.Inactive is True
+
+
+def test_ensure_membership_creates_a_grant(session):
+    """No row means no access, so the first grant is an insert."""
+    from eyened_orm.project_member import ProjectRole
+    from eyened_orm.utils.db_users import MembershipOutcome, ensure_membership
+    from eyened_orm.utils.factories import make_creator, make_project
+
+    creator = make_creator(session, "anna")
+    project = make_project(session, "P-grant")
+
+    member, outcome = ensure_membership(
+        session,
+        creator_id=creator.CreatorID,
+        project_id=project.ProjectID,
+        role=ProjectRole.grader,
+    )
+
+    assert outcome is MembershipOutcome.created
+    assert member.Role is ProjectRole.grader
+
+
+def test_ensure_membership_at_the_same_role_is_unchanged(session):
+    """Re-granting the role someone already holds writes nothing."""
+    from eyened_orm.project_member import ProjectRole
+    from eyened_orm.utils.db_users import MembershipOutcome, ensure_membership
+    from eyened_orm.utils.factories import make_creator, make_project
+
+    creator = make_creator(session, "anna")
+    project = make_project(session, "P-same")
+    kwargs = dict(creator_id=creator.CreatorID, project_id=project.ProjectID)
+    ensure_membership(session, role=ProjectRole.grader, **kwargs)
+
+    _, outcome = ensure_membership(session, role=ProjectRole.grader, **kwargs)
+
+    assert outcome is MembershipOutcome.unchanged
+
+
+def test_ensure_membership_applies_a_role_change_in_both_directions(session):
+    """The helper applies the requested role with no opt-in guard -- including a
+    LOWERING. The confirmation belongs to the caller that can prompt."""
+    from eyened_orm.project_member import ProjectRole
+    from eyened_orm.utils.db_users import MembershipOutcome, ensure_membership
+    from eyened_orm.utils.factories import make_creator, make_project
+
+    creator = make_creator(session, "anna")
+    project = make_project(session, "P-move")
+    kwargs = dict(creator_id=creator.CreatorID, project_id=project.ProjectID)
+    ensure_membership(session, role=ProjectRole.read_only, **kwargs)
+
+    # Asserted immediately after each call, not batched at the end: `ensure_membership`
+    # returns the session's identity-mapped ProjectMember, so `raised` and `lowered`
+    # are the *same* Python object. Reading `raised.Role` after the second call would
+    # see the object's post-lowering state, not the raise this variable is named for.
+    raised, up = ensure_membership(session, role=ProjectRole.project_admin, **kwargs)
+    assert up is MembershipOutcome.role_changed
+    assert raised.Role is ProjectRole.project_admin
+
+    lowered, down = ensure_membership(session, role=ProjectRole.read_only, **kwargs)
+    assert down is MembershipOutcome.role_changed
+    assert lowered.Role is ProjectRole.read_only

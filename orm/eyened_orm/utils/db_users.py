@@ -1,6 +1,6 @@
 import enum
 
-from eyened_orm import Creator, SystemRole, is_system_admin
+from eyened_orm import Creator, ProjectMember, ProjectRole, SystemRole, is_system_admin
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
@@ -165,3 +165,45 @@ def ensure_admin(
         return creator, BootstrapOutcome.reactivated
 
     return creator, BootstrapOutcome.unchanged
+
+
+class MembershipOutcome(enum.Enum):
+    """What ``ensure_membership`` actually did, so callers can report precisely."""
+
+    created = "created"            # no grant existed
+    role_changed = "role_changed"  # a grant existed at a different role
+    unchanged = "unchanged"        # already at this role; nothing written
+
+
+def ensure_membership(
+    session: Session, *, creator_id: int, project_id: int, role: ProjectRole
+) -> tuple[ProjectMember, MembershipOutcome]:
+    """Idempotent grant-or-adjust of one creator's role in one project.
+
+    ``creator_id`` and ``project_id`` are keyword-only: two bare ints transpose
+    silently, and the resulting grant would be to the wrong person.
+
+    **Applies the requested role in both directions, including a lowering, with
+    no opt-in guard.** The confirmation lives in the caller that can prompt. A
+    non-interactive caller inherits the obligation to refuse or confirm a
+    demotion itself, or it will silently demote.
+
+    Flushes, never commits -- the caller owns the transaction.
+    """
+    member = session.get(
+        ProjectMember, {"CreatorID": creator_id, "ProjectID": project_id}
+    )
+    if member is None:
+        member = ProjectMember(
+            CreatorID=creator_id, ProjectID=project_id, Role=role
+        )
+        session.add(member)
+        session.flush()
+        return member, MembershipOutcome.created
+
+    if member.Role is not role:
+        member.Role = role
+        session.flush()
+        return member, MembershipOutcome.role_changed
+
+    return member, MembershipOutcome.unchanged
