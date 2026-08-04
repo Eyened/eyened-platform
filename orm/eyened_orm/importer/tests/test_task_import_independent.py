@@ -18,8 +18,18 @@ def _count(session, model) -> int:
 
 def _project_id(session, name: str) -> int:
     """The id of the project the image import just created -- Task.ProjectID is
-    NOT NULL, so every task row here has to name the project of its images."""
-    return session.scalar(select(Project.ProjectID).where(Project.ProjectName == name))
+    NOT NULL, so every task row here has to name the project of its images.
+
+    The assert is load-bearing: the importer skips any field whose new value is
+    None even when creating, so a silent None here would drop ProjectID from the
+    INSERT and surface as a NOT NULL IntegrityError -- which is exactly the
+    failure some of these tests assert for an entirely different reason.
+    """
+    project_id = session.scalar(
+        select(Project.ProjectID).where(Project.ProjectName == name)
+    )
+    assert project_id is not None, f"no Project named {name!r}"
+    return project_id
 
 
 def test_image_then_task_import_creates_tasks_subtasks_and_links(session):
