@@ -78,3 +78,61 @@ def test_save_result_links_input_provenance(session):
     )
     assert output_av is not None
     assert roi_av in output_av.InputValues
+
+
+def test_commit_pending_batch_replays_after_deadlock(session, monkeypatch):
+    """Rollback must not drop siblings: retry re-applies the whole open batch."""
+    from sqlalchemy.exc import OperationalError
+
+    import eyened_orm.inference.attribute_inference as ai_mod
+    from eyened_orm.inference.cfi_roi import CFI_ROI
+
+    _proj, images = _import_images(session, count=3)
+    pipeline = CFI_ROI(session, n_workers=1)
+    session.commit()  # persist model/attr rows before we simulate a failed commit
+
+    commit_calls = {"n": 0}
+    real_commit = session.commit
+
+    def flaky_commit():
+        commit_calls["n"] += 1
+        if commit_calls["n"] == 1:
+            raise OperationalError(
+                "statement",
+                {},
+                Exception(1213, "Deadlock found when trying to get lock"),
+            )
+        return real_commit()
+
+    monkeypatch.setattr(session, "commit", flaky_commit)
+    monkeypatch.setattr(ai_mod.time, "sleep", lambda _s: None)
+
+    pending = [
+        (images[0].ImageInstanceID, {"center": [1, 2], "radius": 3}),
+        (images[1].ImageInstanceID, None),
+        (images[2].ImageInstanceID, {"center": [4, 5], "radius": 6}),
+    ]
+    pipeline._commit_pending_batch(pending)
+
+    assert pending == []
+    assert commit_calls["n"] == 2
+
+    rows = {
+        av.ImageInstanceID: av
+        for av in AttributeValue.by_columns(
+            session,
+            AttributeID=pipeline.attr_definition.AttributeID,
+            ModelID=pipeline.model.ModelID,
+            ImageInstanceID={im.ImageInstanceID for im in images},
+        )
+    }
+    assert set(rows) == {im.ImageInstanceID for im in images}
+    assert rows[images[0].ImageInstanceID].ValueJSON == {
+        "center": [1, 2],
+        "radius": 3,
+    }
+    assert rows[images[1].ImageInstanceID].ValueJSON is None
+    assert rows[images[2].ImageInstanceID].ValueJSON == {
+        "center": [4, 5],
+        "radius": 6,
+    }

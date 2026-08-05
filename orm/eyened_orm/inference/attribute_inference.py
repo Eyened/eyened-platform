@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Iterator, List, Set, Tuple, TypeVar
+from typing import Any, ClassVar, Iterable, Iterator, List, Set, Tuple
 
 import numpy as np
 from sqlalchemy.exc import OperationalError
@@ -33,8 +33,6 @@ from eyened_orm.inference.multi_process_inference import (
     BaseInferencePipeline,
     MultiProcessInference,
 )
-
-_T = TypeVar("_T")
 
 # MySQL: 1205 lock wait timeout, 1213 deadlock
 _RETRYABLE_MYSQL_ERRNOS = frozenset({1205, 1213})
@@ -481,22 +479,39 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         )
         yield from mpi.run()
 
-    def _db_retry(
+    def _apply_pending_outcome(self, image_id: int, result: Any | None) -> None:
+        """Stage one outcome in the current session (no commit)."""
+        if result is None:
+            self._save_failure(image_id)
+        else:
+            self._save_result(image_id, result)
+
+    def _commit_pending_batch(
         self,
-        fn: Callable[[], _T],
+        pending: list[tuple[int, Any | None]],
         *,
         max_attempts: int = 3,
-        label: str = "db write",
-    ) -> _T:
-        """Run ``fn``; on MySQL lock/deadlock, rollback and retry with backoff."""
+    ) -> None:
+        """Apply ``pending`` outcomes and commit; replay the whole batch on lock/deadlock.
+
+        ``pending`` holds plain ``(image_id, result)`` pairs (``result is None`` means
+        failure). On MySQL 1205/1213 we rollback and re-apply every item before
+        retrying commit, so uncommitted siblings are never silently dropped.
+        """
+        if not pending:
+            return
         for attempt in range(1, max_attempts + 1):
             try:
-                return fn()
+                for image_id, result in pending:
+                    self._apply_pending_outcome(image_id, result)
+                self.session.commit()
+                pending.clear()
+                return
             except OperationalError as exc:
                 if not _is_retryable_db_error(exc) or attempt >= max_attempts:
                     raise
                 print(
-                    f"{label}: {exc.orig}; "
+                    f"commit batch ({len(pending)} images): {exc.orig}; "
                     f"rollback and retry {attempt}/{max_attempts}"
                 )
                 self.session.rollback()
@@ -506,23 +521,16 @@ class AttributeInferencePipeline(BaseInferencePipeline):
     def run(self, image_ids: Iterable[int], commit_interval: int = 100) -> None:
         """Run inference on a list of image IDs and save results."""
         image_ids_set = set(image_ids)
-        for i, (image_id, result) in enumerate(
-            tqdm(self.process(image_ids_set), total=len(image_ids_set))
+        pending: list[tuple[int, Any | None]] = []
+        for image_id, result in tqdm(
+            self.process(image_ids_set), total=len(image_ids_set)
         ):
-            if i % commit_interval == 0:
-                self._db_retry(self.session.commit, label="commit")
             if result is None:
                 print(f"Image {image_id} failed to process")
-                self._db_retry(
-                    lambda iid=image_id: self._save_failure(iid),
-                    label=f"save failure image {image_id}",
-                )
-                continue
-            self._db_retry(
-                lambda iid=image_id, res=result: self._save_result(iid, res),
-                label=f"save result image {image_id}",
-            )
-        self._db_retry(self.session.commit, label="final commit")
+            pending.append((image_id, result))
+            if len(pending) >= commit_interval:
+                self._commit_pending_batch(pending)
+        self._commit_pending_batch(pending)
 
 
 class CFIAttributeInferencePipeline(AttributeInferencePipeline):
