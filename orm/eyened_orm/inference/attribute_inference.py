@@ -252,50 +252,54 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             ready.add(image_id)
         return ready, missing
 
-    def _attribute_value_image_id_stmt(self, *, model_id: int | None = None):
-        """Select ``ImageInstanceID`` for this attribute + model (name or ID)."""
-        from sqlalchemy import select
+    def _outcome_image_ids_in_scope(
+        self,
+        image_ids: Iterable[int],
+        *,
+        model_id: int | None = None,
+        has_stored_value: bool | None = None,
+    ) -> Set[int]:
+        """Image IDs in ``image_ids`` that have a matching AttributeValue row.
+
+        ``has_stored_value``: ``None`` = any row, ``True`` = succeeded, ``False`` =
+        failed. Queries in chunks (same size as pipeline ID chunks) so large
+        targets never build one huge ``IN (...)``.
+        """
+        from sqlalchemy import not_, select
+
+        from eyened_orm.commands.targets import iter_image_id_chunks
+
+        ids = set(image_ids)
+        if not ids:
+            return set()
 
         stmt = select(AttributeValue.ImageInstanceID).where(
             AttributeValue.AttributeID == self.attr_definition.AttributeID,
         )
         if model_id is not None:
-            return stmt.where(AttributeValue.ModelID == model_id)
-        return stmt.join(
-            AttributesModel,
-            AttributeValue.ModelID == AttributesModel.ModelID,
-        ).where(AttributesModel.ModelName == self.model_name)
+            stmt = stmt.where(AttributeValue.ModelID == model_id)
+        else:
+            stmt = stmt.join(
+                AttributesModel,
+                AttributeValue.ModelID == AttributesModel.ModelID,
+            ).where(AttributesModel.ModelName == self.model_name)
 
-    def _image_ids_with_any_row(self, *, model_id: int | None = None) -> Set[int]:
-        """Image IDs that have any AttributeValue row (ID-only; no value payloads)."""
-        stmt = self._attribute_value_image_id_stmt(model_id=model_id).distinct()
-        return set(self.session.scalars(stmt).all())
+        if has_stored_value is True:
+            stmt = stmt.where(attribute_value_has_stored_value_sql())
+        elif has_stored_value is False:
+            stmt = stmt.where(not_(attribute_value_has_stored_value_sql()))
 
-    def _image_ids_with_succeeded_row(self, *, model_id: int | None = None) -> Set[int]:
-        """Image IDs with a non-null value column for this attribute/model."""
-        has_value = attribute_value_has_stored_value_sql()
-        stmt = (
-            self._attribute_value_image_id_stmt(model_id=model_id)
-            .where(has_value)
-            .distinct()
-        )
-        return set(self.session.scalars(stmt).all())
-
-    def _image_ids_with_failed_row(self, *, model_id: int | None = None) -> Set[int]:
-        """Image IDs with an all-null value row for this attribute/model."""
-        from sqlalchemy import not_
-
-        has_value = attribute_value_has_stored_value_sql()
-        stmt = (
-            self._attribute_value_image_id_stmt(model_id=model_id)
-            .where(not_(has_value))
-            .distinct()
-        )
-        return set(self.session.scalars(stmt).all())
+        found: set[int] = set()
+        for chunk in iter_image_id_chunks(ids):
+            chunk_stmt = stmt.where(
+                AttributeValue.ImageInstanceID.in_(chunk)
+            ).distinct()
+            found.update(self.session.scalars(chunk_stmt).all())
+        return found
 
     def failed_image_ids_in_scope(self, image_ids: Iterable[int]) -> Set[int]:
         """Image IDs in scope that have a failed row for this model (any version)."""
-        return self._image_ids_with_failed_row() & set(image_ids)
+        return self._outcome_image_ids_in_scope(image_ids, has_stored_value=False)
 
     def select_pending_by_outcomes(
         self,
@@ -307,10 +311,10 @@ class AttributeInferencePipeline(BaseInferencePipeline):
     ) -> Set[int]:
         """Return IDs that still need inference based on existing AttributeValue rows.
 
-        One or two ID-only SQL queries cover the whole attribute/model space;
-        results are intersected with ``image_ids`` in Python. Does **not** apply
-        required-input filtering — follow up with :meth:`filter_image_ids`
-        (typically per chunk, ``overwrite=True``) when inputs are required.
+        Outcome lookups are scoped to ``image_ids`` (chunked ``IN`` queries). Does
+        **not** apply required-input filtering — follow up with
+        :meth:`filter_image_ids` (typically per chunk, ``overwrite=True``) when
+        inputs are required.
 
         Sets :attr:`last_filter_stats` (``skipped_missing_inputs`` is always 0).
         """
@@ -321,24 +325,22 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         if overwrite:
             pending = image_ids_set
         elif failed:
-            if upgrade:
-                succeeded_ids = self._image_ids_with_succeeded_row(
-                    model_id=self.model.ModelID
-                )
-            else:
-                succeeded_ids = self._image_ids_with_succeeded_row()
-            excluded = succeeded_ids & image_ids_set
-            skipped_successful = len(excluded)
+            succeeded_ids = self._outcome_image_ids_in_scope(
+                image_ids_set,
+                model_id=self.model.ModelID if upgrade else None,
+                has_stored_value=True,
+            )
+            skipped_successful = len(succeeded_ids)
             pending = image_ids_set - succeeded_ids
         elif upgrade:
-            recorded_ids = self._image_ids_with_any_row(model_id=self.model.ModelID)
-            excluded = recorded_ids & image_ids_set
-            skipped_existing = len(excluded)
+            recorded_ids = self._outcome_image_ids_in_scope(
+                image_ids_set, model_id=self.model.ModelID
+            )
+            skipped_existing = len(recorded_ids)
             pending = image_ids_set - recorded_ids
         else:
-            recorded_ids = self._image_ids_with_any_row()
-            excluded = recorded_ids & image_ids_set
-            skipped_existing = len(excluded)
+            recorded_ids = self._outcome_image_ids_in_scope(image_ids_set)
+            skipped_existing = len(recorded_ids)
             pending = image_ids_set - recorded_ids
 
         self.last_filter_stats = FilterStats(
