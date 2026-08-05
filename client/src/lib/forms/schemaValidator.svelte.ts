@@ -84,10 +84,15 @@ export class SchemaValidator {
     }
 }
 
-interface ValidationError {
+export interface ValidationError {
     path: string;
     type: string;
     message: string;
+}
+
+/** Testable entry point for the recursive JSON Schema checks. */
+export function validateSchema(schema: any, value: any): ValidationError[] {
+    return run_validation(schema, value).errors;
 }
 
 function run_validation(schema: any, value: any) {
@@ -97,6 +102,29 @@ function run_validation(schema: any, value: any) {
         errors,
         absent_keys,
     };
+}
+
+function jsonType(value: unknown): string {
+    if (value === null) return "null";
+    if (Array.isArray(value)) return "array";
+    return typeof value;
+}
+
+function matchesType(
+    schemaType: string | readonly string[],
+    value: unknown,
+): boolean {
+    const allowed = Array.isArray(schemaType) ? schemaType : [schemaType];
+    const t = jsonType(value);
+    return allowed.some((a) =>
+        a === "integer"
+            ? t === "number" && Number.isInteger(value)
+            : a === t,
+    );
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validate(
@@ -120,6 +148,17 @@ function validate(
         return errors;
     }
 
+    // Type check first so oneOf/{type:"null"} does not match objects, and so
+    // we do not recurse into properties of a non-object.
+    if (schema.type !== undefined && !matchesType(schema.type, value)) {
+        errors.push({
+            path,
+            type: "type",
+            message: `${path || "value"}: Expected ${Array.isArray(schema.type) ? schema.type.join("|") : schema.type}, got ${jsonType(value)}`,
+        });
+        return errors;
+    }
+
     // Const validation
     if (schema.const !== undefined) {
         if (!deepEquals(value, schema.const)) {
@@ -139,7 +178,7 @@ function validate(
     }
 
     // Required properties
-    if (schema.required && Array.isArray(schema.required)) {
+    if (schema.required && Array.isArray(schema.required) && isPlainObject(value)) {
         for (const key of schema.required) {
             if (!(key in value)) {
                 const message = `${path}.${key}: Missing required property`;
@@ -154,7 +193,7 @@ function validate(
     }
 
     // Object properties validation (recursive)
-    if (schema.properties && typeof value === "object") {
+    if (schema.properties && isPlainObject(value)) {
         for (const key in schema.properties) {
             if (key in value) {
                 errors.push(
@@ -170,21 +209,34 @@ function validate(
     }
 
     // additionalProperties: false rejects undeclared keys (e.g. stray `index`
-    // on a 2D-only point object).
-    if (
-        schema.additionalProperties === false &&
-        typeof value === "object" &&
-        value !== null &&
-        !Array.isArray(value)
-    ) {
-        const allowed = new Set(Object.keys(schema.properties ?? {}));
-        for (const key of Object.keys(value as Record<string, unknown>)) {
-            if (!allowed.has(key)) {
-                errors.push({
-                    path: `${path}.${key}`,
-                    type: "additionalProperties",
-                    message: `${path || "value"}.${key}: Unexpected property`,
-                });
+    // on a 2D-only point object). A schema object validates undeclared keys
+    // (e.g. pointset registration's per-image PublicID map).
+    if (isPlainObject(value)) {
+        const declared = new Set(Object.keys(schema.properties ?? {}));
+        if (schema.additionalProperties === false) {
+            for (const key of Object.keys(value)) {
+                if (!declared.has(key)) {
+                    errors.push({
+                        path: `${path}.${key}`,
+                        type: "additionalProperties",
+                        message: `${path || "value"}.${key}: Unexpected property`,
+                    });
+                }
+            }
+        } else if (
+            typeof schema.additionalProperties === "object" &&
+            schema.additionalProperties !== null
+        ) {
+            for (const [key, child] of Object.entries(value)) {
+                if (declared.has(key)) continue;
+                errors.push(
+                    ...validate(
+                        schema.additionalProperties,
+                        child,
+                        `${path}.${key}`,
+                        absent_keys,
+                    ),
+                );
             }
         }
     }

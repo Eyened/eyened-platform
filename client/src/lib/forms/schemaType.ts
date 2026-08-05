@@ -33,7 +33,7 @@ export type JSONSchema = {
     required?: readonly string[];
     properties?: Readonly<Record<string, JSONSchema>>;
     patternProperties?: Readonly<Record<string, JSONSchema>>;
-    additionalProperties?: JSONSchema;
+    additionalProperties?: boolean | JSONSchema;
     unevaluatedProperties?: JSONSchema;
     dependencies?: Readonly<Record<string, JSONSchema | readonly string[]>>;
     propertyNames?: JSONSchema;
