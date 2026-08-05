@@ -672,12 +672,12 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             self.Rows_y = h
         else:
             if self.Rows_y != h:
-                print(f"Rows_y mismatch: {self.Rows_y} != {h}")
+                print(f"Rows_y mismatch: {self.Rows_y} != {h} for {self.ImageInstanceID}")
         if self.Columns_x is None:
             self.Columns_x = w
         else:
             if self.Columns_x != w:
-                print(f"Columns_x mismatch: {self.Columns_x} != {w}")
+                print(f"Columns_x mismatch: {self.Columns_x} != {w} for {self.ImageInstanceID}")
         if self.NrOfFrames is None:
             self.NrOfFrames = n_frames
         else:
@@ -687,7 +687,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
                     # e.g. for CFI or other 2D images, both None and 1 seem valid
                     pass
                 else:
-                    print(f"NrOfFrames mismatch: {self.NrOfFrames} != {n_frames}")
+                    print(f"NrOfFrames mismatch: {self.NrOfFrames} != {n_frames} for {self.ImageInstanceID}")
 
     @property
     def bounds(self) -> Optional[CFIBounds]:

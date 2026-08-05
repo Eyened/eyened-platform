@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, Iterator, List, Set, Tuple
+from typing import Any, Callable, ClassVar, Iterable, Iterator, List, Set, Tuple, TypeVar
 
 import numpy as np
+from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 
 from eyened_orm import (
@@ -22,17 +24,28 @@ from eyened_orm.inference.model_inputs import (
     resolve_inputs_for_images,
 )
 from eyened_orm.inference.attribute_value_outcome import (
+    attribute_value_has_stored_value_sql,
     failure_update_values,
     has_stored_value,
-    image_ids_with_failed_outcome,
-    image_ids_with_recorded_outcome,
-    image_ids_with_succeeded_outcome,
     success_update_values,
 )
 from eyened_orm.inference.multi_process_inference import (
     BaseInferencePipeline,
     MultiProcessInference,
 )
+
+_T = TypeVar("_T")
+
+# MySQL: 1205 lock wait timeout, 1213 deadlock
+_RETRYABLE_MYSQL_ERRNOS = frozenset({1205, 1213})
+
+
+def _is_retryable_db_error(exc: BaseException) -> bool:
+    if not isinstance(exc, OperationalError):
+        return False
+    orig = getattr(exc, "orig", None)
+    errno = getattr(orig, "args", (None,))[0] if orig is not None else None
+    return errno in _RETRYABLE_MYSQL_ERRNOS
 
 
 @dataclass(frozen=True)
@@ -45,6 +58,25 @@ class InferenceItem:
 
     image_rgb: np.ndarray | None
     input_values: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class FilterStats:
+    """Outcome of :meth:`AttributeInferencePipeline.filter_image_ids` for one call."""
+
+    considered: int
+    pending: int
+    skipped_existing: int = 0
+    skipped_successful: int = 0
+    skipped_missing_inputs: int = 0
+
+    @property
+    def skipped_total(self) -> int:
+        return (
+            self.skipped_existing
+            + self.skipped_successful
+            + self.skipped_missing_inputs
+        )
 
 
 class AttributeInferencePipeline(BaseInferencePipeline):
@@ -92,7 +124,11 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         """
         self.session = session
         self.n_workers = n_workers
-        self._input_values_by_image: dict[int, dict[str, AttributeValue]] = {}
+        # Plain snapshots only — never hand live ORM AttributeValues to the MPI
+        # feeder thread (sessions are not thread-safe; commits expire objects).
+        self._input_data_by_image: dict[int, dict[str, Any]] = {}
+        self._input_av_ids_by_image: dict[int, dict[str, int]] = {}
+        self.last_filter_stats: FilterStats | None = None
 
         # Store any additional kwargs as instance attributes
         for key, value in kwargs.items():
@@ -146,9 +182,11 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             update_values=success_update_values(self.attribute_data_type, result),
         )
 
-        input_values = self._input_values_by_image.get(image_id)
-        if input_values:
-            av.InputValues = set(input_values.values())
+        input_ids = self._input_av_ids_by_image.get(image_id)
+        if input_ids:
+            # Re-load by PK in this write session (IDs snapshotted before MPI).
+            linked = AttributeValue.by_ids(self.session, input_ids.values())
+            av.InputValues = set(linked)
             self.session.add(av)
 
     def _save_failure(self, image_id: int) -> None:
@@ -172,57 +210,147 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         )
 
     def _ensure_inputs_resolved(self, image_ids: Iterable[int]) -> None:
+        """Resolve required inputs and snapshot plain data + AttributeValue IDs.
+
+        Live ORM objects are not retained: the MPI feeder thread must only see
+        picklable plain values, and mid-run commits must not expire objects the
+        feeder still holds.
+        """
         if not self.required_inputs:
-            self._input_values_by_image = {}
+            self._input_data_by_image = {}
+            self._input_av_ids_by_image = {}
             return
-        self._input_values_by_image = resolve_inputs_for_images(
+        resolved = resolve_inputs_for_images(
             self.session, set(image_ids), self.required_inputs
         )
+        data_by_image: dict[int, dict[str, Any]] = {}
+        ids_by_image: dict[int, dict[str, int]] = {}
+        for image_id, inputs in resolved.items():
+            data_by_image[image_id] = {
+                name: attribute_value_data(av) for name, av in inputs.items()
+            }
+            ids_by_image[image_id] = {
+                name: av.AttributeValueID for name, av in inputs.items()
+            }
+        self._input_data_by_image = data_by_image
+        self._input_av_ids_by_image = ids_by_image
 
     def _filter_images_with_required_inputs(
         self, image_ids: Iterable[int]
-    ) -> Set[int]:
+    ) -> tuple[Set[int], int]:
+        """Return ``(ready_ids, missing_count)`` for required model inputs."""
         if not self.required_inputs:
-            return set(image_ids)
+            return set(image_ids), 0
 
         ready: set[int] = set()
         missing = 0
         for image_id in image_ids:
-            inputs = self._input_values_by_image.get(image_id, {})
+            inputs = self._input_data_by_image.get(image_id, {})
             if not all(
                 spec.resolved_input_name in inputs for spec in self.required_inputs
             ):
                 missing += 1
                 continue
             ready.add(image_id)
-        if missing:
-            print(f"Skipping {missing} images missing required inputs")
-        return ready
+        return ready, missing
 
-    def _attribute_values_for_model_name(
-        self, image_ids_set: set[int]
-    ) -> list[AttributeValue]:
+    def _attribute_value_image_id_stmt(self, *, model_id: int | None = None):
+        """Select ``ImageInstanceID`` for this attribute + model (name or ID)."""
         from sqlalchemy import select
 
-        stmt = (
-            select(AttributeValue)
-            .join(
-                AttributesModel,
-                AttributeValue.ModelID == AttributesModel.ModelID,
-            )
-            .where(
-                AttributeValue.AttributeID == self.attr_definition.AttributeID,
-                AttributesModel.ModelName == self.model_name,
-                AttributeValue.ImageInstanceID.in_(image_ids_set),
-            )
+        stmt = select(AttributeValue.ImageInstanceID).where(
+            AttributeValue.AttributeID == self.attr_definition.AttributeID,
         )
-        return list(self.session.scalars(stmt).all())
+        if model_id is not None:
+            return stmt.where(AttributeValue.ModelID == model_id)
+        return stmt.join(
+            AttributesModel,
+            AttributeValue.ModelID == AttributesModel.ModelID,
+        ).where(AttributesModel.ModelName == self.model_name)
+
+    def _image_ids_with_any_row(self, *, model_id: int | None = None) -> Set[int]:
+        """Image IDs that have any AttributeValue row (ID-only; no value payloads)."""
+        stmt = self._attribute_value_image_id_stmt(model_id=model_id).distinct()
+        return set(self.session.scalars(stmt).all())
+
+    def _image_ids_with_succeeded_row(self, *, model_id: int | None = None) -> Set[int]:
+        """Image IDs with a non-null value column for this attribute/model."""
+        has_value = attribute_value_has_stored_value_sql()
+        stmt = (
+            self._attribute_value_image_id_stmt(model_id=model_id)
+            .where(has_value)
+            .distinct()
+        )
+        return set(self.session.scalars(stmt).all())
+
+    def _image_ids_with_failed_row(self, *, model_id: int | None = None) -> Set[int]:
+        """Image IDs with an all-null value row for this attribute/model."""
+        from sqlalchemy import not_
+
+        has_value = attribute_value_has_stored_value_sql()
+        stmt = (
+            self._attribute_value_image_id_stmt(model_id=model_id)
+            .where(not_(has_value))
+            .distinct()
+        )
+        return set(self.session.scalars(stmt).all())
 
     def failed_image_ids_in_scope(self, image_ids: Iterable[int]) -> Set[int]:
         """Image IDs in scope that have a failed row for this model (any version)."""
+        return self._image_ids_with_failed_row() & set(image_ids)
+
+    def select_pending_by_outcomes(
+        self,
+        image_ids: Iterable[int],
+        *,
+        upgrade: bool = False,
+        failed: bool = False,
+        overwrite: bool = False,
+    ) -> Set[int]:
+        """Return IDs that still need inference based on existing AttributeValue rows.
+
+        One or two ID-only SQL queries cover the whole attribute/model space;
+        results are intersected with ``image_ids`` in Python. Does **not** apply
+        required-input filtering — follow up with :meth:`filter_image_ids`
+        (typically per chunk, ``overwrite=True``) when inputs are required.
+
+        Sets :attr:`last_filter_stats` (``skipped_missing_inputs`` is always 0).
+        """
         image_ids_set = set(image_ids)
-        existing = self._attribute_values_for_model_name(image_ids_set)
-        return image_ids_with_failed_outcome(existing) & image_ids_set
+        skipped_existing = 0
+        skipped_successful = 0
+
+        if overwrite:
+            pending = image_ids_set
+        elif failed:
+            if upgrade:
+                succeeded_ids = self._image_ids_with_succeeded_row(
+                    model_id=self.model.ModelID
+                )
+            else:
+                succeeded_ids = self._image_ids_with_succeeded_row()
+            excluded = succeeded_ids & image_ids_set
+            skipped_successful = len(excluded)
+            pending = image_ids_set - succeeded_ids
+        elif upgrade:
+            recorded_ids = self._image_ids_with_any_row(model_id=self.model.ModelID)
+            excluded = recorded_ids & image_ids_set
+            skipped_existing = len(excluded)
+            pending = image_ids_set - recorded_ids
+        else:
+            recorded_ids = self._image_ids_with_any_row()
+            excluded = recorded_ids & image_ids_set
+            skipped_existing = len(excluded)
+            pending = image_ids_set - recorded_ids
+
+        self.last_filter_stats = FilterStats(
+            considered=len(image_ids_set),
+            pending=len(pending),
+            skipped_existing=skipped_existing,
+            skipped_successful=skipped_successful,
+            skipped_missing_inputs=0,
+        )
+        return pending
 
     def filter_image_ids(
         self,
@@ -233,6 +361,9 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         overwrite: bool = False,
     ) -> Set[int]:
         """Return image IDs that still need inference for this pipeline.
+
+        Sets :attr:`last_filter_stats` with per-call skip counts (caller should
+        print progress; this method does not print).
 
         **Default** (``upgrade=False``, ``failed=False``, ``overwrite=False``):
         exclude images that already have any ``AttributeValue`` row for this
@@ -251,63 +382,37 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         **Overwrite** (``overwrite=True``): do not skip images based on existing
         output; still skip images missing required inputs.
         """
-        from sqlalchemy import select
+        pending = self.select_pending_by_outcomes(
+            image_ids, upgrade=upgrade, failed=failed, overwrite=overwrite
+        )
+        outcome_stats = self.last_filter_stats
+        assert outcome_stats is not None
 
-        image_ids_set = set(image_ids)
-
-        if overwrite:
-            pending = image_ids_set
-        elif upgrade:
-            stmt = select(AttributeValue).where(
-                AttributeValue.AttributeID == self.attr_definition.AttributeID,
-                AttributeValue.ModelID == self.model.ModelID,
-                AttributeValue.ImageInstanceID.in_(image_ids_set),
-            )
-            existing = list(self.session.scalars(stmt).all())
-            if failed:
-                excluded_ids = image_ids_with_succeeded_outcome(existing)
-                if excluded_ids:
-                    print(
-                        f"Skipping {len(excluded_ids)} images with successful results"
-                    )
-                pending = image_ids_set - excluded_ids
-            else:
-                recorded_ids = image_ids_with_recorded_outcome(existing)
-                if recorded_ids:
-                    print(f"Skipping {len(recorded_ids)} images with existing results")
-                pending = image_ids_set - recorded_ids
-        else:
-            existing = self._attribute_values_for_model_name(image_ids_set)
-            if failed:
-                excluded_ids = image_ids_with_succeeded_outcome(existing)
-                if excluded_ids:
-                    print(
-                        f"Skipping {len(excluded_ids)} images with successful results"
-                    )
-                pending = image_ids_set - excluded_ids
-            else:
-                recorded_ids = image_ids_with_recorded_outcome(existing)
-                if recorded_ids:
-                    print(f"Skipping {len(recorded_ids)} images with existing results")
-                pending = image_ids_set - recorded_ids
         if self.required_inputs:
             self._ensure_inputs_resolved(pending)
-            pending = self._filter_images_with_required_inputs(pending)
+            pending, skipped_missing_inputs = self._filter_images_with_required_inputs(
+                pending
+            )
         else:
-            self._input_values_by_image = {}
+            self._input_data_by_image = {}
+            self._input_av_ids_by_image = {}
+            skipped_missing_inputs = 0
 
+        self.last_filter_stats = FilterStats(
+            considered=outcome_stats.considered,
+            pending=len(pending),
+            skipped_existing=outcome_stats.skipped_existing,
+            skipped_successful=outcome_stats.skipped_successful,
+            skipped_missing_inputs=skipped_missing_inputs,
+        )
         return pending
 
     def _input_data_for_image(self, image_id: int) -> dict[str, Any] | None:
-        """Plain input values for worker processes (ORM objects stay in the parent)."""
+        """Return snapshotted plain input values for the MPI feeder / workers."""
         if not self.required_inputs:
             return None
-        inputs = self._input_values_by_image.get(image_id)
-        if not inputs:
-            return None
-        return {
-            name: attribute_value_data(av) for name, av in inputs.items()
-        }
+        inputs = self._input_data_by_image.get(image_id)
+        return inputs or None
 
     def _load_image_rgb(self, image: ImageInstance) -> np.ndarray:
         """Load decoded pixels for one image. Override in modality-specific subclasses."""
@@ -376,6 +481,28 @@ class AttributeInferencePipeline(BaseInferencePipeline):
         )
         yield from mpi.run()
 
+    def _db_retry(
+        self,
+        fn: Callable[[], _T],
+        *,
+        max_attempts: int = 3,
+        label: str = "db write",
+    ) -> _T:
+        """Run ``fn``; on MySQL lock/deadlock, rollback and retry with backoff."""
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return fn()
+            except OperationalError as exc:
+                if not _is_retryable_db_error(exc) or attempt >= max_attempts:
+                    raise
+                print(
+                    f"{label}: {exc.orig}; "
+                    f"rollback and retry {attempt}/{max_attempts}"
+                )
+                self.session.rollback()
+                time.sleep(0.5 * (2 ** (attempt - 1)))
+        raise AssertionError("unreachable")  # pragma: no cover
+
     def run(self, image_ids: Iterable[int], commit_interval: int = 100) -> None:
         """Run inference on a list of image IDs and save results."""
         image_ids_set = set(image_ids)
@@ -383,13 +510,19 @@ class AttributeInferencePipeline(BaseInferencePipeline):
             tqdm(self.process(image_ids_set), total=len(image_ids_set))
         ):
             if i % commit_interval == 0:
-                self.session.commit()
+                self._db_retry(self.session.commit, label="commit")
             if result is None:
                 print(f"Image {image_id} failed to process")
-                self._save_failure(image_id)
+                self._db_retry(
+                    lambda iid=image_id: self._save_failure(iid),
+                    label=f"save failure image {image_id}",
+                )
                 continue
-            self._save_result(image_id, result)
-        self.session.commit()
+            self._db_retry(
+                lambda iid=image_id, res=result: self._save_result(iid, res),
+                label=f"save result image {image_id}",
+            )
+        self._db_retry(self.session.commit, label="final commit")
 
 
 class CFIAttributeInferencePipeline(AttributeInferencePipeline):

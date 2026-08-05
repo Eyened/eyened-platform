@@ -41,6 +41,30 @@ VALUE_COLUMN_BY_DATA_TYPE: dict[AttributeDataType, str] = {
 }
 
 
+def attribute_value_has_stored_value_sql(attribute_value_cls: type | None = None):
+    """SQL expression that is true when a row has a non-null stored value.
+
+    Matches :func:`has_stored_value` / :func:`attribute_value_outcome` semantics,
+    including SQLite's habit of persisting JSON ``null`` as the text ``'null'``
+    rather than SQL NULL.
+    """
+    from sqlalchemy import String, and_, cast, not_, or_
+
+    from eyened_orm import AttributeValue
+
+    cls = attribute_value_cls or AttributeValue
+    json_missing = or_(
+        cls.ValueJSON.is_(None),
+        cast(cls.ValueJSON, String) == "null",
+    )
+    return or_(
+        cls.ValueFloat.is_not(None),
+        cls.ValueInt.is_not(None),
+        cls.ValueText.is_not(None),
+        not_(json_missing),
+    )
+
+
 def value_column_for_data_type(data_type: AttributeDataType) -> str:
     try:
         return VALUE_COLUMN_BY_DATA_TYPE[data_type]

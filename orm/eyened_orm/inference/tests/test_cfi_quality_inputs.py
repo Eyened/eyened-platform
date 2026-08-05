@@ -122,7 +122,11 @@ def test_filter_image_ids_includes_image_with_cfi_roi(session):
     filtered = pipeline.filter_image_ids([image.ImageInstanceID])
 
     assert filtered == {image.ImageInstanceID}
-    assert pipeline._input_values_by_image[image.ImageInstanceID]["CFI_ROI"] == roi_av
+    assert pipeline._input_data_by_image[image.ImageInstanceID]["CFI_ROI"] == roi_av.ValueJSON
+    assert (
+        pipeline._input_av_ids_by_image[image.ImageInstanceID]["CFI_ROI"]
+        == roi_av.AttributeValueID
+    )
 
 
 def test_filter_image_ids_rejects_cfi_roi_below_min_version(session):
@@ -220,3 +224,22 @@ def test_save_result_links_cfi_roi_provenance(session):
     assert output_av is not None
     assert output_av.ValueFloat == 3.5
     assert roi_av in output_av.InputValues
+
+
+def test_input_snapshot_survives_session_commit(session):
+    """Feeder-facing snapshots must not depend on live ORM state after commit."""
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    roi_json = {"center": [1, 2], "radius": 3, "lines": {}}
+    roi_av = _seed_cfi_roi(session, image.ImageInstanceID, roi_json=roi_json)
+
+    pipeline = CFI_Quality(session, device=torch.device("cpu"), n_workers=1)
+    pipeline._ensure_inputs_resolved([image.ImageInstanceID])
+    session.commit()  # would expire live AttributeValue objects
+
+    assert pipeline._input_data_for_image(image.ImageInstanceID) == {
+        "CFI_ROI": roi_json
+    }
+    assert pipeline._input_av_ids_by_image[image.ImageInstanceID]["CFI_ROI"] == (
+        roi_av.AttributeValueID
+    )

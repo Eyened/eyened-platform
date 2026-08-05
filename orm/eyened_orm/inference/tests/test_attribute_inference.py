@@ -61,7 +61,12 @@ def test_save_result_links_input_provenance(session):
     session.commit()
 
     pipeline = CFI_ODFD(session, device=torch.device("cpu"), n_workers=1)
-    pipeline._input_values_by_image = {image.ImageInstanceID: {"CFI_ROI": roi_av}}
+    pipeline._input_data_by_image = {
+        image.ImageInstanceID: {"CFI_ROI": roi_av.ValueJSON}
+    }
+    pipeline._input_av_ids_by_image = {
+        image.ImageInstanceID: {"CFI_ROI": roi_av.AttributeValueID}
+    }
     pipeline._save_result(image.ImageInstanceID, 42.0)
     session.flush()
 

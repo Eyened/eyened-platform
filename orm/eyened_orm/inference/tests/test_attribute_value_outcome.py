@@ -85,6 +85,46 @@ def test_filter_image_ids_includes_images_without_rows(session):
     assert filtered == {image.ImageInstanceID}
 
 
+def test_select_pending_by_outcomes_excludes_existing_upfront(session):
+    _proj, images = _import_images(session, count=3)
+    done_a, done_b, pending = images
+
+    pipeline = CFI_ROI(session, n_workers=1)
+    pipeline._save_result(done_a.ImageInstanceID, {"center": [1, 2], "radius": 3})
+    pipeline._save_failure(done_b.ImageInstanceID)
+    session.commit()
+
+    selected = pipeline.select_pending_by_outcomes(
+        [im.ImageInstanceID for im in images]
+    )
+    assert selected == {pending.ImageInstanceID}
+    assert pipeline.last_filter_stats is not None
+    assert pipeline.last_filter_stats.skipped_existing == 2
+    assert pipeline.last_filter_stats.pending == 1
+
+
+def test_attribute_value_has_stored_value_sql_matches_python(session):
+    from sqlalchemy import select
+
+    from eyened_orm.inference.attribute_value_outcome import (
+        attribute_value_has_stored_value_sql,
+    )
+
+    _proj, images = _import_images(session, count=2)
+    pipeline = CFI_ROI(session, n_workers=1)
+    pipeline._save_failure(images[0].ImageInstanceID)
+    pipeline._save_result(images[1].ImageInstanceID, {"center": [1, 2], "radius": 3})
+    session.commit()
+
+    has_value = attribute_value_has_stored_value_sql()
+    succeeded = set(
+        session.scalars(
+            select(AttributeValue.ImageInstanceID).where(has_value).distinct()
+        ).all()
+    )
+    assert succeeded == {images[1].ImageInstanceID}
+
+
 def test_save_failure_does_not_erase_existing_value(session):
     torch = pytest.importorskip("torch")
     from eyened_orm.inference.cfi_odfd import CFI_ODFD

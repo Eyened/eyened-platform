@@ -217,3 +217,41 @@ def test_run_cfi_models_passes_processing_options(
     assert call["batch_size"] == 4
     assert call["n_workers"] == 2
     assert call["commit_interval"] == 50
+
+
+def test_run_cfi_attribute_pipeline_filters_before_chunking(session, monkeypatch, capsys):
+    from eyened_orm.commands import model_processing
+    from eyened_orm.commands.model_processing import run_cfi_attribute_pipeline
+    from eyened_orm.inference.cfi_roi import CFI_ROI
+
+    _proj, images = _import_images(session, count=3)
+    done_a, done_b, pending = images
+
+    pipeline_probe = CFI_ROI(session, n_workers=1)
+    pipeline_probe._save_result(done_a.ImageInstanceID, {"center": [1, 2], "radius": 3})
+    pipeline_probe._save_failure(done_b.ImageInstanceID)
+    session.commit()
+
+    run_calls: list[set[int]] = []
+
+    def fake_run(self, image_ids, commit_interval=100):
+        run_calls.append(set(image_ids))
+
+    monkeypatch.setattr(CFI_ROI, "run", fake_run)
+    monkeypatch.setattr(
+        model_processing,
+        "_filter_supported_modalities",
+        lambda session, ids, _modalities: set(ids),
+    )
+
+    run_cfi_attribute_pipeline(
+        session,
+        {im.ImageInstanceID for im in images},
+        "cfi-roi",
+        n_workers=1,
+    )
+
+    assert run_calls == [{pending.ImageInstanceID}]
+    out = capsys.readouterr().out
+    assert "3 candidates → 1 pending" in out
+    assert "2 existing" in out

@@ -109,13 +109,6 @@ def run_cfi_attribute_pipeline(
     if not image_ids:
         print(f"No images with supported modalities for {model_slug}")
         return
-    print(f"Running {model_slug} ({len(image_ids)} candidate images)")
-    pipeline = model_class(
-        session,
-        device=device,
-        n_workers=n_workers,
-        batch_size=batch_size,
-    )
 
     if failed:
         scope = "failed"
@@ -126,34 +119,105 @@ def run_cfi_attribute_pipeline(
     else:
         scope = "default"
 
-    total_processed = 0
-    chunks = list(iter_image_id_chunks(image_ids))
-    for chunk_idx, chunk in enumerate(chunks, start=1):
-        chunk_ids = chunk
-        if failed:
-            chunk_ids = pipeline.failed_image_ids_in_scope(chunk_ids)
-            if not chunk_ids:
-                continue
-        filtered = pipeline.filter_image_ids(
-            chunk_ids, upgrade=upgrade, failed=failed, overwrite=overwrite
+    n_candidates = len(image_ids)
+    pipeline = model_class(
+        session,
+        device=device,
+        n_workers=n_workers,
+        batch_size=batch_size,
+    )
+
+    # Exclude existing outcomes once up-front (ID-only SQL), then chunk only
+    # the remaining work. Required-input checks stay per-chunk below.
+    outcome_ids = set(image_ids)
+    if failed:
+        outcome_ids = pipeline.failed_image_ids_in_scope(outcome_ids)
+        print(
+            f"{model_slug}: {len(outcome_ids)} failed rows in scope "
+            f"(of {n_candidates} candidates)"
         )
+    pending = pipeline.select_pending_by_outcomes(
+        outcome_ids, upgrade=upgrade, failed=failed, overwrite=overwrite
+    )
+    outcome_stats = pipeline.last_filter_stats
+    assert outcome_stats is not None
+
+    skip_parts = []
+    if outcome_stats.skipped_existing:
+        skip_parts.append(f"{outcome_stats.skipped_existing} existing")
+    if outcome_stats.skipped_successful:
+        skip_parts.append(f"{outcome_stats.skipped_successful} already succeeded")
+    if failed and n_candidates > len(outcome_ids):
+        skip_parts.append(f"{n_candidates - len(outcome_ids)} not failed")
+    skip_summary = ", ".join(skip_parts) if skip_parts else "none"
+
+    chunks = list(iter_image_id_chunks(pending))
+    print(
+        f"Running {model_slug} ({n_candidates} candidates → {len(pending)} pending "
+        f"after outcome filter [{skip_summary}]; "
+        f"{len(chunks)} chunks of ≤{PIPELINE_IMAGE_CHUNK_SIZE}, mode={scope})"
+    )
+
+    if not pending:
+        if failed:
+            print(f"{model_slug}: no failed images to process")
+        else:
+            print(f"{model_slug}: nothing to process")
+        return
+
+    total_processed = 0
+    total_skipped_missing_inputs = 0
+
+    for chunk_idx, chunk in enumerate(chunks, start=1):
+        chunk_size = len(chunk)
+        if pipeline.required_inputs:
+            # Outcome filtering already done; only resolve/skip missing inputs.
+            filtered = pipeline.filter_image_ids(chunk, overwrite=True)
+            skipped_missing = (
+                pipeline.last_filter_stats.skipped_missing_inputs
+                if pipeline.last_filter_stats
+                else 0
+            )
+        else:
+            filtered = chunk
+            skipped_missing = 0
+
+        total_skipped_missing_inputs += skipped_missing
+        if skipped_missing:
+            print(
+                f"{model_slug} chunk {chunk_idx}/{len(chunks)}: "
+                f"{len(filtered)} to process of {chunk_size} "
+                f"(skipped {skipped_missing} missing inputs); "
+                f"so far {total_processed} processed, "
+                f"{total_skipped_missing_inputs} missing inputs"
+            )
+        else:
+            print(
+                f"{model_slug} chunk {chunk_idx}/{len(chunks)}: "
+                f"processing {len(filtered)} images; "
+                f"so far {total_processed} processed"
+            )
+
         if not filtered:
             continue
-        print(
-            f"Processing {len(filtered)} images "
-            f"(chunk {chunk_idx}/{len(chunks)}, {scope})"
-        )
         pipeline.run(filtered, commit_interval=commit_interval)
         session.commit()
         total_processed += len(filtered)
 
     if total_processed == 0:
-        if failed:
-            print("No failed images in scope")
-        else:
-            print("No images to process")
+        print(
+            f"{model_slug}: nothing processed "
+            f"({total_skipped_missing_inputs} missing inputs "
+            f"of {len(pending)} pending after outcome filter)"
+        )
         return
-    print(f"Completed processing {total_processed} images")
+    print(
+        f"Completed {model_slug}: processed {total_processed}; "
+        f"skipped {outcome_stats.skipped_existing} existing, "
+        f"{outcome_stats.skipped_successful} already succeeded, "
+        f"{total_skipped_missing_inputs} missing inputs "
+        f"(of {n_candidates} candidates)"
+    )
 
 
 def _run_cfi_models_impl(
