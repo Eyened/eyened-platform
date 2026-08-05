@@ -21,6 +21,7 @@
         extraPreview: (pt: ImagePoint) => string;
         rowKey: (row: PointRow) => string;
         indexApplicable: (pt: ImagePoint) => boolean;
+        allowNullIndex?: boolean;
         onToggleExpand: (row: PointRow) => void;
         onUpdateCoord: (
             pid: string,
@@ -51,6 +52,7 @@
         extraPreview,
         rowKey,
         indexApplicable,
+        allowNullIndex = true,
         onToggleExpand,
         onUpdateCoord,
         onUpdateExtra,
@@ -101,6 +103,7 @@
                 {enumExtras}
                 {stringExtraKeys}
                 {indexApplicable}
+                {allowNullIndex}
                 coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
                 {onUpdateCoord}
                 {onUpdateExtra}

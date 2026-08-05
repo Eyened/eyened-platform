@@ -12,6 +12,8 @@
         enumExtras: { key: string; values: readonly string[] }[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
+        /** When false (volume schemas), blanking i is rejected upstream. */
+        allowNullIndex?: boolean;
         coordLabel: string;
         onUpdateCoord: (
             pid: string,
@@ -36,6 +38,7 @@
         enumExtras,
         stringExtraKeys,
         indexApplicable,
+        allowNullIndex = true,
         coordLabel,
         onUpdateCoord,
         onUpdateExtra,
@@ -99,7 +102,11 @@
             />
         </label>
         {#if indexApplicable(row.pt)}
-            <label title="B-scan index; empty = enface (null)">
+            <label
+                title={allowNullIndex
+                    ? "B-scan index; empty = enface (null)"
+                    : "B-scan index (required)"}
+            >
                 i
                 <Input
                     type="number"
@@ -108,7 +115,8 @@
                     value={typeof row.pt.index === "number"
                         ? Math.round(row.pt.index)
                         : ""}
-                    placeholder="null"
+                    placeholder={allowNullIndex ? "null" : undefined}
+                    required={!allowNullIndex}
                     oninput={(e) =>
                         onUpdateCoord(
                             row.publicId,

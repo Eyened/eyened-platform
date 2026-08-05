@@ -24,6 +24,7 @@
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext, onDestroy } from "svelte";
+    import { toast } from "svelte-sonner";
 
     interface Props {
         schema: JSONSchema;
@@ -126,6 +127,9 @@
         if (analysis?.coordinateSpace === "enface2d") return false;
         return "index" in pt;
     }
+
+    /** Volume schemas require a numeric index; only `oct` allows blank → null. */
+    const allowNullIndex = $derived(analysis?.coordinateSpace === "oct");
 
     function formatCoord(pt: ImagePoint): string {
         const x = Math.round(pt.x);
@@ -302,6 +306,11 @@
         const pt = pts[index];
         if (!pt) return;
         if (key === "index" && raw.trim() === "") {
+            // volume: index is required; blanking would strand the marker.
+            if (analysis?.coordinateSpace === "volume") {
+                toast.warning("B-scan index is required for this field");
+                return;
+            }
             pts[index] = { ...pt, index: null };
             commitPoints(pid, pts);
             return;
@@ -395,6 +404,7 @@
                         enumExtras={analysis.enumExtras}
                         {stringExtraKeys}
                         {indexApplicable}
+                        {allowNullIndex}
                         coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
                         onUpdateCoord={updatePointCoord}
                         onUpdateExtra={updatePointExtra}
@@ -418,6 +428,7 @@
                     {extraPreview}
                     {rowKey}
                     {indexApplicable}
+                    {allowNullIndex}
                     onToggleExpand={toggleExpand}
                     onUpdateCoord={updatePointCoord}
                     onUpdateExtra={updatePointExtra}
