@@ -13,6 +13,7 @@ Command utilities for the eyened ORM.
 
 The following commands are available:
 - update-thumbnails: Update thumbnails for all images in the database.
+- repair-image-dimensions: Fix Rows_y/Columns_x/NrOfFrames from on-disk pixels (filtered targets).
 - run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
 - run-cfi-amd: Run CFI AMD segmentation models.
@@ -169,6 +170,48 @@ def create_user(username: str, password: str, is_human: bool, description: str |
             print(f"User created successfully")
         except ValueError as e:
             print(f"Error creating user: {e}")
+
+
+@eorm.command("repair-image-dimensions")
+@image_target_options(require_one=True)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Report fixes without writing DB or AuditLog",
+)
+def repair_image_dimensions_cmd(
+    path,
+    image_ids,
+    project,
+    patient,
+    exclude,
+    modality,
+    include_inactive,
+    dry_run,
+):
+    """Set Rows_y / Columns_x / NrOfFrames from on-disk pixel arrays.
+
+    Skips images that already match. Skips (and reports) images with blocking
+    dependents (segmentations, CFROI, CFKeypoints). Writes AuditLog on each fix.
+    Requires a target scope (--image-ids, --path, --project, or --patient).
+    """
+    from eyened_orm.commands.repair_image_dimensions import run_repair_image_dimensions
+
+    database = get_database(confirmation=not dry_run)
+    spec = target_spec_from_cli(
+        path=path,
+        image_ids=image_ids,
+        project=project,
+        patient=patient,
+        exclude=exclude,
+        modality=modality,
+        include_inactive=include_inactive,
+    )
+    try:
+        run_repair_image_dimensions(database, spec, dry_run=dry_run)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
 
 
 @eorm.command()
