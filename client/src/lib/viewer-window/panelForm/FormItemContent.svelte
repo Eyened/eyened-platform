@@ -17,7 +17,8 @@
         type JSONSchema,
     } from "$lib/forms/schemaType";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { onMount, setContext } from "svelte";
+    import { onDestroy, onMount, setContext } from "svelte";
+    import { toast } from "svelte-sonner";
     import * as Tooltip from "../../components/ui/tooltip";
     import Tagger from "../../tags/Tagger.svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
@@ -71,6 +72,10 @@
         status = "loaded";
     });
 
+    onDestroy(() => {
+        if (saveTimeout) clearTimeout(saveTimeout);
+    });
+
     async function onchange(next: unknown) {
         if (!canEdit) return;
         // Always apply `next`, including undefined/null/''/0/false. Callers use
@@ -89,9 +94,16 @@
         // Debounce: wait 500ms after last keystroke before saving.
         // JSON body cannot be undefined — persist null for an omitted root value.
         saveTimeout = setTimeout(async () => {
-            await setFormAnnotationValue(form.id, value ?? null);
-            status = "synced";
-            saveTimeout = null;
+            try {
+                await setFormAnnotationValue(form.id, value ?? null);
+                status = "synced";
+            } catch (e) {
+                console.error("Failed to save form annotation", e);
+                status = "error";
+                toast.error("Failed to save form annotation");
+            } finally {
+                saveTimeout = null;
+            }
         }, 500);
     }
 
@@ -219,6 +231,9 @@
     }
     span.saving {
         color: orange;
+    }
+    span.error {
+        color: red;
     }
     table {
         border-collapse: collapse;
