@@ -16,9 +16,11 @@ from eyened_orm import (
     SubTask,
     Task,
 )
+from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import (
     SINGLE_PROJECT_ENTITIES,
-    project_id_of_column,
+    apply_scope,
     projects_of,
 )
 from eyened_orm.task import SubTaskState, TaskState
@@ -188,14 +190,28 @@ def test_a_form_annotation_resolves_through_its_patient(session):
     }
 
 
-# --- project_id_of_column: the correlated form consumed by apply_scope -------
+# --- the correlated EXISTS predicate that apply_scope emits ------------------
+#
+# These three retarget Task 4's guards from the scalar-subquery form
+# (``project_id_of_column``, removed) onto the EXISTS form that replaced it.
+# The hazard they guard -- auto-correlation emptying the subquery's FROM -- is
+# unchanged by the shape of the subquery, so the coverage had to move, not go.
+
+
+def _grader_scope(*project_ids: int) -> AccessScope:
+    return AccessScope(
+        actor_id=7,
+        username="alice",
+        is_admin=False,
+        roles={p: ProjectRole.grader for p in project_ids},
+    )
 
 
 @pytest.mark.parametrize(
     "entity", sorted(SINGLE_PROJECT_ENTITIES, key=lambda e: e.__name__),
     ids=lambda e: e.__name__,
 )
-def test_project_id_of_column_compiles_inside_a_query_that_also_joins_patient(entity):
+def test_apply_scope_compiles_inside_a_query_that_also_joins_patient(entity):
     """Every entry must survive an enclosing query that already selects Patient.
 
     Without this: SQLAlchemy *auto*-correlation strips from a subquery's FROM
@@ -210,17 +226,17 @@ def test_project_id_of_column_compiles_inside_a_query_that_also_joins_patient(en
     any helper would remove. Parametrized over the registry so a future entity
     is covered without anyone remembering to add a case.
     """
-    outer = select(entity).select_from(entity, Patient).where(
-        project_id_of_column(entity).in_([1])
+    outer = apply_scope(
+        select(entity).select_from(entity, Patient), entity, _grader_scope(1)
     )
     sql = str(outer.compile(dialect=sqlite.dialect()))
     assert "ProjectID" in sql
 
 
-def test_project_id_of_column_filters_a_study_to_one_project(session):
+def test_apply_scope_filters_a_study_to_one_project(session):
     """Compiling is not filtering: prove the correlation binds to the outer row.
 
-    Without this a degenerate expression -- correlated against the wrong table,
+    Without this a degenerate predicate -- correlated against the wrong table,
     or not correlated at all -- would still compile and still pass the test
     above while returning every study or none.
     """
@@ -235,18 +251,20 @@ def test_project_id_of_column_filters_a_study_to_one_project(session):
     ).one()
 
     found = session.scalars(
-        select(Study.StudyID)
-        .join(Patient, Patient.PatientID == Study.PatientID)
-        .where(project_id_of_column(Study).in_([project_a_id]))
+        apply_scope(
+            select(Study.StudyID).join(Patient, Patient.PatientID == Study.PatientID),
+            Study,
+            _grader_scope(project_a_id),
+        )
     ).all()
     assert set(found) == {study_a_id}
 
 
-def test_project_id_of_column_filters_an_image_to_one_project(session):
+def test_apply_scope_filters_an_image_to_one_project(session):
     """The same proof one level deeper, through Series and Study.
 
-    Without this, an image-level expression that resolved to the wrong join
-    chain would be caught only by Task 5's integration, i.e. in the API.
+    Without this, an image-level predicate that resolved to the wrong join
+    chain would be caught only in the API.
     """
     backend = make_storage_backend(session)
     device = make_device(session, "d")
@@ -257,10 +275,13 @@ def test_project_id_of_column_filters_an_image_to_one_project(session):
     image_a_id = image_a.ImageInstanceID
 
     found = session.scalars(
-        select(ImageInstance.ImageInstanceID)
-        .join(Series, Series.SeriesID == ImageInstance.SeriesID)
-        .join(Study, Study.StudyID == Series.StudyID)
-        .join(Patient, Patient.PatientID == Study.PatientID)
-        .where(project_id_of_column(ImageInstance).in_([project_a_id]))
+        apply_scope(
+            select(ImageInstance.ImageInstanceID)
+            .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+            .join(Study, Study.StudyID == Series.StudyID)
+            .join(Patient, Patient.PatientID == Study.PatientID),
+            ImageInstance,
+            _grader_scope(project_a_id),
+        )
     ).all()
     assert set(found) == {image_a_id}
