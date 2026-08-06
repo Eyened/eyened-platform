@@ -3,16 +3,14 @@ import type { MainViewerContext } from "./MainViewerContext.svelte";
 import type { EnfaceProjectionManager } from "$lib/viewer-window/enfaceProjectionManager.svelte";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
+import type { WebGL } from "$lib/webgl/webgl";
 
-const { getOrCompile, getShaderTemplateCache, getBaseUniforms } = vi.hoisted(
-    () => ({
-        getOrCompile: vi.fn(),
-        getShaderTemplateCache: vi.fn(),
-        getBaseUniforms: vi.fn(() => ({ u_base: "base" })),
-    }),
-);
+const { compileShaderTemplate, getBaseUniforms } = vi.hoisted(() => ({
+    compileShaderTemplate: vi.fn(),
+    getBaseUniforms: vi.fn(() => ({ u_base: "base" })),
+}));
 
-vi.mock("$lib/webgl/shaderTemplate", () => ({ getShaderTemplateCache }));
+vi.mock("$lib/webgl/shaderTemplate", () => ({ compileShaderTemplate }));
 
 vi.mock("$lib/webgl/imageRenderer", () => ({ getBaseUniforms }));
 
@@ -48,38 +46,47 @@ function source(
     };
 }
 
+const webgl = {} as WebGL;
+
 describe("EnfaceProjectionOverlay", () => {
     beforeEach(() => {
-        getOrCompile.mockReset();
-        getShaderTemplateCache.mockReset();
-        getShaderTemplateCache.mockReturnValue({ getOrCompile });
+        compileShaderTemplate.mockReset();
         getBaseUniforms.mockClear();
         getBaseUniforms.mockReturnValue({ u_base: "base" });
     });
 
-    it("renders every enabled source with its mapped program and dimensions", () => {
+    it("compiles enabled sources once in the constructor and reuses them on repaint", () => {
         const firstPass = vi.fn();
         const secondPass = vi.fn();
-        getOrCompile
+        compileShaderTemplate
             .mockReturnValueOnce({ pass: firstPass })
             .mockReturnValueOnce({ pass: secondPass });
-        const overlay = new EnfaceProjectionOverlay([
-            source("binary", "first"),
-            source("off", "disabled"),
-            source("heatmap", "second"),
-        ]);
+
+        const overlay = new EnfaceProjectionOverlay(
+            [
+                source("binary", "first"),
+                source("off", "disabled"),
+                source("heatmap", "second"),
+            ],
+            webgl,
+        );
+
+        expect(compileShaderTemplate).toHaveBeenCalledTimes(2);
+        expect(
+            compileShaderTemplate.mock.calls.map((call) => call[2]),
+        ).toEqual([{ mapping: "first" }, { mapping: "second" }]);
+
         const viewerContext = {
-            image: { webgl: "webgl" },
+            image: { webgl },
         } as unknown as ViewerContext;
         const renderTarget = {} as RenderTarget;
 
         overlay.repaint(viewerContext, renderTarget);
+        overlay.repaint(viewerContext, renderTarget);
 
-        expect(getOrCompile).toHaveBeenCalledTimes(2);
-        expect(getOrCompile.mock.calls.map((call) => call[2])).toEqual([
-            { mapping: "first" },
-            { mapping: "second" },
-        ]);
+        expect(compileShaderTemplate).toHaveBeenCalledTimes(2);
+        expect(firstPass).toHaveBeenCalledTimes(2);
+        expect(secondPass).toHaveBeenCalledTimes(2);
         expect(firstPass).toHaveBeenCalledWith(
             renderTarget,
             expect.objectContaining({
@@ -104,60 +111,24 @@ describe("EnfaceProjectionOverlay", () => {
 
     it("skips a source whose mapped shader fails to compile", () => {
         const pass = vi.fn();
-        getOrCompile
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        compileShaderTemplate
             .mockImplementationOnce(() => {
                 throw new Error("compile failed");
             })
             .mockReturnValueOnce({ pass });
-        const overlay = new EnfaceProjectionOverlay([
-            source("binary", "broken"),
-            source("binary", "valid"),
-        ]);
+
+        const overlay = new EnfaceProjectionOverlay(
+            [source("binary", "broken"), source("binary", "valid")],
+            webgl,
+        );
 
         overlay.repaint(
-            { image: { webgl: "webgl" } } as unknown as ViewerContext,
+            { image: { webgl } } as unknown as ViewerContext,
             {} as RenderTarget,
         );
 
-        expect(getOrCompile).toHaveBeenCalledTimes(2);
+        expect(compileShaderTemplate).toHaveBeenCalledTimes(2);
         expect(pass).toHaveBeenCalledOnce();
-    });
-
-    it("skips a source whose shader is negative-cached as null", () => {
-        const pass = vi.fn();
-        getOrCompile.mockReturnValueOnce(null).mockReturnValueOnce({ pass });
-        const overlay = new EnfaceProjectionOverlay([
-            source("binary", "known-bad"),
-            source("binary", "valid"),
-        ]);
-
-        overlay.repaint(
-            { image: { webgl: "webgl" } } as unknown as ViewerContext,
-            {} as RenderTarget,
-        );
-
-        expect(getOrCompile).toHaveBeenCalledTimes(2);
-        expect(pass).toHaveBeenCalledOnce();
-    });
-
-    it("looks the program cache up on the webgl context instead of owning one", () => {
-        getOrCompile.mockReturnValue({ pass: vi.fn() });
-        const viewerContext = {
-            image: { webgl: "webgl" },
-        } as unknown as ViewerContext;
-
-        new EnfaceProjectionOverlay([source("binary", "shared")]).repaint(
-            viewerContext,
-            {} as RenderTarget,
-        );
-        new EnfaceProjectionOverlay([source("heatmap", "shared")]).repaint(
-            viewerContext,
-            {} as RenderTarget,
-        );
-
-        expect(getShaderTemplateCache.mock.calls).toEqual([
-            ["webgl"],
-            ["webgl"],
-        ]);
     });
 });

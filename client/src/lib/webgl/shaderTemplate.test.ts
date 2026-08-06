@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 const { textureShaderProgram } = vi.hoisted(() => ({
     textureShaderProgram: vi.fn(),
@@ -12,16 +12,8 @@ vi.mock("./FragmentShaderProgram", () => ({
     },
 }));
 
-import {
-    applyInserts,
-    getShaderTemplateCache,
-    shaderCacheKey,
-    ShaderTemplateCache,
-} from "./shaderTemplate";
+import { applyInserts, compileShaderTemplate } from "./shaderTemplate";
 import type { WebGL } from "./webgl";
-
-const webgl = {} as WebGL;
-const template = "// @insert mapping";
 
 describe("applyInserts", () => {
     it("replaces insert slots", () => {
@@ -34,7 +26,6 @@ describe("applyInserts", () => {
     });
 
     it("prefers /// @insert so vite-plugin-glsl-preserved markers work", () => {
-        // vite-plugin-glsl strips `//` comments but keeps `///`.
         const template = `A\n/// @insert mapping\nB`;
         const out = applyInserts(template, {
             mapping: "vec2 mapping(vec2 uv) { return uv; }",
@@ -50,57 +41,16 @@ describe("applyInserts", () => {
     });
 });
 
-describe("shaderCacheKey", () => {
-    it("is stable for same inputs", () => {
-        const a = shaderCacheKey("t", { mapping: "m1" });
-        const b = shaderCacheKey("t", { mapping: "m1" });
-        expect(a).toBe(b);
-    });
-
-    it("changes when insert content changes", () => {
-        const a = shaderCacheKey("t", { mapping: "m1" });
-        const b = shaderCacheKey("t", { mapping: "m2" });
-        expect(a).not.toBe(b);
-    });
-});
-
-describe("ShaderTemplateCache", () => {
-    beforeEach(() => {
-        textureShaderProgram.mockReset();
-    });
-
-    it("compiles once per key and returns the cached program", () => {
-        const cache = new ShaderTemplateCache();
-        const first = cache.getOrCompile(webgl, template, { mapping: "m" });
-        const second = cache.getOrCompile(webgl, template, { mapping: "m" });
-
-        expect(first).toBe(second);
-        expect(textureShaderProgram).toHaveBeenCalledOnce();
-    });
-
-    it("throws once on failure, then returns null without recompiling", () => {
-        textureShaderProgram.mockImplementation(() => {
-            throw new Error("compile failed");
+describe("compileShaderTemplate", () => {
+    it("applies inserts then constructs a TextureShaderProgram", () => {
+        textureShaderProgram.mockClear();
+        const webgl = {} as WebGL;
+        compileShaderTemplate(webgl, "A\n/// @insert mapping\nB", {
+            mapping: "vec2 mapping(vec2 uv) { return uv; }",
         });
-        vi.spyOn(console, "error").mockImplementation(() => {});
-        const cache = new ShaderTemplateCache();
-
-        expect(() =>
-            cache.getOrCompile(webgl, template, { mapping: "bad" }),
-        ).toThrow(/compile failed/);
-        expect(
-            cache.getOrCompile(webgl, template, { mapping: "bad" }),
-        ).toBeNull();
-        expect(textureShaderProgram).toHaveBeenCalledOnce();
-    });
-});
-
-describe("getShaderTemplateCache", () => {
-    it("returns one cache per webgl context", () => {
-        const a = {} as WebGL;
-        const b = {} as WebGL;
-
-        expect(getShaderTemplateCache(a)).toBe(getShaderTemplateCache(a));
-        expect(getShaderTemplateCache(a)).not.toBe(getShaderTemplateCache(b));
+        expect(textureShaderProgram).toHaveBeenCalledWith(
+            webgl,
+            "A\nvec2 mapping(vec2 uv) { return uv; }\nB",
+        );
     });
 });

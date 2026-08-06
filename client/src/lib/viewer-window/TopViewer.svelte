@@ -104,7 +104,9 @@
         if (!sources.length) {
             return;
         }
-        return viewerContext.addOverlay(new EnfaceProjectionOverlay(sources));
+        return viewerContext.addOverlay(
+            new EnfaceProjectionOverlay(sources, image.webgl),
+        );
     });
 
     function toggleLinesOverlay(e: MouseEvent) {

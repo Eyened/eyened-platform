@@ -1,6 +1,8 @@
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
-import { getShaderTemplateCache } from "$lib/webgl/shaderTemplate";
+import { compileShaderTemplate } from "$lib/webgl/shaderTemplate";
+import type { TextureShaderProgram } from "$lib/webgl/FragmentShaderProgram";
+import type { WebGL } from "$lib/webgl/webgl";
 import type { RenderTarget } from "$lib/webgl/types";
 import fs_render_enface_projection from "./fs_render_enface_projection.frag";
 import type { Overlay } from "../viewer-utils";
@@ -11,32 +13,47 @@ export type EnfaceOverlayPaintSource = EnfaceOverlaySourceResolved & {
     mainViewerContext: MainViewerContext;
 };
 
+type PreparedSource = {
+    source: EnfaceOverlayPaintSource;
+    program: TextureShaderProgram;
+};
+
+/**
+ * Programs are compiled once when the overlay is created. TopViewer rebuilds
+ * this overlay when registration / modes change, so repaint only draws.
+ */
 export class EnfaceProjectionOverlay implements Overlay {
-    constructor(readonly sources: EnfaceOverlayPaintSource[]) {}
+    private readonly prepared: PreparedSource[] = [];
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget): void {
-        const base = getBaseUniforms(viewerContext);
-        const programs = getShaderTemplateCache(viewerContext.image.webgl);
-
-        for (const source of this.sources) {
+    constructor(sources: EnfaceOverlayPaintSource[], webgl: WebGL) {
+        for (const source of sources) {
             if (source.mode === "off" || !source.mainViewerContext) {
                 continue;
             }
-
-            let program;
             try {
-                program = programs.getOrCompile(
-                    viewerContext.image.webgl,
+                const program = compileShaderTemplate(
+                    webgl,
                     fs_render_enface_projection,
                     { mapping: source.mappingGlsl },
                 );
-            } catch {
-                continue;
+                this.prepared.push({ source, program });
+            } catch (err) {
+                console.error(
+                    "EnfaceProjectionOverlay: shader compile failed",
+                    err,
+                );
             }
-            if (!program) {
-                continue;
-            }
+        }
+    }
 
+    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget): void {
+        if (!this.prepared.length) {
+            return;
+        }
+
+        const base = getBaseUniforms(viewerContext);
+
+        for (const { source, program } of this.prepared) {
             const projections = source.manager.getVisibleProjections();
             if (!projections.length) {
                 continue;
