@@ -238,12 +238,15 @@ def test_dev_bypass_handles_the_configured_admin_password_correctly(
     mode as reading a Settings field that does not exist, on the same code
     path.
 
-    ``password_configured`` is what makes the unwrap itself load-bearing: it
-    asserts the password was stored *unwrapped* (``verify_password`` against
-    the plaintext succeeds). Without it, deleting ``.get_secret_value()`` --
-    so a ``SecretStr`` is passed straight to ``create_user``/``hash_password``
-    -- would hash the wrapper's repr instead of the password and stay green,
-    because the only other dev-bypass test never configures a password.
+    ``password_configured`` is what makes the unwrap itself load-bearing.
+    Deleting ``.get_secret_value()`` passes a ``SecretStr`` to
+    ``create_user``/``hash_password``, which is Argon2 and rejects a non-str:
+    the request 500s, so the assertion that bites first is the **status code**,
+    not the ``verify_password`` below it. That distinction matters -- swap in a
+    hasher that stringifies its input and the status code goes green again,
+    leaving ``verify_password`` as the only thing still guarding the unwrap.
+    The other dev-bypass test never configures a password, so without this case
+    the branch has no coverage at all.
     """
     from fastapi.testclient import TestClient
     from pydantic import SecretStr

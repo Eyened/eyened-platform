@@ -208,10 +208,11 @@ async def get_current_user(
         creator, _ = ensure_admin(
             session,
             settings.admin_username,
-            # Unwrap at the call site: create_user/hash_password hash whatever
-            # they are handed, so passing the SecretStr through would hash the
-            # wrapper's repr and create an account whose real password nobody
-            # can ever know. Conditional, because the field is optional.
+            # Unwrap at the call site: hash_password is Argon2, which rejects a
+            # non-str, so passing the SecretStr through raises TypeError and the
+            # request 500s. A hasher that stringified its input instead would
+            # hash the wrapper's repr silently -- hence the unwrap, not a cast.
+            # Conditional, because the field is optional.
             settings.admin_password.get_secret_value()
             if settings.admin_password is not None
             else None,

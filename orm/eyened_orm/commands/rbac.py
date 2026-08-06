@@ -53,16 +53,19 @@ def init_admin(username: str, password: str | None) -> None:
     database = get_database()
     with database.get_session() as session:
         creator, outcome = ensure_admin(session, username, password)
+        # None means "nothing happened, so nothing to audit" -- keeping that in the
+        # match keeps the audit condition from being written twice and drifting.
+        action: str | None
         match outcome:
             case BootstrapOutcome.unchanged:
-                pass
+                action = None
             case BootstrapOutcome.created:
                 action = "INSERT"
             case BootstrapOutcome.promoted | BootstrapOutcome.reactivated:
                 action = "UPDATE"
             case _:
                 raise ValueError(f"unhandled BootstrapOutcome: {outcome!r}")
-        if outcome is not BootstrapOutcome.unchanged:
+        if action is not None:
             _audit(
                 session,
                 command="init-admin",
