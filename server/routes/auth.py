@@ -205,9 +205,9 @@ async def get_current_user(
         # ensure_admin, not a bare lookup: the account is a data superuser only
         # if it is an administrator, and any dump taken before cutover has
         # IsAdmin false on every row. No password is passed, though: the
-        # bypass never authenticates with one, and passing the configured
-        # admin_password through would overwrite any password an operator
-        # set on this account on every single request.
+        # bypass never authenticates with one, and passing a password through
+        # would overwrite any password an operator set on this account on
+        # every single request.
         creator, _ = ensure_admin(
             session,
             settings.admin_username,

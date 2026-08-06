@@ -45,10 +45,17 @@ def _audit(
 @click.option(
     "--password",
     type=str,
-    default=None,
-    help="Omit to leave password login disabled (or unchanged, for an existing account).",
+    envvar="EYENED_API_ADMIN_PASSWORD",
+    prompt=True,
+    hide_input=True,
+    confirmation_prompt=True,
+    help=(
+        "Reads EYENED_API_ADMIN_PASSWORD if set; otherwise prompts twice without "
+        "echoing input. Leave blank to leave password login disabled (or "
+        "unchanged, for an existing account)."
+    ),
 )
-def init_admin(username: str, password: str | None) -> None:
+def init_admin(username: str, password: str) -> None:
     """Create or promote the platform administrator (idempotent)."""
     database = get_database()
     with database.get_session() as session:

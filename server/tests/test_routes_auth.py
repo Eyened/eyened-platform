@@ -220,14 +220,13 @@ def test_dev_bypass_promotes_the_configured_account_to_administrator(
     assert creator.IsAdmin is True
 
 
-def test_dev_bypass_works_with_no_admin_password_configured(session, monkeypatch):
-    """Regression test for a specific AttributeError: ``admin_password``
-    defaults to None, and code that unconditionally reaches for
-    ``.get_secret_value()`` on it raises on that default -- the same failure
-    mode as reading a Settings field that does not exist, on the same code
-    path. Without this test, a future change that re-adds an unconditional
-    unwrap of ``admin_password`` would 500 every unconfigured dev bypass
-    request and nothing here would catch it.
+def test_dev_bypass_works_without_configuring_a_password(session, monkeypatch):
+    """The dev bypass never authenticates with a password, so a deployment
+    that configures only ``admin_username`` (the common case -- password
+    login for the bootstrapped account is optional) must still work. Without
+    this test, a future change that makes ``get_current_user`` unconditionally
+    reach for a password would 500 every such dev-bypass request and nothing
+    here would catch it.
     """
     from fastapi.testclient import TestClient
 
@@ -246,20 +245,19 @@ def test_dev_bypass_works_with_no_admin_password_configured(session, monkeypatch
         assert client.get("/auth/me").status_code == 200
 
 
-def test_dev_bypass_does_not_change_the_account_password(session, monkeypatch):
+def test_dev_bypass_never_forwards_a_password_to_ensure_admin(session, monkeypatch):
     """The dev bypass calls ``ensure_admin`` for its promote-to-admin side
-    effect, not to authenticate -- it must pass no password. If it passed
-    ``settings.admin_password`` through instead, every single dev-bypass
-    request would silently overwrite whatever password an operator set on
-    this account (e.g. via ``eorm init-admin --password``), because
-    ``server/db.py``'s ``get_db`` commits the session. This seeds an account
-    with a known password, configures a *different* ``admin_password``, makes
-    a bypass request, and asserts the original password still verifies --
-    it fails against a version of ``get_current_user`` that forwards the
-    configured password to ``ensure_admin``.
+    effect, not to authenticate -- it must pass no password. ``Settings`` has
+    no password field to leak, but ``get_current_user`` could still pass a
+    literal string through; if it did, every single dev-bypass request would
+    silently overwrite whatever password an operator set on this account
+    (e.g. via ``eorm init-admin --password``), because ``server/db.py``'s
+    ``get_db`` commits the session. This seeds an account with a known
+    password, makes a bypass request, and asserts the original password
+    still verifies -- it fails against a version of ``get_current_user``
+    that forwards any password to ``ensure_admin``.
     """
     from fastapi.testclient import TestClient
-    from pydantic import SecretStr
     from sqlalchemy import select
 
     import server.db as server_db
@@ -285,7 +283,6 @@ def test_dev_bypass_does_not_change_the_account_password(session, monkeypatch):
         Settings(
             public_auth_disabled=True,
             admin_username="devadmin",
-            admin_password=SecretStr("configured-password"),
         ),
     )
 
