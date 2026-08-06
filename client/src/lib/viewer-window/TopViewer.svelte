@@ -10,7 +10,7 @@
     import MainIcon from "./icons/MainIcon.svelte";
     import Lines from "./icons/Lines.svelte";
     import EnfaceProjectionModeIcon from "./icons/EnfaceProjectionModeIcon.svelte";
-    import { composeGlslPath } from "$lib/registration/composeGlslPath";
+    import { resolveEnfaceOverlaySources } from "$lib/registration/resolveEnfaceOverlaySources";
 
     interface Props {
         image: AbstractImage;
@@ -28,10 +28,22 @@
     setContext("viewerContext", viewerContext);
 
     const isProjImage = $derived(image.image_id.endsWith("_proj"));
-    const enfaceProjectionManager = $derived(
-        isProjImage
-            ? viewerWindowContext.enfaceProjectionManagers.get(publicId)
-            : undefined,
+    const resolved = $derived.by(() =>
+        resolveEnfaceOverlaySources({
+            imageId: image.image_id,
+            imageWidth: image.width,
+            imageHeight: image.height,
+            registration: viewerWindowContext.registration,
+            managers: viewerWindowContext.enfaceProjectionManagers,
+            projMode: viewerContext.enfaceProjectionMode,
+            linkedModes: viewerContext.enfaceProjectionModesByOct,
+        }),
+    );
+    const paintSources = $derived.by(() =>
+        resolved.flatMap((source) => {
+            const mainViewerContext = source.manager.mainViewerContext;
+            return mainViewerContext ? [{ ...source, mainViewerContext }] : [];
+        }),
     );
 
     let photoLocators = $derived(
@@ -61,25 +73,11 @@
     });
 
     $effect(() => {
-        const manager = enfaceProjectionManager;
-        const ctx = manager?.mainViewerContext;
-        if (!manager || !ctx || viewerContext.enfaceProjectionMode === "off") {
+        const sources = paintSources.filter((source) => source.mode !== "off");
+        if (!sources.length) {
             return;
         }
-        const mappingGlsl = composeGlslPath([]);
-        return viewerContext.addOverlay(
-            new EnfaceProjectionOverlay([
-                {
-                    octPublicId: publicId,
-                    manager,
-                    mainViewerContext: ctx,
-                    mappingGlsl,
-                    mode: viewerContext.enfaceProjectionMode,
-                    sizePrimary: [image.width, image.height],
-                    sizeSecondary: [image.width, image.height],
-                },
-            ]),
-        );
+        return viewerContext.addOverlay(new EnfaceProjectionOverlay(sources));
     });
 
     function toggleLinesOverlay(e: MouseEvent) {
@@ -92,6 +90,11 @@
         const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
         const index = modes.indexOf(viewerContext.enfaceProjectionMode);
         viewerContext.enfaceProjectionMode = modes[(index + 1) % modes.length];
+    }
+
+    function cycleLinkedProjectionMode(e: MouseEvent, octPublicId: string) {
+        e.stopPropagation();
+        viewerContext.cycleEnfaceProjectionModeForOct(octPublicId);
     }
 
     function selectImage(e: MouseEvent) {
@@ -111,11 +114,11 @@
         <span class="public-id">{publicId}</span>
         <CopyIconButton text={publicId} ariaLabel="Copy public ID" />
     </div>
-    {#if hasLocators || enfaceProjectionManager}
+    {#if hasLocators || resolved.length > 0}
         <div class="header overlay">
             <div class="content outer">
                 <div class="content">
-                    {#if enfaceProjectionManager}
+                    {#if isProjImage && resolved.length > 0}
                         <MainIcon
                             onclick={cycleProjectionMode}
                             active={viewerContext.enfaceProjectionMode !==
@@ -128,6 +131,28 @@
                             ]}
                             iconSnippet={projectionModeIcon}
                         />
+                    {:else}
+                        {#each resolved as source (source.octPublicId)}
+                            <MainIcon
+                                onclick={(event) =>
+                                    cycleLinkedProjectionMode(
+                                        event,
+                                        source.octPublicId,
+                                    )}
+                                active={source.mode !== "off"}
+                                tooltip={`${projectionModeLabels[source.mode]} (${source.octPublicId})`}
+                                hoverColor={projectionModeHoverColors[
+                                    source.mode
+                                ]}
+                            >
+                                {#snippet iconSnippet()}
+                                    <EnfaceProjectionModeIcon
+                                        mode={source.mode}
+                                        gradientId={`enface-heatmap-${publicId}-${source.octPublicId}`}
+                                    />
+                                {/snippet}
+                            </MainIcon>
+                        {/each}
                     {/if}
                     {#if hasLocators}
                         <MainIcon

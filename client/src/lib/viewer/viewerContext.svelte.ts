@@ -67,6 +67,11 @@ export class ViewerContext {
     hideOverlays: boolean = $state(false);
     renderMode: RenderMode = $state("Original");
     enfaceProjectionMode: EnfaceProjectionMode = $state("off");
+    /** Per-OCT enface overlay mode for non-_proj top-row images. */
+    enfaceProjectionModesByOct: Map<string, EnfaceProjectionMode> = $state(
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        new Map(),
+    );
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
     cursorStyle: cursorStyle = $state("default");
@@ -188,6 +193,21 @@ export class ViewerContext {
             index: i,
         });
         this.index = i;
+    }
+
+    cycleEnfaceProjectionModeForOct(octPublicId: string): void {
+        const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
+        const current =
+            this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
+        const next = modes[(modes.indexOf(current) + 1) % modes.length];
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        const map = new Map(this.enfaceProjectionModesByOct);
+        map.set(octPublicId, next);
+        this.enfaceProjectionModesByOct = map;
+    }
+
+    getEnfaceProjectionModeForOct(octPublicId: string): EnfaceProjectionMode {
+        return this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
     }
 
     initTransform() {
