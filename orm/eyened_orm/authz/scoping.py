@@ -99,12 +99,31 @@ SET_VALUED_ENTITIES: frozenset[type[Base]] = frozenset({Task, SubTask})
 
 
 def _join_to_patient(stmt: Select, node: type[Base]) -> Select:
-    """Join ``stmt`` -- already selecting FROM ``node`` -- up to ``Patient``."""
-    while node is not Patient:
+    """Join ``stmt`` -- already selecting FROM ``node`` -- up to ``Patient``.
+
+    Bounded by ``len(_PARENT_OF)`` hops: that is the longest a chain through
+    the map can legitimately be, since each hop consumes one entry and none
+    are revisited on a well-formed map. A malformed ``_PARENT_OF`` -- a cycle,
+    or a chain that dead-ends without reaching ``Patient`` -- raises instead of
+    looping forever, which matters here because this walk sits on the
+    authorization path.
+    """
+    start = node
+    for _ in range(len(_PARENT_OF) + 1):
+        if node is Patient:
+            return stmt
+        if node not in _PARENT_OF:
+            raise KeyError(
+                f"{start.__name__} has no route to Patient: "
+                f"{node.__name__} is not registered in _PARENT_OF"
+            )
         parent, onclause = _PARENT_OF[node]
         stmt = stmt.join(parent, onclause())
         node = parent
-    return stmt
+    raise ValueError(
+        f"{start.__name__}'s _PARENT_OF chain did not reach Patient within "
+        f"{len(_PARENT_OF)} hops -- it is likely cyclic"
+    )
 
 
 def _project_ids_from(
@@ -217,7 +236,9 @@ def _subtask_images_to_patient(
 
 def project_ids_of_task(task_id: int) -> Select:
     """The projects every image of every subtask of this task sits in."""
-    return _subtask_images_to_patient(SubTask).where(SubTask.TaskID == task_id).distinct()
+    return (
+        _subtask_images_to_patient(SubTask).where(SubTask.TaskID == task_id).distinct()
+    )
 
 
 def project_ids_of_subtask(subtask_id: int) -> Select:
@@ -254,7 +275,12 @@ def _set_valued_predicate(
     sibling = aliased(SubTask)
     # SubTask is scoped by its *parent task*, not only by its own images, so
     # both branches walk every sibling subtask of the same task.
-    task_id_column = Task.TaskID if entity is Task else SubTask.TaskID
+    if entity is Task:
+        task_id_column = Task.TaskID
+    elif entity is SubTask:
+        task_id_column = SubTask.TaskID
+    else:
+        raise KeyError(entity)
     inner = (
         _subtask_images_to_patient(sibling)
         .where(sibling.TaskID == task_id_column)
