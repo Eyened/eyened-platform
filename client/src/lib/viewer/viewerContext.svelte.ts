@@ -206,10 +206,6 @@ export class ViewerContext {
         this.enfaceProjectionModesByOct = map;
     }
 
-    getEnfaceProjectionModeForOct(octPublicId: string): EnfaceProjectionMode {
-        return this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
-    }
-
     initTransform() {
         this.transform = this.getInitTransform();
     }

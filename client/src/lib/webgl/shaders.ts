@@ -25,13 +25,10 @@ import fs_enfaceProjectMask from "./glsl/fs_enface_project_mask.frag";
 import fs_enfaceProjectProbability from "./glsl/fs_enface_project_probability.frag";
 import fs_enfaceProjectMultiClass from "./glsl/fs_enface_project_multiclass.frag";
 import fs_enfaceProjectMultiLabel from "./glsl/fs_enface_project_multilabel.frag";
-import fs_renderEnfaceProjection from "$lib/viewer/overlays/fs_render_enface_projection.frag";
 import fs_minmax_reduction from "./glsl/fs_minmax_reduction.frag";
 import fs_normalize from "./glsl/fs_normalize.frag";
 import fs_extract_slice from "./glsl/fs_extract_slice.frag";
 import type { WebGL } from "./webgl";
-import { applyInserts } from "./shaderTemplate";
-import { composeGlslPath } from "$lib/registration/composeGlslPath";
 
 /** Inject shared segmentation quad outline helpers before main(). */
 function withSegBoundsOutline(fragmentSource: string): string {
@@ -67,7 +64,6 @@ export class Shaders {
     enfaceProjectProbability: PixelShaderProgram;
     enfaceProjectMultiClass: PixelShaderProgram;
     enfaceProjectMultiLabel: PixelShaderProgram;
-    renderEnfaceProjection: TextureShaderProgram;
     minMaxReduction: PixelShaderProgram;
     normalize: PixelShaderProgram;
     extractSlice: PixelShaderProgram;
@@ -120,12 +116,6 @@ export class Shaders {
         this.enfaceProjectMultiLabel = new PixelShaderProgram(
             webgl,
             fs_enfaceProjectMultiLabel,
-        );
-        this.renderEnfaceProjection = new TextureShaderProgram(
-            webgl,
-            applyInserts(fs_renderEnfaceProjection, {
-                mapping: composeGlslPath([]),
-            }),
         );
         this.minMaxReduction = new PixelShaderProgram(
             webgl,
