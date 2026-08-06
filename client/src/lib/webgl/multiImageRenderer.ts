@@ -4,6 +4,7 @@ import type { WebGL } from "./webgl";
 import type { RenderTarget } from "./types";
 import type { Registration } from "$lib/registration/registration";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+import { composeGlslPath } from "$lib/registration/composeGlslPath";
 import fs_redblue from "./multiImageFragment/redblue.frag";
 import { getBaseUniforms, type ImageRenderer } from "./imageRenderer";
 
@@ -58,7 +59,7 @@ export class MultiImageRenderer implements ImageRenderer {
         if (item && item.glslMapping) {
             const fs_updated = fs_redblue.replace(
                 `// @insert mapping`,
-                item.glslMapping,
+                composeGlslPath([item.glslMapping]),
             );
             this.shaderRedBlue = new TextureShaderProgram(
                 this.webgl,

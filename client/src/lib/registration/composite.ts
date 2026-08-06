@@ -1,5 +1,7 @@
 import type { Position } from "$lib/types";
 import type { RegistrationItem } from "./registrationItem";
+import { composeGlslPath } from "./composeGlslPath";
+
 /**
  * CompositeRegistration is a class that represents a composite registration
  * between two images. It is used to apply a series of transformations
@@ -24,20 +26,19 @@ export class CompositeRegistration implements RegistrationItem {
     }
 
     get glslMapping(): string {
-        let result = "";
-        let i = 0;
-        for (const transform of this.transforms) {
-            const subMapping = transform.glslMapping;
-            subMapping.replace(`vec2 mapping`, `vec2 mapping_${i}`);
-            result += subMapping;
-            i++;
-        }
-        result += `vec2 mapping(vec2 uv) {`;
-        for (let j = 0; j < i; j++) {
-            result += `uv = mapping_${j}(uv);`;
-        }
-        result += `return uv;}`;
-        return result;
+        const hops = this.transforms
+            .map((t) => t.glslMapping)
+            .filter((s) => s.trim().length > 0);
+        // CompositeRegistration still exposes a single mapping() for consumers
+        // that expect RegistrationItem.glslMapping to be composable as one hop.
+        // For multi-transform edges, bake the chain into one map_hop wrapper:
+        if (hops.length === 0) return "";
+        const inner = composeGlslPath(hops);
+        // Re-wrap composed mapping() as map_hop for further composition:
+        return inner.replace(
+            /vec2\s+mapping\s*\(\s*vec2\s+uv\s*\)/,
+            "vec2 map_hop(vec2 uv)",
+        );
     }
 
     get inverse(): CompositeRegistration {

@@ -18,7 +18,7 @@ export class AffineRegistration implements RegistrationItem {
     }
 
     get glslMapping(): string {
-        return `vec2 mapping(vec2 uv) {
+        return `vec2 map_hop(vec2 uv) {
             mat3 transform = ${mat3(this.M)}
             vec3 transformedUV = transform * vec3(uv * u_size_primary.xy, 1.0);
             vec2 result = transformedUV.xy / transformedUV.z;
