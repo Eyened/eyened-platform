@@ -204,18 +204,14 @@ async def get_current_user(
     if settings.public_auth_disabled:
         # ensure_admin, not a bare lookup: the account is a data superuser only
         # if it is an administrator, and any dump taken before cutover has
-        # IsAdmin false on every row.
+        # IsAdmin false on every row. No password is passed, though: the
+        # bypass never authenticates with one, and passing the configured
+        # admin_password through would overwrite any password an operator
+        # set on this account on every single request.
         creator, _ = ensure_admin(
             session,
             settings.admin_username,
-            # Unwrap at the call site: hash_password is Argon2, which rejects a
-            # non-str, so passing the SecretStr through raises TypeError and the
-            # request 500s. A hasher that stringified its input instead would
-            # hash the wrapper's repr silently -- hence the unwrap, not a cast.
-            # Conditional, because the field is optional.
-            settings.admin_password.get_secret_value()
-            if settings.admin_password is not None
-            else None,
+            None,
         )
         return CurrentUser(
             creator_id=creator.CreatorID, username=creator.CreatorName
