@@ -30,6 +30,8 @@ import fs_minmax_reduction from "./glsl/fs_minmax_reduction.frag";
 import fs_normalize from "./glsl/fs_normalize.frag";
 import fs_extract_slice from "./glsl/fs_extract_slice.frag";
 import type { WebGL } from "./webgl";
+import { applyInserts } from "./shaderTemplate";
+import { composeGlslPath } from "$lib/registration/composeGlslPath";
 
 /** Inject shared segmentation quad outline helpers before main(). */
 function withSegBoundsOutline(fragmentSource: string): string {
@@ -121,7 +123,9 @@ export class Shaders {
         );
         this.renderEnfaceProjection = new TextureShaderProgram(
             webgl,
-            fs_renderEnfaceProjection,
+            applyInserts(fs_renderEnfaceProjection, {
+                mapping: composeGlslPath([]),
+            }),
         );
         this.minMaxReduction = new PixelShaderProgram(
             webgl,
