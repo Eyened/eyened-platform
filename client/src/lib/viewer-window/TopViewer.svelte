@@ -10,6 +10,7 @@
     import MainIcon from "./icons/MainIcon.svelte";
     import Lines from "./icons/Lines.svelte";
     import EnfaceProjectionModeIcon from "./icons/EnfaceProjectionModeIcon.svelte";
+    import { composeGlslPath } from "$lib/registration/composeGlslPath";
 
     interface Props {
         image: AbstractImage;
@@ -60,16 +61,25 @@
     });
 
     $effect(() => {
-        const ctx = enfaceProjectionManager?.mainViewerContext;
-        if (
-            enfaceProjectionManager &&
-            ctx &&
-            viewerContext.enfaceProjectionMode !== "off"
-        ) {
-            return viewerContext.addOverlay(
-                new EnfaceProjectionOverlay(enfaceProjectionManager, ctx),
-            );
+        const manager = enfaceProjectionManager;
+        const ctx = manager?.mainViewerContext;
+        if (!manager || !ctx || viewerContext.enfaceProjectionMode === "off") {
+            return;
         }
+        const mappingGlsl = composeGlslPath([]);
+        return viewerContext.addOverlay(
+            new EnfaceProjectionOverlay([
+                {
+                    octPublicId: publicId,
+                    manager,
+                    mainViewerContext: ctx,
+                    mappingGlsl,
+                    mode: viewerContext.enfaceProjectionMode,
+                    sizePrimary: [image.width, image.height],
+                    sizeSecondary: [image.width, image.height],
+                },
+            ]),
+        );
     });
 
     function toggleLinesOverlay(e: MouseEvent) {
