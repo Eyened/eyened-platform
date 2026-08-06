@@ -6,6 +6,14 @@ classes to HTTP statuses; the ORM only raises them.
 """
 from __future__ import annotations
 
+from .errors import AuthorizationError, NotVisibleError, PermissionDeniedError
 from .roles import ProjectRole
+from .scope import AccessScope
 
-__all__ = ["ProjectRole"]
+__all__ = [
+    "AccessScope",
+    "AuthorizationError",
+    "NotVisibleError",
+    "PermissionDeniedError",
+    "ProjectRole",
+]
