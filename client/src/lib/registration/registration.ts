@@ -163,6 +163,10 @@ export class Registration {
         return new Set(Object.keys(this.shortestPaths[source] ?? {}));
     }
 
+    listDirectTargets(source: string): string[] {
+        return [...this.registrationItems.targets(source)];
+    }
+
     mapPosition(
         source: string,
         target: string,
