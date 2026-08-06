@@ -13,6 +13,7 @@ from hashlib import pbkdf2_hmac
 from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
+from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
@@ -201,20 +202,22 @@ async def get_current_user(
     """Get the current authenticated user from either Authorization header or cookies."""
     # Bypass authentication if disabled (development mode)
     if settings.public_auth_disabled:
-        creator = (
-            session.query(Creator)
-            .where(Creator.CreatorName == settings.admin_username)
-            .first()
+        # ensure_admin, not a bare lookup: the account is a data superuser only
+        # if it is an administrator, and any dump taken before cutover has
+        # IsAdmin false on every row.
+        creator, _ = ensure_admin(
+            session,
+            settings.admin_username,
+            # Unwrap at the call site: create_user/hash_password hash whatever
+            # they are handed, so passing the SecretStr through would hash the
+            # wrapper's repr and create an account whose real password nobody
+            # can ever know. Conditional, because the field is optional.
+            settings.admin_password.get_secret_value()
+            if settings.admin_password is not None
+            else None,
         )
-        if not creator:
-            # Should not happen if init_admin ran; ensure dev usability
-            creator = create_user(
-                session, settings.admin_username, settings.admin_password
-            )
         return CurrentUser(
-            creator_id=creator.CreatorID,
-            username=creator.CreatorName,
-            role=creator.Role,
+            creator_id=creator.CreatorID, username=creator.CreatorName
         )
 
     # Try Authorization header first (for API clients)

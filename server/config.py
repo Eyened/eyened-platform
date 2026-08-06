@@ -126,6 +126,15 @@ class Settings(BaseSettings):
     )
     debug: bool = False
     public_auth_disabled: bool = False
+    # Names the account the dev-auth bypass logs in as, and the account
+    # `eorm init-admin` bootstraps. Two places naming the same account that
+    # disagree is the failure dev/sample.env's note exists to prevent.
+    admin_username: str = Field(default="admin", min_length=1)
+    # Optional on purpose: the dev bypass never posts credentials, so requiring
+    # one would make every deployment configure a secret nothing uses. A None
+    # password means password login is disabled for the bootstrapped account,
+    # which is the correct outcome, not an error.
+    admin_password: SecretStr | None = None
     auth_password_enabled: bool = True
     auth_oidc_enabled: bool = False
     secret_key: SecretStr = ""

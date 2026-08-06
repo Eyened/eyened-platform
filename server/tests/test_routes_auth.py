@@ -186,3 +186,60 @@ def test_check_oidc_login_migrates_non_subject_identifier_but_does_not_commit(se
     session.rollback()  # get_db does this in production on a later exception
     reloaded = session.get(Creator, creator_id)
     assert reloaded.EmployeeIdentifier == "oidc:email:old@example.com"
+
+
+def test_dev_bypass_promotes_the_configured_account_to_administrator(
+    session, monkeypatch
+):
+    """Otherwise a pre-cutover dump shows a developer an empty platform."""
+    from fastapi.testclient import TestClient
+
+    import server.db as server_db
+    from server.config import Settings
+    from server.main import app_api
+    from server.tests.conftest import _SessionBoundDatabase
+
+    monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
+    monkeypatch.setattr(
+        "server.routes.auth.settings",
+        Settings(public_auth_disabled=True, admin_username="devadmin"),
+    )
+
+    with TestClient(app_api) as client:
+        resp = client.get("/auth/me")
+
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "devadmin"
+
+    from eyened_orm import Creator
+    from sqlalchemy import select
+
+    creator = session.scalars(
+        select(Creator).where(Creator.CreatorName == "devadmin")
+    ).first()
+    assert creator.IsAdmin is True
+
+
+def test_dev_bypass_works_with_no_admin_password_configured(session, monkeypatch):
+    """Regression for a specific AttributeError, not a feature test.
+
+    ``admin_password`` defaults to None, so an unconditional
+    ``.get_secret_value()`` raises -- the *same* failure mode as reading a
+    setting that does not exist, on the *same* code path.
+    """
+    from fastapi.testclient import TestClient
+
+    import server.db as server_db
+    from server.config import Settings
+    from server.main import app_api
+    from server.tests.conftest import _SessionBoundDatabase
+
+    monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
+    monkeypatch.setattr(
+        "server.routes.auth.settings",
+        Settings(public_auth_disabled=True, admin_username="devadmin"),
+    )
+    assert Settings().admin_password is None
+
+    with TestClient(app_api) as client:
+        assert client.get("/auth/me").status_code == 200

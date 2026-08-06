@@ -70,6 +70,16 @@ def _register_model_commands():
 _register_model_commands()
 
 
+def _register_rbac_commands():
+    from .commands.rbac import rbac_commands
+
+    for command in rbac_commands:
+        eorm.add_command(command)
+
+
+_register_rbac_commands()
+
+
 @eorm.command()
 @click.option("--recreate", is_flag=True, default=False, help="Drop and create the database before creating the models")
 @click.option(
