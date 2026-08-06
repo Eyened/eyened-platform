@@ -26,7 +26,7 @@ class ProjectMember(Base):
     __tablename__ = "ProjectMember"
 
     CreatorID: Mapped[int] = mapped_column(
-        ForeignKey("Creator.CreatorID", ondelete="CASCADE"), primary_key=True
+        ForeignKey("Creator.CreatorID", ondelete="RESTRICT"), primary_key=True
     )
     ProjectID: Mapped[int] = mapped_column(
         ForeignKey("Project.ProjectID", ondelete="CASCADE"), primary_key=True

@@ -34,7 +34,7 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["CreatorID"], ["Creator.CreatorID"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["CreatorID"], ["Creator.CreatorID"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["ProjectID"], ["Project.ProjectID"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("CreatorID", "ProjectID"),
     )
