@@ -9,7 +9,7 @@ from __future__ import annotations
 from .errors import AuthorizationError, NotVisibleError, PermissionDeniedError
 from .roles import ProjectRole
 from .scope import AccessScope
-from .scoping import PROJECT_IDS_OF, projects_of
+from .scoping import PROJECT_IDS_OF, apply_scope, projects_of
 
 __all__ = [
     "PROJECT_IDS_OF",
@@ -18,5 +18,6 @@ __all__ = [
     "NotVisibleError",
     "PermissionDeniedError",
     "ProjectRole",
+    "apply_scope",
     "projects_of",
 ]
