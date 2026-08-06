@@ -2,7 +2,7 @@ import type { EnfaceProjectionMode } from "$lib/viewer/viewer-utils";
 import type { EnfaceProjectionManager } from "$lib/viewer-window/enfaceProjectionManager.svelte";
 import { AffineRegistration } from "./affine";
 import { composeGlslPath } from "./composeGlslPath";
-import type { Registration } from "./registration";
+import type { Registration } from "./registration.svelte";
 
 export type EnfaceOverlaySourceResolved = {
     octPublicId: string;
@@ -18,6 +18,12 @@ export function resolveEnfaceOverlaySources(args: {
     imageWidth: number;
     imageHeight: number;
     registration: Registration;
+    /**
+     * `Registration.revision`. Deliberately unused here: passing it in makes
+     * reactive callers depend on it, so their derived sources re-resolve when
+     * registration items import after the viewer already mounted.
+     */
+    registrationRevision?: number;
     managers: ReadonlyMap<string, EnfaceProjectionManager>;
     /** Mode for the real _proj viewer (single source). */
     projMode: EnfaceProjectionMode;

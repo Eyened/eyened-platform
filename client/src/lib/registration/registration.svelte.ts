@@ -37,10 +37,22 @@ class Mapper<T> {
 }
 
 export class Registration {
+    /**
+     * Bumped whenever registration items are imported or paths are recomputed.
+     * The graph is mutated in place and keeps growing after viewers mount (photo
+     * locators load per image, patient-level sets load later still), so reactive
+     * consumers need a signal to re-query it.
+     */
+    revision = $state(0);
+
     private pointer: Pointer = {
         image_id: "",
         position: { x: 0, y: 0, index: 0 },
     };
+    // The graph and its caches are queried imperatively (RAF repaint, pointer
+    // mapping), never read from $effect/$derived directly — `revision` above is
+    // the reactive signal — so SvelteMap/SvelteSet would only add proxy cost.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- see above
     private cache = new Map<string, Position | undefined>();
 
     private readonly mappings = new Mapper<mappingFunction>();
@@ -114,6 +126,7 @@ export class Registration {
             if (!this.pathsDirty) return;
             this.pathsDirty = false;
             this.shortestPaths = allPairsShortestPaths(this.mappings);
+            this.revision++;
         });
     }
 
@@ -122,6 +135,7 @@ export class Registration {
         this.pathsDirty = false;
         this.recomputeScheduled = false;
         this.shortestPaths = allPairsShortestPaths(this.mappings);
+        this.revision++;
     }
 
     async addImage(image: AbstractImage, photoLocators: PhotoLocator[]) {
@@ -150,6 +164,7 @@ export class Registration {
         }
         this.pathsDirty = true;
         this.scheduleRecompute();
+        this.revision++;
     }
 
     /** Import all patient-level registration pairs and recompute paths for transitive linking. */
@@ -160,6 +175,7 @@ export class Registration {
     }
 
     getLinkedImgIds(source: string): Set<string> {
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- plain query result
         return new Set(Object.keys(this.shortestPaths[source] ?? {}));
     }
 
@@ -186,6 +202,8 @@ export class Registration {
     }
 }
 
+// Local BFS scratch state — never observed reactively.
+/* eslint-disable svelte/prefer-svelte-reactivity */
 function allPairsShortestPaths(graph: Mapper<mappingFunction>): {
     [node: string]: { [node: string]: string[] };
 } {

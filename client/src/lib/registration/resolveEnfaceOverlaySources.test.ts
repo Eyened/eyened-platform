@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Registration } from "./registration";
+import { Registration } from "./registration.svelte";
 import { AffineRegistration } from "./affine";
 import { ParabolicRegistration } from "./parabolic";
 import { Matrix } from "$lib/matrix";

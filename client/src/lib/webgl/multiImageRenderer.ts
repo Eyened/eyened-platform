@@ -2,7 +2,7 @@ import { TextureShaderProgram } from "$lib/webgl/FragmentShaderProgram";
 import type { Image2D } from "$lib/webgl/image2D";
 import type { WebGL } from "./webgl";
 import type { RenderTarget } from "./types";
-import type { Registration } from "$lib/registration/registration";
+import type { Registration } from "$lib/registration/registration.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { composeGlslPath } from "$lib/registration/composeGlslPath";
 import fs_redblue from "./multiImageFragment/redblue.frag";

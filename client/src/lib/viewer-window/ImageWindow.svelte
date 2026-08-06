@@ -1,7 +1,7 @@
 <script lang="ts">
     import { ImageLoader } from "$lib/data-loading/imageLoader";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { Registration } from "$lib/registration/registration";
+    import { Registration } from "$lib/registration/registration.svelte";
     import type { WebGL } from "$lib/webgl/webgl";
     import { getContext, setContext } from "svelte";
     import type { ImageGET } from "../../types/openapi_types";

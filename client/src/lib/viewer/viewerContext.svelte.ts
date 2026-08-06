@@ -5,7 +5,7 @@ import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
 import type { Shaders } from "$lib/webgl/shaders";
 import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
-import type { Registration } from "../registration/registration";
+import type { Registration } from "../registration/registration.svelte";
 import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
 import { HotKeys } from "./controls/hotkeys";
 import { ScrollOCT } from "./controls/scrollOCT";
