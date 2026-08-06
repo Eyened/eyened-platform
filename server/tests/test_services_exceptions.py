@@ -125,7 +125,9 @@ def test_a_denial_is_logged_with_the_facts_the_response_omits(caplog):
             client.get("/boom")
 
     assert any(
-        '"actor_id": 7' in r.message and '"entity": "Task"' in r.message
+        '"actor_id": 7' in r.message
+        and '"entity": "Task"' in r.message
+        and '"projects": [3]' in r.message
         for r in caplog.records
     )
 
