@@ -7,10 +7,19 @@ export function applyInserts(
 ): string {
     let out = template;
     for (const [name, code] of Object.entries(inserts)) {
-        const marker = `// @insert ${name}`;
-        if (!out.includes(marker)) {
+        // vite-plugin-glsl strips ordinary `//` comments; `///` is preserved.
+        // Check the triple-slash form first — `// @insert X` is a substring of
+        // `/// @insert X`, so matching single-slash first would leave a stray `/`.
+        const triple = `/// @insert ${name}`;
+        const single = `// @insert ${name}`;
+        const marker = out.includes(triple)
+            ? triple
+            : out.includes(single)
+              ? single
+              : null;
+        if (!marker) {
             throw new Error(
-                `applyInserts: template missing slot "// @insert ${name}"`,
+                `applyInserts: template missing slot "// @insert ${name}" or "/// @insert ${name}"`,
             );
         }
         out = out.split(marker).join(code);

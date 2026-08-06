@@ -31,7 +31,7 @@ vec3 heatmap(float value) {
     return c4;
 }
 
-// @insert mapping
+/// @insert mapping
 
 void main() {
     color_out = vec4(0.0);

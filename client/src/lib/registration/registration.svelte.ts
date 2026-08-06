@@ -6,6 +6,7 @@ import {
     type PhotoLocator,
 } from "./photoLocators";
 import { OCTToProj, ProjToOCT } from "./projectionRegistration";
+import { enfaceToProjRegistrationItems } from "./enfaceToProj";
 import type { mappingFunction, RegistrationItem } from "./registrationItem";
 import { getRegistrationSets, type RegistrationSet } from "./registrationItem";
 
@@ -152,6 +153,15 @@ export class Registration {
         if (image.is3D) {
             items.push(new OCTToProj(image.instance));
             items.push(new ProjToOCT(image.instance));
+            // Direct enface → `_proj` GPU hops (patient affines never target `_proj`).
+            items.push(
+                ...enfaceToProjRegistrationItems(
+                    photoLocators,
+                    `${image.instance.id}`,
+                    image.width,
+                    image.depth,
+                ),
+            );
         }
         this.importRegistrationItems(items);
     }
@@ -186,6 +196,11 @@ export class Registration {
     getLinkedImgIds(source: string): Set<string> {
         // eslint-disable-next-line svelte/prefer-svelte-reactivity -- plain query result
         return new Set(Object.keys(this.shortestPaths[source] ?? {}));
+    }
+
+    /** Shortest path node ids inclusive, or undefined if unreachable. */
+    getPath(source: string, target: string): string[] | undefined {
+        return this.shortestPaths[source]?.[target];
     }
 
     listDirectTargets(source: string): string[] {

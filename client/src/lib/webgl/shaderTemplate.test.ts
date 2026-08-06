@@ -33,6 +33,16 @@ describe("applyInserts", () => {
         expect(out).not.toContain("@insert");
     });
 
+    it("prefers /// @insert so vite-plugin-glsl-preserved markers work", () => {
+        // vite-plugin-glsl strips `//` comments but keeps `///`.
+        const template = `A\n/// @insert mapping\nB`;
+        const out = applyInserts(template, {
+            mapping: "vec2 mapping(vec2 uv) { return uv; }",
+        });
+        expect(out).toBe("A\nvec2 mapping(vec2 uv) { return uv; }\nB");
+        expect(out).not.toMatch(/^\//m);
+    });
+
     it("throws if a slot is missing from the template", () => {
         expect(() => applyInserts("no slots", { mapping: "x" })).toThrow(
             /mapping/,

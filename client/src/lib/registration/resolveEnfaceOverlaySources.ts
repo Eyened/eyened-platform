@@ -1,6 +1,6 @@
 import type { EnfaceProjectionMode } from "$lib/viewer/viewer-utils";
 import type { EnfaceProjectionManager } from "$lib/viewer-window/enfaceProjectionManager.svelte";
-import { AffineRegistration } from "./affine";
+import { bakeHopGlsl } from "./enfaceToProj";
 import { composeGlslPath } from "./composeGlslPath";
 import type { Registration } from "./registration.svelte";
 
@@ -25,6 +25,8 @@ export function resolveEnfaceOverlaySources(args: {
      */
     registrationRevision?: number;
     managers: ReadonlyMap<string, EnfaceProjectionManager>;
+    /** Pixel size lookup for intermediate path nodes (and current image). */
+    getImageSize: (imageId: string) => [number, number] | undefined;
     /** Mode for the real _proj viewer (single source). */
     projMode: EnfaceProjectionMode;
     /** Per-OCT modes for linked viewers; missing key ⇒ "off". */
@@ -51,29 +53,52 @@ export function resolveEnfaceOverlaySources(args: {
     }
 
     const sources: EnfaceOverlaySourceResolved[] = [];
-    for (const target of args.registration.listDirectTargets(args.imageId)) {
-        if (!target.endsWith("_proj")) {
+    for (const [octPublicId, manager] of args.managers) {
+        const projId = `${octPublicId}_proj`;
+        const path = args.registration.getPath(args.imageId, projId);
+        if (!path || path.length < 2) {
             continue;
         }
-        const item = args.registration.getRegistrationItem(
-            args.imageId,
-            target,
-        );
-        if (!(item instanceof AffineRegistration) || !item.glslMapping.trim()) {
+
+        const projSize: [number, number] = [
+            manager.octImage.width,
+            manager.octImage.depth,
+        ];
+        const hops: string[] = [];
+        let ok = true;
+        for (let i = 0; i < path.length - 1; i++) {
+            const from = path[i];
+            const to = path[i + 1];
+            const item = args.registration.getRegistrationItem(from, to);
+            if (!item) {
+                ok = false;
+                break;
+            }
+            const srcSize =
+                from === args.imageId ? sizePrimary : args.getImageSize(from);
+            const dstSize = to === projId ? projSize : args.getImageSize(to);
+            if (!srcSize || !dstSize) {
+                ok = false;
+                break;
+            }
+            const hop = bakeHopGlsl(item, srcSize, dstSize);
+            if (!hop) {
+                ok = false;
+                break;
+            }
+            hops.push(hop);
+        }
+        if (!ok) {
             continue;
         }
-        const octPublicId = target.slice(0, -"_proj".length);
-        const manager = args.managers.get(octPublicId);
-        if (!manager) {
-            continue;
-        }
+
         sources.push({
             octPublicId,
             manager,
-            mappingGlsl: composeGlslPath([item.glslMapping]),
+            mappingGlsl: composeGlslPath(hops),
             mode: args.linkedModes.get(octPublicId) ?? "off",
             sizePrimary,
-            sizeSecondary: [manager.octImage.width, manager.octImage.depth],
+            sizeSecondary: projSize,
         });
     }
     return sources;

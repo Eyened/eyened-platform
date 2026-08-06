@@ -11,6 +11,7 @@
     import Lines from "./icons/Lines.svelte";
     import EnfaceProjectionModeIcon from "./icons/EnfaceProjectionModeIcon.svelte";
     import { resolveEnfaceOverlaySources } from "$lib/registration/resolveEnfaceOverlaySources";
+    import { instances } from "$lib/data/stores.svelte";
 
     interface Props {
         image: AbstractImage;
@@ -41,6 +42,26 @@
             registration: viewerWindowContext.registration,
             registrationRevision,
             managers: viewerWindowContext.enfaceProjectionManagers,
+            getImageSize: (id) => {
+                for (const [img] of viewerWindowContext.topViewers) {
+                    if (img.image_id === id) {
+                        return [img.width, img.height];
+                    }
+                }
+                if (id.endsWith("_proj")) {
+                    const octId = id.slice(0, -"_proj".length);
+                    const mgr =
+                        viewerWindowContext.enfaceProjectionManagers.get(octId);
+                    if (mgr) {
+                        return [mgr.octImage.width, mgr.octImage.depth];
+                    }
+                }
+                const meta = instances.get(id);
+                if (meta) {
+                    return [meta.columns, meta.rows];
+                }
+                return undefined;
+            },
             projMode: viewerContext.enfaceProjectionMode,
             linkedModes: viewerContext.enfaceProjectionModesByOct,
         }),
