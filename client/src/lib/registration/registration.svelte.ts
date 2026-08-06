@@ -1,3 +1,4 @@
+import { untrack } from "svelte";
 import type { Position } from "$lib/types";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import {
@@ -118,6 +119,14 @@ export class Registration {
         return currentPosition;
     }
 
+    private bumpRevision() {
+        // `revision++` both reads and writes. Callers often run from `$effect`
+        // (RegistrationItemLoader), and a tracked read would re-subscribe that
+        // effect to revision → infinite loop. Untrack the read so only explicit
+        // consumers (TopViewer `$derived`) depend on the signal.
+        this.revision = untrack(() => this.revision) + 1;
+    }
+
     private scheduleRecompute() {
         if (this.recomputeScheduled) return;
         this.recomputeScheduled = true;
@@ -126,7 +135,7 @@ export class Registration {
             if (!this.pathsDirty) return;
             this.pathsDirty = false;
             this.shortestPaths = allPairsShortestPaths(this.mappings);
-            this.revision++;
+            this.bumpRevision();
         });
     }
 
@@ -135,7 +144,7 @@ export class Registration {
         this.pathsDirty = false;
         this.recomputeScheduled = false;
         this.shortestPaths = allPairsShortestPaths(this.mappings);
-        this.revision++;
+        this.bumpRevision();
     }
 
     async addImage(image: AbstractImage, photoLocators: PhotoLocator[]) {
@@ -164,7 +173,7 @@ export class Registration {
         }
         this.pathsDirty = true;
         this.scheduleRecompute();
-        this.revision++;
+        this.bumpRevision();
     }
 
     /** Import all patient-level registration pairs and recompute paths for transitive linking. */
