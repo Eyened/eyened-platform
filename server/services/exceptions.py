@@ -8,8 +8,17 @@ a subclass with a ``status_code`` — no per-route wiring.
 
 from __future__ import annotations
 
+import json
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+
+from eyened_orm.authz.errors import (
+    AuthorizationError,
+    NotVisibleError,
+    PermissionDeniedError,
+)
 
 
 class ServiceError(Exception):
@@ -55,6 +64,19 @@ def service_error_to_response(exc: ServiceError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
+_AUTHZ_STATUS: dict[type[AuthorizationError], int] = {
+    NotVisibleError: 404,
+    PermissionDeniedError: 403,
+}
+_AUTHZ_BODY = {404: "Not found", 403: "Forbidden"}
+_DENIAL_LOGGER = logging.getLogger("eyened.authz")
+
+
+def _authz_status(exc: AuthorizationError) -> int:
+    """403 for anything not in the map: a denial must never fail open."""
+    return _AUTHZ_STATUS.get(type(exc), 403)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register a single handler that maps every ServiceError subclass.
 
@@ -66,3 +88,30 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(ServiceError)
     async def _handle_service_error(request: Request, exc: ServiceError) -> JSONResponse:
         return service_error_to_response(exc)
+
+    @app.exception_handler(AuthorizationError)
+    async def _handle_authorization_error(
+        request: Request, exc: AuthorizationError
+    ) -> JSONResponse:
+        """404/403 by visibility, with the facts in the log rather than the body.
+
+        This is not AuditLog: denials are operational, not attributable state
+        changes. It is the only record that a boundary was tested.
+        """
+        status_code = _authz_status(exc)
+        _DENIAL_LOGGER.info(
+            json.dumps(
+                {
+                    "actor_id": exc.actor_id,
+                    "entity": exc.entity,
+                    "entity_id": exc.entity_id,
+                    "projects": sorted(exc.projects),
+                    "path": request.url.path,
+                    "method": request.method,
+                    "status": status_code,
+                }
+            )
+        )
+        return JSONResponse(
+            status_code=status_code, content={"detail": _AUTHZ_BODY[status_code]}
+        )
