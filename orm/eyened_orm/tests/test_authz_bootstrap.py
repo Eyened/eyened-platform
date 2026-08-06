@@ -70,7 +70,7 @@ def test_reactivate_is_opt_in(session):
 
 def test_count_admins_ignores_deactivated_administrators(session):
     """The last-admin guard must not count someone who cannot make requests."""
-    first, _ = ensure_admin(session, "root", None)
+    _, _ = ensure_admin(session, "root", None)
     second, _ = ensure_admin(session, "root2", None)
     assert count_admins(session) == 2
     second.Inactive = True

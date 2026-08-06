@@ -1,6 +1,7 @@
 from hashlib import pbkdf2_hmac
 from types import SimpleNamespace
 
+import pytest
 from eyened_orm import AuditLog, Creator
 from eyened_orm.utils.db_users import hash_password
 
@@ -220,16 +221,37 @@ def test_dev_bypass_promotes_the_configured_account_to_administrator(
     assert creator.IsAdmin is True
 
 
-def test_dev_bypass_works_with_no_admin_password_configured(session, monkeypatch):
-    """Regression for a specific AttributeError, not a feature test.
+@pytest.mark.parametrize(
+    "configured_password",
+    [None, "pw"],
+    ids=["no_password_configured", "password_configured"],
+)
+def test_dev_bypass_handles_the_configured_admin_password_correctly(
+    session, monkeypatch, configured_password
+):
+    """Covers both branches of the ``.get_secret_value()`` unwrap at
+    ``server/routes/auth.py:214-217``.
 
-    ``admin_password`` defaults to None, so an unconditional
-    ``.get_secret_value()`` raises -- the *same* failure mode as reading a
-    setting that does not exist, on the *same* code path.
+    ``no_password_configured`` is a regression test for a specific
+    AttributeError: ``admin_password`` defaults to None, and an unconditional
+    ``.get_secret_value()`` call raises on that default -- the same failure
+    mode as reading a Settings field that does not exist, on the same code
+    path.
+
+    ``password_configured`` is what makes the unwrap itself load-bearing: it
+    asserts the password was stored *unwrapped* (``verify_password`` against
+    the plaintext succeeds). Without it, deleting ``.get_secret_value()`` --
+    so a ``SecretStr`` is passed straight to ``create_user``/``hash_password``
+    -- would hash the wrapper's repr instead of the password and stay green,
+    because the only other dev-bypass test never configures a password.
     """
     from fastapi.testclient import TestClient
+    from pydantic import SecretStr
+    from sqlalchemy import select
 
     import server.db as server_db
+    from eyened_orm import Creator
+    from eyened_orm.utils.db_users import verify_password
     from server.config import Settings
     from server.main import app_api
     from server.tests.conftest import _SessionBoundDatabase
@@ -237,9 +259,20 @@ def test_dev_bypass_works_with_no_admin_password_configured(session, monkeypatch
     monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
     monkeypatch.setattr(
         "server.routes.auth.settings",
-        Settings(public_auth_disabled=True, admin_username="devadmin"),
+        Settings(
+            public_auth_disabled=True,
+            admin_username="devadmin",
+            admin_password=(
+                SecretStr(configured_password) if configured_password else None
+            ),
+        ),
     )
-    assert Settings().admin_password is None
 
     with TestClient(app_api) as client:
         assert client.get("/auth/me").status_code == 200
+
+    if configured_password is not None:
+        creator = session.scalars(
+            select(Creator).where(Creator.CreatorName == "devadmin")
+        ).first()
+        assert verify_password(configured_password, creator.PasswordHash)

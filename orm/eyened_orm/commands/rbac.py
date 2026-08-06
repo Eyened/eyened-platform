@@ -53,11 +53,20 @@ def init_admin(username: str, password: str | None) -> None:
     database = get_database()
     with database.get_session() as session:
         creator, outcome = ensure_admin(session, username, password)
+        match outcome:
+            case BootstrapOutcome.unchanged:
+                pass
+            case BootstrapOutcome.created:
+                action = "INSERT"
+            case BootstrapOutcome.promoted | BootstrapOutcome.reactivated:
+                action = "UPDATE"
+            case _:
+                raise ValueError(f"unhandled BootstrapOutcome: {outcome!r}")
         if outcome is not BootstrapOutcome.unchanged:
             _audit(
                 session,
                 command="init-admin",
-                action="UPDATE" if outcome is not BootstrapOutcome.created else "INSERT",
+                action=action,
                 entity="Creator",
                 entity_id=creator.CreatorID,
                 changes={
