@@ -1,6 +1,6 @@
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import { getBaseUniforms } from "$lib/webgl/imageRenderer";
-import { ShaderTemplateCache } from "$lib/webgl/shaderTemplate";
+import { getShaderTemplateCache } from "$lib/webgl/shaderTemplate";
 import type { RenderTarget } from "$lib/webgl/types";
 import fs_render_enface_projection from "./fs_render_enface_projection.frag";
 import type { Overlay } from "../viewer-utils";
@@ -12,12 +12,11 @@ export type EnfaceOverlayPaintSource = EnfaceOverlaySourceResolved & {
 };
 
 export class EnfaceProjectionOverlay implements Overlay {
-    private readonly programs = new ShaderTemplateCache();
-
     constructor(readonly sources: EnfaceOverlayPaintSource[]) {}
 
     repaint(viewerContext: ViewerContext, renderTarget: RenderTarget): void {
         const base = getBaseUniforms(viewerContext);
+        const programs = getShaderTemplateCache(viewerContext.image.webgl);
 
         for (const source of this.sources) {
             if (source.mode === "off" || !source.mainViewerContext) {
@@ -26,12 +25,15 @@ export class EnfaceProjectionOverlay implements Overlay {
 
             let program;
             try {
-                program = this.programs.getOrCompile(
+                program = programs.getOrCompile(
                     viewerContext.image.webgl,
                     fs_render_enface_projection,
                     { mapping: source.mappingGlsl },
                 );
             } catch {
+                continue;
+            }
+            if (!program) {
                 continue;
             }
 

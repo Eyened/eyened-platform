@@ -32,6 +32,11 @@ export class ProgramInfo {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const log = gl.getProgramInfoLog(program);
+            gl.deleteProgram(program);
+            throw new Error(`Program link failed: ${log ?? "no log"}`);
+        }
 
         this.program = program;
 

@@ -39,16 +39,18 @@ function fnv1a(s: string): string {
 }
 
 export class ShaderTemplateCache {
-    private readonly cache = new Map<string, TextureShaderProgram>();
+    /** `null` marks a key that already failed to compile, so we never retry it. */
+    private readonly cache = new Map<string, TextureShaderProgram | null>();
 
     getOrCompile(
         webgl: WebGL,
         template: string,
         inserts: Record<string, string>,
-    ): TextureShaderProgram {
+    ): TextureShaderProgram | null {
         const key = shaderCacheKey(template, inserts);
-        const hit = this.cache.get(key);
-        if (hit) return hit;
+        if (this.cache.has(key)) {
+            return this.cache.get(key)!;
+        }
 
         try {
             const source = applyInserts(template, inserts);
@@ -56,8 +58,25 @@ export class ShaderTemplateCache {
             this.cache.set(key, program);
             return program;
         } catch (err) {
+            this.cache.set(key, null);
             console.error("ShaderTemplateCache: compile failed", err);
             throw err;
         }
     }
+}
+
+const cachesByWebGL = new WeakMap<WebGL, ShaderTemplateCache>();
+
+/**
+ * Shader programs are tied to a GL context, not to whoever asked for them.
+ * Keying the cache on the `WebGL` instance lets short-lived consumers (overlays
+ * that get recreated whenever their props change) reuse compiled programs.
+ */
+export function getShaderTemplateCache(webgl: WebGL): ShaderTemplateCache {
+    let cache = cachesByWebGL.get(webgl);
+    if (!cache) {
+        cache = new ShaderTemplateCache();
+        cachesByWebGL.set(webgl, cache);
+    }
+    return cache;
 }
