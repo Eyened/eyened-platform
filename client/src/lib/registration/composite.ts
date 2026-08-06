@@ -1,6 +1,8 @@
 import type { Position } from "$lib/types";
 import type { RegistrationItem } from "./registrationItem";
-import { composeGlslPath } from "./composeGlslPath";
+
+const MAP_HOP_DECL = /vec2\s+map_hop\s*\(\s*vec2\s+uv\s*\)/g;
+const NUMBERED_MAP_DECL = /vec2\s+map_(\d+)\s*\(\s*vec2\s+uv\s*\)/g;
 
 /**
  * CompositeRegistration is a class that represents a composite registration
@@ -29,16 +31,32 @@ export class CompositeRegistration implements RegistrationItem {
         const hops = this.transforms
             .map((t) => t.glslMapping)
             .filter((s) => s.trim().length > 0);
-        // CompositeRegistration still exposes a single mapping() for consumers
-        // that expect RegistrationItem.glslMapping to be composable as one hop.
-        // For multi-transform edges, bake the chain into one map_hop wrapper:
         if (hops.length === 0) return "";
-        const inner = composeGlslPath(hops);
-        // Re-wrap composed mapping() as map_hop for further composition:
-        return inner.replace(
-            /vec2\s+mapping\s*\(\s*vec2\s+uv\s*\)/,
-            "vec2 map_hop(vec2 uv)",
+
+        const reserved = new Set(
+            hops.flatMap((hop) =>
+                [...hop.matchAll(NUMBERED_MAP_DECL)].map((match) =>
+                    Number(match[1]),
+                ),
+            ),
         );
+        const helperNames: string[] = [];
+        let nextIndex = 0;
+        const helpers = hops.map((hop) => {
+            while (reserved.has(nextIndex)) nextIndex++;
+            const helperName = `map_${nextIndex}`;
+            reserved.add(nextIndex);
+            nextIndex++;
+            helperNames.push(helperName);
+            return hop.replace(MAP_HOP_DECL, `vec2 ${helperName}(vec2 uv)`);
+        });
+        let wrapper = "vec2 map_hop(vec2 uv) {\n";
+        for (const helperName of helperNames) {
+            wrapper += `  uv = ${helperName}(uv);\n`;
+        }
+        wrapper += "  return uv;\n}";
+
+        return `${helpers.join("\n")}\n${wrapper}`;
     }
 
     get inverse(): CompositeRegistration {
