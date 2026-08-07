@@ -23,6 +23,7 @@ function source(
     mode: EnfaceOverlayPaintSource["mode"],
     mappingGlsl: string,
     alpha = 0.5,
+    identityMapping = false,
 ): EnfaceOverlayPaintSource {
     return {
         octPublicId: mappingGlsl,
@@ -43,6 +44,7 @@ function source(
         mode,
         sizePrimary: [200, 100],
         sizeSecondary: [50, 25],
+        identityMapping,
     };
 }
 
@@ -92,6 +94,7 @@ describe("EnfaceProjectionOverlay", () => {
             expect.objectContaining({
                 u_base: "base",
                 u_mode: 0,
+                u_nearest_sample: 0,
                 u_min_thickness: 0,
                 u_max_thickness: 1,
                 u_alpha: 0.2,
@@ -103,8 +106,45 @@ describe("EnfaceProjectionOverlay", () => {
             renderTarget,
             expect.objectContaining({
                 u_mode: 1,
+                u_nearest_sample: 0,
                 u_min_thickness: 2,
                 u_max_thickness: 8,
+            }),
+        );
+    });
+
+    it("uses nearest thickness sampling only for identity _proj binary", () => {
+        const binaryPass = vi.fn();
+        const heatmapPass = vi.fn();
+        compileShaderTemplate
+            .mockReturnValueOnce({ pass: binaryPass })
+            .mockReturnValueOnce({ pass: heatmapPass });
+
+        const overlay = new EnfaceProjectionOverlay(
+            [
+                source("binary", "proj-id", 0.5, true),
+                source("heatmap", "proj-heat", 0.5, true),
+            ],
+            webgl,
+        );
+
+        overlay.repaint(
+            { image: { webgl } } as unknown as ViewerContext,
+            {} as RenderTarget,
+        );
+
+        expect(binaryPass).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                u_mode: 0,
+                u_nearest_sample: 1,
+            }),
+        );
+        expect(heatmapPass).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                u_mode: 1,
+                u_nearest_sample: 0,
             }),
         );
     });

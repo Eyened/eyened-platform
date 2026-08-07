@@ -60,6 +60,9 @@ export class EnfaceProjectionOverlay implements Overlay {
             }
 
             const renderAsHeatmap = source.mode === "heatmap";
+            // Nearest only for identity `_proj` binary — avoid LINEAR row bleed.
+            const nearestSample =
+                source.identityMapping && !renderAsHeatmap ? 1 : 0;
             for (const { projection, color, layerAlpha } of projections) {
                 const thicknessRange = renderAsHeatmap
                     ? projection.getThicknessRange()
@@ -72,6 +75,7 @@ export class EnfaceProjectionOverlay implements Overlay {
                     u_max_thickness: thicknessRange.max,
                     u_alpha: layerAlpha * source.mainViewerContext.alpha,
                     u_mode: renderAsHeatmap ? 1 : 0,
+                    u_nearest_sample: nearestSample,
                     u_outline: false,
                     u_size_primary: source.sizePrimary,
                     u_size_secondary: source.sizeSecondary,

@@ -11,6 +11,8 @@ export type EnfaceOverlaySourceResolved = {
     mode: EnfaceProjectionMode;
     sizePrimary: [number, number];
     sizeSecondary: [number, number];
+    /** True for the real `_proj` viewer (identity UV); linked hops stay false. */
+    identityMapping: boolean;
 };
 
 export function resolveEnfaceOverlaySources(args: {
@@ -48,6 +50,7 @@ export function resolveEnfaceOverlaySources(args: {
                 mode: args.projMode,
                 sizePrimary,
                 sizeSecondary: sizePrimary,
+                identityMapping: true,
             },
         ];
     }
@@ -99,6 +102,7 @@ export function resolveEnfaceOverlaySources(args: {
             mode: args.linkedModes.get(octPublicId) ?? "off",
             sizePrimary,
             sizeSecondary: projSize,
+            identityMapping: false,
         });
     }
     return sources;

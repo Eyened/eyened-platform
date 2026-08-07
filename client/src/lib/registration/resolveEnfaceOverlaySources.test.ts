@@ -42,6 +42,7 @@ describe("resolveEnfaceOverlaySources", () => {
         expect(sources[0].octPublicId).toBe("oct1");
         expect(sources[0].mappingGlsl).toContain("return uv;");
         expect(sources[0].mode).toBe("binary");
+        expect(sources[0].identityMapping).toBe(true);
     });
 
     it("includes direct affine and parabolic edges to _proj", () => {
@@ -85,8 +86,10 @@ describe("resolveEnfaceOverlaySources", () => {
         expect(byOct.oct1.mappingGlsl).toContain("map_0");
         expect(byOct.oct1.sizePrimary).toEqual([200, 200]);
         expect(byOct.oct1.sizeSecondary).toEqual([100, 50]);
+        expect(byOct.oct1.identityMapping).toBe(false);
         expect(byOct.oct2.mode).toBe("off");
         expect(byOct.oct2.mappingGlsl).toContain("dx_val");
+        expect(byOct.oct2.identityMapping).toBe(false);
     });
 
     it("composes affine + enface→proj along a multi-hop path", () => {
