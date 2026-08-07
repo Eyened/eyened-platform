@@ -19,8 +19,20 @@ SRC="$DEPLOY_DIR/storage-mounts.conf"
 COMPOSE_OUT="$DEPLOY_DIR/compose.storage.yaml"
 NGINX_OUT="$DEPLOY_DIR/nginx/storage.d/storage.conf"
 
-[ -f "$SRC" ] || die "error: $SRC not found.
+if [ ! -e "$SRC" ]; then
+    die "error: $SRC not found.
       Fix: cp deploy/storage-mounts.conf.example deploy/storage-mounts.conf"
+fi
+# -e alone is not enough: a `[ -f "$SRC" ]` guard tests existence, not
+# readability, and `done < "$SRC"` below is a compound command whose own
+# redirect failure `set -e` does NOT abort — the loop body would simply never
+# run, every mount would silently vanish, and both outputs would be
+# regenerated as empty. Check readability explicitly, the same way lib.sh's
+# C1 fix does, so this never depends on `set -e` to be safe.
+if [ ! -r "$SRC" ]; then
+    die "error: $SRC exists but is not readable by this user.
+      Fix: check its permissions/ownership, e.g. 'ls -l $SRC'."
+fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -28,11 +40,25 @@ trap 'rm -rf "$work"' EXIT
 : > "$work/mounts"
 : > "$work/keylines"
 lineno=0
+CR=$(printf '\r')
 # `rest` catches a third field, which is how a path containing a space shows
 # up. Rejecting it beats mounting a silently truncated path.
 while read -r key path rest || [ -n "$key" ]; do
     lineno=$((lineno + 1))
     case "$key" in ''|\#*) continue ;; esac
+
+    # CRLF guard. IFS never contains \r, so a Windows line ending stays glued
+    # to the last field `read` captured (usually $path, or $rest if the line
+    # over-splits) instead of showing up as its own token — it slips past the
+    # key-charset check (which never sees it) and every other check, ending
+    # up baked into the nginx alias and the compose bind path. Reject by
+    # name rather than silently stripping: a file with CRLF endings needs
+    # fixing, and stripping would hide that from the operator.
+    case "$key$path$rest" in
+        *"$CR"*) die "error: $SRC line $lineno has Windows (CRLF) line endings.
+      Fix: convert the file to Unix line endings, e.g. 'dos2unix $SRC' or
+      'sed -i \"s/\\r\$//\" $SRC'." ;;
+    esac
 
     if [ -z "$path" ] || [ -n "$rest" ]; then
         die "error: $SRC line $lineno is not a '<key> <absolute-path>' pair:
@@ -83,6 +109,16 @@ while read -r key path rest || [ -n "$key" ]; do
       which is unsafe in the generated nginx 'alias' directive. Rename the directory." ;;
         *\#*) die "error: storage mount path for '$key' (line $lineno) contains '#', which is
       the nginx comment character. Rename the directory." ;;
+    esac
+    # A '..' path segment trivially bypasses the '/'-root guard below (e.g.
+    # '/mnt/a/../../etc' resolves outside the intended tree once nginx's
+    # `alias` and the bind mount follow it). Every absolute path with a '..'
+    # segment contains it either as '/../ ' in the middle or '/..' at the
+    # end, so one pattern pair covers all positions.
+    case "$path" in
+        */../*|*/..) die "error: storage mount path for '$key' (line $lineno) contains a '..'
+      path segment, which can point outside the intended directory. Use a
+      direct absolute path with no '..' components." ;;
     esac
     case "$key$path" in
         *[\'\"\$]*) die "error: storage mount '$key' (line $lineno) contains a quote or \$, which
