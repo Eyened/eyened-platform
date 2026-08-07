@@ -104,6 +104,40 @@ function classifyLines(lines: LinePhotoLocator[]): "raster" | "radial" {
     return hubOk && wideFan ? "radial" : "raster";
 }
 
+/**
+ * Median consecutive spacing (px) along the mean normal for roughly parallel lines.
+ * Null when lines are not parallel enough or fewer than 2.
+ */
+export function medianRasterLineSpacingPx(
+    lines: LinePhotoLocator[],
+): number | null {
+    if (lines.length < 2) {
+        return null;
+    }
+    const dirs = lines.map(lineUnit);
+    const ref = dirs[0];
+    const parallelEnough = dirs.every(
+        (d) => Math.abs(d.ux * ref.ux + d.uy * ref.uy) > 0.95,
+    );
+    if (!parallelEnough) {
+        return null;
+    }
+    const members = rasterMembers(lines);
+    const gaps: number[] = [];
+    for (let i = 1; i < members.length; i++) {
+        gaps.push(members[i].offset - members[i - 1].offset);
+    }
+    return gaps.length ? median(gaps) : null;
+}
+
+/** Unit normal of the mean line direction (for choosing enface axis resolution). */
+export function rasterStackAxis(
+    lines: LinePhotoLocator[],
+): "horizontal" | "vertical" {
+    const { nx, ny } = meanNormal(lines);
+    return Math.abs(ny) >= Math.abs(nx) ? "vertical" : "horizontal";
+}
+
 function meanNormal(lines: LinePhotoLocator[]): { nx: number; ny: number } {
     let nx = 0;
     let ny = 0;

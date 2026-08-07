@@ -10,6 +10,21 @@ import { enfaceToProjRegistrationItems } from "./enfaceToProj";
 import type { mappingFunction, RegistrationItem } from "./registrationItem";
 import { getRegistrationSets, type RegistrationSet } from "./registrationItem";
 
+/** DICOM SliceThickness as mm/frame from OCT volume dimensions when available. */
+function sliceThicknessMmFromOct(image: AbstractImage): number | null {
+    const { depth, depth_mm } = image.dimensions;
+    if (depth > 1 && depth_mm > 0) {
+        return depth_mm / depth;
+    }
+    try {
+        const raw = image.meta?.x52009229?.[0]?.x00289110?.[0]?.x00180050;
+        const n = Number(raw);
+        return n > 0 ? n : null;
+    } catch {
+        return null;
+    }
+}
+
 export type Pointer = {
     image_id: string;
     position: Position;
@@ -160,6 +175,7 @@ export class Registration {
                     `${image.instance.id}`,
                     image.width,
                     image.depth,
+                    sliceThicknessMmFromOct(image),
                 ),
             );
         }

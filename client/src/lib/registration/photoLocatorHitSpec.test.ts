@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CirclePhotoLocator, LinePhotoLocator } from "./photoLocators";
-import { buildPhotoLocatorHitSpec } from "./photoLocatorHitSpec";
+import { buildPhotoLocatorHitSpec, medianRasterLineSpacingPx } from "./photoLocatorHitSpec";
 
 function horiz(y: number, index: number) {
     return new LinePhotoLocator(
@@ -17,6 +17,12 @@ describe("buildPhotoLocatorHitSpec raster", () => {
     it("classifies parallel horizontals as raster", () => {
         const spec = buildPhotoLocatorHitSpec([horiz(40, 0), horiz(50, 1)]);
         expect(spec.kind).toBe("raster");
+    });
+
+    it("returns median consecutive gap for parallel lines", () => {
+        // gaps 10, 10, 20 → median 10
+        const lines = [horiz(0, 0), horiz(10, 1), horiz(20, 2), horiz(40, 3)];
+        expect(medianRasterLineSpacingPx(lines)).toBeCloseTo(10);
     });
 
     it("hits midway with half-gap delta (5px for 10px spacing)", () => {

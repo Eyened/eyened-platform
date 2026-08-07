@@ -1,4 +1,5 @@
 import type { Position } from "$lib/types";
+import type { ImageGET } from "../../types/openapi_types";
 import { f, mat3 } from "./affine";
 import { AffineRegistration } from "./affine";
 import { CompositeRegistration } from "./composite";
@@ -8,8 +9,13 @@ import {
     LinePhotoLocator,
     type PhotoLocator,
 } from "./photoLocators";
+import {
+    medianRasterLineSpacingPx,
+    rasterStackAxis,
+} from "./photoLocatorHitSpec";
 import type { RegistrationItem } from "./registrationItem";
 import { Matrix } from "$lib/matrix";
+import { instances } from "$lib/data/stores.svelte";
 
 /**
  * Bake a single UV→UV hop with concrete pixel sizes.
@@ -30,7 +36,12 @@ export function bakeHopGlsl(
         return bakeCompositeHop(item, srcSize, dstSize);
     }
     if (item instanceof EnfaceToProjPhotolocations) {
-        return bakeEnfaceToProjHop(item.photoLocators, srcSize, dstSize);
+        return bakeEnfaceToProjHop(
+            item.photoLocators,
+            srcSize,
+            dstSize,
+            item.maxMatchDistPx,
+        );
     }
     return null;
 }
@@ -141,6 +152,8 @@ export class EnfaceToProjPhotolocations implements RegistrationItem {
         public readonly photoLocators: PhotoLocator[],
         public readonly projWidth: number,
         public readonly projDepth: number,
+        /** Raster-only: max perpendicular match distance in enface px (null = ungated). */
+        public readonly maxMatchDistPx: number | null = null,
     ) {}
 
     mapping(p: Position): Position | undefined {
@@ -156,6 +169,13 @@ export class EnfaceToProjPhotolocations implements RegistrationItem {
                     index: 0,
                 };
             }
+        }
+        if (
+            best &&
+            this.maxMatchDistPx != null &&
+            minDistance > this.maxMatchDistPx
+        ) {
+            return undefined;
         }
         return best;
     }
@@ -201,14 +221,51 @@ export class ProjToEnfacePhotolocations implements RegistrationItem {
             this.photoLocators,
             this.projWidth,
             this.projDepth,
+            // Inverse does not use maxMatchDistPx; forward edge owns the gate.
         );
     }
+}
+
+/**
+ * Prefer DICOM SliceThickness (mm) converted via enface mm/px along the stack
+ * axis; otherwise median spacing between parallel raster lines (enface px).
+ */
+export function resolveRasterMaxMatchDistPx(
+    lines: LinePhotoLocator[],
+    sliceThicknessMm?: number | null,
+    enfaceMmPerPx?: number | null,
+): number | null {
+    if (
+        sliceThicknessMm != null &&
+        sliceThicknessMm > 0 &&
+        enfaceMmPerPx != null &&
+        enfaceMmPerPx > 0
+    ) {
+        return sliceThicknessMm / enfaceMmPerPx;
+    }
+    return medianRasterLineSpacingPx(lines);
+}
+
+function enfaceMmPerPxAlongStack(
+    lines: LinePhotoLocator[],
+    enface: ImageGET | undefined,
+): number | null {
+    if (!enface || lines.length < 2) {
+        return null;
+    }
+    const axis = rasterStackAxis(lines);
+    const r =
+        axis === "vertical"
+            ? enface.resolution_vertical
+            : enface.resolution_horizontal;
+    return r != null && r > 0 ? r : null;
 }
 
 export function bakeEnfaceToProjHop(
     photoLocators: PhotoLocator[],
     srcSize: [number, number],
     dstSize: [number, number],
+    maxMatchDistPx: number | null = null,
 ): string | null {
     if (!photoLocators.length) {
         return null;
@@ -256,12 +313,20 @@ export function bakeEnfaceToProjHop(
         return null;
     }
 
+    const gate =
+        maxMatchDistPx != null && maxMatchDistPx > 0
+            ? `if (bestDist > ${f(maxMatchDistPx)}) {
+                return vec2(-1.0);
+            }
+            `
+            : "";
+
     return `vec2 map_hop(vec2 uv) {
             vec2 p = uv * vec2(${f(srcSize[0])}, ${f(srcSize[1])});
             float bestDist = 1e20;
             vec2 best = vec2(0.0);
             ${blocks.join("\n")}
-            return best / vec2(${f(dstSize[0])}, ${f(dstSize[1])});
+            ${gate}return best / vec2(${f(dstSize[0])}, ${f(dstSize[1])});
         }`;
 }
 
@@ -271,6 +336,7 @@ export function enfaceToProjRegistrationItems(
     octPublicId: string,
     projWidth: number,
     projDepth: number,
+    sliceThicknessMm?: number | null,
 ): RegistrationItem[] {
     const projId = `${octPublicId}_proj`;
     const byEnface = new Map<string, PhotoLocator[]>();
@@ -282,6 +348,19 @@ export function enfaceToProjRegistrationItems(
 
     const items: RegistrationItem[] = [];
     for (const [enfaceId, locs] of byEnface) {
+        const lines = locs.filter(
+            (l): l is LinePhotoLocator => l instanceof LinePhotoLocator,
+        );
+        const hasCircles = locs.some((l) => l instanceof CirclePhotoLocator);
+        // Tiny step: gate raster-only families (no circles mixed in).
+        const maxMatchDistPx =
+            !hasCircles && lines.length >= 2
+                ? resolveRasterMaxMatchDistPx(
+                      lines,
+                      sliceThicknessMm,
+                      enfaceMmPerPxAlongStack(lines, instances.get(enfaceId)),
+                  )
+                : null;
         items.push(
             new EnfaceToProjPhotolocations(
                 enfaceId,
@@ -289,6 +368,7 @@ export function enfaceToProjRegistrationItems(
                 locs,
                 projWidth,
                 projDepth,
+                maxMatchDistPx,
             ),
         );
     }
