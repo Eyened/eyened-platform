@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..authz.scope import AccessScope
-from ..authz.scoping import apply_scope
+from ..authz.scoping import SET_VALUED_ENTITIES, SINGLE_PROJECT_ENTITIES, apply_scope
 from ..base import Base
 
 __all__ = ["scoped_one"]
@@ -37,7 +37,18 @@ def scoped_one(
     ``None`` when it does not exist *or* is out of scope -- deliberately
     indistinguishable, so the service's existing NotFoundError produces the 404
     and no caller can tell the two apart.
+
+    Raises ``KeyError`` for an entity with no scoping rule. ``apply_scope``
+    returns such a statement unfiltered by design -- correct there, because it
+    is also asked about entities that carry no project data -- but here it
+    would make the call a silent no-op wearing a scoped name, which is worse
+    than an unconverted ``session.get``: the next reader sees the helper and
+    stops looking.
     """
+    if entity not in SINGLE_PROJECT_ENTITIES and entity not in SET_VALUED_ENTITIES:
+        raise KeyError(
+            f"{entity.__name__} has no scoping rule; scoped_one would not filter it"
+        )
     stmt = select(entity).where(*criteria)
     if options:
         stmt = stmt.options(*options)

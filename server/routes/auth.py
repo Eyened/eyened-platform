@@ -13,7 +13,6 @@ from hashlib import pbkdf2_hmac
 from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
-from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
@@ -35,7 +34,6 @@ from ..services.audit_service import AuditService, get_audit_service
 # ``dependency_overrides`` keys on.
 from ..services.current_user import (  # noqa: F401
     CurrentUser,
-    _decode_token_or_401,
     get_current_user,
     verify_token,
 )

@@ -3,6 +3,7 @@ import pytest
 from eyened_orm import Feature
 from eyened_orm.repositories.feature_repository import FeatureRepository
 
+from server.services.acting_user import ActingUser
 from server.services.exceptions import ConflictError, NotFoundError
 from server.services.feature_service import FeatureService
 from eyened_orm.utils.factories import admin_scope
@@ -15,10 +16,17 @@ def _make_feature(session, name: str) -> Feature:
     return f
 
 
-def _service(session, audit=None) -> FeatureService:
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> FeatureService:
+    scope = (
+        admin_scope(actor_id=actor.id, username=actor.username)
+        if actor is not None
+        else admin_scope()
+    )
     return FeatureService(
-        FeatureRepository(session, scope=admin_scope()),
-        scope=admin_scope(),
+        FeatureRepository(session, scope=scope),
+        scope=scope,
         audit=audit,
     )
 
@@ -67,13 +75,18 @@ def test_create_feature_without_subfeatures(session):
 
 def test_create_feature_logs_insert(session):
     """Creating a feature emits one INSERT audit record naming the entity."""
+    actor = ActingUser(id=7, username="feature-actor")
     audit = FakeAudit()
 
-    _service(session, audit).create_feature("solo", None)
+    _service(session, actor, audit=audit).create_feature("solo", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
     assert audit.records[0]["entity"] == "Feature"
+    # Pins the service's `self._actor = ActingUser.from_scope(scope)` line.
+    # Without it the service can attribute every audit row to the wrong user
+    # and stay green -- the audit trail is the artefact, so it needs the pin.
+    assert audit.records[0]["actor"] == actor
 
 
 def test_get_feature_unknown_raises_not_found(session):
@@ -128,7 +141,7 @@ def test_update_feature_logs_rename_as_diff(session):
     feature = _make_feature(session, "old")
     audit = FakeAudit()
 
-    _service(session, audit).update_feature(feature.FeatureID, "new", None)
+    _service(session, audit=audit).update_feature(feature.FeatureID, "new", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "UPDATE"
@@ -143,7 +156,7 @@ def test_update_feature_logs_both_name_and_subfeatures_diff(session):
     child = _make_feature(session, "child")
     audit = FakeAudit()
 
-    _service(session, audit).update_feature(
+    _service(session, audit=audit).update_feature(
         parent.FeatureID, "new", [child.FeatureID]
     )
 
@@ -199,7 +212,7 @@ def test_delete_feature_logs_delete(session):
     feature = _make_feature(session, "gone")
     audit = FakeAudit()
 
-    _service(session, audit).delete_feature(feature.FeatureID)
+    _service(session, audit=audit).delete_feature(feature.FeatureID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"

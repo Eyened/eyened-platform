@@ -46,7 +46,7 @@ def _make_tag(
     return tag
 
 
-def _service(session, actor: ActingUser, audit=None) -> TagService:
+def _service(session, actor: ActingUser, *, audit=None) -> TagService:
     scope = admin_scope(actor_id=actor.id, username=actor.username)
     return TagService(
         TagRepository(session, scope=scope),
@@ -72,7 +72,7 @@ def test_create_tag_logs_insert(session):
     actor = _actor(session)
     audit = FakeAudit()
 
-    _service(session, actor, audit).create_tag("New", "desc", TagType.Study)
+    _service(session, actor, audit=audit).create_tag("New", "desc", TagType.Study)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
@@ -104,7 +104,7 @@ def test_update_tag_logs_update_as_diff(session):
     tag = _make_tag(session, actor.id, "Old")
     audit = FakeAudit()
 
-    _service(session, actor, audit).update_tag(tag.TagID, "New", None, None)
+    _service(session, actor, audit=audit).update_tag(tag.TagID, "New", None, None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "UPDATE"
@@ -135,7 +135,7 @@ def test_delete_tag_logs_delete(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, actor, audit).delete_tag(tag.TagID)
+    _service(session, actor, audit=audit).delete_tag(tag.TagID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
@@ -157,7 +157,7 @@ def test_star_tag_is_idempotent(session):
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
-    service = _service(session, actor, audit)
+    service = _service(session, actor, audit=audit)
     service.star_tag(tag.TagID)
 
     service.star_tag(tag.TagID)
@@ -178,7 +178,7 @@ def test_star_tag_logs_insert(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, actor, audit).star_tag(tag.TagID)
+    _service(session, actor, audit=audit).star_tag(tag.TagID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
@@ -202,7 +202,7 @@ def test_unstar_tag_absent_is_noop(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, actor, audit).unstar_tag(tag.TagID)
+    _service(session, actor, audit=audit).unstar_tag(tag.TagID)
 
     assert len(audit.records) == 0
 
@@ -214,7 +214,7 @@ def test_unstar_tag_logs_delete(session):
     _service(session, actor).star_tag(tag.TagID)
     audit = FakeAudit()
 
-    _service(session, actor, audit).unstar_tag(tag.TagID)
+    _service(session, actor, audit=audit).unstar_tag(tag.TagID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
@@ -259,7 +259,7 @@ def test_delete_tag_in_use_emits_no_audit_record(session):
     audit = FakeAudit()
 
     with pytest.raises(ConflictError):
-        _service(session, actor, audit).delete_tag(tag.TagID)
+        _service(session, actor, audit=audit).delete_tag(tag.TagID)
 
     assert audit.records == []
     session.rollback()

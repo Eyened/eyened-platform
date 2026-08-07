@@ -47,7 +47,9 @@ def _make_task(session, td_id: int, creator_id: int, name: str = "T") -> Task:
     return task
 
 
-def _service(session, actor: ActingUser | None = None, audit=None) -> TaskService:
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> TaskService:
     scope = (
         admin_scope(actor_id=actor.id, username=actor.username)
         if actor is not None
@@ -84,11 +86,12 @@ def test_create_task_logs_insert(session):
     td = _task_def(session)
     audit = FakeAudit()
 
-    _service(session, actor, audit).create_task("New", None, None, td.TaskDefinitionID)
+    _service(session, actor, audit=audit).create_task("New", None, None, td.TaskDefinitionID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
     assert audit.records[0]["entity"] == "Task"
+    assert audit.records[0]["actor"] == actor
 
 
 def test_list_tasks_returns_tasks_with_counts(session):
@@ -155,7 +158,7 @@ def test_update_task_logs_rename_as_diff(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id, "Old")
     audit = FakeAudit()
 
-    _service(session, actor, audit).update_task(
+    _service(session, actor, audit=audit).update_task(
         task.TaskID, "New", None, None, None, None
     )
 
@@ -193,7 +196,7 @@ def test_delete_task_logs_delete(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     audit = FakeAudit()
 
-    _service(session, actor, audit).delete_task(task.TaskID)
+    _service(session, actor, audit=audit).delete_task(task.TaskID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"

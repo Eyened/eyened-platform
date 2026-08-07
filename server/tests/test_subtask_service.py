@@ -53,7 +53,9 @@ def _make_subtask(session, task_id: int, state: SubTaskState = SubTaskState.NotS
     return st
 
 
-def _service(session, actor: ActingUser | None = None, audit=None) -> SubTaskService:
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> SubTaskService:
     scope = (
         admin_scope(actor_id=actor.id, username=actor.username)
         if actor is not None
@@ -102,12 +104,13 @@ def test_update_subtask_logs_update_as_diff(session):
     st = _make_subtask(session, task.TaskID)
     audit = FakeAudit()
 
-    _service(session, actor, audit).update_subtask(st.SubTaskID, "c", None)
+    _service(session, actor, audit=audit).update_subtask(st.SubTaskID, "c", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "UPDATE"
     assert audit.records[0]["entity"] == "SubTask"
     assert audit.records[0]["changes"] == {"Comments": {"old": "orig", "new": "c"}}
+    assert audit.records[0]["actor"] == actor
 
 
 def test_delete_subtask_removes_it(session):
@@ -137,7 +140,7 @@ def test_delete_subtask_logs_delete(session):
     st = _make_subtask(session, task.TaskID)
     audit = FakeAudit()
 
-    _service(session, actor, audit).delete_subtask(st.SubTaskID)
+    _service(session, actor, audit=audit).delete_subtask(st.SubTaskID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
@@ -254,7 +257,7 @@ def test_add_image_logs_insert(session):
     _make_image(session, "pub-1")
     audit = FakeAudit()
 
-    _service(session, actor, audit).add_image(st.SubTaskID, "pub-1")
+    _service(session, actor, audit=audit).add_image(st.SubTaskID, "pub-1")
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
@@ -310,7 +313,7 @@ def test_remove_image_logs_delete(session):
     service = _service(session, actor)
     service.add_image(st.SubTaskID, "pub-1")
     audit = FakeAudit()
-    _service(session, actor, audit).remove_image(st.SubTaskID, "pub-1")
+    _service(session, actor, audit=audit).remove_image(st.SubTaskID, "pub-1")
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"

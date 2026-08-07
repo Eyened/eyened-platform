@@ -75,7 +75,9 @@ def _actor() -> ActingUser:
     return ActingUser(id=1, username="alice")
 
 
-def _service(session, actor: ActingUser | None = None, audit=None) -> StudyService:
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> StudyService:
     actor = actor if actor is not None else _actor()
     scope = admin_scope(actor_id=actor.id, username=actor.username)
     return StudyService(
@@ -145,7 +147,7 @@ def test_tag_study_logs_insert_when_audit_present(session):
     audit = FakeAudit()
     actor = _actor()
 
-    _service(session, actor, audit).tag_study(study.StudyID, tag.TagID, "hi")
+    _service(session, actor, audit=audit).tag_study(study.StudyID, tag.TagID, "hi")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -230,7 +232,7 @@ def test_patch_study_tag_logs_update_as_diff(session):
     _make_link(session, tag, study, actor.id, comment="old")
     audit = FakeAudit()
 
-    _service(session, actor, audit).patch_study_tag(study.StudyID, tag.TagID, "new")
+    _service(session, actor, audit=audit).patch_study_tag(study.StudyID, tag.TagID, "new")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -256,7 +258,7 @@ def test_untag_study_logs_delete_when_audit_present(session):
     _make_link(session, tag, study, actor.id, comment="bye")
     audit = FakeAudit()
 
-    _service(session, actor, audit).untag_study(study.StudyID, tag.TagID)
+    _service(session, actor, audit=audit).untag_study(study.StudyID, tag.TagID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]

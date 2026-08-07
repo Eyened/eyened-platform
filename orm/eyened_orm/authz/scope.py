@@ -48,8 +48,12 @@ class AccessScope:
     ) -> "AccessScope":
         """Unrestricted scope for the non-API paths v0.3 places outside
         enforcement: the ``eorm`` CLI, RQ workers, and the pre-authentication
-        login path. Never returned by ``get_access_scope``. Its call sites are
-        pinned by a test -- an unbounded escape hatch needs one.
+        login path. Never returned by ``get_access_scope``.
+
+        NOT yet pinned to an allow-list of call sites: an unbounded escape
+        hatch needs one, and until that guard is written the only thing
+        stopping a new call site is review. The service-factory guard bans it
+        there, which is the one place it would be invisible.
         """
         return cls(actor_id=actor_id, username=username, is_admin=True, roles={})
 

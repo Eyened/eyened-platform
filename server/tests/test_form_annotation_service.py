@@ -40,7 +40,9 @@ class FakeAudit:
         self.records.append(kwargs)
 
 
-def _service(session, audit=None, actor: ActingUser | None = None) -> FormAnnotationService:
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> FormAnnotationService:
     scope = (
         admin_scope(actor_id=actor.id, username=actor.username)
         if actor is not None
@@ -223,7 +225,7 @@ def test_create_logs_insert(session):
     patient_id, schema_id = _make_patient_and_schema(session, "ci1")
     audit = FakeAudit()
 
-    ann = _service(session, audit, actor=actor).create(
+    ann = _service(session, actor, audit=audit).create(
         form_schema_id=schema_id,
         patient_id=patient_id,
         study_id=None,
@@ -239,6 +241,7 @@ def test_create_logs_insert(session):
     assert rec["action"] == "INSERT"
     assert rec["entity"] == "FormAnnotation"
     assert rec["entity_id"] == ann.FormAnnotationID
+    assert rec["actor"] == actor
 
 
 def test_update_applies_field(session):
@@ -269,7 +272,7 @@ def test_update_logs_diff_with_applied_columns(session):
     ann = _make_annotation(session, "ud1")
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).update(
+    _service(session, actor, audit=audit).update(
         ann.FormAnnotationID, {"form_data": {"b": 2}}
     )
 
@@ -290,7 +293,7 @@ def test_update_image_id_diffs_on_image_instance_id_column(session):
     image_id = _make_image(session, "img-2")
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).update(
+    _service(session, actor, audit=audit).update(
         ann.FormAnnotationID, {"image_id": "img-2"}
     )
 
@@ -321,7 +324,7 @@ def test_soft_delete_logs_delete(session):
     ann = _make_annotation(session, "sd1")
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).soft_delete(ann.FormAnnotationID)
+    _service(session, actor, audit=audit).soft_delete(ann.FormAnnotationID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -355,7 +358,7 @@ def test_set_value_logs_update_without_changes(session):
     ann = _make_annotation(session, "sv1")
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).set_value(ann.FormAnnotationID, {"x": 1})
+    _service(session, actor, audit=audit).set_value(ann.FormAnnotationID, {"x": 1})
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -423,7 +426,7 @@ def test_tag_logs_insert(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "hi")
+    _service(session, actor, audit=audit).tag(ann.FormAnnotationID, tag.TagID, "hi")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -448,7 +451,7 @@ def test_tag_update_logs_diff_with_identity(session):
     _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "first")
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "second")
+    _service(session, actor, audit=audit).tag(ann.FormAnnotationID, tag.TagID, "second")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -493,7 +496,7 @@ def test_patch_tag_logs_update_as_diff(session):
     _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "old")
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).patch_tag(ann.FormAnnotationID, tag.TagID, "new")
+    _service(session, actor, audit=audit).patch_tag(ann.FormAnnotationID, tag.TagID, "new")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -542,7 +545,7 @@ def test_untag_logs_delete(session):
     _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "bye")
     audit = FakeAudit()
 
-    _service(session, audit, actor=actor).untag(ann.FormAnnotationID, tag.TagID)
+    _service(session, actor, audit=audit).untag(ann.FormAnnotationID, tag.TagID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]

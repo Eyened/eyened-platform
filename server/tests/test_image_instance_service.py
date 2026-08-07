@@ -89,7 +89,9 @@ def _make_link(
     return link
 
 
-def _service(session, actor: ActingUser | None = None, audit=None) -> ImageInstanceService:
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> ImageInstanceService:
     scope = (
         admin_scope(actor_id=actor.id, username=actor.username)
         if actor is not None
@@ -216,7 +218,7 @@ def test_tag_instance_logs_insert(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, actor, audit).tag_instance("pub-1", tag.TagID, "hi")
+    _service(session, actor, audit=audit).tag_instance("pub-1", tag.TagID, "hi")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -243,7 +245,7 @@ def test_tag_instance_update_logs_raw_string_public_id(session):
     _make_link(session, tag, image_id, actor.id, comment="first")
     audit = FakeAudit()
 
-    _service(session, actor, audit).tag_instance("pub-1", tag.TagID, "second")
+    _service(session, actor, audit=audit).tag_instance("pub-1", tag.TagID, "second")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -302,7 +304,7 @@ def test_patch_instance_tag_logs_update_as_diff(session):
     _make_link(session, tag, image_id, actor.id, comment="old")
     audit = FakeAudit()
 
-    _service(session, actor, audit).patch_instance_tag("pub-1", tag.TagID, "new")
+    _service(session, actor, audit=audit).patch_instance_tag("pub-1", tag.TagID, "new")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -346,7 +348,7 @@ def test_untag_instance_logs_delete_when_audit_present(session):
     _make_link(session, tag, image_id, actor.id, comment="bye")
     audit = FakeAudit()
 
-    _service(session, actor, audit).untag_instance("pub-1", tag.TagID)
+    _service(session, actor, audit=audit).untag_instance("pub-1", tag.TagID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]

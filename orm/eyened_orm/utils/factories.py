@@ -15,8 +15,9 @@ from sqlalchemy.orm import Session
 if TYPE_CHECKING:
     # Type-checking only, so the quoted annotations on admin_scope/scope_for
     # actually resolve -- an annotation that cannot resolve is not an
-    # annotation. The runtime imports stay function-local (see those two
-    # functions) to keep this module's import cheap.
+    # annotation. The runtime imports stay function-local for symmetry with the
+    # rest of this module, NOT to keep the import cheap: the line below already
+    # pulls eyened_orm, which loads authz.scope and authz.roles transitively.
     from eyened_orm.authz.roles import ProjectRole
     from eyened_orm.authz.scope import AccessScope
 

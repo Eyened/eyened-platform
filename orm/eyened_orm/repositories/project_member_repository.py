@@ -11,8 +11,10 @@ class ProjectMemberRepository:
     """Data access for ProjectMember rows.
 
     Deliberately takes no ``AccessScope``: this repository *builds* the scope,
-    and its only constructors are ``get_access_scope`` and the ``eorm`` CLI.
-    The repository coverage guard names it as the single exemption.
+    so requiring one would be circular. Its only constructor today is
+    ``get_access_scope``; the membership CLI will be the second. It is the
+    single exemption in the guard that requires every repository to take a
+    scope as constructor state.
     """
 
     def __init__(self, session: Session) -> None:

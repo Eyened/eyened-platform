@@ -4,9 +4,10 @@
 
 ## Source
 
-RBAC multi-project enforcement work, branch `feature/rbac-multi-project-tasks`.
-Plan: `docs/superpowers/plans/2026-08-06-rbac-multi-project-tasks.md`, Task 12
-("Scope `Task` and `SubTask` reads — the containment rule at the API").
+RBAC multi-project enforcement work, branch `feature/rbac-multi-project-tasks`,
+during the task that scopes `Task` and `SubTask` reads (the containment rule at
+the API). The plan it came from is a working document that is not tracked in
+this repository, so it is named here rather than linked.
 
 Measured on the shared dev MySQL 8.0.27 (`eyened-gpu:8983`) on 2026-08-07, with
 read-only `EXPLAIN ANALYZE` / `SELECT` only. The plan's Task 12 block originally
@@ -32,9 +33,12 @@ images.
 
 ## Why
 
-The current predicate costs **O(total `SubTaskImageLink` rows) on every request**,
-independent of the caller's scope, of `LIMIT`, and of how many tasks the caller
-can see. MySQL decorrelates the `NOT EXISTS`, dropping the `sib.TaskID = t.TaskID`
+Once task reads are scoped, the predicate costs **O(total `SubTaskImageLink`
+rows) per request** for every non-administrator, independent of how many tasks
+the caller can see and of `LIMIT`. (An administrator pays nothing: `apply_scope`
+returns the statement untouched. And nothing pays it *today* — no repository
+applies this predicate yet, so the figures below were measured by running it by
+hand, not by timing a live endpoint.) MySQL decorrelates the `NOT EXISTS`, dropping the `sib.TaskID = t.TaskID`
 correlation, so it computes the task→project map for *every* task, materializes it
 with deduplication, and then antijoins. The antijoin itself is free
 (`Single-row index lookup on <subquery2>`, 0.000 ms/row); the whole cost is the one

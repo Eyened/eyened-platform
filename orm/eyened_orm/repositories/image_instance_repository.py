@@ -146,6 +146,11 @@ class ImageInstanceRepository:
 
         Mirrors the legacy ``_get_image_instance_by_public_id`` resolver: try the
         PublicID; on no match fall back to the raw id (numeric-PK fallback).
+
+        ``scoped_one`` takes the first row rather than raising on a second, as
+        the previous ``.one()`` did. Safe only because ``ImageInstance.PublicID``
+        is UNIQUE NOT NULL -- there is no second row to pick between. Drop that
+        constraint and this silently returns an arbitrary one, unordered.
         """
         item = scoped_one(
             self._session,

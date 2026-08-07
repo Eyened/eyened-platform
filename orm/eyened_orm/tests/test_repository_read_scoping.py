@@ -156,6 +156,14 @@ def test_a_tag_link_on_an_out_of_scope_row_reads_as_absent(session, two_projects
         session, scope=scope_for(two_projects["A"]["project"])
     )
     assert repo.get_tag_link(tag.TagID, two_projects["B"]["image"]) is None
+    # The owning scope still sees it. Without this direction the test passes for
+    # a predicate that hides the link from EVERYONE: tagging then reads as
+    # untagged, so DELETE silently no-ops and a re-tag hits the duplicate
+    # composite key as a 500.
+    owner_repo = ImageInstanceRepository(
+        session, scope=scope_for(two_projects["B"]["project"])
+    )
+    assert owner_repo.get_tag_link(tag.TagID, two_projects["B"]["image"]) is not None
 
     study_tag = Tag(
         TagName="st",
@@ -177,3 +185,26 @@ def test_a_tag_link_on_an_out_of_scope_row_reads_as_absent(session, two_projects
         session, scope=scope_for(two_projects["A"]["project"])
     )
     assert study_repo.get_link(study_tag.TagID, two_projects["B"]["study"]) is None
+    owner_study_repo = StudyRepository(
+        session, scope=scope_for(two_projects["B"]["project"])
+    )
+    assert (
+        owner_study_repo.get_link(study_tag.TagID, two_projects["B"]["study"])
+        is not None
+    )
+
+
+def test_scoped_one_refuses_an_entity_with_no_scoping_rule(session):
+    """A helper named `scoped_one` that quietly filters nothing is a trap.
+
+    Tag has no project anchor, so apply_scope passes it through untouched --
+    correct for apply_scope, wrong for this helper. SubTaskImageLink is the
+    live case: it is in neither registry, and the first task to read it under a
+    scope would otherwise get a green no-op.
+    """
+    from eyened_orm import Tag
+
+    from eyened_orm.repositories._scoped import scoped_one
+
+    with pytest.raises(KeyError, match="no scoping rule"):
+        scoped_one(session, Tag, admin_scope(), Tag.TagID == 1)

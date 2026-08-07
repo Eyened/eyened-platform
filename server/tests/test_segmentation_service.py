@@ -54,9 +54,10 @@ class FakeSegmentationDataStore:
 
 def _service(
     session,
+    actor: ActingUser | None = None,
+    *,
     store: FakeSegmentationDataStore | None = None,
     audit: FakeAudit | None = None,
-    actor: ActingUser | None = None,
 ) -> SegmentationService:
     scope = (
         admin_scope(actor_id=actor.id, username=actor.username)
@@ -135,7 +136,7 @@ def test_create_persists_and_writes(session):
     session.commit()
     store = FakeSegmentationDataStore()
 
-    created = _service(session, store, actor=actor).create(
+    created = _service(session, actor, store=store).create(
         image_id=image_id,
         feature_id=seg.FeatureID,
         subtask_id=None,
@@ -262,6 +263,7 @@ def test_create_logs_insert(session):
     assert rec["action"] == "INSERT"
     assert rec["entity"] == "Segmentation"
     assert rec["entity_id"] == created.SegmentationID
+    assert rec["actor"] == actor
 
 
 def test_write_data_unknown_raises_not_found(session):
@@ -281,7 +283,7 @@ def test_write_data_persists_zarr_index(session):
     session.commit()
     store = FakeSegmentationDataStore()
 
-    updated = _service(session, store, actor=actor).write_data(
+    updated = _service(session, actor, store=store).write_data(
         seg.SegmentationID, np.zeros((1, 4, 4), dtype=np.uint8)
     )
 
