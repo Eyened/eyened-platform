@@ -19,20 +19,20 @@ SRC="$DEPLOY_DIR/storage-mounts.conf"
 COMPOSE_OUT="$DEPLOY_DIR/compose.storage.yaml"
 NGINX_OUT="$DEPLOY_DIR/nginx/storage.d/storage.conf"
 
-if [ ! -e "$SRC" ]; then
-    die "error: $SRC not found.
+[ -f "$SRC" ] || die "error: $SRC not found.
       Fix: cp deploy/storage-mounts.conf.example deploy/storage-mounts.conf"
-fi
-# -e alone is not enough: a `[ -f "$SRC" ]` guard tests existence, not
-# readability, and `done < "$SRC"` below is a compound command whose own
-# redirect failure `set -e` does NOT abort — the loop body would simply never
-# run, every mount would silently vanish, and both outputs would be
-# regenerated as empty. Check readability explicitly, the same way lib.sh's
-# C1 fix does, so this never depends on `set -e` to be safe.
-if [ ! -r "$SRC" ]; then
-    die "error: $SRC exists but is not readable by this user.
+# `-f` above is a TYPE check (regular file only — rejects a directory, FIFO
+# or other non-regular node at $SRC, which is exactly what Docker creates at
+# a bind-mount source that does not yet exist) and is NOT a readability
+# check. `-r` below is readability and is NOT a type check. Neither implies
+# the other, so both are required, as two separate guards with distinct
+# messages. `done < "$SRC"` further down is a compound command whose own
+# redirect failure `set -e` does NOT abort — the loop body would simply
+# never run, every mount would silently vanish, and both outputs would be
+# regenerated as empty. Check both explicitly, the same way lib.sh's C1 fix
+# does, so this never depends on `set -e` to be safe.
+[ -r "$SRC" ] || die "error: $SRC exists but is not readable by this user.
       Fix: check its permissions/ownership, e.g. 'ls -l $SRC'."
-fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -43,7 +43,15 @@ lineno=0
 CR=$(printf '\r')
 # `rest` catches a third field, which is how a path containing a space shows
 # up. Rejecting it beats mounting a silently truncated path.
-while read -r key path rest || [ -n "$key" ]; do
+#
+# Belt-and-braces beyond the -f/-r checks above: wrap the loop itself in
+# `if ! ... ; then die; fi`. A leading `!` exempts this compound command from
+# `set -e`, so we can inspect its real exit status instead of letting a
+# failed `done < "$SRC"` redirect fall through silently to "0 mounts found".
+# This catches any case the type/readability checks don't anticipate (a
+# TOCTOU race, or a node type neither -f nor -r rules out) without replacing
+# those checks — they still give the precise, common-case error message.
+if ! while read -r key path rest || [ -n "$key" ]; do
     lineno=$((lineno + 1))
     case "$key" in ''|\#*) continue ;; esac
 
@@ -140,7 +148,11 @@ while read -r key path rest || [ -n "$key" ]; do
     printf '%s\t%s\n' "$key" "$lineno" >> "$work/keylines"
 
     printf '%s\t%s\n' "$key" "$path" >> "$work/mounts"
-done < "$SRC"
+done < "$SRC"; then
+    die "error: could not read $SRC to the end (see any message above).
+      The file may have changed type or permissions while this script was
+      running. Fix: check its permissions/ownership, e.g. 'ls -l $SRC'."
+fi
 
 # --- nginx locations -------------------------------------------------------
 {
