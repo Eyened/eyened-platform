@@ -107,6 +107,11 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     # R1: import_api.py is slated for deprecation (see module docstring); only
     # import_single_image holds a Session, for ImportRun.apply().
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; holds Session for ImportRun.apply()",
+    ("services/access_scope.py", "get_access_scope"): (
+        "scope resolver -- the composition-root dependency that builds the "
+        "request's AccessScope; holds a Session like the get_*_service factories, "
+        "which _is_di_factory exempts by name pattern only"
+    ),
 }
 
 
@@ -175,6 +180,12 @@ _DB_ACCESS_ALLOWED: dict[tuple[str, str], str] = {
     # Human decision: import_api.py is slated for deprecation. Calls
     # session.rollback() on the caught-failure path.
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
+    ("services/access_scope.py", "get_access_scope"): (
+        "scope resolver -- reads Creator (IsAdmin/Inactive) before any scope "
+        "exists, the same case as the five auth.py resolvers. What would remove "
+        "it: a CreatorRepository read, which would need an unbounded "
+        "AccessScope.trusted() inside the scope resolver -- a worse trade"
+    ),
 }
 
 
