@@ -16,6 +16,11 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# `unless-stopped`, not `always`: a client install runs unattended for months
+# and must come back after a host reboot or a dockerd restart, but an
+# operator's deliberate `docker compose stop` must stay stopped.
+x-restart: &default-restart unless-stopped
+
 services:
 
   database:
@@ -25,6 +30,7 @@ services:
     # Apple Silicon.
     image: mysql:8.0.46
     logging: *default-logging
+    restart: *default-restart
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
       MYSQL_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
@@ -51,6 +57,7 @@ services:
     profiles: ["tools"]
     image: adminer:4.8.1
     logging: *default-logging
+    restart: *default-restart
     ports:
       - "${ADMINER_PORT:-8081}:8080"
     environment:
@@ -59,6 +66,7 @@ services:
   redis:
     image: redis:7-alpine
     logging: *default-logging
+    restart: *default-restart
     environment:
       REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
     command: >
@@ -75,6 +83,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.server
     logging: *default-logging
+    restart: *default-restart
     # Deliberately NO `env_file: .env`, for the same reason the fileserver has
     # none: .env holds MYSQL_ROOT_PASSWORD, which this container never needs
     # and which `docker inspect` would hand to anyone who can reach the daemon.
@@ -91,7 +100,7 @@ services:
       # one-line .env change and needs no compose edit.
       EYENED_REDIS_HOST: ${EYENED_REDIS_HOST:-redis}
       EYENED_REDIS_PORT: ${EYENED_REDIS_PORT:-6379}
-      EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
+      EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
       EYENED_DATABASE_HOST: ${EYENED_DATABASE_HOST:-database}
       EYENED_DATABASE_PORT: ${EYENED_DATABASE_PORT:-3306}
       EYENED_DATABASE_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
@@ -147,6 +156,7 @@ services:
   fileserver:
     image: nginx:1.27-alpine
     logging: *default-logging
+    restart: *default-restart
     # Deliberately NO `env_file: .env`. nginx has no use for
     # MYSQL_ROOT_PASSWORD, EYENED_API_SECRET_KEY or the redis password, and
     # anything in a container's environment is one `docker inspect` away from
