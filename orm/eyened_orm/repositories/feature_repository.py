@@ -5,13 +5,15 @@ from sqlalchemy.orm import Session
 
 from eyened_orm import Feature
 from eyened_orm.segmentation import FeatureFeatureLink, Segmentation
+from eyened_orm.authz.scope import AccessScope
 
 
 class FeatureRepository:
     """Data access for Feature rows and their parent/child (composite) links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def add(self, feature: Feature) -> None:
         """Stage a new feature and flush so its PK is assigned."""

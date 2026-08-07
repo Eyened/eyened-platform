@@ -13,7 +13,12 @@ from eyened_orm.tag import (
     TagType,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
-from eyened_orm.utils.factories import make_patient, make_project, make_study
+from eyened_orm.utils.factories import (
+    admin_scope,
+    make_patient,
+    make_project,
+    make_study,
+)
 
 
 def _make_creator(session, name: str = "tester") -> Creator:
@@ -40,7 +45,7 @@ def test_list_all_returns_all_tags_with_creator(session):
     _make_tag(session, creator.CreatorID, "Beta")
     _make_tag(session, creator.CreatorID, "Alpha", TagType.ImageInstance)
 
-    tags = TagRepository(session).list_all()
+    tags = TagRepository(session, scope=admin_scope()).list_all()
 
     assert sorted(t.TagName for t in tags) == ["Alpha", "Beta"]
     # Creator was selectinload-ed, so reading it needs no extra lazy query.
@@ -71,7 +76,7 @@ def test_delete_refuses_a_tag_that_is_still_applied(session):
     # link. Expunging makes get_by_id emit real SQL, exactly as a request does,
     # so this test exercises the noload as well as the FK. See Step 2.
     session.expunge_all()
-    repository = TagRepository(session)
+    repository = TagRepository(session, scope=admin_scope())
 
     with pytest.raises(IntegrityError):
         repository.delete(repository.get_by_id(tag_id))
@@ -86,7 +91,7 @@ def test_delete_allows_a_tag_nobody_has_applied(session):
     """An unapplied tag stays freely deletable -- v0.2's user-writable namespace."""
     creator = _make_creator(session)
     tag = _make_tag(session, creator.CreatorID, "Unapplied")
-    repository = TagRepository(session)
+    repository = TagRepository(session, scope=admin_scope())
 
     repository.delete(repository.get_by_id(tag.TagID))
 
@@ -108,7 +113,7 @@ def test_delete_allows_a_starred_tag_and_drops_the_star(session):
     session.commit()
     tag_id = tag.TagID
     session.expunge_all()
-    repository = TagRepository(session)
+    repository = TagRepository(session, scope=admin_scope())
 
     repository.delete(repository.get_by_id(tag_id))
 
@@ -145,7 +150,7 @@ def test_get_by_id_does_not_load_the_link_collections(session):
     # options are never applied.
     session.expunge_all()
 
-    fetched = TagRepository(session).get_by_id(tag_id)
+    fetched = TagRepository(session, scope=admin_scope()).get_by_id(tag_id)
 
     assert fetched is not None
     assert list(fetched.StudyTagLinks) == []

@@ -6,6 +6,7 @@ from eyened_orm.repositories.feature_repository import FeatureRepository
 from server.services.acting_user import ActingUser
 from server.services.exceptions import ConflictError, NotFoundError
 from server.services.feature_service import FeatureService
+from eyened_orm.utils.factories import admin_scope
 
 
 def _make_feature(session, name: str) -> Feature:
@@ -16,7 +17,11 @@ def _make_feature(session, name: str) -> Feature:
 
 
 def _service(session, audit=None) -> FeatureService:
-    return FeatureService(FeatureRepository(session), audit=audit)
+    return FeatureService(
+        FeatureRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=audit,
+    )
 
 
 def _actor() -> ActingUser:
@@ -52,7 +57,7 @@ def test_create_feature_persists_with_subfeatures(session):
     feature = _service(session).create_feature("parent", [child.FeatureID], _actor())
 
     assert feature.FeatureName == "parent"
-    assert FeatureRepository(session).list_subfeature_ids(feature.FeatureID) == [
+    assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(feature.FeatureID) == [
         child.FeatureID
     ]
 
@@ -62,7 +67,7 @@ def test_create_feature_without_subfeatures(session):
     feature = _service(session).create_feature("solo", None, _actor())
 
     assert feature.FeatureName == "solo"
-    assert FeatureRepository(session).list_subfeature_ids(feature.FeatureID) == []
+    assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(feature.FeatureID) == []
 
 
 def test_create_feature_logs_insert(session):
@@ -112,7 +117,7 @@ def test_update_feature_replaces_subfeatures(session):
 
     service.update_feature(parent.FeatureID, None, [b.FeatureID], _actor())
 
-    assert FeatureRepository(session).list_subfeature_ids(parent.FeatureID) == [
+    assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(parent.FeatureID) == [
         b.FeatureID
     ]
 
@@ -159,7 +164,7 @@ def test_delete_feature_removes_it(session):
 
     _service(session).delete_feature(feature.FeatureID, _actor())
 
-    assert FeatureRepository(session).get_by_id(feature.FeatureID) is None
+    assert FeatureRepository(session, scope=admin_scope()).get_by_id(feature.FeatureID) is None
 
 
 def test_delete_feature_unknown_raises_not_found(session):
@@ -172,7 +177,7 @@ def test_delete_feature_blocked_by_child_link_raises_conflict(session):
     """A feature that is a child of another cannot be deleted (409 FEATURE_IS_CHILD)."""
     parent = _make_feature(session, "parent")
     child = _make_feature(session, "child")
-    FeatureRepository(session).replace_subfeatures(parent.FeatureID, [child.FeatureID])
+    FeatureRepository(session, scope=admin_scope()).replace_subfeatures(parent.FeatureID, [child.FeatureID])
 
     with pytest.raises(ConflictError) as exc:
         _service(session).delete_feature(child.FeatureID, _actor())
@@ -184,7 +189,7 @@ def test_delete_feature_blocked_by_child_link_raises_conflict(session):
 
 def test_delete_feature_blocked_by_segmentations_raises_conflict(session):
     """A feature with linked segmentations cannot be deleted (409 FEATURE_HAS_SEGMENTATIONS)."""
-    service = FeatureService(_SegBlockingRepo())
+    service = FeatureService(_SegBlockingRepo(), scope=admin_scope())
 
     with pytest.raises(ConflictError) as exc:
         service.delete_feature(7, _actor())

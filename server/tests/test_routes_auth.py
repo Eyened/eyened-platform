@@ -201,7 +201,10 @@ def test_dev_bypass_promotes_the_configured_account_to_administrator(
 
     monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
     monkeypatch.setattr(
-        "server.routes.auth.settings",
+        # get_current_user moved to server/services/current_user.py (to delete
+        # the services -> routes import edge); it reads `settings` from that
+        # module's namespace, so this is the target that must be patched.
+        "server.services.current_user.settings",
         Settings(public_auth_disabled=True, admin_username="devadmin"),
     )
 
@@ -237,7 +240,10 @@ def test_dev_bypass_works_without_configuring_a_password(session, monkeypatch):
 
     monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
     monkeypatch.setattr(
-        "server.routes.auth.settings",
+        # get_current_user moved to server/services/current_user.py (to delete
+        # the services -> routes import edge); it reads `settings` from that
+        # module's namespace, so this is the target that must be patched.
+        "server.services.current_user.settings",
         Settings(public_auth_disabled=True, admin_username="devadmin"),
     )
 
@@ -279,7 +285,10 @@ def test_dev_bypass_never_forwards_a_password_to_ensure_admin(session, monkeypat
 
     monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
     monkeypatch.setattr(
-        "server.routes.auth.settings",
+        # get_current_user moved to server/services/current_user.py (to delete
+        # the services -> routes import edge); it reads `settings` from that
+        # module's namespace, so this is the target that must be patched.
+        "server.services.current_user.settings",
         Settings(
             public_auth_disabled=True,
             admin_username="devadmin",
@@ -293,3 +302,18 @@ def test_dev_bypass_never_forwards_a_password_to_ensure_admin(session, monkeypat
         select(Creator).where(Creator.CreatorName == "devadmin")
     ).first()
     assert verify_password("operator-set-password", reloaded.PasswordHash)
+
+
+def test_the_access_token_no_longer_carries_a_role_claim(signed_jwts):
+    """Only one thing in the system is called 'role', and it is not the token."""
+    import jwt
+
+    from server.config import settings
+    from server.routes.auth import create_access_token
+
+    payload = jwt.decode(
+        create_access_token(1, "alice"),
+        settings.secret_key_value,
+        algorithms=[settings.jwt_algorithm],
+    )
+    assert "role" not in payload

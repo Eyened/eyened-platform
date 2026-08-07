@@ -4,13 +4,15 @@ from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import ModelSegmentation, Segmentation
 from eyened_orm.tag import SegmentationTagLink
+from eyened_orm.authz.scope import AccessScope
 
 
 class SegmentationRepository:
     """Data access for Segmentation reads, mutations, and its Tag links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def get_by_id(self, segmentation_id: int) -> Segmentation | None:
         """Return the segmentation by id, or None if absent."""
@@ -81,8 +83,9 @@ class SegmentationRepository:
 class ModelSegmentationRepository:
     """Data access for ModelSegmentation reads and mutations (data endpoints only)."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def get_by_id(self, model_segmentation_id: int) -> ModelSegmentation | None:
         """Return the model segmentation by id, or None if absent."""

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState
+from eyened_orm.authz.scope import AccessScope
 
 # Load task metadata without eager-loading every SubTask row (mirrors the
 # route's former ``_task_query_options``).
@@ -17,8 +18,9 @@ _TASK_RELATIONS = (
 class TaskRepository:
     """Data access for Task rows and their subtask counts."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def add(self, task: Task) -> None:
         """Stage a new task and flush so its PK is assigned."""
@@ -102,8 +104,9 @@ _SUBTASK_IMAGE_LOADER = (
 class SubTaskRepository:
     """Data access for a task's SubTask rows and their image links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def add(self, subtask: SubTask) -> None:
         """Stage a new subtask and flush so its PK is assigned."""

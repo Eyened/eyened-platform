@@ -27,6 +27,7 @@ from eyened_orm.repositories.tag_repository import TagRepository
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.form_annotation_service import FormAnnotationService
+from eyened_orm.utils.factories import admin_scope
 
 
 class FakeAudit:
@@ -41,9 +42,10 @@ class FakeAudit:
 
 def _service(session, audit=None) -> FormAnnotationService:
     return FormAnnotationService(
-        FormAnnotationRepository(session),
-        ImageInstanceRepository(session),
-        TagRepository(session),
+        FormAnnotationRepository(session, scope=admin_scope()),
+        ImageInstanceRepository(session, scope=admin_scope()),
+        TagRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
         audit=audit,
     )
 
@@ -513,7 +515,7 @@ def test_untag_removes_link(session):
     service.untag(ann.FormAnnotationID, tag.TagID, actor)
 
     assert (
-        FormAnnotationRepository(session).get_tag_link(
+        FormAnnotationRepository(session, scope=admin_scope()).get_tag_link(
             tag.TagID, ann.FormAnnotationID
         )
         is None

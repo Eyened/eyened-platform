@@ -7,8 +7,10 @@ from eyened_orm import ImageInstance, ImageInstanceTagLink
 from eyened_orm.repositories.image_instance_repository import ImageInstanceRepository
 from eyened_orm.repositories.tag_repository import TagRepository
 from eyened_orm.tag import TagType
+from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import BadRequestError, NotFoundError
@@ -21,10 +23,13 @@ class ImageInstanceService:
         self,
         repository: ImageInstanceRepository,
         tag_repository: TagRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
         self.tags = tag_repository
+        self.scope = scope
         self.audit = audit
 
     def get_instance(
@@ -235,8 +240,12 @@ class ImageInstanceService:
 
 def get_image_instance_service(
     db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
 ) -> ImageInstanceService:
     """Default ImageInstanceService wiring for FastAPI ``Depends()``."""
     return ImageInstanceService(
-        ImageInstanceRepository(db), TagRepository(db), audit=get_audit_service(db)
+        ImageInstanceRepository(db, scope=scope),
+        TagRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
     )

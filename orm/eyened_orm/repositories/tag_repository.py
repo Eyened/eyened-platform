@@ -5,13 +5,15 @@ from sqlalchemy.orm import Session, load_only, noload, selectinload
 
 from eyened_orm import Creator, CreatorTagLink, Tag
 from eyened_orm.tag import TAG_LINK_COLLECTIONS
+from eyened_orm.authz.scope import AccessScope
 
 
 class TagRepository:
     """Data access for Tag rows and their per-user 'star' links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def add(self, tag: Tag) -> None:
         """Stage a new tag and flush so its PK is assigned."""

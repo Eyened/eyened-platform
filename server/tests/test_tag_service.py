@@ -5,7 +5,12 @@ import pytest
 from eyened_orm import Creator, CreatorTagLink, Tag
 from eyened_orm.tag import StudyTagLink, TagType
 from eyened_orm.repositories.tag_repository import TagRepository
-from eyened_orm.utils.factories import make_patient, make_project, make_study
+from eyened_orm.utils.factories import (
+    admin_scope,
+    make_patient,
+    make_project,
+    make_study,
+)
 
 from server.services.acting_user import ActingUser
 from server.services.exceptions import ConflictError, NotFoundError
@@ -42,7 +47,11 @@ def _make_tag(
 
 
 def _service(session, audit=None) -> TagService:
-    return TagService(TagRepository(session), audit=audit)
+    return TagService(
+        TagRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=audit,
+    )
 
 
 def test_create_tag_persists_and_returns(session):
@@ -109,7 +118,7 @@ def test_delete_tag_removes_it(session):
 
     _service(session).delete_tag(tag.TagID, actor)
 
-    assert TagRepository(session).get_by_id(tag.TagID) is None
+    assert TagRepository(session, scope=admin_scope()).get_by_id(tag.TagID) is None
 
 
 def test_delete_tag_unknown_raises_not_found(session):
@@ -139,7 +148,7 @@ def test_star_tag_creates_link(session):
 
     _service(session).star_tag(tag.TagID, actor)
 
-    assert TagRepository(session).get_star_link(tag.TagID, actor.id) is not None
+    assert TagRepository(session, scope=admin_scope()).get_star_link(tag.TagID, actor.id) is not None
 
 
 def test_star_tag_is_idempotent(session):
@@ -183,7 +192,7 @@ def test_unstar_tag_removes_link(session):
 
     _service(session).unstar_tag(tag.TagID, actor)
 
-    assert TagRepository(session).get_star_link(tag.TagID, actor.id) is None
+    assert TagRepository(session, scope=admin_scope()).get_star_link(tag.TagID, actor.id) is None
 
 
 def test_unstar_tag_absent_is_noop(session):
@@ -264,4 +273,4 @@ def test_delete_starred_tag_succeeds(session):
 
     _service(session).delete_tag(tag.TagID, actor)
 
-    assert TagRepository(session).get_by_id(tag.TagID) is None
+    assert TagRepository(session, scope=admin_scope()).get_by_id(tag.TagID) is None

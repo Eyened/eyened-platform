@@ -17,6 +17,7 @@ from eyened_orm import (
     Study,
 )
 from eyened_orm.tag import FormAnnotationTagLink, SegmentationTagLink
+from eyened_orm.authz.scope import AccessScope
 
 _STORAGE_LOADER = selectinload(ImageInstance.ImageStorages).selectinload(
     ImageStorage.StorageBackend
@@ -82,8 +83,9 @@ def _full_graph_options(
 class ImageInstanceRepository:
     """Data access for ImageInstance reads and its Tag links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def get_full_graph_by_id(
         self,

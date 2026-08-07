@@ -58,10 +58,11 @@ def _service(
     audit: FakeAudit | None = None,
 ) -> SegmentationService:
     return SegmentationService(
-        SegmentationRepository(session),
-        ImageInstanceRepository(session),
-        TagRepository(session),
+        SegmentationRepository(session, scope=admin_scope()),
+        ImageInstanceRepository(session, scope=admin_scope()),
+        TagRepository(session, scope=admin_scope()),
         store or FakeSegmentationDataStore(),
+        scope=admin_scope(),
         audit=audit,
     )
 
@@ -71,7 +72,9 @@ def _model_service(
     store: FakeSegmentationDataStore | None = None,
 ) -> ModelSegmentationService:
     return ModelSegmentationService(
-        ModelSegmentationRepository(session), store or FakeSegmentationDataStore()
+        ModelSegmentationRepository(session, scope=admin_scope()),
+        store or FakeSegmentationDataStore(),
+        scope=admin_scope(),
     )
 
 
@@ -344,7 +347,9 @@ def test_model_write_data_store_write_precedes_repo_persist():
     item = object()
 
     ModelSegmentationService(
-        _OrderRecordingModelRepo(item, calls), _OrderRecordingStore(calls)
+        _OrderRecordingModelRepo(item, calls),
+        _OrderRecordingStore(calls),
+        scope=admin_scope(),
     ).write_data(1, np.zeros((1, 4, 4), dtype=np.uint8))
 
     assert calls == [("store.write", item), ("save", item)]
@@ -450,6 +455,7 @@ def test_patch_logs_true_diff(session):
 
 from eyened_orm import Tag
 from eyened_orm.tag import TagType
+from eyened_orm.utils.factories import admin_scope
 
 
 def _make_tag(
@@ -573,7 +579,7 @@ def test_untag_removes_link(session):
     service.untag(seg.SegmentationID, tag.TagID, actor)
 
     assert (
-        SegmentationRepository(session).get_tag_link(
+        SegmentationRepository(session, scope=admin_scope()).get_tag_link(
             tag.TagID, seg.SegmentationID
         )
         is None

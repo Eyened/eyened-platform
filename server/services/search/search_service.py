@@ -34,10 +34,12 @@ from eyened_orm.image_instance import Laterality as ImgLaterality
 from eyened_orm.image_instance import Modality as ImgModality
 from eyened_orm.patient import SexEnum as PatientSex
 from eyened_orm.repositories.search import SearchRepository
+from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from ...db import get_db
+from ..access_scope import get_access_scope
 from ..exceptions import BadRequestError
 from .conditions import translate_instance_conditions, translate_study_conditions
 from .fields import (
@@ -70,8 +72,14 @@ class StudySearchResult:
 class SearchService:
     """Orchestrates search: translate the DSL, query, paginate, derive, count."""
 
-    def __init__(self, repository: SearchRepository) -> None:
+    def __init__(
+        self,
+        repository: SearchRepository,
+        *,
+        scope: AccessScope,
+    ) -> None:
         self.repository = repository
+        self.scope = scope
 
     def search_instances(
         self,
@@ -331,6 +339,9 @@ class SearchService:
         return items
 
 
-def get_search_service(db: Session = Depends(get_db)) -> SearchService:
+def get_search_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> SearchService:
     """FastAPI dependency: a SearchService wired to its repository."""
-    return SearchService(SearchRepository(db))
+    return SearchService(SearchRepository(db, scope=scope), scope=scope)

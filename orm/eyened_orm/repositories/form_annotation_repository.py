@@ -11,13 +11,15 @@ from eyened_orm import (
     Study,
     StudyTagLink,
 )
+from eyened_orm.authz.scope import AccessScope
 
 
 class FormAnnotationRepository:
     """Data access for FormAnnotation reads, mutations, and its Tag links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def get_by_id(self, annotation_id: int) -> FormAnnotation | None:
         """Return the annotation by id, or None if absent."""

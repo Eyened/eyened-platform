@@ -7,6 +7,7 @@ from eyened_orm.repositories.task_repository import SubTaskRepository
 from server.services.acting_user import ActingUser
 from server.services.exceptions import NotFoundError
 from server.services.task_service import SubTaskService
+from eyened_orm.utils.factories import admin_scope
 
 
 class FakeAudit:
@@ -53,7 +54,11 @@ def _make_subtask(session, task_id: int, state: SubTaskState = SubTaskState.NotS
 
 
 def _service(session, audit=None) -> SubTaskService:
-    return SubTaskService(SubTaskRepository(session), audit=audit)
+    return SubTaskService(
+        SubTaskRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=audit,
+    )
 
 
 def test_get_subtask_unknown_raises_not_found(session):
@@ -109,7 +114,7 @@ def test_delete_subtask_removes_it(session):
 
     _service(session).delete_subtask(st.SubTaskID, actor)
 
-    assert SubTaskRepository(session).get_by_id(st.SubTaskID) is None
+    assert SubTaskRepository(session, scope=admin_scope()).get_by_id(st.SubTaskID) is None
 
 
 def test_delete_subtask_unknown_raises_not_found(session):
@@ -300,7 +305,11 @@ def test_remove_image_logs_delete(session):
     service = _service(session)
     service.add_image(st.SubTaskID, "pub-1", actor)
     audit = FakeAudit()
-    SubTaskService(SubTaskRepository(session), audit=audit).remove_image(
+    SubTaskService(
+        SubTaskRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=audit,
+    ).remove_image(
         st.SubTaskID, "pub-1", actor
     )
 

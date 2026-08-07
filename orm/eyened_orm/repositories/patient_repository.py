@@ -3,13 +3,15 @@ from __future__ import annotations
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import AttributeValue, Patient
+from eyened_orm.authz.scope import AccessScope
 
 
 class PatientRepository:
     """Data access for Patient rows."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def get_with_attributes(
         self,

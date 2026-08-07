@@ -3,10 +3,12 @@ from __future__ import annotations
 from eyened_orm import SubTask, Task
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
+from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import NotFoundError
@@ -19,10 +21,13 @@ class TaskService:
         self,
         task_repository: TaskRepository,
         subtask_repository: SubTaskRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.tasks = task_repository
         self.subtasks = subtask_repository
+        self.scope = scope
         self.audit = audit
 
     def create_task(
@@ -221,9 +226,12 @@ class SubTaskService:
     def __init__(
         self,
         subtask_repository: SubTaskRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.subtasks = subtask_repository
+        self.scope = scope
         self.audit = audit
 
     def get_subtask(self, subtask_id: int, *, with_images: bool) -> SubTask:
@@ -363,13 +371,26 @@ class SubTaskService:
         return self.subtasks.get_with_images(subtask_id)
 
 
-def get_task_service(db: Session = Depends(get_db)) -> TaskService:
+def get_task_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> TaskService:
     """Default TaskService wiring for FastAPI ``Depends()``."""
     return TaskService(
-        TaskRepository(db), SubTaskRepository(db), audit=get_audit_service(db)
+        TaskRepository(db, scope=scope),
+        SubTaskRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
     )
 
 
-def get_subtask_service(db: Session = Depends(get_db)) -> SubTaskService:
+def get_subtask_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> SubTaskService:
     """Default SubTaskService wiring for FastAPI ``Depends()``."""
-    return SubTaskService(SubTaskRepository(db), audit=get_audit_service(db))
+    return SubTaskService(
+        SubTaskRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
+    )

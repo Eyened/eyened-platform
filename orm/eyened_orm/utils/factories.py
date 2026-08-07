@@ -8,8 +8,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    # Type-checking only, so the quoted annotations on admin_scope/scope_for
+    # actually resolve -- an annotation that cannot resolve is not an
+    # annotation. The runtime imports stay function-local (see those two
+    # functions) to keep this module's import cheap.
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.authz.scope import AccessScope
 
 from eyened_orm import (
     Creator,
@@ -321,4 +330,31 @@ def seed_search_dataset(session: Session) -> SearchDataset:
         images={"a1": a1, "a2": a2, "b1": b1, "inactive": inactive},
         studies={"a": study_a, "b": study_b},
         projects={"alpha": alpha, "beta": beta},
+    )
+
+
+def admin_scope(actor_id: int = 1, username: str = "tester") -> "AccessScope":
+    """An unrestricted scope, for tests whose subject is not authorization."""
+    from eyened_orm.authz.scope import AccessScope
+
+    return AccessScope(
+        actor_id=actor_id, username=username, is_admin=True, roles={}
+    )
+
+
+def scope_for(
+    *project_ids: int,
+    role: "ProjectRole | None" = None,
+    actor_id: int = 1,
+    username: str = "tester",
+) -> "AccessScope":
+    """A non-admin scope holding ``role`` in each of ``project_ids``."""
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.authz.scope import AccessScope
+
+    return AccessScope(
+        actor_id=actor_id,
+        username=username,
+        is_admin=False,
+        roles={p: role or ProjectRole.grader for p in project_ids},
     )

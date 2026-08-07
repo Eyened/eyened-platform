@@ -14,8 +14,10 @@ from eyened_orm.repositories.image_instance_repository import (
     ImageInstanceRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import BadRequestError, NotFoundError
@@ -40,11 +42,14 @@ class FormAnnotationService:
         repository: FormAnnotationRepository,
         image_repository: ImageInstanceRepository,
         tag_repository: TagRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
         self.images = image_repository
         self.tags = tag_repository
+        self.scope = scope
         self.audit = audit
 
     def _resolve_image_instance_id(self, image_id: str | None) -> int | None:
@@ -405,11 +410,13 @@ class FormAnnotationService:
 
 def get_form_annotation_service(
     db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
 ) -> FormAnnotationService:
     """Default FormAnnotationService wiring for FastAPI ``Depends()``."""
     return FormAnnotationService(
-        FormAnnotationRepository(db),
-        ImageInstanceRepository(db),
-        TagRepository(db),
+        FormAnnotationRepository(db, scope=scope),
+        ImageInstanceRepository(db, scope=scope),
+        TagRepository(db, scope=scope),
+        scope=scope,
         audit=get_audit_service(db),
     )

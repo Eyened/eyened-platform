@@ -18,8 +18,10 @@ from eyened_orm.repositories.segmentation_repository import (
     SegmentationRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import BadRequestError, NotFoundError
@@ -45,12 +47,15 @@ class SegmentationService:
         image_repository: ImageInstanceRepository,
         tag_repository: TagRepository,
         data_store: SegmentationDataStore,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
         self.images = image_repository
         self.tags = tag_repository
         self.store = data_store
+        self.scope = scope
         self.audit = audit
 
     def get_segmentation(self, segmentation_id: int) -> Segmentation:
@@ -433,9 +438,12 @@ class ModelSegmentationService:
         self,
         repository: ModelSegmentationRepository,
         data_store: SegmentationDataStore,
+        *,
+        scope: AccessScope,
     ) -> None:
         self.repository = repository
         self.store = data_store
+        self.scope = scope
 
     def read_data(
         self,
@@ -488,22 +496,26 @@ class ModelSegmentationService:
 
 def get_segmentation_service(
     db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
 ) -> SegmentationService:
     """Default SegmentationService wiring for FastAPI ``Depends()``."""
     return SegmentationService(
-        SegmentationRepository(db),
-        ImageInstanceRepository(db),
-        TagRepository(db),
+        SegmentationRepository(db, scope=scope),
+        ImageInstanceRepository(db, scope=scope),
+        TagRepository(db, scope=scope),
         get_segmentation_data_store(),
+        scope=scope,
         audit=get_audit_service(db),
     )
 
 
 def get_model_segmentation_service(
     db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
 ) -> ModelSegmentationService:
     """Default ModelSegmentationService wiring for FastAPI ``Depends()``."""
     return ModelSegmentationService(
-        ModelSegmentationRepository(db),
+        ModelSegmentationRepository(db, scope=scope),
         get_segmentation_data_store(),
+        scope=scope,
     )

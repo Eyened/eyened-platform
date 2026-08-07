@@ -11,6 +11,7 @@ from eyened_orm import (
 )
 from eyened_orm.project import ExternalEnum
 from eyened_orm.repositories.image_instance_repository import ImageInstanceRepository
+from eyened_orm.utils.factories import admin_scope
 
 
 def _make_image(session, public_id: str) -> int:
@@ -51,7 +52,7 @@ def test_get_full_graph_by_public_id_resolves_graph_and_digit_fallback(session):
     """Resolve by PublicID (all eager-load branches on), else by numeric PK string."""
     image_id = _make_image(session, "pub-str")
     _make_image(session, "9999")  # a PublicID that is itself a digit string
-    repo = ImageInstanceRepository(session)
+    repo = ImageInstanceRepository(session, scope=admin_scope())
     # all flags True so the conditional selectinload branches are exercised
     kw = dict(
         with_segmentations=True,
@@ -73,7 +74,7 @@ def test_get_full_graph_by_public_id_resolves_graph_and_digit_fallback(session):
 def test_get_with_storage_by_public_id_found_and_missing(session):
     """get_with_storage_by_public_id resolves by PublicID, or None if absent."""
     image_id = _make_image(session, "pub-store")
-    repo = ImageInstanceRepository(session)
+    repo = ImageInstanceRepository(session, scope=admin_scope())
 
     item = repo.get_with_storage_by_public_id("pub-store")
     assert item is not None and item.ImageInstanceID == image_id

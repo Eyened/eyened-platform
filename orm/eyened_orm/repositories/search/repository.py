@@ -21,6 +21,7 @@ from eyened_orm.attributes import (
     AttributesModel,
     AttributesModelOutput,
 )
+from eyened_orm.authz.scope import AccessScope
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -39,8 +40,9 @@ from .selects import (
 class SearchRepository:
     """Query construction and execution for instance and study search."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def search_instances(
         self,

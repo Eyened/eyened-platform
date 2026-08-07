@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from eyened_orm import Feature
 from eyened_orm.repositories.feature_repository import FeatureRepository
+from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import ConflictError, NotFoundError
@@ -17,9 +19,12 @@ class FeatureService:
     def __init__(
         self,
         repository: FeatureRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
+        self.scope = scope
         self.audit = audit
 
     def list_features(self, with_counts: bool) -> tuple[list[Feature], dict[int, int]]:
@@ -129,6 +134,13 @@ class FeatureService:
         return None
 
 
-def get_feature_service(db: Session = Depends(get_db)) -> FeatureService:
+def get_feature_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> FeatureService:
     """Default FeatureService wiring for FastAPI ``Depends()``."""
-    return FeatureService(FeatureRepository(db), audit=get_audit_service(db))
+    return FeatureService(
+        FeatureRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
+    )

@@ -4,13 +4,15 @@ from sqlalchemy.orm import Session, noload
 
 from eyened_orm import Study, StudyTagLink, Tag
 from eyened_orm.tag import TAG_LINK_COLLECTIONS
+from eyened_orm.authz.scope import AccessScope
 
 
 class StudyRepository:
     """Data access for Study rows and their Tag links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def get_by_id(self, study_id: int) -> Study | None:
         """Return the study with the given id, or None if absent."""

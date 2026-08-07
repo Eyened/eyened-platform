@@ -10,6 +10,7 @@ from server.services.acting_user import ActingUser
 from server.services.audit_service import AuditService, get_audit_service
 from server.services.exceptions import NotFoundError
 from server.services.feature_service import FeatureService, get_feature_service
+from eyened_orm.utils.factories import admin_scope
 
 
 class _ExplodingRepo(FeatureRepository):
@@ -20,7 +21,11 @@ class _ExplodingRepo(FeatureRepository):
 
 def test_first_write_rolls_back_when_second_fails(session):
     """When a later write raises, the earlier already-flushed write vanishes on rollback."""
-    service = FeatureService(_ExplodingRepo(session), audit=AuditService(session))
+    service = FeatureService(
+        _ExplodingRepo(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=AuditService(session),
+    )
     with pytest.raises(RuntimeError):
         service.create_feature("parent", [1], ActingUser(id=1, username="alice"))
 
@@ -36,7 +41,11 @@ def test_prior_audit_row_rolls_back_with_a_later_failed_write(session):
         entity_id=1, changes={"name": "pre-existing"},
     )
 
-    service = FeatureService(_ExplodingRepo(session), audit=AuditService(session))
+    service = FeatureService(
+        _ExplodingRepo(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=AuditService(session),
+    )
     with pytest.raises(RuntimeError):
         service.create_feature("parent", [1], ActingUser(id=1, username="alice"))
 
@@ -64,7 +73,11 @@ def test_domain_error_mid_request_rolls_back_and_returns_its_status(client, sess
     from server.main import app_api
 
     def _failing_feature_service(db: Session = Depends(get_db)) -> FeatureService:
-        return FeatureService(_NotFoundAfterWriteRepo(db), audit=get_audit_service(db))
+        return FeatureService(
+            _NotFoundAfterWriteRepo(db, scope=admin_scope()),
+            scope=admin_scope(),
+            audit=get_audit_service(db),
+        )
 
     app_api.dependency_overrides[get_feature_service] = _failing_feature_service
     try:

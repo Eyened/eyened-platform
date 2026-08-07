@@ -14,6 +14,7 @@ from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.authz.bootstrap import ensure_admin
+from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
@@ -26,6 +27,18 @@ from ..config import get_oidc_metadata, settings
 from ..db import get_db
 from ..services.acting_user import ActingUser
 from ..services.audit_service import AuditService, get_audit_service
+
+# Re-exported, not redefined. These moved to server/services/current_user.py to
+# delete the services -> routes import edge (see that module's docstring); this
+# import keeps every existing ``from .auth import CurrentUser, get_current_user``
+# working against the SAME function objects, which is what FastAPI's
+# ``dependency_overrides`` keys on.
+from ..services.current_user import (  # noqa: F401
+    CurrentUser,
+    _decode_token_or_401,
+    get_current_user,
+    verify_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,16 +85,6 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
-class CurrentUser:
-    def __init__(self, creator_id: int, username: str, role: str | None = None):
-        self.id = creator_id
-        self.username = username
-        self.role = role
-
-    def get_creator(self, session: Session) -> Creator:
-        return session.query(Creator).where(Creator.CreatorID == self.id).first()
-
-
 class AuthOptionsResponse(BaseModel):
     password_enabled: bool
     oidc_enabled: bool
@@ -100,12 +103,11 @@ class OIDCAuthenticationRequest(BaseModel):
 
 
 # JWT utilities
-def create_access_token(user_id: int, username: str, role: str | None = None) -> str:
+def create_access_token(user_id: int, username: str) -> str:
     """Create a JWT access token."""
     payload = {
         "sub": str(user_id),  # Convert to string
         "username": username,
-        "role": role,
         "type": "access",
         "exp": datetime.now(timezone.utc)
         + timedelta(minutes=settings.access_token_expire_minutes),
@@ -128,34 +130,6 @@ def create_refresh_token(user_id: int) -> str:
     return jwt.encode(
         payload, settings.secret_key_value, algorithm=settings.jwt_algorithm
     )
-
-
-def _decode_token_or_401(token: str, *, detail: str | None = None) -> dict:
-    """Decode JWT; raise 401 when invalid."""
-    try:
-        return jwt.decode(
-            token, settings.secret_key_value, algorithms=[settings.jwt_algorithm]
-        )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-        )
-
-
-def verify_token(token: str) -> dict:
-    """Verify and decode a JWT token."""
-    return _decode_token_or_401(token)
 
 
 def _try_decode_token(token: str) -> dict | None:
@@ -189,71 +163,6 @@ async def is_authenticated(
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required",
-    )
-
-
-# Replace the existing get_current_user function with this merged version
-async def get_current_user(
-    authorization: str = Header(None),
-    jwt_token: str = Cookie(None),
-    refresh_token: str = Cookie(None),
-    session: Session = Depends(get_db),
-) -> CurrentUser:
-    """Get the current authenticated user from either Authorization header or cookies."""
-    # Bypass authentication if disabled (development mode)
-    if settings.public_auth_disabled:
-        # ensure_admin, not a bare lookup: the account is a data superuser only
-        # if it is an administrator, and any dump taken before cutover has
-        # IsAdmin false on every row. No password is passed, though: the
-        # bypass never authenticates with one, and passing a password through
-        # would overwrite any password an operator set on this account on
-        # every single request.
-        creator, _ = ensure_admin(
-            session,
-            settings.admin_username,
-            None,
-        )
-        return CurrentUser(
-            creator_id=creator.CreatorID, username=creator.CreatorName
-        )
-
-    # Try Authorization header first (for API clients)
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.replace("Bearer ", "")
-        payload = verify_token(token)
-        if payload.get("type") == "access":
-            return CurrentUser(
-                creator_id=int(payload["sub"]),
-                username=payload["username"],
-                role=payload.get("role"),
-            )
-
-    # Try access token cookie (for web clients)
-    if jwt_token:
-        try:
-            payload = verify_token(jwt_token)
-            if payload.get("type") == "access":
-                return CurrentUser(
-                    creator_id=int(payload["sub"]),
-                    username=payload["username"],
-                    role=payload.get("role"),
-                )
-        except:
-            pass  # Access token failed, try refresh
-
-    # Try refresh token
-    if refresh_token:
-        try:
-            payload = verify_token(refresh_token)
-            if payload.get("type") == "refresh":
-                # This will be handled by the refresh endpoint
-                # For now, we'll let the client handle the 401 and call refresh
-                pass
-        except:
-            pass
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
     )
 
 
@@ -325,9 +234,7 @@ async def login(
     creator = check_login(user_data.username, user_data.password, session)
 
     # Create both tokens
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName)
     refresh_token = create_refresh_token(creator.CreatorID)
 
     # If API client, return token in response body
@@ -369,9 +276,7 @@ async def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
     """Get access token for API clients."""
     creator = check_login(user_data.username, user_data.password, session)
 
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName)
 
     return TokenResponse(
         access_token=access_token,
@@ -457,14 +362,14 @@ async def refresh_token(
         # the same claim; a malformed sub can't arise from a token this process
         # signed itself, and if it ever did, the ValueError falls through to the
         # blanket `except Exception` below -- same 401 outcome as before.
-        creator = CreatorRepository(session).get_by_id(int(payload["sub"]))
+        creator = CreatorRepository(session, scope=AccessScope.trusted()).get_by_id(
+            int(payload["sub"])
+        )
         if not creator:
             raise HTTPException(status_code=401, detail="User not found")
 
         # Create new access token
-        new_access_token = create_access_token(
-            creator.CreatorID, creator.CreatorName, creator.Role
-        )
+        new_access_token = create_access_token(creator.CreatorID, creator.CreatorName)
 
         # Create NEW refresh token (extends session for active users)
         new_refresh_token = create_refresh_token(creator.CreatorID)
@@ -708,7 +613,7 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             logger.info(f"Replacing temporary OIDC authentication claim '{creator.EmployeeIdentifier}' with {identifier}")
             creator.EmployeeIdentifier = identifier
             # flush only; the request boundary (get_db) commits.
-            CreatorRepository(session).add(creator)
+            CreatorRepository(session, scope=AccessScope.trusted()).add(creator)
 
     else:
         # No existing account was found
@@ -796,9 +701,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
     response.delete_cookie(key="oidc_csrf_token")
     response.delete_cookie(key="oidc_nonce")
 
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName)
     refresh_token = create_refresh_token(creator.CreatorID)
 
     response.set_cookie(

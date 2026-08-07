@@ -22,6 +22,7 @@ from eyened_orm.tag import TagType
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.image_instance_service import ImageInstanceService
+from eyened_orm.utils.factories import admin_scope
 
 
 class FakeAudit:
@@ -90,7 +91,10 @@ def _make_link(
 
 def _service(session, audit=None) -> ImageInstanceService:
     return ImageInstanceService(
-        ImageInstanceRepository(session), TagRepository(session), audit=audit
+        ImageInstanceRepository(session, scope=admin_scope()),
+        TagRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=audit,
     )
 
 
@@ -316,7 +320,7 @@ def test_untag_instance_removes_link(session):
 
     service.untag_instance("pub-1", tag.TagID, actor)
 
-    assert ImageInstanceRepository(session).get_tag_link(tag.TagID, image_id) is None
+    assert ImageInstanceRepository(session, scope=admin_scope()).get_tag_link(tag.TagID, image_id) is None
 
 
 def test_untag_instance_absent_link_is_idempotent(session):

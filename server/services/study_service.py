@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from eyened_orm import StudyTagLink
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.study_repository import StudyRepository
+from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import BadRequestError, NotFoundError
@@ -19,9 +21,12 @@ class StudyService:
     def __init__(
         self,
         repository: StudyRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
+        self.scope = scope
         self.audit = audit
 
     def tag_study(
@@ -170,6 +175,13 @@ class StudyService:
         return link
 
 
-def get_study_service(db: Session = Depends(get_db)) -> StudyService:
+def get_study_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> StudyService:
     """Default StudyService wiring for FastAPI ``Depends()``."""
-    return StudyService(StudyRepository(db), audit=get_audit_service(db))
+    return StudyService(
+        StudyRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
+    )

@@ -3,11 +3,13 @@ from __future__ import annotations
 from eyened_orm import Tag
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import ConflictError, NotFoundError
@@ -19,9 +21,12 @@ class TagService:
     def __init__(
         self,
         repository: TagRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
+        self.scope = scope
         self.audit = audit
 
     def list_tags(self) -> list[Tag]:
@@ -175,6 +180,13 @@ class TagService:
         return None
 
 
-def get_tag_service(db: Session = Depends(get_db)) -> TagService:
+def get_tag_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> TagService:
     """Default TagService wiring for FastAPI ``Depends()``."""
-    return TagService(TagRepository(db), audit=get_audit_service(db))
+    return TagService(
+        TagRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
+    )

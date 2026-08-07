@@ -4,6 +4,7 @@ from eyened_orm import Creator, Patient, Project, Study, StudyTagLink, Tag
 from eyened_orm.project import ExternalEnum
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.study_repository import StudyRepository
+from eyened_orm.utils.factories import admin_scope
 
 
 def _make_study(session) -> Study:
@@ -48,7 +49,7 @@ def test_get_link_returns_the_link(session):
     )
     session.flush()
 
-    result = StudyRepository(session).get_link(tag.TagID, study.StudyID)
+    result = StudyRepository(session, scope=admin_scope()).get_link(tag.TagID, study.StudyID)
     assert result is not None
     assert result.TagID == tag.TagID
     assert result.StudyID == study.StudyID
@@ -57,7 +58,7 @@ def test_get_link_returns_the_link(session):
 def test_get_link_absent_returns_none(session):
     """get_link returns None (never raises) when the pair is not linked."""
     study = _make_study(session)
-    assert StudyRepository(session).get_link(999_999, study.StudyID) is None
+    assert StudyRepository(session, scope=admin_scope()).get_link(999_999, study.StudyID) is None
 
 
 def test_get_tag_does_not_load_the_link_collections(session):
@@ -84,7 +85,7 @@ def test_get_tag_does_not_load_the_link_collections(session):
     # never applied, so the test would pass with or without the fix.
     session.expunge_all()
 
-    fetched = StudyRepository(session).get_tag(tag_id)
+    fetched = StudyRepository(session, scope=admin_scope()).get_tag(tag_id)
 
     assert fetched is not None
     assert fetched.TagType is TagType.Study  # what the caller actually needs

@@ -7,6 +7,7 @@ from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepos
 from server.services.acting_user import ActingUser
 from server.services.exceptions import NotFoundError
 from server.services.task_service import TaskService
+from eyened_orm.utils.factories import admin_scope
 
 
 class FakeAudit:
@@ -47,7 +48,12 @@ def _make_task(session, td_id: int, creator_id: int, name: str = "T") -> Task:
 
 
 def _service(session, audit=None) -> TaskService:
-    return TaskService(TaskRepository(session), SubTaskRepository(session), audit=audit)
+    return TaskService(
+        TaskRepository(session, scope=admin_scope()),
+        SubTaskRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=audit,
+    )
 
 
 def test_create_task_persists_with_defaults(session):
@@ -164,8 +170,8 @@ def test_delete_task_removes_it_and_cascades_subtasks(session):
 
     _service(session).delete_task(task.TaskID, actor)
 
-    assert TaskRepository(session).get_by_id(task.TaskID) is None
-    assert SubTaskRepository(session).all_ids_for_task(task.TaskID) == []
+    assert TaskRepository(session, scope=admin_scope()).get_by_id(task.TaskID) is None
+    assert SubTaskRepository(session, scope=admin_scope()).all_ids_for_task(task.TaskID) == []
 
 
 def test_delete_task_unknown_raises_not_found(session):

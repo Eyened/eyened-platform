@@ -10,6 +10,7 @@ from eyened_orm.repositories.study_repository import StudyRepository
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.study_service import StudyService
+from eyened_orm.utils.factories import admin_scope
 
 
 def _make_study(session) -> Study:
@@ -71,7 +72,11 @@ class FakeAudit:
 
 
 def _service(session, audit=None) -> StudyService:
-    return StudyService(StudyRepository(session), audit=audit)
+    return StudyService(
+        StudyRepository(session, scope=admin_scope()),
+        scope=admin_scope(),
+        audit=audit,
+    )
 
 
 def _actor() -> ActingUser:
@@ -127,7 +132,7 @@ def test_tag_study_existing_link_updates_comment(session):
 
     assert link.Comment == "second"
     # Still a single link (no duplicate row created).
-    assert StudyRepository(session).get_link(tag.TagID, study.StudyID) is not None
+    assert StudyRepository(session, scope=admin_scope()).get_link(tag.TagID, study.StudyID) is not None
 
 
 def test_tag_study_logs_insert_when_audit_present(session):
@@ -162,7 +167,7 @@ def test_untag_study_removes_the_link(session):
 
     service.untag_study(study.StudyID, tag.TagID, _actor())
 
-    assert StudyRepository(session).get_link(tag.TagID, study.StudyID) is None
+    assert StudyRepository(session, scope=admin_scope()).get_link(tag.TagID, study.StudyID) is None
 
 
 def test_untag_study_unknown_study_raises_not_found(session):
@@ -178,7 +183,7 @@ def test_untag_study_no_link_is_idempotent(session):
     _service(session).untag_study(study.StudyID, 999_999, _actor())
 
     # The no-op leaves no link behind (and did not raise).
-    assert StudyRepository(session).get_link(999_999, study.StudyID) is None
+    assert StudyRepository(session, scope=admin_scope()).get_link(999_999, study.StudyID) is None
 
 
 def test_patch_study_tag_updates_comment(session):

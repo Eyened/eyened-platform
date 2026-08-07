@@ -65,13 +65,55 @@ def client(session, monkeypatch):
     # A CurrentUser with no backing Creator row: search never calls get_creator(),
     # and seeding one would pollute /instances/search/signature's creator list.
     app_api.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        creator_id=1, username="tester", role="admin"
+        creator_id=1, username="tester"
     )
+
+    from eyened_orm.utils.factories import admin_scope
+    from server.services.access_scope import get_access_scope
+
+    # Existing route tests are not about authorization; give them an admin
+    # scope so they keep testing what they were written to test. Tests that ARE
+    # about authorization use the `client_scoped` fixture below, and the
+    # deactivated-user test deliberately uses neither -- it must exercise the
+    # real resolution.
+    app_api.dependency_overrides[get_access_scope] = lambda: admin_scope()
+
     with TestClient(app_api) as c:
         yield c
     # Pop only what this fixture installed: app_api is a module-level singleton, so
     # clear() would silently delete overrides another fixture or test owns.
     app_api.dependency_overrides.pop(get_current_user, None)
+    app_api.dependency_overrides.pop(get_access_scope, None)
+
+
+@pytest.fixture()
+def client_scoped(session, monkeypatch):
+    """TestClient whose AccessScope the test sets, for authorization tests.
+
+    Yields ``(client, set_scope)``; call ``set_scope(scope)`` before the request.
+    """
+    import server.db as server_db
+    from server.main import app_api
+    from server.routes.auth import CurrentUser, get_current_user
+    from server.services.access_scope import get_access_scope
+    from eyened_orm.utils.factories import admin_scope
+
+    monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
+    holder = {"scope": admin_scope()}
+
+    app_api.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        creator_id=holder["scope"].actor_id, username=holder["scope"].username
+    )
+    app_api.dependency_overrides[get_access_scope] = lambda: holder["scope"]
+
+    def set_scope(scope):
+        holder["scope"] = scope
+
+    with TestClient(app_api) as c:
+        yield c, set_scope
+
+    app_api.dependency_overrides.pop(get_current_user, None)
+    app_api.dependency_overrides.pop(get_access_scope, None)
 
 
 @pytest.fixture()

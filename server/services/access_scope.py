@@ -18,7 +18,7 @@ from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
 
 from ..db import get_db
-from ..routes.auth import CurrentUser, get_current_user
+from .current_user import CurrentUser, get_current_user
 
 
 def get_access_scope(
