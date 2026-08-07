@@ -23,6 +23,87 @@ type RasterMember = {
     delta: number;
 };
 
+function lineUnit(l: LinePhotoLocator) {
+    const dx = l.end.x - l.start.x;
+    const dy = l.end.y - l.start.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { ux: dx / len, uy: dy / len, len };
+}
+
+/** Least-squares hub: point minimizing sum of squared distances to infinite lines. */
+function estimateHub(lines: LinePhotoLocator[]): { x: number; y: number } {
+    let a00 = 0,
+        a01 = 0,
+        a11 = 0,
+        b0 = 0,
+        b1 = 0;
+    for (const l of lines) {
+        const { ux, uy } = lineUnit(l);
+        const nx = -uy;
+        const ny = ux;
+        a00 += nx * nx;
+        a01 += nx * ny;
+        a11 += ny * ny;
+        const d = nx * l.start.x + ny * l.start.y;
+        b0 += nx * d;
+        b1 += ny * d;
+    }
+    const det = a00 * a11 - a01 * a01;
+    if (Math.abs(det) < 1e-8) {
+        let x = 0,
+            y = 0;
+        for (const l of lines) {
+            x += l.start.x;
+            y += l.start.y;
+        }
+        return { x: x / lines.length, y: y / lines.length };
+    }
+    return {
+        x: (a11 * b0 - a01 * b1) / det,
+        y: (-a01 * b0 + a00 * b1) / det,
+    };
+}
+
+function distPointToLine(p: { x: number; y: number }, l: LinePhotoLocator) {
+    const lx = l.end.x - l.start.x;
+    const ly = l.end.y - l.start.y;
+    const len = Math.hypot(lx, ly) || 1;
+    return Math.abs(lx * (p.y - l.start.y) - ly * (p.x - l.start.x)) / len;
+}
+
+function median(vals: number[]): number {
+    const s = [...vals].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : 0.5 * (s[m - 1] + s[m]);
+}
+
+function wrapPi(a: number) {
+    while (a <= -Math.PI) a += 2 * Math.PI;
+    while (a > Math.PI) a -= 2 * Math.PI;
+    return a;
+}
+
+function classifyLines(lines: LinePhotoLocator[]): "raster" | "radial" {
+    if (lines.length < 2) return "raster";
+    const hub = estimateHub(lines);
+    const dists = lines.map((l) => distPointToLine(hub, l));
+    const lengths = lines.map((l) => lineUnit(l).len);
+    const hubOk = median(dists) < 0.15 * median(lengths);
+    const angles = lines.map((l) => {
+        const mx = (l.start.x + l.end.x) / 2 - hub.x;
+        const my = (l.start.y + l.end.y) / 2 - hub.y;
+        return Math.atan2(my, mx);
+    });
+    let maxSpan = 0;
+    for (let i = 0; i < angles.length; i++) {
+        for (let j = i + 1; j < angles.length; j++) {
+            maxSpan = Math.max(maxSpan, Math.abs(wrapPi(angles[i] - angles[j])));
+        }
+    }
+    const wideFan = maxSpan > (25 * Math.PI) / 180;
+    return hubOk && wideFan ? "radial" : "raster";
+}
+
 function meanNormal(lines: LinePhotoLocator[]): { nx: number; ny: number } {
     let nx = 0;
     let ny = 0;
@@ -90,6 +171,66 @@ function buildRasterFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
     };
 }
 
+function buildRadialFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
+    const hub = estimateHub(lines);
+    type M = { loc: LinePhotoLocator; angle: number; delta: number; charR: number };
+    const members: M[] = lines.map((loc) => {
+        const mx = (loc.start.x + loc.end.x) / 2 - hub.x;
+        const my = (loc.start.y + loc.end.y) / 2 - hub.y;
+        return {
+            loc,
+            angle: Math.atan2(my, mx),
+            delta: 1,
+            charR: Math.hypot(mx, my) || 1,
+        };
+    });
+    members.sort((a, b) => a.angle - b.angle);
+    const charR = median(members.map((m) => m.charR));
+    for (let i = 0; i < members.length; i++) {
+        const gaps: number[] = [];
+        if (i > 0) gaps.push(members[i].angle - members[i - 1].angle);
+        if (i < members.length - 1)
+            gaps.push(members[i + 1].angle - members[i].angle);
+        members[i].delta = gaps.length
+            ? Math.min(...gaps) / 2
+            : 1 / Math.max(charR, 1);
+    }
+
+    return {
+        kind: "radial",
+        query(p) {
+            const ang = Math.atan2(p.y - hub.y, p.x - hub.x);
+            const r = Math.hypot(p.x - hub.x, p.y - hub.y);
+            if (r < 1e-6) return undefined;
+            let best: HitSpecResult | undefined;
+            let bestScore = Infinity;
+            for (const m of members) {
+                const d = Math.abs(wrapPi(ang - m.angle));
+                if (d > m.delta) continue;
+                const { loc } = m;
+                const lx = loc.end.x - loc.start.x;
+                const ly = loc.end.y - loc.start.y;
+                const len = Math.hypot(lx, ly) || 1;
+                const parallel =
+                    ((p.x - loc.start.x) * lx + (p.y - loc.start.y) * ly) / len;
+                if (parallel < 0 || parallel > len) continue;
+                const score = d / m.delta;
+                if (score < bestScore || (score === bestScore && d < (best?.d ?? Infinity))) {
+                    bestScore = score;
+                    best = {
+                        x: (loc.width * parallel) / len,
+                        y: loc.index + 0.5,
+                        index: loc.index,
+                        d,
+                        delta: m.delta,
+                    };
+                }
+            }
+            return best;
+        },
+    };
+}
+
 /** Task 1: lines → raster only. Tasks 2–3 extend classification. */
 export function buildPhotoLocatorHitSpec(
     locators: PhotoLocator[],
@@ -107,5 +248,8 @@ export function buildPhotoLocatorHitSpec(
         return { kind: "raster", query: () => undefined };
     }
     // Task 2 replaces this with classifyLines(lines)
-    return buildRasterFamily(lines);
+    const pattern = classifyLines(lines);
+    return pattern === "radial"
+        ? buildRadialFamily(lines)
+        : buildRasterFamily(lines);
 }
