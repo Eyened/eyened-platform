@@ -30,8 +30,10 @@ OPENAPI_DIR := $(REPO_ROOT)/client/src/types
 OPENAPI_JSON := $(OPENAPI_DIR)/openapi.json
 OPENAPI_TS := $(REPO_ROOT)/client/src/types/openapi.ts
 
-.PHONY: install doctor up down logs prod migrate db-shell \
+.PHONY: install doctor up down logs prod migrate db-shell help \
         gen-openapi gen-types gen-client-types
+
+.DEFAULT_GOAL := install
 
 ## install: the client install (production stack, bundled database). Alias for ./install.sh.
 install:
@@ -72,6 +74,10 @@ migrate:
 ## db-shell: a MySQL shell in the bundled database.
 db-shell:
 	$(DC) exec -it database sh -c 'exec mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE"'
+
+## help: list these targets and what they do.
+help:
+	@awk 'BEGIN { FS = ": " } /^## / { sub(/^## /, ""); printf "  %s\n", $$0 }' $(MAKEFILE_LIST)
 
 gen-openapi:
 	$(PY) $(REPO_ROOT)/dev/generate_openapi.py $(OPENAPI_DIR)

@@ -51,7 +51,12 @@ case "$MODE" in
            ./install.sh if you do want the bundled database." ;;
         esac
 
-        env_set COMPOSE_FILE "$COMPOSE_FILE_CLIENT"
+        # _set_compose_file, not a bare env_set: prod's .env is by definition
+        # hand-configured (the error above sends the operator to edit it
+        # themselves), so this is the mode where an operator-appended layer
+        # like compose.host-ports.yaml is most likely to already be present
+        # — and a bare env_set here would silently drop it.
+        _set_compose_file "$COMPOSE_FILE_CLIENT"
         ;;
 esac
 

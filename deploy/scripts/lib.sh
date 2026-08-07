@@ -164,16 +164,26 @@ env_set() {
 # replaced; anything else already in COMPOSE_FILE is kept, in order, deduped
 # against the new base.
 #
-# This is called on EVERY first_run_env call, not just the first: a dev/client
-# mode switch (re-running stack.sh in the other mode against an existing
-# .env) must still land the correct base list, so the write cannot be frozen
-# to first-run-only without breaking that. Preserving non-base entries is
-# what stops it from also reverting an operator's host-ports edit on every
-# later run — the bug this replaces (lib.sh's COMPOSE_FILE write used to sit
-# outside the "only on first run" guard with no filtering at all).
+# This is called on EVERY first_run_env call, not just the first, because
+# first_run_env itself runs on every stack.sh invocation, not only when .env
+# is created. A plain re-run of the SAME mode — 're-run ./install.sh',
+# 'make up' twice — is reachable and common, and without preserving non-base
+# entries it would silently strip an operator's appended host-ports layer
+# back out of COMPOSE_FILE on every one of those re-runs. (A dev/client mode
+# switch through stack.sh is NOT the scenario this guards: doctor.sh refuses
+# a mismatched mode before first_run_env is ever reached, so that path never
+# gets here at all.)
 _set_compose_file() {
     _new_base=$1
-    _existing=$(env_get COMPOSE_FILE)
+    # A CRLF .env (hand-edited on Windows/WSL) puts a trailing \r on the last
+    # layer name. Left in, that \r becomes part of the layer's own identity
+    # here: it no longer matches any of the four known base names below, so
+    # it is kept as an "extra" and re-appended forever, including onto a
+    # freshly-generated base list. Compose itself tolerates the stray \r
+    # (trailing whitespace in -f is ignored), so today this only latches a
+    # harmless duplicate — but the same mechanism would just as happily
+    # preserve a CR-suffixed compose.prod.yaml into a dev COMPOSE_FILE.
+    _existing=$(env_get COMPOSE_FILE | tr -d '\r')
     _extra=""
     if [ -n "$_existing" ]; then
         _old_ifs=$IFS
@@ -236,26 +246,6 @@ first_run_env() {
         env_set MYSQL_ROOT_PASSWORD "$_root_pw"
         env_set EYENED_DATABASE_PASSWORD "$_db_pw"
 
-        # install.sh is the published client door, and some operators will run
-        # it under sudo. Docker itself does not need that (the daemon socket
-        # is what needs root, not this script), but nothing here stops them.
-        # Under sudo this process is root, so .env ends up root-owned at 0600
-        # — unreadable by the invoking user's own later `make up` or plain
-        # `docker compose`, which is a worse failure than the file being
-        # briefly group-readable. This has to run AFTER the env_set calls
-        # above, not right after the chmod: env_set's mv (lib.sh) replaces the
-        # file with a fresh temp file it just created, which re-owns it as
-        # root on every call — chowning any earlier would just be undone by
-        # the next env_set. `sudo` sets SUDO_UID/SUDO_GID to the invoking
-        # user, so chown back to that rather than leave a secret only root
-        # can read.
-        if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
-            chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/.env" ||
-                die "error: could not chown $DEPLOY_DIR/.env back to the invoking user
-      (uid $SUDO_UID). It was created root-owned at mode 600 and a later
-      non-sudo 'make up' or 'docker compose' would not be able to read it.
-      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/.env by hand."
-        fi
         echo "==> created deploy/.env with generated secrets"
         echo "    On a shared machine, set COMPOSE_PROJECT_NAME and HTTP_PORT"
         echo "    in deploy/.env to something nobody else is using."
@@ -270,6 +260,46 @@ first_run_env() {
     if [ ! -f "$DEPLOY_DIR/storage-mounts.conf" ]; then
         cp "$DEPLOY_DIR/storage-mounts.conf.example" "$DEPLOY_DIR/storage-mounts.conf" ||
             die "error: could not create $DEPLOY_DIR/storage-mounts.conf from its .example; see above."
+    fi
+
+    # install.sh is the published client door, and some operators will run it
+    # under sudo. Docker itself does not need that (the daemon socket is what
+    # needs root, not this script), but nothing here stops them. Under sudo
+    # this process is root, so anything it writes ends up root-owned —
+    # unreadable, or in storage-mounts.conf's case merely un-editable, by the
+    # invoking user's own later `make up` or plain `docker compose`, which is
+    # a worse failure than the file being briefly group-readable.
+    #
+    # This MUST run last, after _set_compose_file and the storage-mounts.conf
+    # cp above, not right after .env is created: both of those write via
+    # env_set's mv (or cp), which replaces the file with a fresh copy owned
+    # by the current euid — re-owning it as root and undoing an earlier
+    # chown. Measured: chowning before _set_compose_file's env_set call left
+    # .env back at 0:0 after that call ran.
+    #
+    # It also has to run on EVERY call, not just first-run: first_run_env
+    # itself runs on every stack.sh invocation, so a second sudo run against
+    # an already-chowned .env must not skip this — the file could have been
+    # touched by a root run in between. Chowning an already-correct owner to
+    # itself is a no-op, so this costs nothing on the common case where the
+    # invoking user was never root to begin with (SUDO_UID unset, block
+    # skipped entirely).
+    #
+    # `sudo` sets SUDO_UID/SUDO_GID to the invoking user, so chown back to
+    # that rather than leave secrets only root can read.
+    if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
+        chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/.env" ||
+            die "error: could not chown $DEPLOY_DIR/.env back to the invoking user
+      (uid $SUDO_UID). It was written root-owned at mode 600 and a later
+      non-sudo 'make up' or 'docker compose' would not be able to read it.
+      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/.env by hand."
+        if [ -f "$DEPLOY_DIR/storage-mounts.conf" ]; then
+            chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/storage-mounts.conf" ||
+                die "error: could not chown $DEPLOY_DIR/storage-mounts.conf back to the
+      invoking user (uid $SUDO_UID). It was written root-owned and the
+      invoking user would not be able to edit their own mount list.
+      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/storage-mounts.conf by hand."
+        fi
     fi
 }
 
