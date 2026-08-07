@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from eyened_orm import ModelSegmentation, Segmentation
 from eyened_orm.tag import SegmentationTagLink
 from eyened_orm.authz.scope import AccessScope
+from eyened_orm.repositories._scoped import scoped_one
 
 
 class SegmentationRepository:
@@ -15,18 +16,26 @@ class SegmentationRepository:
         self._scope = scope
 
     def get_by_id(self, segmentation_id: int) -> Segmentation | None:
-        """Return the segmentation by id, or None if absent."""
-        return self._session.get(Segmentation, segmentation_id)
+        """Return the segmentation by id, or None if absent or out of scope."""
+        return scoped_one(
+            self._session,
+            Segmentation,
+            self._scope,
+            Segmentation.SegmentationID == segmentation_id,
+        )
 
     def get_with_tag_links(self, segmentation_id: int) -> Segmentation | None:
-        """Return the segmentation with its tag links loaded, or None.
+        """Return the segmentation with its tag links loaded, or None if absent
+        or out of scope.
 
         Mirrors the eager-load graph the ``GET /segmentations/{id}`` handler
         built inline.
         """
-        return self._session.get(
+        return scoped_one(
+            self._session,
             Segmentation,
-            segmentation_id,
+            self._scope,
+            Segmentation.SegmentationID == segmentation_id,
             options=(
                 selectinload(Segmentation.SegmentationTagLinks).selectinload(
                     SegmentationTagLink.Tag
@@ -40,10 +49,14 @@ class SegmentationRepository:
     def get_tag_link(
         self, tag_id: int, segmentation_id: int
     ) -> SegmentationTagLink | None:
-        """Return the link for (tag_id, segmentation_id), or None if absent."""
-        return self._session.get(
+        """Return the link for (tag_id, segmentation_id), or None if absent or
+        out of scope."""
+        return scoped_one(
+            self._session,
             SegmentationTagLink,
-            {"TagID": tag_id, "SegmentationID": segmentation_id},
+            self._scope,
+            SegmentationTagLink.TagID == tag_id,
+            SegmentationTagLink.SegmentationID == segmentation_id,
         )
 
     def add(self, segmentation: Segmentation) -> None:
@@ -88,8 +101,14 @@ class ModelSegmentationRepository:
         self._scope = scope
 
     def get_by_id(self, model_segmentation_id: int) -> ModelSegmentation | None:
-        """Return the model segmentation by id, or None if absent."""
-        return self._session.get(ModelSegmentation, model_segmentation_id)
+        """Return the model segmentation by id, or None if absent or out of
+        scope."""
+        return scoped_one(
+            self._session,
+            ModelSegmentation,
+            self._scope,
+            ModelSegmentation.ModelSegmentationID == model_segmentation_id,
+        )
 
     def save(self, model_segmentation: ModelSegmentation) -> None:
         """Persist in-place mutations to ``model_segmentation`` (e.g.

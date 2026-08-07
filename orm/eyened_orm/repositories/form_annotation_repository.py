@@ -12,6 +12,8 @@ from eyened_orm import (
     StudyTagLink,
 )
 from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import apply_scope
+from eyened_orm.repositories._scoped import scoped_one
 
 
 class FormAnnotationRepository:
@@ -22,14 +24,22 @@ class FormAnnotationRepository:
         self._scope = scope
 
     def get_by_id(self, annotation_id: int) -> FormAnnotation | None:
-        """Return the annotation by id, or None if absent."""
-        return self._session.get(FormAnnotation, annotation_id)
+        """Return the annotation by id, or None if absent or out of scope."""
+        return scoped_one(
+            self._session,
+            FormAnnotation,
+            self._scope,
+            FormAnnotation.FormAnnotationID == annotation_id,
+        )
 
     def get_with_tag_links(self, annotation_id: int) -> FormAnnotation | None:
-        """Return the annotation by id with its tag links loaded, or None."""
-        return self._session.get(
+        """Return the annotation by id with its tag links loaded, or None if
+        absent or out of scope."""
+        return scoped_one(
+            self._session,
             FormAnnotation,
-            annotation_id,
+            self._scope,
+            FormAnnotation.FormAnnotationID == annotation_id,
             options=(
                 selectinload(
                     FormAnnotation.FormAnnotationTagLinks
@@ -91,15 +101,20 @@ class FormAnnotationRepository:
             query = query.filter(FormAnnotation.FormSchemaID == form_schema_id)
         if sub_task_id is not None:
             query = query.filter(FormAnnotation.SubTaskID == sub_task_id)
+        query = apply_scope(query, FormAnnotation, self._scope)
         return list(self._session.scalars(query).all())
 
     def get_tag_link(
         self, tag_id: int, annotation_id: int
     ) -> FormAnnotationTagLink | None:
-        """Return the link for (tag_id, annotation_id), or None if absent."""
-        return self._session.get(
+        """Return the link for (tag_id, annotation_id), or None if absent or
+        out of scope."""
+        return scoped_one(
+            self._session,
             FormAnnotationTagLink,
-            {"TagID": tag_id, "FormAnnotationID": annotation_id},
+            self._scope,
+            FormAnnotationTagLink.TagID == tag_id,
+            FormAnnotationTagLink.FormAnnotationID == annotation_id,
         )
 
     def add(self, annotation: FormAnnotation) -> None:

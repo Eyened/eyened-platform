@@ -6,17 +6,24 @@ from datetime import date
 import pytest
 
 from eyened_orm.repositories import (
+    FormAnnotationRepository,
     ImageInstanceRepository,
+    ModelSegmentationRepository,
     PatientRepository,
+    SegmentationRepository,
     StudyRepository,
 )
 from eyened_orm.utils.factories import (
     admin_scope,
     make_creator,
     make_device,
+    make_feature,
+    make_form_annotation,
+    make_form_schema,
     make_image,
     make_patient,
     make_project,
+    make_segmentation,
     make_series,
     make_storage_backend,
     make_study,
@@ -208,3 +215,129 @@ def test_scoped_one_refuses_an_entity_with_no_scoping_rule(session):
 
     with pytest.raises(KeyError, match="no scoping rule"):
         scoped_one(session, Tag, admin_scope(), Tag.TagID == 1)
+
+
+def _image_of(session, two_projects, key):
+    from eyened_orm import ImageInstance
+
+    return session.get(ImageInstance, two_projects[key]["image"])
+
+
+def _patient_of(session, two_projects, key):
+    from eyened_orm import Patient
+
+    return session.get(Patient, two_projects[key]["patient"])
+
+
+def test_segmentation_reads_are_scoped_by_their_image(session, two_projects):
+    """A segmentation is visible exactly to the projects of the image it annotates."""
+    creator = make_creator(session, "alice")
+    feature = make_feature(session, "retina")
+    seg_a = make_segmentation(
+        session, _image_of(session, two_projects, "A"), feature, creator
+    )
+    seg_b = make_segmentation(
+        session, _image_of(session, two_projects, "B"), feature, creator
+    )
+    a_id, b_id = seg_a.SegmentationID, seg_b.SegmentationID
+    session.commit()
+
+    repo = SegmentationRepository(
+        session, scope=scope_for(two_projects["A"]["project"])
+    )
+    assert repo.get_by_id(a_id) is not None
+    assert repo.get_by_id(b_id) is None
+    assert repo.get_with_tag_links(b_id) is None
+    # Positive control: the predicate hides B from A, not from everyone.
+    owner = SegmentationRepository(
+        session, scope=scope_for(two_projects["B"]["project"])
+    )
+    assert owner.get_by_id(b_id) is not None
+    assert owner.get_with_tag_links(b_id) is not None
+
+
+def test_model_segmentation_reads_are_scoped_by_their_own_entity(session, two_projects):
+    """ModelSegmentation is a distinct mapped class from Segmentation.
+
+    apply_scope keys on the class it is handed and BOTH are registered, so
+    passing `Segmentation` here still filters -- by the wrong join chain -- and
+    scoped_one's registry check cannot see it. This test is the only thing that
+    can.
+    """
+    from eyened_orm import ModelSegmentation
+    from eyened_orm.segmentation import DataRepresentation, Datatype, SegmentationModel
+
+    # No factory exists: ModelSegmentation.ModelID is NOT NULL and SegmentationModel
+    # is a joined-table subclass of Model, whose ModelName/Version are NOT NULL.
+    model = SegmentationModel(ModelName="m", Version="1")
+    session.add(model)
+    session.flush()
+    made = {}
+    for key in ("A", "B"):
+        row = ModelSegmentation(
+            ModelID=model.ModelID,
+            ImageInstanceID=two_projects[key]["image"],
+            DataType=Datatype.R8UI,
+            DataRepresentation=DataRepresentation.Binary,
+            Depth=1,
+            Height=4,
+            Width=4,
+        )
+        session.add(row)
+        session.flush()
+        made[key] = row.ModelSegmentationID
+    session.commit()
+
+    repo = ModelSegmentationRepository(
+        session, scope=scope_for(two_projects["A"]["project"])
+    )
+    assert repo.get_by_id(made["A"]) is not None
+    assert repo.get_by_id(made["B"]) is None
+    owner = ModelSegmentationRepository(
+        session, scope=scope_for(two_projects["B"]["project"])
+    )
+    assert owner.get_by_id(made["B"]) is not None
+
+
+def test_form_annotation_reads_are_scoped_by_their_patient(session, two_projects):
+    """A form annotation is visible exactly to the projects of its patient."""
+    creator = make_creator(session, "alice")
+    schema = make_form_schema(session, "s")
+    made = {
+        key: make_form_annotation(
+            session, schema, _patient_of(session, two_projects, key), creator
+        ).FormAnnotationID
+        for key in ("A", "B")
+    }
+    session.commit()
+
+    repo = FormAnnotationRepository(
+        session, scope=scope_for(two_projects["A"]["project"])
+    )
+    assert repo.get_by_id(made["A"]) is not None
+    assert repo.get_by_id(made["B"]) is None
+    assert repo.get_with_tag_links(made["B"]) is None
+    owner = FormAnnotationRepository(
+        session, scope=scope_for(two_projects["B"]["project"])
+    )
+    assert owner.get_by_id(made["B"]) is not None
+
+
+def test_list_active_returns_only_in_scope_rows(session, two_projects):
+    """A collection filters and returns 200; it never 404s."""
+    creator = make_creator(session, "alice")
+    schema = make_form_schema(session, "s")
+    for key in ("A", "B"):
+        make_form_annotation(
+            session, schema, _patient_of(session, two_projects, key), creator
+        )
+    session.commit()
+
+    a_rows = FormAnnotationRepository(
+        session, scope=scope_for(two_projects["A"]["project"])
+    ).list_active()
+    assert {r.PatientID for r in a_rows} == {two_projects["A"]["patient"]}
+    b_rows = FormAnnotationRepository(
+        session, scope=scope_for(two_projects["B"]["project"])
+    ).list_active()
+    assert {r.PatientID for r in b_rows} == {two_projects["B"]["patient"]}
