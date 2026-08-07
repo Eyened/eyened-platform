@@ -158,6 +158,46 @@ env_set() {
         { rm -f "$_tmp"; die "error: could not put $_tmp into place as $_file."; }
 }
 
+# Rewrite COMPOSE_FILE's BASE layer list while preserving any layer the
+# operator appended by hand (deploy/.env.example documents appending
+# :compose.host-ports.yaml). Only the four known base layers are ever
+# replaced; anything else already in COMPOSE_FILE is kept, in order, deduped
+# against the new base.
+#
+# This is called on EVERY first_run_env call, not just the first: a dev/client
+# mode switch (re-running stack.sh in the other mode against an existing
+# .env) must still land the correct base list, so the write cannot be frozen
+# to first-run-only without breaking that. Preserving non-base entries is
+# what stops it from also reverting an operator's host-ports edit on every
+# later run — the bug this replaces (lib.sh's COMPOSE_FILE write used to sit
+# outside the "only on first run" guard with no filtering at all).
+_set_compose_file() {
+    _new_base=$1
+    _existing=$(env_get COMPOSE_FILE)
+    _extra=""
+    if [ -n "$_existing" ]; then
+        _old_ifs=$IFS
+        IFS=':'
+        for _layer in $_existing; do
+            case "$_layer" in
+                compose.yaml|compose.dev.yaml|compose.storage.yaml|compose.prod.yaml|"") ;;
+                *)
+                    case ":$_extra:" in
+                        *":$_layer:"*) ;;
+                        *) _extra=${_extra:+$_extra:}$_layer ;;
+                    esac
+                    ;;
+            esac
+        done
+        IFS=$_old_ifs
+    fi
+    if [ -n "$_extra" ]; then
+        env_set COMPOSE_FILE "$_new_base:$_extra"
+    else
+        env_set COMPOSE_FILE "$_new_base"
+    fi
+}
+
 # First-run setup for the dev and install modes of stack.sh. MODE is dev or
 # client and decides which layer list is recorded — that one line is what lets
 # every later command be a bare `docker compose ...` with no -f flags.
@@ -172,6 +212,13 @@ env_set() {
 # holding nothing but the four generated secrets, the "created" banner, and
 # exit 0 — and since the guard below is `[ ! -f .env ]`, no later run ever
 # repairs it.
+#
+# CONTRACT: COMPOSE_FILE's base layer list is rewritten on every call (via
+# _set_compose_file above), not only when .env is first created — only the
+# four known base layer names are ever touched, so a layer the operator
+# appended by hand survives. doctor.sh and bootstrap.sh only ever READ
+# COMPOSE_FILE and neither assumes it is left untouched across runs, so
+# neither is affected by this.
 first_run_env() {
     _mode=$1
     if [ ! -f "$DEPLOY_DIR/.env" ]; then
@@ -188,14 +235,35 @@ first_run_env() {
         env_set EYENED_REDIS_PASSWORD "$_redis_pw"
         env_set MYSQL_ROOT_PASSWORD "$_root_pw"
         env_set EYENED_DATABASE_PASSWORD "$_db_pw"
+
+        # install.sh is the published client door, and some operators will run
+        # it under sudo. Docker itself does not need that (the daemon socket
+        # is what needs root, not this script), but nothing here stops them.
+        # Under sudo this process is root, so .env ends up root-owned at 0600
+        # — unreadable by the invoking user's own later `make up` or plain
+        # `docker compose`, which is a worse failure than the file being
+        # briefly group-readable. This has to run AFTER the env_set calls
+        # above, not right after the chmod: env_set's mv (lib.sh) replaces the
+        # file with a fresh temp file it just created, which re-owns it as
+        # root on every call — chowning any earlier would just be undone by
+        # the next env_set. `sudo` sets SUDO_UID/SUDO_GID to the invoking
+        # user, so chown back to that rather than leave a secret only root
+        # can read.
+        if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
+            chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/.env" ||
+                die "error: could not chown $DEPLOY_DIR/.env back to the invoking user
+      (uid $SUDO_UID). It was created root-owned at mode 600 and a later
+      non-sudo 'make up' or 'docker compose' would not be able to read it.
+      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/.env by hand."
+        fi
         echo "==> created deploy/.env with generated secrets"
         echo "    On a shared machine, set COMPOSE_PROJECT_NAME and HTTP_PORT"
         echo "    in deploy/.env to something nobody else is using."
     fi
 
     case "$_mode" in
-        dev)    env_set COMPOSE_FILE "$COMPOSE_FILE_DEV" ;;
-        client) env_set COMPOSE_FILE "$COMPOSE_FILE_CLIENT" ;;
+        dev)    _set_compose_file "$COMPOSE_FILE_DEV" ;;
+        client) _set_compose_file "$COMPOSE_FILE_CLIENT" ;;
         *)      die "first_run_env: expected 'dev' or 'client', got '$_mode'" ;;
     esac
 
