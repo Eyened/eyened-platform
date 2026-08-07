@@ -32,6 +32,18 @@ services:
     volumes:
       - ../client:/app/client
       - client_node_modules:/app/client/node_modules
+    # YAML anchors do not cross files: compose.yaml's x-logging/x-restart
+    # only reach the services defined in compose.yaml, so a service a layer
+    # introduces inherits neither and must restate them itself. Without this,
+    # vite/HMR/npm-install stdout is an UNCAPPED json-file log on a host
+    # several stacks share — exactly what compose.yaml's log cap exists to
+    # prevent. Literal values, matching the base's, not a re-declared anchor.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
 
   fileserver:
     volumes:

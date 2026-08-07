@@ -138,11 +138,16 @@ services:
         condition: service_healthy
         required: false
     healthcheck:
+      # 127.0.0.1, not localhost: the dev layer adds an extra_hosts entry
+      # that can alias `localhost` itself to the docker gateway (so the
+      # server can reach a host-published Keycloak). An IP literal bypasses
+      # /etc/hosts entirely and can never be shadowed by that alias, now or
+      # later — do not "tidy" this back to localhost.
       test:
         - CMD
         - python
         - -c
-        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2).read()
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()
       interval: 10s
       timeout: 3s
       retries: 5

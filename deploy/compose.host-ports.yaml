@@ -4,11 +4,16 @@
 #
 # Enable by appending :compose.host-ports.yaml to COMPOSE_FILE in deploy/.env
 # and picking ports nobody else is using.
+#
+# Bound to 127.0.0.1, not every interface: both named use cases (DBeaver, a
+# host-side alembic) are local to this machine, and a host shared by other
+# users should not get MySQL/Redis reachable from the network by default. If
+# you genuinely need remote access, change the host_ip below yourself.
 
 services:
   database:
     ports:
-      - "${DB_PUBLISH_PORT:-13306}:3306"
+      - "127.0.0.1:${DB_PUBLISH_PORT:-13306}:3306"
   redis:
     ports:
-      - "${REDIS_PUBLISH_PORT:-16379}:6379"
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-16379}:6379"
