@@ -27,6 +27,7 @@ from eyened_orm.utils.factories import (
     make_series,
     make_storage_backend,
     make_study,
+    make_tag,
     scope_for,
 )
 
@@ -231,6 +232,8 @@ def _patient_of(session, two_projects, key):
 
 def test_segmentation_reads_are_scoped_by_their_image(session, two_projects):
     """A segmentation is visible exactly to the projects of the image it annotates."""
+    from eyened_orm.tag import TagType
+
     creator = make_creator(session, "alice")
     feature = make_feature(session, "retina")
     seg_a = make_segmentation(
@@ -254,6 +257,17 @@ def test_segmentation_reads_are_scoped_by_their_image(session, two_projects):
     )
     assert owner.get_by_id(b_id) is not None
     assert owner.get_with_tag_links(b_id) is not None
+
+    tag = make_tag(session, "seg-tag", TagType.Segmentation, creator)
+    SegmentationRepository(session, scope=admin_scope()).add_link(
+        tag_id=tag.TagID, segmentation_id=b_id, creator_id=creator.CreatorID
+    )
+    session.commit()
+
+    assert repo.get_tag_link(tag.TagID, b_id) is None
+    # The owning scope still sees it. Without this direction the test passes
+    # for a predicate that hides the link from EVERYONE, not just from A.
+    assert owner.get_tag_link(tag.TagID, b_id) is not None
 
 
 def test_model_segmentation_reads_are_scoped_by_their_own_entity(session, two_projects):
@@ -301,6 +315,8 @@ def test_model_segmentation_reads_are_scoped_by_their_own_entity(session, two_pr
 
 def test_form_annotation_reads_are_scoped_by_their_patient(session, two_projects):
     """A form annotation is visible exactly to the projects of its patient."""
+    from eyened_orm.tag import TagType
+
     creator = make_creator(session, "alice")
     schema = make_form_schema(session, "s")
     made = {
@@ -321,6 +337,20 @@ def test_form_annotation_reads_are_scoped_by_their_patient(session, two_projects
         session, scope=scope_for(two_projects["B"]["project"])
     )
     assert owner.get_by_id(made["B"]) is not None
+
+    tag = make_tag(session, "form-tag", TagType.FormAnnotation, creator)
+    FormAnnotationRepository(session, scope=admin_scope()).add_link(
+        tag_id=tag.TagID,
+        form_annotation_id=made["B"],
+        creator_id=creator.CreatorID,
+        comment=None,
+    )
+    session.commit()
+
+    assert repo.get_tag_link(tag.TagID, made["B"]) is None
+    # The owning scope still sees it. Without this direction the test passes
+    # for a predicate that hides the link from EVERYONE, not just from A.
+    assert owner.get_tag_link(tag.TagID, made["B"]) is not None
 
 
 def test_list_active_returns_only_in_scope_rows(session, two_projects):
