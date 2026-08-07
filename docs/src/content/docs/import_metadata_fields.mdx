@@ -34,7 +34,7 @@ Each row is walked through the importer graph (`Project → Patient → Study �
 | Series | `series_instance_uid`, `series_id`, or `series_anonymous_identity` |
 | Device | `manufacturer` + `manufacturer_model_name` + `device_description`, or `device_model_id` / `device_id` |
 | Image file | `storage_backend_key` + `object_key` |
-| Image metadata | `modality` (required for the viewer) |
+| Image metadata | `modality` (required for the viewer; can be filled from DICOM when using [preparation](/eyened-platform/orm/importer#row-preparation)) |
 
 **Patch an existing image** — provide `image_instance_id`, `public_id`, or `sop_instance_uid` plus only the fields you want to change.
 
@@ -157,9 +157,19 @@ Files are referenced by storage backend + path within that backend (resolved via
 | `storage_backend_kind` | str | Property | Backend kind when **creating** a new backend |
 | `image_storage_id` | int | PK | Existing `ImageStorage` row |
 | `object_key` | str | Lookup | **Required for new images.** Path to the file within the backend (unique per backend) |
-| `image_storage_format` | str | Property | MIME or format string (`image/png`, `dicom`, …); often inferred from `object_key` during [preparation](/eyened-platform/orm/importer) |
+| `image_storage_format` | str | Property | MIME or format string (`image/png`, `dicom`, …); often inferred from `object_key` during [preparation](/eyened-platform/orm/importer#row-preparation) |
 | `image_storage_is_primary` | bool | Property | Whether this row is the primary storage location for the instance |
 | `image_storage_hash` | bytes | Property | SHA-256 digest (32 bytes) |
 | `image_storage_checksum` | str | Property | Checksum string (e.g. MD5 hex) |
+
+---
+
+## DICOM preparation (optional)
+
+With `PreparationOptions(read_dicom_header=True)` on the [ORM importer](/eyened-platform/orm/importer#row-preparation), missing fields above can be filled from the DICOM file at `storage_backend_key` + `object_key` (relative path under `EYENED_STORAGE_MOUNTS`). Explicit row/default values are never overwritten.
+
+Common auto-fills: `patient_identifier` ← `PatientID`, `study_date` ← `StudyDate`, `dicom_modality` / `modality` from DICOM `Modality` + `ImageType`, geometry and `resolution_*` (including OPT spacing from Shared Functional Groups `PixelMeasuresSequence`), series/SOP UIDs, laterality, acquisition datetime.
+
+`link_oct_enface_series=True` can rewrite enface `series_instance_uid` to match the linked OCT so both share one Series (Referenced SOP / FrameOfReferenceUID). See [OCT–enface series linking](/eyened-platform/orm/importer#octenface-series-linking).
 
 </div>

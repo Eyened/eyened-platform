@@ -7,6 +7,10 @@ sidebar:
 
 The API **registers** images that already exist on a storage backend — it does not upload file bytes. See **[Importing data](/eyened-platform/importing_data)**.
 
+::::note
+`POST /api/import/image` does **not** run DICOM header preparation (`read_dicom_header` / `link_oct_enface_series`). Supply PatientID, study date, modality, and series linking on the row yourself, or use the [ORM importer](/eyened-platform/orm/importer#row-preparation) with `PreparationOptions`.
+::::
+
 ### POST /api/import/image
 
 Import a single flat `ImportRow`.

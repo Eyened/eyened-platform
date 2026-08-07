@@ -12,6 +12,7 @@ The renewed ORM importer turns **flat rows** (`ImportRow`) into a consistent set
 At a high level:
 
 - Build a list of `ImportRow` objects (or load them from CSV)
+- Optionally enrich rows with [preparation](#row-preparation) (`PreparationOptions`: format inference, DICOM headers, OCT–enface series linking, hashes)
 - Plan the import with `plan_image_import(session, rows, ...)` (or `build_image_import_rows` + `plan_import`) to produce an `ImportRun`
 - Review the planned changes (`run.display_summary()` / `run.full_summary()`)
 - Apply the changes (`run.apply()`), then `session.commit()`
@@ -34,9 +35,9 @@ from eyened_orm.importer import plan_image_import, ImportRow
 
 defaults = {
     "project_external": "Y",
-    "manufacturer": "UNKOWN",
-    "manufacturer_model_name": "UNKOWN",
-    "device_description": "UNKOWN",
+    "manufacturer": "UNKNOWN",
+    "manufacturer_model_name": "UNKNOWN",
+    "device_description": "UNKNOWN",
     "dataset_identifier": "",  # deprecated, but required by schema
     "storage_backend_kind": "local",
 }
@@ -68,6 +69,76 @@ run.display_summary()  # human-friendly overview (HTML in notebooks)
 run.apply()
 session.commit()
 ```
+
+## Row preparation
+
+Before planning, `plan_image_import` / `build_image_import_rows` call `prepare_rows` to fill missing fields. Control this with `PreparationOptions` (pass as `options=` to those helpers).
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `infer_image_format` | `True` | Set `image_storage_format` from `object_key` (e.g. `.dcm` → `"dicom"`) |
+| `defaults` | `None` | Fill missing row fields from a dict |
+| `read_dicom_header` | `False` | Parse DICOM headers (no pixels) and merge missing ImportRow fields |
+| `link_oct_enface_series` | `False` | Co-locate OPT/OCT + enface under one `series_instance_uid` (needs header metadata) |
+| `read_image_header` | `False` | Read PNG/JPEG dimensions |
+| `compute_storage_hash` / `compute_storage_checksum` | `False` | SHA-256 / MD5 of file bytes |
+| `raw_loader` | `None` | Optional `Callable[[ImportRow], bytes \| None]` instead of storage mounts |
+
+**Merge rule:** preparation only fills fields that are still `None`. Values you set on the `ImportRow` (or in `defaults`) always win — for example an explicit `patient_identifier` overrides DICOM `PatientID`.
+
+**Reading files:** with `read_dicom_header` (or hashes), bytes are loaded via `EYENED_STORAGE_MOUNTS[storage_backend_key] / object_key`, or via `raw_loader`. Use a **relative** `object_key` under the mount (not an absolute path).
+
+```python
+from eyened_orm.importer import ImportRow, PreparationOptions, plan_image_import
+
+opts = PreparationOptions(
+    defaults=defaults,
+    infer_image_format=True,
+    read_dicom_header=True,
+    link_oct_enface_series=True,
+)
+run = plan_image_import(session, rows, options=opts)
+```
+
+### DICOM header fields
+
+When `read_dicom_header=True` and `image_storage_format == "dicom"`, `dicom_header_patches_from_bytes` may fill (among others):
+
+| DICOM source | ImportRow field |
+|--------------|-----------------|
+| `PatientID` | `patient_identifier` |
+| `StudyDate` | `study_date` |
+| `Modality` (+ heuristics) | `dicom_modality` and viewer `modality` |
+| `SOPInstanceUID` / `SOPClassUID` | `sop_instance_uid` / `sop_class_uid` |
+| `SeriesInstanceUID` / `StudyInstanceUID` / `SeriesNumber` | series fields |
+| `Rows` / `Columns` / `NumberOfFrames` | `height` / `width` / `depth` |
+| `PixelSpacing` / `SliceThickness` (top-level or Shared FG `PixelMeasuresSequence`) | `resolution_*` |
+| Laterality / acquisition datetime | `laterality` / `acquisition_date_time` |
+
+**Viewer modality heuristics** (Spectralis-oriented; leave `modality` unset when ambiguous):
+
+- `OPT` → `dicom_modality=OPT`, `modality=OCT` (OCTA is **not** auto-detected)
+- `OP` + `ImageType` containing `RED` → `InfraredReflectance`
+- `OP` + `ImageType` containing `AF` → `Autofluorescence`
+- `OP` without those subtypes → `dicom_modality=OP` only
+- Other DICOM modalities (e.g. `OT` device raw data) → neither modality field set; usually skip those files at row-building time
+
+Preparation logs **warnings** when OPT→OCT mapping is used, when OP has no viewer modality, or when series linking cannot run (see below).
+
+### OCT–enface series linking
+
+Some exports (notably Heidelberg) give each file its own `SeriesInstanceUID`, while OCT and the IR/AF localizer still belong together. They typically share `FrameOfReferenceUID`, and the OPT references the enface via `ReferencedImageSequence` / Ophthalmic Frame Location.
+
+With `link_oct_enface_series=True` (and `read_dicom_header=True` so that metadata is present), preparation:
+
+1. Finds OPT/OCT rows and their referenced enface SOP UIDs (FoR fallback if needed)
+2. Sets all members of each pair/group to the **OCT’s** `series_instance_uid`
+
+So they land in one `Series` for the viewer and for export localizer heuristics. Rows with an explicit `series_id` are left alone. Confirmed links still apply if `series_anonymous_identity` is set (otherwise distinct DICOM series UIDs would keep the pair apart).
+
+::::caution
+If `link_oct_enface_series=True` but headers are not read (`read_dicom_header=False`, unreadable mounts/`object_key`, or missing FoR/references), linking is a **no-op** and a warning is logged.
+::::
 
 ## Import from CSV
 
@@ -103,6 +174,8 @@ Primary keys take precedence when provided.
 When you don’t have a stable real-world identifier (for example no DICOM `series_instance_uid`), you can group rows **within the same import batch** using `*_anonymous_identity`.
 
 Rows with the same `series_anonymous_identity` will be grouped into the **same `Series`**.
+
+For DICOM OCT + enface that already have UIDs but should share a series, prefer [`link_oct_enface_series`](#octenface-series-linking) instead of inventing anonymous identities.
 
 ## Reviewing changes in detail
 
@@ -157,9 +230,10 @@ session.commit()
 - **Deduplication**: rows with the same lookup key are merged into one create + updates.
 - **Idempotency**: re-running the same import should not produce any changes.
 - **Primary-key precedence**: if `*_id` is provided, it wins over lookup keys (and allows renaming lookup fields).
+- **DICOM preparation**: PatientID/StudyDate/modality/resolutions and OCT–enface series linking (see tests in `orm/eyened_orm/importer/tests/test_preparation_dicom_and_hashes.py`).
 
 ::::note
 For a hands-on, runnable walkthrough, see the example notebook at
-`https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/importer_example.ipynb`.
+[`orm/notebooks/image_importer_tutorial.ipynb`](https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/image_importer_tutorial.ipynb).
+Task imports: [`orm/notebooks/task_importer_tutorial.ipynb`](https://github.com/Eyened/eyened-platform/blob/main/orm/notebooks/task_importer_tutorial.ipynb).
 ::::
-
