@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Hot backup of the compose MySQL volume: xtrabackup --backup then --prepare into DEST.
 # Usage: ./save_dump.sh [-e envfile] <output-dir>
-#   Default env is database/.env; paths are resolved relative to database/ (e.g. -e .env.dump tmp).
+#   Default env is deploy/.env; paths are resolved relative to deploy/ (e.g. -e .env.dump tmp).
 # Requires: database running; EYENED_DATABASE_USER and EYENED_DATABASE_PASSWORD in the env file.
 set -euo pipefail
 
-DIR="$(cd "$(dirname "$0")" && pwd)"
+# Compose (and .env) live in deploy/, one level up from scripts/.
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$DIR/.env"
 
 usage() {
@@ -14,9 +15,9 @@ usage() {
 
 compose() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose "$@"
+    ( cd "$DIR" && docker compose "$@" )
   elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose "$@"
+    ( cd "$DIR" && docker-compose "$@" )
   else
     echo "error: neither 'docker compose' nor 'docker-compose' is available" >&2
     exit 1
@@ -34,17 +35,17 @@ shift $((OPTIND - 1))
 
 if [ -z "${1:-}" ]; then
   usage
-  echo "  <output-dir>: absolute path or path under database/ (e.g. tmp)" >&2
+  echo "  <output-dir>: absolute path or path under deploy/ (e.g. tmp)" >&2
   exit 1
 fi
 DEST="$1"
 
-# Resolve relative env file path against database/
+# Resolve relative env file path against deploy/
 if [[ "$ENV_FILE" != /* ]]; then
   ENV_FILE="$DIR/${ENV_FILE#./}"
 fi
 
-# Bind mounts require an absolute host path; resolve relative paths against database/
+# Bind mounts require an absolute host path; resolve relative paths against deploy/
 if [[ "$DEST" != /* ]]; then
   DEST="$DIR/${DEST#./}"
 fi

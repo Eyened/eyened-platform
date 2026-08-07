@@ -68,6 +68,13 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: database
 
+  # Used only by deploy/scripts/{load,save}_dump.sh.
+  xtrabackup:
+    profiles: ["backup"]
+    image: percona/percona-xtrabackup:8.0
+    volumes:
+      - db_data:/var/lib/mysql
+
   redis:
     image: redis:7-alpine
     logging: *default-logging

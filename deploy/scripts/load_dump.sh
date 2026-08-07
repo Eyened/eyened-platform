@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Load a prepared XtraBackup directory into the compose MySQL data volume.
-# Usage: ./load_dump.sh /absolute/path/to/backup-dir   (or relative to database/, e.g. tmp)
-# The backup must already be prepared (xtrabackup --prepare). Intended to be run from database/.
+# Usage: ./load_dump.sh /absolute/path/to/backup-dir   (or relative to deploy/, e.g. tmp)
+# The backup must already be prepared (xtrabackup --prepare). Run from anywhere;
+# paths are resolved relative to deploy/.
 set -euo pipefail
 
-DIR="$(cd "$(dirname "$0")" && pwd)"
+# Compose (and .env) live in deploy/, one level up from scripts/.
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 usage() {
   echo "usage: $0 <backup-dir>" >&2
@@ -12,9 +14,9 @@ usage() {
 
 compose() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose "$@"
+    ( cd "$DIR" && docker compose "$@" )
   elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose "$@"
+    ( cd "$DIR" && docker-compose "$@" )
   else
     echo "error: neither 'docker compose' nor 'docker-compose' is available" >&2
     exit 1
@@ -27,7 +29,7 @@ if [ -z "${1:-}" ]; then
 fi
 SRC="$1"
 
-# Bind mounts require an absolute host path; resolve relative paths against database/
+# Bind mounts require an absolute host path; resolve relative paths against deploy/
 if [[ "$SRC" != /* ]]; then
   SRC="$DIR/${SRC#./}"
 fi
