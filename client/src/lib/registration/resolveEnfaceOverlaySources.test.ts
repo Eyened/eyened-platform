@@ -44,7 +44,7 @@ describe("resolveEnfaceOverlaySources", () => {
         expect(sources[0].mode).toBe("binary");
     });
 
-    it("includes direct affine edges to _proj", () => {
+    it("includes direct affine and parabolic edges to _proj", () => {
         const registration = new Registration();
         registration.importRegistrationItems(
             [
@@ -77,12 +77,16 @@ describe("resolveEnfaceOverlaySources", () => {
             projMode: "binary",
             linkedModes: new Map([["oct1", "heatmap"]]),
         });
-        expect(sources).toHaveLength(1);
-        expect(sources[0].octPublicId).toBe("oct1");
-        expect(sources[0].mode).toBe("heatmap");
-        expect(sources[0].mappingGlsl).toContain("map_0");
-        expect(sources[0].sizePrimary).toEqual([200, 200]);
-        expect(sources[0].sizeSecondary).toEqual([100, 50]);
+        expect(sources).toHaveLength(2);
+        const byOct = Object.fromEntries(
+            sources.map((s) => [s.octPublicId, s]),
+        );
+        expect(byOct.oct1.mode).toBe("heatmap");
+        expect(byOct.oct1.mappingGlsl).toContain("map_0");
+        expect(byOct.oct1.sizePrimary).toEqual([200, 200]);
+        expect(byOct.oct1.sizeSecondary).toEqual([100, 50]);
+        expect(byOct.oct2.mode).toBe("off");
+        expect(byOct.oct2.mappingGlsl).toContain("dx_val");
     });
 
     it("composes affine + enface→proj along a multi-hop path", () => {
@@ -125,6 +129,55 @@ describe("resolveEnfaceOverlaySources", () => {
         expect(sources).toHaveLength(1);
         expect(sources[0].mappingGlsl).toContain("map_0");
         expect(sources[0].mappingGlsl).toContain("map_1");
+        expect(sources[0].mappingGlsl).toContain("bestDist");
+    });
+
+    it("composes parabolic + enface→proj along a multi-hop path", () => {
+        const registration = new Registration();
+        const locators = [
+            new LinePhotoLocator(
+                "ir",
+                "oct1",
+                { x: 0, y: 0 },
+                { x: 150, y: 0 },
+                0,
+                100,
+            ),
+        ];
+        registration.importRegistrationItems(
+            [
+                new ParabolicRegistration(
+                    "fundus",
+                    "ir",
+                    [0.1, 0, 0, 0, 0, 0, 0],
+                    [0, 0.2, 0, 0, 0, 0, 0],
+                ),
+                new EnfaceToProjPhotolocations(
+                    "ir",
+                    "oct1_proj",
+                    locators,
+                    100,
+                    50,
+                ),
+            ],
+            false,
+        );
+        registration.recomputePathsNow();
+
+        const sources = resolveEnfaceOverlaySources({
+            imageId: "fundus",
+            imageWidth: 200,
+            imageHeight: 200,
+            registration,
+            managers: new Map([["oct1", fakeManager("oct1")]]),
+            getImageSize,
+            projMode: "binary",
+            linkedModes: new Map([["oct1", "binary"]]),
+        });
+        expect(sources).toHaveLength(1);
+        expect(sources[0].mappingGlsl).toContain("map_0");
+        expect(sources[0].mappingGlsl).toContain("map_1");
+        expect(sources[0].mappingGlsl).toContain("dx_val");
         expect(sources[0].mappingGlsl).toContain("bestDist");
     });
 

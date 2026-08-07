@@ -2,6 +2,7 @@ import type { Position } from "$lib/types";
 import { f, mat3 } from "./affine";
 import { AffineRegistration } from "./affine";
 import { CompositeRegistration } from "./composite";
+import { ParabolicRegistration } from "./parabolic";
 import {
     CirclePhotoLocator,
     LinePhotoLocator,
@@ -21,6 +22,9 @@ export function bakeHopGlsl(
 ): string | null {
     if (item instanceof AffineRegistration) {
         return bakeAffineHop(item.M, srcSize, dstSize);
+    }
+    if (item instanceof ParabolicRegistration) {
+        return bakeParabolicHop(item.dx, item.dy, srcSize, dstSize);
     }
     if (item instanceof CompositeRegistration) {
         return bakeCompositeHop(item, srcSize, dstSize);
@@ -44,23 +48,86 @@ export function bakeAffineHop(
         }`;
 }
 
+/** Pixel-space displacement matching ParabolicRegistration.mapping. */
+function bakeParabolicPixelStep(dx: number[], dy: number[]): string | null {
+    if (dx.length !== 7 || dy.length !== 7) {
+        return null;
+    }
+    return `{
+                float x = p.x;
+                float y = p.y;
+                float dx_val = ${f(dx[0])} + ${f(dx[1])} + ${f(dx[2])} * x + ${f(dx[3])} * y + ${f(dx[4])} * x * x + ${f(dx[5])} * x * y + ${f(dx[6])} * y * y;
+                float dy_val = ${f(dy[0])} + ${f(dy[1])} + ${f(dy[2])} * x + ${f(dy[3])} * y + ${f(dy[4])} * x * x + ${f(dy[5])} * x * y + ${f(dy[6])} * y * y;
+                p = vec2(x - dx_val, y - dy_val);
+            }`;
+}
+
+export function bakeParabolicHop(
+    dx: number[],
+    dy: number[],
+    srcSize: [number, number],
+    dstSize: [number, number],
+): string | null {
+    const step = bakeParabolicPixelStep(dx, dy);
+    if (!step) {
+        return null;
+    }
+    return `vec2 map_hop(vec2 uv) {
+            vec2 p = uv * vec2(${f(srcSize[0])}, ${f(srcSize[1])});
+            ${step}
+            return p / vec2(${f(dstSize[0])}, ${f(dstSize[1])});
+        }`;
+}
+
+function bakeAffinePixelStep(M: Matrix): string {
+    return `{
+                mat3 transform = ${mat3(M)}
+                vec3 tp = transform * vec3(p, 1.0);
+                p = tp.xy / tp.z;
+            }`;
+}
+
 function bakeCompositeHop(
     item: CompositeRegistration,
     srcSize: [number, number],
     dstSize: [number, number],
 ): string | null {
+    if (item.transforms.length === 0) {
+        return null;
+    }
+
     const affines = item.transforms.filter(
         (t): t is AffineRegistration => t instanceof AffineRegistration,
     );
-    if (affines.length === 0 || affines.length !== item.transforms.length) {
-        return null;
+    if (affines.length === item.transforms.length) {
+        // CPU applies T0 then T1 … → combined = Tn * … * T0
+        let combined = affines[0].M;
+        for (let i = 1; i < affines.length; i++) {
+            combined = affines[i].M.multiply(combined);
+        }
+        return bakeAffineHop(combined, srcSize, dstSize);
     }
-    // CPU applies T0 then T1 … → combined = Tn * … * T0
-    let combined = affines[0].M;
-    for (let i = 1; i < affines.length; i++) {
-        combined = affines[i].M.multiply(combined);
+
+    // Mixed affine/parabolic: same continuous pixel space as CompositeRegistration.mapping.
+    const steps: string[] = [];
+    for (const t of item.transforms) {
+        if (t instanceof AffineRegistration) {
+            steps.push(bakeAffinePixelStep(t.M));
+        } else if (t instanceof ParabolicRegistration) {
+            const step = bakeParabolicPixelStep(t.dx, t.dy);
+            if (!step) {
+                return null;
+            }
+            steps.push(step);
+        } else {
+            return null;
+        }
     }
-    return bakeAffineHop(combined, srcSize, dstSize);
+    return `vec2 map_hop(vec2 uv) {
+            vec2 p = uv * vec2(${f(srcSize[0])}, ${f(srcSize[1])});
+            ${steps.join("\n")}
+            return p / vec2(${f(dstSize[0])}, ${f(dstSize[1])});
+        }`;
 }
 
 /** Direct enface → `{oct}_proj` edge derived from photo locators (for GPU sampling). */
