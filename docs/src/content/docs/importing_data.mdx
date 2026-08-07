@@ -26,7 +26,7 @@ Typical workflow:
 5. `run.apply()` then `session.commit()` — write to the database
 6. Optionally export the run to JSON for audit or undo
 
-Each row points to an image file via `storage_backend_key` and **relative** `object_key` within that backend. The file must already exist — import registers the path in the database; it does not copy or upload image bytes. Place files on the backend first (e.g. rsync to a local mount, or upload to S3 separately), then run the import. DICOM header reading uses `EYENED_STORAGE_MOUNTS[backend] / object_key` (or a custom `raw_loader`).
+Each row points to an image file via `storage_backend_key` and **relative** `object_key` within that backend. The file must already exist — import registers the path in the database; it does not copy or upload image bytes. Place files on the backend first, then run the import. DICOM header reading uses `EYENED_STORAGE_MOUNTS[backend] / object_key` (or a custom `raw_loader`).
 
 Full guide: **[ORM Importer](/eyened-platform/orm/importer)** (requires **[ORM setup](/eyened-platform/orm/getting_started)**).
 

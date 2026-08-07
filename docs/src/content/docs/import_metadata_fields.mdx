@@ -34,7 +34,7 @@ Each row is walked through the importer graph (`Project → Patient → Study �
 | Series | `series_instance_uid`, `series_id`, or `series_anonymous_identity` |
 | Device | `manufacturer` + `manufacturer_model_name` + `device_description`, or `device_model_id` / `device_id` |
 | Image file | `storage_backend_key` + `object_key` |
-| Image metadata | `modality` (required for the viewer; can be filled from DICOM when using [preparation](/eyened-platform/orm/importer#row-preparation)) |
+| Image metadata | `modality` (required for the viewer; can be partially filled from DICOM when using [preparation](/eyened-platform/orm/importer#row-preparation)) |
 
 **Patch an existing image** — provide `image_instance_id`, `public_id`, or `sop_instance_uid` plus only the fields you want to change.
 
