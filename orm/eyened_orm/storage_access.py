@@ -25,7 +25,7 @@ class StorageRef:
 def resolve_image_data_ref(
     image_instance,
     *,
-    index: int | None = None,
+    index: int | None = 0,
     meta: bool = False,
 ) -> StorageRef:
     storage = image_instance.primary_storage
