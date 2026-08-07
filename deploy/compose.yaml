@@ -116,14 +116,20 @@ services:
       EYENED_API_DEBUG: ${EYENED_API_DEBUG:-false}
       # Always /storage inside the container; what backs it is decided below.
       EYENED_STORAGE_ROOT: /storage
-      # OIDC endpoints are browser-facing. The metadata URL and the iss=
-      # validation below MUST keep naming the same issuer (Keycloak's own
-      # host:port) or token validation fails at runtime — see the open
-      # question flagged in the Task 8b report about whether Keycloak should
-      # instead be proxied under PUBLIC_URL. Only the redirect URL, which the
-      # browser is sent back to, is derived from PUBLIC_URL: behind a TLS-
-      # terminating proxy (SURF Research Cloud, any ingress) that is the
+      # The redirect URL is browser-facing, so it follows PUBLIC_URL: behind
+      # a TLS-terminating proxy (SURF Research Cloud, any ingress) that is the
       # public https:// origin with no port — not this stack's host and port.
+      #
+      # The metadata URL is different: the SERVER fetches it directly
+      # (server/config.py), not the browser, so it must name an address the
+      # server container can reach — today that is Keycloak's own
+      # host:KEYCLOAK_PORT. Moving it onto PUBLIC_URL would make the server
+      # fetch back out through the TLS proxy it's behind (egress, split-DNS,
+      # cert trust — no thanks), and it is NOT needed for the metadata
+      # document's issuer to match the token's iss= below: both come from
+      # Keycloak's own KC_HOSTNAME, not from the URL we fetch it at. Move the
+      # metadata URL and iss= only together, and only alongside an nginx
+      # route for /realms/ plus a matching KC_HOSTNAME.
       # Inert unless EYENED_API_AUTH_OIDC_ENABLED is true (see the oidc profile).
       EYENED_OIDC_METADATA_URL: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}/realms/eyened-dev/.well-known/openid-configuration
       EYENED_OIDC_REDIRECT_URL: ${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${HTTP_PORT:-8080}}/users/oidc-callback
