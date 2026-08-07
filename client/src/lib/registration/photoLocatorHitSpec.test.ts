@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LinePhotoLocator } from "./photoLocators";
+import { CirclePhotoLocator, LinePhotoLocator } from "./photoLocators";
 import { buildPhotoLocatorHitSpec } from "./photoLocatorHitSpec";
 
 function horiz(y: number, index: number) {
@@ -101,5 +101,35 @@ describe("buildPhotoLocatorHitSpec radial", () => {
         const hit = spec.query(p);
         expect(hit).toBeDefined();
         expect(hit!.index).toBe(0);
+    });
+});
+
+function ring(radius: number, index: number, start = Math.PI) {
+    return new CirclePhotoLocator(
+        "ir",
+        "oct",
+        { x: 50, y: 50 },
+        radius,
+        start,
+        index,
+        100,
+    );
+}
+
+describe("buildPhotoLocatorHitSpec circular", () => {
+    it("hits full ring with start_angle=π via wrap", () => {
+        const spec = buildPhotoLocatorHitSpec([ring(20, 0), ring(30, 1)]);
+        // point at angle 0 (east): must map despite start_angle=π
+        const hit = spec.query({ x: 70, y: 50 });
+        expect(hit).toBeDefined();
+        expect(hit!.index).toBe(0);
+        expect(hit!.x).toBeGreaterThanOrEqual(0);
+        expect(hit!.x).toBeLessThanOrEqual(100);
+    });
+
+    it("uses half radius gap; misses outside outer ring half-gap", () => {
+        const spec = buildPhotoLocatorHitSpec([ring(20, 0), ring(30, 1)]);
+        expect(spec.query({ x: 50 + 24, y: 50 })?.index).toBe(0); // 4px out from r=20
+        expect(spec.query({ x: 50 + 36, y: 50 })).toBeUndefined(); // 6px out from r=30
     });
 });

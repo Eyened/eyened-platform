@@ -231,6 +231,104 @@ function buildRadialFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
     };
 }
 
+const CENTER_EPS = 2; // px
+
+function buildCircularFamily(
+    circles: CirclePhotoLocator[],
+): PhotoLocatorHitSpec {
+    const c = circles[0].center;
+    type M = { loc: CirclePhotoLocator; delta: number };
+    const members: M[] = [...circles]
+        .sort((a, b) => a.radius - b.radius)
+        .map((loc) => ({ loc, delta: 1 }));
+    for (let i = 0; i < members.length; i++) {
+        const gaps: number[] = [];
+        if (i > 0)
+            gaps.push(members[i].loc.radius - members[i - 1].loc.radius);
+        if (i < members.length - 1)
+            gaps.push(members[i + 1].loc.radius - members[i].loc.radius);
+        members[i].delta = gaps.length ? Math.min(...gaps) / 2 : 1;
+    }
+
+    return {
+        kind: "circular",
+        query(p) {
+            const dx = p.x - c.x;
+            const dy = p.y - c.y;
+            const rr = Math.hypot(dx, dy);
+            let best: HitSpecResult | undefined;
+            let bestScore = Infinity;
+            for (const m of members) {
+                const d = Math.abs(rr - m.loc.radius);
+                if (d > m.delta) continue;
+                let angle = Math.atan2(dy, dx) - m.loc.start_angle;
+                let t = angle / (2 * Math.PI);
+                t = t - Math.floor(t); // fract → [0,1)
+                const score = d / m.delta;
+                if (
+                    score < bestScore ||
+                    (score === bestScore && d < (best?.d ?? Infinity))
+                ) {
+                    bestScore = score;
+                    best = {
+                        x: m.loc.width * t,
+                        y: m.loc.index + 0.5,
+                        index: m.loc.index,
+                        d,
+                        delta: m.delta,
+                    };
+                }
+            }
+            return best;
+        },
+    };
+}
+
+function groupCirclesByCenter(
+    circles: CirclePhotoLocator[],
+): CirclePhotoLocator[][] {
+    const groups: CirclePhotoLocator[][] = [];
+    for (const cir of circles) {
+        let g = groups.find(
+            (grp) =>
+                Math.hypot(
+                    grp[0].center.x - cir.center.x,
+                    grp[0].center.y - cir.center.y,
+                ) < CENTER_EPS,
+        );
+        if (!g) {
+            g = [];
+            groups.push(g);
+        }
+        g.push(cir);
+    }
+    return groups;
+}
+
+function mergeSpecs(specs: PhotoLocatorHitSpec[]): PhotoLocatorHitSpec {
+    if (specs.length === 1) return specs[0];
+    return {
+        kind: "mixed",
+        query(p) {
+            let best: HitSpecResult | undefined;
+            let bestScore = Infinity;
+            for (const s of specs) {
+                const hit = s.query(p);
+                if (!hit) continue;
+                const score = hit.d / hit.delta;
+                if (
+                    score < bestScore ||
+                    (score === bestScore && hit.d < (best?.d ?? Infinity))
+                ) {
+                    bestScore = score;
+                    best = hit;
+                }
+            }
+            return best;
+        },
+    };
+}
+
 /** Task 1: lines → raster only. Tasks 2–3 extend classification. */
 export function buildPhotoLocatorHitSpec(
     locators: PhotoLocator[],
@@ -241,15 +339,19 @@ export function buildPhotoLocatorHitSpec(
     const circles = locators.filter(
         (l): l is CirclePhotoLocator => l instanceof CirclePhotoLocator,
     );
-    if (circles.length) {
-        throw new Error("circular families: implement in Task 3");
+    const specs: PhotoLocatorHitSpec[] = [];
+    if (lines.length) {
+        specs.push(
+            classifyLines(lines) === "radial"
+                ? buildRadialFamily(lines)
+                : buildRasterFamily(lines),
+        );
     }
-    if (!lines.length) {
+    for (const g of groupCirclesByCenter(circles)) {
+        specs.push(buildCircularFamily(g));
+    }
+    if (!specs.length) {
         return { kind: "raster", query: () => undefined };
     }
-    // Task 2 replaces this with classifyLines(lines)
-    const pattern = classifyLines(lines);
-    return pattern === "radial"
-        ? buildRadialFamily(lines)
-        : buildRasterFamily(lines);
+    return mergeSpecs(specs);
 }
