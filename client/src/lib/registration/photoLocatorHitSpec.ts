@@ -118,7 +118,7 @@ function meanNormal(lines: LinePhotoLocator[]): { nx: number; ny: number } {
     return { nx: nx / nlen, ny: ny / nlen };
 }
 
-function buildRasterFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
+function rasterMembers(lines: LinePhotoLocator[]): RasterMember[] {
     const { nx, ny } = meanNormal(lines);
     const members: RasterMember[] = lines.map((loc) => {
         const mx = (loc.start.x + loc.end.x) / 2;
@@ -133,7 +133,11 @@ function buildRasterFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
             gaps.push(members[i + 1].offset - members[i].offset);
         members[i].delta = gaps.length ? Math.min(...gaps) / 2 : 1;
     }
+    return members;
+}
 
+function buildRasterFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
+    const members = rasterMembers(lines);
     return {
         kind: "raster",
         query(p) {
@@ -171,10 +175,19 @@ function buildRasterFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
     };
 }
 
-function buildRadialFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
+type RadialMember = {
+    loc: LinePhotoLocator;
+    angle: number;
+    delta: number;
+    charR: number;
+};
+
+function radialMembers(lines: LinePhotoLocator[]): {
+    hub: { x: number; y: number };
+    members: RadialMember[];
+} {
     const hub = estimateHub(lines);
-    type M = { loc: LinePhotoLocator; angle: number; delta: number; charR: number };
-    const members: M[] = lines.map((loc) => {
+    const members: RadialMember[] = lines.map((loc) => {
         const mx = (loc.start.x + loc.end.x) / 2 - hub.x;
         const my = (loc.start.y + loc.end.y) / 2 - hub.y;
         return {
@@ -195,7 +208,11 @@ function buildRadialFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
             ? Math.min(...gaps) / 2
             : 1 / Math.max(charR, 1);
     }
+    return { hub, members };
+}
 
+function buildRadialFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
+    const { hub, members } = radialMembers(lines);
     return {
         kind: "radial",
         query(p) {
@@ -215,7 +232,10 @@ function buildRadialFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
                     ((p.x - loc.start.x) * lx + (p.y - loc.start.y) * ly) / len;
                 if (parallel < 0 || parallel > len) continue;
                 const score = d / m.delta;
-                if (score < bestScore || (score === bestScore && d < (best?.d ?? Infinity))) {
+                if (
+                    score < bestScore ||
+                    (score === bestScore && d < (best?.d ?? Infinity))
+                ) {
                     bestScore = score;
                     best = {
                         x: (loc.width * parallel) / len,
@@ -233,12 +253,10 @@ function buildRadialFamily(lines: LinePhotoLocator[]): PhotoLocatorHitSpec {
 
 const CENTER_EPS = 2; // px
 
-function buildCircularFamily(
-    circles: CirclePhotoLocator[],
-): PhotoLocatorHitSpec {
-    const c = circles[0].center;
-    type M = { loc: CirclePhotoLocator; delta: number };
-    const members: M[] = [...circles]
+type CircularMember = { loc: CirclePhotoLocator; delta: number };
+
+function circularMembers(circles: CirclePhotoLocator[]): CircularMember[] {
+    const members: CircularMember[] = [...circles]
         .sort((a, b) => a.radius - b.radius)
         .map((loc) => ({ loc, delta: 1 }));
     for (let i = 0; i < members.length; i++) {
@@ -249,7 +267,14 @@ function buildCircularFamily(
             gaps.push(members[i + 1].loc.radius - members[i].loc.radius);
         members[i].delta = gaps.length ? Math.min(...gaps) / 2 : 1;
     }
+    return members;
+}
 
+function buildCircularFamily(
+    circles: CirclePhotoLocator[],
+): PhotoLocatorHitSpec {
+    const c = circles[0].center;
+    const members = circularMembers(circles);
     return {
         kind: "circular",
         query(p) {
