@@ -4,7 +4,7 @@
 FROM node:24-slim
 COPY client /app/client
 WORKDIR /app/client
-RUN npm install
+RUN npm ci
 
 COPY deploy/entrypoint-client.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
