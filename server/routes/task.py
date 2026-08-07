@@ -14,7 +14,6 @@ from ..dtos.dtos_tasks import (
     TaskPATCH,
     TaskPUT,
 )
-from ..services.acting_user import ActingUser
 from ..services.task_service import TaskService, get_task_service
 from .auth import CurrentUser, get_current_user
 
@@ -33,7 +32,6 @@ async def create_task(
         dto.description,
         dto.contact_id,
         dto.task_definition_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.task_to_get(task, num_tasks=0, num_tasks_ready=0)
 
@@ -83,7 +81,6 @@ async def patch_task(
         dto.contact_id,
         dto.task_definition_id,
         dto.task_state,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.task_to_get(
         task, num_tasks=num_tasks, num_tasks_ready=num_tasks_ready
@@ -99,7 +96,6 @@ async def delete_task(
     """Delete a task."""
     service.delete_task(
         task_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 

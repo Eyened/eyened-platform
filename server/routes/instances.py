@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_instances import ImageGET
 from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
-from ..services.acting_user import ActingUser
 from ..services.image_instance_service import (
     ImageInstanceService,
     get_image_instance_service,
@@ -142,7 +141,6 @@ async def tag_instance(
         instance_id,
         body.tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -160,7 +158,6 @@ async def patch_instance_tag(
         instance_id,
         tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -176,6 +173,5 @@ async def untag_instance(
     service.untag_instance(
         instance_id,
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)

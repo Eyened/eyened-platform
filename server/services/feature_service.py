@@ -25,6 +25,7 @@ class FeatureService:
     ) -> None:
         self.repository = repository
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def list_features(self, with_counts: bool) -> tuple[list[Feature], dict[int, int]]:
@@ -45,7 +46,7 @@ class FeatureService:
         return feature
 
     def create_feature(
-        self, name: str, subfeature_ids: list[int] | None, actor: ActingUser
+        self, name: str, subfeature_ids: list[int] | None
     ) -> Feature:
         """Create a feature and set its subfeature links."""
         feature = Feature(FeatureName=name)
@@ -53,7 +54,7 @@ class FeatureService:
         self.repository.replace_subfeatures(feature.FeatureID, subfeature_ids)
         if self.audit is not None:
             self.audit.record(
-                action="INSERT", entity="Feature", actor=actor,
+                action="INSERT", entity="Feature", actor=self._actor,
                 entity_id=feature.FeatureID,
                 changes={"name": feature.FeatureName, "subfeature_ids": subfeature_ids or []},
             )
@@ -61,7 +62,7 @@ class FeatureService:
 
     def update_feature(
         self, feature_id: int, name: str | None,
-        subfeature_ids: list[int] | None, actor: ActingUser,
+        subfeature_ids: list[int] | None,
     ) -> Feature:
         """Update a feature's name and/or subfeature links (each optional).
 
@@ -85,12 +86,12 @@ class FeatureService:
 
         if self.audit is not None:
             self.audit.record(
-                action="UPDATE", entity="Feature", actor=actor,
+                action="UPDATE", entity="Feature", actor=self._actor,
                 entity_id=feature_id, changes=changes if changes else None,
             )
         return feature
 
-    def delete_feature(self, feature_id: int, actor: ActingUser) -> None:
+    def delete_feature(self, feature_id: int) -> None:
         """Delete a feature, unless it is referenced by segmentations or is a child.
 
         Raises:
@@ -128,7 +129,7 @@ class FeatureService:
         self.repository.delete(feature)
         if self.audit is not None:
             self.audit.record(
-                action="DELETE", entity="Feature", actor=actor,
+                action="DELETE", entity="Feature", actor=self._actor,
                 entity_id=feature_id, changes=deleted_data,
             )
         return None

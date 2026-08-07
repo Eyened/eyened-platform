@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Response
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import TagGET, TagPATCH, TagPUT
-from ..services.acting_user import ActingUser
 from ..services.tag_service import TagService, get_tag_service
 from .auth import CurrentUser, get_current_user
 
@@ -20,7 +19,6 @@ async def create_tag(
         dto.name,
         dto.description,
         dto.tag_type,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.tag_to_get(tag)
 
@@ -47,7 +45,6 @@ async def patch_tag(
         dto.name,
         dto.description,
         dto.tag_type,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.tag_to_get(tag)
 
@@ -61,7 +58,6 @@ async def delete_tag(
     """Delete a tag (409 if it is still applied to any record)."""
     service.delete_tag(
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -75,7 +71,6 @@ async def star_tag(
     """Star a tag for the current user (idempotent)."""
     service.star_tag(
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -89,6 +84,5 @@ async def unstar_tag(
     """Remove the current user's star from a tag (idempotent)."""
     service.unstar_tag(
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)

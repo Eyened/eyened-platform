@@ -132,3 +132,31 @@ def test_every_service_factory_depends_on_get_access_scope():
             ):
                 missing.append(f"{module.__name__}.{attr}")
     assert missing == []
+
+
+def test_no_service_method_takes_an_actor_parameter():
+    """One source of actor identity per call. Two can disagree.
+
+    server/routes/auth.py and import_api.py still build an ActingUser by hand:
+    they call AuditService directly rather than through a scoped service, so
+    there is no scope to derive it from.
+    """
+    import ast
+    import pathlib
+
+    services = pathlib.Path(__file__).resolve().parents[1] / "services"
+    offenders: list[str] = []
+    for path in services.rglob("*.py"):
+        if "__pycache__" in path.parts or path.name == "audit_service.py":
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for item in node.body:
+                if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                names = [a.arg for a in item.args.args + item.args.kwonlyargs]
+                if "actor" in names:
+                    offenders.append(f"{path.name}::{node.name}.{item.name}")
+    assert offenders == []

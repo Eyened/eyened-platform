@@ -71,16 +71,18 @@ class FakeAudit:
         self.records.append(kwargs)
 
 
-def _service(session, audit=None) -> StudyService:
-    return StudyService(
-        StudyRepository(session, scope=admin_scope()),
-        scope=admin_scope(),
-        audit=audit,
-    )
-
-
 def _actor() -> ActingUser:
     return ActingUser(id=1, username="alice")
+
+
+def _service(session, actor: ActingUser | None = None, audit=None) -> StudyService:
+    actor = actor if actor is not None else _actor()
+    scope = admin_scope(actor_id=actor.id, username=actor.username)
+    return StudyService(
+        StudyRepository(session, scope=scope),
+        scope=scope,
+        audit=audit,
+    )
 
 
 def test_tag_study_creates_a_new_link(session):
@@ -89,7 +91,7 @@ def test_tag_study_creates_a_new_link(session):
     creator = _make_creator(session)
     tag = _make_tag(session, creator.CreatorID)
 
-    link = _service(session).tag_study(study.StudyID, tag.TagID, "hi", _actor())
+    link = _service(session).tag_study(study.StudyID, tag.TagID, "hi")
 
     assert link.TagID == tag.TagID
     assert link.StudyID == study.StudyID
@@ -100,14 +102,14 @@ def test_tag_study_creates_a_new_link(session):
 def test_tag_study_unknown_study_raises_not_found(session):
     """Tagging a non-existent study is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).tag_study(999_999, 1, None, _actor())
+        _service(session).tag_study(999_999, 1, None)
 
 
 def test_tag_study_unknown_tag_raises_not_found(session):
     """A valid study but unknown tag id is translated to NotFoundError (-> 404)."""
     study = _make_study(session)
     with pytest.raises(NotFoundError):
-        _service(session).tag_study(study.StudyID, 999_999, None, _actor())
+        _service(session).tag_study(study.StudyID, 999_999, None)
 
 
 def test_tag_study_wrong_tag_type_raises_bad_request(session):
@@ -117,7 +119,7 @@ def test_tag_study_wrong_tag_type_raises_bad_request(session):
     tag = _make_tag(session, creator.CreatorID, tag_type=TagType.ImageInstance)
 
     with pytest.raises(BadRequestError):
-        _service(session).tag_study(study.StudyID, tag.TagID, None, _actor())
+        _service(session).tag_study(study.StudyID, tag.TagID, None)
 
 
 def test_tag_study_existing_link_updates_comment(session):
@@ -126,9 +128,9 @@ def test_tag_study_existing_link_updates_comment(session):
     creator = _make_creator(session)
     tag = _make_tag(session, creator.CreatorID)
     service = _service(session)
-    service.tag_study(study.StudyID, tag.TagID, "first", _actor())
+    service.tag_study(study.StudyID, tag.TagID, "first")
 
-    link = service.tag_study(study.StudyID, tag.TagID, "second", _actor())
+    link = service.tag_study(study.StudyID, tag.TagID, "second")
 
     assert link.Comment == "second"
     # Still a single link (no duplicate row created).
@@ -143,13 +145,13 @@ def test_tag_study_logs_insert_when_audit_present(session):
     audit = FakeAudit()
     actor = _actor()
 
-    _service(session, audit).tag_study(study.StudyID, tag.TagID, "hi", actor)
+    _service(session, actor, audit).tag_study(study.StudyID, tag.TagID, "hi")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
     assert rec["action"] == "INSERT"
     assert rec["entity"] == "StudyTagLink"
-    assert rec["actor"] is actor
+    assert rec["actor"] == actor
     assert rec["changes"] == {
         "tag_id": tag.TagID,
         "study_id": study.StudyID,
@@ -163,9 +165,9 @@ def test_untag_study_removes_the_link(session):
     creator = _make_creator(session)
     tag = _make_tag(session, creator.CreatorID)
     service = _service(session)
-    service.tag_study(study.StudyID, tag.TagID, None, _actor())
+    service.tag_study(study.StudyID, tag.TagID, None)
 
-    service.untag_study(study.StudyID, tag.TagID, _actor())
+    service.untag_study(study.StudyID, tag.TagID)
 
     assert StudyRepository(session, scope=admin_scope()).get_link(tag.TagID, study.StudyID) is None
 
@@ -173,14 +175,14 @@ def test_untag_study_removes_the_link(session):
 def test_untag_study_unknown_study_raises_not_found(session):
     """Untagging a non-existent study is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).untag_study(999_999, 1, _actor())
+        _service(session).untag_study(999_999, 1)
 
 
 def test_untag_study_no_link_is_idempotent(session):
     """Untagging a study that has no such link is a silent no-op, not an error."""
     study = _make_study(session)
     # No link exists; deleting is a no-op, not an error.
-    _service(session).untag_study(study.StudyID, 999_999, _actor())
+    _service(session).untag_study(study.StudyID, 999_999)
 
     # The no-op leaves no link behind (and did not raise).
     assert StudyRepository(session, scope=admin_scope()).get_link(999_999, study.StudyID) is None
@@ -192,9 +194,9 @@ def test_patch_study_tag_updates_comment(session):
     creator = _make_creator(session)
     tag = _make_tag(session, creator.CreatorID)
     service = _service(session)
-    service.tag_study(study.StudyID, tag.TagID, "old", _actor())
+    service.tag_study(study.StudyID, tag.TagID, "old")
 
-    link = service.patch_study_tag(study.StudyID, tag.TagID, "new", _actor())
+    link = service.patch_study_tag(study.StudyID, tag.TagID, "new")
 
     assert link.Comment == "new"
 
@@ -206,7 +208,7 @@ def test_patch_study_tag_missing_link_raises_not_found(session):
     tag = _make_tag(session, creator.CreatorID)
 
     with pytest.raises(NotFoundError):
-        _service(session).patch_study_tag(study.StudyID, tag.TagID, "x", _actor())
+        _service(session).patch_study_tag(study.StudyID, tag.TagID, "x")
 
 
 def test_patch_study_tag_wrong_tag_type_raises_bad_request(session):
@@ -216,7 +218,7 @@ def test_patch_study_tag_wrong_tag_type_raises_bad_request(session):
     tag = _make_tag(session, creator.CreatorID, tag_type=TagType.Segmentation)
 
     with pytest.raises(BadRequestError):
-        _service(session).patch_study_tag(study.StudyID, tag.TagID, "x", _actor())
+        _service(session).patch_study_tag(study.StudyID, tag.TagID, "x")
 
 
 def test_patch_study_tag_logs_update_as_diff(session):
@@ -228,13 +230,13 @@ def test_patch_study_tag_logs_update_as_diff(session):
     _make_link(session, tag, study, actor.id, comment="old")
     audit = FakeAudit()
 
-    _service(session, audit).patch_study_tag(study.StudyID, tag.TagID, "new", actor)
+    _service(session, actor, audit).patch_study_tag(study.StudyID, tag.TagID, "new")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
     assert rec["action"] == "UPDATE"
     assert rec["entity"] == "StudyTagLink"
-    assert rec["actor"] is actor
+    assert rec["actor"] == actor
     # StudyTagLink's composite PK means entity_id is null; changes must carry
     # the (tag_id, study_id) identity alongside the comment diff, or the
     # audit row is unidentifiable.
@@ -254,13 +256,13 @@ def test_untag_study_logs_delete_when_audit_present(session):
     _make_link(session, tag, study, actor.id, comment="bye")
     audit = FakeAudit()
 
-    _service(session, audit).untag_study(study.StudyID, tag.TagID, actor)
+    _service(session, actor, audit).untag_study(study.StudyID, tag.TagID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]
     assert rec["action"] == "DELETE"
     assert rec["entity"] == "StudyTagLink"
-    assert rec["actor"] is actor
+    assert rec["actor"] == actor
     assert rec["changes"] == {
         "tag_id": tag.TagID,
         "study_id": study.StudyID,

@@ -46,10 +46,11 @@ def _make_tag(
     return tag
 
 
-def _service(session, audit=None) -> TagService:
+def _service(session, actor: ActingUser, audit=None) -> TagService:
+    scope = admin_scope(actor_id=actor.id, username=actor.username)
     return TagService(
-        TagRepository(session, scope=admin_scope()),
-        scope=admin_scope(),
+        TagRepository(session, scope=scope),
+        scope=scope,
         audit=audit,
     )
 
@@ -58,7 +59,7 @@ def test_create_tag_persists_and_returns(session):
     """Creating a tag stores it with the acting user as owner."""
     actor = _actor(session)
 
-    tag = _service(session).create_tag("New", "desc", TagType.Study, actor)
+    tag = _service(session, actor).create_tag("New", "desc", TagType.Study)
 
     assert tag.TagName == "New"
     assert tag.TagType == TagType.Study
@@ -71,12 +72,12 @@ def test_create_tag_logs_insert(session):
     actor = _actor(session)
     audit = FakeAudit()
 
-    _service(session, audit).create_tag("New", "desc", TagType.Study, actor)
+    _service(session, actor, audit).create_tag("New", "desc", TagType.Study)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
     assert audit.records[0]["entity"] == "Tag"
-    assert audit.records[0]["actor"] is actor
+    assert audit.records[0]["actor"] == actor
 
 
 def test_update_tag_changes_fields(session):
@@ -84,7 +85,7 @@ def test_update_tag_changes_fields(session):
     actor = _actor(session)
     tag = _make_tag(session, actor.id, "Old")
 
-    updated = _service(session).update_tag(tag.TagID, "New", "newdesc", None, actor)
+    updated = _service(session, actor).update_tag(tag.TagID, "New", "newdesc", None)
 
     assert updated.TagName == "New"
     assert updated.TagDescription == "newdesc"
@@ -94,7 +95,7 @@ def test_update_tag_unknown_raises_not_found(session):
     """Updating a missing tag is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).update_tag(999_999, "x", None, None, actor)
+        _service(session, actor).update_tag(999_999, "x", None, None)
 
 
 def test_update_tag_logs_update_as_diff(session):
@@ -103,7 +104,7 @@ def test_update_tag_logs_update_as_diff(session):
     tag = _make_tag(session, actor.id, "Old")
     audit = FakeAudit()
 
-    _service(session, audit).update_tag(tag.TagID, "New", None, None, actor)
+    _service(session, actor, audit).update_tag(tag.TagID, "New", None, None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "UPDATE"
@@ -116,7 +117,7 @@ def test_delete_tag_removes_it(session):
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
 
-    _service(session).delete_tag(tag.TagID, actor)
+    _service(session, actor).delete_tag(tag.TagID)
 
     assert TagRepository(session, scope=admin_scope()).get_by_id(tag.TagID) is None
 
@@ -125,7 +126,7 @@ def test_delete_tag_unknown_raises_not_found(session):
     """Deleting a missing tag is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).delete_tag(999_999, actor)
+        _service(session, actor).delete_tag(999_999)
 
 
 def test_delete_tag_logs_delete(session):
@@ -134,7 +135,7 @@ def test_delete_tag_logs_delete(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, audit).delete_tag(tag.TagID, actor)
+    _service(session, actor, audit).delete_tag(tag.TagID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
@@ -146,7 +147,7 @@ def test_star_tag_creates_link(session):
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
 
-    _service(session).star_tag(tag.TagID, actor)
+    _service(session, actor).star_tag(tag.TagID)
 
     assert TagRepository(session, scope=admin_scope()).get_star_link(tag.TagID, actor.id) is not None
 
@@ -156,10 +157,10 @@ def test_star_tag_is_idempotent(session):
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
-    service = _service(session, audit)
-    service.star_tag(tag.TagID, actor)
+    service = _service(session, actor, audit)
+    service.star_tag(tag.TagID)
 
-    service.star_tag(tag.TagID, actor)
+    service.star_tag(tag.TagID)
 
     assert len(audit.records) == 1  # only the first star logged
 
@@ -168,7 +169,7 @@ def test_star_tag_unknown_raises_not_found(session):
     """Starring a missing tag is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).star_tag(999_999, actor)
+        _service(session, actor).star_tag(999_999)
 
 
 def test_star_tag_logs_insert(session):
@@ -177,7 +178,7 @@ def test_star_tag_logs_insert(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, audit).star_tag(tag.TagID, actor)
+    _service(session, actor, audit).star_tag(tag.TagID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
@@ -188,9 +189,9 @@ def test_unstar_tag_removes_link(session):
     """Unstarring removes the acting user's CreatorTagLink."""
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
-    _service(session).star_tag(tag.TagID, actor)
+    _service(session, actor).star_tag(tag.TagID)
 
-    _service(session).unstar_tag(tag.TagID, actor)
+    _service(session, actor).unstar_tag(tag.TagID)
 
     assert TagRepository(session, scope=admin_scope()).get_star_link(tag.TagID, actor.id) is None
 
@@ -201,7 +202,7 @@ def test_unstar_tag_absent_is_noop(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, audit).unstar_tag(tag.TagID, actor)
+    _service(session, actor, audit).unstar_tag(tag.TagID)
 
     assert len(audit.records) == 0
 
@@ -210,10 +211,10 @@ def test_unstar_tag_logs_delete(session):
     """Unstarring a starred tag emits one DELETE audit record for the link entity."""
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
-    _service(session).star_tag(tag.TagID, actor)
+    _service(session, actor).star_tag(tag.TagID)
     audit = FakeAudit()
 
-    _service(session, audit).unstar_tag(tag.TagID, actor)
+    _service(session, actor, audit).unstar_tag(tag.TagID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
@@ -233,7 +234,7 @@ def test_delete_tag_in_use_raises_conflict(session):
     session.flush()
 
     with pytest.raises(ConflictError) as excinfo:
-        _service(session).delete_tag(tag.TagID, actor)
+        _service(session, actor).delete_tag(tag.TagID)
 
     assert excinfo.value.detail["code"] == "TAG_IN_USE"
     # _make_tag names it "T1"; the message must name the tag so the UI can say
@@ -258,7 +259,7 @@ def test_delete_tag_in_use_emits_no_audit_record(session):
     audit = FakeAudit()
 
     with pytest.raises(ConflictError):
-        _service(session, audit).delete_tag(tag.TagID, actor)
+        _service(session, actor, audit).delete_tag(tag.TagID)
 
     assert audit.records == []
     session.rollback()
@@ -271,6 +272,6 @@ def test_delete_starred_tag_succeeds(session):
     session.add(CreatorTagLink(TagID=tag.TagID, CreatorID=actor.id))
     session.flush()
 
-    _service(session).delete_tag(tag.TagID, actor)
+    _service(session, actor).delete_tag(tag.TagID)
 
     assert TagRepository(session, scope=admin_scope()).get_by_id(tag.TagID) is None

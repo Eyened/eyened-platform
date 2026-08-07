@@ -30,6 +30,7 @@ class ImageInstanceService:
         self.repository = repository
         self.tags = tag_repository
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def get_instance(
@@ -94,7 +95,6 @@ class ImageInstanceService:
         public_id: str,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> ImageInstanceTagLink:
         """Attach a Tag to an instance (idempotent; updates comment if re-tagged).
 
@@ -116,14 +116,14 @@ class ImageInstanceService:
             link = self.repository.add_link(
                 tag_id=tag.TagID,
                 image_instance_id=instance.ImageInstanceID,
-                creator_id=actor.id,
+                creator_id=self.scope.actor_id,
                 comment=comment,
             )
             if self.audit is not None:
                 self.audit.record(
                     action="INSERT",
                     entity="ImageInstanceTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes={
                         "tag_id": tag.TagID,
                         "image_instance_id": instance.ImageInstanceID,
@@ -149,7 +149,7 @@ class ImageInstanceService:
                 self.audit.record(
                     action="UPDATE",
                     entity="ImageInstanceTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
 
@@ -161,7 +161,6 @@ class ImageInstanceService:
         public_id: str,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> ImageInstanceTagLink:
         """Update the comment on an existing instance tag link.
 
@@ -200,16 +199,14 @@ class ImageInstanceService:
                 self.audit.record(
                     action="UPDATE",
                     entity="ImageInstanceTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
 
         link.Tag = tag
         return link
 
-    def untag_instance(
-        self, public_id: str, tag_id: int, actor: ActingUser
-    ) -> None:
+    def untag_instance(self, public_id: str, tag_id: int) -> None:
         """Remove a Tag from an instance (idempotent; no error if not linked).
 
         Raises:
@@ -232,7 +229,7 @@ class ImageInstanceService:
                 self.audit.record(
                     action="DELETE",
                     entity="ImageInstanceTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=deleted_data,
                 )
         return None

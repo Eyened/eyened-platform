@@ -40,12 +40,17 @@ class FakeAudit:
         self.records.append(kwargs)
 
 
-def _service(session, audit=None) -> FormAnnotationService:
+def _service(session, audit=None, actor: ActingUser | None = None) -> FormAnnotationService:
+    scope = (
+        admin_scope(actor_id=actor.id, username=actor.username)
+        if actor is not None
+        else admin_scope()
+    )
     return FormAnnotationService(
-        FormAnnotationRepository(session, scope=admin_scope()),
-        ImageInstanceRepository(session, scope=admin_scope()),
-        TagRepository(session, scope=admin_scope()),
-        scope=admin_scope(),
+        FormAnnotationRepository(session, scope=scope),
+        ImageInstanceRepository(session, scope=scope),
+        TagRepository(session, scope=scope),
+        scope=scope,
         audit=audit,
     )
 
@@ -180,7 +185,7 @@ def test_create_resolves_image_and_persists(session):
     patient_id, schema_id = _make_patient_and_schema(session, "c1")
     image_id = _make_image(session, "img-1")
 
-    ann = _service(session).create(
+    ann = _service(session, actor=actor).create(
         form_schema_id=schema_id,
         patient_id=patient_id,
         study_id=None,
@@ -189,7 +194,6 @@ def test_create_resolves_image_and_persists(session):
         sub_task_id=None,
         form_data={"a": 1},
         form_annotation_reference_id=None,
-        actor=actor,
     )
 
     assert ann.FormAnnotationID is not None
@@ -201,7 +205,7 @@ def test_create_unknown_image_raises_not_found(session):
     actor = _actor(session)
     patient_id, schema_id = _make_patient_and_schema(session, "c2")
     with pytest.raises(NotFoundError):
-        _service(session).create(
+        _service(session, actor=actor).create(
             form_schema_id=schema_id,
             patient_id=patient_id,
             study_id=None,
@@ -210,7 +214,6 @@ def test_create_unknown_image_raises_not_found(session):
             sub_task_id=None,
             form_data=None,
             form_annotation_reference_id=None,
-            actor=actor,
         )
 
 
@@ -220,7 +223,7 @@ def test_create_logs_insert(session):
     patient_id, schema_id = _make_patient_and_schema(session, "ci1")
     audit = FakeAudit()
 
-    ann = _service(session, audit).create(
+    ann = _service(session, audit, actor=actor).create(
         form_schema_id=schema_id,
         patient_id=patient_id,
         study_id=None,
@@ -229,7 +232,6 @@ def test_create_logs_insert(session):
         sub_task_id=None,
         form_data={"a": 1},
         form_annotation_reference_id=None,
-        actor=actor,
     )
 
     assert len(audit.records) == 1
@@ -244,8 +246,8 @@ def test_update_applies_field(session):
     actor = _actor(session)
     ann = _make_annotation(session, "u1")
 
-    updated = _service(session).update(
-        ann.FormAnnotationID, {"form_data": {"b": 2}}, actor
+    updated = _service(session, actor=actor).update(
+        ann.FormAnnotationID, {"form_data": {"b": 2}}
     )
 
     assert updated.FormData == {"b": 2}
@@ -254,7 +256,7 @@ def test_update_applies_field(session):
 def test_update_unknown_raises_not_found(session):
     """update on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).update(999_999, {"form_data": {}}, _actor(session))
+        _service(session).update(999_999, {"form_data": {}})
 
 
 def test_update_logs_diff_with_applied_columns(session):
@@ -267,8 +269,8 @@ def test_update_logs_diff_with_applied_columns(session):
     ann = _make_annotation(session, "ud1")
     audit = FakeAudit()
 
-    _service(session, audit).update(
-        ann.FormAnnotationID, {"form_data": {"b": 2}}, actor
+    _service(session, audit, actor=actor).update(
+        ann.FormAnnotationID, {"form_data": {"b": 2}}
     )
 
     assert len(audit.records) == 1
@@ -288,8 +290,8 @@ def test_update_image_id_diffs_on_image_instance_id_column(session):
     image_id = _make_image(session, "img-2")
     audit = FakeAudit()
 
-    _service(session, audit).update(
-        ann.FormAnnotationID, {"image_id": "img-2"}, actor
+    _service(session, audit, actor=actor).update(
+        ann.FormAnnotationID, {"image_id": "img-2"}
     )
 
     assert audit.records[0]["changes"] == {
@@ -302,7 +304,7 @@ def test_soft_delete_sets_inactive(session):
     actor = _actor(session)
     ann = _make_annotation(session, "d1")
 
-    _service(session).soft_delete(ann.FormAnnotationID, actor)
+    _service(session, actor=actor).soft_delete(ann.FormAnnotationID)
 
     assert ann.Inactive is True
 
@@ -310,7 +312,7 @@ def test_soft_delete_sets_inactive(session):
 def test_soft_delete_unknown_raises_not_found(session):
     """soft_delete on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).soft_delete(999_999, _actor(session))
+        _service(session).soft_delete(999_999)
 
 
 def test_soft_delete_logs_delete(session):
@@ -319,7 +321,7 @@ def test_soft_delete_logs_delete(session):
     ann = _make_annotation(session, "sd1")
     audit = FakeAudit()
 
-    _service(session, audit).soft_delete(ann.FormAnnotationID, actor)
+    _service(session, audit, actor=actor).soft_delete(ann.FormAnnotationID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -334,7 +336,7 @@ def test_set_value_overwrites_form_data(session):
     actor = _actor(session)
     ann = _make_annotation(session, "v1")
 
-    _service(session).set_value(ann.FormAnnotationID, {"new": 9}, actor)
+    _service(session, actor=actor).set_value(ann.FormAnnotationID, {"new": 9})
 
     assert ann.FormData == {"new": 9}
 
@@ -342,7 +344,7 @@ def test_set_value_overwrites_form_data(session):
 def test_set_value_unknown_raises_not_found(session):
     """set_value on a missing annotation raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).set_value(999_999, {}, _actor(session))
+        _service(session).set_value(999_999, {})
 
 
 def test_set_value_logs_update_without_changes(session):
@@ -353,7 +355,7 @@ def test_set_value_logs_update_without_changes(session):
     ann = _make_annotation(session, "sv1")
     audit = FakeAudit()
 
-    _service(session, audit).set_value(ann.FormAnnotationID, {"x": 1}, actor)
+    _service(session, audit, actor=actor).set_value(ann.FormAnnotationID, {"x": 1})
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -369,7 +371,7 @@ def test_tag_creates_link(session):
     ann = _make_annotation(session, "t1")
     tag = _make_tag(session, actor.id)
 
-    link = _service(session).tag(ann.FormAnnotationID, tag.TagID, "hi", actor)
+    link = _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "hi")
 
     assert link.TagID == tag.TagID
     assert link.Comment == "hi"
@@ -381,7 +383,7 @@ def test_tag_unknown_annotation_raises_not_found(session):
     actor = _actor(session)
     tag = _make_tag(session, actor.id)
     with pytest.raises(NotFoundError):
-        _service(session).tag(999_999, tag.TagID, None, actor)
+        _service(session, actor=actor).tag(999_999, tag.TagID, None)
 
 
 def test_tag_unknown_tag_raises_not_found(session):
@@ -389,7 +391,7 @@ def test_tag_unknown_tag_raises_not_found(session):
     actor = _actor(session)
     ann = _make_annotation(session, "t2")
     with pytest.raises(NotFoundError):
-        _service(session).tag(ann.FormAnnotationID, 999_999, None, actor)
+        _service(session, actor=actor).tag(ann.FormAnnotationID, 999_999, None)
 
 
 def test_tag_wrong_type_raises_bad_request(session):
@@ -398,7 +400,7 @@ def test_tag_wrong_type_raises_bad_request(session):
     ann = _make_annotation(session, "t3")
     tag = _make_tag(session, actor.id, tag_type=TagType.ImageInstance)
     with pytest.raises(BadRequestError):
-        _service(session).tag(ann.FormAnnotationID, tag.TagID, None, actor)
+        _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, None)
 
 
 def test_tag_existing_updates_comment(session):
@@ -406,10 +408,10 @@ def test_tag_existing_updates_comment(session):
     actor = _actor(session)
     ann = _make_annotation(session, "t4")
     tag = _make_tag(session, actor.id)
-    service = _service(session)
+    service = _service(session, actor=actor)
 
-    service.tag(ann.FormAnnotationID, tag.TagID, "first", actor)
-    link = service.tag(ann.FormAnnotationID, tag.TagID, "second", actor)
+    service.tag(ann.FormAnnotationID, tag.TagID, "first")
+    link = service.tag(ann.FormAnnotationID, tag.TagID, "second")
 
     assert link.Comment == "second"
 
@@ -421,7 +423,7 @@ def test_tag_logs_insert(session):
     tag = _make_tag(session, actor.id)
     audit = FakeAudit()
 
-    _service(session, audit).tag(ann.FormAnnotationID, tag.TagID, "hi", actor)
+    _service(session, audit, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "hi")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -443,10 +445,10 @@ def test_tag_update_logs_diff_with_identity(session):
     actor = _actor(session)
     ann = _make_annotation(session, "ti2")
     tag = _make_tag(session, actor.id)
-    _service(session).tag(ann.FormAnnotationID, tag.TagID, "first", actor)
+    _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "first")
     audit = FakeAudit()
 
-    _service(session, audit).tag(ann.FormAnnotationID, tag.TagID, "second", actor)
+    _service(session, audit, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "second")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -464,10 +466,10 @@ def test_patch_tag_updates_comment(session):
     actor = _actor(session)
     ann = _make_annotation(session, "t5")
     tag = _make_tag(session, actor.id)
-    service = _service(session)
-    service.tag(ann.FormAnnotationID, tag.TagID, "old", actor)
+    service = _service(session, actor=actor)
+    service.tag(ann.FormAnnotationID, tag.TagID, "old")
 
-    link = service.patch_tag(ann.FormAnnotationID, tag.TagID, "new", actor)
+    link = service.patch_tag(ann.FormAnnotationID, tag.TagID, "new")
 
     assert link.Comment == "new"
 
@@ -478,7 +480,7 @@ def test_patch_tag_unknown_link_raises_not_found(session):
     ann = _make_annotation(session, "t6")
     tag = _make_tag(session, actor.id)
     with pytest.raises(NotFoundError):
-        _service(session).patch_tag(ann.FormAnnotationID, tag.TagID, "x", actor)
+        _service(session, actor=actor).patch_tag(ann.FormAnnotationID, tag.TagID, "x")
 
 
 def test_patch_tag_logs_update_as_diff(session):
@@ -488,10 +490,10 @@ def test_patch_tag_logs_update_as_diff(session):
     actor = _actor(session)
     ann = _make_annotation(session, "pt1")
     tag = _make_tag(session, actor.id)
-    _service(session).tag(ann.FormAnnotationID, tag.TagID, "old", actor)
+    _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "old")
     audit = FakeAudit()
 
-    _service(session, audit).patch_tag(ann.FormAnnotationID, tag.TagID, "new", actor)
+    _service(session, audit, actor=actor).patch_tag(ann.FormAnnotationID, tag.TagID, "new")
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -509,10 +511,10 @@ def test_untag_removes_link(session):
     actor = _actor(session)
     ann = _make_annotation(session, "t7")
     tag = _make_tag(session, actor.id)
-    service = _service(session)
-    service.tag(ann.FormAnnotationID, tag.TagID, None, actor)
+    service = _service(session, actor=actor)
+    service.tag(ann.FormAnnotationID, tag.TagID, None)
 
-    service.untag(ann.FormAnnotationID, tag.TagID, actor)
+    service.untag(ann.FormAnnotationID, tag.TagID)
 
     assert (
         FormAnnotationRepository(session, scope=admin_scope()).get_tag_link(
@@ -529,7 +531,7 @@ def test_untag_absent_link_is_idempotent(session):
     tag = _make_tag(session, actor.id)
 
     # Does not raise even though no link exists.
-    _service(session).untag(ann.FormAnnotationID, tag.TagID, actor)
+    _service(session, actor=actor).untag(ann.FormAnnotationID, tag.TagID)
 
 
 def test_untag_logs_delete(session):
@@ -537,10 +539,10 @@ def test_untag_logs_delete(session):
     actor = _actor(session)
     ann = _make_annotation(session, "ut1")
     tag = _make_tag(session, actor.id)
-    _service(session).tag(ann.FormAnnotationID, tag.TagID, "bye", actor)
+    _service(session, actor=actor).tag(ann.FormAnnotationID, tag.TagID, "bye")
     audit = FakeAudit()
 
-    _service(session, audit).untag(ann.FormAnnotationID, tag.TagID, actor)
+    _service(session, audit, actor=actor).untag(ann.FormAnnotationID, tag.TagID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]

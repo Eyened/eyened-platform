@@ -7,7 +7,6 @@ from eyened_orm.task import SubTaskState
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_tasks import SubTaskGET, SubTaskWithImagesGET
-from ..services.acting_user import ActingUser
 from ..services.task_service import SubTaskService, get_subtask_service
 from .auth import CurrentUser, get_current_user
 
@@ -51,7 +50,6 @@ async def patch_subtask(
         subtaskid,
         dto.comments,
         dto.task_state,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.subtask_to_get(st)
 
@@ -65,7 +63,6 @@ async def delete_subtask(
     """Delete a subtask."""
     service.delete_subtask(
         subtaskid,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -81,7 +78,6 @@ async def add_subtask_image(
     st = service.add_image(
         subtaskid,
         body.instance_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.subtask_with_images_to_get(st)
 
@@ -99,6 +95,5 @@ async def remove_subtask_image(
     st = service.remove_image(
         subtaskid,
         instance_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.subtask_with_images_to_get(st)

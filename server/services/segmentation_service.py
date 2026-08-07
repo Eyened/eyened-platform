@@ -56,6 +56,7 @@ class SegmentationService:
         self.tags = tag_repository
         self.store = data_store
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def get_segmentation(self, segmentation_id: int) -> Segmentation:
@@ -107,7 +108,6 @@ class SegmentationService:
         threshold: float | None,
         reference_segmentation_id: int | None,
         array: np.ndarray | None,
-        actor: ActingUser,
     ) -> Segmentation:
         """Create a Segmentation and write its (empty or provided) data.
 
@@ -123,7 +123,7 @@ class SegmentationService:
         segmentation = Segmentation(
             ImageInstanceID=instance.ImageInstanceID,
             FeatureID=feature_id,
-            CreatorID=actor.id,
+            CreatorID=self.scope.actor_id,
             SubTaskID=subtask_id,
             DataType=data_type,
             DataRepresentation=data_representation,
@@ -152,7 +152,7 @@ class SegmentationService:
             self.audit.record(
                 action="INSERT",
                 entity="Segmentation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=segmentation.SegmentationID,
                 changes={
                     "image_instance_id": segmentation.ImageInstanceID,
@@ -235,7 +235,6 @@ class SegmentationService:
         *,
         axis: Optional[int] = None,
         scan_nr: Optional[int] = None,
-        actor: ActingUser,
     ) -> Segmentation:
         """Write (a slice of) a segmentation's binary data via the store.
 
@@ -262,12 +261,12 @@ class SegmentationService:
             self.audit.record(
                 action="UPDATE",
                 entity="Segmentation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=segmentation_id,
             )
         return segmentation
 
-    def soft_delete(self, segmentation_id: int, actor: ActingUser) -> None:
+    def soft_delete(self, segmentation_id: int) -> None:
         """Soft-delete a segmentation (sets Inactive; row is kept).
 
         Raises:
@@ -295,7 +294,7 @@ class SegmentationService:
             self.audit.record(
                 action="DELETE",
                 entity="Segmentation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=segmentation_id,
                 changes=deleted_data,
             )
@@ -308,7 +307,6 @@ class SegmentationService:
         reference_segmentation_id: int | None,
         feature_id: int | None,
         threshold: float | None,
-        actor: ActingUser,
     ) -> Segmentation:
         """Apply the provided (non-None) fields to a segmentation.
 
@@ -339,7 +337,7 @@ class SegmentationService:
             self.audit.record(
                 action="UPDATE",
                 entity="Segmentation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=segmentation_id,
                 changes=changes if changes else None,
             )
@@ -349,7 +347,6 @@ class SegmentationService:
         self,
         segmentation_id: int,
         tag_id: int,
-        actor: ActingUser,
     ) -> SegmentationTagLink:
         """Attach a Tag to a segmentation (idempotent).
 
@@ -374,7 +371,7 @@ class SegmentationService:
             link = self.repository.add_link(
                 tag_id=tag.TagID,
                 segmentation_id=segmentation_id,
-                creator_id=actor.id,
+                creator_id=self.scope.actor_id,
             )
             if self.audit is not None:
                 # SegmentationTagLink has a composite PK, so entity_id is
@@ -383,7 +380,7 @@ class SegmentationService:
                 self.audit.record(
                     action="INSERT",
                     entity="SegmentationTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes={
                         "tag_id": tag.TagID,
                         "segmentation_id": segmentation_id,
@@ -397,7 +394,6 @@ class SegmentationService:
         self,
         segmentation_id: int,
         tag_id: int,
-        actor: ActingUser,
     ) -> None:
         """Remove a Tag from a segmentation (idempotent; no error if unlinked).
 
@@ -420,7 +416,7 @@ class SegmentationService:
                 self.audit.record(
                     action="DELETE",
                     entity="SegmentationTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=deleted_data,
                 )
         return None

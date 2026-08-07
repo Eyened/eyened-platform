@@ -28,6 +28,7 @@ class TaskService:
         self.tasks = task_repository
         self.subtasks = subtask_repository
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def create_task(
@@ -36,7 +37,6 @@ class TaskService:
         description: str | None,
         contact_id: int | None,
         task_definition_id: int,
-        actor: ActingUser,
     ) -> Task:
         """Create a task owned by the acting user (TaskState.NotStarted)."""
         task = Task(
@@ -44,7 +44,7 @@ class TaskService:
             Description=description,
             ContactID=contact_id,
             TaskDefinitionID=task_definition_id,
-            CreatorID=actor.id,
+            CreatorID=self.scope.actor_id,
             TaskState=TaskState.NotStarted,
         )
         self.tasks.add(task)
@@ -53,7 +53,7 @@ class TaskService:
             self.audit.record(
                 action="INSERT",
                 entity="Task",
-                actor=actor,
+                actor=self._actor,
                 entity_id=task.TaskID,
                 changes={
                     "name": task.TaskName,
@@ -89,7 +89,6 @@ class TaskService:
         contact_id: int | None,
         task_definition_id: int | None,
         task_state: TaskState | None,
-        actor: ActingUser,
     ) -> tuple[Task, tuple[int, int]]:
         """Update a task's mutable fields (each optional).
 
@@ -123,13 +122,13 @@ class TaskService:
             self.audit.record(
                 action="UPDATE",
                 entity="Task",
-                actor=actor,
+                actor=self._actor,
                 entity_id=task_id,
                 changes=changes if changes else None,
             )
         return task, counts
 
-    def delete_task(self, task_id: int, actor: ActingUser) -> None:
+    def delete_task(self, task_id: int) -> None:
         """Delete a task (its subtasks cascade at the DB level).
 
         Raises:
@@ -152,7 +151,7 @@ class TaskService:
             self.audit.record(
                 action="DELETE",
                 entity="Task",
-                actor=actor,
+                actor=self._actor,
                 entity_id=task_id,
                 changes=deleted_data,
             )
@@ -232,6 +231,7 @@ class SubTaskService:
     ) -> None:
         self.subtasks = subtask_repository
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def get_subtask(self, subtask_id: int, *, with_images: bool) -> SubTask:
@@ -254,7 +254,6 @@ class SubTaskService:
         subtask_id: int,
         comments: str | None,
         task_state: SubTaskState | None,
-        actor: ActingUser,
     ) -> SubTask:
         """Update a subtask's comments/state (each optional).
 
@@ -280,13 +279,13 @@ class SubTaskService:
             self.audit.record(
                 action="UPDATE",
                 entity="SubTask",
-                actor=actor,
+                actor=self._actor,
                 entity_id=subtask_id,
                 changes=changes if changes else None,
             )
         return subtask
 
-    def delete_subtask(self, subtask_id: int, actor: ActingUser) -> None:
+    def delete_subtask(self, subtask_id: int) -> None:
         """Delete a subtask (its image links cascade at the DB level).
 
         Raises:
@@ -307,15 +306,13 @@ class SubTaskService:
             self.audit.record(
                 action="DELETE",
                 entity="SubTask",
-                actor=actor,
+                actor=self._actor,
                 entity_id=subtask_id,
                 changes=deleted_data,
             )
         return None
 
-    def add_image(
-        self, subtask_id: int, image_public_id: str, actor: ActingUser
-    ) -> SubTask:
+    def add_image(self, subtask_id: int, image_public_id: str) -> SubTask:
         """Link an image (by PublicID) to a subtask at the next ImageIndex.
 
         Raises:
@@ -334,7 +331,7 @@ class SubTaskService:
             self.audit.record(
                 action="INSERT",
                 entity="SubTaskImageLink",
-                actor=actor,
+                actor=self._actor,
                 changes={
                     "subtask_id": subtask_id,
                     "image_instance_id": image_instance_id,
@@ -342,9 +339,7 @@ class SubTaskService:
             )
         return self.subtasks.get_with_images(subtask_id)
 
-    def remove_image(
-        self, subtask_id: int, image_public_id: str, actor: ActingUser
-    ) -> SubTask:
+    def remove_image(self, subtask_id: int, image_public_id: str) -> SubTask:
         """Unlink an image (by PublicID) from a subtask.
 
         Raises:
@@ -362,7 +357,7 @@ class SubTaskService:
             self.audit.record(
                 action="DELETE",
                 entity="SubTaskImageLink",
-                actor=actor,
+                actor=self._actor,
                 changes={
                     "subtask_id": subtask_id,
                     "image_instance_id": image_instance_id,

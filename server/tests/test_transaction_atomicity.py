@@ -27,7 +27,7 @@ def test_first_write_rolls_back_when_second_fails(session):
         audit=AuditService(session),
     )
     with pytest.raises(RuntimeError):
-        service.create_feature("parent", [1], ActingUser(id=1, username="alice"))
+        service.create_feature("parent", [1])
 
     session.rollback()  # get_db does this in production on the propagated exception
 
@@ -47,7 +47,7 @@ def test_prior_audit_row_rolls_back_with_a_later_failed_write(session):
         audit=AuditService(session),
     )
     with pytest.raises(RuntimeError):
-        service.create_feature("parent", [1], ActingUser(id=1, username="alice"))
+        service.create_feature("parent", [1])
 
     session.rollback()  # get_db does this in production on the propagated exception
 

@@ -50,6 +50,7 @@ class FormAnnotationService:
         self.images = image_repository
         self.tags = tag_repository
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def _resolve_image_instance_id(self, image_id: str | None) -> int | None:
@@ -121,7 +122,6 @@ class FormAnnotationService:
         sub_task_id: int | None,
         form_data: Any,
         form_annotation_reference_id: int | None,
-        actor: ActingUser,
     ) -> FormAnnotation:
         """Create a FormAnnotation owned by the acting user.
 
@@ -135,7 +135,7 @@ class FormAnnotationService:
             StudyID=study_id,
             ImageInstanceID=image_instance_id,
             Laterality=laterality,
-            CreatorID=actor.id,
+            CreatorID=self.scope.actor_id,
             SubTaskID=sub_task_id,
             FormData=form_data,
             FormAnnotationReferenceID=form_annotation_reference_id,
@@ -145,7 +145,7 @@ class FormAnnotationService:
             self.audit.record(
                 action="INSERT",
                 entity="FormAnnotation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=annotation.FormAnnotationID,
                 changes={
                     "form_schema_id": annotation.FormSchemaID,
@@ -161,7 +161,6 @@ class FormAnnotationService:
         self,
         annotation_id: int,
         updates: dict[str, Any],
-        actor: ActingUser,
     ) -> FormAnnotation:
         """Apply the provided (snake_case-keyed) fields to an annotation.
 
@@ -197,13 +196,13 @@ class FormAnnotationService:
             self.audit.record(
                 action="UPDATE",
                 entity="FormAnnotation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=annotation.FormAnnotationID,
                 changes=changes if changes else None,
             )
         return annotation
 
-    def soft_delete(self, annotation_id: int, actor: ActingUser) -> None:
+    def soft_delete(self, annotation_id: int) -> None:
         """Soft-delete an annotation (sets Inactive; row is kept).
 
         Raises:
@@ -228,7 +227,7 @@ class FormAnnotationService:
             self.audit.record(
                 action="DELETE",
                 entity="FormAnnotation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=annotation_id,
                 changes=deleted_data,
             )
@@ -238,7 +237,6 @@ class FormAnnotationService:
         self,
         annotation_id: int,
         form_data: Any,
-        actor: ActingUser,
     ) -> None:
         """Overwrite an annotation's FormData payload (high-frequency op).
 
@@ -257,7 +255,7 @@ class FormAnnotationService:
             self.audit.record(
                 action="UPDATE",
                 entity="FormAnnotation",
-                actor=actor,
+                actor=self._actor,
                 entity_id=annotation_id,
             )
         return None
@@ -267,7 +265,6 @@ class FormAnnotationService:
         annotation_id: int,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> FormAnnotationTagLink:
         """Attach a Tag to an annotation (idempotent; updates comment if re-tagged).
 
@@ -289,14 +286,14 @@ class FormAnnotationService:
             link = self.repository.add_link(
                 tag_id=tag.TagID,
                 form_annotation_id=annotation_id,
-                creator_id=actor.id,
+                creator_id=self.scope.actor_id,
                 comment=comment,
             )
             if self.audit is not None:
                 self.audit.record(
                     action="INSERT",
                     entity="FormAnnotationTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes={
                         "tag_id": tag.TagID,
                         "form_annotation_id": annotation_id,
@@ -320,7 +317,7 @@ class FormAnnotationService:
                 self.audit.record(
                     action="UPDATE",
                     entity="FormAnnotationTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
 
@@ -332,7 +329,6 @@ class FormAnnotationService:
         annotation_id: int,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> FormAnnotationTagLink:
         """Update the comment on an existing annotation tag link.
 
@@ -370,16 +366,14 @@ class FormAnnotationService:
                 self.audit.record(
                     action="UPDATE",
                     entity="FormAnnotationTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
 
         link.Tag = tag
         return link
 
-    def untag(
-        self, annotation_id: int, tag_id: int, actor: ActingUser
-    ) -> None:
+    def untag(self, annotation_id: int, tag_id: int) -> None:
         """Remove a Tag from an annotation (idempotent; no error if not linked).
 
         Raises:
@@ -402,7 +396,7 @@ class FormAnnotationService:
                 self.audit.record(
                     action="DELETE",
                     entity="FormAnnotationTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=deleted_data,
                 )
         return None

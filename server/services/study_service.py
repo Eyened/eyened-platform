@@ -27,6 +27,7 @@ class StudyService:
     ) -> None:
         self.repository = repository
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def tag_study(
@@ -34,7 +35,6 @@ class StudyService:
         study_id: int,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> StudyTagLink:
         """Attach a Study tag to a study (idempotent; updates comment if linked).
 
@@ -56,7 +56,7 @@ class StudyService:
             link = self.repository.add_link(
                 tag_id=tag.TagID,
                 study_id=study_id,
-                creator_id=actor.id,
+                creator_id=self.scope.actor_id,
                 comment=comment,
             )
             link.Tag = tag
@@ -64,7 +64,7 @@ class StudyService:
                 self.audit.record(
                     action="INSERT",
                     entity="StudyTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes={
                         "tag_id": tag.TagID,
                         "study_id": study_id,
@@ -88,7 +88,7 @@ class StudyService:
                 self.audit.record(
                     action="UPDATE",
                     entity="StudyTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
         return link
@@ -97,7 +97,6 @@ class StudyService:
         self,
         study_id: int,
         tag_id: int,
-        actor: ActingUser,
     ) -> None:
         """Remove a Study tag from a study (idempotent).
 
@@ -122,7 +121,7 @@ class StudyService:
             self.audit.record(
                 action="DELETE",
                 entity="StudyTagLink",
-                actor=actor,
+                actor=self._actor,
                 changes=deleted_data,
             )
         return None
@@ -132,7 +131,6 @@ class StudyService:
         study_id: int,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> StudyTagLink:
         """Update the comment on an existing Study tag link.
 
@@ -168,7 +166,7 @@ class StudyService:
                 self.audit.record(
                     action="UPDATE",
                     entity="StudyTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
         link.Tag = tag

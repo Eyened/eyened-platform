@@ -53,10 +53,15 @@ def _make_subtask(session, task_id: int, state: SubTaskState = SubTaskState.NotS
     return st
 
 
-def _service(session, audit=None) -> SubTaskService:
+def _service(session, actor: ActingUser | None = None, audit=None) -> SubTaskService:
+    scope = (
+        admin_scope(actor_id=actor.id, username=actor.username)
+        if actor is not None
+        else admin_scope()
+    )
     return SubTaskService(
-        SubTaskRepository(session, scope=admin_scope()),
-        scope=admin_scope(),
+        SubTaskRepository(session, scope=scope),
+        scope=scope,
         audit=audit,
     )
 
@@ -74,8 +79,8 @@ def test_update_subtask_changes_fields(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
 
-    updated = _service(session).update_subtask(
-        st.SubTaskID, "newcomment", SubTaskState.Ready, actor
+    updated = _service(session, actor).update_subtask(
+        st.SubTaskID, "newcomment", SubTaskState.Ready
     )
 
     assert updated.Comments == "newcomment"
@@ -86,7 +91,7 @@ def test_update_subtask_unknown_raises_not_found(session):
     """Updating a missing subtask is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).update_subtask(999_999, "x", None, actor)
+        _service(session, actor).update_subtask(999_999, "x", None)
 
 
 def test_update_subtask_logs_update_as_diff(session):
@@ -97,7 +102,7 @@ def test_update_subtask_logs_update_as_diff(session):
     st = _make_subtask(session, task.TaskID)
     audit = FakeAudit()
 
-    _service(session, audit).update_subtask(st.SubTaskID, "c", None, actor)
+    _service(session, actor, audit).update_subtask(st.SubTaskID, "c", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "UPDATE"
@@ -112,7 +117,7 @@ def test_delete_subtask_removes_it(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
 
-    _service(session).delete_subtask(st.SubTaskID, actor)
+    _service(session, actor).delete_subtask(st.SubTaskID)
 
     assert SubTaskRepository(session, scope=admin_scope()).get_by_id(st.SubTaskID) is None
 
@@ -121,7 +126,7 @@ def test_delete_subtask_unknown_raises_not_found(session):
     """Deleting a missing subtask is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).delete_subtask(999_999, actor)
+        _service(session, actor).delete_subtask(999_999)
 
 
 def test_delete_subtask_logs_delete(session):
@@ -132,7 +137,7 @@ def test_delete_subtask_logs_delete(session):
     st = _make_subtask(session, task.TaskID)
     audit = FakeAudit()
 
-    _service(session, audit).delete_subtask(st.SubTaskID, actor)
+    _service(session, actor, audit).delete_subtask(st.SubTaskID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
@@ -194,7 +199,7 @@ def test_add_image_appends_link_at_next_index(session):
     st = _make_subtask(session, task.TaskID)
     _make_image(session, "pub-1")
 
-    updated = _service(session).add_image(st.SubTaskID, "pub-1", actor)
+    updated = _service(session, actor).add_image(st.SubTaskID, "pub-1")
 
     assert [link.ImageInstance.PublicID for link in updated.SubTaskImageLinks] == ["pub-1"]
     assert [link.ImageIndex for link in updated.SubTaskImageLinks] == [0]
@@ -208,16 +213,16 @@ def test_add_image_second_image_gets_next_index(session):
     st = _make_subtask(session, task.TaskID)
     _make_image(session, "pub-1")
     _make_image(session, "pub-2")
-    service = _service(session)
+    service = _service(session, actor)
 
-    service.add_image(st.SubTaskID, "pub-1", actor)
+    service.add_image(st.SubTaskID, "pub-1")
     # The service no longer commits (get_db owns the request-scoped
     # transaction); commit here to cross the same request boundary a second
     # real HTTP call would get for free via a brand-new session, so the
     # eager-loaded SubTaskImageLinks collection below is reloaded fresh
     # rather than served stale from the identity map.
     session.commit()
-    updated = service.add_image(st.SubTaskID, "pub-2", actor)
+    updated = service.add_image(st.SubTaskID, "pub-2")
 
     assert [link.ImageIndex for link in updated.SubTaskImageLinks] == [0, 1]
 
@@ -227,7 +232,7 @@ def test_add_image_unknown_subtask_raises_not_found(session):
     actor = _actor(session)
     _make_image(session, "pub-1")
     with pytest.raises(NotFoundError):
-        _service(session).add_image(999_999, "pub-1", actor)
+        _service(session, actor).add_image(999_999, "pub-1")
 
 
 def test_add_image_unknown_image_raises_not_found(session):
@@ -237,7 +242,7 @@ def test_add_image_unknown_image_raises_not_found(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
     with pytest.raises(NotFoundError):
-        _service(session).add_image(st.SubTaskID, "nope", actor)
+        _service(session, actor).add_image(st.SubTaskID, "nope")
 
 
 def test_add_image_logs_insert(session):
@@ -249,7 +254,7 @@ def test_add_image_logs_insert(session):
     _make_image(session, "pub-1")
     audit = FakeAudit()
 
-    _service(session, audit).add_image(st.SubTaskID, "pub-1", actor)
+    _service(session, actor, audit).add_image(st.SubTaskID, "pub-1")
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
@@ -263,13 +268,13 @@ def test_remove_image_deletes_the_link(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
     _make_image(session, "pub-1")
-    service = _service(session)
-    service.add_image(st.SubTaskID, "pub-1", actor)
+    service = _service(session, actor)
+    service.add_image(st.SubTaskID, "pub-1")
     # Cross the request boundary a real second HTTP call would get for free
     # via a brand-new session (see test_add_image_second_image_gets_next_index).
     session.commit()
 
-    updated = service.remove_image(st.SubTaskID, "pub-1", actor)
+    updated = service.remove_image(st.SubTaskID, "pub-1")
 
     assert updated.SubTaskImageLinks == []
 
@@ -281,7 +286,7 @@ def test_remove_image_unknown_image_raises_not_found(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
     with pytest.raises(NotFoundError):
-        _service(session).remove_image(st.SubTaskID, "nope", actor)
+        _service(session, actor).remove_image(st.SubTaskID, "nope")
 
 
 def test_remove_image_unlinked_image_raises_not_found(session):
@@ -292,7 +297,7 @@ def test_remove_image_unlinked_image_raises_not_found(session):
     st = _make_subtask(session, task.TaskID)
     _make_image(session, "pub-1")  # exists, but never linked
     with pytest.raises(NotFoundError):
-        _service(session).remove_image(st.SubTaskID, "pub-1", actor)
+        _service(session, actor).remove_image(st.SubTaskID, "pub-1")
 
 
 def test_remove_image_logs_delete(session):
@@ -302,16 +307,10 @@ def test_remove_image_logs_delete(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
     _make_image(session, "pub-1")
-    service = _service(session)
-    service.add_image(st.SubTaskID, "pub-1", actor)
+    service = _service(session, actor)
+    service.add_image(st.SubTaskID, "pub-1")
     audit = FakeAudit()
-    SubTaskService(
-        SubTaskRepository(session, scope=admin_scope()),
-        scope=admin_scope(),
-        audit=audit,
-    ).remove_image(
-        st.SubTaskID, "pub-1", actor
-    )
+    _service(session, actor, audit).remove_image(st.SubTaskID, "pub-1")
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"

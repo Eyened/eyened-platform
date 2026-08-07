@@ -56,13 +56,19 @@ def _service(
     session,
     store: FakeSegmentationDataStore | None = None,
     audit: FakeAudit | None = None,
+    actor: ActingUser | None = None,
 ) -> SegmentationService:
+    scope = (
+        admin_scope(actor_id=actor.id, username=actor.username)
+        if actor is not None
+        else admin_scope()
+    )
     return SegmentationService(
-        SegmentationRepository(session, scope=admin_scope()),
-        ImageInstanceRepository(session, scope=admin_scope()),
-        TagRepository(session, scope=admin_scope()),
+        SegmentationRepository(session, scope=scope),
+        ImageInstanceRepository(session, scope=scope),
+        TagRepository(session, scope=scope),
         store or FakeSegmentationDataStore(),
-        scope=admin_scope(),
+        scope=scope,
         audit=audit,
     )
 
@@ -129,7 +135,7 @@ def test_create_persists_and_writes(session):
     session.commit()
     store = FakeSegmentationDataStore()
 
-    created = _service(session, store).create(
+    created = _service(session, store, actor=actor).create(
         image_id=image_id,
         feature_id=seg.FeatureID,
         subtask_id=None,
@@ -144,7 +150,6 @@ def test_create_persists_and_writes(session):
         threshold=None,
         reference_segmentation_id=None,
         array=np.zeros((1, 4, 4), dtype=np.uint8),
-        actor=actor,
     )
 
     assert created.SegmentationID is not None
@@ -158,7 +163,7 @@ def test_create_empty_array_fills_zeros(session):
     image_id = seg.ImageInstance.PublicID
     session.commit()
 
-    created = _service(session).create(
+    created = _service(session, actor=actor).create(
         image_id=image_id,
         feature_id=seg.FeatureID,
         subtask_id=None,
@@ -173,7 +178,6 @@ def test_create_empty_array_fills_zeros(session):
         threshold=None,
         reference_segmentation_id=None,
         array=None,
-        actor=actor,
     )
 
     assert created.shape == (1, 4, 4)
@@ -185,7 +189,7 @@ def test_create_unknown_image_raises_not_found(session):
     seg = _make_segmentation(session, "c2")
     session.commit()
     with pytest.raises(NotFoundError):
-        _service(session).create(
+        _service(session, actor=actor).create(
             image_id="no-such-image",
             feature_id=seg.FeatureID,
             subtask_id=None,
@@ -200,7 +204,6 @@ def test_create_unknown_image_raises_not_found(session):
             threshold=None,
             reference_segmentation_id=None,
             array=None,
-            actor=actor,
         )
 
 
@@ -211,7 +214,7 @@ def test_create_shape_mismatch_raises_bad_request(session):
     image_id = seg.ImageInstance.PublicID
     session.commit()
     with pytest.raises(BadRequestError):
-        _service(session).create(
+        _service(session, actor=actor).create(
             image_id=image_id,
             feature_id=seg.FeatureID,
             subtask_id=None,
@@ -226,7 +229,6 @@ def test_create_shape_mismatch_raises_bad_request(session):
             threshold=None,
             reference_segmentation_id=None,
             array=np.zeros((2, 4, 4), dtype=np.uint8),  # depth 2 != 1
-            actor=actor,
         )
 
 
@@ -238,7 +240,7 @@ def test_create_logs_insert(session):
     session.commit()
     audit = FakeAudit()
 
-    created = _service(session, audit=audit).create(
+    created = _service(session, audit=audit, actor=actor).create(
         image_id=image_id,
         feature_id=seg.FeatureID,
         subtask_id=None,
@@ -253,7 +255,6 @@ def test_create_logs_insert(session):
         threshold=None,
         reference_segmentation_id=None,
         array=None,
-        actor=actor,
     )
 
     assert len(audit.records) == 1
@@ -266,9 +267,7 @@ def test_create_logs_insert(session):
 def test_write_data_unknown_raises_not_found(session):
     """write_data on a missing id raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).write_data(
-            999_999, np.zeros((1, 4, 4), dtype=np.uint8), actor=_actor(session)
-        )
+        _service(session).write_data(999_999, np.zeros((1, 4, 4), dtype=np.uint8))
 
 
 def test_write_data_persists_zarr_index(session):
@@ -282,8 +281,8 @@ def test_write_data_persists_zarr_index(session):
     session.commit()
     store = FakeSegmentationDataStore()
 
-    updated = _service(session, store).write_data(
-        seg.SegmentationID, np.zeros((1, 4, 4), dtype=np.uint8), actor=actor
+    updated = _service(session, store, actor=actor).write_data(
+        seg.SegmentationID, np.zeros((1, 4, 4), dtype=np.uint8)
     )
 
     assert updated.ZarrArrayIndex == 0
@@ -298,8 +297,8 @@ def test_write_data_logs_update(session):
     session.commit()
     audit = FakeAudit()
 
-    _service(session, audit=audit).write_data(
-        seg.SegmentationID, np.zeros((1, 4, 4), dtype=np.uint8), actor=actor
+    _service(session, audit=audit, actor=actor).write_data(
+        seg.SegmentationID, np.zeros((1, 4, 4), dtype=np.uint8)
     )
 
     assert len(audit.records) == 1
@@ -361,7 +360,7 @@ def test_soft_delete_sets_inactive(session):
     seg = _make_segmentation(session, "d1")
     session.commit()
 
-    _service(session).soft_delete(seg.SegmentationID, actor)
+    _service(session, actor=actor).soft_delete(seg.SegmentationID)
 
     assert seg.Inactive is True
 
@@ -369,7 +368,7 @@ def test_soft_delete_sets_inactive(session):
 def test_soft_delete_unknown_raises_not_found(session):
     """soft_delete on a missing id raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).soft_delete(999_999, _actor(session))
+        _service(session).soft_delete(999_999)
 
 
 def test_soft_delete_logs_delete(session):
@@ -379,7 +378,7 @@ def test_soft_delete_logs_delete(session):
     session.commit()
     audit = FakeAudit()
 
-    _service(session, audit=audit).soft_delete(seg.SegmentationID, actor)
+    _service(session, audit=audit, actor=actor).soft_delete(seg.SegmentationID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -396,12 +395,11 @@ def test_patch_applies_threshold_and_feature(session):
     other = _make_segmentation(session, "p1-feat")
     session.commit()
 
-    updated = _service(session).patch(
+    updated = _service(session, actor=actor).patch(
         seg.SegmentationID,
         reference_segmentation_id=None,
         feature_id=other.FeatureID,
         threshold=0.5,
-        actor=actor,
     )
 
     assert updated.Threshold == 0.5
@@ -416,7 +414,6 @@ def test_patch_unknown_raises_not_found(session):
             reference_segmentation_id=None,
             feature_id=None,
             threshold=1.0,
-            actor=_actor(session),
         )
 
 
@@ -434,12 +431,11 @@ def test_patch_logs_true_diff(session):
     old_feature_id = seg.FeatureID
     audit = FakeAudit()
 
-    _service(session, audit=audit).patch(
+    _service(session, audit=audit, actor=actor).patch(
         seg.SegmentationID,
         reference_segmentation_id=None,
         feature_id=other.FeatureID,
         threshold=0.5,
-        actor=actor,
     )
 
     assert len(audit.records) == 1
@@ -479,7 +475,7 @@ def test_tag_creates_link(session):
     tag = _make_tag(session, actor.id)
     session.commit()
 
-    link = _service(session).tag(seg.SegmentationID, tag.TagID, actor)
+    link = _service(session, actor=actor).tag(seg.SegmentationID, tag.TagID)
 
     assert link.TagID == tag.TagID
     assert link.SegmentationID == seg.SegmentationID
@@ -492,7 +488,7 @@ def test_tag_unknown_segmentation_raises_not_found(session):
     tag = _make_tag(session, actor.id)
     session.commit()
     with pytest.raises(NotFoundError):
-        _service(session).tag(999_999, tag.TagID, actor)
+        _service(session, actor=actor).tag(999_999, tag.TagID)
 
 
 def test_tag_unknown_tag_raises_not_found(session):
@@ -501,7 +497,7 @@ def test_tag_unknown_tag_raises_not_found(session):
     seg = _make_segmentation(session, "t2")
     session.commit()
     with pytest.raises(NotFoundError):
-        _service(session).tag(seg.SegmentationID, 999_999, actor)
+        _service(session, actor=actor).tag(seg.SegmentationID, 999_999)
 
 
 def test_tag_wrong_type_raises_bad_request(session):
@@ -511,7 +507,7 @@ def test_tag_wrong_type_raises_bad_request(session):
     tag = _make_tag(session, actor.id, tag_type=TagType.ImageInstance)
     session.commit()
     with pytest.raises(BadRequestError):
-        _service(session).tag(seg.SegmentationID, tag.TagID, actor)
+        _service(session, actor=actor).tag(seg.SegmentationID, tag.TagID)
 
 
 def test_tag_is_idempotent(session):
@@ -520,10 +516,10 @@ def test_tag_is_idempotent(session):
     seg = _make_segmentation(session, "t4")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service(session)
+    service = _service(session, actor=actor)
 
-    service.tag(seg.SegmentationID, tag.TagID, actor)
-    link = service.tag(seg.SegmentationID, tag.TagID, actor)
+    service.tag(seg.SegmentationID, tag.TagID)
+    link = service.tag(seg.SegmentationID, tag.TagID)
 
     assert link.TagID == tag.TagID
 
@@ -539,7 +535,7 @@ def test_tag_logs_insert(session):
     session.commit()
     audit = FakeAudit()
 
-    _service(session, audit=audit).tag(seg.SegmentationID, tag.TagID, actor)
+    _service(session, audit=audit, actor=actor).tag(seg.SegmentationID, tag.TagID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]
@@ -558,11 +554,11 @@ def test_tag_idempotent_replay_does_not_reaudit(session):
     seg = _make_segmentation(session, "ti2")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service(session)
-    service.tag(seg.SegmentationID, tag.TagID, actor)
+    service = _service(session, actor=actor)
+    service.tag(seg.SegmentationID, tag.TagID)
     audit = FakeAudit()
 
-    _service(session, audit=audit).tag(seg.SegmentationID, tag.TagID, actor)
+    _service(session, audit=audit, actor=actor).tag(seg.SegmentationID, tag.TagID)
 
     assert audit.records == []
 
@@ -573,10 +569,10 @@ def test_untag_removes_link(session):
     seg = _make_segmentation(session, "t5")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service(session)
-    service.tag(seg.SegmentationID, tag.TagID, actor)
+    service = _service(session, actor=actor)
+    service.tag(seg.SegmentationID, tag.TagID)
 
-    service.untag(seg.SegmentationID, tag.TagID, actor)
+    service.untag(seg.SegmentationID, tag.TagID)
 
     assert (
         SegmentationRepository(session, scope=admin_scope()).get_tag_link(
@@ -593,7 +589,7 @@ def test_untag_absent_link_is_idempotent(session):
     tag = _make_tag(session, actor.id)
     session.commit()
 
-    _service(session).untag(seg.SegmentationID, tag.TagID, actor)
+    _service(session, actor=actor).untag(seg.SegmentationID, tag.TagID)
 
 
 def test_untag_logs_delete(session):
@@ -603,11 +599,11 @@ def test_untag_logs_delete(session):
     seg = _make_segmentation(session, "ut1")
     tag = _make_tag(session, actor.id)
     session.commit()
-    service = _service(session)
-    service.tag(seg.SegmentationID, tag.TagID, actor)
+    service = _service(session, actor=actor)
+    service.tag(seg.SegmentationID, tag.TagID)
     audit = FakeAudit()
 
-    _service(session, audit=audit).untag(seg.SegmentationID, tag.TagID, actor)
+    _service(session, audit=audit, actor=actor).untag(seg.SegmentationID, tag.TagID)
 
     assert len(audit.records) == 1
     rec = audit.records[0]

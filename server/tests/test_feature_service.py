@@ -3,7 +3,6 @@ import pytest
 from eyened_orm import Feature
 from eyened_orm.repositories.feature_repository import FeatureRepository
 
-from server.services.acting_user import ActingUser
 from server.services.exceptions import ConflictError, NotFoundError
 from server.services.feature_service import FeatureService
 from eyened_orm.utils.factories import admin_scope
@@ -22,10 +21,6 @@ def _service(session, audit=None) -> FeatureService:
         scope=admin_scope(),
         audit=audit,
     )
-
-
-def _actor() -> ActingUser:
-    return ActingUser(id=1, username="alice")
 
 
 class FakeAudit:
@@ -54,7 +49,7 @@ def test_create_feature_persists_with_subfeatures(session):
     """Creating a feature with subfeature ids writes the ordered child links."""
     child = _make_feature(session, "child")
 
-    feature = _service(session).create_feature("parent", [child.FeatureID], _actor())
+    feature = _service(session).create_feature("parent", [child.FeatureID])
 
     assert feature.FeatureName == "parent"
     assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(feature.FeatureID) == [
@@ -64,7 +59,7 @@ def test_create_feature_persists_with_subfeatures(session):
 
 def test_create_feature_without_subfeatures(session):
     """Creating a feature with no subfeatures leaves it childless."""
-    feature = _service(session).create_feature("solo", None, _actor())
+    feature = _service(session).create_feature("solo", None)
 
     assert feature.FeatureName == "solo"
     assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(feature.FeatureID) == []
@@ -74,7 +69,7 @@ def test_create_feature_logs_insert(session):
     """Creating a feature emits one INSERT audit record naming the entity."""
     audit = FakeAudit()
 
-    _service(session, audit).create_feature("solo", None, _actor())
+    _service(session, audit).create_feature("solo", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
@@ -102,7 +97,7 @@ def test_update_feature_changes_name(session):
     """Updating name overwrites FeatureName in place."""
     feature = _make_feature(session, "old")
 
-    updated = _service(session).update_feature(feature.FeatureID, "new", None, _actor())
+    updated = _service(session).update_feature(feature.FeatureID, "new", None)
 
     assert updated.FeatureName == "new"
 
@@ -113,9 +108,9 @@ def test_update_feature_replaces_subfeatures(session):
     a = _make_feature(session, "a")
     b = _make_feature(session, "b")
     service = _service(session)
-    service.update_feature(parent.FeatureID, None, [a.FeatureID], _actor())
+    service.update_feature(parent.FeatureID, None, [a.FeatureID])
 
-    service.update_feature(parent.FeatureID, None, [b.FeatureID], _actor())
+    service.update_feature(parent.FeatureID, None, [b.FeatureID])
 
     assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(parent.FeatureID) == [
         b.FeatureID
@@ -125,7 +120,7 @@ def test_update_feature_replaces_subfeatures(session):
 def test_update_feature_unknown_raises_not_found(session):
     """Updating a missing feature is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).update_feature(999_999, "x", None, _actor())
+        _service(session).update_feature(999_999, "x", None)
 
 
 def test_update_feature_logs_rename_as_diff(session):
@@ -133,7 +128,7 @@ def test_update_feature_logs_rename_as_diff(session):
     feature = _make_feature(session, "old")
     audit = FakeAudit()
 
-    _service(session, audit).update_feature(feature.FeatureID, "new", None, _actor())
+    _service(session, audit).update_feature(feature.FeatureID, "new", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "UPDATE"
@@ -149,7 +144,7 @@ def test_update_feature_logs_both_name_and_subfeatures_diff(session):
     audit = FakeAudit()
 
     _service(session, audit).update_feature(
-        parent.FeatureID, "new", [child.FeatureID], _actor()
+        parent.FeatureID, "new", [child.FeatureID]
     )
 
     assert audit.records[0]["changes"] == {
@@ -162,7 +157,7 @@ def test_delete_feature_removes_it(session):
     """Deleting an unreferenced feature removes it from the database."""
     feature = _make_feature(session, "gone")
 
-    _service(session).delete_feature(feature.FeatureID, _actor())
+    _service(session).delete_feature(feature.FeatureID)
 
     assert FeatureRepository(session, scope=admin_scope()).get_by_id(feature.FeatureID) is None
 
@@ -170,7 +165,7 @@ def test_delete_feature_removes_it(session):
 def test_delete_feature_unknown_raises_not_found(session):
     """Deleting a missing feature is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).delete_feature(999_999, _actor())
+        _service(session).delete_feature(999_999)
 
 
 def test_delete_feature_blocked_by_child_link_raises_conflict(session):
@@ -180,7 +175,7 @@ def test_delete_feature_blocked_by_child_link_raises_conflict(session):
     FeatureRepository(session, scope=admin_scope()).replace_subfeatures(parent.FeatureID, [child.FeatureID])
 
     with pytest.raises(ConflictError) as exc:
-        _service(session).delete_feature(child.FeatureID, _actor())
+        _service(session).delete_feature(child.FeatureID)
 
     detail = exc.value.detail
     assert detail["code"] == "FEATURE_IS_CHILD"
@@ -192,7 +187,7 @@ def test_delete_feature_blocked_by_segmentations_raises_conflict(session):
     service = FeatureService(_SegBlockingRepo(), scope=admin_scope())
 
     with pytest.raises(ConflictError) as exc:
-        service.delete_feature(7, _actor())
+        service.delete_feature(7)
 
     detail = exc.value.detail
     assert detail["code"] == "FEATURE_HAS_SEGMENTATIONS"
@@ -204,7 +199,7 @@ def test_delete_feature_logs_delete(session):
     feature = _make_feature(session, "gone")
     audit = FakeAudit()
 
-    _service(session, audit).delete_feature(feature.FeatureID, _actor())
+    _service(session, audit).delete_feature(feature.FeatureID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
