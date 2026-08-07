@@ -1,0 +1,40 @@
+# Production / deployment layer: concerns not already covered by the base.
+#
+# It makes NO assumption about where the database lives. That is expressed by
+# the local-db profile plus EYENED_DATABASE_HOST, which is what lets this one
+# layer serve both a client's self-contained install and a site pointed at a
+# managed database.
+#
+# There is no `client` service: the frontend is a static SPA baked into the
+# fileserver image below.
+#
+# No `restart:` here: the base already applies x-restart (unless-stopped) to
+# every service, this layer included, so repeating it would just be a value
+# that could silently diverge from the base's the day someone changes one and
+# not the other.
+
+services:
+
+  server:
+    deploy:
+      resources:
+        limits:
+          cpus: "8.0"
+          memory: 16G
+
+  fileserver:
+    # Replaces the base's stock nginx with one that has the built SPA in it.
+    #
+    # The explicit `image:` is REQUIRED, not decorative. When build and image
+    # are both set, compose builds and then tags the result with `image:` —
+    # and the base already set `image: nginx:1.27-alpine`. Without this line
+    # the built image would be tagged `nginx:1.27-alpine` in the local daemon,
+    # shadowing the official one for every other project on this host.
+    image: eyened-fileserver:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.fileserver
+    volumes:
+      # The prod `location /`: static root + SPA fallback. Single file onto a
+      # fixed name, same reason as the dev layer.
+      - ./nginx/client.d/prod.conf:/etc/nginx/client.d/client.conf:ro

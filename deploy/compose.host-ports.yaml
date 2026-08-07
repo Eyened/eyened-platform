@@ -1,0 +1,14 @@
+# Optional: publish the backing services on the host, for DBeaver or a
+# host-side alembic. Off by default because a published 3306/6379 is the
+# commonest collision between developers sharing a machine.
+#
+# Enable by appending :compose.host-ports.yaml to COMPOSE_FILE in deploy/.env
+# and picking ports nobody else is using.
+
+services:
+  database:
+    ports:
+      - "${DB_PUBLISH_PORT:-13306}:3306"
+  redis:
+    ports:
+      - "${REDIS_PUBLISH_PORT:-16379}:6379"
