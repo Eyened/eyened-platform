@@ -68,12 +68,16 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: database
 
-  # Used only by deploy/scripts/{load,save}_dump.sh.
+  # Used only by deploy/scripts/{load,save}_dump.sh. Must mount the SAME
+  # source as the database service above — a bare `db_data` here would attach
+  # to an unrelated, empty named volume whenever DB_DATA_PATH is set (a
+  # durable deployment's bind mount), so load_dump.sh would wipe and restore
+  # into nothing while reporting success and the live database sat untouched.
   xtrabackup:
     profiles: ["backup"]
     image: percona/percona-xtrabackup:8.0
     volumes:
-      - db_data:/var/lib/mysql
+      - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
 
   redis:
     image: redis:7-alpine

@@ -11,6 +11,15 @@ resolve_compose
 name=${1:-}
 [ -n "$name" ] || die "usage: make db-restore NAME=<name>"
 
+# NAME is interpolated into a file path AND into a container's `sh -c`
+# string below, so anything outside this set (in particular `;`, `/`, `..`)
+# is refused rather than reaching either.
+case "$name" in
+    *[!A-Za-z0-9._-]*) die "error: NAME '$name' contains characters other than
+      letters, digits, '.', '_' and '-'.
+      Pick a name matching [A-Za-z0-9._-]." ;;
+esac
+
 # Same lookup as db-snapshot.sh — resolve the volume from the container, never
 # by rebuilding "${project}_db_data" (compose normalises project names).
 cid=$(compose ps -q database || true)
@@ -31,6 +40,16 @@ case "$answer" in y|Y|yes|YES) ;; *) die "cancelled." ;; esac
 # since the datadir may already have been wiped by the time it lands. INT and
 # TERM are trapped explicitly because an EXIT trap alone does not fire on a
 # signal in every shell this might run under.
+#
+# A trap that only runs `cleanup` and returns does NOT stop the script — the
+# shell resumes at the next statement, so a signal during `compose stop
+# database` would restart the (now running) database via the trap and then
+# carry on into the `rm -rf`/`tar xzf` step below, wiping and extracting over
+# a live datadir as if nothing happened (measured: dash, bash and busybox sh
+# all resume this way). The INT/TERM handlers below run `cleanup`, restore
+# the signal's default action, then re-raise it against this process so the
+# shell actually dies instead of limping forward. `cleanup` stays idempotent
+# (guarded by $restarted) because the re-raise can also trigger the EXIT trap.
 restarted=0
 cleanup() {
     if [ "$restarted" -eq 0 ]; then
@@ -39,7 +58,9 @@ cleanup() {
         compose start database || echo "error: could not restart the database — start it by hand: (cd deploy && $COMPOSE_BIN start database)" >&2
     fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'cleanup; trap - INT; kill -INT $$' INT
+trap 'cleanup; trap - TERM; kill -TERM $$' TERM
 
 echo "==> stopping the database"
 compose stop database
@@ -47,7 +68,7 @@ compose stop database
 docker run --rm \
     -v "$volume:/data" \
     -v "$DEPLOY_DIR/snapshots:/in:ro" \
-    alpine sh -c "rm -rf /data/* /data/..?* 2>/dev/null; tar xzf /in/$name.tgz -C /data"
+    alpine sh -c "rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; tar xzf /in/$name.tgz -C /data"
 
 echo "==> starting the database"
 compose start database
