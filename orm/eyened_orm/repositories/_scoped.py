@@ -17,9 +17,11 @@ from ..base import Base
 
 __all__ = ["scoped_one"]
 
-# Generic, so a repository's `-> Patient | None` still typechecks. A bare
-# `-> Base | None` would erase the concrete type at every one of the ~20 call
-# sites and push a cast into each of them.
+# Generic, so a repository's `-> Patient | None` stays the *declared* return
+# type at the call site, even though nothing enforces it: `apply_scope` is
+# typed `-> Select` unparameterized, so this isn't a checked guarantee -- a
+# bare `-> Base | None` would just make that erasure explicit and force a
+# cast into each of the ~20 call sites instead.
 T = TypeVar("T", bound=Base)
 
 

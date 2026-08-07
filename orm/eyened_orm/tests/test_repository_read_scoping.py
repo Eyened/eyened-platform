@@ -69,6 +69,9 @@ def test_image_reads_return_none_out_of_scope(session, two_projects):
     out_of_scope = two_projects["B"]
     assert repo.get_by_public_id(out_of_scope["public_id"]) is None
     assert repo.get_with_storage_by_public_id(out_of_scope["public_id"]) is None
+    # The numeric-string form forces get_with_storage_by_public_id's PK-fallback
+    # branch (PublicID lookup misses because it's a digit string, not "img-B").
+    assert repo.get_with_storage_by_public_id(str(out_of_scope["image"])) is None
     assert (
         repo.get_full_graph_by_id(
             out_of_scope["image"],
@@ -153,3 +156,24 @@ def test_a_tag_link_on_an_out_of_scope_row_reads_as_absent(session, two_projects
         session, scope=scope_for(two_projects["A"]["project"])
     )
     assert repo.get_tag_link(tag.TagID, two_projects["B"]["image"]) is None
+
+    study_tag = Tag(
+        TagName="st",
+        TagType=TagType.Study,
+        TagDescription="st",
+        CreatorID=creator.CreatorID,
+    )
+    session.add(study_tag)
+    session.flush()
+    StudyRepository(session, scope=admin_scope()).add_link(
+        tag_id=study_tag.TagID,
+        study_id=two_projects["B"]["study"],
+        creator_id=creator.CreatorID,
+        comment=None,
+    )
+    session.commit()
+
+    study_repo = StudyRepository(
+        session, scope=scope_for(two_projects["A"]["project"])
+    )
+    assert study_repo.get_link(study_tag.TagID, two_projects["B"]["study"]) is None
