@@ -231,13 +231,20 @@ with Database().get_session() as session:
         # omitting the flag makes it prompt twice on stdin instead.
         pw_file=$(mktemp) || die "bootstrap: could not create a temp file for the admin password."
         trap 'rm -f "$pw_file"' EXIT
+        # A signal is not an exit: whether EXIT also runs on SIGINT/SIGTERM is
+        # shell-dependent, and where it does not, Ctrl-C during the exec below
+        # leaves this file — holding the plaintext admin password — behind in
+        # /tmp. Handling both signals explicitly removes it in every shell; the
+        # `exit` then re-runs the EXIT trap, which is harmless (`rm -f`).
+        trap 'rm -f "$pw_file"; exit 130' INT
+        trap 'rm -f "$pw_file"; exit 143' TERM
         printf '%s\n%s\n' "$admin_password" "$admin_password" > "$pw_file"
         compose exec -T server eorm create-user \
             --username admin \
             --description "created by deploy/scripts/bootstrap.sh on first run" \
             < "$pw_file"
         rm -f "$pw_file"
-        trap - EXIT
+        trap - EXIT INT TERM
         cat <<EOF
 
 ------------------------------------------------------------------------
