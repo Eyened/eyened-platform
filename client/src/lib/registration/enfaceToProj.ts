@@ -10,6 +10,7 @@ import {
     type PhotoLocator,
 } from "./photoLocators";
 import {
+    medianCircularRadiusSpacingPx,
     medianRasterLineSpacingPx,
     rasterStackAxis,
 } from "./photoLocatorHitSpec";
@@ -293,13 +294,14 @@ export function bakeEnfaceToProjHop(
             }`);
         } else if (loc instanceof CirclePhotoLocator) {
             blocks.push(`{
+                const float TWO_PI = 6.283185307179586;
                 vec2 center = vec2(${f(loc.center.x)}, ${f(loc.center.y)});
                 vec2 vecc = p - center;
                 float radius = ${f(loc.radius)};
                 float dist = abs(length(vecc) - radius);
                 float angle = atan(vecc.y, vecc.x) - ${f(loc.start_angle)};
-                float r = angle / (2.0 * 3.141592653589793);
-                float ox = ${f(loc.width)} * r;
+                float t = fract(angle / TWO_PI);
+                float ox = ${f(loc.width)} * t;
                 float oy = ${f(loc.index)} + 0.5;
                 if (dist < bestDist) {
                     bestDist = dist;
@@ -351,16 +353,21 @@ export function enfaceToProjRegistrationItems(
         const lines = locs.filter(
             (l): l is LinePhotoLocator => l instanceof LinePhotoLocator,
         );
-        const hasCircles = locs.some((l) => l instanceof CirclePhotoLocator);
-        // Tiny step: gate raster-only families (no circles mixed in).
-        const maxMatchDistPx =
-            !hasCircles && lines.length >= 2
-                ? resolveRasterMaxMatchDistPx(
-                      lines,
-                      sliceThicknessMm,
-                      enfaceMmPerPxAlongStack(lines, instances.get(enfaceId)),
-                  )
-                : null;
+        const circles = locs.filter(
+            (l): l is CirclePhotoLocator => l instanceof CirclePhotoLocator,
+        );
+        let maxMatchDistPx: number | null = null;
+        if (circles.length === 0 && lines.length >= 2) {
+            maxMatchDistPx = resolveRasterMaxMatchDistPx(
+                lines,
+                sliceThicknessMm,
+                enfaceMmPerPxAlongStack(lines, instances.get(enfaceId)),
+            );
+        } else if (lines.length === 0 && circles.length >= 2) {
+            // Concentric rings: median radius gap (same units as photolocator px).
+            maxMatchDistPx = medianCircularRadiusSpacingPx(circles);
+        }
+        // Single circle / mixed: ungated nearest (circle angle uses fract below).
         items.push(
             new EnfaceToProjPhotolocations(
                 enfaceId,

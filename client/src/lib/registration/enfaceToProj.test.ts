@@ -3,7 +3,7 @@ import {
     bakeEnfaceToProjHop,
     resolveRasterMaxMatchDistPx,
 } from "./enfaceToProj";
-import { LinePhotoLocator } from "./photoLocators";
+import { CirclePhotoLocator, LinePhotoLocator } from "./photoLocators";
 import { medianRasterLineSpacingPx } from "./photoLocatorHitSpec";
 
 function horiz(y: number, index: number) {
@@ -61,5 +61,25 @@ describe("bakeEnfaceToProjHop raster gate", () => {
         );
         expect(glsl).toBeTruthy();
         expect(glsl!).not.toContain("return vec2(-1.0)");
+    });
+});
+
+describe("bakeEnfaceToProjHop circular angle wrap", () => {
+    it("fract-wraps start_angle so circumferential UV stays in [0,1)", () => {
+        const ring = new CirclePhotoLocator(
+            "ir",
+            "oct",
+            { x: 50, y: 50 },
+            20,
+            Math.PI,
+            0,
+            100,
+        );
+        const glsl = bakeEnfaceToProjHop([ring], [200, 200], [100, 50], null);
+        expect(glsl).toBeTruthy();
+        expect(glsl!).toContain("fract(angle / TWO_PI)");
+        expect(glsl!).not.toContain(
+            "float r = angle / (2.0 * 3.141592653589793)",
+        );
     });
 });

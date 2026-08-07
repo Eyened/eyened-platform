@@ -304,6 +304,24 @@ function circularMembers(circles: CirclePhotoLocator[]): CircularMember[] {
     return members;
 }
 
+/**
+ * Median consecutive radius gap (px) for concentric circles (same center).
+ * Null when fewer than 2 circles.
+ */
+export function medianCircularRadiusSpacingPx(
+    circles: CirclePhotoLocator[],
+): number | null {
+    if (circles.length < 2) {
+        return null;
+    }
+    const members = circularMembers(circles);
+    const gaps: number[] = [];
+    for (let i = 1; i < members.length; i++) {
+        gaps.push(members[i].loc.radius - members[i - 1].loc.radius);
+    }
+    return gaps.length ? median(gaps) : null;
+}
+
 function buildCircularFamily(
     circles: CirclePhotoLocator[],
 ): PhotoLocatorHitSpec {
