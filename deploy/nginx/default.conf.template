@@ -1,3 +1,12 @@
+# The scheme the CLIENT used. Behind a TLS-terminating proxy that is https
+# even though our own connection is http; with nothing in front, the header is
+# absent and $scheme is correct.
+map $http_x_forwarded_proto $client_scheme {
+    default $scheme;
+    https   https;
+    http    http;
+}
+
 server {
     listen 80;
     resolver 127.0.0.11 valid=10s;
@@ -40,7 +49,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $client_scheme;
     }
 
     # Frontend. The ONE location that differs between environments: dev

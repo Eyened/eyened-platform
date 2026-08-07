@@ -37,7 +37,12 @@ services:
       MYSQL_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
       MYSQL_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
     volumes:
-      - db_data:/var/lib/mysql
+      # Unset -> the named volume db_data (this stack's own disk). Set to an
+      # absolute host path -> a bind mount, which is what puts MySQL on storage
+      # that outlives the machine. On SURF Research Cloud the workspace disk is
+      # deleted with the workspace and an external volume is not, so a durable
+      # deployment there MUST set this to a path under ~/data/<volume>.
+      - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
     # Liveness only: mysqladmin ping answers even when credentials are
     # rejected, and a password on the command line would show up in `ps`.
     healthcheck:
@@ -111,10 +116,17 @@ services:
       EYENED_API_DEBUG: ${EYENED_API_DEBUG:-false}
       # Always /storage inside the container; what backs it is decided below.
       EYENED_STORAGE_ROOT: /storage
-      # OIDC endpoints are browser-facing, so they are built from PUBLIC_HOST.
+      # OIDC endpoints are browser-facing. The metadata URL and the iss=
+      # validation below MUST keep naming the same issuer (Keycloak's own
+      # host:port) or token validation fails at runtime — see the open
+      # question flagged in the Task 8b report about whether Keycloak should
+      # instead be proxied under PUBLIC_URL. Only the redirect URL, which the
+      # browser is sent back to, is derived from PUBLIC_URL: behind a TLS-
+      # terminating proxy (SURF Research Cloud, any ingress) that is the
+      # public https:// origin with no port — not this stack's host and port.
       # Inert unless EYENED_API_AUTH_OIDC_ENABLED is true (see the oidc profile).
       EYENED_OIDC_METADATA_URL: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}/realms/eyened-dev/.well-known/openid-configuration
-      EYENED_OIDC_REDIRECT_URL: http://${PUBLIC_HOST:-localhost}:${HTTP_PORT:-8080}/users/oidc-callback
+      EYENED_OIDC_REDIRECT_URL: ${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${HTTP_PORT:-8080}}/users/oidc-callback
       EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS: iss=http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}/realms/eyened-dev
     volumes:
       # Unset PLATFORM_STORAGE_PATH -> the named volume below (a clean clone
