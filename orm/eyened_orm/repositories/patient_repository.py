@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session, selectinload
 from eyened_orm import AttributeValue, Patient
 from eyened_orm.authz.scope import AccessScope
 
+from ._scoped import scoped_one
+
 
 class PatientRepository:
     """Data access for Patient rows."""
@@ -33,4 +35,10 @@ class PatientRepository:
                     AttributeValue.ProducingModel
                 )
             )
-        return self._session.get(Patient, patient_id, options=tuple(opts))
+        return scoped_one(
+            self._session,
+            Patient,
+            self._scope,
+            Patient.PatientID == patient_id,
+            options=tuple(opts),
+        )

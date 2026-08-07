@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from sqlalchemy import select
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -18,6 +16,8 @@ from eyened_orm import (
 )
 from eyened_orm.tag import FormAnnotationTagLink, SegmentationTagLink
 from eyened_orm.authz.scope import AccessScope
+
+from ._scoped import scoped_one
 
 _STORAGE_LOADER = selectinload(ImageInstance.ImageStorages).selectinload(
     ImageStorage.StorageBackend
@@ -99,7 +99,13 @@ class ImageInstanceRepository:
         opts = _full_graph_options(
             with_segmentations, with_form_annotations, with_model_segmentations
         )
-        return self._session.get(ImageInstance, instance_id, options=tuple(opts))
+        return scoped_one(
+            self._session,
+            ImageInstance,
+            self._scope,
+            ImageInstance.ImageInstanceID == instance_id,
+            options=tuple(opts),
+        )
 
     def get_full_graph_by_public_id(
         self,
@@ -113,17 +119,23 @@ class ImageInstanceRepository:
         opts = _full_graph_options(
             with_segmentations, with_form_annotations, with_model_segmentations
         )
-        item = (
-            self._session.scalars(
-                select(ImageInstance)
-                .options(*opts)
-                .where(ImageInstance.PublicID == image_id)
-            )
-            .first()
+        item = scoped_one(
+            self._session,
+            ImageInstance,
+            self._scope,
+            ImageInstance.PublicID == image_id,
+            options=tuple(opts),
         )
         if item is None and image_id.isdigit():
-            item = self._session.get(
-                ImageInstance, int(image_id), options=tuple(opts)
+            # The numeric-PK fallback is a second lookup, so it needs the filter
+            # too -- an unscoped fallback would be a read bypass reachable by
+            # simply passing the integer id as a string.
+            item = scoped_one(
+                self._session,
+                ImageInstance,
+                self._scope,
+                ImageInstance.ImageInstanceID == int(image_id),
+                options=tuple(opts),
             )
         return item
 
@@ -133,24 +145,35 @@ class ImageInstanceRepository:
         """Return the instance by PublicID with storage loaded (PK fallback), or None.
 
         Mirrors the legacy ``_get_image_instance_by_public_id`` resolver: try the
-        PublicID; on no match fall back to ``session.get`` with the raw id.
+        PublicID; on no match fall back to the raw id (numeric-PK fallback).
         """
-        try:
-            return self._session.scalars(
-                select(ImageInstance)
-                .options(_STORAGE_LOADER)
-                .where(ImageInstance.PublicID == public_id)
-            ).one()
-        except NoResultFound:
-            return self._session.get(ImageInstance, public_id)
+        item = scoped_one(
+            self._session,
+            ImageInstance,
+            self._scope,
+            ImageInstance.PublicID == public_id,
+            options=(_STORAGE_LOADER,),
+        )
+        if item is None and public_id.isdigit():
+            item = scoped_one(
+                self._session,
+                ImageInstance,
+                self._scope,
+                ImageInstance.ImageInstanceID == int(public_id),
+                options=(_STORAGE_LOADER,),
+            )
+        return item
 
     def get_tag_link(
         self, tag_id: int, image_instance_id: int
     ) -> ImageInstanceTagLink | None:
-        """Return the link for (tag_id, image_instance_id), or None if absent."""
-        return self._session.get(
+        """Return the link for (tag_id, image_instance_id), or None if absent/out of scope."""
+        return scoped_one(
+            self._session,
             ImageInstanceTagLink,
-            {"TagID": tag_id, "ImageInstanceID": image_instance_id},
+            self._scope,
+            ImageInstanceTagLink.TagID == tag_id,
+            ImageInstanceTagLink.ImageInstanceID == image_instance_id,
         )
 
     def save_link(self, link: ImageInstanceTagLink) -> None:
@@ -169,9 +192,12 @@ class ImageInstanceRepository:
         the faithful equivalent of the legacy ``_resolve_image_instance_id``
         helper (no PK/digit fallback, unlike ``get_full_graph_by_public_id``).
         """
-        return self._session.scalars(
-            select(ImageInstance).where(ImageInstance.PublicID == public_id)
-        ).first()
+        return scoped_one(
+            self._session,
+            ImageInstance,
+            self._scope,
+            ImageInstance.PublicID == public_id,
+        )
 
     def add_link(
         self,

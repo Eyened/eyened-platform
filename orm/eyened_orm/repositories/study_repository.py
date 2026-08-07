@@ -6,6 +6,8 @@ from eyened_orm import Study, StudyTagLink, Tag
 from eyened_orm.tag import TAG_LINK_COLLECTIONS
 from eyened_orm.authz.scope import AccessScope
 
+from ._scoped import scoped_one
+
 
 class StudyRepository:
     """Data access for Study rows and their Tag links."""
@@ -15,8 +17,8 @@ class StudyRepository:
         self._scope = scope
 
     def get_by_id(self, study_id: int) -> Study | None:
-        """Return the study with the given id, or None if absent."""
-        return self._session.get(Study, study_id)
+        """Return the study with the given id, or None if absent or out of scope."""
+        return scoped_one(self._session, Study, self._scope, Study.StudyID == study_id)
 
     def get_tag(self, tag_id: int) -> Tag | None:
         """Return the tag with the given id, or None if absent.
@@ -43,8 +45,14 @@ class StudyRepository:
         )
 
     def get_link(self, tag_id: int, study_id: int) -> StudyTagLink | None:
-        """Return the StudyTagLink for (tag, study), or None if not linked."""
-        return self._session.get(StudyTagLink, {"TagID": tag_id, "StudyID": study_id})
+        """Return the StudyTagLink for (tag, study), or None if absent/out of scope."""
+        return scoped_one(
+            self._session,
+            StudyTagLink,
+            self._scope,
+            StudyTagLink.TagID == tag_id,
+            StudyTagLink.StudyID == study_id,
+        )
 
     def save_link(self, link: StudyTagLink) -> None:
         """Persist in-place mutations to ``link`` (e.g. ``Comment``) within the
