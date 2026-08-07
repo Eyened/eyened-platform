@@ -19,8 +19,31 @@ case "$MODE" in
 esac
 
 failed=0
+# Both go to stdout: FAIL used to go to stderr, but that means a redirected
+# or piped run (`make doctor 2>&1 | tee log`, or capturing just one stream)
+# interleaves the report out of order or loses half of it. This file's whole
+# purpose is one readable, ordered list, so both share a stream.
 ok()      { printf 'ok    %s\n' "$1"; }
-problem() { printf 'FAIL  %s\n' "$1" >&2; failed=1; }
+problem() { printf 'FAIL  %s\n' "$1"; failed=1; }
+
+# Strip a trailing CR (a CRLF .env, e.g. hand-edited on Windows/WSL) and
+# surrounding whitespace, and unwrap one layer of matching quotes. env_get
+# (lib.sh:90) returns values verbatim — it has no opinion on either — and
+# every comparison below is an exact-match `case`, so an unstripped `\r` or
+# a quoted `"change_me"` reads as a DIFFERENT string and silently passes.
+# This does not change what lib.sh or compose itself does with the value —
+# only what doctor compares against — so a CRLF .env is still worth fixing
+# at the source; doctor's checks must simply not be foolable by it either way.
+norm() {
+    _v=$(printf '%s' "$1" | tr -d '\r')
+    _v=${_v%"${_v##*[![:space:]]}"}
+    _v=${_v#"${_v%%[![:space:]]*}"}
+    case "$_v" in
+        \"*\") _v=${_v#\"}; _v=${_v%\"} ;;
+        \'*\') _v=${_v#\'}; _v=${_v%\'} ;;
+    esac
+    printf '%s' "$_v"
+}
 
 # --- Docker daemon ---------------------------------------------------------
 if docker info >/dev/null 2>&1; then
@@ -91,7 +114,7 @@ for _t in $required_tools; do
     esac
 done
 if [ -z "$missing_tools" ]; then
-    ok "required external tools are present ($required_tools)"
+    ok "required tools are present in the standard system path ($required_tools)"
 else
     problem "These tools are used by the deploy scripts but were not found as real
       executables (a shell builtin or function does not count):
@@ -102,8 +125,26 @@ fi
 
 # --- Whose .env is this, and is OIDC configured usably? --------------------
 if [ -f "$DEPLOY_DIR/.env" ]; then
-    compose_file=$(env_get COMPOSE_FILE)
-    profiles=$(env_get COMPOSE_PROFILES)
+  if [ ! -r "$DEPLOY_DIR/.env" ]; then
+    # Same case lib.sh's env_set already guards against (lib.sh:126-129, with
+    # the same rationale): an unreadable file looks exactly like "key not
+    # present" to env_get's `sed | tail` (tail exits 0 on the empty input a
+    # failed sed leaves behind), so every derived check below would silently
+    # see empty values and report a WRONG answer (oidc off, wrong entry
+    # point, defaults cleared) instead of "could not tell". Report the one
+    # real problem and skip the checks that depend on reading the file,
+    # rather than let them guess.
+    problem "deploy/.env exists but is not readable by this user, so the checks that
+      depend on it (entry point, OIDC host, secrets) could not run.
+      Fix: chmod u+r deploy/.env, or re-run as the user that owns it."
+  else
+    # Every value below goes through norm(): env_get (lib.sh:90) returns
+    # values verbatim, and every comparison here is an exact-match `case`, so
+    # a CRLF .env (trailing \r on every value) or a hand-quoted
+    # MYSQL_ROOT_PASSWORD="change_me" would otherwise compare unequal to the
+    # bare value being tested for and pass every check that depends on it.
+    compose_file=$(norm "$(env_get COMPOSE_FILE)")
+    profiles=$(norm "$(env_get COMPOSE_PROFILES)")
 
     # OIDC endpoints are built from PUBLIC_HOST because the issuer the SERVER
     # validates must be byte-identical to the one the BROWSER was redirected
@@ -114,7 +155,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # refused connections before it succeeds.
     case "$profiles" in
         *oidc*)
-            public_host=$(env_get PUBLIC_HOST)
+            public_host=$(norm "$(env_get PUBLIC_HOST)")
             case "${public_host:-localhost}" in
                 localhost|127.0.0.1|::1)
                     problem "COMPOSE_PROFILES enables 'oidc' but PUBLIC_HOST is
@@ -160,7 +201,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
         ok "deploy/.env matches the '$MODE' entry point"
     fi
 
-    if [ -n "$(env_get EYENED_API_SECRET_KEY)" ]; then
+    if [ -n "$(norm "$(env_get EYENED_API_SECRET_KEY)")" ]; then
         ok "EYENED_API_SECRET_KEY is set"
     else
         problem "EYENED_API_SECRET_KEY is empty in deploy/.env, so sessions cannot be
@@ -174,7 +215,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # the whole stack on published default passwords, silently.
     bad_secrets=""
     for _var in MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_REDIS_PASSWORD; do
-        _val=$(env_get "$_var")
+        _val=$(norm "$(env_get "$_var")")
         case "$_val" in
             change_me) bad_secrets="$bad_secrets $_var" ;;
         esac
@@ -188,20 +229,33 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       Fix: remove deploy/.env and re-run so real secrets are generated, or set
            each one by hand to a long random value."
     fi
+  fi
 else
     ok "no deploy/.env yet — it will be created from .env.example"
 fi
 
 # --- HTTP_PORT ------------------------------------------------------------
-http_port=$(env_get HTTP_PORT)
-[ -n "$http_port" ] || http_port=$(env_get HTTP_PORT "$DEPLOY_DIR/.env.example")
+# env_get defaults to $DEPLOY_DIR/.env and does not check readability itself
+# (lib.sh:88-91: a failed `sed` still lets `tail` exit 0) — called unguarded
+# against an unreadable .env it would print a raw, unexplained
+# "sed: can't read ...: Permission denied" to stderr on top of the one
+# problem already reported above. Only read .env here when it is readable;
+# otherwise fall back to .env.example, same as when .env does not exist yet.
+http_port=""
+if [ -r "$DEPLOY_DIR/.env" ]; then
+    http_port=$(norm "$(env_get HTTP_PORT)")
+fi
+[ -n "$http_port" ] || http_port=$(norm "$(env_get HTTP_PORT "$DEPLOY_DIR/.env.example")")
 
 port_probe() {
     # 0 = in use, 1 = free, 2 = cannot tell. Neither nc nor python3 is
     # guaranteed on a stock macOS or WSL host, so "cannot tell" is a real case
-    # and must not be reported as "free".
+    # and must not be reported as "free". `-w 2` on nc: a busybox build
+    # without NC_EXTRA has no `-z` and would otherwise block reading stdin
+    # instead of returning promptly — not observed on this host's busybox,
+    # but cheap portability insurance.
     if command -v nc >/dev/null 2>&1; then
-        nc -z 127.0.0.1 "$1" >/dev/null 2>&1 && return 0 || return 1
+        nc -z -w 2 127.0.0.1 "$1" >/dev/null 2>&1 && return 0 || return 1
     elif command -v python3 >/dev/null 2>&1; then
         python3 -c 'import socket, sys
 s = socket.socket(); s.settimeout(1)
@@ -210,31 +264,53 @@ sys.exit(0 if s.connect_ex(("127.0.0.1", int(sys.argv[1]))) == 0 else 1)' "$1" &
     return 2
 }
 
-# A re-run must not trip over its own listener. compose() dies if COMPOSE_BIN
-# is unset or empty (lib.sh:56), so it is only called when the detection above
-# actually found a binary — otherwise this falls straight through to the raw
-# port probe below.
-if [ -n "$COMPOSE_BIN" ]; then
-    ours=$(compose ps -q fileserver 2>/dev/null || true)
-else
-    ours=""
-fi
-if [ -n "$ours" ]; then
-    ok "port $http_port is held by this stack's own fileserver (this is a re-run)"
-else
-    set +e
-    port_probe "$http_port"
-    probe=$?
-    set -e
-    case "$probe" in
-        0) problem "Port $http_port is already in use, so the platform cannot bind it.
+case "$http_port" in
+    ''|*[!0-9]*)
+        problem "HTTP_PORT in deploy/.env is not a plain number ('$http_port'), so it cannot
+      be checked or used to publish the platform.
+      Fix: set HTTP_PORT in deploy/.env to a numeric port, e.g. 8080." ;;
+    *)
+        # A re-run must not trip over its own listener — but only if the
+        # running fileserver actually publishes THIS $http_port. compose ps
+        # alone doesn't prove that: an operator who followed doctor's own
+        # advice ("set HTTP_PORT to a free port") after a previous FAIL, while
+        # an old instance of this same stack is still up on the old port,
+        # would otherwise get a shortcut that is true about "a fileserver
+        # from this stack is running" and false about "on the port being
+        # asked about" — and the new port goes completely unprobed.
+        # compose() dies if COMPOSE_BIN is unset or empty (lib.sh:56), so it
+        # is only called when the detection above actually found a binary.
+        ours_matches=no
+        if [ -n "$COMPOSE_BIN" ]; then
+            set +e
+            ours=$(compose ps -q fileserver 2>/dev/null)
+            set -e
+            if [ -n "$ours" ]; then
+                set +e
+                published=$(compose port fileserver 80 2>/dev/null)
+                set -e
+                case "$published" in
+                    *:"$http_port") ours_matches=yes ;;
+                esac
+            fi
+        fi
+        if [ "$ours_matches" = yes ]; then
+            ok "port $http_port is held by this stack's own fileserver (this is a re-run)"
+        else
+            set +e
+            port_probe "$http_port"
+            probe=$?
+            set -e
+            case "$probe" in
+                0) problem "Port $http_port is already in use, so the platform cannot bind it.
       Fix: set HTTP_PORT in deploy/.env to a free port (on a machine shared
            with other developers, pick one nobody else is using), or stop
            whatever is holding $http_port." ;;
-        2) ok "port $http_port: no probe tool (nc/python3) here, check skipped" ;;
-        *) ok "port $http_port is free" ;;
-    esac
-fi
+                2) ok "port $http_port: no probe tool (nc/python3) here, check skipped" ;;
+                *) ok "port $http_port is free" ;;
+            esac
+        fi ;;
+esac
 
 # --- Disk --------------------------------------------------------------
 # "Where Docker will build" is Docker's data root (default /var/lib/docker)
