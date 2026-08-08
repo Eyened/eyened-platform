@@ -21,7 +21,7 @@ export class ImageSliceStack extends AbstractImage {
         img_id: string,
         data: Uint8Array,
         dimensions: Dimensions,
-        meta: any,
+        meta: Record<string, unknown>,
     ) {
         super(instance, webgl, img_id, dimensions, meta);
         assertSliceStackFits(dimensions, getVolumeLimits(webgl.gl));
@@ -40,10 +40,7 @@ export class ImageSliceStack extends AbstractImage {
     }
 
     setActiveSliceIndex(index: number): void {
-        this.activeSliceIndex = Math.max(
-            0,
-            Math.min(index, this.depth - 1),
-        );
+        this.activeSliceIndex = Math.max(0, Math.min(index, this.depth - 1));
     }
 
     getSlice(index: number): TextureData {

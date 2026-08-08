@@ -18,7 +18,7 @@ export function createVolumeImage(
     img_id: string,
     data: Uint8Array,
     dimensions: Dimensions,
-    meta: any,
+    meta: Record<string, unknown>,
 ): Image2D | VolumeImage {
     const limits = getVolumeLimits(webgl.gl);
     const { width, height, depth } = dimensions;
@@ -50,12 +50,5 @@ export function createVolumeImage(
     console.info(
         `[volume] image ${img_id}: ${width}x${height}x${depth} → ImageSliceStack`,
     );
-    return new ImageSliceStack(
-        instance,
-        webgl,
-        img_id,
-        data,
-        dimensions,
-        meta,
-    );
+    return new ImageSliceStack(instance, webgl, img_id, data, dimensions, meta);
 }
