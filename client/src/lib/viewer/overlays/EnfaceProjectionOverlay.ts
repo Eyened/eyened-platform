@@ -46,6 +46,14 @@ export class EnfaceProjectionOverlay implements Overlay {
         }
     }
 
+    /** Release GL programs allocated for this overlay (call on effect teardown). */
+    destroy(): void {
+        for (const { program } of this.prepared) {
+            program.dispose();
+        }
+        this.prepared.length = 0;
+    }
+
     repaint(viewerContext: ViewerContext, renderTarget: RenderTarget): void {
         if (!this.prepared.length) {
             return;

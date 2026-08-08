@@ -171,4 +171,19 @@ describe("EnfaceProjectionOverlay", () => {
         expect(compileShaderTemplate).toHaveBeenCalledTimes(2);
         expect(pass).toHaveBeenCalledOnce();
     });
+
+    it("disposes compiled programs on destroy", () => {
+        const dispose = vi.fn();
+        compileShaderTemplate
+            .mockReturnValueOnce({ pass: vi.fn(), dispose })
+            .mockReturnValueOnce({ pass: vi.fn(), dispose });
+
+        const overlay = new EnfaceProjectionOverlay(
+            [source("binary", "first"), source("heatmap", "second")],
+            webgl,
+        );
+        overlay.destroy();
+
+        expect(dispose).toHaveBeenCalledTimes(2);
+    });
 });
