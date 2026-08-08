@@ -153,15 +153,19 @@ export class ViewerContext {
             ) {
                 this.windowLevel = { min: 30, max: 225 };
             }
-            // aspect ratio for OCT
-            if (image.resolution.z && image.resolution.x > 0) {
+            // B-scan exaggeration only for axial OCT volumes (not enface stacks)
+            if (
+                image.orientation === "axial" &&
+                image.resolution.z &&
+                image.resolution.x > 0
+            ) {
                 this.stretch = (8 * image.resolution.y) / image.resolution.x;
             }
         }
         this.transform = this.getInitTransform();
         this.imageTransform = image.transform;
 
-        if (image.is3D) {
+        if (image.is3D && image.depth > 1) {
             this.addOverlay(new ScrollOCT());
         }
         this.addOverlay(new UpdatePosition());

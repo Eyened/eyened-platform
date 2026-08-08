@@ -23,13 +23,12 @@ export function createVolumeImage(
     const limits = getVolumeLimits(webgl.gl);
     const { width, height, depth } = dimensions;
 
-    if (fitsTexture3D(dimensions, limits)) {
-        return new Image3D(instance, webgl, img_id, data, dimensions, meta);
-    }
-
-    assertSliceStackFits(dimensions, limits);
-
+    // Single-frame → Image2D (never depth-1 Image3D / OCT stretch path)
     if (depth === 1) {
+        assertSliceStackFits(dimensions, limits);
+        console.info(
+            `[volume] image ${img_id}: ${width}x${height}x${depth} → Image2D`,
+        );
         return Image2D.fromPixelData(
             instance,
             webgl,
@@ -40,6 +39,17 @@ export function createVolumeImage(
         );
     }
 
+    if (fitsTexture3D(dimensions, limits)) {
+        console.info(
+            `[volume] image ${img_id}: ${width}x${height}x${depth} → Image3D`,
+        );
+        return new Image3D(instance, webgl, img_id, data, dimensions, meta);
+    }
+
+    assertSliceStackFits(dimensions, limits);
+    console.info(
+        `[volume] image ${img_id}: ${width}x${height}x${depth} → ImageSliceStack`,
+    );
     return new ImageSliceStack(
         instance,
         webgl,

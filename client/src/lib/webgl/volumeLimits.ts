@@ -34,7 +34,7 @@ export function fitsSliceStack(
 }
 
 export function assertSliceStackFits(
-    dimensions: Dimensions,
+    dimensions: Pick<Dimensions, "width" | "height">,
     limits: WebGLVolumeLimits,
 ): void {
     if (fitsSliceStack(dimensions, limits)) {

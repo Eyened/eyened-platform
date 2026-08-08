@@ -37,8 +37,14 @@ export class ImageLoader {
         const dataUrl = this.buildDataUrl(imageId);
         // Convert to lowercase for case-insensitive comparison
         const dataFormat = instance.data_format;
+        console.info(
+            `[imageLoader] load image ${img_id} format=${dataFormat} ` +
+                `rows=${instance.rows} cols=${instance.columns} frames=${instance.nr_of_frames ?? 1}`,
+        );
         if (dataFormat === "image/png" || dataFormat === "image/jpeg") {
-            return [await this.loadImage2D(instance, img_id)];
+            const image = await this.loadImage2D(instance, img_id);
+            console.info(`[imageLoader] image ${img_id} → Image2D (raster)`);
+            return [image];
         } else if (dataFormat === "binary") {
             const meta = await this.loadBinaryMeta(imageId);
             const image = await this.loadBinary3D(
@@ -117,7 +123,17 @@ export class ImageLoader {
     async returnLoadedVolume(
         volume: Image2D | Image3D | ImageSliceStack,
     ): Promise<LoadedImages> {
-        if (volume instanceof Image2D || volume instanceof ImageSliceStack) {
+        if (volume instanceof Image2D) {
+            console.info(
+                `[imageLoader] image ${volume.image_id} loaded as Image2D`,
+            );
+            return [volume];
+        }
+        if (volume instanceof ImageSliceStack) {
+            console.info(
+                `[imageLoader] image ${volume.image_id} loaded as ImageSliceStack ` +
+                    `(${volume.width}x${volume.height}x${volume.depth}; no enface path)`,
+            );
             return [volume];
         }
 
@@ -129,8 +145,16 @@ export class ImageLoader {
             img3d.depth > this.minBscansForEnface &&
             img3d.orientation === "axial"
         ) {
+            console.info(
+                `[imageLoader] image ${img3d.image_id} loaded as Image3D + enface ` +
+                    `(${img3d.width}x${img3d.height}x${img3d.depth}, orientation=${img3d.orientation})`,
+            );
             return [await img3d.createEnfaceProjection(), img3d];
         } else {
+            console.info(
+                `[imageLoader] image ${img3d.image_id} loaded as Image3D ` +
+                    `(${img3d.width}x${img3d.height}x${img3d.depth}, orientation=${img3d.orientation})`,
+            );
             return [img3d];
         }
     }
@@ -237,12 +261,17 @@ export class ImageLoader {
         const dimensions = this.extractDimensions(meta);
 
         const photometricInterpretation = meta.x00280004;
+        const transferSyntax = meta.x00020010;
         const { width, height, depth } = dimensions;
 
         const pixelData = ds.elements.x7fe00010;
 
         // pixeldata is already in the correct format
         if (pixelData.length === width * height * depth) {
+            console.info(
+                `[imageLoader] dicom ${img_id}: uncompressed pixel data ` +
+                    `${width}x${height}x${depth} (transferSyntax=${transferSyntax})`,
+            );
             const dicomBytes = ds.byteArray as Uint8Array;
             const volume = dicomBytes.subarray(
                 pixelData.dataOffset,
@@ -261,7 +290,11 @@ export class ImageLoader {
         }
 
         if (depth > 1 || meta.x00080060 === "OPT") {
-            // 3D OCT
+            // 3D OCT — cornerstone/OpenJPEG may emit j2k INFO lines per frame
+            console.info(
+                `[imageLoader] dicom ${img_id}: decoding ${depth} frame(s) via cornerstone ` +
+                    `(${width}x${height}, modality=${meta.x00080060}, transferSyntax=${transferSyntax})`,
+            );
             const volume = new Uint8Array(width * height * depth);
             for (let i = 0; i < depth; i++) {
                 const frameImageId = `wadouri:${url}?frame=${i}`;
@@ -287,6 +320,10 @@ export class ImageLoader {
             photometricInterpretation === "RGB" ||
             photometricInterpretation === "MONOCHROME2"
         ) {
+            console.info(
+                `[imageLoader] dicom ${img_id}: single-frame 2D via cornerstone ` +
+                    `(${width}x${height}, photometric=${photometricInterpretation}, transferSyntax=${transferSyntax})`,
+            );
             const pixelData = new Uint8Array(image.getPixelData());
             return [
                 Image2D.fromPixelData(
