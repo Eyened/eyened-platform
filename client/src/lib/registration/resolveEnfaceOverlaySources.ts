@@ -20,12 +20,6 @@ export function resolveEnfaceOverlaySources(args: {
     imageWidth: number;
     imageHeight: number;
     registration: Registration;
-    /**
-     * `Registration.revision`. Deliberately unused here: passing it in makes
-     * reactive callers depend on it, so their derived sources re-resolve when
-     * registration items import after the viewer already mounted.
-     */
-    registrationRevision?: number;
     managers: ReadonlyMap<string, EnfaceProjectionManager>;
     /** Pixel size lookup for intermediate path nodes (and current image). */
     getImageSize: (imageId: string) => [number, number] | undefined;
@@ -34,6 +28,10 @@ export function resolveEnfaceOverlaySources(args: {
     /** Per-OCT modes for linked viewers; missing key ⇒ "off". */
     linkedModes: ReadonlyMap<string, EnfaceProjectionMode>;
 }): EnfaceOverlaySourceResolved[] {
+    // Track Registration.revision here (not via an unused caller-passed arg) so
+    // $derived.by callers re-resolve when items import after the viewer mounts.
+    void args.registration.revision;
+
     const sizePrimary: [number, number] = [args.imageWidth, args.imageHeight];
 
     if (args.imageId.endsWith("_proj")) {

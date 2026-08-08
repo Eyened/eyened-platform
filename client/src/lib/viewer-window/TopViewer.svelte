@@ -29,18 +29,14 @@
     setContext("viewerContext", viewerContext);
 
     const isProjImage = $derived(image.image_id.endsWith("_proj"));
-    // Photo locators and patient-level registration sets keep importing after this
-    // viewer mounts, so the overlay sources have to re-resolve on every bump.
-    const registrationRevision = $derived(
-        viewerWindowContext.registration.revision,
-    );
+    // resolveEnfaceOverlaySources reads registration.revision so this derived
+    // re-runs when photo locators / registration sets import after mount.
     const resolved = $derived.by(() =>
         resolveEnfaceOverlaySources({
             imageId: image.image_id,
             imageWidth: image.width,
             imageHeight: image.height,
             registration: viewerWindowContext.registration,
-            registrationRevision,
             managers: viewerWindowContext.enfaceProjectionManagers,
             getImageSize: (id) => {
                 for (const [img] of viewerWindowContext.topViewers) {
@@ -218,10 +214,13 @@
         right: 0;
         bottom: 0;
         pointer-events: none;
+        /* Don't stretch .content to full height — that steals shift+wheel from Viewer. */
+        align-items: flex-start;
     }
     div.content {
         pointer-events: auto;
         flex: 0;
+        align-self: flex-start;
     }
     div.content.outer {
         flex-direction: column;

@@ -6,6 +6,17 @@ import { bakeHopGlsl, bakeParabolicHop } from "./enfaceToProj";
 import { Matrix } from "$lib/matrix";
 import { composeGlslPath } from "./composeGlslPath";
 
+/** Parse the two floats out of a `vec2(...)` literal (same spirit as parseMat3). */
+function parseVec2(literal: string): [number, number] {
+    const m = literal.match(/vec2\(\s*([^,]+)\s*,\s*([^)]+)\s*\)/);
+    expect(m).not.toBeNull();
+    const x = Number(m![1].trim());
+    const y = Number(m![2].trim());
+    expect(Number.isFinite(x)).toBe(true);
+    expect(Number.isFinite(y)).toBe(true);
+    return [x, y];
+}
+
 describe("bakeHopGlsl parabolic", () => {
     it("bakes coefficients and sizes into map_hop", () => {
         const glsl = bakeParabolicHop(
@@ -15,10 +26,14 @@ describe("bakeHopGlsl parabolic", () => {
             [150, 80],
         );
         expect(glsl).toContain("vec2 map_hop(vec2 uv)");
-        expect(glsl).toContain("200.0");
-        expect(glsl).toContain("100.0");
-        expect(glsl).toContain("150.0");
-        expect(glsl).toContain("80.0");
+        // Pin operand *positions*: src multiplies uv, dst divides the result.
+        // A bare toContain("200.0") still passes if srcSize/dstSize are swapped.
+        const srcLit = glsl!.match(/uv \* (vec2\([^)]+\))/);
+        const dstLit = glsl!.match(/return p \/ (vec2\([^)]+\))/);
+        expect(srcLit).not.toBeNull();
+        expect(dstLit).not.toBeNull();
+        expect(parseVec2(srcLit![1])).toEqual([200, 100]);
+        expect(parseVec2(dstLit![1])).toEqual([150, 80]);
         expect(glsl).toContain("0.1");
         expect(glsl).toContain("0.2");
         expect(glsl).not.toContain("u_size_primary");
@@ -58,7 +73,11 @@ describe("bakeHopGlsl parabolic", () => {
         expect(hop).not.toBeNull();
         expect(hop).toContain("mat3");
         expect(hop).toContain("dx_val");
-        expect(hop).toContain("100.0");
-        expect(hop).toContain("50.0");
+        const srcLit = hop!.match(/uv \* (vec2\([^)]+\))/);
+        const dstLit = hop!.match(/return p \/ (vec2\([^)]+\))/);
+        expect(srcLit).not.toBeNull();
+        expect(dstLit).not.toBeNull();
+        expect(parseVec2(srcLit![1])).toEqual([100, 100]);
+        expect(parseVec2(dstLit![1])).toEqual([50, 50]);
     });
 });

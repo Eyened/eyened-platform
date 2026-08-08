@@ -18,6 +18,8 @@ describe("composeGlslPath", () => {
         expect(src).not.toContain("map_hop");
         expect(src).toContain("uv = map_0(uv);");
         expect(src).toContain("return uv;");
+        // Body of map_0 must come from hopA (not a renamed empty stub).
+        expect(src).toMatch(/vec2 map_0\(vec2 uv\)\s*\{\s*return uv \* 2\.0;/);
     });
 
     it("chains multiple hops in order", () => {
@@ -28,6 +30,9 @@ describe("composeGlslPath", () => {
         const i1 = src.indexOf("uv = map_1(uv);");
         expect(i0).toBeGreaterThan(-1);
         expect(i1).toBeGreaterThan(i0);
+        // Pin hop bodies to indices: reverse([hopA, hopB]) would swap these.
+        expect(src).toMatch(/vec2 map_0\(vec2 uv\)\s*\{\s*return uv \* 2\.0;/);
+        expect(src).toMatch(/vec2 map_1\(vec2 uv\)\s*\{\s*return uv \+ 0\.1;/);
     });
 
     it("skips empty hop strings", () => {
