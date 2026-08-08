@@ -228,8 +228,9 @@ export class ProjToEnfacePhotolocations implements RegistrationItem {
 }
 
 /**
- * Prefer DICOM SliceThickness (mm) converted via enface mm/px along the stack
- * axis; otherwise median spacing between parallel raster lines (enface px).
+ * Prefer DICOM SliceThickness (mm) converted via enface mm/px; otherwise median
+ * spacing. Returns a *half*-gap / half-thickness so the outer catchment matches
+ * ±T/2 (I4), not a full inter-slice overshoot.
  */
 export function resolveRasterMaxMatchDistPx(
     lines: LinePhotoLocator[],
@@ -242,16 +243,48 @@ export function resolveRasterMaxMatchDistPx(
         enfaceMmPerPx != null &&
         enfaceMmPerPx > 0
     ) {
-        return sliceThicknessMm / enfaceMmPerPx;
+        return sliceThicknessMm / enfaceMmPerPx / 2;
     }
-    return medianRasterLineSpacingPx(lines);
+    const median = medianRasterLineSpacingPx(lines);
+    if (median != null && median > 0) {
+        return median / 2;
+    }
+    // Singleton line: no neighbor gap — keep a thin strip (hit-spec uses 1px).
+    if (lines.length === 1) {
+        return 1;
+    }
+    return null;
+}
+
+/** Half radius-gap, or thin annulus for a single circle (C1 Heidelberg case). */
+export function resolveCircularMaxMatchDistPx(
+    circles: CirclePhotoLocator[],
+    sliceThicknessMm?: number | null,
+    enfaceMmPerPx?: number | null,
+): number | null {
+    if (
+        sliceThicknessMm != null &&
+        sliceThicknessMm > 0 &&
+        enfaceMmPerPx != null &&
+        enfaceMmPerPx > 0
+    ) {
+        return sliceThicknessMm / enfaceMmPerPx / 2;
+    }
+    const median = medianCircularRadiusSpacingPx(circles);
+    if (median != null && median > 0) {
+        return median / 2;
+    }
+    if (circles.length === 1 && circles[0].radius > 0) {
+        return Math.max(circles[0].radius * 0.05, 1);
+    }
+    return null;
 }
 
 function enfaceMmPerPxAlongStack(
     lines: LinePhotoLocator[],
     enface: ImageGET | undefined,
 ): number | null {
-    if (!enface || lines.length < 2) {
+    if (!enface || lines.length < 1) {
         return null;
     }
     const axis = rasterStackAxis(lines);
@@ -260,6 +293,24 @@ function enfaceMmPerPxAlongStack(
             ? enface.resolution_vertical
             : enface.resolution_horizontal;
     return r != null && r > 0 ? r : null;
+}
+
+function enfaceMmPerPxIsotropic(enface: ImageGET | undefined): number | null {
+    if (!enface) {
+        return null;
+    }
+    const h = enface.resolution_horizontal;
+    const v = enface.resolution_vertical;
+    if (h != null && h > 0 && v != null && v > 0) {
+        return (h + v) / 2;
+    }
+    if (h != null && h > 0) {
+        return h;
+    }
+    if (v != null && v > 0) {
+        return v;
+    }
+    return null;
 }
 
 export function bakeEnfaceToProjHop(
@@ -357,17 +408,20 @@ export function enfaceToProjRegistrationItems(
             (l): l is CirclePhotoLocator => l instanceof CirclePhotoLocator,
         );
         let maxMatchDistPx: number | null = null;
-        if (circles.length === 0 && lines.length >= 2) {
+        const enface = instances.get(enfaceId);
+        if (circles.length === 0 && lines.length >= 1) {
             maxMatchDistPx = resolveRasterMaxMatchDistPx(
                 lines,
                 sliceThicknessMm,
-                enfaceMmPerPxAlongStack(lines, instances.get(enfaceId)),
+                enfaceMmPerPxAlongStack(lines, enface),
             );
-        } else if (lines.length === 0 && circles.length >= 2) {
-            // Concentric rings: median radius gap (same units as photolocator px).
-            maxMatchDistPx = medianCircularRadiusSpacingPx(circles);
+        } else if (lines.length === 0 && circles.length >= 1) {
+            maxMatchDistPx = resolveCircularMaxMatchDistPx(
+                circles,
+                sliceThicknessMm,
+                enfaceMmPerPxIsotropic(enface),
+            );
         }
-        // Single circle / mixed: ungated nearest (circle angle uses fract below).
         items.push(
             new EnfaceToProjPhotolocations(
                 enfaceId,

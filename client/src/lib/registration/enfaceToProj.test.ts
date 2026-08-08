@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     bakeEnfaceToProjHop,
+    resolveCircularMaxMatchDistPx,
     resolveRasterMaxMatchDistPx,
 } from "./enfaceToProj";
 import { CirclePhotoLocator, LinePhotoLocator } from "./photoLocators";
@@ -26,15 +27,44 @@ describe("medianRasterLineSpacingPx", () => {
 });
 
 describe("resolveRasterMaxMatchDistPx", () => {
-    it("prefers DICOM slice thickness converted via enface mm/px", () => {
+    it("prefers half DICOM slice thickness in enface px", () => {
         const lines = [horiz(0, 0), horiz(10, 1)];
-        // 0.12 mm / 0.012 mm/px = 10 px
-        expect(resolveRasterMaxMatchDistPx(lines, 0.12, 0.012)).toBeCloseTo(10);
+        // 0.12 mm / 0.012 mm/px = 10 px full → half-gap 5
+        expect(resolveRasterMaxMatchDistPx(lines, 0.12, 0.012)).toBeCloseTo(5);
     });
 
-    it("falls back to median line spacing when thickness missing", () => {
+    it("falls back to half median line spacing when thickness missing", () => {
         const lines = [horiz(0, 0), horiz(10, 1), horiz(20, 2)];
-        expect(resolveRasterMaxMatchDistPx(lines, null, null)).toBeCloseTo(10);
+        expect(resolveRasterMaxMatchDistPx(lines, null, null)).toBeCloseTo(5);
+    });
+
+    it("uses 1px strip for a singleton line", () => {
+        expect(resolveRasterMaxMatchDistPx([horiz(40, 0)], null, null)).toBe(1);
+    });
+});
+
+describe("resolveCircularMaxMatchDistPx", () => {
+    it("uses a thin annulus for a singleton circle", () => {
+        const ring = new CirclePhotoLocator(
+            "ir",
+            "oct",
+            { x: 50, y: 50 },
+            200,
+            Math.PI,
+            0,
+            100,
+        );
+        expect(resolveCircularMaxMatchDistPx([ring], null, null)).toBeCloseTo(
+            10,
+        );
+    });
+
+    it("uses half median radius gap for concentric rings", () => {
+        const rings = [
+            new CirclePhotoLocator("ir", "oct", { x: 50, y: 50 }, 20, 0, 0, 100),
+            new CirclePhotoLocator("ir", "oct", { x: 50, y: 50 }, 30, 0, 1, 100),
+        ];
+        expect(resolveCircularMaxMatchDistPx(rings, null, null)).toBeCloseTo(5);
     });
 });
 
