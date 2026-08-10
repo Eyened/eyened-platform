@@ -133,6 +133,32 @@ def owned(session):
                 CreatorID=author.CreatorID,
             )
         )
+
+    # A link whose CreatorID differs from its parent row's -- the loop above
+    # always makes them match, so on its own it cannot tell ``untag``'s
+    # ownership argument (the link's author) apart from the parent's. This
+    # tag links to the *own* segmentation/annotation (parent author: actor)
+    # but the link itself is authored by ``other``.
+    seg_tag_mismatched_owner = make_tag(
+        session, "seg-mismatched-owner", TagType.Segmentation, other
+    )
+    session.add(
+        SegmentationTagLink(
+            SegmentationID=segmentations["own"].SegmentationID,
+            TagID=seg_tag_mismatched_owner.TagID,
+            CreatorID=other.CreatorID,
+        )
+    )
+    form_tag_mismatched_owner = make_tag(
+        session, "form-mismatched-owner", TagType.FormAnnotation, other
+    )
+    session.add(
+        FormAnnotationTagLink(
+            FormAnnotationID=annotations["own"].FormAnnotationID,
+            TagID=form_tag_mismatched_owner.TagID,
+            CreatorID=other.CreatorID,
+        )
+    )
     session.flush()
 
     # Read every id out before the commit: expire_on_commit=True, and an
@@ -156,6 +182,8 @@ def owned(session):
         "study_tag_free": study_tag_free.TagID,
         "image_tag": {k: v.TagID for k, v in image_tags.items()},
         "image_tag_free": image_tag_free.TagID,
+        "seg_tag_mismatched_owner": seg_tag_mismatched_owner.TagID,
+        "form_tag_mismatched_owner": form_tag_mismatched_owner.TagID,
     }
     session.commit()
     return data
@@ -359,6 +387,28 @@ _DELETE = {
         "instance_untag",
     )
 }
+# The two cases above target the ``own``/``foreign`` row-authored links, where
+# a tag link's own author always matches its parent row's -- so they cannot
+# tell ``untag``'s ``owner_id=link.CreatorID`` apart from a parent-authored
+# stand-in. These two add a link on the *own* row authored by ``other``: the
+# actor owns the parent segmentation/annotation but did not create the link,
+# so ``require_owner_or_project_admin`` must still refuse a mere grader.
+_DELETE.update(
+    {
+        "segmentation_untag_link_owned_by_other": lambda d, who: (
+            "DELETE",
+            f"/segmentations/{d['segmentation']['own']}"
+            f"/tags/{d['seg_tag_mismatched_owner']}",
+            {},
+        ),
+        "form_annotation_untag_link_owned_by_other": lambda d, who: (
+            "DELETE",
+            f"/form-annotations/{d['annotation']['own']}"
+            f"/tags/{d['form_tag_mismatched_owner']}",
+            {},
+        ),
+    }
+)
 
 
 # --- The brief's two named cases -------------------------------------------
