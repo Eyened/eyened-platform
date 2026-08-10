@@ -7,6 +7,8 @@ from eyened_orm import ImageInstance, ImageInstanceTagLink
 from eyened_orm.repositories.image_instance_repository import ImageInstanceRepository
 from eyened_orm.repositories.tag_repository import TagRepository
 from eyened_orm.tag import TagType
+from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
+from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
@@ -110,6 +112,19 @@ class ImageInstanceService:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.ImageInstance:
             raise BadRequestError("Tag type must be ImageInstance")
+        # A tag link carries no project of its own, so it is authorized against
+        # its *parent* -- the deliberate asymmetry recorded at ``PROJECT_IDS_OF``
+        # (``projects_of(session, ImageInstanceTagLink, ...)`` raises by
+        # design). The floor therefore names the parent, whose projects it is
+        # judged on; the ownership overlay names the link, whose CreatorID it
+        # reads, with ``entity_id=None`` because a link's key is composite.
+        projects = self.repository.project_ids(instance.ImageInstanceID)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="ImageInstance",
+            entity_id=instance.ImageInstanceID,
+        )
 
         link = self.repository.get_tag_link(tag.TagID, instance.ImageInstanceID)
         if link is None:
@@ -131,6 +146,16 @@ class ImageInstanceService:
                     },
                 )
         elif comment is not None:
+            # This branch overwrites an existing link's comment, so it is a
+            # modify and takes the same overlay ``patch_instance_tag`` does.
+            # Without it POST would be a standing bypass of PATCH's check.
+            require_owner(
+                self.scope,
+                owner_id=link.CreatorID,
+                entity="ImageInstanceTagLink",
+                entity_id=None,
+                projects=projects,
+            )
             before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
             # ImageInstanceTagLink has a composite PK, so entity_id is null;
@@ -176,10 +201,24 @@ class ImageInstanceService:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.ImageInstance:
             raise BadRequestError("Tag type must be ImageInstance")
+        projects = self.repository.project_ids(instance.ImageInstanceID)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="ImageInstance",
+            entity_id=instance.ImageInstanceID,
+        )
 
         link = self.repository.get_tag_link(tag_id, instance.ImageInstanceID)
         if link is None:
             raise NotFoundError("Link not found")
+        require_owner(
+            self.scope,
+            owner_id=link.CreatorID,
+            entity="ImageInstanceTagLink",
+            entity_id=None,
+            projects=projects,
+        )
 
         if comment is not None:
             before = AuditService.snapshot(link, "Comment")
@@ -215,9 +254,23 @@ class ImageInstanceService:
         instance = self.repository.get_with_storage_by_public_id(public_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
+        projects = self.repository.project_ids(instance.ImageInstanceID)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="ImageInstance",
+            entity_id=instance.ImageInstanceID,
+        )
 
         link = self.repository.get_tag_link(tag_id, instance.ImageInstanceID)
         if link is not None:
+            require_owner_or_project_admin(
+                self.scope,
+                owner_id=link.CreatorID,
+                entity="ImageInstanceTagLink",
+                entity_id=None,
+                projects=projects,
+            )
             deleted_data = {
                 "tag_id": tag_id,
                 "image_instance_id": instance.ImageInstanceID,

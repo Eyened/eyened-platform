@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, noload
 from eyened_orm import Study, StudyTagLink, Tag
 from eyened_orm.tag import TAG_LINK_COLLECTIONS
 from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import projects_of
 
 from ._scoped import scoped_one
 
@@ -15,6 +16,20 @@ class StudyRepository:
     def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
         self._scope = scope
+
+    def project_ids(self, study_id: int) -> set[int]:
+        """The project this study sits in, for a write check to be judged on.
+
+        The repository owns the Session, so the authz resolution runs here
+        rather than a service reaching through for a Session it must not hold.
+        Uses ``projects_of``, the one definition the reads and the CLI share.
+
+        Deliberately unscoped: the returned set is the *input* to
+        ``AccessScope.require``, so filtering it by the caller's scope would
+        remove exactly the projects the check exists to catch and make every
+        floor pass.
+        """
+        return projects_of(self._session, Study, study_id)
 
     def get_by_id(self, study_id: int) -> Study | None:
         """Return the study with the given id, or None if absent or out of scope."""

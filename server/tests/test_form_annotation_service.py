@@ -127,6 +127,20 @@ def _actor(session, key: str = "actor") -> ActingUser:
     return ActingUser(id=creator.CreatorID, username=creator.CreatorName)
 
 
+def _author(annotation) -> ActingUser:
+    """The acting user for a *modify* of ``annotation``: its own author.
+
+    ``_make_annotation`` mints its own ``c-<key>`` creator, so ``_actor``'s
+    unrelated ``u-actor`` is a different user -- and the ownership overlay
+    refuses a modify by anyone else, administrators included. A test about
+    audit content or data behaviour must therefore act as the author, or it
+    stops testing what its name says and starts testing the overlay.
+    """
+    return ActingUser(
+        id=annotation.CreatorID, username=annotation.Creator.CreatorName
+    )
+
+
 def _make_tag(session, creator_id: int, tag_type: TagType = TagType.FormAnnotation) -> Tag:
     tag = Tag(
         TagName=f"t-{tag_type.name}-{creator_id}",
@@ -246,8 +260,8 @@ def test_create_logs_insert(session):
 
 def test_update_applies_field(session):
     """update applies a provided field to the annotation."""
-    actor = _actor(session)
     ann = _make_annotation(session, "u1")
+    actor = _author(ann)
 
     updated = _service(session, actor=actor).update(
         ann.FormAnnotationID, {"form_data": {"b": 2}}
@@ -268,8 +282,8 @@ def test_update_logs_diff_with_applied_columns(session):
     pre-refactor 'None -> <new>' quirk (Decision #3: the old snake_case
     getattr never matched the PascalCase column, so every entry read
     'None -> <new>' regardless of the real old value)."""
-    actor = _actor(session)
     ann = _make_annotation(session, "ud1")
+    actor = _author(ann)
     audit = FakeAudit()
 
     _service(session, actor, audit=audit).update(
@@ -288,8 +302,8 @@ def test_update_image_id_diffs_on_image_instance_id_column(session):
     """An image_id update diffs the ImageInstanceID column it actually set
     (via the same snake->Pascal map used to setattr), not the snake_case
     'image_id' request key — the other half of the Decision-3 removal."""
-    actor = _actor(session)
     ann = _make_annotation(session, "ud2")
+    actor = _author(ann)
     image_id = _make_image(session, "img-2")
     audit = FakeAudit()
 
@@ -336,8 +350,8 @@ def test_soft_delete_logs_delete(session):
 
 def test_set_value_overwrites_form_data(session):
     """set_value overwrites the annotation's FormData payload."""
-    actor = _actor(session)
     ann = _make_annotation(session, "v1")
+    actor = _author(ann)
 
     _service(session, actor=actor).set_value(ann.FormAnnotationID, {"new": 9})
 
@@ -354,8 +368,8 @@ def test_set_value_logs_update_without_changes(session):
     """set_value's UPDATE audit carries no changes payload — pre-refactor
     log_simple never included field detail for this high-frequency op;
     preserved as-is (not a Decision-3-style improvement site)."""
-    actor = _actor(session)
     ann = _make_annotation(session, "sv1")
+    actor = _author(ann)
     audit = FakeAudit()
 
     _service(session, actor, audit=audit).set_value(ann.FormAnnotationID, {"x": 1})

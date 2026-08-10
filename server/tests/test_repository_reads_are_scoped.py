@@ -58,6 +58,15 @@ _UNSCOPED_METHODS = {
     # every floor built on it pass vacuously.
     "TaskRepository.project_ids": "resolves the projects a write is judged on",
     "SubTaskRepository.project_ids": "resolves the projects a write is judged on",
+    "SegmentationRepository.project_ids": "resolves the projects a write is judged on",
+    "FormAnnotationRepository.project_ids": "resolves the projects a write is "
+    "judged on",
+    "StudyRepository.project_ids": "resolves the projects a write is judged on",
+    "ImageInstanceRepository.project_ids": "resolves the projects a write is "
+    "judged on",
+    "FormAnnotationRepository.project_ids_of_patient": "resolves the project a "
+    "form annotation would be created into; the create floor has no row of its "
+    "own to resolve yet",
     "SubTaskRepository.project_ids_of_image": "resolves the project an image "
     "would bring into a task; the *after* half of a link write",
     "SubTaskRepository.resolve_image_instance_id": "PublicID -> id resolution only; "

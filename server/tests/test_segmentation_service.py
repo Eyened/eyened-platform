@@ -94,6 +94,20 @@ def _actor(session, key: str = "actor") -> ActingUser:
     return ActingUser(id=creator.CreatorID, username=creator.CreatorName)
 
 
+def _author(segmentation) -> ActingUser:
+    """The acting user for a *modify* of ``segmentation``: its own author.
+
+    ``_make_segmentation`` mints its own ``c-<key>`` creator, so ``_actor``'s
+    unrelated ``u-actor`` is a different user -- and the ownership overlay
+    refuses a modify by anyone else, administrators included. A test about
+    audit content or data behaviour must therefore act as the author, or it
+    stops testing what its name says and starts testing the overlay.
+    """
+    return ActingUser(
+        id=segmentation.CreatorID, username=segmentation.Creator.CreatorName
+    )
+
+
 def test_get_segmentation_unknown_raises_not_found(session):
     """get_segmentation on a missing id raises NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
@@ -278,8 +292,8 @@ def test_write_data_persists_zarr_index(session):
     Pins the store-vs-DB order: store.write() (which assigns ZarrArrayIndex)
     runs BEFORE the repo persists — unchanged from pre-refactor.
     """
-    actor = _actor(session)
     seg = _make_segmentation(session, "w1")
+    actor = _author(seg)
     session.commit()
     store = FakeSegmentationDataStore()
 
@@ -294,8 +308,8 @@ def test_write_data_logs_update(session):
     """write_data's UPDATE audit carries no changes payload — pre-refactor
     log_simple never included field detail for this high-frequency op;
     preserved as-is."""
-    actor = _actor(session)
     seg = _make_segmentation(session, "wu1")
+    actor = _author(seg)
     session.commit()
     audit = FakeAudit()
 
@@ -392,9 +406,9 @@ def test_soft_delete_logs_delete(session):
 
 def test_patch_applies_threshold_and_feature(session):
     """patch updates threshold and feature_id on the row."""
-    actor = _actor(session)
     seg = _make_segmentation(session, "p1")
     other = _make_segmentation(session, "p1-feat")
+    actor = _author(seg)
     session.commit()
 
     updated = _service(session, actor=actor).patch(
@@ -426,9 +440,9 @@ def test_patch_logs_true_diff(session):
     change-string was built, so they logged '<new> -> <new>' instead of the
     true old value. AuditService.snapshot/diff now reports true old/new for all three
     fields."""
-    actor = _actor(session)
     seg = _make_segmentation(session, "pd1")
     other = _make_segmentation(session, "pd1-feat")
+    actor = _author(seg)
     session.commit()
     old_feature_id = seg.FeatureID
     audit = FakeAudit()

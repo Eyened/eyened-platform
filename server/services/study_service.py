@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from eyened_orm import StudyTagLink
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.study_repository import StudyRepository
+from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
+from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
@@ -50,6 +52,16 @@ class StudyService:
             raise NotFoundError(f"Tag {tag_id} not found")
         if tag.TagType != TagType.Study:
             raise BadRequestError("Tag type must be Study")
+        # A tag link carries no project of its own, so it is authorized against
+        # its *parent* -- the deliberate asymmetry recorded at ``PROJECT_IDS_OF``
+        # (``projects_of(session, StudyTagLink, ...)`` raises by design). The
+        # floor therefore names the parent, whose projects it is judged on; the
+        # ownership overlay names the link, whose CreatorID it reads, with
+        # ``entity_id=None`` because a link's primary key is composite.
+        projects = self.repository.project_ids(study_id)
+        self.scope.require(
+            projects, ProjectRole.grader, entity="Study", entity_id=study_id
+        )
 
         link = self.repository.get_link(tag_id, study_id)
         if link is None:
@@ -72,6 +84,16 @@ class StudyService:
                     },
                 )
         elif comment is not None:
+            # This branch overwrites an existing link's comment, so it is a
+            # modify and takes the same overlay ``patch_study_tag`` does.
+            # Without it POST would be a standing bypass of PATCH's check.
+            require_owner(
+                self.scope,
+                owner_id=link.CreatorID,
+                entity="StudyTagLink",
+                entity_id=None,
+                projects=projects,
+            )
             before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
             # StudyTagLink has a composite PK, so entity_id is null; fold the
@@ -106,9 +128,20 @@ class StudyService:
         study = self.repository.get_by_id(study_id)
         if study is None:
             raise NotFoundError(f"Study {study_id} not found")
+        projects = self.repository.project_ids(study_id)
+        self.scope.require(
+            projects, ProjectRole.grader, entity="Study", entity_id=study_id
+        )
         link = self.repository.get_link(tag_id, study_id)
         if link is None:
             return None
+        require_owner_or_project_admin(
+            self.scope,
+            owner_id=link.CreatorID,
+            entity="StudyTagLink",
+            entity_id=None,
+            projects=projects,
+        )
 
         deleted_data = {
             "tag_id": tag_id,
@@ -146,9 +179,20 @@ class StudyService:
             raise NotFoundError(f"Tag {tag_id} not found")
         if tag.TagType != TagType.Study:
             raise BadRequestError("Tag type must be Study")
+        projects = self.repository.project_ids(study_id)
+        self.scope.require(
+            projects, ProjectRole.grader, entity="Study", entity_id=study_id
+        )
         link = self.repository.get_link(tag_id, study_id)
         if link is None:
             raise NotFoundError(f"Tag {tag_id} is not linked to study {study_id}")
+        require_owner(
+            self.scope,
+            owner_id=link.CreatorID,
+            entity="StudyTagLink",
+            entity_id=None,
+            projects=projects,
+        )
 
         if comment is not None:
             before = AuditService.snapshot(link, "Comment")

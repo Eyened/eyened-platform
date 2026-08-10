@@ -8,11 +8,12 @@ from eyened_orm import (
     FormAnnotationTagLink,
     ImageInstance,
     ImageInstanceTagLink,
+    Patient,
     Study,
     StudyTagLink,
 )
 from eyened_orm.authz.scope import AccessScope
-from eyened_orm.authz.scoping import apply_scope
+from eyened_orm.authz.scoping import apply_scope, projects_of
 from eyened_orm.repositories._scoped import scoped_one
 
 
@@ -22,6 +23,31 @@ class FormAnnotationRepository:
     def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
         self._scope = scope
+
+    def project_ids(self, annotation_id: int) -> set[int]:
+        """The projects this annotation touches, for a write check to be judged on.
+
+        The repository owns the Session, so the authz resolution runs here
+        rather than a service reaching through for a Session it must not hold.
+        Uses ``projects_of``, the one definition the reads and the CLI share.
+
+        Deliberately unscoped: the returned set is the *input* to
+        ``AccessScope.require``, so filtering it by the caller's scope would
+        remove exactly the projects the check exists to catch and make every
+        floor pass.
+        """
+        return projects_of(self._session, FormAnnotation, annotation_id)
+
+    def project_ids_of_patient(self, patient_id: int) -> set[int]:
+        """The project a patient sits in, for the floor on *creating* an
+        annotation -- which has no row of its own to resolve yet.
+
+        Lives here rather than on a ``PatientRepository`` for the same reason
+        ``SubTaskRepository.project_ids_of_image`` lives beside its only caller:
+        ``FormAnnotation`` is anchored to ``Patient``, and this repository is
+        the one the create path already holds. Deliberately unscoped, as above.
+        """
+        return projects_of(self._session, Patient, patient_id)
 
     def get_by_id(self, annotation_id: int) -> FormAnnotation | None:
         """Return the annotation by id, or None if absent or out of scope."""

@@ -14,6 +14,8 @@ from eyened_orm.repositories.image_instance_repository import (
     ImageInstanceRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
+from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
@@ -129,6 +131,16 @@ class FormAnnotationService:
             NotFoundError: If image_id is given but resolves to no instance.
         """
         image_instance_id = self._resolve_image_instance_id(image_id)
+        # No ownership overlay on create: the row does not exist yet and its
+        # author is the caller by construction (CreatorID below). The floor is
+        # judged on the patient's project -- ``FormAnnotation``'s own anchor --
+        # because there is no annotation row to resolve projects from yet.
+        self.scope.require(
+            self.repository.project_ids_of_patient(patient_id),
+            ProjectRole.grader,
+            entity="FormAnnotation",
+            entity_id=None,
+        )
         annotation = FormAnnotation(
             FormSchemaID=form_schema_id,
             PatientID=patient_id,
@@ -174,6 +186,20 @@ class FormAnnotationService:
         annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
+        projects = self.repository.project_ids(annotation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+        )
+        require_owner(
+            self.scope,
+            owner_id=annotation.CreatorID,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+            projects=projects,
+        )
 
         # Column list is purely updates-key-driven, so it can be built before
         # any mutation happens -- which is what snapshot() requires.
@@ -211,6 +237,20 @@ class FormAnnotationService:
         annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
+        projects = self.repository.project_ids(annotation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+        )
+        require_owner_or_project_admin(
+            self.scope,
+            owner_id=annotation.CreatorID,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+            projects=projects,
+        )
 
         deleted_data = {
             "form_schema_id": annotation.FormSchemaID,
@@ -246,6 +286,20 @@ class FormAnnotationService:
         annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
+        projects = self.repository.project_ids(annotation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+        )
+        require_owner(
+            self.scope,
+            owner_id=annotation.CreatorID,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+            projects=projects,
+        )
 
         annotation.FormData = form_data
         self.repository.save(annotation)
@@ -280,6 +334,19 @@ class FormAnnotationService:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.FormAnnotation:
             raise BadRequestError("Tag type must be FormAnnotation")
+        # A tag link carries no project of its own, so it is authorized against
+        # its *parent* -- the deliberate asymmetry recorded at ``PROJECT_IDS_OF``
+        # (``projects_of(session, FormAnnotationTagLink, ...)`` raises by
+        # design). The floor therefore names the parent, whose projects it is
+        # judged on; the ownership overlay names the link, whose CreatorID it
+        # reads, with ``entity_id=None`` because a link's key is composite.
+        projects = self.repository.project_ids(annotation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+        )
 
         link = self.repository.get_tag_link(tag.TagID, annotation_id)
         if link is None:
@@ -301,6 +368,16 @@ class FormAnnotationService:
                     },
                 )
         elif comment is not None:
+            # This branch overwrites an existing link's comment, so it is a
+            # modify and takes the same overlay ``patch_tag`` does. Without it
+            # POST would be a standing bypass of PATCH's ownership check.
+            require_owner(
+                self.scope,
+                owner_id=link.CreatorID,
+                entity="FormAnnotationTagLink",
+                entity_id=None,
+                projects=projects,
+            )
             before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
             # FormAnnotationTagLink has a composite PK, so entity_id is null;
@@ -344,10 +421,24 @@ class FormAnnotationService:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.FormAnnotation:
             raise BadRequestError("Tag type must be FormAnnotation")
+        projects = self.repository.project_ids(annotation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+        )
 
         link = self.repository.get_tag_link(tag_id, annotation_id)
         if link is None:
             raise NotFoundError("Link not found")
+        require_owner(
+            self.scope,
+            owner_id=link.CreatorID,
+            entity="FormAnnotationTagLink",
+            entity_id=None,
+            projects=projects,
+        )
 
         if comment is not None:
             before = AuditService.snapshot(link, "Comment")
@@ -382,9 +473,23 @@ class FormAnnotationService:
         annotation = self.repository.get_by_id(annotation_id)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
+        projects = self.repository.project_ids(annotation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="FormAnnotation",
+            entity_id=annotation_id,
+        )
 
         link = self.repository.get_tag_link(tag_id, annotation_id)
         if link is not None:
+            require_owner_or_project_admin(
+                self.scope,
+                owner_id=link.CreatorID,
+                entity="FormAnnotationTagLink",
+                entity_id=None,
+                projects=projects,
+            )
             deleted_data = {
                 "tag_id": tag_id,
                 "form_annotation_id": annotation_id,

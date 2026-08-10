@@ -18,6 +18,8 @@ from eyened_orm.repositories.segmentation_repository import (
     SegmentationRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
+from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
@@ -119,6 +121,16 @@ class SegmentationService:
         instance = self.images.get_by_public_id(image_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
+        # No ownership overlay on create: the row does not exist yet and its
+        # author is the caller by construction (CreatorID below). The floor is
+        # judged on the image's project, which is the only project the new
+        # segmentation can ever touch.
+        self.scope.require(
+            self.images.project_ids(instance.ImageInstanceID),
+            ProjectRole.grader,
+            entity="Segmentation",
+            entity_id=None,
+        )
 
         segmentation = Segmentation(
             ImageInstanceID=instance.ImageInstanceID,
@@ -245,6 +257,20 @@ class SegmentationService:
         segmentation = self.repository.get_by_id(segmentation_id)
         if segmentation is None:
             raise NotFoundError("Segmentation data not found")
+        projects = self.repository.project_ids(segmentation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+        )
+        require_owner(
+            self.scope,
+            owner_id=segmentation.CreatorID,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+            projects=projects,
+        )
         # Store write MUST stay before the repo write here (unchanged order
         # from pre-refactor: store.write -> session.add). Zarr I/O is not
         # part of the DB transaction — see the class-level note on atomicity.
@@ -275,6 +301,20 @@ class SegmentationService:
         segmentation = self.repository.get_by_id(segmentation_id)
         if segmentation is None:
             raise NotFoundError("Segmentation not found")
+        projects = self.repository.project_ids(segmentation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+        )
+        require_owner_or_project_admin(
+            self.scope,
+            owner_id=segmentation.CreatorID,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+            projects=projects,
+        )
 
         deleted_data = {
             "image_instance_id": segmentation.ImageInstanceID,
@@ -316,6 +356,20 @@ class SegmentationService:
         segmentation = self.repository.get_by_id(segmentation_id)
         if segmentation is None:
             raise NotFoundError("Segmentation not found")
+        projects = self.repository.project_ids(segmentation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+        )
+        require_owner(
+            self.scope,
+            owner_id=segmentation.CreatorID,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+            projects=projects,
+        )
 
         before = AuditService.snapshot(
             segmentation, "ReferenceSegmentationID", "FeatureID", "Threshold"
@@ -365,6 +419,18 @@ class SegmentationService:
             raise NotFoundError("Tag not found")
         if tag.TagType != TagType.Segmentation:
             raise BadRequestError("Tag type must be Segmentation")
+        # A tag link carries no project of its own, so it is authorized against
+        # its *parent* -- the deliberate asymmetry recorded at ``PROJECT_IDS_OF``
+        # (``projects_of(session, SegmentationTagLink, ...)`` raises by design).
+        # The floor therefore names the parent, whose projects it is judged on;
+        # the ownership overlay below names the link, whose CreatorID it reads.
+        # ``entity_id=None`` there because a link's primary key is composite.
+        self.scope.require(
+            self.repository.project_ids(segmentation_id),
+            ProjectRole.grader,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+        )
 
         link = self.repository.get_tag_link(tag.TagID, segmentation_id)
         if link is None:
@@ -403,9 +469,23 @@ class SegmentationService:
         segmentation = self.repository.get_by_id(segmentation_id)
         if segmentation is None:
             raise NotFoundError("Segmentation not found")
+        projects = self.repository.project_ids(segmentation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="Segmentation",
+            entity_id=segmentation_id,
+        )
 
         link = self.repository.get_tag_link(tag_id, segmentation_id)
         if link is not None:
+            require_owner_or_project_admin(
+                self.scope,
+                owner_id=link.CreatorID,
+                entity="SegmentationTagLink",
+                entity_id=None,
+                projects=projects,
+            )
             deleted_data = {
                 "tag_id": tag_id,
                 "segmentation_id": segmentation_id,

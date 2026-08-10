@@ -16,6 +16,7 @@ from eyened_orm import (
 )
 from eyened_orm.tag import FormAnnotationTagLink, SegmentationTagLink
 from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import projects_of
 
 from ._scoped import scoped_one
 
@@ -86,6 +87,20 @@ class ImageInstanceRepository:
     def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
         self._scope = scope
+
+    def project_ids(self, image_instance_id: int) -> set[int]:
+        """The project this image sits in, for a write check to be judged on.
+
+        The repository owns the Session, so the authz resolution runs here
+        rather than a service reaching through for a Session it must not hold.
+        Uses ``projects_of``, the one definition the reads and the CLI share.
+
+        Deliberately unscoped: the returned set is the *input* to
+        ``AccessScope.require``, so filtering it by the caller's scope would
+        remove exactly the projects the check exists to catch and make every
+        floor pass.
+        """
+        return projects_of(self._session, ImageInstance, image_instance_id)
 
     def get_full_graph_by_id(
         self,
