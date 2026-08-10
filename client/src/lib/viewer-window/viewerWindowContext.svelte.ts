@@ -50,6 +50,7 @@ export class ViewerWindowContext {
 
     private frame: number = 0;
     private loadedPatientIds = new Set<number>();
+    private destroyed = false;
 
     constructor(
         public readonly webgl: WebGL,
@@ -70,10 +71,13 @@ export class ViewerWindowContext {
 
         void this.setInstanceIDs(instanceIDs)
             .then(async () => {
+                if (this.destroyed) return;
                 await this.restoreMainViewersFromViewState();
+                if (this.destroyed) return;
                 this.viewState?.enableRecording();
             })
             .catch(async (error) => {
+                if (this.destroyed) return;
                 console.error(
                     "[viewerViewState] initial load failed; restoring/enabling anyway",
                     error,
@@ -86,6 +90,7 @@ export class ViewerWindowContext {
                         restoreError,
                     );
                 }
+                if (this.destroyed) return;
                 this.viewState?.enableRecording();
             });
     }
@@ -165,6 +170,7 @@ export class ViewerWindowContext {
     }
 
     destroy() {
+        this.destroyed = true;
         this.viewState?.flush();
         // Cancel animation frame
         cancelAnimationFrame(this.frame);
