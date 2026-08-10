@@ -195,6 +195,37 @@ def foreign_segmentation(owned):
     return {"id": owned["segmentation"]["foreign"], "project": owned["project"]}
 
 
+@pytest.fixture()
+def tag_pair(session, owned):
+    """Two tags with no project of their own and no link to anything: one
+    owned by ``owned``'s actor, one by its stranger.
+
+    ``Tag`` is deliberately absent from ``PROJECT_IDS_OF`` (see
+    ``orm/eyened_orm/authz/scoping.py``) -- a tag carries no project of its
+    own -- so ``update_tag``/``delete_tag`` bind purely on ownership. These
+    tags stay unlinked to any study/image/segmentation/annotation so nothing
+    about "which project can see this tag" is in play; ``owned["project"]``
+    is used only as *the actor's* membership, to hold a role that must not
+    matter.
+    """
+    from eyened_orm import Tag
+    from eyened_orm.tag import TagType
+
+    own = Tag(
+        TagName="own-plain", TagType=TagType.Study, TagDescription="",
+        CreatorID=owned["actor"],
+    )
+    foreign = Tag(
+        TagName="foreign-plain", TagType=TagType.Study, TagDescription="",
+        CreatorID=owned["other"],
+    )
+    session.add_all([own, foreign])
+    session.flush()
+    ids = {"own": own.TagID, "foreign": foreign.TagID}
+    session.commit()
+    return ids
+
+
 def _npy_body() -> bytes:
     """A 1x4x4 uint8 .npy payload matching the fixture image's shape."""
     buffer = io.BytesIO()
@@ -448,6 +479,98 @@ def test_a_project_admin_can_delete_another_users_segmentation(
     assert client.delete(
         f"/segmentations/{foreign_segmentation['id']}"
     ).status_code == 204
+
+
+# --- TagService: the ownership overlay on a project-less entity -----------
+#
+# A Tag carries no project of its own (see the ``tag_pair`` fixture): it is
+# deliberately absent from both ``_PARENT_OF`` and ``PROJECT_IDS_OF``, so both
+# checks below pass ``projects=frozenset()``. ``update_tag`` calls
+# ``require_owner`` (403 for anyone but the owner, administrators included).
+# ``delete_tag`` calls ``require_owner_or_project_admin`` over that empty set,
+# which Step 3a's fail-closed guard in ``AccessScope.require`` turns into a
+# 404 for every non-owner except an administrator -- the 403/404 asymmetry
+# the task report calls out. The "refused" actors below hold project_admin in
+# ``owned["project"]``, a real membership, so the refusal can only be coming
+# from ownership -- an actor with no role anywhere would prove nothing about
+# the overlay (the same trap the module docstring warns about for visibility).
+
+
+def test_the_owner_can_update_their_tag(client_scoped, owned, tag_pair):
+    """No role floor exists on a Tag; only ownership binds -- read_only is
+    enough once the actor is the author."""
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            owned["project"], role=ProjectRole.read_only, actor_id=owned["actor"]
+        )
+    )
+    resp = client.patch(f"/tags/{tag_pair['own']}", json={"name": "renamed"})
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "renamed"
+
+
+def test_a_project_admin_cannot_update_another_users_tag(
+    client_scoped, owned, tag_pair
+):
+    """A non-owner is refused even holding project_admin somewhere -- a Tag
+    has no projects, so the role clause could never be what saves them; only
+    a missing `require_owner` call could let this through."""
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            owned["project"], role=ProjectRole.project_admin, actor_id=owned["actor"]
+        )
+    )
+    resp = client.patch(f"/tags/{tag_pair['foreign']}", json={"name": "renamed"})
+    assert resp.status_code == 403
+
+
+def test_an_administrator_cannot_update_another_users_tag(
+    client_scoped, owned, tag_pair
+):
+    """`require_owner` binds administrators too -- the strongest scope there
+    is must still be refused."""
+    client, set_scope = client_scoped
+    set_scope(admin_scope(actor_id=owned["actor"]))
+    resp = client.patch(f"/tags/{tag_pair['foreign']}", json={"name": "renamed"})
+    assert resp.status_code == 403
+
+
+def test_the_owner_can_delete_their_tag(client_scoped, owned, tag_pair):
+    """`require_owner_or_project_admin`'s ownership clause returns early for
+    the author, no role needed."""
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            owned["project"], role=ProjectRole.read_only, actor_id=owned["actor"]
+        )
+    )
+    assert client.delete(f"/tags/{tag_pair['own']}").status_code == 204
+
+
+def test_a_project_admin_cannot_delete_another_users_tag(
+    client_scoped, owned, tag_pair
+):
+    """A non-owner is refused even holding project_admin somewhere: the empty
+    project set fails closed for every non-administrator (Step 3a), so this
+    is a 404 -- unlike `update_tag`'s 403 for the identical actor above."""
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            owned["project"], role=ProjectRole.project_admin, actor_id=owned["actor"]
+        )
+    )
+    assert client.delete(f"/tags/{tag_pair['foreign']}").status_code == 404
+
+
+def test_an_administrator_can_delete_another_users_tag(client_scoped, owned, tag_pair):
+    """The empty-set guard's `is_admin` arm lets an administrator through
+    without a separate ownership case -- `require_owner` would have refused
+    this the same way it refuses the update above."""
+    client, set_scope = client_scoped
+    set_scope(admin_scope(actor_id=owned["actor"]))
+    assert client.delete(f"/tags/{tag_pair['foreign']}").status_code == 204
 
 
 # --- One case per enforcement statement ------------------------------------

@@ -3,6 +3,7 @@ from __future__ import annotations
 from eyened_orm import Tag
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
 from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.exc import IntegrityError
@@ -77,6 +78,17 @@ class TagService:
         tag = self.repository.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError(f"Tag {tag_id} not found")
+        # A Tag is a global label with no project of its own (deliberately
+        # absent from PROJECT_IDS_OF -- see orm/eyened_orm/authz/scoping.py).
+        # There is no role floor to resolve here; only the ownership overlay
+        # binds, and it binds administrators too.
+        require_owner(
+            self.scope,
+            owner_id=tag.CreatorID,
+            entity="Tag",
+            entity_id=tag_id,
+            projects=frozenset(),
+        )
 
         before = AuditService.snapshot(tag, "TagName", "TagDescription", "TagType")
         if name is not None:
@@ -111,6 +123,18 @@ class TagService:
         tag = self.repository.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError(f"Tag {tag_id} not found")
+        # A Tag is a global label with no project of its own (deliberately
+        # absent from PROJECT_IDS_OF -- see orm/eyened_orm/authz/scoping.py).
+        # There is no role floor to resolve here: the owner deletes, or a
+        # project_admin does across the (empty) project set -- which Step 3a's
+        # fail-closed guard turns into a 404 for everyone else, admins excepted.
+        require_owner_or_project_admin(
+            self.scope,
+            owner_id=tag.CreatorID,
+            entity="Tag",
+            entity_id=tag_id,
+            projects=frozenset(),
+        )
 
         # Read before the delete: a failed flush leaves the Session needing a
         # rollback, so the 409 message must not depend on touching `tag` again.
