@@ -4,16 +4,17 @@ import { AbstractImage } from "./abstractImage";
 import { TextureData } from "./texture";
 import type { Dimensions } from "./types";
 import type { WebGL } from "./webgl";
-import { assertSliceStackFits, getVolumeLimits } from "./volumeLimits";
 
+/**
+ * Volume stored as a single TEXTURE_2D_ARRAY when slices exceed MAX_3D_TEXTURE_SIZE.
+ * Layer size is bounded by MAX_TEXTURE_SIZE; depth by MAX_ARRAY_TEXTURE_LAYERS.
+ */
 export class ImageSliceStack extends AbstractImage {
     is3D = true;
     is2D = false;
-    isSliceStack = true;
 
-    private readonly slices: TextureData[];
+    texture: WebGLTexture;
     private claheSliceCache = new Map<number, TextureData>();
-    private activeSliceIndex = 0;
 
     constructor(
         instance: ImageGET,
@@ -24,55 +25,47 @@ export class ImageSliceStack extends AbstractImage {
         meta: Record<string, unknown>,
     ) {
         super(instance, webgl, img_id, dimensions, meta);
-        assertSliceStackFits(dimensions, getVolumeLimits(webgl.gl));
-        this.slices = initSliceTextures(
-            webgl.gl,
-            dimensions.width,
-            dimensions.height,
-            dimensions.depth,
-            data,
-        );
+        this.texture = initTexture2DArray(webgl.gl, dimensions, data);
     }
 
-    /** Active slice texture; updated by the renderer via {@link setActiveSliceIndex}. */
-    get texture(): WebGLTexture {
-        return this.getSliceTexture(this.activeSliceIndex);
-    }
-
-    setActiveSliceIndex(index: number): void {
-        this.activeSliceIndex = Math.max(0, Math.min(index, this.depth - 1));
-    }
-
-    getSlice(index: number): TextureData {
-        const clampedIndex = Math.max(0, Math.min(index, this.depth - 1));
-        return this.slices[clampedIndex];
-    }
-
-    getSliceTexture(index: number): WebGLTexture {
-        return this.getSlice(index).texture;
+    /**
+     * Extract a single layer as RGBA (grayscale replicated) for CLAHE / 2D paths.
+     */
+    extractSlice(index: number): TextureData {
+        const { webgl, width, height, depth } = this;
+        const clampedIndex = Math.max(0, Math.min(Math.round(index), depth - 1));
+        const sliceTexture = new TextureData(webgl.gl, width, height, "RGBA");
+        sliceTexture.passShader(webgl.shaders.extractSliceArray, {
+            u_volume: this.texture,
+            u_image_size: [width, height, depth],
+            u_index: clampedIndex,
+        });
+        return sliceTexture;
     }
 
     async getClaheSliceTexture(
         index: number,
     ): Promise<TextureData | undefined> {
-        const clampedIndex = Math.max(0, Math.min(index, this.depth - 1));
+        const clampedIndex = Math.max(0, Math.min(Math.round(index), this.depth - 1));
 
         const cached = this.getClaheSliceTextureSync(clampedIndex);
         if (cached) {
             return cached;
         }
 
-        const slice = this.getSlice(clampedIndex);
+        const sliceTexture = this.extractSlice(clampedIndex);
         const claheInput: ClaheInput = {
             width: this.width,
             height: this.height,
             webgl: this.webgl,
-            texture: slice.texture,
+            texture: sliceTexture.texture,
             instance: this.instance,
         };
 
         const claheResult =
             await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
+
+        sliceTexture.dispose();
 
         if (claheResult) {
             this.claheSliceCache.set(clampedIndex, claheResult);
@@ -83,7 +76,7 @@ export class ImageSliceStack extends AbstractImage {
     }
 
     getClaheSliceTextureSync(index: number): TextureData | undefined {
-        const clampedIndex = Math.max(0, Math.min(index, this.depth - 1));
+        const clampedIndex = Math.max(0, Math.min(Math.round(index), this.depth - 1));
         return this.claheSliceCache.get(clampedIndex);
     }
 
@@ -95,33 +88,49 @@ export class ImageSliceStack extends AbstractImage {
         }
         this.claheSliceCache.clear();
 
-        for (const slice of this.slices) {
-            slice.dispose();
+        if (this.texture) {
+            this.webgl.gl.deleteTexture(this.texture);
         }
     }
 }
 
-function initSliceTextures(
+function initTexture2DArray(
     gl: WebGL2RenderingContext,
-    width: number,
-    height: number,
-    depth: number,
+    dimensions: Dimensions,
     data: Uint8Array,
-): TextureData[] {
-    const sliceSize = width * height;
-    const expectedSize = sliceSize * depth;
-    if (data.length !== expectedSize) {
+): WebGLTexture {
+    const { width, height, depth } = dimensions;
+    const expectedSize = width * height * depth;
+    if (data.length < expectedSize) {
         throw new Error(
-            `Volume data length ${data.length} does not match ` +
+            `Volume data length ${data.length} is smaller than ` +
                 `${width}x${height}x${depth} (${expectedSize})`,
         );
     }
 
-    const slices: TextureData[] = [];
-    for (let i = 0; i < depth; i++) {
-        const slice = new TextureData(gl, width, height, "R8");
-        slice.uploadData(data.subarray(i * sliceSize, (i + 1) * sliceSize));
-        slices.push(slice);
-    }
-    return slices;
+    const texture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Prefer exact-sized view when padded trailing bytes exist (texImage3D would tolerate them).
+    const payload =
+        data.length === expectedSize ? data : data.subarray(0, expectedSize);
+
+    gl.texImage3D(
+        gl.TEXTURE_2D_ARRAY,
+        0,
+        gl.R8,
+        width,
+        height,
+        depth,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        payload,
+    );
+    return texture;
 }

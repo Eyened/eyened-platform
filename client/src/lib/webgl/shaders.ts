@@ -27,6 +27,7 @@ import fs_enfaceProjection from "./glsl/fs_enface_projection.frag";
 import fs_minmax_reduction from "./glsl/fs_minmax_reduction.frag";
 import fs_normalize from "./glsl/fs_normalize.frag";
 import fs_extract_slice from "./glsl/fs_extract_slice.frag";
+import fs_extract_slice_array from "./glsl/fs_extract_slice_array.frag";
 import type { WebGL } from "./webgl";
 
 /** Inject shared segmentation quad outline helpers before main(). */
@@ -64,6 +65,7 @@ export class Shaders {
     minMaxReduction: PixelShaderProgram;
     normalize: PixelShaderProgram;
     extractSlice: PixelShaderProgram;
+    extractSliceArray: PixelShaderProgram;
 
     constructor(webgl: WebGL) {
         this.renderFeatures = new TextureShaderProgram(
@@ -112,6 +114,10 @@ export class Shaders {
         );
         this.normalize = new PixelShaderProgram(webgl, fs_normalize);
         this.extractSlice = new PixelShaderProgram(webgl, fs_extract_slice);
+        this.extractSliceArray = new PixelShaderProgram(
+            webgl,
+            fs_extract_slice_array,
+        );
 
         this.import = new PixelShaderProgram(webgl, fs_import);
         this.importProbability = new PixelShaderProgram(
