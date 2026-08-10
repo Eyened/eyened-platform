@@ -355,13 +355,6 @@ export class ViewerWindowContext {
         this.viewState.setOpenViewers(entries);
     }
 
-    findImageByImageId(imageId: string): AbstractImage | undefined {
-        for (const image of this.topViewers.keys()) {
-            if (image.image_id === imageId) return image;
-        }
-        return undefined;
-    }
-
     getImages(instanceID: string): Promise<LoadedImages> {
         const instance = instances.get(instanceID);
         if (instance === undefined) {
