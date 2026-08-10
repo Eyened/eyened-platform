@@ -23,8 +23,8 @@ export function createVolumeImage(
     const limits = getVolumeLimits(webgl.gl);
     const { width, height, depth } = dimensions;
 
-    // Single-frame → Image2D (never depth-1 Image3D / OCT stretch path)
-    if (depth === 1) {
+    // Single-frame → Image2D, except OPT line/circle scans (need is3D stretch)
+    if (depth === 1 && (meta as { x00080060?: string }).x00080060 !== "OPT") {
         assertSliceStackFits(dimensions, limits);
         console.info(
             `[volume] image ${img_id}: ${width}x${height}x${depth} → Image2D`,
