@@ -34,7 +34,9 @@ describe("parseFrameParam / serializeFrameParam", () => {
     });
 
     it("ignores malformed pairs and non-integer / negative indices", () => {
-        expect(parseFrameParam("aaa:42,bad,bbb:x,ccc:-1,ddd:3.5,eee:7")).toEqual({
+        expect(
+            parseFrameParam("aaa:42,bad,bbb:x,ccc:-1,ddd:3.5,eee:7"),
+        ).toEqual({
             aaa: 42,
             eee: 7,
         });
@@ -54,15 +56,22 @@ describe("parseStoredState / serializeStoredState", () => {
     it("returns null for invalid JSON, wrong version, or missing frames", () => {
         expect(parseStoredState(null)).toBeNull();
         expect(parseStoredState("{")).toBeNull();
-        expect(parseStoredState(JSON.stringify({ version: 2, frames: {} }))).toBeNull();
+        expect(
+            parseStoredState(JSON.stringify({ version: 2, frames: {} })),
+        ).toBeNull();
         expect(parseStoredState(JSON.stringify({ version: 1 }))).toBeNull();
+        expect(
+            parseStoredState(JSON.stringify({ version: 1, frames: [5] })),
+        ).toBeNull();
     });
 });
 
 describe("storageKey", () => {
     it("prefixes scope", () => {
         expect(storageKey("view")).toBe("eyened:viewerViewState:view");
-        expect(storageKey("subtask:99")).toBe("eyened:viewerViewState:subtask:99");
+        expect(storageKey("subtask:99")).toBe(
+            "eyened:viewerViewState:subtask:99",
+        );
     });
 });
 
@@ -74,12 +83,10 @@ describe("createViewerViewStateController", () => {
             JSON.stringify({ version: 1, frames: { aaa: 1 } }),
         );
         let params = new URLSearchParams("frame=aaa:9");
-        const replaced: string[] = [];
         const c = createViewerViewStateController({
             scope: "view",
             getSearchParams: () => params,
             replaceUrl: (p) => {
-                replaced.push(p.toString());
                 params = new URLSearchParams(p);
             },
             storage,
@@ -107,6 +114,8 @@ describe("createViewerViewStateController", () => {
         });
         c.hydrate();
         expect(c.peekFrame("aaa", 10)).toBe(3);
+        c.enableRecording();
+        expect(params.get("frame")).toBe("aaa:3");
     });
 
     it("ignores record until enableRecording", () => {

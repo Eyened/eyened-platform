@@ -33,6 +33,7 @@ export function serializeFrameParam(frames: Record<string, number>): string {
             ([, index]) =>
                 Number.isInteger(index) && index >= 0 && Number.isFinite(index),
         )
+        .sort(([a], [b]) => a.localeCompare(b))
         .map(([id, index]) => `${id}:${index}`)
         .join(",");
 }
@@ -48,7 +49,8 @@ export function parseStoredState(
             typeof parsed !== "object" ||
             (parsed as ViewerViewStateV1).version !== 1 ||
             typeof (parsed as ViewerViewStateV1).frames !== "object" ||
-            (parsed as ViewerViewStateV1).frames === null
+            (parsed as ViewerViewStateV1).frames === null ||
+            Array.isArray((parsed as ViewerViewStateV1).frames)
         ) {
             return null;
         }
@@ -138,6 +140,7 @@ export function createViewerViewStateController(options: {
         record(instanceId, index, depth) {
             if (!recording || depth <= 1) return;
             if (!Number.isInteger(index) || index < 0 || index >= depth) return;
+            if (frames[instanceId] === index) return;
             frames[instanceId] = index;
             persist();
         },

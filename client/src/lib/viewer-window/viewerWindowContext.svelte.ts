@@ -67,9 +67,17 @@ export class ViewerWindowContext {
         };
         loop();
 
-        void this.setInstanceIDs(instanceIDs).then(() => {
-            this.viewState?.enableRecording();
-        });
+        void this.setInstanceIDs(instanceIDs)
+            .then(() => {
+                this.viewState?.enableRecording();
+            })
+            .catch((error) => {
+                console.error(
+                    "[viewerViewState] initial load failed; enabling recording anyway",
+                    error,
+                );
+                this.viewState?.enableRecording();
+            });
     }
 
     addViewer(viewer: ViewerContext) {

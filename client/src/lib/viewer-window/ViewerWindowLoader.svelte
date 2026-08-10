@@ -92,14 +92,15 @@ Used to create the viewerwindow context.
             scope,
             getSearchParams: () => new URLSearchParams(page.url.searchParams),
             replaceUrl: (params) => {
-                const url = new URL(window.location.href);
-                url.search = params.toString();
-                // Keep commas readable like BrowserOverlay does for instances
-                const search = url.search.replaceAll("%2C", ",");
+                // Avoid `new URL(...)` (svelte/prefer-svelte-reactivity).
+                const searchRaw = params.toString();
+                const search = searchRaw
+                    ? `?${searchRaw.replaceAll("%2C", ",")}`
+                    : "";
                 history.replaceState(
                     history.state,
                     "",
-                    `${url.pathname}${search}${url.hash}`,
+                    `${window.location.pathname}${search}${window.location.hash}`,
                 );
             },
             storage:
