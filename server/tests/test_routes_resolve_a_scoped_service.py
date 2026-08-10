@@ -14,10 +14,10 @@ into the first is how a guard turns an open hole into a documented guarantee.
 Both lists, and the discovered-unscoped set they are checked against, are
 keyed on ``f"{sorted(route.methods)} {route.path}"`` -- not on ``route.path``
 alone. FastAPI can register a second route at the same path under a different
-method -- a hypothetical ``DELETE /instances/images/{dataset_identifier:path}``
-alongside the ``GET`` already exempted here (no such ``DELETE`` exists today);
-keying on the path only would make that second, unrelated route silently
-exempt too, with the set-equality ratchet below still green.
+method -- a hypothetical ``DELETE /import/status/{task_id}`` alongside the
+``GET`` already exempted here (no such ``DELETE`` exists today); keying on the
+path only would make that second, unrelated route silently exempt too, with
+the set-equality ratchet below still green.
 """
 from __future__ import annotations
 
@@ -57,12 +57,6 @@ _UNGATED_PROJECT_DATA = {
     "['POST'] /import/update_thumbnails",
     "['POST'] /import/update_thumbnails_for_image_ids",
     "['GET'] /import/status/{task_id}",  # no authentication at all
-    # Pixel data by storage path, served via X-Accel-Redirect. These touch no
-    # Session at all -- the URL path *is* the identifier -- so there is no
-    # service to make scoped without first resolving path -> ImageInstance.
-    # An authenticated caller can fetch any project's pixels by path today.
-    "['GET'] /instances/images/{dataset_identifier:path}",
-    "['GET'] /instances/thumbnails/{thumbnail_identifier:path}",
 }
 
 _EXEMPT = _NO_PROJECT_DATA | _UNGATED_PROJECT_DATA

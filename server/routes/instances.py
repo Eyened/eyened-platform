@@ -108,27 +108,6 @@ async def get_public_image_thumbnail(
     return build_storage_redirect_response(ref.nginx_path)
 
 
-@router.get("/instances/images/{dataset_identifier:path}")
-async def get_file(
-    dataset_identifier: str,
-    _: bool = Depends(is_authenticated),
-):
-    # Set X-Accel-Redirect header to tell NGINX to serve the file
-    response = Response()
-    response.headers["X-Accel-Redirect"] = "/files/" + dataset_identifier
-    return response
-
-
-@router.get("/instances/thumbnails/{thumbnail_identifier:path}")
-async def get_thumb(
-    thumbnail_identifier: str,
-    _: bool = Depends(is_authenticated),
-):
-    response = Response()
-    response.headers["X-Accel-Redirect"] = "/thumbnails/" + thumbnail_identifier
-    return response
-
-
 @router.post("/instances/{instance_id}/tags", response_model=TagMeta)
 async def tag_instance(
     instance_id: str,
