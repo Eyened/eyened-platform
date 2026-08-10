@@ -170,6 +170,16 @@ export class ViewerContext {
         this.addOverlay(new ZoomPan());
         this.addOverlay(new CursorOverlay());
         this.addOverlay(new HotKeys());
+
+        if (image.is3D && image.depth > 1) {
+            const pending = this.viewerWindowContext.viewState?.peekFrame(
+                this.instance.id,
+                image.depth,
+            );
+            if (pending !== undefined) {
+                this.setIndex(pending);
+            }
+        }
     }
 
     setIndex(i: number) {
@@ -188,6 +198,13 @@ export class ViewerContext {
             index: i,
         });
         this.index = i;
+        if (this.image.is3D && this.image.depth > 1) {
+            this.viewerWindowContext.viewState?.record(
+                this.instance.id,
+                i,
+                this.image.depth,
+            );
+        }
     }
 
     initTransform() {
