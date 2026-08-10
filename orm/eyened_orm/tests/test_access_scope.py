@@ -68,12 +68,21 @@ def test_require_raises_permission_denied_when_a_role_is_under_the_floor():
     assert exc.value.projects == {2}
 
 
-def test_require_on_an_empty_project_set_passes_for_anyone():
-    """Vacuity: an object touching no projects is readable and writable by all.
+def test_require_on_an_empty_project_set_fails_closed_except_for_an_admin():
+    """The inverse of read-side vacuity, and the admin exemption that saves it.
 
-    Accepted in v0.3 (Visibility, consequence 4), not an oversight.
+    v0.3 accepts vacuity for *visibility* (Visibility, consequence 4): an
+    object touching no projects is findable by all. ``require`` is the write
+    side, where the same emptiness would wave a zero-membership caller past
+    every floor -- so it raises instead. The admin must still get through:
+    ``effective_role`` short-circuits, but the empty set never reaches it, so
+    the exemption has to sit ahead of the raise rather than behind it.
     """
-    _member().require(set(), ProjectRole.project_admin, entity="Task", entity_id=3)
+    with pytest.raises(NotVisibleError):
+        _member().require(set(), ProjectRole.project_admin, entity="Task", entity_id=3)
+    AccessScope(actor_id=1, username="root", is_admin=True, roles={}).require(
+        set(), ProjectRole.project_admin, entity="Task", entity_id=3
+    )
 
 
 def test_require_admin_refuses_a_project_admin():

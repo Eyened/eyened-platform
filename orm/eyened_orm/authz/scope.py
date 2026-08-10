@@ -81,10 +81,27 @@ class AccessScope:
     ) -> None:
         """Assert the actor holds every one of ``project_ids`` at ``floor``.
 
-        Containment, vacuity and the 404/403 split all fall out of this one
-        method rather than needing separate rules. An empty ``project_ids``
-        satisfies both guards trivially -- that is v0.3's accepted vacuity.
+        Containment and the 404/403 split both fall out of this one method
+        rather than needing separate rules.
+
+        An empty ``project_ids`` **fails closed** for a non-administrator. Both
+        comprehensions below iterate nothing, so vacuity would let any caller --
+        including one with no memberships at all -- past every floor built on
+        this method the moment the object it names touches no projects. v0.3
+        accepts that vacuity for *visibility*, where the consequence is only
+        that an empty shell is findable; carried into a write it is an
+        unguarded mutation, which nothing in the spec contemplates and no
+        product behaviour needs. ``NotVisibleError`` rather than
+        ``PermissionDeniedError``: no floor exists that would let this caller
+        past, so a 403 would confirm the row while promising nothing.
         """
+        if not project_ids and not self.is_admin:
+            raise NotVisibleError(
+                actor_id=self.actor_id,
+                entity=entity,
+                entity_id=entity_id,
+                projects=frozenset(),
+            )
         # Resolved once into a dict rather than twice through effective_role:
         # `self.effective_role(p) < floor` is a type error against a
         # `ProjectRole | None` return, and mypy is right -- narrowing here is

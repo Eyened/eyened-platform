@@ -52,15 +52,23 @@ _UNSCOPED_METHODS = {
     "SearchRepository.column_values": "generic vocabulary wrapper; every remaining "
     "call site passes Creator, DeviceModel, Feature or FormSchema",
     "SearchRepository.resolve_attribute_definitions": "attribute definitions",
+    # Project *resolution*, not row access: each returns the project set that a
+    # write check is then judged on, so filtering it by the caller's own scope
+    # would delete exactly the projects the check exists to catch and make
+    # every floor built on it pass vacuously.
+    "TaskRepository.project_ids": "resolves the projects a write is judged on",
+    "SubTaskRepository.project_ids": "resolves the projects a write is judged on",
+    "SubTaskRepository.project_ids_of_image": "resolves the project an image "
+    "would bring into a task; the *after* half of a link write",
     "SubTaskRepository.resolve_image_instance_id": "PublicID -> id resolution only; "
     "returns an int that is unusable without a subtask to attach it to",
     "SubTaskRepository.next_image_index": "returns an integer, not a row",
     # Deliberately unscoped: SubTaskImageLink is in neither scoping registry,
     # and registering it as single-project would expose the A-side link of a
     # project-spanning task -- the partial view containment exists to prevent.
-    # Containment belongs at the subtask, which is scoped. NOT a claim that
-    # every caller is contained: add_image rejects an out-of-scope subtask
-    # first, remove_image does not yet. That write-path gap is known and open.
+    # Containment belongs at the subtask, which is scoped -- and both callers
+    # now honour it: add_image and remove_image each reject an out-of-scope
+    # subtask before they reach this method.
     "SubTaskRepository.get_image_link": "a composite-PK link row that never "
     "reaches a response; see the note above on where containment belongs",
 }

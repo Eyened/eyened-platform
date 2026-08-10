@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState
 from eyened_orm.authz.scope import AccessScope
-from eyened_orm.authz.scoping import apply_scope
+from eyened_orm.authz.scoping import apply_scope, projects_of
 
 from ._scoped import scoped_one
 
@@ -56,6 +56,20 @@ class TaskRepository:
             Task.TaskID == task_id,
             options=_TASK_RELATIONS,
         )
+
+    def project_ids(self, task_id: int) -> set[int]:
+        """The projects this task touches, for a write check to be judged on.
+
+        The repository owns the Session, so the authz resolution runs here
+        rather than a service reaching through for a Session it must not hold.
+        Uses ``projects_of``, the one definition the reads and the CLI share.
+
+        Deliberately unscoped: the returned set is the *input* to
+        ``AccessScope.require``, so filtering it by the caller's scope would
+        remove exactly the projects the check exists to catch and make every
+        floor pass.
+        """
+        return projects_of(self._session, Task, task_id)
 
     def list_all(self) -> list[Task]:
         """Return every task the scope may read (TaskID order), relations loaded."""
@@ -214,6 +228,31 @@ class SubTaskRepository:
             SubTask.SubTaskID == subtask_id,
             options=(_SUBTASK_IMAGE_LOADER,),
         )
+
+    def project_ids(self, subtask_id: int) -> set[int]:
+        """The **parent task's** project set -- what a subtask write is judged on.
+
+        A superset of the subtask's own images, matching the read predicate:
+        you get a whole task or none of it, so a mutation is authorized against
+        the whole task too.
+
+        Deliberately unscoped, for the same reason as ``TaskRepository`` -- see
+        the note there. This is project resolution, not row access.
+        """
+        return projects_of(self._session, SubTask, subtask_id)
+
+    def project_ids_of_image(self, image_instance_id: int) -> set[int]:
+        """The project an image sits in, for the *after* half of a link write.
+
+        Lives here rather than on ``ImageInstanceRepository`` because this
+        repository already resolves image ids (``resolve_image_instance_id``)
+        on behalf of the link writes that are its only caller.
+
+        Deliberately unscoped: same reason as ``project_ids`` above. Scoping it
+        would silently drop the out-of-scope project whose presence is the
+        whole point of the *after* check.
+        """
+        return projects_of(self._session, ImageInstance, image_instance_id)
 
     def resolve_image_instance_id(self, public_id: str) -> int | None:
         """Return the ImageInstanceID for a PublicID, or None if no image matches."""

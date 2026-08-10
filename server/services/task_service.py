@@ -3,6 +3,8 @@ from __future__ import annotations
 from eyened_orm import SubTask, Task
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
+from eyened_orm.authz.errors import NotVisibleError
+from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -92,12 +94,27 @@ class TaskService:
     ) -> tuple[Task, tuple[int, int]]:
         """Update a task's mutable fields (each optional).
 
+        The floor depends on which fields the request actually changes:
+        project_admin if name or description move, grader if only the status
+        does. v0.3's matrix separates "create/delete tasks" from "update tasks
+        status", and renaming belongs with administering the task.
+
         Raises:
             NotFoundError: If the task does not exist.
+            NotVisibleError: If the task touches a project the actor lacks.
+            PermissionDeniedError: If the actor is under the floor.
         """
         task = self.tasks.get_by_id(task_id)
         if task is None:
             raise NotFoundError(f"Task {task_id} not found")
+
+        administrative = name is not None or description is not None
+        self.scope.require(
+            self.tasks.project_ids(task_id),
+            ProjectRole.project_admin if administrative else ProjectRole.grader,
+            entity="Task",
+            entity_id=task_id,
+        )
 
         before = AuditService.snapshot(
             task, "TaskName", "Description", "ContactID", "TaskDefinitionID", "TaskState"
@@ -131,12 +148,25 @@ class TaskService:
     def delete_task(self, task_id: int) -> None:
         """Delete a task (its subtasks cascade at the DB level).
 
+        Requires ``project_admin`` in every project the task touches, resolved
+        before the delete: afterwards the subtask/link join path the resolution
+        walks is gone.
+
         Raises:
             NotFoundError: If the task does not exist.
+            NotVisibleError: If the task touches a project the actor lacks.
+            PermissionDeniedError: If the actor is under the floor.
         """
         task = self.tasks.get_by_id(task_id)
         if task is None:
             raise NotFoundError(f"Task {task_id} not found")
+
+        self.scope.require(
+            self.tasks.project_ids(task_id),
+            ProjectRole.project_admin,
+            entity="Task",
+            entity_id=task_id,
+        )
 
         deleted_data = {
             "name": task.TaskName,
@@ -234,6 +264,30 @@ class SubTaskService:
         self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
+    def _task_projects(self, subtask_id: int) -> set[int]:
+        """The parent task's project set -- what every subtask mutation is judged on."""
+        return self.subtasks.project_ids(subtask_id)
+
+    def _reread_with_images(self, subtask_id: int) -> SubTask:
+        """Re-read the mutated subtask, refusing rather than returning ``None``.
+
+        ``get_with_images`` is scope-filtered, so a write that pushes the task
+        out of the caller's reach makes it ``None`` -- and the response
+        converter dereferences that straight into an AttributeError, i.e. a 500
+        on a request that was authorized. The floors above close every path
+        that gets here; this is what turns a regression in them back into an
+        authorization answer instead of a crash.
+        """
+        subtask = self.subtasks.get_with_images(subtask_id)
+        if subtask is None:
+            raise NotVisibleError(
+                actor_id=self.scope.actor_id,
+                entity="SubTask",
+                entity_id=subtask_id,
+                projects=frozenset(),
+            )
+        return subtask
+
     def get_subtask(self, subtask_id: int, *, with_images: bool) -> SubTask:
         """Return a subtask, image-loaded iff ``with_images``.
 
@@ -257,12 +311,23 @@ class SubTaskService:
     ) -> SubTask:
         """Update a subtask's comments/state (each optional).
 
+        Requires ``grader`` in every project the parent task touches.
+
         Raises:
             NotFoundError: If the subtask does not exist.
+            NotVisibleError: If the task touches a project the actor lacks.
+            PermissionDeniedError: If the actor is under the floor.
         """
         subtask = self.subtasks.get_by_id(subtask_id)
         if subtask is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
+
+        self.scope.require(
+            self._task_projects(subtask_id),
+            ProjectRole.grader,
+            entity="SubTask",
+            entity_id=subtask_id,
+        )
 
         before = AuditService.snapshot(subtask, "Comments", "TaskState")
         if comments is not None:
@@ -288,12 +353,25 @@ class SubTaskService:
     def delete_subtask(self, subtask_id: int) -> None:
         """Delete a subtask (its image links cascade at the DB level).
 
+        Requires ``grader`` in every project the parent task touches, resolved
+        **before** the delete: the resolution walks this subtask's own links,
+        and the delete destroys them.
+
         Raises:
             NotFoundError: If the subtask does not exist.
+            NotVisibleError: If the task touches a project the actor lacks.
+            PermissionDeniedError: If the actor is under the floor.
         """
         subtask = self.subtasks.get_by_id(subtask_id)
         if subtask is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
+
+        self.scope.require(
+            self._task_projects(subtask_id),
+            ProjectRole.grader,
+            entity="SubTask",
+            entity_id=subtask_id,
+        )
 
         deleted_data = {
             "task_id": subtask.TaskID,
@@ -315,14 +393,34 @@ class SubTaskService:
     def add_image(self, subtask_id: int, image_public_id: str) -> SubTask:
         """Link an image (by PublicID) to a subtask at the next ImageIndex.
 
+        Requires ``grader`` in every project the task touches **before** the
+        change and every project it touches **after** it. Adding grows the set,
+        so the union is ``after``; the before half is already loaded for the
+        visibility check, so the extra cost is one project lookup for the image.
+        Without the after half a grader could link an image out of a project
+        they hold nothing in, laundering it into a task they can see.
+
         Raises:
             NotFoundError: If the subtask or the image does not exist.
+            NotVisibleError: If either side touches a project the actor lacks.
+            PermissionDeniedError: If the actor is under the floor.
         """
         if self.subtasks.get_by_id(subtask_id) is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
         image_instance_id = self.subtasks.resolve_image_instance_id(image_public_id)
         if image_instance_id is None:
             raise NotFoundError("ImageInstance not found")
+
+        projects_before = self._task_projects(subtask_id)
+        projects_after = projects_before | self.subtasks.project_ids_of_image(
+            image_instance_id
+        )
+        self.scope.require(
+            projects_before | projects_after,
+            ProjectRole.grader,
+            entity="SubTask",
+            entity_id=subtask_id,
+        )
 
         self.subtasks.add_link(
             subtask_id, image_instance_id, self.subtasks.next_image_index(subtask_id)
@@ -337,20 +435,47 @@ class SubTaskService:
                     "image_instance_id": image_instance_id,
                 },
             )
-        return self.subtasks.get_with_images(subtask_id)
+        return self._reread_with_images(subtask_id)
 
     def remove_image(self, subtask_id: int, image_public_id: str) -> SubTask:
         """Unlink an image (by PublicID) from a subtask.
 
+        Requires ``grader`` in every project the task touches. Removing shrinks
+        the set, so the union of before and after is ``before`` -- and it is
+        resolved before the delete, which destroys the link the resolution
+        walks.
+
+        The leading visibility check is not optional, and the floor does not
+        subsume it. Without it this method reaches ``get_image_link`` -- a bare
+        ``session.get``, which no scope touches -- on a subtask the caller
+        cannot see. Before the floor existed that deleted the link outright.
+        With the floor the status is 404 either way, but the *body* is not: a
+        linked image is refused by the floor ("Not found") and an unlinked one
+        by the link lookup that ran first ("Link not found"), which confirms a
+        link on a row the caller may not know exists. Ids are sequential
+        autoincrement, so that difference is an enumeration oracle. The
+        ordering here is visibility, then projects, then floor, then mutate.
+
         Raises:
-            NotFoundError: If the image or the (subtask, image) link is absent.
+            NotFoundError: If the subtask, the image or the link is absent.
+            NotVisibleError: If the task touches a project the actor lacks.
+            PermissionDeniedError: If the actor is under the floor.
         """
+        if self.subtasks.get_by_id(subtask_id) is None:
+            raise NotFoundError(f"SubTask {subtask_id} not found")
         image_instance_id = self.subtasks.resolve_image_instance_id(image_public_id)
         if image_instance_id is None:
             raise NotFoundError("ImageInstance not found")
         link = self.subtasks.get_image_link(subtask_id, image_instance_id)
         if link is None:
             raise NotFoundError("Link not found")
+
+        self.scope.require(
+            self._task_projects(subtask_id),
+            ProjectRole.grader,
+            entity="SubTask",
+            entity_id=subtask_id,
+        )
 
         self.subtasks.delete_link(link)
         if self.audit is not None:
@@ -363,7 +488,7 @@ class SubTaskService:
                     "image_instance_id": image_instance_id,
                 },
             )
-        return self.subtasks.get_with_images(subtask_id)
+        return self._reread_with_images(subtask_id)
 
 
 def get_task_service(

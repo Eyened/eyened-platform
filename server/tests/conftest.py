@@ -118,10 +118,22 @@ def client_scoped(session, monkeypatch):
 
 @pytest.fixture()
 def spanning(session):
-    """Three tasks: one spanning projects A and B, one empty, one wholly inside A.
+    """Four tasks: one spanning projects A and B, one empty, one in A, one in B.
 
     Shared rather than local: later tasks build on the same shape, and two
     fixtures that drift apart would make their assertions mean different things.
+
+    Two of the shapes exist for the write-floor tests and are load-bearing:
+
+    ``b_only_single`` is a subtask of the project-B-only task holding **exactly
+    one** image. The count is the point. On a two-image subtask an unscoped
+    delete of one link leaves the task still spanning B, so the out-of-scope
+    re-read afterwards returns ``None``, the route 500s and ``get_db`` rolls the
+    delete back -- a test written on two links passes without the fix. On one
+    link the delete commits and the project-B subtask comes back in the body.
+
+    ``empty_subtask`` is a subtask of the link-less task, so every check keyed
+    on a resolved project set runs on the empty set there.
     """
     from datetime import date
 
@@ -153,8 +165,9 @@ def spanning(session):
     taskdef = TaskDefinition(TaskDefinitionName="def")
     session.add(taskdef)
     session.flush()
+    taskdef_id = taskdef.TaskDefinitionID
     tasks = {}
-    for label in ("spanning", "empty", "a_only"):
+    for label in ("spanning", "empty", "a_only", "b_only"):
         task = Task(
             TaskName=label,
             TaskDefinitionID=taskdef.TaskDefinitionID,
@@ -165,7 +178,11 @@ def spanning(session):
         tasks[label] = task.TaskID
 
     subtasks = {}
-    for label, names in (("spanning", ("A", "B")), ("a_only", ("A",))):
+    for label, names in (
+        ("spanning", ("A", "B")),
+        ("a_only", ("A",)),
+        ("b_only", ("B",)),
+    ):
         for name in names:
             subtask = SubTask(TaskID=tasks[label], TaskState=SubTaskState.NotStarted)
             session.add(subtask)
@@ -178,15 +195,26 @@ def spanning(session):
                 )
             )
             subtasks[f"{label}-{name}"] = subtask.SubTaskID
+
+    linkless = SubTask(TaskID=tasks["empty"], TaskState=SubTaskState.NotStarted)
+    session.add(linkless)
+    session.flush()
+    # Read the ids out before the commit: expire_on_commit=True, and an
+    # expired instance re-loads through whatever session the test later has.
+    linkless_id = linkless.SubTaskID
     session.commit()
     return {
         "projects": projects,
         "images": images,
         "public_ids": public_ids,
+        "task_definition": taskdef_id,
         "task": tasks["spanning"],
         "empty": tasks["empty"],
         "a_only": tasks["a_only"],
+        "b_only": tasks["b_only"],
         "subtasks": subtasks,
+        "b_only_single": subtasks["b_only-B"],
+        "empty_subtask": linkless_id,
     }
 
 
