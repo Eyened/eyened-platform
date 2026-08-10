@@ -14,10 +14,10 @@ into the first is how a guard turns an open hole into a documented guarantee.
 Both lists, and the discovered-unscoped set they are checked against, are
 keyed on ``f"{sorted(route.methods)} {route.path}"`` -- not on ``route.path``
 alone. FastAPI can register a second route at the same path under a different
-method (``DELETE /instances/images/{dataset_identifier:path}`` next to the
-``GET`` already exempted here); keying on the path only would make that
-second, unrelated route silently exempt too, with the set-equality ratchet
-below still green.
+method -- a hypothetical ``DELETE /instances/images/{dataset_identifier:path}``
+alongside the ``GET`` already exempted here (no such ``DELETE`` exists today);
+keying on the path only would make that second, unrelated route silently
+exempt too, with the set-equality ratchet below still green.
 """
 from __future__ import annotations
 

@@ -39,12 +39,12 @@ def scoped_one(
     and no caller can tell the two apart.
 
     Raises ``KeyError`` for an entity with no scoping rule. ``apply_scope``
-    also raises for an entity in none of its three registries, unless the
-    entity is declared safe to read unfiltered in ``SAFE_UNFILTERED_ENTITIES``
-    -- a fallback this check does not have. ``scoped_one``'s check is the
-    earlier and narrower one: an entity that is safe-unfiltered but not
-    single/set-valued would raise right here, before ``apply_scope`` is ever
-    reached, which is why this one fires first.
+    raises only for an entity in none of its three registries --
+    ``SAFE_UNFILTERED_ENTITIES`` is a fallback this check does not have. So
+    this check fires on a larger set: an entity that is safe-unfiltered but
+    neither single- nor set-valued raises right here, before ``apply_scope``
+    is ever reached. It is also unconditional, where ``apply_scope``
+    short-circuits an admin scope ahead of any registry lookup.
     """
     if entity not in SINGLE_PROJECT_ENTITIES and entity not in SET_VALUED_ENTITIES:
         raise KeyError(

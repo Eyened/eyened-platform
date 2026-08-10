@@ -355,10 +355,13 @@ def apply_scope(stmt: Select, entity: type[Base], scope: AccessScope) -> Select:
     been filtered. Failing closed makes the omission a crash at the first call
     instead of a leak.
 
-    ``scoped_one`` raises for a related but strictly narrower condition: it
-    has no ``SAFE_UNFILTERED_ENTITIES`` fallback, so it raises on an entity
-    this function would pass through unfiltered, and it only reaches this
-    function at all once its own, earlier check has cleared.
+    ``scoped_one`` raises on a strictly larger set of entities: it has no
+    ``SAFE_UNFILTERED_ENTITIES`` fallback, so it raises on an entity this
+    function would pass through unfiltered, and it only reaches this function
+    at all once its own, earlier check has cleared. It is also unconditional
+    where this one is not -- an admin scope short-circuits here before any
+    registry is consulted, so ``scoped_one(session, Project, admin)`` raises
+    while ``apply_scope(stmt, Project, admin)`` returns the statement untouched.
     """
     if scope.is_admin:
         return stmt
