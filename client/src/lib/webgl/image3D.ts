@@ -222,7 +222,10 @@ export class Image3D extends AbstractImage {
         index: number,
     ): Promise<TextureData | undefined> {
         const { depth } = this;
-        const clampedIndex = Math.max(0, Math.min(Math.round(index), depth - 1));
+        const clampedIndex = Math.max(
+            0,
+            Math.min(Math.round(index), depth - 1),
+        );
 
         // Check cache first
         const cached = this.getClaheSliceTextureSync(clampedIndex);
@@ -272,7 +275,10 @@ export class Image3D extends AbstractImage {
 
     getClaheSliceTextureSync(index: number): TextureData | undefined {
         const { depth } = this;
-        const clampedIndex = Math.max(0, Math.min(Math.round(index), depth - 1));
+        const clampedIndex = Math.max(
+            0,
+            Math.min(Math.round(index), depth - 1),
+        );
         return this.claheSliceCache.get(clampedIndex);
     }
 

@@ -128,7 +128,10 @@
             <tr>
                 <td>CLAHE</td>
                 <td class="shortcut"><kbd>H</kbd></td>
-                <td>Local contrast enhancement (computed per slice for volumes).</td>
+                <td
+                    >Local contrast enhancement (computed per slice for
+                    volumes).</td
+                >
             </tr>
         </tbody>
     </table>

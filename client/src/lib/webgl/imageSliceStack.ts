@@ -34,7 +34,10 @@ export class ImageSliceStack extends AbstractImage {
      */
     extractSlice(index: number): TextureData {
         const { webgl, width, height, depth } = this;
-        const clampedIndex = Math.max(0, Math.min(Math.round(index), depth - 1));
+        const clampedIndex = Math.max(
+            0,
+            Math.min(Math.round(index), depth - 1),
+        );
         const sliceTexture = new TextureData(webgl.gl, width, height, "RGBA");
         sliceTexture.passShader(webgl.shaders.extractSliceArray, {
             u_volume: this.texture,
