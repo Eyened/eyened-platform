@@ -71,6 +71,12 @@ export abstract class AbstractImage {
     abstract is3D: boolean;
     abstract is2D: boolean;
 
+    /**
+     * When false, only Original + CLAHE are offered (volumes / grayscale).
+     * Color fundus bitmaps set this true so CE / channels / etc. appear.
+     */
+    supportsColorRenderModes = false;
+
     getAspectRatio() {
         const { width, height, width_mm, height_mm } = this.dimensions;
         if (width_mm <= 0 || height_mm <= 0) {

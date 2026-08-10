@@ -3,6 +3,10 @@ import type { Image2D } from "$lib/webgl/image2D";
 import type { AbstractImage } from "./abstractImage";
 import type { RenderTarget } from "./types";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+import {
+    isRenderModeAvailable,
+    type RenderMode,
+} from "$lib/viewer/viewer-utils";
 import fs_renderImage2D from "./glsl/fs_render_image2D.frag";
 import fs_renderLuminance from "./glsl/fs_render_luminance.frag";
 import fs_renderImage3D from "./glsl/fs_render_image3D.frag";
@@ -38,11 +42,15 @@ export class BaseImageRenderer implements ImageRenderer {
         const { image } = viewerContext;
 
         const uniforms = getBaseUniforms(viewerContext);
-        const { renderMode } = viewerContext;
+        const renderMode = resolveRenderMode(image, viewerContext.renderMode);
 
         if (image instanceof ImageSliceStack) {
             if (renderMode == "CLAHE") {
-                image.getClaheSliceTexture(viewerContext.index);
+                void image
+                    .getClaheSliceTexture(viewerContext.index)
+                    .catch((err) =>
+                        console.error("CLAHE slice processing failed", err),
+                    );
                 const claheTexture = image.getClaheSliceTextureSync(
                     viewerContext.index,
                 );
@@ -62,15 +70,16 @@ export class BaseImageRenderer implements ImageRenderer {
         if (image.is3D) {
             if (renderMode == "CLAHE") {
                 const img3d = image as Image3D;
-                // initiate the CLAHE processing (async)
-                img3d.getClaheSliceTexture(viewerContext.index);
-                // check if the CLAHE processing is complete (sync)
+                void img3d
+                    .getClaheSliceTexture(viewerContext.index)
+                    .catch((err) =>
+                        console.error("CLAHE slice processing failed", err),
+                    );
                 const claheTexture = img3d.getClaheSliceTextureSync(
                     viewerContext.index,
                 );
-                // use the CLAHE texture
                 if (claheTexture) {
-                    uniforms.u_image = claheTexture?.texture;
+                    uniforms.u_image = claheTexture.texture;
                     this.shaderBase.pass(renderTarget, uniforms);
                 } else {
                     this.shader3D.pass(renderTarget, uniforms);
@@ -103,6 +112,15 @@ export class BaseImageRenderer implements ImageRenderer {
             this.shaderBase.pass(renderTarget, uniforms);
         }
     }
+}
+
+function resolveRenderMode(
+    image: AbstractImage,
+    renderMode: RenderMode,
+): RenderMode {
+    return isRenderModeAvailable(image.supportsColorRenderModes, renderMode)
+        ? renderMode
+        : "Original";
 }
 
 export function getBaseUniforms(viewerContext: ViewerContext): any {

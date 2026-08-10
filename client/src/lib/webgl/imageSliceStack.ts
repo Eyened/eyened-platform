@@ -15,6 +15,7 @@ export class ImageSliceStack extends AbstractImage {
 
     texture: WebGLTexture;
     private claheSliceCache = new Map<number, TextureData>();
+    private claheInflight = new Map<number, Promise<TextureData | undefined>>();
 
     constructor(
         instance: ImageGET,
@@ -46,37 +47,60 @@ export class ImageSliceStack extends AbstractImage {
     async getClaheSliceTexture(
         index: number,
     ): Promise<TextureData | undefined> {
-        const clampedIndex = Math.max(0, Math.min(Math.round(index), this.depth - 1));
+        const clampedIndex = Math.max(
+            0,
+            Math.min(Math.round(index), this.depth - 1),
+        );
 
         const cached = this.getClaheSliceTextureSync(clampedIndex);
         if (cached) {
             return cached;
         }
 
-        const sliceTexture = this.extractSlice(clampedIndex);
-        const claheInput: ClaheInput = {
-            width: this.width,
-            height: this.height,
-            webgl: this.webgl,
-            texture: sliceTexture.texture,
-            instance: this.instance,
-        };
-
-        const claheResult =
-            await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
-
-        sliceTexture.dispose();
-
-        if (claheResult) {
-            this.claheSliceCache.set(clampedIndex, claheResult);
-            return claheResult;
+        const inflight = this.claheInflight.get(clampedIndex);
+        if (inflight) {
+            return inflight;
         }
 
-        return undefined;
+        const promise = this.computeClaheSlice(clampedIndex).finally(() => {
+            this.claheInflight.delete(clampedIndex);
+        });
+        this.claheInflight.set(clampedIndex, promise);
+        return promise;
+    }
+
+    private async computeClaheSlice(
+        clampedIndex: number,
+    ): Promise<TextureData | undefined> {
+        const sliceTexture = this.extractSlice(clampedIndex);
+        try {
+            const claheInput: ClaheInput = {
+                width: this.width,
+                height: this.height,
+                webgl: this.webgl,
+                texture: sliceTexture.texture,
+                instance: this.instance,
+            };
+
+            const claheResult =
+                await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
+
+            if (claheResult) {
+                this.claheSliceCache.set(clampedIndex, claheResult);
+                return claheResult;
+            }
+
+            return undefined;
+        } finally {
+            sliceTexture.dispose();
+        }
     }
 
     getClaheSliceTextureSync(index: number): TextureData | undefined {
-        const clampedIndex = Math.max(0, Math.min(Math.round(index), this.depth - 1));
+        const clampedIndex = Math.max(
+            0,
+            Math.min(Math.round(index), this.depth - 1),
+        );
         return this.claheSliceCache.get(clampedIndex);
     }
 
@@ -87,6 +111,7 @@ export class ImageSliceStack extends AbstractImage {
             texture.dispose();
         }
         this.claheSliceCache.clear();
+        this.claheInflight.clear();
 
         if (this.texture) {
             this.webgl.gl.deleteTexture(this.texture);

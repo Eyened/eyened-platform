@@ -16,6 +16,7 @@ export class Image3D extends AbstractImage {
 
     // Cache for CLAHE-processed slices
     private claheSliceCache = new Map<number, TextureData>();
+    private claheInflight = new Map<number, Promise<TextureData | undefined>>();
 
     constructor(
         instance: ImageGET,
@@ -221,7 +222,7 @@ export class Image3D extends AbstractImage {
         index: number,
     ): Promise<TextureData | undefined> {
         const { depth } = this;
-        const clampedIndex = Math.max(0, Math.min(index, depth - 1));
+        const clampedIndex = Math.max(0, Math.min(Math.round(index), depth - 1));
 
         // Check cache first
         const cached = this.getClaheSliceTextureSync(clampedIndex);
@@ -229,37 +230,49 @@ export class Image3D extends AbstractImage {
             return cached;
         }
 
-        // Extract the slice
-        const sliceTexture = this.extractSlice(clampedIndex);
-
-        // Create a ClaheInput wrapper for the slice
-        const claheInput: ClaheInput = {
-            width: this.width,
-            height: this.height,
-            webgl: this.webgl,
-            texture: sliceTexture.texture,
-            instance: this.instance,
-        };
-
-        // Apply CLAHE processing
-        const claheResult =
-            await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
-
-        // Dispose the intermediate slice texture
-        sliceTexture.dispose();
-
-        // If CLAHE processing succeeded, cache and return the result
-        if (claheResult) {
-            this.claheSliceCache.set(clampedIndex, claheResult);
-            return claheResult;
+        const inflight = this.claheInflight.get(clampedIndex);
+        if (inflight) {
+            return inflight;
         }
 
-        return undefined;
+        const promise = this.computeClaheSlice(clampedIndex).finally(() => {
+            this.claheInflight.delete(clampedIndex);
+        });
+        this.claheInflight.set(clampedIndex, promise);
+        return promise;
+    }
+
+    private async computeClaheSlice(
+        clampedIndex: number,
+    ): Promise<TextureData | undefined> {
+        const sliceTexture = this.extractSlice(clampedIndex);
+
+        try {
+            const claheInput: ClaheInput = {
+                width: this.width,
+                height: this.height,
+                webgl: this.webgl,
+                texture: sliceTexture.texture,
+                instance: this.instance,
+            };
+
+            const claheResult =
+                await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
+
+            if (claheResult) {
+                this.claheSliceCache.set(clampedIndex, claheResult);
+                return claheResult;
+            }
+
+            return undefined;
+        } finally {
+            sliceTexture.dispose();
+        }
     }
 
     getClaheSliceTextureSync(index: number): TextureData | undefined {
         const { depth } = this;
-        const clampedIndex = Math.max(0, Math.min(index, depth - 1));
+        const clampedIndex = Math.max(0, Math.min(Math.round(index), depth - 1));
         return this.claheSliceCache.get(clampedIndex);
     }
 
@@ -272,6 +285,7 @@ export class Image3D extends AbstractImage {
             texture.dispose();
         }
         this.claheSliceCache.clear();
+        this.claheInflight.clear();
 
         // Dispose 3D texture
         if (this.texture) {
