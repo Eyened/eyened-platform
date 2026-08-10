@@ -18,7 +18,7 @@ export function createVolumeImage(
     img_id: string,
     data: Uint8Array,
     dimensions: Dimensions,
-    meta: Record<string, unknown>,
+    meta: object,
 ): Image2D | VolumeImage {
     const limits = getVolumeLimits(webgl.gl);
     const { width, height, depth } = dimensions;

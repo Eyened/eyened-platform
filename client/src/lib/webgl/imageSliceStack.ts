@@ -23,7 +23,7 @@ export class ImageSliceStack extends AbstractImage {
         img_id: string,
         data: Uint8Array,
         dimensions: Dimensions,
-        meta: Record<string, unknown>,
+        meta: object,
     ) {
         super(instance, webgl, img_id, dimensions, meta);
         this.texture = initTexture2DArray(webgl.gl, dimensions, data);
