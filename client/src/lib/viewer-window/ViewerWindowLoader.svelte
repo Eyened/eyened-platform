@@ -4,7 +4,6 @@ Used to create the viewerwindow context.
 
 -->
 <script lang="ts">
-    import { page } from "$app/state";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { Registration } from "$lib/registration/registration";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
@@ -90,9 +89,11 @@ Used to create the viewerwindow context.
 
         const viewState = createViewerViewStateController({
             scope,
-            getSearchParams: () => new URLSearchParams(page.url.searchParams),
+            getSearchParams: () => new URLSearchParams(window.location.search),
             replaceUrl: (params) => {
                 // Avoid `new URL(...)` (svelte/prefer-svelte-reactivity).
+                // Use history.replaceState (not page.url) so we don't fight SvelteKit;
+                // readers must use window.location.search (see BrowserOverlay).
                 const searchRaw = params.toString();
                 const search = searchRaw
                     ? `?${searchRaw.replaceAll("%2C", ",")}`
@@ -103,8 +104,7 @@ Used to create the viewerwindow context.
                     `${window.location.pathname}${search}${window.location.hash}`,
                 );
             },
-            storage:
-                typeof localStorage !== "undefined" ? localStorage : undefined,
+            storage: localStorage,
         });
         viewState.hydrate();
 
