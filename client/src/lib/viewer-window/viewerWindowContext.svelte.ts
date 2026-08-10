@@ -165,6 +165,7 @@ export class ViewerWindowContext {
     }
 
     destroy() {
+        this.viewState?.flush();
         // Cancel animation frame
         cancelAnimationFrame(this.frame);
 

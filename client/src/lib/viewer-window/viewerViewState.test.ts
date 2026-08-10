@@ -170,8 +170,10 @@ describe("createViewerViewStateController", () => {
         c.enableRecording();
         expect(params.get("v")).toBe("aaa");
         c.recordIndex("aaa", 4, 10);
+        c.flush();
         expect(params.get("v")).toBe("aaa.4");
         c.recordIndex("zzz", 1, 10);
+        c.flush();
         expect(params.get("v")).toBe("aaa.4");
     });
 

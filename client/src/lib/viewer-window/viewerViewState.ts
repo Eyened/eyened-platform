@@ -114,7 +114,11 @@ export type ViewerViewStateController = {
     setOpenViewers(viewers: OpenViewerEntry[]): void;
     recordIndex(imageId: string, index: number, depth: number): void;
     prune(instanceIds: readonly string[]): void;
+    /** Flush any pending debounced persist (e.g. on unmount). */
+    flush(): void;
 };
+
+const PERSIST_DEBOUNCE_MS = 250;
 
 export function createViewerViewStateController(options: {
     scope: string;
@@ -126,18 +130,16 @@ export function createViewerViewStateController(options: {
     const key = storageKey(options.scope);
     let viewers: OpenViewerEntry[] = [];
     let recording = false;
+    let persistTimer: ReturnType<typeof setTimeout> | undefined;
 
     function persist() {
         const params = new URLSearchParams(options.getSearchParams());
         const encoded = serializeViewersParam(viewers);
         if (encoded) params.set(VIEW_STATE_PARAM, encoded);
         else params.delete(VIEW_STATE_PARAM);
-        // Drop legacy param if present
-        params.delete("frame");
-        options.replaceUrl(params);
-        if (!storage) return;
         try {
-            storage.setItem(
+            options.replaceUrl(params);
+            storage?.setItem(
                 key,
                 serializeStoredState({
                     version: 2,
@@ -149,8 +151,23 @@ export function createViewerViewStateController(options: {
                 }),
             );
         } catch {
-            // private mode / quota — URL sync still applied
+            // private mode / quota / browser history rate limits
         }
+    }
+
+    function schedulePersist() {
+        if (persistTimer !== undefined) clearTimeout(persistTimer);
+        persistTimer = setTimeout(() => {
+            persistTimer = undefined;
+            persist();
+        }, PERSIST_DEBOUNCE_MS);
+    }
+
+    function flush() {
+        if (persistTimer === undefined) return;
+        clearTimeout(persistTimer);
+        persistTimer = undefined;
+        persist();
     }
 
     function sameViewers(a: OpenViewerEntry[], b: OpenViewerEntry[]): boolean {
@@ -219,7 +236,7 @@ export function createViewerViewStateController(options: {
             viewers = viewers.map((v, j) =>
                 j === i ? { id: v.id, index } : v,
             );
-            persist();
+            schedulePersist();
         },
         prune(instanceIds) {
             const allowed = new Set(instanceIds);
@@ -230,5 +247,6 @@ export function createViewerViewStateController(options: {
             viewers = next;
             if (recording) persist();
         },
+        flush,
     };
 }
