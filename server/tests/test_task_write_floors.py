@@ -2,12 +2,25 @@
 from __future__ import annotations
 
 from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.authz.scope import AccessScope
 from eyened_orm.utils.factories import scope_for
 
 
 # The `spanning` fixture is shared (server/tests/conftest.py): the same four
 # tasks back the containment-route tests, so a floor asserted here and a 404
 # asserted there are talking about the same rows.
+
+
+def _scope_holding(roles: dict[int, ProjectRole]) -> AccessScope:
+    """A non-admin scope holding a *different* role per project.
+
+    ``scope_for`` applies one role to every project it is given, which cannot
+    express the only shape that discriminates the *after* half of the union:
+    an actor who can see project B (so the post-write re-read succeeds) but is
+    under the floor there (so the union rejects). See
+    ``test_a_grader_in_a_who_only_reads_b_cannot_add_an_image_from_b``.
+    """
+    return AccessScope(actor_id=1, username="tester", is_admin=False, roles=roles)
 
 
 def test_grader_updates_task_status(client_scoped, spanning):
@@ -76,9 +89,14 @@ def test_anyone_can_create_a_task(session, client_scoped, spanning):
 
 
 def test_a_grader_in_a_cannot_add_an_image_from_b(client_scoped, spanning):
-    """Without the *after* half, this would launder B data into a visible task.
+    """An actor blind to B cannot pull a B image into a task they can see.
 
-    404, not 403: B is not visible to this actor at all.
+    404, not 403: B is not visible to this actor at all. This case does **not**
+    discriminate the union -- with only ``projects_before`` consulted the write
+    would commit and the post-write scoped re-read would then fail, so the 404
+    survives either way. It is kept for the path it does pin: an unseeable
+    project is answered 404, never 403. The union itself is pinned by the
+    read-only-in-B case below.
     """
     client, set_scope = client_scoped
     set_scope(scope_for(spanning["projects"]["A"], role=ProjectRole.grader))
@@ -87,6 +105,49 @@ def test_a_grader_in_a_cannot_add_an_image_from_b(client_scoped, spanning):
         json={"instance_id": spanning["public_ids"]["B"]},
     )
     assert resp.status_code == 404
+
+
+def test_a_grader_in_a_who_only_reads_b_cannot_add_an_image_from_b(
+    session, client_scoped, spanning
+):
+    """The *after* half, discriminated: 403, and no link committed.
+
+    The roles are deliberately unequal. ``read_only`` in B keeps the task
+    visible after the write -- so the post-write re-read cannot be what refuses
+    -- while leaving the actor under ``grader`` there. Only the *after* half of
+    ``projects_before | projects_after`` sees B; consult ``projects_before``
+    alone and this request is a 200 with the link committed.
+
+    403 rather than 404 because the actor holds every project involved and is
+    merely under the floor in one of them.
+    """
+    from eyened_orm import SubTaskImageLink
+
+    client, set_scope = client_scoped
+    set_scope(
+        _scope_holding(
+            {
+                spanning["projects"]["A"]: ProjectRole.grader,
+                spanning["projects"]["B"]: ProjectRole.read_only,
+            }
+        )
+    )
+    subtask_id = spanning["subtasks"]["a_only-A"]
+    resp = client.post(
+        f"/subtasks/{subtask_id}/images",
+        json={"instance_id": spanning["public_ids"]["B"]},
+    )
+    assert resp.status_code == 403
+
+    session.expire_all()
+    assert (
+        session.query(SubTaskImageLink)
+        .filter_by(
+            SubTaskID=subtask_id, ImageInstanceID=spanning["images"]["B"]
+        )
+        .count()
+        == 0
+    )
 
 
 def test_a_grader_in_both_can_add_an_image_from_either(client_scoped, spanning):
@@ -99,12 +160,15 @@ def test_a_grader_in_both_can_add_an_image_from_either(client_scoped, spanning):
     assert resp.status_code == 200
 
 
-def test_removing_an_image_checks_the_projects_held_before(client_scoped, spanning):
-    """Without the *before* half, a grader could alter a task they hold nothing in.
+def test_removing_an_image_from_a_partly_visible_task_is_404(client_scoped, spanning):
+    """A subtask of a task the actor cannot fully see is not reachable at all.
 
-    The *spanning* subtask, deliberately: its parent task's before-set holds B,
-    which this actor lacks. On the a_only subtask the actor holds everything and
-    the request would 200 -- passing for a reason the name does not claim.
+    What refuses here is ``remove_image``'s leading visibility check, **not** its
+    floor: the parent task spans A and B, the actor holds only A, so the scoped
+    ``get_by_id`` returns nothing and the method raises before the floor is
+    consulted. Delete the floor and this test still passes -- by design; the
+    floor is pinned by ``test_read_only_in_every_project_cannot_remove_an_image``
+    below, which is written on a fully visible task for exactly that reason.
     """
     client, set_scope = client_scoped
     set_scope(scope_for(spanning["projects"]["A"], role=ProjectRole.grader))
@@ -115,15 +179,107 @@ def test_removing_an_image_checks_the_projects_held_before(client_scoped, spanni
     assert resp.status_code == 404
 
 
+def test_read_only_in_every_project_cannot_remove_an_image(
+    session, client_scoped, spanning
+):
+    """``remove_image``'s floor, on a task the actor can fully see.
+
+    read_only in both A and B, so the parent task of ``spanning-A`` is visible
+    and the leading check passes; only the ``grader`` floor stands between this
+    request and the delete. Delete the floor and the link goes.
+    """
+    from eyened_orm import SubTaskImageLink
+
+    client, set_scope = client_scoped
+    set_scope(scope_for(*spanning["projects"].values(), role=ProjectRole.read_only))
+    subtask_id = spanning["subtasks"]["spanning-A"]
+    resp = client.delete(
+        f"/subtasks/{subtask_id}/images/{spanning['public_ids']['A']}"
+    )
+    assert resp.status_code == 403
+
+    session.expire_all()
+    assert (
+        session.query(SubTaskImageLink).filter_by(SubTaskID=subtask_id).count() == 1
+    )
+
+
+def test_read_only_in_every_project_cannot_delete_a_subtask(
+    session, client_scoped, spanning
+):
+    """``delete_subtask``'s floor, on a task the actor can fully see."""
+    from eyened_orm import SubTask
+
+    client, set_scope = client_scoped
+    set_scope(scope_for(*spanning["projects"].values(), role=ProjectRole.read_only))
+    subtask_id = spanning["subtasks"]["spanning-A"]
+    assert client.delete(f"/subtasks/{subtask_id}").status_code == 403
+
+    session.expire_all()
+    assert session.get(SubTask, subtask_id) is not None
+
+
+def test_read_only_in_every_project_cannot_update_a_subtask(
+    session, client_scoped, spanning
+):
+    """``update_subtask``'s floor through a *role*, not through the empty set.
+
+    The empty-set case (``test_a_stranger_cannot_mutate_a_task_that_touches_no
+    _projects``) reaches ``require``'s fail-closed guard, which fires whatever
+    floor is passed -- so it cannot tell ``grader`` from ``read_only`` and
+    survives a floor lowered to ``read_only``. This case is the one that reads
+    the floor argument: the actor sees every project the task touches, so only
+    the role comparison can refuse.
+    """
+    from eyened_orm import SubTask
+
+    client, set_scope = client_scoped
+    set_scope(scope_for(*spanning["projects"].values(), role=ProjectRole.read_only))
+    subtask_id = spanning["subtasks"]["spanning-A"]
+    resp = client.patch(f"/subtasks/{subtask_id}", json={"comments": "hijacked"})
+    assert resp.status_code == 403
+
+    session.expire_all()
+    assert session.get(SubTask, subtask_id).Comments != "hijacked"
+
+
+def test_a_grader_unlinks_the_last_image_of_a_visible_subtask(
+    session, client_scoped, spanning
+):
+    """The happy path that pins *resolve the projects before you mutate*.
+
+    ``b_only_single`` holds exactly one link, so the delete empties its parent
+    task's project set. Resolved before the delete the set is ``{B}`` and this
+    grader passes; resolved after, it is the empty set, which ``require`` now
+    fails closed -- a 404 with the delete rolled back. That is what makes the
+    ordering observable rather than merely correct.
+    """
+    from eyened_orm import SubTaskImageLink
+
+    client, set_scope = client_scoped
+    set_scope(scope_for(spanning["projects"]["B"], role=ProjectRole.grader))
+    subtask_id = spanning["b_only_single"]
+    resp = client.delete(
+        f"/subtasks/{subtask_id}/images/{spanning['public_ids']['B']}"
+    )
+    assert resp.status_code == 200
+
+    session.expire_all()
+    assert (
+        session.query(SubTaskImageLink).filter_by(SubTaskID=subtask_id).count() == 0
+    )
+
+
 # --- F1 and F2 (Phase C review findings, folded into this task) ---
 
 
 def test_a_stranger_cannot_unlink_the_last_image_of_a_hidden_subtask(
-    session, client_scoped, spanning
+    client_scoped, spanning
 ):
-    """F1: 404 and the link survives -- not 403, and not a committed delete."""
-    from eyened_orm import SubTaskImageLink
+    """F1: a hidden subtask is answered identically whether or not it holds the link.
 
+    The status code alone is not the pin -- see the second probe below.
+    """
     client, set_scope = client_scoped
     set_scope(scope_for(spanning["projects"]["A"], role=ProjectRole.project_admin))
     resp = client.delete(
@@ -131,7 +287,6 @@ def test_a_stranger_cannot_unlink_the_last_image_of_a_hidden_subtask(
         f"/images/{spanning['public_ids']['B']}"
     )
     assert resp.status_code == 404
-    assert resp.json().get("comments") is None  # the 200 body disclosed the row
 
     # ...and the same request for an image that is NOT linked to that subtask
     # must be answered identically. The status code alone cannot tell the two
@@ -145,14 +300,6 @@ def test_a_stranger_cannot_unlink_the_last_image_of_a_hidden_subtask(
         f"/images/{spanning['public_ids']['A']}"
     )
     assert (other.status_code, other.json()) == (resp.status_code, resp.json())
-
-    session.expire_all()
-    assert (
-        session.query(SubTaskImageLink)
-        .filter_by(SubTaskID=spanning["b_only_single"])
-        .count()
-        == 1
-    )
 
 
 def test_zero_memberships_cannot_unlink_anything(client_scoped, spanning):
