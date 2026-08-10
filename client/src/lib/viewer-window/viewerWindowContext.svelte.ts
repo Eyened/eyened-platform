@@ -18,6 +18,7 @@ import { SvelteMap } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from "./MainViewer.svelte";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
+import type { ViewerViewStateController } from "./viewerViewState";
 
 export type MainPanelType = {
     component: any;
@@ -44,6 +45,8 @@ export class ViewerWindowContext {
     photoLocators = new SvelteMap<string, PhotoLocator[]>();
     photoLocatorSets: PhotoLocator[][] = $state([]);
 
+    public readonly viewState: ViewerViewStateController | undefined;
+
     private frame: number = 0;
     private loadedPatientIds = new Set<number>();
 
@@ -52,8 +55,10 @@ export class ViewerWindowContext {
         public readonly registration: Registration,
         public readonly creator: unknown,
         instanceIDs: string[] = [],
+        viewState?: ViewerViewStateController,
     ) {
         this.imageLoader = new ImageLoader(webgl);
+        this.viewState = viewState;
 
         // start rendering loop
         const loop = () => {
@@ -62,7 +67,9 @@ export class ViewerWindowContext {
         };
         loop();
 
-        this.setInstanceIDs(instanceIDs);
+        void this.setInstanceIDs(instanceIDs).then(() => {
+            this.viewState?.enableRecording();
+        });
     }
 
     addViewer(viewer: ViewerContext) {
@@ -85,6 +92,8 @@ export class ViewerWindowContext {
     }
 
     async setInstanceIDs(ids: string[]) {
+        this.viewState?.prune(ids);
+
         // ensure metadata of all instances is loaded
         const fetchOptions = {
             with_segmentations: true,
@@ -128,14 +137,13 @@ export class ViewerWindowContext {
         }
 
         // Load images for all instances
+        const loadPromises: Promise<unknown>[] = [];
         for (const id of ids) {
             const instance = instances.get(id);
-            if (instance) {
-                this.loadImage(instance);
-            } else {
-                console.warn(`Instance with id ${id} not found after fetch`);
-            }
+            if (instance) loadPromises.push(this.loadImage(instance));
+            else console.warn(`Instance with id ${id} not found after fetch`);
         }
+        await Promise.all(loadPromises);
     }
 
     destroy() {
