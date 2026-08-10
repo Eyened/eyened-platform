@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session, selectinload
 from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
 from eyened_orm.task import SubTaskState
 from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import apply_scope
+
+from ._scoped import scoped_one
 
 # Load task metadata without eager-loading every SubTask row (mirrors the
 # route's former ``_task_query_options``).
@@ -33,8 +36,8 @@ class TaskRepository:
         self._session.flush()
 
     def get_by_id(self, task_id: int) -> Task | None:
-        """Return the task with the given id, or None if absent."""
-        return self._session.get(Task, task_id)
+        """Return the task with the given id, or None if absent or out of scope."""
+        return scoped_one(self._session, Task, self._scope, Task.TaskID == task_id)
 
     def save(self, task: Task) -> None:
         """Persist in-place mutations to ``task`` within the request transaction.
@@ -46,34 +49,32 @@ class TaskRepository:
 
     def get_with_relations(self, task_id: int) -> Task | None:
         """Return the task with Creator + TaskDefinition eager-loaded, or None."""
-        return (
-            self._session.execute(
-                select(Task).options(*_TASK_RELATIONS).where(Task.TaskID == task_id)
-            )
-            .scalars()
-            .first()
+        return scoped_one(
+            self._session,
+            Task,
+            self._scope,
+            Task.TaskID == task_id,
+            options=_TASK_RELATIONS,
         )
 
     def list_all(self) -> list[Task]:
-        """Return all tasks (TaskID order) with Creator + TaskDefinition loaded."""
-        return list(
-            self._session.execute(
-                select(Task).options(*_TASK_RELATIONS).order_by(Task.TaskID)
-            )
-            .scalars()
-            .all()
+        """Return every task the scope may read (TaskID order), relations loaded."""
+        stmt = apply_scope(
+            select(Task).options(*_TASK_RELATIONS).order_by(Task.TaskID),
+            Task,
+            self._scope,
         )
+        return list(self._session.execute(stmt).scalars().all())
 
     def subtask_counts(self, task_ids: list[int]) -> dict[int, tuple[int, int]]:
         """Return {task_id: (num_subtasks, num_ready)} for the given task ids.
 
-        One grouped aggregate over ``SubTask`` (mirrors the route's former
-        ``_subtask_counts_by_task_id``). Every requested id is present in the
-        result: ids with no subtasks map to ``(0, 0)``.
+        Scoped through SubTask, so a hidden task reports (0, 0) rather than a
+        partial view. Every requested id is still present in the result.
         """
         if not task_ids:
             return {}
-        rows = self._session.execute(
+        stmt = apply_scope(
             select(
                 SubTask.TaskID,
                 func.count().label("num"),
@@ -84,9 +85,13 @@ class TaskRepository:
                     0,
                 ).label("ready"),
             )
+            .select_from(SubTask)
             .where(SubTask.TaskID.in_(task_ids))
-            .group_by(SubTask.TaskID)
-        ).all()
+            .group_by(SubTask.TaskID),
+            SubTask,
+            self._scope,
+        )
+        rows = self._session.execute(stmt).all()
         counts = {int(tid): (int(n), int(r)) for tid, n, r in rows}
         return {tid: counts.get(tid, (0, 0)) for tid in task_ids}
 
@@ -138,15 +143,14 @@ class SubTaskRepository:
 
     def all_ids_for_task(self, task_id: int) -> list[int]:
         """Return the task's SubTaskIDs ordered ascending (backs absolute index)."""
-        return list(
-            self._session.execute(
-                select(SubTask.SubTaskID)
-                .where(SubTask.TaskID == task_id)
-                .order_by(SubTask.SubTaskID)
-            )
-            .scalars()
-            .all()
+        stmt = apply_scope(
+            select(SubTask.SubTaskID)
+            .where(SubTask.TaskID == task_id)
+            .order_by(SubTask.SubTaskID),
+            SubTask,
+            self._scope,
         )
+        return list(self._session.execute(stmt).scalars().all())
 
     def count_for_task(
         self,
@@ -160,6 +164,7 @@ class SubTaskRepository:
         )
         if status is not None:
             stmt = stmt.where(SubTask.TaskState == status)
+        stmt = apply_scope(stmt, SubTask, self._scope)
         return self._session.scalar(stmt) or 0
 
     def list_for_task(
@@ -181,13 +186,16 @@ class SubTaskRepository:
         stmt = stmt.order_by(SubTask.SubTaskID)
         if with_images:
             stmt = stmt.options(_SUBTASK_IMAGE_LOADER)
+        stmt = apply_scope(stmt, SubTask, self._scope)
         return list(
             self._session.execute(stmt.limit(limit).offset(offset)).scalars().all()
         )
 
     def get_by_id(self, subtask_id: int) -> SubTask | None:
-        """Return the subtask with the given id, or None if absent."""
-        return self._session.get(SubTask, subtask_id)
+        """Return the subtask with the given id, or None if absent or out of scope."""
+        return scoped_one(
+            self._session, SubTask, self._scope, SubTask.SubTaskID == subtask_id
+        )
 
     def save(self, subtask: SubTask) -> None:
         """Persist in-place mutations to ``subtask`` within the request transaction.
@@ -199,14 +207,12 @@ class SubTaskRepository:
 
     def get_with_images(self, subtask_id: int) -> SubTask | None:
         """Return the subtask with its image links eager-loaded, or None."""
-        return (
-            self._session.execute(
-                select(SubTask)
-                .options(_SUBTASK_IMAGE_LOADER)
-                .where(SubTask.SubTaskID == subtask_id)
-            )
-            .scalars()
-            .first()
+        return scoped_one(
+            self._session,
+            SubTask,
+            self._scope,
+            SubTask.SubTaskID == subtask_id,
+            options=(_SUBTASK_IMAGE_LOADER,),
         )
 
     def resolve_image_instance_id(self, public_id: str) -> int | None:
