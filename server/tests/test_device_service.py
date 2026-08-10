@@ -14,7 +14,7 @@ def test_list_devices_returns_repository_rows_in_order(session):
     )
     session.flush()
 
-    service = DeviceService(DeviceRepository())
-    result = service.list_devices(session)
+    service = DeviceService(DeviceRepository(session))
+    result = service.list_devices()
 
     assert [d.Manufacturer for d in result] == ["Topcon", "Zeiss"]

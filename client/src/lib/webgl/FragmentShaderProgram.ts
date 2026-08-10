@@ -104,11 +104,6 @@ export class TextureShaderProgram extends BaseTextureShaderProgram {
         super(webgl, textureVertexShader, fragmentShader);
     }
 }
-export class TextureShaderProgram3D extends BaseTextureShaderProgram {
-    constructor(webgl: WebGL, fragmentShader: string) {
-        super(webgl, textureVertexShader3D, fragmentShader);
-    }
-}
 export class PixelShaderProgram extends FragmentShaderProgram {
     constructor(
         webgl: WebGL,
@@ -279,26 +274,6 @@ void main() {
     vec3 p = u_transform * p_in; 
 	gl_Position = vec4(p, 1.0);	
 	v_uv = a_position.xy;
-}`;
-
-const textureVertexShader3D = `#version 300 es
-in vec4 a_position;
-out vec3 v_uv;
-
-uniform mat3 u_transform;
-uniform mat3 u_image_transform;
-uniform vec3 u_image_size;
-uniform vec2 u_viewer_size;
-
-uniform int u_index;
-uniform vec2 u_translate;
-uniform vec2 u_scale;
-
-void main() {
-	vec3 p_in = vec3(u_image_size.xy * a_position.xy, 1.0);
-	vec3 p = u_transform * p_in;
-	gl_Position = vec4(p, 1.0);
-	v_uv = vec3(a_position.xy, (float(u_index) + 0.5) / u_image_size.z);
 }`;
 
 const pixelVertexShader = `#version 300 es

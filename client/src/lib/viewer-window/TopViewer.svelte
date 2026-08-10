@@ -1,12 +1,15 @@
 <script lang="ts">
     import CopyIconButton from "$lib/components/CopyIconButton.svelte";
     import Viewer from "$lib/viewer/Viewer.svelte";
+    import { EnfaceProjectionOverlay } from "$lib/viewer/overlays/EnfaceProjectionOverlay";
+    import type { EnfaceProjectionMode } from "$lib/viewer/viewer-utils";
+    import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
     import { getContext, setContext } from "svelte";
     import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import MainIcon from "./icons/MainIcon.svelte";
-    import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
     import Lines from "./icons/Lines.svelte";
+    import EnfaceProjectionModeIcon from "./icons/EnfaceProjectionModeIcon.svelte";
 
     interface Props {
         image: AbstractImage;
@@ -14,7 +17,7 @@
 
     let { image }: Props = $props();
 
-    const publicId = image.instance.id;
+    const publicId = $derived(image.instance.id);
 
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
@@ -23,8 +26,12 @@
     const viewerContext = viewerWindowContext.topViewers.get(image)!;
     setContext("viewerContext", viewerContext);
 
-    // const registration = viewerContext.registration;
-    // let linkedImages = $derived(registration.getLinkedImgIds(image.image_id));
+    const isProjImage = $derived(image.image_id.endsWith("_proj"));
+    const enfaceProjectionManager = $derived(
+        isProjImage
+            ? viewerWindowContext.enfaceProjectionManagers.get(publicId)
+            : undefined,
+    );
 
     let photoLocators = $derived(
         viewerWindowContext.photoLocators.get(image.image_id)!,
@@ -32,26 +39,52 @@
     let hasLocators = $derived(
         image.is2D && photoLocators && photoLocators.length,
     );
-    let removeOverlay = () => {};
-    let hideOverlay = $state(false);
+    let hideLinesOverlay = $state(false);
+
+    const projectionModeLabels: Record<EnfaceProjectionMode, string> = {
+        off: "Enface segmentation off",
+        binary: "Enface segmentation: mask",
+        heatmap: "Enface segmentation: thickness heatmap",
+    };
+
+    const projectionModeHoverColors: Record<EnfaceProjectionMode, string> = {
+        off: "rgb(175, 175, 175)",
+        binary: "white",
+        heatmap: "rgb(255, 200, 120)",
+    };
 
     $effect(() => {
-        removeOverlay();
-        if (hasLocators && !hideOverlay) {
-            removeOverlay = viewerContext.addOverlay(
-                new OCTLinesOverlay(photoLocators),
-            );
-        } else {
-            removeOverlay();
+        if (hasLocators && !hideLinesOverlay) {
+            return viewerContext.addOverlay(new OCTLinesOverlay(photoLocators));
         }
-        return removeOverlay;
     });
-    function toggleOverlay(e: MouseEvent) {
+
+    $effect(() => {
+        const ctx = enfaceProjectionManager?.mainViewerContext;
+        if (
+            enfaceProjectionManager &&
+            ctx &&
+            viewerContext.enfaceProjectionMode !== "off"
+        ) {
+            return viewerContext.addOverlay(
+                new EnfaceProjectionOverlay(enfaceProjectionManager, ctx),
+            );
+        }
+    });
+
+    function toggleLinesOverlay(e: MouseEvent) {
         e.stopPropagation();
-        hideOverlay = !hideOverlay;
+        hideLinesOverlay = !hideLinesOverlay;
     }
 
-    function selectImage(e: any) {
+    function cycleProjectionMode(e: MouseEvent) {
+        e.stopPropagation();
+        const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
+        const index = modes.indexOf(viewerContext.enfaceProjectionMode);
+        viewerContext.enfaceProjectionMode = modes[(index + 1) % modes.length];
+    }
+
+    function selectImage(e: MouseEvent) {
         if (e.shiftKey) {
             viewerWindowContext.addImagePanel(image);
         } else {
@@ -68,20 +101,43 @@
         <span class="public-id">{publicId}</span>
         <CopyIconButton text={publicId} ariaLabel="Copy public ID" />
     </div>
-    {#if hasLocators}
+    {#if hasLocators || enfaceProjectionManager}
         <div class="header overlay">
             <div class="content outer">
                 <div class="content">
-                    <MainIcon
-                        onclick={toggleOverlay}
-                        active={!hideOverlay}
-                        Icon={Lines}
-                    />
+                    {#if enfaceProjectionManager}
+                        <MainIcon
+                            onclick={cycleProjectionMode}
+                            active={viewerContext.enfaceProjectionMode !==
+                                "off"}
+                            tooltip={projectionModeLabels[
+                                viewerContext.enfaceProjectionMode
+                            ]}
+                            hoverColor={projectionModeHoverColors[
+                                viewerContext.enfaceProjectionMode
+                            ]}
+                            iconSnippet={projectionModeIcon}
+                        />
+                    {/if}
+                    {#if hasLocators}
+                        <MainIcon
+                            onclick={toggleLinesOverlay}
+                            active={!hideLinesOverlay}
+                            Icon={Lines}
+                        />
+                    {/if}
                 </div>
             </div>
         </div>
     {/if}
 </div>
+
+{#snippet projectionModeIcon()}
+    <EnfaceProjectionModeIcon
+        mode={viewerContext.enfaceProjectionMode}
+        gradientId="enface-heatmap-{publicId}"
+    />
+{/snippet}
 
 <style>
     div {

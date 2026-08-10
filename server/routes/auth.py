@@ -13,6 +13,7 @@ from hashlib import pbkdf2_hmac
 from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
+from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
@@ -22,7 +23,8 @@ from sqlalchemy.orm import Session
 
 from ..config import get_oidc_metadata, settings
 from ..db import get_db
-from ..utils.db_logging import get_db_logger
+from ..services.acting_user import ActingUser
+from ..services.audit_service import AuditService, get_audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -294,22 +296,17 @@ def check_login(username: str, password: str, db: Session) -> Creator:
             "sha256", password.encode(), "6f4b661212".encode(), 10000
         )
         if old_hash == creator.Password:
-            # Migrate to new hash
+            # Migrate to new hash. The mutation stays pending here; get_db commits
+            # it at the request boundary.
             creator.PasswordHash = hash_password(password)
             creator.Password = None
-            db.commit()
-            db.refresh(creator)
-            # Log password migration
-            logger = get_db_logger()
-            if logger:
-                logger.log_update(
-                    user=creator.CreatorName,
-                    user_id=creator.CreatorID,
-                    endpoint="POST /api/auth/login",
-                    entity="Creator",
-                    entity_id=creator.CreatorID,
-                    changes={"password_hash": "migrated from legacy"},
-                )
+            AuditService(db, enabled=settings.db_log.enabled).record(
+                action="UPDATE",
+                entity="Creator",
+                actor=ActingUser(id=creator.CreatorID, username=creator.CreatorName),
+                entity_id=creator.CreatorID,
+                changes={"password_hash": "migrated from legacy"},
+            )
             return creator
 
     raise HTTPException(
@@ -398,51 +395,45 @@ async def change_password(
     change_password_data: ChangePasswordRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
+    audit: AuditService = Depends(get_audit_service),
 ):
     """Change user password."""
     creator = check_login(
         current_user.username, change_password_data.old_password, session
     )
 
-    # Set new password using Argon2
+    # Set new password using Argon2. The mutation stays pending here; get_db
+    # commits it at the request boundary.
     creator.PasswordHash = hash_password(change_password_data.new_password)
     creator.Password = None  # Clear old hash if it exists
-    session.commit()
 
-    # Log password change
-    logger = get_db_logger()
-    if logger:
-        logger.log_update(
-            user=creator.CreatorName,
-            user_id=creator.CreatorID,
-            endpoint="POST /api/auth/change-password",
-            entity="Creator",
-            entity_id=creator.CreatorID,
-            changes={"password_hash": "updated"},
-        )
+    audit.record(
+        action="UPDATE",
+        entity="Creator",
+        actor=ActingUser(id=current_user.id, username=current_user.username),
+        entity_id=creator.CreatorID,
+        changes={"password_hash": "updated"},
+    )
 
     return creator_to_response(creator, session)
 
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register_user(user_data: UserLogin, session: Session = Depends(get_db)):
+async def register_user(
+    user_data: UserLogin,
+    session: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+):
     """Register a new user."""
     new_user = create_user(session, user_data.username, user_data.password)
 
-    # Log user creation
-    logger = get_db_logger()
-    if logger:
-        logger.log_insert(
-            user="system",  # Registration doesn't require auth
-            user_id=0,
-            endpoint="POST /api/auth/register",
-            entity="Creator",
-            entity_id=new_user.CreatorID,
-            fields={
-                "username": new_user.CreatorName,
-                "is_human": new_user.IsHuman,
-            },
-        )
+    audit.record(
+        action="INSERT",
+        entity="Creator",
+        trusted_path="auth:register",
+        entity_id=new_user.CreatorID,
+        changes={"username": new_user.CreatorName, "is_human": new_user.IsHuman},
+    )
 
     return creator_to_response(new_user, session)
 
@@ -462,10 +453,11 @@ async def refresh_token(
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
 
-        # Get user from database
-        creator = (
-            session.query(Creator).where(Creator.CreatorID == payload["sub"]).first()
-        )
+        # Get user from database. int() mirrors get_current_user's handling of
+        # the same claim; a malformed sub can't arise from a token this process
+        # signed itself, and if it ever did, the ValueError falls through to the
+        # blanket `except Exception` below -- same 401 outcome as before.
+        creator = CreatorRepository(session).get_by_id(int(payload["sub"]))
         if not creator:
             raise HTTPException(status_code=401, detail="User not found")
 
@@ -715,8 +707,8 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             identifier = f"oidc:sub:{id_claims['sub']}"
             logger.info(f"Replacing temporary OIDC authentication claim '{creator.EmployeeIdentifier}' with {identifier}")
             creator.EmployeeIdentifier = identifier
-            session.add(creator)
-            session.commit()
+            # flush only; the request boundary (get_db) commits.
+            CreatorRepository(session).add(creator)
 
     else:
         # No existing account was found

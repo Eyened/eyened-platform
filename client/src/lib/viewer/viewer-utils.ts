@@ -47,6 +47,8 @@ export function isRenderModeAvailable(
     return getAvailableRenderModes(supportsColor).includes(mode);
 }
 
+export type EnfaceProjectionMode = "off" | "binary" | "heatmap";
+
 export type WindowLevel = { min: number; max: number };
 
 export type PanelName =

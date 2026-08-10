@@ -166,6 +166,10 @@ export class SegmentationState {
         }
     }
 
+    private notifySliceChanged(): void {
+        this.segmentationItem?.notifySliceChanged(this.scanNr);
+    }
+
     private async initialize() {
         // Load a single slice from the server
         const sparse_axis = this.segmentation.sparse_axis ?? undefined;
@@ -189,12 +193,14 @@ export class SegmentationState {
         }
         this.mask.importData(npyArray.data as DrawingArray);
         this.segmentationItem?.addSavedScanIndex(scan_nr);
+        this.notifySliceChanged();
     }
 
     async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
         await this.isDrawing; // wait for previous drawing to finish
         this.ensureInitialCheckpoint();
         this.mask.draw(drawing, settings);
+        this.notifySliceChanged();
         this.isDrawing = this.checkpoint();
     }
 
@@ -233,6 +239,7 @@ export class SegmentationState {
             );
         }
 
+        this.notifySliceChanged();
         this.isDrawing = this.checkpoint();
     }
 
@@ -254,6 +261,7 @@ export class SegmentationState {
         const data = await this.history.undo();
         if (data) {
             this.mask.importData(data);
+            this.notifySliceChanged();
             await this.updateServer();
         }
     }
@@ -262,6 +270,7 @@ export class SegmentationState {
         const data = await this.history.redo();
         if (data) {
             this.mask.importData(data);
+            this.notifySliceChanged();
             await this.updateServer();
         }
     }

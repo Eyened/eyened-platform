@@ -27,7 +27,7 @@ def test_list_all_returns_all_tags_with_creator(session):
     _make_tag(session, creator.CreatorID, "Beta")
     _make_tag(session, creator.CreatorID, "Alpha", TagType.ImageInstance)
 
-    tags = TagRepository().list_all(session)
+    tags = TagRepository(session).list_all()
 
     assert sorted(t.TagName for t in tags) == ["Alpha", "Beta"]
     # Creator was selectinload-ed, so reading it needs no extra lazy query.

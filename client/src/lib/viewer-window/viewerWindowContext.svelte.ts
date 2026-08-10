@@ -12,10 +12,12 @@ import {
 import type { Registration } from "$lib/registration/registration";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
+import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from "./MainViewer.svelte";
+import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
 
 export type MainPanelType = {
     component: any;
@@ -34,6 +36,10 @@ export class ViewerWindowContext {
 
     public readonly imageLoader: ImageLoader;
     public readonly topViewers = new SvelteMap<AbstractImage, ViewerContext>();
+    public readonly enfaceProjectionManagers = new SvelteMap<
+        string,
+        EnfaceProjectionManager
+    >();
 
     photoLocators = new SvelteMap<string, PhotoLocator[]>();
     photoLocatorSets: PhotoLocator[][] = $state([]);
@@ -157,6 +163,10 @@ export class ViewerWindowContext {
         this.photoLocatorSets = [];
         this.mainPanels = [];
         this.instanceIds = [];
+        for (const manager of this.enfaceProjectionManagers.values()) {
+            manager.dispose();
+        }
+        this.enfaceProjectionManagers.clear();
     }
 
     async loadImage(instance: ImageGET): Promise<LoadedImages> {
@@ -178,9 +188,21 @@ export class ViewerWindowContext {
 
                     // Create viewer contexts
                     for (const image of loadedImages) {
-                        this.topViewers.set(
-                            image,
-                            new ViewerContext(image, this),
+                        const viewerContext = new ViewerContext(image, this);
+                        if (image.image_id.endsWith("_proj")) {
+                            viewerContext.enfaceProjectionMode = "binary";
+                        }
+                        this.topViewers.set(image, viewerContext);
+                    }
+
+                    const projImage = loadedImages.find((img) =>
+                        img.image_id.endsWith("_proj"),
+                    );
+                    const octImage = loadedImages.find((img) => img.is3D);
+                    if (projImage?.is2D && octImage?.is3D) {
+                        this.enfaceProjectionManagers.set(
+                            instance.id,
+                            new EnfaceProjectionManager(octImage as Image3D),
                         );
                     }
 
