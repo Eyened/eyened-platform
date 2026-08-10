@@ -172,8 +172,8 @@ export class ViewerContext {
         this.addOverlay(new HotKeys());
 
         if (image.is3D && image.depth > 1) {
-            const pending = this.viewerWindowContext.viewState?.peekFrame(
-                this.instance.id,
+            const pending = this.viewerWindowContext.viewState?.peekIndex(
+                this.image.image_id,
                 image.depth,
             );
             if (pending !== undefined) {
@@ -199,8 +199,8 @@ export class ViewerContext {
         });
         this.index = i;
         if (this.image.is3D && this.image.depth > 1) {
-            this.viewerWindowContext.viewState?.record(
-                this.instance.id,
+            this.viewerWindowContext.viewState?.recordIndex(
+                this.image.image_id,
                 i,
                 this.image.depth,
             );

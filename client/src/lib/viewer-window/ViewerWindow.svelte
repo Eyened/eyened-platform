@@ -23,9 +23,44 @@ Keeps track of the main panels and the top row of images.
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
 
-    // open first image
+    // Open main viewers from view-state when present; else first instance.
     const instanceIds = viewerWindowContext.instanceIds;
-    if (instanceIds.length) {
+    const pendingViewers = viewerWindowContext.viewState?.getViewers() ?? [];
+    if (pendingViewers.length) {
+        Promise.all(
+            pendingViewers.map(async (entry) => {
+                const instanceId = entry.id.replace(/_proj$/u, "");
+                const images = await viewerWindowContext.getImages(instanceId);
+                return (
+                    images.find((img) => img.image_id === entry.id) ??
+                    images[images.length - 1]
+                );
+            }),
+        )
+            .then((images) => {
+                const panels = images
+                    .filter((image): image is NonNullable<typeof image> =>
+                        Boolean(image),
+                    )
+                    .map((image) => ({
+                        component: MainViewer,
+                        props: { image },
+                    }));
+                if (!panels.length) return;
+                if (panels.length === 1) {
+                    viewerWindowContext.setPanel(panels[0]);
+                } else {
+                    viewerWindowContext.mainPanels = panels;
+                    viewerWindowContext.syncMainPanelsToViewState();
+                }
+            })
+            .catch((error) => {
+                console.error(
+                    "[viewerViewState] failed to restore open viewers",
+                    error,
+                );
+            });
+    } else if (instanceIds.length) {
         const openInstance = instanceIds[0];
         viewerWindowContext.getImages(openInstance).then((images) => {
             // images is normally a single image

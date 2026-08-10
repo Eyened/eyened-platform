@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
-    parseFrameParam,
-    serializeFrameParam,
+    parseViewersParam,
+    serializeViewersParam,
     parseStoredState,
     serializeStoredState,
     storageKey,
     createViewerViewStateController,
+    VIEW_STATE_PARAM,
+    instanceIdFromImageId,
 } from "./viewerViewState";
 
 function memoryStorage(): Pick<Storage, "getItem" | "setItem"> & {
@@ -21,68 +23,93 @@ function memoryStorage(): Pick<Storage, "getItem" | "setItem"> & {
     };
 }
 
-describe("parseFrameParam / serializeFrameParam", () => {
-    it("round-trips id:index pairs", () => {
-        const frames = { aaa: 42, bbb: 10 };
-        expect(parseFrameParam(serializeFrameParam(frames))).toEqual(frames);
+describe("parseViewersParam / serializeViewersParam", () => {
+    it("round-trips id.index and bare ids", () => {
+        const viewers = [
+            { id: "aaa", index: 42 },
+            { id: "bbb_proj" },
+            { id: "ccc", index: 10 },
+        ];
+        expect(parseViewersParam(serializeViewersParam(viewers))).toEqual(
+            viewers,
+        );
     });
 
-    it("returns empty object for null/empty", () => {
-        expect(parseFrameParam(null)).toEqual({});
-        expect(parseFrameParam("")).toEqual({});
-        expect(parseFrameParam(undefined)).toEqual({});
+    it("returns empty for null/empty", () => {
+        expect(parseViewersParam(null)).toEqual([]);
+        expect(parseViewersParam("")).toEqual([]);
+        expect(parseViewersParam(undefined)).toEqual([]);
     });
 
-    it("ignores malformed pairs and non-integer / negative indices", () => {
+    it("ignores malformed tokens", () => {
         expect(
-            parseFrameParam("aaa:42,bad,bbb:x,ccc:-1,ddd:3.5,eee:7"),
-        ).toEqual({
-            aaa: 42,
-            eee: 7,
-        });
+            parseViewersParam("aaa.42,bad!,bbb.x,ccc.-1,ddd.3.5,eee.7,fff"),
+        ).toEqual([
+            { id: "aaa", index: 42 },
+            { id: "eee", index: 7 },
+            { id: "fff" },
+        ]);
     });
 
     it("omits empty serialize", () => {
-        expect(serializeFrameParam({})).toBe("");
+        expect(serializeViewersParam([])).toBe("");
+    });
+
+    it("does not percent-encode dots in typical ids", () => {
+        const encoded = serializeViewersParam([
+            { id: "q4m7gj6h", index: 119 },
+            { id: "vc88pyyh", index: 15 },
+        ]);
+        expect(encoded).toBe("q4m7gj6h.119,vc88pyyh.15");
+        expect(encoded.includes("%")).toBe(false);
+        expect(encoded.includes(":")).toBe(false);
     });
 });
 
 describe("parseStoredState / serializeStoredState", () => {
-    it("round-trips v1 payload", () => {
-        const state = { version: 1 as const, frames: { a: 1 } };
+    it("round-trips v2 payload", () => {
+        const state = {
+            version: 2 as const,
+            viewers: [{ id: "a", index: 1 }, { id: "b" }],
+        };
         expect(parseStoredState(serializeStoredState(state))).toEqual(state);
     });
 
-    it("returns null for invalid JSON, wrong version, or missing frames", () => {
+    it("returns null for invalid or legacy payloads", () => {
         expect(parseStoredState(null)).toBeNull();
         expect(parseStoredState("{")).toBeNull();
         expect(
-            parseStoredState(JSON.stringify({ version: 2, frames: {} })),
+            parseStoredState(JSON.stringify({ version: 1, frames: {} })),
         ).toBeNull();
-        expect(parseStoredState(JSON.stringify({ version: 1 }))).toBeNull();
-        expect(
-            parseStoredState(JSON.stringify({ version: 1, frames: [5] })),
-        ).toBeNull();
+        expect(parseStoredState(JSON.stringify({ version: 2 }))).toBeNull();
     });
 });
 
-describe("storageKey", () => {
+describe("storageKey / instanceIdFromImageId", () => {
     it("prefixes scope", () => {
         expect(storageKey("view")).toBe("eyened:viewerViewState:view");
         expect(storageKey("subtask:99")).toBe(
             "eyened:viewerViewState:subtask:99",
         );
     });
+
+    it("strips _proj suffix", () => {
+        expect(instanceIdFromImageId("abc_proj")).toBe("abc");
+        expect(instanceIdFromImageId("abc")).toBe("abc");
+    });
 });
 
 describe("createViewerViewStateController", () => {
-    it("prefers URL frame over localStorage on hydrate", () => {
+    it(`prefers URL ${VIEW_STATE_PARAM} over localStorage on hydrate`, () => {
         const storage = memoryStorage();
         storage.setItem(
             "eyened:viewerViewState:view",
-            JSON.stringify({ version: 1, frames: { aaa: 1 } }),
+            JSON.stringify({
+                version: 2,
+                viewers: [{ id: "aaa", index: 1 }],
+            }),
         );
-        let params = new URLSearchParams("frame=aaa:9");
+        let params = new URLSearchParams("v=aaa.9,bbb");
         const c = createViewerViewStateController({
             scope: "view",
             getSearchParams: () => params,
@@ -92,16 +119,23 @@ describe("createViewerViewStateController", () => {
             storage,
         });
         c.hydrate();
-        expect(c.peekFrame("aaa", 100)).toBe(9);
+        expect(c.getViewers()).toEqual([
+            { id: "aaa", index: 9 },
+            { id: "bbb" },
+        ]);
         c.enableRecording();
-        expect(params.get("frame")).toBe("aaa:9");
+        expect(params.get("v")).toBe("aaa.9,bbb");
+        expect(params.get("frame")).toBeNull();
     });
 
-    it("falls back to localStorage when URL frame empty", () => {
+    it("falls back to localStorage when URL empty", () => {
         const storage = memoryStorage();
         storage.setItem(
             "eyened:viewerViewState:subtask:5",
-            JSON.stringify({ version: 1, frames: { aaa: 3 } }),
+            JSON.stringify({
+                version: 2,
+                viewers: [{ id: "aaa", index: 3 }],
+            }),
         );
         let params = new URLSearchParams();
         const c = createViewerViewStateController({
@@ -113,12 +147,12 @@ describe("createViewerViewStateController", () => {
             storage,
         });
         c.hydrate();
-        expect(c.peekFrame("aaa", 10)).toBe(3);
+        expect(c.peekIndex("aaa", 10)).toBe(3);
         c.enableRecording();
-        expect(params.get("frame")).toBe("aaa:3");
+        expect(params.get("v")).toBe("aaa.3");
     });
 
-    it("ignores record until enableRecording", () => {
+    it("ignores recordIndex until enableRecording and only for open viewers", () => {
         let params = new URLSearchParams();
         const storage = memoryStorage();
         const c = createViewerViewStateController({
@@ -130,18 +164,19 @@ describe("createViewerViewStateController", () => {
             storage,
         });
         c.hydrate();
-        c.record("aaa", 4, 10);
-        expect(params.get("frame")).toBeNull();
+        c.setOpenViewers([{ id: "aaa" }]);
+        c.recordIndex("aaa", 4, 10);
+        expect(params.get("v")).toBeNull();
         c.enableRecording();
-        c.record("aaa", 4, 10);
-        expect(params.get("frame")).toBe("aaa:4");
-        expect(
-            JSON.parse(storage.data["eyened:viewerViewState:view"]).frames.aaa,
-        ).toBe(4);
+        expect(params.get("v")).toBe("aaa");
+        c.recordIndex("aaa", 4, 10);
+        expect(params.get("v")).toBe("aaa.4");
+        c.recordIndex("zzz", 1, 10);
+        expect(params.get("v")).toBe("aaa.4");
     });
 
-    it("peekFrame rejects out-of-range; prune drops stale ids", () => {
-        let params = new URLSearchParams("frame=aaa:50,bbb:2");
+    it("peekIndex rejects out-of-range; prune drops stale instance viewers", () => {
+        let params = new URLSearchParams("v=aaa.50,bbb.2,ccc_proj");
         const storage = memoryStorage();
         const c = createViewerViewStateController({
             scope: "view",
@@ -152,10 +187,10 @@ describe("createViewerViewStateController", () => {
             storage,
         });
         c.hydrate();
-        expect(c.peekFrame("aaa", 10)).toBeUndefined();
-        expect(c.peekFrame("bbb", 10)).toBe(2);
+        expect(c.peekIndex("aaa", 10)).toBeUndefined();
+        expect(c.peekIndex("bbb", 10)).toBe(2);
         c.enableRecording();
-        c.prune(["bbb"]);
-        expect(params.get("frame")).toBe("bbb:2");
+        c.prune(["bbb", "ccc"]);
+        expect(params.get("v")).toBe("bbb.2,ccc_proj");
     });
 });

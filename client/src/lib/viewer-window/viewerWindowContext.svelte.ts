@@ -250,22 +250,60 @@ export class ViewerWindowContext {
 
     addImagePanel(image: AbstractImage) {
         this.mainPanels.push({ component: MainViewer, props: { image } });
+        this.syncMainPanelsToViewState();
     }
 
     setImagePanel(image: AbstractImage) {
         this.mainPanels = [{ component: MainViewer, props: { image } }];
+        this.syncMainPanelsToViewState();
     }
 
     setPanel(panel: MainPanelType) {
         this.mainPanels = [panel];
+        this.syncMainPanelsToViewState();
     }
 
     addPanel(panel: MainPanelType) {
         this.mainPanels.push(panel);
+        this.syncMainPanelsToViewState();
     }
 
     removePanel(panel: MainPanelType) {
         this.mainPanels = this.mainPanels.filter((item) => item !== panel);
+        this.syncMainPanelsToViewState();
+    }
+
+    /** Keep URL/localStorage open-viewer list aligned with mainPanels. */
+    syncMainPanelsToViewState() {
+        if (!this.viewState) return;
+        const prev = this.viewState.getViewers();
+        const entries = [];
+        for (const panel of this.mainPanels) {
+            const image = panel.props?.image as AbstractImage | undefined;
+            if (!image) continue;
+            const existing = prev.find((v) => v.id === image.image_id);
+            if (image.is3D && image.depth > 1) {
+                const live = [...this.viewers].find(
+                    (vc) => vc.image.image_id === image.image_id,
+                );
+                const index = live?.index ?? existing?.index;
+                entries.push(
+                    index !== undefined
+                        ? { id: image.image_id, index }
+                        : { id: image.image_id },
+                );
+            } else {
+                entries.push({ id: image.image_id });
+            }
+        }
+        this.viewState.setOpenViewers(entries);
+    }
+
+    findImageByImageId(imageId: string): AbstractImage | undefined {
+        for (const image of this.topViewers.keys()) {
+            if (image.image_id === imageId) return image;
+        }
+        return undefined;
     }
 
     getImages(instanceID: string): Promise<LoadedImages> {
