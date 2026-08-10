@@ -353,8 +353,12 @@ def apply_scope(stmt: Select, entity: type[Base], scope: AccessScope) -> Select:
     unfiltered would be a silent no-op wearing a scoped name: an entity that
     ought to be scoped but was never registered would read as though it had
     been filtered. Failing closed makes the omission a crash at the first call
-    instead of a leak, and matches ``scoped_one``, which raises for the same
-    condition and reaches this function through it -- one contract, not two.
+    instead of a leak.
+
+    ``scoped_one`` raises for a related but strictly narrower condition: it
+    has no ``SAFE_UNFILTERED_ENTITIES`` fallback, so it raises on an entity
+    this function would pass through unfiltered, and it only reaches this
+    function at all once its own, earlier check has cleared.
     """
     if scope.is_admin:
         return stmt

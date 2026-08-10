@@ -3,22 +3,27 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
 from sqlalchemy import select
 
 from eyened_orm import ImageInstance, Patient, SubTask, Task
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import SAFE_UNFILTERED_ENTITIES, apply_scope
+from eyened_orm.tag import TagType
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.utils.factories import (
     make_creator,
     make_device,
+    make_feature,
+    make_form_schema,
     make_image,
     make_patient,
     make_project,
     make_series,
     make_storage_backend,
     make_study,
+    make_tag,
 )
 
 
@@ -141,26 +146,35 @@ def test_every_safe_unfiltered_entity_is_returned_unfiltered(session):
     Membership governs nothing about a creator, a device, a feature, a form
     definition or a label, so an actor with no memberships still has to be
     able to read them -- a passthrough, not an empty result and not a raise.
-    The length assertion is load-bearing: an emptied frozenset would make this
-    loop iterate zero times and still report green, which is the one way this
-    test could bless a fail-closed function that never passes anything.
+    Every one of the six entities is seeded with at least one row here
+    (``_fixture`` only supplies a device, i.e. ``DeviceInstance`` and
+    ``DeviceModel``): an empty table would make the equality below compare
+    ``[] == []`` regardless of what ``apply_scope`` did, which is a second
+    way this test could bless a fail-closed function that never passes
+    anything through -- the non-empty assertion closes that gap. The
+    ``len(...) == 6`` assertion closes the third: an emptied frozenset would
+    make the loop iterate zero times and still report green.
     """
     from eyened_orm import Creator
 
     _fixture(session)
-    make_creator(session, "alice")
+    creator = make_creator(session, "alice")
+    make_feature(session, "feat-1")
+    make_form_schema(session, "schema-1")
+    make_tag(session, "tag-1", TagType.Study, creator)
     session.commit()
 
     assert len(SAFE_UNFILTERED_ENTITIES) == 6
     for entity in SAFE_UNFILTERED_ENTITIES:
         base = select(entity)
+        rows = session.scalars(base).all()
+        assert rows, f"{entity.__name__} table is empty -- passthrough is unproven"
         assert (
-            session.scalars(apply_scope(base, entity, _scope())).all()
-            == session.scalars(base).all()
+            session.scalars(apply_scope(base, entity, _scope())).all() == rows
         ), entity.__name__
 
 
-def test_an_entity_in_no_registry_raises_rather_than_passing_through(session):
+def test_an_entity_in_no_registry_raises_rather_than_passing_through():
     """A silent passthrough is a no-op wearing a scoped name.
 
     Project is the real instance, not a hypothetical: it is the anchor every
@@ -168,15 +182,13 @@ def test_an_entity_in_no_registry_raises_rather_than_passing_through(session):
     none of the three sets. Before this raise existed, apply_scope(stmt,
     Project, scope) returned the statement untouched and looked like scoping.
     """
-    import pytest
-
     from eyened_orm import Project
 
     with pytest.raises(KeyError, match="Project is in no scoping registry"):
         apply_scope(select(Project), Project, _scope())
 
 
-def test_an_admin_scope_short_circuits_before_the_registry_check(session):
+def test_an_admin_scope_short_circuits_before_the_registry_check():
     """The raise must not fire for an administrator, who reads everything.
 
     is_admin returns before any registry is consulted, so an unregistered

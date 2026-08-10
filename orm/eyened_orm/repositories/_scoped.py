@@ -39,11 +39,12 @@ def scoped_one(
     and no caller can tell the two apart.
 
     Raises ``KeyError`` for an entity with no scoping rule. ``apply_scope``
-    returns such a statement unfiltered by design -- correct there, because it
-    is also asked about entities that carry no project data -- but here it
-    would make the call a silent no-op wearing a scoped name, which is worse
-    than an unconverted ``session.get``: the next reader sees the helper and
-    stops looking.
+    also raises for an entity in none of its three registries, unless the
+    entity is declared safe to read unfiltered in ``SAFE_UNFILTERED_ENTITIES``
+    -- a fallback this check does not have. ``scoped_one``'s check is the
+    earlier and narrower one: an entity that is safe-unfiltered but not
+    single/set-valued would raise right here, before ``apply_scope`` is ever
+    reached, which is why this one fires first.
     """
     if entity not in SINGLE_PROJECT_ENTITIES and entity not in SET_VALUED_ENTITIES:
         raise KeyError(

@@ -14,6 +14,14 @@ merged into or overwritten by that one.
 Scope, stated so the guard is not over-trusted: it checks that a method's body
 reaches ``apply_scope``/``scoped_one`` or references ``self._scope``, not that
 the argument is the right entity. Review is the backstop for that.
+
+The DTO detector below has its own, narrower blind spot: it matches only a
+bare-``Name`` call to ``object_session(...)`` and a parameter annotated
+literally ``Session``, so ``sa.orm.object_session(x)`` (attribute form) or a
+converter that reads through an injected repository instead of a raw session
+would not be found. That boundary is acceptable -- the pin is a ratchet on a
+known-open surface, not a completeness claim -- but it is not exercised by
+this guard, so it is not caught either.
 """
 from __future__ import annotations
 
@@ -136,6 +144,43 @@ def _scanned_reads() -> list[tuple[str, str, ast.AST]]:
                     continue
                 found.append((qualname, path.name, item))
     return found
+
+
+def _scanned_classes() -> set[str]:
+    """Every class name visible to the same file walk ``_scanned_reads`` uses.
+
+    Kept as a literal copy of that walk's file-discovery loop (same
+    ``__pycache__``/leading-underscore skip), rather than a refactor shared
+    with ``_scanned_reads``, so a future edit to one does not silently drag
+    the other out of sync. A repository class defined in a module the skip
+    hides -- ``_internal_repository.py``, say -- would never show up here.
+    """
+    classes: set[str] = set()
+    for path in sorted(_REPOSITORIES.rglob("*.py")):
+        if "__pycache__" in path.parts or path.name.startswith("_"):
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                classes.add(node.name)
+    return classes
+
+
+def test_the_class_walk_sees_every_repository_class():
+    """A repository hidden by the leading-underscore file skip would be invisible.
+
+    ``_all_repository_classes`` (``test_scope_is_constructor_state.py``) finds
+    every ``*Repository`` class via ``pkgutil.walk_packages``, which does not
+    skip ``_``-prefixed modules. This guard's own file walk does skip them, so
+    a repository added in a module like ``_internal_repository.py`` would
+    never reach ``_scanned_reads`` and ``_EXPECTED_SCANNED_READS`` would stay
+    unchanged -- a silent hole that neither count-based guard above would
+    catch, because both only ever see what this same skip already let through.
+    """
+    from server.tests.test_scope_is_constructor_state import _all_repository_classes
+
+    expected = {cls.__name__ for cls in _all_repository_classes().values()}
+    assert _scanned_classes() >= expected
 
 
 def test_every_read_of_a_scoped_repository_consults_the_scope():
