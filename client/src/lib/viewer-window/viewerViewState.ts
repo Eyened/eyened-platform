@@ -69,3 +69,88 @@ export function parseStoredState(
 export function serializeStoredState(state: ViewerViewStateV1): string {
     return JSON.stringify(state);
 }
+
+export type ViewerViewStateController = {
+    hydrate(): void;
+    enableRecording(): void;
+    peekFrame(instanceId: string, depth: number): number | undefined;
+    record(instanceId: string, index: number, depth: number): void;
+    prune(instanceIds: readonly string[]): void;
+};
+
+export function createViewerViewStateController(options: {
+    scope: string;
+    getSearchParams: () => URLSearchParams;
+    replaceUrl: (params: URLSearchParams) => void;
+    storage?: Pick<Storage, "getItem" | "setItem">;
+}): ViewerViewStateController {
+    const storage = options.storage;
+    const key = storageKey(options.scope);
+    let frames: Record<string, number> = {};
+    let recording = false;
+
+    function persist() {
+        const params = new URLSearchParams(options.getSearchParams());
+        const encoded = serializeFrameParam(frames);
+        if (encoded) params.set("frame", encoded);
+        else params.delete("frame");
+        options.replaceUrl(params);
+        if (!storage) return;
+        try {
+            storage.setItem(
+                key,
+                serializeStoredState({ version: 1, frames: { ...frames } }),
+            );
+        } catch {
+            // private mode / quota — URL sync still applied
+        }
+    }
+
+    return {
+        hydrate() {
+            recording = false;
+            const fromUrl = parseFrameParam(
+                options.getSearchParams().get("frame"),
+            );
+            if (Object.keys(fromUrl).length > 0) {
+                frames = fromUrl;
+                return;
+            }
+            const stored = parseStoredState(storage?.getItem(key) ?? null);
+            frames = stored?.frames ?? {};
+        },
+        enableRecording() {
+            recording = true;
+            persist();
+        },
+        peekFrame(instanceId, depth) {
+            const index = frames[instanceId];
+            if (
+                !Number.isInteger(index) ||
+                index < 0 ||
+                index >= depth ||
+                depth <= 1
+            ) {
+                return undefined;
+            }
+            return index;
+        },
+        record(instanceId, index, depth) {
+            if (!recording || depth <= 1) return;
+            if (!Number.isInteger(index) || index < 0 || index >= depth) return;
+            frames[instanceId] = index;
+            persist();
+        },
+        prune(instanceIds) {
+            const allowed = new Set(instanceIds);
+            let changed = false;
+            for (const id of Object.keys(frames)) {
+                if (!allowed.has(id)) {
+                    delete frames[id];
+                    changed = true;
+                }
+            }
+            if (changed && recording) persist();
+        },
+    };
+}
