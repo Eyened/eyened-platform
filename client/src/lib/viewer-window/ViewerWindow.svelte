@@ -7,7 +7,6 @@ Keeps track of the main panels and the top row of images.
 <script lang="ts">
     import { onDestroy, onMount, setContext } from "svelte";
     import MainPanel from "./MainPanel.svelte";
-    import MainViewer from "./MainViewer.svelte";
     import TopRowImages from "./TopRowImages.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
@@ -23,55 +22,8 @@ Keeps track of the main panels and the top row of images.
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
 
-    // Open main viewers from view-state when present; else first instance.
-    const instanceIds = viewerWindowContext.instanceIds;
-    const pendingViewers = viewerWindowContext.viewState?.getViewers() ?? [];
-    if (pendingViewers.length) {
-        Promise.all(
-            pendingViewers.map(async (entry) => {
-                const instanceId = entry.id.replace(/_proj$/u, "");
-                const images = await viewerWindowContext.getImages(instanceId);
-                return (
-                    images.find((img) => img.image_id === entry.id) ??
-                    images[images.length - 1]
-                );
-            }),
-        )
-            .then((images) => {
-                const panels = images
-                    .filter((image): image is NonNullable<typeof image> =>
-                        Boolean(image),
-                    )
-                    .map((image) => ({
-                        component: MainViewer,
-                        props: { image },
-                    }));
-                if (!panels.length) return;
-                if (panels.length === 1) {
-                    viewerWindowContext.setPanel(panels[0]);
-                } else {
-                    viewerWindowContext.mainPanels = panels;
-                    viewerWindowContext.syncMainPanelsToViewState();
-                }
-            })
-            .catch((error) => {
-                console.error(
-                    "[viewerViewState] failed to restore open viewers",
-                    error,
-                );
-            });
-    } else if (instanceIds.length) {
-        const openInstance = instanceIds[0];
-        viewerWindowContext.getImages(openInstance).then((images) => {
-            // images is normally a single image
-            // for OCT it is an array: enface projection + oct image
-            const panel = {
-                component: MainViewer,
-                props: { image: images[images.length - 1] }, // last image (in case of OCT)
-            };
-            viewerWindowContext.setPanel(panel);
-        });
-    }
+    // Main viewers are restored by ViewerWindowContext after images load
+    // (see restoreMainViewersFromViewState) so task grade and /view share one path.
 
     let main: HTMLDivElement | undefined = $state();
     let isResizing = false;

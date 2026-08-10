@@ -19,6 +19,7 @@ import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from "./MainViewer.svelte";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
 import type { ViewerViewStateController } from "./viewerViewState";
+import { instanceIdFromImageId } from "./viewerViewState";
 
 export type MainPanelType = {
     component: any;
@@ -68,14 +69,23 @@ export class ViewerWindowContext {
         loop();
 
         void this.setInstanceIDs(instanceIDs)
-            .then(() => {
+            .then(async () => {
+                await this.restoreMainViewersFromViewState();
                 this.viewState?.enableRecording();
             })
-            .catch((error) => {
+            .catch(async (error) => {
                 console.error(
-                    "[viewerViewState] initial load failed; enabling recording anyway",
+                    "[viewerViewState] initial load failed; restoring/enabling anyway",
                     error,
                 );
+                try {
+                    await this.restoreMainViewersFromViewState();
+                } catch (restoreError) {
+                    console.error(
+                        "[viewerViewState] failed to restore open viewers",
+                        restoreError,
+                    );
+                }
                 this.viewState?.enableRecording();
             });
     }
@@ -271,6 +281,48 @@ export class ViewerWindowContext {
     removePanel(panel: MainPanelType) {
         this.mainPanels = this.mainPanels.filter((item) => item !== panel);
         this.syncMainPanelsToViewState();
+    }
+
+    /**
+     * Open main panels from hydrated view-state, or the first instance.
+     * Must run after setInstanceIDs so instances/images are in memory
+     * (task grade does not preload the instances store the way /view does).
+     */
+    async restoreMainViewersFromViewState() {
+        const pending = this.viewState?.getViewers() ?? [];
+        if (pending.length) {
+            const images = await Promise.all(
+                pending.map(async (entry) => {
+                    const instanceId = instanceIdFromImageId(entry.id);
+                    const loaded = await this.getImages(instanceId);
+                    return (
+                        loaded.find((img) => img.image_id === entry.id) ??
+                        loaded[loaded.length - 1]
+                    );
+                }),
+            );
+            const panels = images
+                .filter((image): image is AbstractImage => Boolean(image))
+                .map((image) => ({
+                    component: MainViewer,
+                    props: { image },
+                }));
+            if (!panels.length) return;
+            if (panels.length === 1) {
+                this.setPanel(panels[0]);
+            } else {
+                this.mainPanels = panels;
+                this.syncMainPanelsToViewState();
+            }
+            return;
+        }
+
+        if (!this.instanceIds.length) return;
+        const loaded = await this.getImages(this.instanceIds[0]);
+        this.setPanel({
+            component: MainViewer,
+            props: { image: loaded[loaded.length - 1] },
+        });
     }
 
     /** Keep URL/localStorage open-viewer list aligned with mainPanels. */
