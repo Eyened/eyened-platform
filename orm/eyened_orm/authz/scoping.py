@@ -18,10 +18,11 @@ from sqlalchemy.orm import Session, aliased
 from sqlalchemy.orm.util import AliasedClass
 
 from ..base import Base
-from ..form_annotation import FormAnnotation
-from ..image_instance import ImageInstance
+from ..creator import Creator
+from ..form_annotation import FormAnnotation, FormSchema
+from ..image_instance import DeviceInstance, DeviceModel, ImageInstance
 from ..patient import Patient
-from ..segmentation import ModelSegmentation, Segmentation
+from ..segmentation import Feature, ModelSegmentation, Segmentation
 from ..series import Series
 from ..study import Study
 from ..tag import (
@@ -29,12 +30,14 @@ from ..tag import (
     ImageInstanceTagLink,
     SegmentationTagLink,
     StudyTagLink,
+    Tag,
 )
 from ..task import SubTask, SubTaskImageLink, Task
 from .scope import AccessScope
 
 __all__ = [
     "PROJECT_IDS_OF",
+    "SAFE_UNFILTERED_ENTITIES",
     "SET_VALUED_ENTITIES",
     "SINGLE_PROJECT_ENTITIES",
     "apply_scope",
@@ -96,6 +99,18 @@ _PARENT_OF: dict[type[Base], tuple[type[Base], Callable[[], ColumnElement[bool]]
 
 SINGLE_PROJECT_ENTITIES: frozenset[type[Base]] = frozenset(_PARENT_OF) | {Patient}
 SET_VALUED_ENTITIES: frozenset[type[Base]] = frozenset({Task, SubTask})
+
+# Entities that carry no project anchor and are therefore safe to read
+# unfiltered. This list is the *reason* apply_scope may return a statement
+# untouched; naming it is what lets that function fail closed on everything
+# else instead of guessing. An entity is only safe here because a membership
+# governs nothing about it -- a creator, a hardware model, a segmentation
+# feature, a form definition and a label all exist independently of any
+# project. Adding a name is a claim of exactly that, and the suite pins both
+# directions: every member passes through, and a non-member raises.
+SAFE_UNFILTERED_ENTITIES: frozenset[type[Base]] = frozenset(
+    {Creator, DeviceInstance, DeviceModel, Feature, FormSchema, Tag}
+)
 
 
 def _join_to_patient(stmt: Select, node: type[Base]) -> Select:
@@ -329,9 +344,17 @@ def apply_scope(stmt: Select, entity: type[Base], scope: AccessScope) -> Select:
     ``NotFoundError`` produces the 404 -- so reads never need ``scope.require``
     and there is no path where a row is fetched first and judged afterwards.
 
-    Entities with no project anchor (``Creator``, ``Feature``, ``Tag``,
-    ``FormSchema``, ``Device*``) pass through unfiltered; that is deliberate,
-    not an omission, and the coverage test in the suite pins the list.
+    Entities with no project anchor pass through unfiltered; that is
+    deliberate, not an omission, and ``SAFE_UNFILTERED_ENTITIES`` is the list
+    -- named rather than implied, so the coverage test in the suite can pin
+    both directions of it.
+
+    Raises ``KeyError`` for any other entity. Returning such a statement
+    unfiltered would be a silent no-op wearing a scoped name: an entity that
+    ought to be scoped but was never registered would read as though it had
+    been filtered. Failing closed makes the omission a crash at the first call
+    instead of a leak, and matches ``scoped_one``, which raises for the same
+    condition and reaches this function through it -- one contract, not two.
     """
     if scope.is_admin:
         return stmt
@@ -340,4 +363,10 @@ def apply_scope(stmt: Select, entity: type[Base], scope: AccessScope) -> Select:
         return stmt.where(_set_valued_predicate(entity, accessible))
     if entity in SINGLE_PROJECT_ENTITIES:
         return stmt.where(_single_project_predicate(entity, accessible))
-    return stmt
+    if entity in SAFE_UNFILTERED_ENTITIES:
+        return stmt
+    raise KeyError(
+        f"{entity.__name__} is in no scoping registry and is not declared "
+        "safe to read unfiltered; add it to SINGLE_PROJECT_ENTITIES, "
+        "SET_VALUED_ENTITIES or SAFE_UNFILTERED_ENTITIES"
+    )

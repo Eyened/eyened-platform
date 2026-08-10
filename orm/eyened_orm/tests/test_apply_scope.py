@@ -8,7 +8,7 @@ from sqlalchemy import select
 from eyened_orm import ImageInstance, Patient, SubTask, Task
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
-from eyened_orm.authz.scoping import apply_scope
+from eyened_orm.authz.scoping import SAFE_UNFILTERED_ENTITIES, apply_scope
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.utils.factories import (
     make_creator,
@@ -135,19 +135,56 @@ def test_a_subtask_is_hidden_by_its_parents_projects_not_its_own(session):
     assert lone.SubTaskID in visible
 
 
-def test_an_unregistered_entity_is_returned_unfiltered(session):
-    """Non-project entities (Creator, Feature, Tag, ...) pass straight through.
+def test_every_safe_unfiltered_entity_is_returned_unfiltered(session):
+    """The declared non-project entities pass straight through.
 
-    A registry miss must be a passthrough, not a KeyError and not an empty
-    result -- an actor with no memberships still has to be able to read them.
+    Membership governs nothing about a creator, a device, a feature, a form
+    definition or a label, so an actor with no memberships still has to be
+    able to read them -- a passthrough, not an empty result and not a raise.
+    The length assertion is load-bearing: an emptied frozenset would make this
+    loop iterate zero times and still report green, which is the one way this
+    test could bless a fail-closed function that never passes anything.
     """
     from eyened_orm import Creator
 
     _fixture(session)
     make_creator(session, "alice")
     session.commit()
-    base = select(Creator)
-    assert (
-        session.scalars(apply_scope(base, Creator, _scope())).all()
-        == session.scalars(base).all()
-    )
+
+    assert len(SAFE_UNFILTERED_ENTITIES) == 6
+    for entity in SAFE_UNFILTERED_ENTITIES:
+        base = select(entity)
+        assert (
+            session.scalars(apply_scope(base, entity, _scope())).all()
+            == session.scalars(base).all()
+        ), entity.__name__
+
+
+def test_an_entity_in_no_registry_raises_rather_than_passing_through(session):
+    """A silent passthrough is a no-op wearing a scoped name.
+
+    Project is the real instance, not a hypothetical: it is the anchor every
+    other entity's route leads *to*, so it has no route of its own and sits in
+    none of the three sets. Before this raise existed, apply_scope(stmt,
+    Project, scope) returned the statement untouched and looked like scoping.
+    """
+    import pytest
+
+    from eyened_orm import Project
+
+    with pytest.raises(KeyError, match="Project is in no scoping registry"):
+        apply_scope(select(Project), Project, _scope())
+
+
+def test_an_admin_scope_short_circuits_before_the_registry_check(session):
+    """The raise must not fire for an administrator, who reads everything.
+
+    is_admin returns before any registry is consulted, so an unregistered
+    entity is not an error on that path -- pinned because reordering those
+    two blocks would turn every admin read of a non-project entity into a
+    crash, and no other test in this file would notice.
+    """
+    from eyened_orm import Project
+
+    base = select(Project)
+    assert apply_scope(base, Project, _scope(is_admin=True)) is base
