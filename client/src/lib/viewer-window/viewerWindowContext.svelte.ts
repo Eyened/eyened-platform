@@ -302,12 +302,9 @@ export class ViewerWindowContext {
                     );
                 }),
             );
-            const panels = images
-                .filter((image): image is AbstractImage => Boolean(image))
-                .map((image) => ({
-                    component: MainViewer,
-                    props: { image },
-                }));
+            const panels = images.flatMap((image) =>
+                image ? [{ component: MainViewer, props: { image } }] : [],
+            );
             if (!panels.length) return;
             if (panels.length === 1) {
                 this.setPanel(panels[0]);

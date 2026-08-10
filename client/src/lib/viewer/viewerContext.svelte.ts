@@ -176,9 +176,12 @@ export class ViewerContext {
                 this.image.image_id,
                 image.depth,
             );
-            if (pending !== undefined) {
-                this.setIndex(pending);
-            }
+            // Apply pending on viewer.index only. setIndex() writes the global
+            // registration pointer, which cannot hold per-viewer frames
+            // (known limitation for multiple open volumes).
+            this.index = pending ?? Math.round(image.depth / 2);
+        } else if (image.is3D) {
+            this.index = 0;
         }
     }
 
@@ -349,11 +352,8 @@ export class ViewerContext {
         );
         if (p) {
             this.index = p.index;
-        } else {
-            // this.index = Math.round(this.image.depth / 2);
-            this.index =
-                this.image.depth === 1 ? 0 : Math.round(this.image.depth / 2);
         }
+        // else keep this.index (mid-slice / restored pending / last setIndex)
 
         const renderTarget = { ...renderBounds, framebuffer: null };
 
