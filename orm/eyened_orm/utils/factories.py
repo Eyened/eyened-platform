@@ -6,6 +6,7 @@ transaction; only ``seed_search_dataset`` commits.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import TYPE_CHECKING
@@ -346,16 +347,30 @@ def admin_scope(actor_id: int = 1, username: str = "tester") -> "AccessScope":
 def scope_for(
     *project_ids: int,
     role: "ProjectRole | None" = None,
+    roles: "Mapping[int, ProjectRole] | None" = None,
     actor_id: int = 1,
     username: str = "tester",
 ) -> "AccessScope":
-    """A non-admin scope holding ``role`` in each of ``project_ids``."""
+    """A non-admin scope holding ``role`` in each of ``project_ids``.
+
+    Pass ``roles`` instead for the shape that a single broadcast ``role``
+    cannot express: a *different* role per project (e.g. grader in one,
+    read_only in another). ``roles`` is exclusive with ``project_ids``/
+    ``role`` -- it replaces them rather than layering on top.
+    """
     from eyened_orm.authz.roles import ProjectRole
     from eyened_orm.authz.scope import AccessScope
+
+    if roles is not None:
+        if project_ids or role is not None:
+            raise ValueError("roles is exclusive with project_ids/role")
+        role_map = dict(roles)
+    else:
+        role_map = {p: role or ProjectRole.grader for p in project_ids}
 
     return AccessScope(
         actor_id=actor_id,
         username=username,
         is_admin=False,
-        roles={p: role or ProjectRole.grader for p in project_ids},
+        roles=role_map,
     )
