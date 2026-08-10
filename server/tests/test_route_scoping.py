@@ -126,18 +126,3 @@ def test_an_empty_scope_is_served_no_pixels(authenticated_scoped, two_projects_i
         public_id = two_projects_images[name]["public_id"]
         assert client.get(f"/images/{public_id}/data").status_code == 404
         assert client.get(f"/images/{public_id}/thumbnail").status_code == 404
-
-
-def test_the_by_path_pixel_routes_no_longer_exist(
-    authenticated_scoped, two_projects_images
-):
-    """The unscoped by-path pair is gone, not merely unused.
-
-    Deleting them is what closes the hole, so a re-added route must fail here
-    as well as in the route-guard's set-equality ratchet.
-    """
-    client, set_scope = authenticated_scoped
-    set_scope(scope_for(two_projects_images["A"]["project"]))
-
-    assert client.get("/instances/images/ds-img-B").status_code == 404
-    assert client.get("/instances/thumbnails/thumb-B_144.jpg").status_code == 404
