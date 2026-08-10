@@ -10,34 +10,42 @@ They are deliberate follow-up work, gated on an EXPLAIN ANALYZE baseline against
 real MySQL; the SQLite suite can prove rows are unchanged but not that a rewrite
 is faster. Do not "fix" them here.
 
-Read-scoping coverage of SearchRepository's eleven public methods:
+Read-scoping coverage of SearchRepository's twelve public methods:
 
-Six row/count-returning methods apply apply_scope() before executing and
-return only rows the caller's project memberships allow: search_instances,
-count_instances, search_studies, count_studies, studies_by_ids,
-instances_for_studies.
+Seven row/count/value-returning methods scope before returning data the
+caller's project memberships allow: search_instances, count_instances,
+search_studies, count_studies, studies_by_ids, instances_for_studies, and
+visible_project_names. The last of these filters Project.ProjectID directly
+against the scope's accessible set rather than going through apply_scope,
+since Project has no anchor route for that helper to walk -- it is the
+anchor every other entity's route leads to, not an entity with a route of
+its own.
 
 Four methods are deliberately unfiltered: they read non-project vocabulary
 with no project anchor to scope against -- tag_names,
 active_form_creator_names, attribute_signature_rows,
 resolve_attribute_definitions.
 
-column_values is unfiltered too, but it is NOT on the safe list above and is
-NOT deliberately unfiltered -- it is a known, unfixed gap owned by Task 13a
-(a separate unit of work that runs before the read-scoping coverage guard).
-column_values is a generic column-values wrapper, and whether a given call
-leaks project data depends entirely on what the caller passes it. Its call
-sites that pass Project enumerate every project's name in the database into
-a search-form dropdown, regardless of the caller's memberships. Fixing it
-means filtering Project.ProjectID at the caller, which this module's scoping
-cannot reach today, since Project has no anchor route of its own to route
-through.
+column_values is unfiltered too, and that is safe: every remaining call site
+passes Creator, DeviceModel, Feature or FormSchema, all non-project
+vocabulary. Its former Project-typed call sites (the project-name dropdown on
+both search-form signatures) were replaced by visible_project_names above.
+Do not add a new column_values(Project, ...) call -- the generic wrapper has
+no scoping of its own, and doing so would silently reopen this leak.
 """
 from __future__ import annotations
 
 from typing import Any, List, Literal, Optional, Tuple
 
-from eyened_orm import Creator, FormAnnotation, ImageInstance, Series, Study, Tag
+from eyened_orm import (
+    Creator,
+    FormAnnotation,
+    ImageInstance,
+    Project,
+    Series,
+    Study,
+    Tag,
+)
 from eyened_orm.attributes import (
     AttributeDataType,
     AttributeDefinition,
@@ -234,6 +242,25 @@ class SearchRepository:
         )
         stmt = apply_scope(stmt, ImageInstance, self._scope)
         return list(self._session.execute(stmt).scalars().all())
+
+    def visible_project_names(self) -> List[str]:
+        """Distinct project names the scope may see, sorted.
+
+        Admin short-circuits to every project; a non-admin caller sees only
+        the names of the projects in its scope. Filters ``Project.ProjectID``
+        directly rather than through ``apply_scope``, since ``Project`` has no
+        anchor route for that helper to walk -- it is the anchor other
+        entities route *to*.
+        """
+        if self._scope.is_admin:
+            return sorted(Project.query_column(self._session, Project.ProjectName))
+        return sorted(
+            Project.query_column(
+                self._session,
+                Project.ProjectName,
+                where=Project.ProjectID.in_(self._scope.project_ids),
+            )
+        )
 
     def column_values(self, model: Any, column: Any, *, where: Any = None) -> List[Any]:
         """Distinct values of a column on ``model`` (thin wrapper over ``Model.query_column``).

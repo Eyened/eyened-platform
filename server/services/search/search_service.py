@@ -23,7 +23,6 @@ from eyened_orm import (
     FormSchema,
     ImageInstance,
     ImageInstanceTagLink,
-    Project,
     SegmentationTagLink,
     Study,
     StudyTagLink,
@@ -227,7 +226,7 @@ class SearchService:
             # DB-derived simple columns
             SignatureField(
                 name="Project Name",
-                values=sorted(self.repository.column_values(Project, Project.ProjectName)),
+                values=self.repository.visible_project_names(),
             ),
             SignatureField(
                 name="Device Model ID",
@@ -310,7 +309,7 @@ class SearchService:
             # DB-derived
             SignatureField(
                 name="Project Name",
-                values=sorted(self.repository.column_values(Project, Project.ProjectName)),
+                values=self.repository.visible_project_names(),
             ),
             SignatureField(
                 name="Form Schema Name",
