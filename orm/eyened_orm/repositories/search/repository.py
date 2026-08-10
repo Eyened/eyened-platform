@@ -9,6 +9,29 @@ the OR-of-joins EXISTS, and the redundant DISTINCT in instances_for_studies).
 They are deliberate follow-up work, gated on an EXPLAIN ANALYZE baseline against
 real MySQL; the SQLite suite can prove rows are unchanged but not that a rewrite
 is faster. Do not "fix" them here.
+
+Read-scoping coverage of SearchRepository's eleven public methods:
+
+Six row/count-returning methods apply apply_scope() before executing and
+return only rows the caller's project memberships allow: search_instances,
+count_instances, search_studies, count_studies, studies_by_ids,
+instances_for_studies.
+
+Four methods are deliberately unfiltered: they read non-project vocabulary
+with no project anchor to scope against -- tag_names,
+active_form_creator_names, attribute_signature_rows,
+resolve_attribute_definitions.
+
+column_values is unfiltered too, but it is NOT on the safe list above and is
+NOT deliberately unfiltered -- it is a known, unfixed gap owned by Task 13a
+(a separate unit of work that runs before the read-scoping coverage guard).
+column_values is a generic column-values wrapper, and whether a given call
+leaks project data depends entirely on what the caller passes it. Its call
+sites that pass Project enumerate every project's name in the database into
+a search-form dropdown, regardless of the caller's memberships. Fixing it
+means filtering Project.ProjectID at the caller, which this module's scoping
+cannot reach today, since Project has no anchor route of its own to route
+through.
 """
 from __future__ import annotations
 
@@ -22,6 +45,7 @@ from eyened_orm.attributes import (
     AttributesModelOutput,
 )
 from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import apply_scope
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -64,6 +88,7 @@ class SearchRepository:
         stmt = build_instance_select(
             conditions, attr_conditions, attr_defs, order_by, order
         )
+        stmt = apply_scope(stmt, ImageInstance, self._scope)
         return list(
             self._session.execute(
                 stmt.options(*instance_options()).limit(limit).offset(offset)
@@ -81,6 +106,7 @@ class SearchRepository:
     ) -> int:
         """Count instances matching the same predicate ``search_instances`` applies."""
         stmt = instance_filtered_select(conditions, attr_conditions, attr_defs)
+        stmt = apply_scope(stmt, ImageInstance, self._scope)
         return self._session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
@@ -108,6 +134,7 @@ class SearchRepository:
     ) -> List[Study]:
         """Return studies matching the conditions, ordered and windowed."""
         stmt = build_study_select(conditions, order_by, order)
+        stmt = apply_scope(stmt, Study, self._scope)
         return list(
             self._session.execute(
                 stmt.options(*study_options()).limit(limit).offset(offset)
@@ -123,6 +150,7 @@ class SearchRepository:
     ) -> int:
         """Count studies matching the same predicate ``search_studies`` applies."""
         stmt = study_filtered_select(conditions)
+        stmt = apply_scope(stmt, Study, self._scope)
         return self._session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
@@ -189,6 +217,7 @@ class SearchRepository:
             .where(Study.StudyID.in_(study_ids))
             .options(*study_options())
         )
+        stmt = apply_scope(stmt, Study, self._scope)
         return list(self._session.execute(stmt).scalars().all())
 
     def instances_for_studies(self, study_ids: List[int]) -> List[ImageInstance]:
@@ -203,6 +232,7 @@ class SearchRepository:
             .options(*instance_options())
             .distinct()
         )
+        stmt = apply_scope(stmt, ImageInstance, self._scope)
         return list(self._session.execute(stmt).scalars().all())
 
     def column_values(self, model: Any, column: Any, *, where: Any = None) -> List[Any]:
