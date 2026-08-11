@@ -89,17 +89,22 @@ def two_projects(session):
     """
     backend = make_storage_backend(session)
     device = make_device(session, "d")
+    names = ("A", "B")
     # Burn ProjectIDs so the two id spaces cannot coincide. One project per
     # image otherwise numbers both 1, 2, and the gate's resolver returning
     # {project_id: image_id} -- the mapping inverted -- passes every test in
     # this file. In production image ids dwarf project ids, so that inversion
     # would leave `set(image_ids) - set(by_image)` non-empty and 404 every
-    # enqueue; these throwaway rows are what lets a test see it. Do not
-    # simplify them away.
-    for i in range(3):
+    # enqueue; these throwaway rows are what lets a test see it. Burning
+    # len(names) + 1 rather than a hardcoded count keeps the project id space
+    # starting strictly past the largest image id this fixture creates for
+    # any number of names -- adding a third name/image below grows the burn
+    # count with it instead of quietly letting the two id spaces collide
+    # again. Do not simplify these rows away.
+    for i in range(len(names) + 1):
         make_project(session, f"spacer-{i}")
     made = {}
-    for name in ("A", "B"):
+    for name in names:
         project = make_project(session, name)
         patient = make_patient(session, project, f"pat-{name}")
         study = make_study(session, patient, date(2024, 1, 1))
@@ -290,10 +295,18 @@ def test_the_batch_gate_resolves_projects_through_the_shared_helper():
     Structural rather than behavioural because behaviour cannot see it: the
     fork and the shared helper emit identical SQL today, so the ORM-side
     agreement test (test_image_instance_repository.py) passes on either. Only
-    the *shape* of the method distinguishes them, and that is what this reads.
-    Both directions are asserted -- the helper is called, and no query is built
-    locally -- because either alone admits a body that calls the helper and then
-    ignores it.
+    the *shape* of the module distinguishes them, and that is what this reads.
+
+    Stated as what the assertions prove and no more, and all of it name-based
+    (an AST walk sees identifiers, not bindings): the method body contains a
+    call named ``image_project_pairs``; that name is bound module-wide by an
+    ``ImportFrom`` of ``eyened_orm.authz.scoping``, not shadowed by a
+    module-level ``def image_project_pairs`` hand-written in this file; and
+    the body contains no call named ``select``/``select_from``/``join``/
+    ``outerjoin``/``join_from``. It does *not* prove the call's result is
+    used -- a body that calls the shared helper, discards it, and resolves
+    projects through a differently-named local query function passes every
+    assertion here untouched.
     """
     source = (
         pathlib.Path(__file__).resolve().parents[2]
@@ -323,6 +336,22 @@ def test_the_batch_gate_resolves_projects_through_the_shared_helper():
     }
     assert "image_project_pairs" in called, sorted(called)
     assert called & {"select", "select_from", "join", "outerjoin", "join_from"} == set()
+
+    # Name-based, like the two assertions above: binds the call above to the
+    # shared module rather than to any callable that merely happens to be
+    # named `image_project_pairs`.
+    imports_shared_helper = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "eyened_orm.authz.scoping"
+        and any(alias.name == "image_project_pairs" for alias in node.names)
+        for node in ast.walk(tree)
+    )
+    assert imports_shared_helper, "image_project_pairs is not imported from the shared module"
+    assert not any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "image_project_pairs"
+        for node in ast.walk(tree)
+    ), "image_project_pairs is redefined locally in this module"
 
 
 def test_every_rq_entrypoint_returns_a_bare_bool():

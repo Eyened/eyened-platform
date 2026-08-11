@@ -100,9 +100,14 @@ def test_project_ids_for_images_agrees_with_the_shared_resolver(session):
     ``test_the_batch_gate_resolves_projects_through_the_shared_helper``
     (server/tests/test_import_enqueue_gate.py) is what pins the binding.
     """
-    _burn_project_ids(session, 3)
-    first_id = _make_image(session, "pub-batch-1")
-    second_id = _make_image(session, "pub-batch-2")
+    # Burn one project past the number of images this test creates, so the
+    # project id space starts strictly past the largest image id -- see
+    # _burn_project_ids. Derived from image_public_ids rather than hardcoded,
+    # so adding a third image/project here keeps the two id spaces disjoint
+    # instead of quietly landing them on the same number.
+    image_public_ids = ("pub-batch-1", "pub-batch-2")
+    _burn_project_ids(session, len(image_public_ids) + 1)
+    first_id, second_id = (_make_image(session, pid) for pid in image_public_ids)
     repo = ImageInstanceRepository(session, scope=admin_scope())
 
     shared = {
