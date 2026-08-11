@@ -159,3 +159,65 @@ def test_every_route_enqueueing_over_caller_supplied_ids_is_gated():
         if takes_ids and enqueues and "require_grader_on_images" not in body_names:
             ungated.append(node.name)
     assert ungated == []
+
+
+def test_every_rq_entrypoint_returns_a_bare_bool():
+    """`GET /import/status/{task_id}` hands `job.result` to its caller.
+
+    Every entrypoint returns True today, so the response carries no project
+    data. A job that later returns a summary -- processed ids, per-image errors
+    -- would publish it through that route without a single test failing.
+
+    The `-> bool` annotations added alongside this are documentation, not
+    enforcement: mypy is not a CI gate here, so an annotation that lies about a
+    dict return would pass unnoticed. This AST check is what enforces.
+
+    Entrypoints are found by the `run_*` convention rather than derived from
+    the enqueue call sites, which is the weaker of the two and is a deliberate
+    choice: `_queue_rq_job` (import_api.py) takes the function as a parameter,
+    so an AST walk over `.enqueue(...)` resolves the local name `func` for two
+    of the five and would silently cover only three. The floor assertion below
+    is what keeps the convention honest; the rule itself is written into the
+    module docstring of tasks.py, where an author adding a sixth job will read
+    it.
+    """
+    source = pathlib.Path(__file__).resolve().parents[1] / "utils" / "tasks.py"
+    tree = ast.parse(source.read_text(), filename=str(source))
+    entrypoints = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("run_")
+    ]
+    # Anti-vacuity: a discovery that collapses to [] would assert nothing.
+    assert {node.name for node in entrypoints} >= {
+        "run_thumbnail_update_job",
+        "run_thumbnail_update_for_image_ids_job",
+        "run_cfi_model_for_image_ids",
+        "run_cfi_amd_for_image_ids",
+        "run_layer_segmentation_for_image_ids",
+    }
+    # `ast.walk` descends into nested defs, so a future closure returning a
+    # non-bool flags its enclosing entrypoint. That is a false positive, but it
+    # fails closed and prompts a look; narrowing the walk is not worth it. A
+    # function with no `return` at all passes, correctly: `job.result` is then
+    # None, which discloses nothing.
+    leaky = [
+        node.name
+        for node in entrypoints
+        for stmt in ast.walk(node)
+        if isinstance(stmt, ast.Return)
+        and not (
+            isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, bool)
+        )
+    ]
+    assert leaky == []
+
+
+def test_the_status_route_requires_authentication(client_anonymous):
+    """401, from get_current_user's final raise (server/services/current_user.py).
+
+    Uses `client_anonymous` rather than `client`/`client_scoped`: both of those
+    override get_current_user, so neither can ever observe this case.
+    """
+    assert client_anonymous.get("/import/status/any-id").status_code == 401

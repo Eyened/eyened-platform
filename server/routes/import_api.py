@@ -366,7 +366,19 @@ async def post_import_update_thumbnails_for_image_ids(
 
 
 @router.get("/import/status/{task_id}")
-def get_status(task_id: str):
+def get_status(
+    task_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Return a queued job's status and result.
+
+    Authenticated, but not scope-aware, and that is not an oversight: every RQ
+    entrypoint returns a bare bool (pinned by
+    test_every_rq_entrypoint_returns_a_bare_bool), so there is no project data
+    in the response to filter. Job ids are uuid4 and not enumerable here, so
+    this is a capability control -- but a capability that leaks through a log
+    line or a screenshot would otherwise need no credential at all.
+    """
     from ..main import redis_conn
 
     try:

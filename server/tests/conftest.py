@@ -119,6 +119,31 @@ def client_scoped(session, monkeypatch):
 
 
 @pytest.fixture()
+def client_anonymous(session, monkeypatch):
+    """TestClient with NO auth override, for routes that must reject anonymity.
+
+    The DB still has to be bound: get_current_user takes
+    ``session: Session = Depends(get_db)`` and FastAPI resolves that
+    sub-dependency *before* the auth check runs, so a bare TestClient(app_api)
+    would open a real connection against whatever server.db.database points at
+    rather than failing cleanly at the credential.
+    """
+    import server.db as server_db
+    from server.main import app_api
+    from server.routes.auth import get_current_user
+
+    monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
+    # app_api.dependency_overrides is module-level singleton state, and this
+    # fixture asserts an *absence*. A leak from elsewhere would surface as an
+    # inscrutable 200 or 500; say so instead.
+    assert get_current_user not in app_api.dependency_overrides, (
+        "an override leaked from another fixture; anonymity cannot be observed"
+    )
+    with TestClient(app_api) as c:
+        yield c
+
+
+@pytest.fixture()
 def queue_spy(monkeypatch):
     """Record enqueues instead of reaching Redis.
 

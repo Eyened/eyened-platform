@@ -41,19 +41,25 @@ _NO_PROJECT_DATA = {
     "['GET'] /auth/options",
     "['GET'] /auth/oidc/authorize",
     "['POST'] /auth/oidc/authenticate",
+    # Authenticated, resolves no scope; returns a job status and a bool, never
+    # project data. The bool is pinned by
+    # test_every_rq_entrypoint_returns_a_bare_bool, so this claim fails rather
+    # than quietly stops being true if a job starts returning a summary.
+    "['GET'] /import/status/{task_id}",
 }
 
 # Routes that DO serve project data and resolve no scope. Not safe, not
 # blessed -- listed so the guard states the truth rather than passing by
 # silence, and so the next one added is a failure rather than a review finding.
 # Keyed on method+path; see module docstring.
-_UNGATED_PROJECT_DATA = {
-    # Empty since the import routes were gated: the six entries that lived here
-    # each left when their gate was wired. Kept rather than deleted -- it is the
-    # obvious home for the next route that serves project data unscoped, and an
-    # empty list states "none known" where no list at all states nothing.
-    "['GET'] /import/status/{task_id}",  # no authentication at all
-}
+# Empty since Task 18: all seven entries that lived here were import routes,
+# and each left as its gate was wired -- the six enqueue/import routes to a
+# real gate, /import/status/{task_id} to _NO_PROJECT_DATA above, where the
+# payload analysis puts it. Kept rather than deleted: it is the obvious home
+# for the next route that serves project data unscoped, and an empty list
+# states "none known" where no list at all states nothing.
+# `set()`, not `{}` -- the latter is an empty *dict* and breaks the union below.
+_UNGATED_PROJECT_DATA: set[str] = set()
 
 _EXEMPT = _NO_PROJECT_DATA | _UNGATED_PROJECT_DATA
 
