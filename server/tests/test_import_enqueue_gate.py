@@ -28,11 +28,15 @@ from eyened_orm.utils.factories import (
 _GATED = "/import/run_cfi_models"
 
 # FastAPI's default 404 handler answers an unrouted path with "Not Found"
-# (capital F); an authz denial answers with "Not found" (server/services/
-# exceptions.py:71). Asserting the status alone therefore cannot tell a gated
-# route from a route that does not exist -- a typo in _BY_IDS_ROUTES would keep
-# every case below green. Asserting this exact body is what proves the route is
-# live *and* denying.
+# (capital F); an authz denial answers with "Not found" (_AUTHZ_BODY in
+# server/services/exceptions.py). Asserting the status alone therefore cannot
+# tell a gated route from a route that does not exist -- a typo in
+# _BY_IDS_ROUTES would keep every case below green. Asserting this exact body
+# is what proves the route is live *and* denying.
+#
+# That body check degrades silently if a future StarletteHTTPException handler
+# normalizes the route-miss body to the same "Not found" string -- see
+# test_by_ids_routes_are_registered below for the control that catches that.
 _DENIAL_BODY = {"detail": "Not found"}
 
 # The one exception to that, and the reason it is an exception: the set test
@@ -49,6 +53,29 @@ _BY_IDS_ROUTES = [
     "/import/run_layer_segmentation",
     "/import/update_thumbnails_for_image_ids",
 ]
+
+
+def test_by_ids_routes_are_registered():
+    """The route-existence control the body assertion above cannot provide.
+
+    _DENIAL_BODY currently doubles as proof that a 404 came from a live,
+    denying route rather than a route that does not exist -- see the comment
+    on _DENIAL_BODY. That proof depends on the two 404 bodies staying
+    distinguishable; a future StarletteHTTPException handler that normalizes
+    the route-miss body to the same "Not found" string would make them
+    identical, and every parametrized case in
+    test_one_out_of_scope_id_refuses_the_whole_batch would keep passing
+    against a nonexistent path with nothing anywhere failing. This asserts
+    registration directly, so it cannot be invalidated by a body-format
+    change: independent of the response the routes ever produce.
+
+    A standalone test rather than folded into the parametrized one: it is a
+    single fact about the app's route table, not per-route behaviour, and
+    doesn't need `client_scoped`/`two_projects`/a request round-trip to check.
+    """
+    from server.main import app_api
+
+    assert set(_BY_IDS_ROUTES) <= {r.path for r in app_api.routes}
 
 
 @pytest.fixture()
@@ -121,6 +148,30 @@ def test_an_unknown_id_in_the_batch_refuses_the_whole_batch(
     """
     client, set_scope = client_scoped
     set_scope(scope_for(two_projects["A"]["project"], role=ProjectRole.grader))
+    resp = client.post(
+        _GATED,
+        json={"image_ids": [two_projects["A"]["image"], 999999]},
+    )
+    assert resp.status_code == 404
+    assert resp.json() == _DENIAL_BODY
+    assert queue_spy.enqueued == []
+
+
+def test_an_unknown_id_in_the_batch_refuses_an_admin_too(
+    client_scoped, two_projects, queue_spy
+):
+    """require_grader_on_images's unknown-id pre-check runs before scope.require,
+    so it fails the batch for *every* caller -- admin included (see the
+    docstring on image_instance_service.require_grader_on_images). Nothing
+    above exercises the admin path through this method: every other case in
+    this file scopes the client to a project role. Without this test, an
+    ``if self.scope.is_admin: return`` short-circuit added at the top of
+    require_grader_on_images -- the obvious "fix" for the maintenance-workflow
+    complaint the docstring anticipates -- would flip that guarantee and fail
+    nothing here.
+    """
+    client, set_scope = client_scoped
+    set_scope(admin_scope())
     resp = client.post(
         _GATED,
         json={"image_ids": [two_projects["A"]["image"], 999999]},
