@@ -29,9 +29,11 @@ def require_owner(
     intended, and the reason ModelSegmentation (which carries no CreatorID at
     all) is exempt from this overlay entirely rather than passed through it.
 
-    Always 403, never 404: the caller reached this only after the row passed
-    the read scope and the role floor, so it is a visible row with a refused
-    action and there is no enumeration left to protect.
+    Always 403, never 404, and that rests on a precondition every current
+    caller meets: the row passed the read scope and the role floor before
+    reaching here, so it is a visible row with a refused action. A caller
+    fetching unscoped, or with no floor in front of it, would owe a 404
+    instead and must not simply reuse this.
     """
     if owner_id is None or owner_id != scope.actor_id:
         raise PermissionDeniedError(

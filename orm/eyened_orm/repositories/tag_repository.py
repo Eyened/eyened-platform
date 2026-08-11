@@ -13,6 +13,10 @@ class TagRepository:
 
     def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        # Deliberately never read: Tag is application-wide and intentionally
+        # unscoped (it is named in ``SAFE_UNFILTERED_ENTITIES``), so no query
+        # below has a project filter to omit. Kept for uniformity with every
+        # other repository, and because ``get_tag_service`` passes it.
         self._scope = scope
 
     def add(self, tag: Tag) -> None:

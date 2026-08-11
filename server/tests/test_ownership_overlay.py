@@ -202,11 +202,15 @@ def tag_pair(session, owned):
 
     ``Tag`` is deliberately absent from ``PROJECT_IDS_OF`` (see
     ``orm/eyened_orm/authz/scoping.py``) -- a tag carries no project of its
-    own -- so ``update_tag``/``delete_tag`` bind purely on ownership. These
+    own -- so ``delete_tag`` binds purely on ownership, and ``update_tag``
+    binds on nothing at all. These
     tags stay unlinked to any study/image/segmentation/annotation so nothing
     about "which project can see this tag" is in play; ``owned["project"]``
     is used only as *the actor's* membership, to hold a role that must not
     matter.
+
+    That promise is load-bearing for the tests below, so cases that need a
+    tag *with* links use ``linked_tag`` instead of reaching in here.
     """
     from eyened_orm import Tag
     from eyened_orm.tag import TagType
@@ -224,6 +228,39 @@ def tag_pair(session, owned):
     ids = {"own": own.TagID, "foreign": foreign.TagID}
     session.commit()
     return ids
+
+
+@pytest.fixture()
+def linked_tag(session, owned):
+    """One stranger-authored tag that IS applied to ``owned``'s study.
+
+    Deliberately not folded into ``tag_pair``: that fixture promises unlinked
+    tags and other tests rest on the promise. The link is what makes this tag
+    *resolvable* to a project (``StudyTagLink -> Study -> Patient.ProjectID``
+    reaches ``owned["project"]``) and what makes deleting it hit the
+    ``RESTRICT`` on ``StudyTag.TagID`` -- so a ``delete_tag`` that resolved a
+    project set instead of passing the empty one, or that authorized after
+    attempting the delete, would both be visible against it.
+    """
+    from eyened_orm import StudyTagLink, Tag
+    from eyened_orm.tag import TagType
+
+    tag = Tag(
+        TagName="linked-foreign", TagType=TagType.Study, TagDescription="",
+        CreatorID=owned["other"],
+    )
+    session.add(tag)
+    session.flush()
+    session.add(
+        StudyTagLink(
+            StudyID=owned["study"], TagID=tag.TagID, CreatorID=owned["other"]
+        )
+    )
+    session.flush()
+    # Read the id out before the commit: expire_on_commit=True.
+    tag_id = tag.TagID
+    session.commit()
+    return tag_id
 
 
 def _npy_body() -> bytes:
@@ -481,24 +518,31 @@ def test_a_project_admin_can_delete_another_users_segmentation(
     ).status_code == 204
 
 
-# --- TagService: the ownership overlay on a project-less entity -----------
+# --- TagService: delete binds on ownership, update does not ----------------
 #
 # A Tag carries no project of its own (see the ``tag_pair`` fixture): it is
-# deliberately absent from both ``_PARENT_OF`` and ``PROJECT_IDS_OF``, so both
-# checks below pass ``projects=frozenset()``. ``update_tag`` calls
-# ``require_owner`` (403 for anyone but the owner, administrators included).
+# deliberately absent from both ``_PARENT_OF`` and ``PROJECT_IDS_OF``, so the
+# one check here passes ``projects=frozenset()``. The two verbs deliberately
+# differ:
+#
 # ``delete_tag`` calls ``require_owner_or_project_admin`` over that empty set,
-# which Step 3a's fail-closed guard in ``AccessScope.require`` turns into a
-# 404 for every non-owner except an administrator -- the 403/404 asymmetry
-# the task report calls out. The "refused" actors below hold project_admin in
-# ``owned["project"]``, a real membership, so the refusal can only be coming
-# from ownership -- an actor with no role anywhere would prove nothing about
-# the overlay (the same trap the module docstring warns about for visibility).
+# which ``AccessScope.require``'s fail-closed guard turns into a 404 for every
+# non-owner except an administrator.
+#
+# ``update_tag`` has no check at all. A tag *definition* is application-wide
+# data, not an annotation -- applying a tag is the annotation, and those links
+# are guarded above -- so renaming a shared label is unrestricted (§4.3). The
+# two "can update" cases below are the positive pin on that decision: put the
+# ownership overlay back on this path and they fail.
+#
+# The refused actors below hold project_admin in ``owned["project"]``, a real
+# membership, so a refusal can only be coming from ownership -- an actor with
+# no role anywhere would prove nothing (the same trap the module docstring
+# warns about for visibility).
 
 
 def test_the_owner_can_update_their_tag(client_scoped, owned, tag_pair):
-    """No role floor exists on a Tag; only ownership binds -- read_only is
-    enough once the actor is the author."""
+    """No role floor exists on a Tag: read_only is enough to rename one."""
     client, set_scope = client_scoped
     set_scope(
         scope_for(
@@ -510,12 +554,9 @@ def test_the_owner_can_update_their_tag(client_scoped, owned, tag_pair):
     assert resp.json()["name"] == "renamed"
 
 
-def test_a_project_admin_cannot_update_another_users_tag(
-    client_scoped, owned, tag_pair
-):
-    """A non-owner is refused even holding project_admin somewhere -- a Tag
-    has no projects, so the role clause could never be what saves them; only
-    a missing `require_owner` call could let this through."""
+def test_a_project_admin_can_update_another_users_tag(client_scoped, owned, tag_pair):
+    """Renaming a shared label is unrestricted -- a tag definition is
+    application-wide data, so authorship does not bind on this path."""
     client, set_scope = client_scoped
     set_scope(
         scope_for(
@@ -523,18 +564,18 @@ def test_a_project_admin_cannot_update_another_users_tag(
         )
     )
     resp = client.patch(f"/tags/{tag_pair['foreign']}", json={"name": "renamed"})
-    assert resp.status_code == 403
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["name"] == "renamed"
 
 
-def test_an_administrator_cannot_update_another_users_tag(
-    client_scoped, owned, tag_pair
-):
-    """`require_owner` binds administrators too -- the strongest scope there
-    is must still be refused."""
+def test_an_administrator_can_update_another_users_tag(client_scoped, owned, tag_pair):
+    """Bound to ownership instead, a label whose author is deactivated would be
+    un-renameable by everyone -- administrators are not a special case here
+    because there is no check on this path to except them from."""
     client, set_scope = client_scoped
     set_scope(admin_scope(actor_id=owned["actor"]))
     resp = client.patch(f"/tags/{tag_pair['foreign']}", json={"name": "renamed"})
-    assert resp.status_code == 403
+    assert resp.status_code == 200, resp.text
 
 
 def test_the_owner_can_delete_their_tag(client_scoped, owned, tag_pair):
@@ -553,8 +594,8 @@ def test_a_project_admin_cannot_delete_another_users_tag(
     client_scoped, owned, tag_pair
 ):
     """A non-owner is refused even holding project_admin somewhere: the empty
-    project set fails closed for every non-administrator (Step 3a), so this
-    is a 404 -- unlike `update_tag`'s 403 for the identical actor above."""
+    project set fails closed for every non-administrator, so this is a 404 --
+    while the same actor renaming the same tag above succeeds."""
     client, set_scope = client_scoped
     set_scope(
         scope_for(
@@ -566,11 +607,29 @@ def test_a_project_admin_cannot_delete_another_users_tag(
 
 def test_an_administrator_can_delete_another_users_tag(client_scoped, owned, tag_pair):
     """The empty-set guard's `is_admin` arm lets an administrator through
-    without a separate ownership case -- `require_owner` would have refused
-    this the same way it refuses the update above."""
+    without a separate ownership case, so delete has an escape hatch for a
+    label whose author can no longer act. Rename needs none: it has no check."""
     client, set_scope = client_scoped
     set_scope(admin_scope(actor_id=owned["actor"]))
     assert client.delete(f"/tags/{tag_pair['foreign']}").status_code == 204
+
+
+def test_a_project_admin_cannot_delete_a_linked_tag_they_do_not_own(
+    client_scoped, owned, linked_tag
+):
+    """``projects=frozenset()`` is the decision, and the check runs *before* the
+    delete: a non-owner project_admin -- holding that role in the very project
+    this tag's link resolves to -- still gets a bare 404, never the 409 that
+    would tell them the tag exists, is in use, and is called what it is."""
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            owned["project"], role=ProjectRole.project_admin, actor_id=owned["actor"]
+        )
+    )
+    resp = client.delete(f"/tags/{linked_tag}")
+    assert resp.status_code == 404, resp.text
+    assert resp.json() == {"detail": "Not found"}
 
 
 # --- One case per enforcement statement ------------------------------------

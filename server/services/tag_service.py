@@ -3,7 +3,7 @@ from __future__ import annotations
 from eyened_orm import Tag
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.tag_repository import TagRepository
-from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
+from eyened_orm.authz.ownership import require_owner_or_project_admin
 from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +17,21 @@ from .exceptions import ConflictError, NotFoundError
 
 
 class TagService:
-    """Business logic for tags and per-user tag stars."""
+    """Business logic for tags and per-user tag stars.
+
+    A Tag is a global label with no project of its own: it is deliberately
+    absent from ``PROJECT_IDS_OF`` (see ``orm/eyened_orm/authz/scoping.py``).
+    So no role floor resolves for one, and ``delete_tag`` hands the ownership
+    overlay an empty project set; the comment at that call site says what it
+    makes of it.
+
+    ``update_tag`` carries no authorization check at all. A tag *definition*
+    is application-wide data rather than an annotation -- applying a tag is the
+    annotation, and those links are guarded elsewhere -- so renaming a shared
+    label is unrestricted (§4.3). Bound to ownership instead, a label whose
+    author is deactivated would be un-renameable by everyone, administrators
+    included.
+    """
 
     def __init__(
         self,
@@ -78,17 +92,6 @@ class TagService:
         tag = self.repository.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError(f"Tag {tag_id} not found")
-        # A Tag is a global label with no project of its own (deliberately
-        # absent from PROJECT_IDS_OF -- see orm/eyened_orm/authz/scoping.py).
-        # There is no role floor to resolve here; only the ownership overlay
-        # binds, and it binds administrators too.
-        require_owner(
-            self.scope,
-            owner_id=tag.CreatorID,
-            entity="Tag",
-            entity_id=tag_id,
-            projects=frozenset(),
-        )
 
         before = AuditService.snapshot(tag, "TagName", "TagDescription", "TagType")
         if name is not None:
@@ -123,11 +126,9 @@ class TagService:
         tag = self.repository.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError(f"Tag {tag_id} not found")
-        # A Tag is a global label with no project of its own (deliberately
-        # absent from PROJECT_IDS_OF -- see orm/eyened_orm/authz/scoping.py).
-        # There is no role floor to resolve here: the owner deletes, or a
-        # project_admin does across the (empty) project set -- which Step 3a's
-        # fail-closed guard turns into a 404 for everyone else, admins excepted.
+        # The owner deletes, or a project_admin does -- but over an empty set
+        # that second clause is ``AccessScope.require``'s fail-closed guard on
+        # an empty project set, i.e. a 404 for everyone but an administrator.
         require_owner_or_project_admin(
             self.scope,
             owner_id=tag.CreatorID,

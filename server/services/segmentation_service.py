@@ -422,9 +422,10 @@ class SegmentationService:
         # A tag link carries no project of its own, so it is authorized against
         # its *parent* -- the deliberate asymmetry recorded at ``PROJECT_IDS_OF``
         # (``projects_of(session, SegmentationTagLink, ...)`` raises by design).
-        # The floor therefore names the parent, whose projects it is judged on;
-        # the ownership overlay below names the link, whose CreatorID it reads.
-        # ``entity_id=None`` there because a link's primary key is composite.
+        # The floor therefore names the parent, whose projects it is judged on.
+        # It is the only check here: this method discards the client's comment
+        # rather than writing it, so there is no rewrite of an existing link
+        # for the ownership overlay to guard.
         self.scope.require(
             self.repository.project_ids(segmentation_id),
             ProjectRole.grader,
