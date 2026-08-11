@@ -47,7 +47,7 @@ def test_it_agrees_with_the_enforcement_path(session, spanning):
         assert {pid for pid, _ in batched[tid]} == projects_of(session, Task, tid)
 
 
-def test_a_project_the_scope_cannot_see_drops_out_of_the_answer(session, spanning):
+def test_a_task_touching_an_invisible_project_resolves_to_nothing(session, spanning):
     """The scope predicate filters: a project the caller cannot see is absent,
     which is what makes a hidden task report ``[]`` rather than a partial view.
 
