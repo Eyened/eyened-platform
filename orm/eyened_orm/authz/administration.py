@@ -24,9 +24,12 @@ from .roles import ProjectRole
 
 __all__ = [
     "GrantResult",
+    "TaskGrantPlan",
+    "apply_grant_plan",
     "audit_trusted",
     "grant",
     "parse_role",
+    "plan_grant_for_tasks",
     "resolve_creator",
     "resolve_project",
     "revoke",
@@ -147,6 +150,97 @@ def grant(
         role=role,
         changed=True,
     )
+
+
+@dataclass(frozen=True)
+class TaskGrantPlan:
+    """What ``grant-for-task`` would do, resolved but not yet applied.
+
+    Both tuple lists are ``(project_id, project_name, role)`` -- but the role
+    means different things: in ``to_grant`` it is the role that will be
+    written, in ``already_held`` it is the role the user already has (which is
+    at or above the requested one, which is why it is not being written).
+
+    ``username`` is part of the plan, not a separate argument to
+    ``apply_grant_plan``: the diff is only meaningful for the user it was
+    computed against, and applying it to anyone else silently under-grants.
+    """
+
+    username: str
+    task_ids: tuple[int, ...]
+    to_grant: tuple[tuple[int, str, ProjectRole], ...]
+    already_held: tuple[tuple[int, str, ProjectRole], ...]
+
+
+def plan_grant_for_tasks(
+    session: Session, *, username: str, task_ids: list[int], role: ProjectRole
+) -> TaskGrantPlan:
+    """Resolve the projects the tasks touch and diff them against what is held.
+
+    Writes nothing: the administrator reviews and confirms first. Uses
+    ``projects_of``, the same definition enforcement uses -- so the CLI and the
+    API cannot answer "which projects does this task touch" differently.
+
+    An existing role is never lowered: a user who is already project_admin in
+    one of the task's projects keeps it.
+
+    An id with no task is an error, not an empty result: it is otherwise
+    indistinguishable from a task that touches no projects, and the operator
+    reads a typo as a successful no-op.
+    """
+    from .scoping import projects_of  # local: scoping imports the model layer
+    from ..task import Task
+
+    if not task_ids:
+        raise ValueError("'task_ids' must not be empty")
+
+    creator = resolve_creator(session, username)
+    held = ProjectMemberRepository(session).roles_for(creator.CreatorID)
+
+    found = set(
+        session.scalars(select(Task.TaskID).where(Task.TaskID.in_(task_ids))).all()
+    )
+    missing = [t for t in dict.fromkeys(task_ids) if t not in found]
+    if missing:
+        label = "id" if len(missing) == 1 else "ids"
+        raise LookupError(f"no task with {label} {', '.join(map(str, missing))}")
+
+    needed: set[int] = set()
+    for task_id in task_ids:
+        needed |= projects_of(session, Task, task_id)
+
+    names = dict(
+        session.execute(
+            select(Project.ProjectID, Project.ProjectName).where(
+                Project.ProjectID.in_(needed)
+            )
+        ).all()
+    )
+
+    to_grant: list[tuple[int, str, ProjectRole]] = []
+    already_held: list[tuple[int, str, ProjectRole]] = []
+    for project_id in sorted(needed, key=lambda pid: names[pid]):
+        current = held.get(project_id)
+        if current is not None and current >= role:
+            already_held.append((project_id, names[project_id], current))
+        else:
+            to_grant.append((project_id, names[project_id], role))
+    return TaskGrantPlan(
+        username=username,
+        task_ids=tuple(task_ids),
+        to_grant=tuple(to_grant),
+        already_held=tuple(already_held),
+    )
+
+
+def apply_grant_plan(session: Session, *, plan: TaskGrantPlan) -> list[GrantResult]:
+    """Apply a reviewed plan. The result is ordinary project membership --
+    revoked the same way, and carrying the same access to that project's data
+    outside the task."""
+    return [
+        grant(session, username=plan.username, project_name=name, role=role)
+        for _, name, role in plan.to_grant
+    ]
 
 
 def revoke(session: Session, *, username: str, project_name: str) -> bool:

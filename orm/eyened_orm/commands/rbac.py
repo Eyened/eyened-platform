@@ -9,7 +9,14 @@ from __future__ import annotations
 
 import click
 
-from ..authz.administration import audit_trusted, grant, parse_role, revoke
+from ..authz.administration import (
+    apply_grant_plan,
+    audit_trusted,
+    grant,
+    parse_role,
+    plan_grant_for_tasks,
+    revoke,
+)
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.roles import ProjectRole
 from .shared import get_database
@@ -118,4 +125,53 @@ def revoke_cmd(username: str, project_name: str):
     )
 
 
-rbac_commands = [init_admin, grant_cmd, revoke_cmd]
+@click.command("grant-for-task")
+@click.option("--user", "username", required=True)
+@click.option("--task", "task_ids", type=int, multiple=True, required=True)
+@click.option("--role", required=True, help=_ROLE_HELP)
+@click.option("--yes", is_flag=True, default=False, help="Skip the confirmation.")
+def grant_for_task_cmd(
+    username: str, task_ids: tuple[int, ...], role: str, yes: bool
+) -> None:
+    """Grant a user membership in every project the given tasks touch.
+
+    A convenience over granting projects, not a new kind of grant.
+    """
+    parsed = _parse_role_or_fail(role)
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            plan = plan_grant_for_tasks(
+                session, username=username, task_ids=list(task_ids), role=parsed
+            )
+        except LookupError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+        if not plan.to_grant and not plan.already_held:
+            click.echo(
+                f"Task(s) {', '.join(map(str, task_ids))} touch no projects; "
+                "nothing to grant."
+            )
+            return
+
+        for _, name, held in plan.already_held:
+            click.echo(f"  already holds {held.name} in {name}")
+        for _, name, role_to_grant in plan.to_grant:
+            click.echo(f"  GRANT {role_to_grant.name} in {name}")
+        if not plan.to_grant:
+            click.echo("Nothing to grant.")
+            return
+        # Each project hands over every patient, image and task in it,
+        # permanently, until revoked.
+        if not yes:
+            roles = ", ".join(sorted({r.name for _, _, r in plan.to_grant}))
+            click.confirm(
+                f"Grant {username} {roles} in {len(plan.to_grant)} project(s)?",
+                abort=True,
+            )
+        apply_grant_plan(session, plan=plan)
+        session.commit()
+    click.echo(f"{username}: granted in {len(plan.to_grant)} project(s)")
+
+
+rbac_commands = [init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd]

@@ -1,78 +1,8 @@
 """Containment at the repository: a whole task, or none of it."""
 from __future__ import annotations
 
-from datetime import date
-
-import pytest
-
-from eyened_orm import SubTask, Task, TaskDefinition
 from eyened_orm.repositories import SubTaskRepository, TaskRepository
-from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
-from eyened_orm.utils.factories import (
-    admin_scope,
-    make_device,
-    make_image,
-    make_patient,
-    make_project,
-    make_series,
-    make_storage_backend,
-    make_study,
-    scope_for,
-)
-
-
-@pytest.fixture()
-def spanning(session):
-    """Three tasks: one spanning A and B, one empty, one wholly inside A."""
-    backend = make_storage_backend(session)
-    device = make_device(session, "d")
-    projects, images = {}, {}
-    for name in ("A", "B"):
-        project = make_project(session, name)
-        patient = make_patient(session, project, f"pat-{name}")
-        study = make_study(session, patient, date(2024, 1, 1))
-        series = make_series(session, study)
-        image = make_image(session, series, device, backend, f"img-{name}")
-        projects[name] = project.ProjectID
-        images[name] = image.ImageInstanceID
-
-    taskdef = TaskDefinition(TaskDefinitionName="def")
-    session.add(taskdef)
-    session.flush()
-    tasks = {}
-    for label in ("spanning", "empty", "a_only"):
-        task = Task(
-            TaskName=label,
-            TaskDefinitionID=taskdef.TaskDefinitionID,
-            TaskState=TaskState.NotStarted,
-        )
-        session.add(task)
-        session.flush()
-        tasks[label] = task.TaskID
-
-    subtasks = {}
-    for label, names in (("spanning", ("A", "B")), ("a_only", ("A",))):
-        for name in names:
-            subtask = SubTask(TaskID=tasks[label], TaskState=SubTaskState.NotStarted)
-            session.add(subtask)
-            session.flush()
-            session.add(
-                SubTaskImageLink(
-                    SubTaskID=subtask.SubTaskID,
-                    ImageInstanceID=images[name],
-                    ImageIndex=0,
-                )
-            )
-            subtasks[f"{label}-{name}"] = subtask.SubTaskID
-    session.commit()
-    return {
-        "projects": projects,
-        "images": images,
-        "task": tasks["spanning"],
-        "empty": tasks["empty"],
-        "a_only": tasks["a_only"],
-        "subtasks": subtasks,
-    }
+from eyened_orm.utils.factories import admin_scope, scope_for
 
 
 def test_a_member_of_one_project_does_not_see_a_spanning_task(session, spanning):
