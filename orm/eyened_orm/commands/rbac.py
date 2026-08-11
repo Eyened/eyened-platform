@@ -7,35 +7,12 @@ is what the AuditLog model documents that combination for.
 """
 from __future__ import annotations
 
-from typing import Any
-
 import click
-from sqlalchemy.orm import Session
 
-from ..audit_log import AuditLog
+from ..authz.administration import audit_trusted, grant, parse_role, revoke
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
+from ..authz.roles import ProjectRole
 from .shared import get_database
-
-
-def _audit(
-    session: Session,
-    *,
-    command: str,
-    action: str,
-    entity: str,
-    entity_id: object | None = None,
-    changes: dict[str, Any] | None = None,
-) -> None:
-    session.add(
-        AuditLog(
-            TrustedPath=f"eorm {command}",
-            Action=action,
-            Entity=entity,
-            EntityID=None if entity_id is None else str(entity_id),
-            Changes=changes,
-        )
-    )
-    session.flush()
 
 
 @click.command("init-admin")
@@ -73,7 +50,7 @@ def init_admin(username: str, password: str) -> None:
             case _:
                 raise ValueError(f"unhandled BootstrapOutcome: {outcome!r}")
         if action is not None:
-            _audit(
+            audit_trusted(
                 session,
                 command="init-admin",
                 action=action,
@@ -89,4 +66,56 @@ def init_admin(username: str, password: str) -> None:
     click.echo(f"{username}: {outcome.value}")
 
 
-rbac_commands = [init_admin]
+_ROLE_HELP = "One of: read_only, grader, project_admin."
+
+
+def _parse_role_or_fail(value: str) -> ProjectRole:
+    try:
+        return parse_role(value)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from exc
+
+
+@click.command("grant")
+@click.option("--user", "username", required=True)
+@click.option("--project", "project_name", required=True)
+@click.option("--role", required=True, help=_ROLE_HELP)
+def grant_cmd(username: str, project_name: str, role: str):
+    """Grant a user a role in a project (idempotent)."""
+    parsed = _parse_role_or_fail(role)
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            result = grant(
+                session, username=username, project_name=project_name, role=parsed
+            )
+        except LookupError as exc:
+            raise click.ClickException(str(exc)) from exc
+        session.commit()
+    if result.changed:
+        was = "" if result.previous is None else f" (was {result.previous.name})"
+        click.echo(f"{username}: {parsed.name} in {project_name}{was}")
+    else:
+        click.echo(f"{username}: already {parsed.name} in {project_name}; no change")
+
+
+@click.command("revoke")
+@click.option("--user", "username", required=True)
+@click.option("--project", "project_name", required=True)
+def revoke_cmd(username: str, project_name: str):
+    """Remove a user's membership in a project."""
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            removed = revoke(session, username=username, project_name=project_name)
+        except LookupError as exc:
+            raise click.ClickException(str(exc)) from exc
+        session.commit()
+    click.echo(
+        f"{username}: revoked from {project_name}"
+        if removed
+        else f"{username}: no membership in {project_name}; nothing to do"
+    )
+
+
+rbac_commands = [init_admin, grant_cmd, revoke_cmd]
