@@ -200,10 +200,11 @@ def test_the_round_trip_persists_and_reports_each_outcome(session, stub_database
     assert alice.Inactive is False
 
 
-def test_an_unknown_user_is_a_clean_error_not_a_traceback(session, stub_database):
+@pytest.mark.parametrize("command", (deactivate_cmd, reactivate_cmd))
+def test_an_unknown_user_is_a_clean_error_not_a_traceback(session, stub_database, command):
     """ClickException exits 1 with its message on the stream; an unhandled
     LookupError exits 1 too, so the message is what separates them."""
-    result = CliRunner().invoke(deactivate_cmd, ["--user", "nosuchuser"])
+    result = CliRunner().invoke(command, ["--user", "nosuchuser"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
     assert "Traceback" not in result.output
