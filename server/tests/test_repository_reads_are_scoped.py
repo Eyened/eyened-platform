@@ -66,6 +66,8 @@ _UNSCOPED_METHODS = {
     "StudyRepository.project_ids": "resolves the projects a write is judged on",
     "ImageInstanceRepository.project_ids": "resolves the projects a write is "
     "judged on",
+    "ImageInstanceRepository.project_ids_for_images": "resolves the projects a "
+    "batch of enqueue ids is judged on",
     "FormAnnotationRepository.project_ids_of_patient": "resolves the project a "
     "form annotation would be created into; the create floor has no row of its "
     "own to resolve yet",

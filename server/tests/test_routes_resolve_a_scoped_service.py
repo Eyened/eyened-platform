@@ -48,14 +48,10 @@ _NO_PROJECT_DATA = {
 # silence, and so the next one added is a failure rather than a review finding.
 # Keyed on method+path; see module docstring.
 _UNGATED_PROJECT_DATA = {
-    # Import: authenticated only. Gating these is a separate, planned task;
-    # each entry leaves this list when that task wires the gate.
-    "['POST'] /import/image",
-    "['POST'] /import/run_cfi_amd",
-    "['POST'] /import/run_cfi_models",
-    "['POST'] /import/run_layer_segmentation",
-    "['POST'] /import/update_thumbnails",
-    "['POST'] /import/update_thumbnails_for_image_ids",
+    # Empty since the import routes were gated: the six entries that lived here
+    # each left when their gate was wired. Kept rather than deleted -- it is the
+    # obvious home for the next route that serves project data unscoped, and an
+    # empty list states "none known" where no list at all states nothing.
     "['GET'] /import/status/{task_id}",  # no authentication at all
 }
 

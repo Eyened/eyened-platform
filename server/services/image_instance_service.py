@@ -7,6 +7,7 @@ from eyened_orm import ImageInstance, ImageInstanceTagLink
 from eyened_orm.repositories.image_instance_repository import ImageInstanceRepository
 from eyened_orm.repositories.tag_repository import TagRepository
 from eyened_orm.tag import TagType
+from eyened_orm.authz.errors import NotVisibleError
 from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
@@ -91,6 +92,35 @@ class ImageInstanceService:
         if item is None:
             raise NotFoundError("ImageInstance not found")
         return item
+
+    def require_grader_on_images(self, image_instance_ids: list[int]) -> None:
+        """Require ``grader`` in the project of every supplied image id.
+
+        The RQ worker that executes the job is a trusted non-API path with no
+        AccessScope, so it writes wherever it is told: **the enqueue call is
+        the boundary**. An unchecked enqueue launders a request the caller
+        could not make directly.
+
+        One out-of-scope id fails the whole request. Partial success would let
+        a caller probe which ids exist -- the 404 policy applied to a batch.
+        """
+        by_image = self.repository.project_ids_for_images(image_instance_ids)
+        if set(image_instance_ids) - set(by_image):
+            # An id that resolves to no image is reported the same way as one
+            # the caller cannot see -- otherwise the two answers together are
+            # an existence oracle.
+            raise NotVisibleError(
+                actor_id=self.scope.actor_id,
+                entity="ImageInstance",
+                entity_id=None,
+                projects=frozenset(),
+            )
+        self.scope.require(
+            set(by_image.values()),
+            ProjectRole.grader,
+            entity="ImageInstance",
+            entity_id=None,
+        )
 
     def tag_instance(
         self,

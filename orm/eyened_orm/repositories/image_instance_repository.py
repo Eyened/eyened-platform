@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -101,6 +102,29 @@ class ImageInstanceRepository:
         floor pass.
         """
         return projects_of(self._session, ImageInstance, image_instance_id)
+
+    def project_ids_for_images(
+        self, image_instance_ids: list[int]
+    ) -> dict[int, int]:
+        """Return {image_instance_id: project_id} for the given ids, in one query.
+
+        Ids that resolve to no image are simply absent, so the caller can tell
+        "unknown" from "known" and answer both the same way.
+
+        Unscoped by design: this is project *resolution*, and the returned
+        projects are the input to the caller's check. Filtering it by the scope
+        would make every check trivially pass. Listed in the read-coverage
+        guard's exemptions.
+        """
+        rows = self._session.execute(
+            select(ImageInstance.ImageInstanceID, Patient.ProjectID)
+            .select_from(ImageInstance)
+            .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+            .join(Study, Study.StudyID == Series.StudyID)
+            .join(Patient, Patient.PatientID == Study.PatientID)
+            .where(ImageInstance.ImageInstanceID.in_(image_instance_ids))
+        ).all()
+        return {int(image_id): int(project_id) for image_id, project_id in rows}
 
     def get_full_graph_by_id(
         self,

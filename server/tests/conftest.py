@@ -21,6 +21,8 @@ def pytest_configure(config):
 
 import pytest
 from contextlib import contextmanager
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
 
@@ -114,6 +116,40 @@ def client_scoped(session, monkeypatch):
 
     app_api.dependency_overrides.pop(get_current_user, None)
     app_api.dependency_overrides.pop(get_access_scope, None)
+
+
+@pytest.fixture()
+def queue_spy(monkeypatch):
+    """Record enqueues instead of reaching Redis.
+
+    First queue stub in the suite -- nothing in server/tests touched RQ before
+    Task 18. Both handlers' imports are function-local (`from ..main import
+    queue` / `get_rq_queue`), so patching the module attributes is enough.
+    One object serves as both: `get_rq_queue(name)` returns itself.
+
+    Without it a *regressed* gate would reach Redis, the ConnectionError would
+    be swallowed by each route's `except Exception` into a 200 with
+    success=False, and the failure would read as a queue problem. So
+    `queue_spy.enqueued == []` is what makes every negative case mean
+    something; a bare status assertion is not enough.
+    """
+    import server.main as server_main
+
+    class _Spy:
+        def __init__(self) -> None:
+            self.enqueued: list[tuple] = []
+
+        def __call__(self, name):  # stands in for get_rq_queue(name)
+            return self
+
+        def enqueue(self, func, *args, **kwargs):
+            self.enqueued.append((getattr(func, "__name__", func), args, kwargs))
+            return SimpleNamespace(id=kwargs.get("job_id"))
+
+    spy = _Spy()
+    monkeypatch.setattr(server_main, "queue", spy)
+    monkeypatch.setattr(server_main, "get_rq_queue", spy)
+    return spy
 
 
 @pytest.fixture()
