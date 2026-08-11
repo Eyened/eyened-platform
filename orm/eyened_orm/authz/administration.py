@@ -11,6 +11,7 @@ combination the AuditLog model documents for exactly this.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -173,7 +174,7 @@ class TaskGrantPlan:
 
 
 def plan_grant_for_tasks(
-    session: Session, *, username: str, task_ids: list[int], role: ProjectRole
+    session: Session, *, username: str, task_ids: Sequence[int], role: ProjectRole
 ) -> TaskGrantPlan:
     """Resolve the projects the tasks touch and diff them against what is held.
 

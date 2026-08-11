@@ -8,9 +8,16 @@ unrelated failure, so it would pass whether or not the parse ran.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+
+import pytest
 from click.testing import CliRunner
 
-from eyened_orm.commands.rbac import grant_cmd
+from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.commands import rbac as rbac_module
+from eyened_orm.commands.rbac import grant_cmd, grant_for_task_cmd
+from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
+from eyened_orm.utils.factories import make_creator
 
 
 def test_an_unknown_role_fails_at_the_boundary_naming_the_valid_ones():
@@ -20,17 +27,6 @@ def test_an_unknown_role_fails_at_the_boundary_naming_the_valid_ones():
     assert result.exit_code == 2
     for name in ("read_only", "grader", "project_admin"):
         assert name in result.output
-
-
-from contextlib import contextmanager
-
-import pytest
-
-from eyened_orm.authz.roles import ProjectRole
-from eyened_orm.commands import rbac as rbac_module
-from eyened_orm.commands.rbac import grant_for_task_cmd
-from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
-from eyened_orm.utils.factories import make_creator
 
 
 @pytest.fixture()
@@ -67,6 +63,12 @@ def test_declining_the_confirmation_aborts_and_grants_nothing(
         input="n\n",
     )
     assert result.exit_code == 1
+    # click 8.4.2 catches click.Abort inside main()'s standalone mode and
+    # re-raises as SystemExit(1), so result.exception is never click.Abort --
+    # only the "Aborted!" text (printed exactly on that path) proves the
+    # prompt itself was reached, rather than some earlier, unrelated failure
+    # that also happens to exit 1 and grant nothing.
+    assert "Aborted!" in result.output
     assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
 
 

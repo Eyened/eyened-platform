@@ -142,7 +142,7 @@ def grant_for_task_cmd(
     with database.get_session() as session:
         try:
             plan = plan_grant_for_tasks(
-                session, username=username, task_ids=list(task_ids), role=parsed
+                session, username=username, task_ids=task_ids, role=parsed
             )
         except LookupError as exc:
             raise click.ClickException(str(exc)) from exc
