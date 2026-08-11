@@ -29,6 +29,7 @@ __all__ = [
     "apply_grant_plan",
     "audit_trusted",
     "grant",
+    "grant_all",
     "parse_role",
     "plan_grant_for_tasks",
     "resolve_creator",
@@ -242,6 +243,63 @@ def apply_grant_plan(session: Session, *, plan: TaskGrantPlan) -> list[GrantResu
         grant(session, username=plan.username, project_name=name, role=role)
         for _, name, role in plan.to_grant
     ]
+
+
+def grant_all(
+    session: Session, *, role: ProjectRole = ProjectRole.grader
+) -> tuple[int, int, int]:
+    """Grant ``role`` in every project to every creator that can authenticate.
+
+    Cutover step 3, and nothing else. `grader` rather than `project_admin`
+    because the two are identical in security terms on day one -- everyone
+    holds every project either way -- but they converge differently: pruning
+    means removing projects from people, not adjusting roles, so
+    `project_admin` everywhere would leave over-privileged survivors and a
+    second cleanup pass that is easy to forget.
+
+    Writes one summary AuditLog row rather than one per membership: the
+    per-row detail is the ProjectMember table itself, and 3,256 audit rows for
+    a single operator action is noise, not attribution.
+
+    ``PasswordHash.is_not(None)`` rather than a password-validity check on
+    purpose. ``disable_password`` writes ``'!'``, a valid hash that verifies
+    nothing, and OIDC-provisioned accounts get exactly that (auth.py's
+    create_user call passes password=None). They can authenticate -- just not
+    by password -- so they belong in the cutover grant. Only rows with no
+    PasswordHash at all (AI models, attribution-only creators) are skipped.
+    """
+    creators = session.scalars(
+        select(Creator).where(
+            Creator.IsHuman.is_(True),
+            Creator.Inactive.is_(False),
+            Creator.PasswordHash.is_not(None),
+        )
+    ).all()
+    project_ids = list(session.scalars(select(Project.ProjectID)).all())
+    repository = ProjectMemberRepository(session)
+
+    written = 0
+    for creator in creators:
+        held = repository.roles_for(creator.CreatorID)
+        for project_id in project_ids:
+            if held.get(project_id) is not None:
+                continue
+            repository.upsert(creator.CreatorID, project_id, role)
+            written += 1
+
+    audit_trusted(
+        session,
+        command="grant-all",
+        action="INSERT",
+        entity="ProjectMember",
+        changes={
+            "role": role.name,
+            "creators": len(creators),
+            "projects": len(project_ids),
+            "memberships_written": written,
+        },
+    )
+    return len(creators), len(project_ids), written
 
 
 def revoke(session: Session, *, username: str, project_name: str) -> bool:

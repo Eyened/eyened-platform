@@ -5,6 +5,10 @@ a real Database(). The accept path is not retested here: parse_role's happy
 path is pinned there, and a CLI-level version of it could only assert that an
 error string is *absent* from the output -- which is equally true of any
 unrelated failure, so it would pass whether or not the parse ran.
+
+`grant_all`'s confirmation prompt is tested here too, for the same reason:
+`click.confirm(abort=True)` has no function-level equivalent, so only the CLI
+shell can prove it actually gates the write.
 """
 from __future__ import annotations
 
@@ -13,11 +17,13 @@ from contextlib import contextmanager
 import pytest
 from click.testing import CliRunner
 
+from eyened_orm import ProjectMember
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.commands import rbac as rbac_module
-from eyened_orm.commands.rbac import grant_cmd, grant_for_task_cmd
+from eyened_orm.commands.rbac import grant_all_cmd, grant_cmd, grant_for_task_cmd
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
-from eyened_orm.utils.factories import make_creator
+from eyened_orm.utils.db_users import create_user
+from eyened_orm.utils.factories import make_creator, make_project
 
 
 def test_an_unknown_role_fails_at_the_boundary_naming_the_valid_ones():
@@ -102,3 +108,51 @@ def test_yes_skips_the_prompt(session, stub_database, spanning, alice):
         spanning["projects"]["A"]: ProjectRole.grader,
         spanning["projects"]["B"]: ProjectRole.grader,
     }
+
+
+def test_grant_all_is_registered_on_the_eorm_group():
+    """A command that is defined but never appended to rbac_commands is
+    invisible to `eorm`, and every test that invokes it directly still passes."""
+    from eyened_orm.cli import eorm
+
+    assert "grant-all" in eorm.commands
+
+
+def _memberships(session):
+    return session.query(ProjectMember).count()
+
+
+def _seed_grant_all(session):
+    """A creator with a real password hash -- unlike the `alice` fixture above,
+    whose `make_creator` leaves PasswordHash NULL, which `grant_all` would skip."""
+    create_user(session, "alice", "pw")
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+
+def test_yes_skips_the_confirmation_and_grants(session, stub_database):
+    _seed_grant_all(session)
+
+    result = CliRunner().invoke(grant_all_cmd, ["--yes"])
+    assert result.exit_code == 0, result.output
+    assert _memberships(session) == 2
+
+
+def test_declining_the_confirmation_writes_nothing(session, stub_database):
+    """The confirmation is the only thing standing between a typo and 3,256
+    memberships. Without this test it can be deleted and the suite stays green."""
+    _seed_grant_all(session)
+
+    result = CliRunner().invoke(grant_all_cmd, input="n\n")
+    assert result.exit_code == 1
+    assert _memberships(session) == 0
+
+
+def test_confirming_at_the_prompt_grants(session, stub_database):
+    """Positive control: the decline test above must fail for the right reason."""
+    _seed_grant_all(session)
+
+    result = CliRunner().invoke(grant_all_cmd, input="y\n")
+    assert result.exit_code == 0, result.output
+    assert _memberships(session) == 2

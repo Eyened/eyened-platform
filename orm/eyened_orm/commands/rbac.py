@@ -13,6 +13,7 @@ from ..authz.administration import (
     apply_grant_plan,
     audit_trusted,
     grant,
+    grant_all,
     parse_role,
     plan_grant_for_tasks,
     revoke,
@@ -174,4 +175,28 @@ def grant_for_task_cmd(
     click.echo(f"{username}: granted in {len(plan.to_grant)} project(s)")
 
 
-rbac_commands = [init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd]
+@click.command("grant-all")
+@click.option("--yes", is_flag=True, default=False, help="Skip the confirmation.")
+def grant_all_cmd(yes: bool):
+    """Cutover step 3: grant grader in every project to every real user."""
+    database = get_database()
+    with database.get_session() as session:
+        if not yes:
+            click.confirm(
+                "Grant grader in EVERY project to every creator that can "
+                "authenticate? RBAC then permits everything until pruning.",
+                abort=True,
+            )
+        creators, projects, written = grant_all(session)
+        session.commit()
+    click.echo(
+        f"{written} membership(s) written for {creators} creator(s) "
+        f"across {projects} project(s)."
+    )
+    click.echo(
+        "RBAC is now installed and enforcing a policy that permits everything. "
+        "The first revocation is the first real security improvement."
+    )
+
+
+rbac_commands = [init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd, grant_all_cmd]

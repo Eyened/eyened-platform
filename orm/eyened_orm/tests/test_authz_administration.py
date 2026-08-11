@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from eyened_orm import AuditLog
+from eyened_orm import AuditLog, Project
 from eyened_orm.authz.administration import grant, parse_role, revoke
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
@@ -269,3 +269,159 @@ def test_applying_a_plan_audits_every_grant(session, spanning):
     ).all()
     assert {r.Changes["project_name"] for r in rows} == {"A", "B"}
     assert {(r.ActorID, r.TrustedPath) for r in rows} == {(None, "eorm grant")}
+
+
+def test_grant_all_skips_creators_that_cannot_authenticate(session):
+    """AI models and attribution-only rows would get memberships that can never
+    be used, inflating the list somebody later has to prune."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    human = create_user(session, "alice", "pw")
+    model = make_creator(session, "cfi-quality-v3", is_human=False)
+    attribution_only = make_creator(session, "Consensus")
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    creators, projects, written = grant_all(session)
+    session.commit()
+
+    assert (creators, projects, written) == (1, 2, 2)
+    repo = ProjectMemberRepository(session)
+    assert len(repo.roles_for(human.CreatorID)) == 2
+    assert repo.roles_for(model.CreatorID) == {}
+    assert repo.roles_for(attribution_only.CreatorID) == {}
+
+
+def test_grant_all_writes_one_summary_audit_row(session):
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.utils.db_users import create_user
+
+    create_user(session, "alice", "pw")
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    grant_all(session)
+    session.commit()
+
+    rows = session.scalars(
+        select(AuditLog).where(AuditLog.TrustedPath == "eorm grant-all")
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].Action == "INSERT"
+    assert rows[0].Entity == "ProjectMember"
+    assert rows[0].EntityID is None
+    assert rows[0].Changes == {
+        "role": "grader",
+        "creators": 1,
+        "projects": 2,
+        "memberships_written": 2,
+    }
+
+
+def test_grant_all_is_idempotent(session):
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.utils.db_users import create_user
+
+    create_user(session, "alice", "pw")
+    make_project(session, "A")
+    session.commit()
+
+    grant_all(session)
+    session.commit()
+    _, _, written = grant_all(session)
+    assert written == 0
+
+
+def test_grant_all_skips_a_model_that_has_a_password_hash(session):
+    """The plan's own test cannot see the IsHuman filter: its model has a NULL
+    PasswordHash too, so the password filter alone still passes it."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    model = create_user(session, "cfi-quality-v3", "pw", is_human=False)
+    make_project(session, "A")
+    session.commit()
+
+    creators, _, written = grant_all(session)
+    session.commit()
+
+    assert (creators, written) == (0, 0)
+    assert ProjectMemberRepository(session).roles_for(model.CreatorID) == {}
+
+
+def test_grant_all_skips_a_deactivated_creator(session):
+    """Otherwise the cutover re-grants everyone an administrator deactivated."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    bob = create_user(session, "bob", "pw")
+    bob.Inactive = True
+    make_project(session, "A")
+    session.commit()
+
+    creators, _, written = grant_all(session)
+    session.commit()
+
+    assert (creators, written) == (0, 0)
+    assert ProjectMemberRepository(session).roles_for(bob.CreatorID) == {}
+
+
+def test_grant_all_honours_the_role_it_is_given(session):
+    """`role` is a parameter, not decoration: nothing else pins it."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    alice = create_user(session, "alice", "pw")
+    make_project(session, "A")
+    session.commit()
+
+    grant_all(session, role=ProjectRole.project_admin)
+    session.commit()
+
+    roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
+    assert set(roles.values()) == {ProjectRole.project_admin}
+
+
+def test_grant_all_never_changes_a_role_already_held(session):
+    """A cutover re-run must not quietly lower a project_admin to grader --
+    and `written == 0` is not evidence of that: a mutation that re-upserts
+    without counting reports 0 while rewriting every role it touches."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    alice = create_user(session, "alice", "pw")
+    for name in ("A", "B", "C"):
+        make_project(session, name)
+    session.commit()
+    grant(session, username="alice", project_name="A", role=ProjectRole.project_admin)
+    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    session.commit()
+
+    _, _, written = grant_all(session)
+    session.commit()
+
+    roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
+    names = dict(session.execute(select(Project.ProjectID, Project.ProjectName)).all())
+    by_name = {names[pid]: role for pid, role in roles.items()}
+    assert by_name["A"] is ProjectRole.project_admin   # not lowered
+    assert by_name["B"] is ProjectRole.read_only       # not raised either
+    assert by_name["C"] is ProjectRole.grader
+    assert written == 1
