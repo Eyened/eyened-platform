@@ -548,12 +548,6 @@ class ModelSegmentationService:
         item = self.repository.get_by_id(model_segmentation_id)
         if item is None:
             raise NotFoundError("ModelSegmentation data not found")
-        self.scope.require(
-            self.repository.project_ids(model_segmentation_id),
-            ProjectRole.read_only,
-            entity="ModelSegmentation",
-            entity_id=model_segmentation_id,
-        )
         try:
             return self.store.read(item, axis=axis, slice_index=scan_nr)
         except ValueError as e:

@@ -10,25 +10,43 @@ scope plus ``grader`` and **nothing else**, and because the row cannot carry its
 author, the audit trail has to.
 
 The three route cases below are the three answers that gate can give -- 200,
-403, 404 -- and the fourth test pins the compensation. All four take
-``fake_store`` so a gate that regresses into actually running the write hits an
-in-memory fake rather than the filesystem; only the 200 case reaches it.
+403, 404 -- and the fourth test pins the compensation. The three route cases
+take ``fake_store`` so a gate that regresses into actually running the write
+hits an in-memory fake rather than the filesystem; only the 200 case reaches
+it. The service-level audit case builds its own ``FakeSegmentationDataStore``
+inline instead, since it never goes through the route or the factory.
 """
 from __future__ import annotations
 
 import io
+from datetime import date
 
 import numpy as np
 import pytest
 from sqlalchemy import select
 
-from eyened_orm import AuditLog
+from eyened_orm import AuditLog, ModelSegmentation
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.repositories.segmentation_repository import (
     ModelSegmentationRepository,
 )
-from eyened_orm.utils.factories import scope_for
+from eyened_orm.segmentation import (
+    DataRepresentation,
+    Datatype,
+    SegmentationModel,
+)
+from eyened_orm.utils.factories import (
+    make_device,
+    make_image,
+    make_patient,
+    make_project,
+    make_series,
+    make_storage_backend,
+    make_study,
+    scope_for,
+)
 
+import server.services.segmentation_service as segmentation_service
 from server.services.audit_service import AuditService
 from server.services.segmentation_service import ModelSegmentationService
 from server.tests.test_segmentation_service import FakeSegmentationDataStore
@@ -58,8 +76,6 @@ def fake_store(monkeypatch):
     instead would take its ``audit=`` wiring out from under test, which is
     precisely what these route-level cases exist to cover.
     """
-    import server.services.segmentation_service as segmentation_service
-
     store = FakeSegmentationDataStore()
     monkeypatch.setattr(
         segmentation_service, "get_segmentation_data_store", lambda: store
@@ -81,24 +97,6 @@ def model_segmentation(session):
     *real* membership somewhere. An actor with no roles at all would 404 on
     every request in the suite and would prove nothing about this row.
     """
-    from datetime import date
-
-    from eyened_orm import ModelSegmentation
-    from eyened_orm.segmentation import (
-        DataRepresentation,
-        Datatype,
-        SegmentationModel,
-    )
-    from eyened_orm.utils.factories import (
-        make_device,
-        make_image,
-        make_patient,
-        make_project,
-        make_series,
-        make_storage_backend,
-        make_study,
-    )
-
     backend = make_storage_backend(session)
     device = make_device(session, "d")
     project_a = make_project(session, "A")
@@ -181,7 +179,11 @@ def test_a_read_only_member_cannot_correct_model_output(
 
 
 def test_a_non_member_gets_a_404(client_scoped, model_segmentation, fake_store):
-    """Missing the row's project answers before the floor does."""
+    """The Task 11 read scope still answers first: a non-member 404s on
+    ``get_by_id`` before the ``grader`` floor is ever reached, so the new gate
+    does not turn that 404 into a 403. This pins the status code, not this
+    task's gate -- it already passed before Task 17 and survives deleting the
+    gate outright."""
     client, set_scope = client_scoped
     set_scope(
         scope_for(
