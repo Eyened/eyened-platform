@@ -137,6 +137,12 @@ def test_yes_skips_the_confirmation_and_grants(session, stub_database):
     result = CliRunner().invoke(grant_all_cmd, ["--yes"])
     assert result.exit_code == 0, result.output
     assert _memberships(session) == 2
+    # Pins the counts *and their order*: this seed has 1 creator and 2
+    # projects, so swapping the {creators}/{projects} interpolations in
+    # grant_all_cmd's echo would misreport "2 creator(s) across 1
+    # project(s)" instead of "1 creator(s) across 2 project(s)" -- a change
+    # the exit-code and _memberships() assertions above would not catch.
+    assert "2 membership(s) written for 1 creator(s) across 2 project(s)." in result.output
 
 
 def test_declining_the_confirmation_writes_nothing(session, stub_database):
@@ -146,6 +152,11 @@ def test_declining_the_confirmation_writes_nothing(session, stub_database):
 
     result = CliRunner().invoke(grant_all_cmd, input="n\n")
     assert result.exit_code == 1
+    # As in test_declining_the_confirmation_aborts_and_grants_nothing above:
+    # exit_code == 1 and zero memberships are also satisfied by any
+    # pre-prompt failure, so "Aborted!" is what proves the prompt itself was
+    # reached rather than some unrelated early exit.
+    assert "Aborted!" in result.output
     assert _memberships(session) == 0
 
 
