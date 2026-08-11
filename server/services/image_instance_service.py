@@ -103,6 +103,12 @@ class ImageInstanceService:
 
         One out-of-scope id fails the whole request. Partial success would let
         a caller probe which ids exist -- the 404 policy applied to a batch.
+
+        An id that resolves to no image fails the batch for *every* caller,
+        admin included: re-running a saved id list one of whose images has since
+        been deleted is now a 404 for the whole batch rather than an enqueue
+        over the survivors, which is a deliberate fail-closed change to the
+        maintenance workflow.
         """
         by_image = self.repository.project_ids_for_images(image_instance_ids)
         if set(image_instance_ids) - set(by_image):

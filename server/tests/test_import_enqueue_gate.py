@@ -27,6 +27,14 @@ from eyened_orm.utils.factories import (
 # would run the same helper twelve times and still not catch a fifth route.
 _GATED = "/import/run_cfi_models"
 
+# FastAPI's default 404 handler answers an unrouted path with "Not Found"
+# (capital F); an authz denial answers with "Not found" (server/services/
+# exceptions.py:71). Asserting the status alone therefore cannot tell a gated
+# route from a route that does not exist -- a typo in _BY_IDS_ROUTES would keep
+# every case below green. Asserting this exact body is what proves the route is
+# live *and* denying.
+_DENIAL_BODY = {"detail": "Not found"}
+
 # The one exception to that, and the reason it is an exception: the set test
 # cannot see gate *ordering* -- a gate moved inside a route's `try:` still has
 # the name `require_grader_on_images` in its body, so the AST check stays
@@ -92,6 +100,33 @@ def test_one_out_of_scope_id_refuses_the_whole_batch(
         json={"image_ids": [two_projects["A"]["image"], two_projects["B"]["image"]]},
     )
     assert resp.status_code == 404
+    # Body, not just status: see _DENIAL_BODY. Without this, three of these
+    # four cases pass against a route that does not exist.
+    assert resp.json() == _DENIAL_BODY
+    assert queue_spy.enqueued == []
+
+
+def test_an_unknown_id_in_the_batch_refuses_the_whole_batch(
+    client_scoped, two_projects, queue_spy
+):
+    """The mixed batch is the point: one visible id, one id that resolves to no image.
+
+    A batch where every id resolves cannot reach the unknown-id branch at all --
+    `scope.require` produces the 404 on its own from the resolved project set,
+    so the test above (two real images, one out of scope) leaves that branch
+    dead. Only a batch that is *partly* resolvable exercises it, and without it
+    a grader posting [visible_id, 999999] would get a 200 while
+    [visible_id, other_project_id] gets a 404 -- an existence oracle for ids the
+    actor cannot see.
+    """
+    client, set_scope = client_scoped
+    set_scope(scope_for(two_projects["A"]["project"], role=ProjectRole.grader))
+    resp = client.post(
+        _GATED,
+        json={"image_ids": [two_projects["A"]["image"], 999999]},
+    )
+    assert resp.status_code == 404
+    assert resp.json() == _DENIAL_BODY
     assert queue_spy.enqueued == []
 
 
@@ -144,6 +179,7 @@ def test_every_route_enqueueing_over_caller_supplied_ids_is_gated():
     """
     source = pathlib.Path(__file__).resolve().parents[1] / "routes" / "import_api.py"
     tree = ast.parse(source.read_text(), filename=str(source))
+    discovered: list[str] = []
     ungated: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -156,8 +192,23 @@ def test_every_route_enqueueing_over_caller_supplied_ids_is_gated():
             for n in ast.walk(node)
         )
         enqueues = "enqueue" in body_names or "_queue_rq_job" in body_names
-        if takes_ids and enqueues and "require_grader_on_images" not in body_names:
+        if not (takes_ids and enqueues):
+            continue
+        discovered.append(node.name)
+        if "require_grader_on_images" not in body_names:
             ungated.append(node.name)
+    # Anti-vacuity, in the same style as test_every_rq_entrypoint_returns_a_bare_bool
+    # below: `ungated == []` also passes when discovery finds nothing at all, and
+    # import_api.py is slated for deprecation -- an enqueue route moved to a new
+    # module would leave this hardcoded path empty and the suite green. A name-set
+    # floor rather than a count: the four names are stable, and a rename that
+    # relocates a gate is itself worth a failure.
+    assert set(discovered) >= {
+        "enqueue_run_cfi_models",
+        "enqueue_run_cfi_amd",
+        "enqueue_run_layer_segmentation",
+        "post_import_update_thumbnails_for_image_ids",
+    }
     assert ungated == []
 
 
@@ -199,9 +250,15 @@ def test_every_rq_entrypoint_returns_a_bare_bool():
     }
     # `ast.walk` descends into nested defs, so a future closure returning a
     # non-bool flags its enclosing entrypoint. That is a false positive, but it
-    # fails closed and prompts a look; narrowing the walk is not worth it. A
-    # function with no `return` at all passes, correctly: `job.result` is then
-    # None, which discloses nothing.
+    # fails closed and prompts a look; narrowing the walk is not worth it.
+    # A function with no `return` *statement* passes, correctly: `job.result` is
+    # then None, which discloses nothing. A written-out `return` or
+    # `return None` is flagged even though it discloses nothing either
+    # (`ast.Return.value` is None / `Constant(None)`, and neither is a bool
+    # constant). That second false positive is kept rather than excluded: the
+    # predicate stays "every return is a literal bool", which is the rule the
+    # tasks.py docstring states, and widening it to admit None would also admit
+    # a `return None` that a later edit turns into `return summary`.
     leaky = [
         node.name
         for node in entrypoints
