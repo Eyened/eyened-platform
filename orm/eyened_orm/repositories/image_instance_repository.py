@@ -16,7 +16,7 @@ from eyened_orm import (
 )
 from eyened_orm.tag import FormAnnotationTagLink, SegmentationTagLink
 from eyened_orm.authz.scope import AccessScope
-from eyened_orm.authz.scoping import project_ids_of_images, projects_of
+from eyened_orm.authz.scoping import image_project_pairs, projects_of
 
 from ._scoped import scoped_one
 
@@ -115,13 +115,11 @@ class ImageInstanceRepository:
         would make every check trivially pass. Listed in the read-coverage
         guard's exemptions.
 
-        Resolves through ``project_ids_of_images`` rather than its own join, so
+        Resolves through ``image_project_pairs`` rather than its own join, so
         this gate and the read filters share the one declaration of an image's
         route to its project.
         """
-        rows = self._session.execute(
-            project_ids_of_images(image_instance_ids)
-        ).all()
+        rows = self._session.execute(image_project_pairs(image_instance_ids)).all()
         return {int(image_id): int(project_id) for image_id, project_id in rows}
 
     def get_full_graph_by_id(

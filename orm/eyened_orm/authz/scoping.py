@@ -41,9 +41,9 @@ __all__ = [
     "SET_VALUED_ENTITIES",
     "SINGLE_PROJECT_ENTITIES",
     "apply_scope",
+    "image_project_pairs",
     "project_ids_of_form_annotation",
     "project_ids_of_image",
-    "project_ids_of_images",
     "project_ids_of_model_segmentation",
     "project_ids_of_patient",
     "project_ids_of_segmentation",
@@ -210,7 +210,7 @@ def project_ids_of_image(image_instance_id: int) -> Select:
     )
 
 
-def project_ids_of_images(image_instance_ids: Sequence[int]) -> Select:
+def image_project_pairs(image_instance_ids: Sequence[int]) -> Select:
     """``(ImageInstanceID, ProjectID)`` for a batch of images, in one query.
 
     The batched sibling of ``project_ids_of_image``, for a gate that must judge
@@ -220,11 +220,22 @@ def project_ids_of_images(image_instance_ids: Sequence[int]) -> Select:
     this gate with the read filters instead of leaving it resolving projects by
     a stale route with nothing red.
 
-    Pairs, not the bare project ids ``project_ids_of_*`` return: the caller
-    needs to tell *which* id resolved to nothing, and an id absent from the
-    result is what its 404 is built on. No ``.distinct()`` for the same reason
-    -- every hop of the chain is many-to-one, so one image yields one row, and
-    de-duplicating pairs would not save a caller keying them by image anyway.
+    Named for its rows rather than ``project_ids_of_images``: every
+    ``project_ids_of_*`` selects one column and is consumed through
+    ``session.scalars``, and under that name the same call would hand a caller
+    column 0 -- *image* ids -- to feed ``AccessScope.require`` as a project set,
+    wrong by construction with nothing to raise. Pairs, not bare project ids,
+    because the caller needs to tell *which* id resolved to nothing: an id
+    absent from the result is what its 404 is built on.
+
+    No ``.distinct()``: every hop of today's chain is many-to-one, so one image
+    yields one row. What depends on that is not the wasted row -- a duplicate
+    pair is harmless -- but the caller building a ``dict`` off these rows, where
+    last-row-wins would silently keep one project per image. Should
+    ``_PARENT_OF[ImageInstance]`` ever route through a one-to-many hop, the gate
+    would then judge a *subset* of an image's projects while ``apply_scope``'s
+    ``EXISTS`` still considers all of them; the caller must key by image
+    differently before that route changes.
     """
     return _join_to_patient(
         select(ImageInstance.ImageInstanceID, Patient.ProjectID).select_from(

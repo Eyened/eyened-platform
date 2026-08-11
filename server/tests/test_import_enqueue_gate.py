@@ -89,6 +89,15 @@ def two_projects(session):
     """
     backend = make_storage_backend(session)
     device = make_device(session, "d")
+    # Burn ProjectIDs so the two id spaces cannot coincide. One project per
+    # image otherwise numbers both 1, 2, and the gate's resolver returning
+    # {project_id: image_id} -- the mapping inverted -- passes every test in
+    # this file. In production image ids dwarf project ids, so that inversion
+    # would leave `set(image_ids) - set(by_image)` non-empty and 404 every
+    # enqueue; these throwaway rows are what lets a test see it. Do not
+    # simplify them away.
+    for i in range(3):
+        make_project(session, f"spacer-{i}")
     made = {}
     for name in ("A", "B"):
         project = make_project(session, name)
@@ -99,6 +108,11 @@ def two_projects(session):
         # Read the id out before the commit: expire_on_commit=True.
         made[name] = {"project": project.ProjectID, "image": image.ImageInstanceID}
     session.commit()
+    # The offset actually landed, rather than assumed: a later edit dropping the
+    # spacer rows fails here instead of quietly re-blinding every test below.
+    assert {row["project"] for row in made.values()}.isdisjoint(
+        {row["image"] for row in made.values()}
+    )
     return made
 
 
@@ -261,6 +275,54 @@ def test_every_route_enqueueing_over_caller_supplied_ids_is_gated():
         "post_import_update_thumbnails_for_image_ids",
     }
     assert ungated == []
+
+
+def test_the_batch_gate_resolves_projects_through_the_shared_helper():
+    """The gate's project resolution is not allowed to grow a second join chain.
+
+    ``_PARENT_OF`` (orm/eyened_orm/authz/scoping.py) is the one place an image's
+    route to its ``Project`` is written down, and the read filters are built
+    from it. A gate that re-forks that route into its own hand-written join
+    resolves projects by a copy that a later change to the route -- a
+    denormalized column, an anchor move, a predicate added to a hop -- silently
+    leaves stale, while every read moves.
+
+    Structural rather than behavioural because behaviour cannot see it: the
+    fork and the shared helper emit identical SQL today, so the ORM-side
+    agreement test (test_image_instance_repository.py) passes on either. Only
+    the *shape* of the method distinguishes them, and that is what this reads.
+    Both directions are asserted -- the helper is called, and no query is built
+    locally -- because either alone admits a body that calls the helper and then
+    ignores it.
+    """
+    source = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "orm"
+        / "eyened_orm"
+        / "repositories"
+        / "image_instance_repository.py"
+    )
+    tree = ast.parse(source.read_text(), filename=str(source))
+    bodies = [
+        item
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and node.name == "ImageInstanceRepository"
+        for item in node.body
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and item.name == "project_ids_for_images"
+    ]
+    # Anti-vacuity: a rename or a move would otherwise leave the two assertions
+    # below iterating over nothing and reporting green on an unguarded method.
+    assert len(bodies) == 1, source
+
+    called = {
+        call.func.id if isinstance(call.func, ast.Name) else call.func.attr
+        for call in ast.walk(bodies[0])
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, (ast.Name, ast.Attribute))
+    }
+    assert "image_project_pairs" in called, sorted(called)
+    assert called & {"select", "select_from", "join", "outerjoin", "join_from"} == set()
 
 
 def test_every_rq_entrypoint_returns_a_bare_bool():
