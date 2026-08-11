@@ -66,14 +66,23 @@ class TaskService:
             )
         return task
 
-    def list_tasks(self) -> tuple[list[Task], dict[int, tuple[int, int]]]:
-        """Return all tasks (TaskID order) and their {id: (total, ready)} counts."""
+    def list_tasks(
+        self,
+    ) -> tuple[
+        list[Task], dict[int, tuple[int, int]], dict[int, list[tuple[int, str]]]
+    ]:
+        """Return all tasks (TaskID order), their {id: (total, ready)} counts
+        and the projects each one spans."""
         tasks = self.tasks.list_all()
-        counts = self.tasks.subtask_counts([t.TaskID for t in tasks])
-        return tasks, counts
+        task_ids = [t.TaskID for t in tasks]
+        counts = self.tasks.subtask_counts(task_ids)
+        projects = self.tasks.projects_for_tasks(task_ids)
+        return tasks, counts, projects
 
-    def get_task(self, task_id: int) -> tuple[Task, tuple[int, int]]:
-        """Return a task and its (total, ready) subtask counts.
+    def get_task(
+        self, task_id: int
+    ) -> tuple[Task, tuple[int, int], list[tuple[int, str]]]:
+        """Return a task, its (total, ready) subtask counts and the projects it spans.
 
         Raises:
             NotFoundError: If the task does not exist.
@@ -81,7 +90,11 @@ class TaskService:
         task = self.tasks.get_with_relations(task_id)
         if task is None:
             raise NotFoundError(f"Task {task_id} not found")
-        return task, self.tasks.subtask_counts([task_id])[task_id]
+        return (
+            task,
+            self.tasks.subtask_counts([task_id])[task_id],
+            self.tasks.projects_for_tasks([task_id])[task_id],
+        )
 
     def update_task(
         self,
@@ -91,7 +104,7 @@ class TaskService:
         contact_id: int | None,
         task_definition_id: int | None,
         task_state: TaskState | None,
-    ) -> tuple[Task, tuple[int, int]]:
+    ) -> tuple[Task, tuple[int, int], list[tuple[int, str]]]:
         """Update a task's mutable fields (each optional).
 
         The floor depends on which fields the request actually changes:
@@ -135,6 +148,7 @@ class TaskService:
 
         task = self.tasks.get_with_relations(task_id)
         counts = self.tasks.subtask_counts([task_id])[task_id]
+        projects = self.tasks.projects_for_tasks([task_id])[task_id]
         if self.audit is not None:
             self.audit.record(
                 action="UPDATE",
@@ -143,7 +157,7 @@ class TaskService:
                 entity_id=task_id,
                 changes=changes if changes else None,
             )
-        return task, counts
+        return task, counts, projects
 
     def delete_task(self, task_id: int) -> None:
         """Delete a task (its subtasks cascade at the DB level).

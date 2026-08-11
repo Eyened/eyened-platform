@@ -103,7 +103,7 @@ def test_list_tasks_returns_tasks_with_counts(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted))
     session.flush()
 
-    tasks, counts = _service(session).list_tasks()
+    tasks, counts, _projects = _service(session).list_tasks()
 
     assert [t.TaskID for t in tasks] == [task.TaskID]
     assert counts[task.TaskID] == (2, 1)
@@ -117,7 +117,7 @@ def test_get_task_returns_task_and_counts(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.Ready))
     session.flush()
 
-    got, counts = _service(session).get_task(task.TaskID)
+    got, counts, _projects = _service(session).get_task(task.TaskID)
 
     assert got.TaskID == task.TaskID
     assert counts == (1, 1)
@@ -135,7 +135,7 @@ def test_update_task_changes_fields(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id, "Old")
 
-    updated, _counts = _service(session, actor).update_task(
+    updated, _counts, _projects = _service(session, actor).update_task(
         task.TaskID, "New", "newdesc", None, None, TaskState.Busy
     )
 

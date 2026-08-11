@@ -3,7 +3,17 @@ from __future__ import annotations
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
+from eyened_orm import (
+    ImageInstance,
+    ImageStorage,
+    Patient,
+    Project,
+    Series,
+    Study,
+    SubTask,
+    SubTaskImageLink,
+    Task,
+)
 from eyened_orm.task import SubTaskState
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import apply_scope, projects_of
@@ -108,6 +118,49 @@ class TaskRepository:
         rows = self._session.execute(stmt).all()
         counts = {int(tid): (int(n), int(r)) for tid, n, r in rows}
         return {tid: counts.get(tid, (0, 0)) for tid in task_ids}
+
+    def projects_for_tasks(
+        self, task_ids: list[int]
+    ) -> dict[int, list[tuple[int, str]]]:
+        """Return {task_id: [(project_id, project_name), ...]} for the given ids.
+
+        Walks the same join path enforcement uses, re-expressed for batching
+        and names: ``projects_of`` answers for one entity and returns bare ids,
+        which cannot back a grouped, name-carrying query. The two must not
+        drift -- grant-for-task and this endpoint are the two sides of one
+        promise -- so a test pins them to the same answer.
+
+        One grouped query. Every requested id is present in the result, and an
+        empty list means one of *two* things: the task genuinely has no images,
+        or the caller's scope cannot see the subtasks that carry them. Callers
+        must not read ``[]`` as "spans nothing" on its own; the routes are safe
+        because they 404 an invisible task before the field is read.
+        """
+        if not task_ids:
+            return {}
+        rows = self._session.execute(
+            apply_scope(
+                select(SubTask.TaskID, Patient.ProjectID, Project.ProjectName)
+                .select_from(SubTask)
+                .join(SubTaskImageLink, SubTaskImageLink.SubTaskID == SubTask.SubTaskID)
+                .join(
+                    ImageInstance,
+                    ImageInstance.ImageInstanceID == SubTaskImageLink.ImageInstanceID,
+                )
+                .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+                .join(Study, Study.StudyID == Series.StudyID)
+                .join(Patient, Patient.PatientID == Study.PatientID)
+                .join(Project, Project.ProjectID == Patient.ProjectID)
+                .where(SubTask.TaskID.in_(task_ids))
+                .distinct(),
+                SubTask,
+                self._scope,
+            )
+        ).all()
+        found: dict[int, list[tuple[int, str]]] = {}
+        for task_id, project_id, project_name in rows:
+            found.setdefault(int(task_id), []).append((int(project_id), project_name))
+        return {tid: sorted(found.get(tid, [])) for tid in task_ids}
 
 
 # Eager-load the subtask's images down to their storage backend (mirrors the

@@ -93,7 +93,7 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace")
 # mechanism that quietly stops finding methods still reports green, so the
 # number is pinned rather than merely asserted non-zero. Moving it is a
 # deliberate act: it means a read was added, removed or exempted.
-_EXPECTED_SCANNED_READS = 32
+_EXPECTED_SCANNED_READS = 33
 
 # Every function under server/dtos/ that touches a Session, pinned exactly.
 # A DTO converter is a read surface that satisfies both scope guards while

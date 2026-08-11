@@ -33,7 +33,8 @@ async def create_task(
         dto.contact_id,
         dto.task_definition_id,
     )
-    return DTOConverter.task_to_get(task, num_tasks=0, num_tasks_ready=0)
+    # A task is created with no subtasks, so it spans nothing yet.
+    return DTOConverter.task_to_get(task, num_tasks=0, num_tasks_ready=0, projects=[])
 
 
 @router.get("/task", response_model=List[TaskGET])
@@ -42,12 +43,13 @@ async def list_tasks(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """List all tasks (no pagination)."""
-    tasks, counts = service.list_tasks()
+    tasks, counts, projects = service.list_tasks()
     return [
         DTOConverter.task_to_get(
             t,
             num_tasks=counts[t.TaskID][0],
             num_tasks_ready=counts[t.TaskID][1],
+            projects=projects[t.TaskID],
         )
         for t in tasks
     ]
@@ -60,9 +62,9 @@ async def get_task(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Get a single task with its subtask counts."""
-    task, (num_tasks, num_tasks_ready) = service.get_task(task_id)
+    task, (num_tasks, num_tasks_ready), projects = service.get_task(task_id)
     return DTOConverter.task_to_get(
-        task, num_tasks=num_tasks, num_tasks_ready=num_tasks_ready
+        task, num_tasks=num_tasks, num_tasks_ready=num_tasks_ready, projects=projects
     )
 
 
@@ -74,7 +76,7 @@ async def patch_task(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Update a task's name/description/contact/definition/state."""
-    task, (num_tasks, num_tasks_ready) = service.update_task(
+    task, (num_tasks, num_tasks_ready), projects = service.update_task(
         task_id,
         dto.name,
         dto.description,
@@ -83,7 +85,7 @@ async def patch_task(
         dto.task_state,
     )
     return DTOConverter.task_to_get(
-        task, num_tasks=num_tasks, num_tasks_ready=num_tasks_ready
+        task, num_tasks=num_tasks, num_tasks_ready=num_tasks_ready, projects=projects
     )
 
 

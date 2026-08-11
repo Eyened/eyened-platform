@@ -622,8 +622,17 @@ class DTOConverter:
         *,
         num_tasks: int | None = None,
         num_tasks_ready: int | None = None,
+        projects: list[tuple[int, str]],
     ) -> TaskGET:
-        """Convert Task ORM object to TaskGET."""
+        """Convert Task ORM object to TaskGET.
+
+        ``projects`` is required and takes no default on purpose. The DTO field
+        defaults to ``[]``, so a call site that forgot to pass the task's
+        projects would answer "this task spans nothing" for a task spanning
+        two -- the exact wrong answer, delivered confidently, to the admin this
+        field exists to warn. Requiring it turns that omission into a
+        TypeError.
+        """
         if num_tasks is None or num_tasks_ready is None:
             subs = getattr(task, "SubTasks", []) or []
             if num_tasks is None:
@@ -649,6 +658,10 @@ class DTOConverter:
             ),
             task_state=getattr(task, "TaskState", None),
             task_definition=DTOConverter.task_definition_to_get(task.TaskDefinition),
+            projects=[
+                ProjectMeta(id=project_id, name=project_name)
+                for project_id, project_name in projects
+            ],
         )
 
     @staticmethod
