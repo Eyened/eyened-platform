@@ -28,10 +28,12 @@ __all__ = [
     "TaskGrantPlan",
     "apply_grant_plan",
     "audit_trusted",
+    "deactivate",
     "grant",
     "grant_all",
     "parse_role",
     "plan_grant_for_tasks",
+    "reactivate",
     "resolve_creator",
     "resolve_project",
     "revoke",
@@ -325,5 +327,54 @@ def revoke(session: Session, *, username: str, project_name: str) -> bool:
             "project_name": project_name,
             "role": previous.name,
         },
+    )
+    return True
+
+
+def deactivate(session: Session, *, username: str) -> bool:
+    """Revoke everything, without deleting the row.
+
+    v0.3 requires that administrators can *delete* users and defines that as
+    deactivation: Creator is referenced by Segmentation, FormAnnotation,
+    SubTask, Task, Tag and Annotation, so a real delete either fails on the
+    foreign keys or destroys the attribution that is the entire compliance
+    rationale.
+
+    Memberships are left in place, so reactivation restores the state that
+    existed rather than requiring it to be rebuilt from memory.
+
+    Deactivating the last administrator is permitted: recovery is an UPDATE
+    against the database, which is access the operator running this command
+    already has.
+    """
+    creator = resolve_creator(session, username)
+    if creator.Inactive:
+        return False
+    creator.Inactive = True
+    session.flush()
+    audit_trusted(
+        session,
+        command="deactivate",
+        action="UPDATE",
+        entity="Creator",
+        entity_id=creator.CreatorID,
+        changes={"username": username, "inactive": {"old": False, "new": True}},
+    )
+    return True
+
+
+def reactivate(session: Session, *, username: str) -> bool:
+    creator = resolve_creator(session, username)
+    if not creator.Inactive:
+        return False
+    creator.Inactive = False
+    session.flush()
+    audit_trusted(
+        session,
+        command="reactivate",
+        action="UPDATE",
+        entity="Creator",
+        entity_id=creator.CreatorID,
+        changes={"username": username, "inactive": {"old": True, "new": False}},
     )
     return True

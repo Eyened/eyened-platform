@@ -20,7 +20,13 @@ from click.testing import CliRunner
 from eyened_orm import ProjectMember
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.commands import rbac as rbac_module
-from eyened_orm.commands.rbac import grant_all_cmd, grant_cmd, grant_for_task_cmd
+from eyened_orm.commands.rbac import (
+    deactivate_cmd,
+    grant_all_cmd,
+    grant_cmd,
+    grant_for_task_cmd,
+    reactivate_cmd,
+)
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
 from eyened_orm.utils.db_users import create_user
 from eyened_orm.utils.factories import make_creator, make_project
@@ -46,7 +52,13 @@ def stub_database(session, monkeypatch):
     class _FakeDatabase:
         @contextmanager
         def get_session(self):
-            yield session  # deliberately not closed: the test reads after
+            try:
+                yield session  # deliberately not closed: the test reads after
+            finally:
+                # Discard anything the command left uncommitted. Without this the
+                # fixture hands back the same live session, so a shell that never
+                # commits is indistinguishable from one that does.
+                session.rollback()
 
     monkeypatch.setattr(rbac_module, "get_database", lambda: _FakeDatabase())
 
@@ -167,3 +179,31 @@ def test_confirming_at_the_prompt_grants(session, stub_database):
     result = CliRunner().invoke(grant_all_cmd, input="y\n")
     assert result.exit_code == 0, result.output
     assert _memberships(session) == 2
+
+
+def test_the_round_trip_persists_and_reports_each_outcome(session, stub_database, alice):
+    """The shell commits (else the second invocation would see an active user
+    again), and each command distinguishes a change it made from one it found
+    already done."""
+    first = CliRunner().invoke(deactivate_cmd, ["--user", "alice"])
+    assert first.exit_code == 0
+    assert "deactivated" in first.output
+    assert alice.Inactive is True
+
+    again = CliRunner().invoke(deactivate_cmd, ["--user", "alice"])
+    assert again.exit_code == 0
+    assert "already inactive" in again.output
+
+    back = CliRunner().invoke(reactivate_cmd, ["--user", "alice"])
+    assert back.exit_code == 0
+    assert "reactivated" in back.output
+    assert alice.Inactive is False
+
+
+def test_an_unknown_user_is_a_clean_error_not_a_traceback(session, stub_database):
+    """ClickException exits 1 with its message on the stream; an unhandled
+    LookupError exits 1 too, so the message is what separates them."""
+    result = CliRunner().invoke(deactivate_cmd, ["--user", "nosuchuser"])
+    assert result.exit_code == 1
+    assert "nosuchuser" in result.output
+    assert "Traceback" not in result.output

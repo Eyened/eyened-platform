@@ -12,10 +12,12 @@ import click
 from ..authz.administration import (
     apply_grant_plan,
     audit_trusted,
+    deactivate,
     grant,
     grant_all,
     parse_role,
     plan_grant_for_tasks,
+    reactivate,
     revoke,
 )
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
@@ -199,4 +201,35 @@ def grant_all_cmd(yes: bool):
     )
 
 
-rbac_commands = [init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd, grant_all_cmd]
+@click.command("deactivate")
+@click.option("--user", "username", required=True)
+def deactivate_cmd(username: str):
+    """Deactivate a user: they hold no access, and their work keeps its author."""
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            changed = deactivate(session, username=username)
+        except LookupError as exc:
+            raise click.ClickException(str(exc)) from exc
+        session.commit()
+    click.echo(f"{username}: {'deactivated' if changed else 'already inactive'}")
+
+
+@click.command("reactivate")
+@click.option("--user", "username", required=True)
+def reactivate_cmd(username: str):
+    """Reactivate a user; their memberships were never removed."""
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            changed = reactivate(session, username=username)
+        except LookupError as exc:
+            raise click.ClickException(str(exc)) from exc
+        session.commit()
+    click.echo(f"{username}: {'reactivated' if changed else 'already active'}")
+
+
+rbac_commands = [
+    init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd,
+    grant_all_cmd, deactivate_cmd, reactivate_cmd,
+]

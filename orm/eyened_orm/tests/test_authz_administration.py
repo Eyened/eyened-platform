@@ -5,10 +5,16 @@ import pytest
 from sqlalchemy import select
 
 from eyened_orm import AuditLog, Project
-from eyened_orm.authz.administration import grant, parse_role, revoke
+from eyened_orm.authz.administration import deactivate, grant, parse_role, reactivate, revoke
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
 from eyened_orm.utils.factories import make_creator, make_project
+
+
+def _audit(session, command):
+    return session.scalars(
+        select(AuditLog).where(AuditLog.TrustedPath == f"eorm {command}")
+    ).all()
 
 
 def test_parse_role_accepts_every_role_name():
@@ -425,3 +431,89 @@ def test_grant_all_never_changes_a_role_already_held(session):
     assert by_name["B"] is ProjectRole.read_only       # not raised either
     assert by_name["C"] is ProjectRole.grader
     assert written == 1
+
+
+def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(session):
+    """Reactivation should restore the state that existed rather than require
+    it to be rebuilt from memory."""
+    alice = make_creator(session, "alice")
+    make_project(session, "A")
+    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+    creator_id = alice.CreatorID
+
+    assert deactivate(session, username="alice") is True
+    session.commit()
+    assert alice.Inactive is True
+    assert len(ProjectMemberRepository(session).roles_for(alice.CreatorID)) == 1
+
+    rows = _audit(session, "deactivate")
+    assert len(rows) == 1
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    assert rows[0].Changes == {
+        "username": "alice",
+        "inactive": {"old": False, "new": True},
+    }
+
+
+def test_deactivating_the_only_administrator_is_allowed(session):
+    """No last-admin guard in this pass: the operator running `eorm` already has
+    the database access that recovery needs."""
+    from eyened_orm.authz.bootstrap import count_admins, ensure_admin
+
+    root, _ = ensure_admin(session, "root", None)
+    session.commit()
+
+    assert deactivate(session, username="root") is True
+    session.commit()
+    assert root.Inactive is True
+    assert count_admins(session) == 0
+
+
+def test_reactivate_clears_the_flag_and_audits(session):
+    alice = make_creator(session, "alice")
+    session.commit()
+    creator_id = alice.CreatorID
+    deactivate(session, username="alice")
+    session.commit()
+
+    assert reactivate(session, username="alice") is True
+    session.commit()
+    assert alice.Inactive is False
+
+    rows = _audit(session, "reactivate")
+    assert len(rows) == 1
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    assert rows[0].Changes == {
+        "username": "alice",
+        "inactive": {"old": True, "new": False},
+    }
+
+
+def test_deactivating_an_already_inactive_user_is_a_no_op(session):
+    make_creator(session, "alice")
+    session.commit()
+    deactivate(session, username="alice")
+    session.commit()
+    assert deactivate(session, username="alice") is False
+    assert len(_audit(session, "deactivate")) == 1
+
+
+def test_reactivating_an_already_active_user_is_a_no_op(session):
+    """The symmetric guard: the plan tests it for `deactivate` only."""
+    make_creator(session, "alice")
+    session.commit()
+    assert reactivate(session, username="alice") is False
+    assert _audit(session, "reactivate") == []
+
+
+@pytest.mark.parametrize("command", (deactivate, reactivate))
+def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(session, command):
+    with pytest.raises(LookupError, match="nosuchuser"):
+        command(session, username="nosuchuser")
