@@ -59,6 +59,8 @@ _UNSCOPED_METHODS = {
     "TaskRepository.project_ids": "resolves the projects a write is judged on",
     "SubTaskRepository.project_ids": "resolves the projects a write is judged on",
     "SegmentationRepository.project_ids": "resolves the projects a write is judged on",
+    "ModelSegmentationRepository.project_ids": "resolves the projects a write is "
+    "judged on",
     "FormAnnotationRepository.project_ids": "resolves the projects a write is "
     "judged on",
     "StudyRepository.project_ids": "resolves the projects a write is judged on",

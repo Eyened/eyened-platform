@@ -506,9 +506,16 @@ class SegmentationService:
 class ModelSegmentationService:
     """Business logic for ModelSegmentation binary data endpoints.
 
-    No audit: the pre-refactor service never called ``self.logger`` (verified
-    against ``git show 967e823``), so no ``AuditService`` is wired here — this
-    matches Phase 4c's "ModelSegmentation write has no audit" record.
+    The deliberate hole in the ownership overlay. ``ModelSegmentation`` carries
+    no ``CreatorID``, so "deny unless ``CreatorID`` is the actor" would match
+    nobody and refuse every actor forever — including the grader correcting
+    model output on the live endpoint. The write is gated by scope plus
+    ``grader`` and nothing else.
+
+    Audit is therefore not optional here but compensatory: because the row
+    cannot record who changed it, the ``AuditLog`` row is the only place that
+    author exists. (This replaces an earlier "no audit" note, which recorded
+    the pre-refactor behaviour that this exemption now has to make good.)
     """
 
     def __init__(
@@ -517,10 +524,13 @@ class ModelSegmentationService:
         data_store: SegmentationDataStore,
         *,
         scope: AccessScope,
+        audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
         self.store = data_store
         self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
+        self.audit = audit
 
     def read_data(
         self,
@@ -538,6 +548,12 @@ class ModelSegmentationService:
         item = self.repository.get_by_id(model_segmentation_id)
         if item is None:
             raise NotFoundError("ModelSegmentation data not found")
+        self.scope.require(
+            self.repository.project_ids(model_segmentation_id),
+            ProjectRole.read_only,
+            entity="ModelSegmentation",
+            entity_id=model_segmentation_id,
+        )
         try:
             return self.store.read(item, axis=axis, slice_index=scan_nr)
         except ValueError as e:
@@ -560,6 +576,15 @@ class ModelSegmentationService:
         item = self.repository.get_by_id(model_segmentation_id)
         if item is None:
             raise NotFoundError("ModelSegmentation data not found")
+        # Scope plus the grader floor is the whole check: see the class
+        # docstring for why no ownership overlay can apply to this entity.
+        projects = self.repository.project_ids(model_segmentation_id)
+        self.scope.require(
+            projects,
+            ProjectRole.grader,
+            entity="ModelSegmentation",
+            entity_id=model_segmentation_id,
+        )
         # Store write MUST stay before the repo write here (unchanged order
         # from pre-refactor: store.write -> session.add). Zarr I/O is not
         # part of the DB transaction — see the class-level note on atomicity.
@@ -568,6 +593,17 @@ class ModelSegmentationService:
         except (IndexError, ValueError) as e:
             raise BadRequestError(str(e)) from e
         self.repository.save(item)
+        if self.audit is not None:
+            # A ModelSegmentation resolves through one image to exactly one
+            # project, so the set is a singleton.
+            self.audit.record(
+                action="UPDATE",
+                entity="ModelSegmentation",
+                actor=self._actor,
+                entity_id=model_segmentation_id,
+                project_id=next(iter(projects), None),
+                changes={"axis": axis, "scan_nr": scan_nr},
+            )
         return item
 
 
@@ -595,4 +631,5 @@ def get_model_segmentation_service(
         ModelSegmentationRepository(db, scope=scope),
         get_segmentation_data_store(),
         scope=scope,
+        audit=get_audit_service(db),
     )

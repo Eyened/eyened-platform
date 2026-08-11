@@ -337,6 +337,13 @@ class _OrderRecordingModelRepo:
     def get_by_id(self, model_segmentation_id: int):
         return self._item
 
+    def project_ids(self, model_segmentation_id: int) -> set[int]:
+        # A singleton, not the empty set: a ModelSegmentation resolves through
+        # one image to exactly one project. The empty set would also pass the
+        # admin scope this test uses, but only by tripping require()'s
+        # fail-closed branch -- which is not what the real repository returns.
+        return {1}
+
     def save(self, model_segmentation) -> None:
         self._calls.append(("save", model_segmentation))
 

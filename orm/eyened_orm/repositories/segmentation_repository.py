@@ -116,6 +116,16 @@ class ModelSegmentationRepository:
         self._session = session
         self._scope = scope
 
+    def project_ids(self, model_segmentation_id: int) -> set[int]:
+        """The projects this model segmentation touches (authz).
+
+        Deliberately unscoped for the same reason as
+        ``SegmentationRepository.project_ids`` above: the returned set is the
+        *input* to ``AccessScope.require``, so filtering it by the caller's own
+        scope would remove exactly the projects the check exists to catch.
+        """
+        return projects_of(self._session, ModelSegmentation, model_segmentation_id)
+
     def get_by_id(self, model_segmentation_id: int) -> ModelSegmentation | None:
         """Return the model segmentation by id, or None if absent or out of
         scope."""
